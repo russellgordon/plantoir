@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 function Show-Help {
 @"
 Usage:
-  .\deploy.bat <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--diagnose] [--team <TEAM_SLUG>] [--to-folder <PATH>] [--reset-token|--logout]
+  .\deploy.bat <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--diagnose] [--team <TEAM_SLUG>] [--to-folder <PATH>] [--reset-token|--logout] [--non-interactive]
 
 Examples:
   .\deploy.bat ICS3U 1
@@ -155,11 +155,13 @@ $RESET_TOKEN = $false
 $TO_FOLDER = ''
 $TARGET = 'netlify'
 $ACCOUNT_ARG = ''
+$NON_INTERACTIVE = $false
 
 for ($i = 2; $i -lt $args.Count; $i++) {
   switch -Regex ($args[$i]) {
     '^--help$|^-h$'      { Show-Help; exit 0 }
     '^--diagnose$'       { $DIAGNOSE = '--diagnose'; continue }
+    '^--non-interactive$' { $NON_INTERACTIVE = $true; continue }
     '^--target$'         { if ($i + 1 -ge $args.Count) { Write-Host "Missing value for --target"; Show-Help; exit 1 }; $TARGET = ([string]$args[$i+1]).ToLower(); $i++; continue }
     '^--target=(.+)$'    { $TARGET = $Matches[1].ToLower(); continue }
     '^--account$'        { if ($i + 1 -ge $args.Count) { Write-Host "Missing value for --account"; Show-Help; exit 1 }; $ACCOUNT_ARG = ([string]$args[$i+1]).Trim(); $i++; continue }
@@ -181,6 +183,25 @@ if ($TARGET -ne 'netlify' -and $TARGET -ne 'cloudflare') {
   exit 1
 }
 
+# Called immediately before every question this script asks. Under
+# --non-interactive there is nobody to answer it - the publish was set to
+# happen on its own, at half six, with the app closed - so it REFUSES and says
+# which question it could not ask, rather than waiting for an answer that will
+# never come or quietly taking a default.
+#
+# Exit code 3 means that and nothing else, matching deploy.py's NEEDS_AN_ANSWER;
+# the scheduled wrapper reads it and leaves a note for the app to show the
+# teacher. Every other exit in this script is 0 or 1.
+function Assert-CanAsk([string]$question, [string]$whatToDo) {
+  if (-not $NON_INTERACTIVE) { return }
+  Write-Host ""
+  Write-Host "This publish was set to happen on its own, so nobody is here to answer:"
+  Write-Host ("   {0}" -f $question)
+  Write-Host (" {0}" -f $whatToDo)
+  Write-Host " Nothing was published."
+  exit 3
+}
+
 # Friendly guard: 'Open' course code ended with zero
 if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
   $suggested = $COURSE_CODE.Substring(0, $COURSE_CODE.Length-1) + 'O'
@@ -192,6 +213,7 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
   if ((Test-Path $suggestedCfg) -and -not (Test-Path $originalCfg)) {
     Write-Host ("I see setup data for '{0}' on disk." -f $suggested)
   }
+  Assert-CanAsk ("Fix course code to '{0}'? [Y/n]" -f $suggested) "Publish this section once from Plantoir, where you can answer it."
   $ans = Read-Host ("Fix course code to '{0}'? [Y/n]" -f $suggested)
   if (-not $ans) { $ans = 'Y' }
   if ($ans -match '^[Yy]$') {
@@ -538,6 +560,7 @@ This is the only time you will be asked for it.
      (It is also the long code in the address bar, just after
      dash.cloudflare.com/.)
 "@ | Out-Host
+  Assert-CanAsk "Paste Cloudflare Account ID" "Add the Account ID in this course's settings in Plantoir, under Deploying."
   $entered = (Read-Host "Paste Cloudflare Account ID").Trim()
   if ($entered -notmatch '^[0-9a-fA-F]{32}$') {
     Write-Host "That does not look like an Account ID (it should be 32 letters and digits)."
@@ -647,6 +670,7 @@ this computer.
   8. Copy the long code Cloudflare shows you - it is only shown once - and
      paste it below. Nothing appears as you paste; that is normal.
 "@ | Out-Host
+    Assert-CanAsk "Paste Cloudflare token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
     $pastedSec = Read-Host -AsSecureString "Paste Cloudflare token"
     $plain = $null
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pastedSec)
@@ -737,6 +761,7 @@ this computer.
      it is only shown once.
   6. Paste it below. Nothing appears as you paste; that is normal.
 "@ | Out-Host
+  Assert-CanAsk "Paste Netlify token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
   $pastedSec = Read-Host -AsSecureString "Paste Netlify token"
   $plain = $null
   $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pastedSec)
@@ -763,6 +788,10 @@ if ($NATIVE_RUNTIME) {
   if ($TARGET -eq 'cloudflare') { $deployArgs += @('--target','cloudflare') }
   $deployArgs += @('--course', $COURSE_CODE, '--section', $SECTION_NUM)
   if ($DIAGNOSE)  { $deployArgs += $DIAGNOSE }
+  # PARSING the flag is not enough - it has to reach the Python child, which is
+  # where the site-name question lives. A launcher that took the flag and never
+  # forwarded it would leave a green test suite and an unchanged 45-minute hang.
+  if ($NON_INTERACTIVE) { $deployArgs += '--non-interactive' }
   if ($TEAM_SLUG) { $deployArgs += @('--team', $TEAM_SLUG) }
   # The token rides the child's environment, never a command line: process
   # environments are not persisted anywhere, and wrangler itself reads

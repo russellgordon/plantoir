@@ -256,6 +256,48 @@ final class ScheduledDeployTests: XCTestCase {
                        "A cancelled deploy left a runnable copy of itself behind")
     }
 
+    /// A scheduled deploy tells the launcher that nobody is at the Mac,
+    /// and the Deploy button does not.
+    ///
+    /// The two run the identical launcher through the identical machinery,
+    /// and only this flag tells them apart. Pressing Deploy attaches a
+    /// pseudo-terminal, so a question from the publishing step comes back
+    /// as a dialog somebody answers — that must keep working. At half six
+    /// in the morning the same question either waits forever (measured at
+    /// 45 minutes on Windows) or is answered with a default nobody chose,
+    /// and the website goes to an address nobody picked.
+    @MainActor
+    func testAScheduledDeployTellsTheLauncherNobodyIsHere() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let commandURL: URL = ScheduledDeploy.scriptURL(courseCode: course.code, sectionNumber: 1)
+        try? FileManager.default.removeItem(at: commandURL)
+
+        let runner: FakeLaunchControl = FakeLaunchControl()
+        XCTAssertNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(),
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+
+        let written: String = try String(contentsOf: commandURL, encoding: .utf8)
+        XCTAssertTrue(
+            written.contains("'--non-interactive'"),
+            "The scheduled deploy must tell the launcher nobody can answer a question: \(written)"
+        )
+
+        // And the button does not, so the dialog a teacher answers stays.
+        let buttonArguments: [String] = DeployCommand.arguments(
+            courseCode: course.code,
+            sectionNumber: 1,
+            configuration: course.configuration,
+            cloudflareAccountID: ""
+        )
+        XCTAssertFalse(
+            buttonArguments.contains("--non-interactive"),
+            "Pressing Deploy must still be able to ask the teacher a question"
+        )
+    }
+
     func testTwoSectionsOfOneCourseGetDifferentAgents() throws {
         try prepare()
         let first: String = ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1)

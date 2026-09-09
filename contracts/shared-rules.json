@@ -212,6 +212,18 @@
         "why": "A rollover that cuts a section loose is the moment its published address changes, and nothing else on the trail records it. The same act turns off any publish that was set to happen on its own \u2014 a section with no agreed website and a scheduled run with nobody to ask would otherwise create a website nobody named \u2014 so a teacher whose overnight publish stops happening has one line explaining both."
       },
       {
+        "carries": "the course code, the section number, and which destination stopped",
+        "event": "scheduled publish did not finish",
+        "why": "The same silence as \u201cneeded an answer\u201d, from a different cause \u2014 a revoked token, a network that was down, a build that failed. It is a SEPARATE event because the other one's own wording says a question went unasked, and filing a revoked token under it would make the trail say something untrue about the one run a teacher is trying to understand. Both matter for the same reason: a scheduled publish that did not happen is invisible unless something writes it down.",
+        "appliesOnWhy": "Added on the mac 2026-09-09, when Russell widened the readout to ANY failed scheduled publish rather than only an unanswered question. Windows records only the question case today and is owed this one; see scheduledPublishStopped.platformDifferences and GitHub issue #130. Until then the Windows suite is red on this list, which is the mechanism working rather than damage."
+      },
+      {
+        "carries": "the course code, the section number, and which destination stopped",
+        "event": "scheduled publish needed an answer",
+        "why": "The one thing that can happen to a scheduled publish that a teacher will otherwise never find out about. It runs at half six with the app closed, so a question it could not ask is asked of nobody and seen by nobody; before --non-interactive it either waited for ever (measured at 45 minutes) or took a default and published the site to an address nobody chose. The trail is where \"my site did not update on Tuesday and I do not know why\" gets answered, and without this line the run is indistinguishable from one that was never scheduled. The DESTINATION is carried because a course can publish to several and only one of them may have needed anything — \"it published to the folder and not to Netlify\" is the shape of the report. Dated to when the RUN wrote its record, never to when the app read it, or an overnight problem is filed under the wrong night. Never the question's TEXT: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail.",
+        "appliesOnWhy": "DELIBERATELY not scoped to one platform. The mac's launchd wrapper has the identical problem and the identical fix available — deploy.sh takes --non-interactive as of the same change — so this is owed on both. Proposed from Windows 2026-09-08; GitHub issue #126 carries what the mac owes and why."
+      },
+      {
         "carries": "the course code and the section number",
         "event": "section kept its website",
         "why": "The OTHER answer, and the one a problem report is more likely to be about: a teacher writing in weeks later to say last year's class site was replaced is describing this branch. A trail recording only the cut-loose could not answer the question it would actually be read for. Both answers are recorded because the question is asked every time and neither answer is a default."
@@ -738,6 +750,27 @@
       "token": "[removed: token]"
     },
     "secretLength": 40
+  },
+  "scheduledPublishStopped": {
+    "note": "What a teacher is told when a publish that was set to happen on its own did not get through. It runs at half six with the app closed, so the LAUNCHER writes a record and the APP reads it the next time it opens \u2014 that handover is the feature. Without it the run is indistinguishable from one that was never scheduled, which is exactly the shape of \"my site did not update on Tuesday and I do not know why\".",
+    "kinds": {
+      "neededAnAnswer": "The launcher exited 3: a question was put to nobody. deploy.py's NEEDS_AN_ANSWER, distinct from 1 precisely so a caller can tell the two apart and say something useful.",
+      "didNotFinish": "Any other non-zero exit \u2014 a revoked token, a network that was down, a build that failed."
+    },
+    "sentences": {
+      "neededAnAnswer": "{course} Section {section} was set to publish on its own, and it stopped because publishing to {destination} needed an answer nobody was there to give. Publish this section once yourself, answer the question, and it can publish on its own after that.",
+      "didNotFinish": "{course} Section {section} was set to publish on its own, and it did not finish \u2014 publishing to {destination} stopped, so nothing went up there. Publish it yourself to see what happens."
+    },
+    "firstDestinationWins": "The record is per SECTION and keeps the FIRST destination that stopped. A course can publish to several places and only one may have gone wrong, so \"it published to the folder and not to Netlify\" is the shape of the report; overwriting would tell the teacher about the last thing that went wrong rather than the first.",
+    "clearedBy": "A scheduled run that got ALL the way through \u2014 every destination, exit zero \u2014 OR the teacher dismissing it. Both, and the second is a decision rather than a convenience: clearing only on a successful run leaves the message standing after somebody has already fixed the problem by hand, and the next scheduled run that would clear it could be a week away.",
+    "trail": "One line on the breadcrumb trail, written by the RUN rather than by the app when a teacher opens the section \u2014 so it is written once because the run happens once, and a teacher who never opens that section still has it. An earlier draft had the app note it on opening and mark the record as noted; rewriting the record changed its modification date, which is what the notice shows, so the teacher saw the morning they opened it rather than the half six the run stopped at. Dated to when the RUN wrote its record, and dated to when the RUN wrote its record rather than when the app read it \u2014 or an overnight problem is filed under the morning somebody noticed it. It carries the course, the section and which destination stopped, and NEVER the question's own text: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail. The event is activityTrail.mustRecord's \"scheduled publish needed an answer\".",
+    "platformDifferences": {
+      "asOf": "2026-09-09",
+      "windows": "Records ONLY neededAnAnswer, and clears only on a successful run. ScheduledPublishQuestion, plus the readout in SectionDetailView.",
+      "mac": "Records BOTH kinds, and can also be dismissed by the teacher. Decided by Russell on 2026-09-09: a teacher should learn their overnight publish did not happen whatever the reason, because the SILENCE is the complaint rather than the cause.",
+      "owed": "Windows is owed both widenings. They are deliberate divergences with a decision behind them rather than drift \u2014 but divergences until that side catches up, and this key is where the two are compared."
+    },
+    "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because this side records more than unanswered questions."
   },
   "scheduledDeployRefusals": {
     "alsoSaid": {

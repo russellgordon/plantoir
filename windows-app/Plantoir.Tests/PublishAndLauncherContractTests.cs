@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Reflection;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
@@ -364,6 +365,167 @@ public class PublishAndLauncherContractTests
                 "somebody helping one — can pass it.");
         }
     }
+
+    /// <summary>
+    /// <c>--non-interactive</c> is FORWARDED to the Python, not merely parsed.
+    /// </summary>
+    /// <remarks>
+    /// <para>The test above checks the parser, which is not the property that
+    /// matters here. <c>deploy.ps1</c> builds <c>$deployArgs</c> by hand and
+    /// then invokes <c>deploy.py</c> with it, and the site-name question — the
+    /// one that blocked a harness for 45 minutes — lives in the PYTHON. A
+    /// launcher that took the flag, never added it to <c>$deployArgs</c> and
+    /// exited <c>$nativeExit</c> would leave a green suite and an unchanged
+    /// hang, which is exactly the shape of failure this whole piece of work is
+    /// about.</para>
+    ///
+    /// <para>Coupled to the <c>$deployArgs +=</c> idiom the launcher uses for
+    /// every other flag; a rewrite that changes the idiom should change this
+    /// line with it.</para>
+    /// </remarks>
+    [Fact]
+    public void TheDeployLauncherForwardsNonInteractiveToThePython()
+    {
+        string launcher = File.ReadAllText(Path.Combine(RepoRoot, "deploy.ps1"));
+
+        Assert.Contains("$deployArgs += '--non-interactive'", launcher, StringComparison.Ordinal);
+
+        // And the guard is the flag itself, not something that always fires: a
+        // launcher that passed it unconditionally would refuse every question a
+        // teacher standing at the keyboard is entitled to answer.
+        Assert.Contains("if ($NON_INTERACTIVE) { $deployArgs += '--non-interactive' }",
+                        launcher, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Every question <c>deploy.ps1</c> asks is guarded, and the guard comes
+    /// BEFORE the question.
+    /// </summary>
+    /// <remarks>
+    /// One unguarded <c>Read-Host</c> is one way for a scheduled publish to sit
+    /// waiting at half six with nobody there, which is the whole failure. The
+    /// launcher asks four things — the 'Open' course-code correction, the
+    /// Cloudflare Account ID, and the two token prompts — and this fails if a
+    /// fifth is added without a guard.
+    /// </remarks>
+    [Fact]
+    public void EveryQuestionTheDeployLauncherAsksIsGuarded()
+    {
+        var lines = File.ReadAllLines(Path.Combine(RepoRoot, "deploy.ps1"));
+        var unguarded = new List<int>();
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (!lines[i].Contains("Read-Host", StringComparison.Ordinal)) continue;
+            // The guard sits on the line immediately above the question, which
+            // is the only placement that reads correctly: a guard further away
+            // is one somebody moves code past.
+            // TrimStart before the "#" test, and the "#" test at all, because
+            // the first version of this counted a COMMENTED-OUT guard as a
+            // guard — proved by commenting one out and watching the test still
+            // pass, which is the only way that kind of hole is ever found.
+            string above = i == 0 ? "" : lines[i - 1].TrimStart();
+            if (above.StartsWith("#", StringComparison.Ordinal)
+                || !above.Contains("Assert-CanAsk", StringComparison.Ordinal))
+                unguarded.Add(i + 1);
+        }
+
+        Assert.True(unguarded.Count == 0,
+            "deploy.ps1 asks a question with no Assert-CanAsk above it, at line(s) " +
+            string.Join(", ", unguarded) + ". Under --non-interactive that question is put to " +
+            "nobody: the publish either waits for ever or takes a default and publishes the " +
+            "teacher's site to an address they never chose.");
+    }
+
+    /// <summary>
+    /// The same for <c>deploy.sh</c> — and with the rule that caught the one
+    /// bug a "guard on the line above" check could not see.
+    /// </summary>
+    /// <remarks>
+    /// <para>The mac's launcher is not run on this machine, so this is the only
+    /// gate it has here. Worth having anyway: the flag is in
+    /// <c>app-rules.json</c>, both suites read it, and a guard missing from one
+    /// launcher is a scheduled publish that hangs on one platform only.</para>
+    ///
+    /// <para><b>A guard inside a function whose output is CAPTURED does
+    /// nothing</b>, and that is not a hypothetical. The Cloudflare Account ID
+    /// guard was first written inside <c>prompt_for_cf_account</c>, which is
+    /// called as <c>CF_ACCOUNT="$(prompt_for_cf_account)"</c> — a subshell. The
+    /// refusal text went into the VARIABLE instead of onto the screen, and its
+    /// <c>exit 3</c> exited the subshell, so the script reported an ordinary
+    /// failure and printed nothing at all. Reproduced before it was fixed. So
+    /// this asserts the guard is at the TOP LEVEL: in a function body, the
+    /// caller decides where its output goes, and the guard cannot know.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel()
+    {
+        var lines = File.ReadAllLines(Path.Combine(RepoRoot, "deploy.sh"));
+        var unguarded = new List<string>();
+        bool insideAFunction = false;
+        string function = "";
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            // Good enough for this file's shape, which declares functions as
+            // `name() {` at column zero and closes them with `}` at column zero.
+            var declared = Regex.Match(line, @"^([A-Za-z_][A-Za-z0-9_]*)\(\) \{");
+            if (declared.Success) { insideAFunction = true; function = declared.Groups[1].Value; }
+            else if (line.StartsWith("}", StringComparison.Ordinal)) { insideAFunction = false; function = ""; }
+
+            if (!Regex.IsMatch(line, @"(^|\s)read -r[sp]*p\s")) continue;
+
+            string above = i == 0 ? "" : lines[i - 1].TrimStart();
+            bool guarded = !above.StartsWith("#", StringComparison.Ordinal)
+                           && above.Contains("assert_can_ask", StringComparison.Ordinal);
+
+            if (insideAFunction)
+            {
+                // One function is allowed to hold a question, and it is checked
+                // separately below rather than waved through: the guard sits at
+                // its single call site, where the output goes to the screen and
+                // the exit code is the script's.
+                if (function != GuardedAtItsCallSite)
+                    unguarded.Add($"line {i + 1} is inside {function}(), where a guard's output " +
+                                  "and exit code belong to whoever calls it");
+            }
+            else if (!guarded)
+                unguarded.Add($"line {i + 1} has no assert_can_ask above it");
+        }
+
+        Assert.True(unguarded.Count == 0,
+            "deploy.sh asks a question that --non-interactive cannot refuse: " +
+            string.Join("; ", unguarded) + ". Under a scheduled publish that question is put to " +
+            "nobody, and the run either waits for ever or takes a default.");
+
+        // The exception is only safe while it stays true, so it is ASSERTED
+        // rather than assumed: exactly one call site, and a guard immediately
+        // above it. A second caller, or a guard that drifts away from the call,
+        // and the question is unanswerable again with nothing to say so.
+        var callers = new List<int>();
+        for (int i = 0; i < lines.Length; i++)
+            if (lines[i].Contains(GuardedAtItsCallSite + ")", StringComparison.Ordinal)
+                && !lines[i].TrimStart().StartsWith("#", StringComparison.Ordinal)
+                && !Regex.IsMatch(lines[i], @"^" + GuardedAtItsCallSite + @"\(\) \{"))
+                callers.Add(i);
+
+        int caller = Assert.Single(callers);
+        Assert.Contains("assert_can_ask", lines[caller - 1], StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The one function in <c>deploy.sh</c> that asks a question, guarded at its
+    /// call site because its OUTPUT is captured.
+    /// </summary>
+    /// <remarks>
+    /// <c>CF_ACCOUNT="$(prompt_for_cf_account)"</c> is a subshell: a refusal
+    /// printed inside it lands in the variable rather than on the screen, and
+    /// its <c>exit 3</c> exits the subshell. Reproduced before it was fixed —
+    /// nothing printed, and the wrong exit code, so the launchd wrapper would
+    /// read it as an ordinary failure and leave no note.
+    /// </remarks>
+    private const string GuardedAtItsCallSite = "prompt_for_cf_account";
 
     // ---- The address handed to the teacher's browser ----------------------
 
