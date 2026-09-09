@@ -605,8 +605,22 @@ enum ScheduledDeploy {
         // places at once.
         //
         // This is the DESTINATION leg, so exit 3 here is `neededAnAnswer` and
-        // not the build's own kind: a destination WAS reached and can be
-        // named.
+        // not the build's own kind: deploy.sh was reached, and the question it
+        // refused is one the Publish button asks.
+        //
+        // ONE path through deploy.sh escapes that and is filed rather than
+        // fixed here. If any page under the section's `public/` carries
+        // `ws://localhost:`, deploy.sh reruns preview.sh --build-only itself
+        // and passes its exit 3 straight through — a BUILD question, reported
+        // from here as though a destination had asked it. It needs
+        // NEEDS_BUILD=0 above, which is BuildFreshness.needsRebuild written
+        // out in shell and looks at `index.html` ALONE, while deploy.sh greps
+        // the whole tree. So a clean front page in front of a stale preview
+        // page reaches it. Bringing the two checks into step is a change to
+        // BuildFreshness as well as to this script and belongs to its own
+        // piece of work; the exit code cannot tell the two apart, and giving
+        // the rebuild its own code is a launcher contract change Windows
+        // shares.
         //
         // The FIRST destination that stopped is the one kept: a course can
         // publish to several and only one may have gone wrong, so overwriting
