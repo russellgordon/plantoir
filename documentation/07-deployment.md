@@ -773,7 +773,8 @@ visible as well as the code being 3 — and end to end only by
 `verify-deploy.sh`, which publishes to real Netlify. The BUILD leg's exit 3 is
 proved the same way from the same date, by
 `scripts/test_preview_sh_questions.py`, which runs `preview.sh` to its one
-question — including in the exact command shape the launchd wrapper writes.
+question — including in the flag ORDER the launchd wrapper writes, which is
+the shape a parser bug would hide.
 
 **One narrow path can still produce the sentence #132 removed**, and it is
 filed as [issue #136](https://github.com/russellgordon/plantoir/issues/136)

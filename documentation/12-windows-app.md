@@ -253,9 +253,12 @@ problem — **nobody answers a question at 6 a.m.**
   section has been archived out of `course_config.json` while its scheduled
   deploy still exists. `-NonInteractive` does not reach it either, because
   `preview.bat` starts a new `powershell.exe`. That was GitHub issue #124, and
-  **both launchers take the flag as of 2026-09-09**: `preview.sh` on `dev`,
-  `preview.ps1` on `issue/130`, both refusing with the same exit 3. The mac
-  drives its refusal for real in `scripts/test_preview_sh_questions.py`.
+  **both launchers take the flag as of 2026-09-09**, refusing with the same
+  exit 3 — `preview.sh` here, `preview.ps1` on the Windows side the same day.
+  The mac drives its refusal for real in
+  `scripts/test_preview_sh_questions.py`; Windows SCANS `preview.ps1` for an
+  unguarded question in `PublishAndLauncherContractTests` but nothing there
+  starts the real launcher refusing, which is the piece still worth having.
 
   `ScheduledDeploy.Problem` already refuses to SCHEDULE a section that has
   never been deployed, so the commonest way into this is closed at the other
