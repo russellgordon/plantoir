@@ -244,10 +244,11 @@ Recreating the container is cheap because all state lives in the bind mount.
 - Takes `COURSE SECTION` as positional arguments, plus pass-through flags
   understood by `build_site.py`: `--include-social-media-previews`,
   `--force-npm-install`, `--full-rebuild`, `--build-only` — plus its own
-  `--port N` (container port 8081–8084), `--image REF`, `--non-interactive`
-  (nobody is watching this build; refuse rather than ask — see `deploy.sh`
-  below, where the flag is explained in full), and `--stop`, all of which are
-  handled entirely by the launcher and never reach `build_site.py`.
+  `--port N` (container port 8081–8084, which IS passed on to `build_site.py`),
+  `--image REF`, `--non-interactive` (nobody is watching this build; refuse
+  rather than ask — see `deploy.sh` below, where the flag is explained in
+  full), and `--stop`. The last three are handled entirely by the launcher and
+  never reach `build_site.py`.
 - Checks host-side that the course is set up (`course_config.json` exists)
   and that the section folder is there. The `section_numbers` check itself
   runs in the container once it is up (`docker exec … python3 -`), so a typo

@@ -78,7 +78,7 @@ Three consequences that catch people out:
   `scripts/test_*.py` file executes inside `dotnet test` via
   `PythonToolchainTests` — 156 tests in about eight seconds, no Docker, no
   network, no credentials. (That was fifteen files and 156 tests when measured
-  here on 2026-09-07; there are **seventeen** as of 2026-09-09. The runner
+  here on 2026-09-07; there are **eighteen** as of 2026-09-09. The runner
   DISCOVERS them rather than listing them, so the number is not something
   either side has to keep in step — count them with `ls` rather than trusting
   this sentence, which is why it no longer names one.) `verify.sh` has always run them on the mac and
@@ -246,13 +246,16 @@ problem — **nobody answers a question at 6 a.m.**
   other end. `prompt()` and the surname helper refuse too, as a backstop for
   any path nobody has walked.
 
-  **It stops at the deploy launcher.** `deploy` shells out to `preview.bat
-  --build-only` when the built site is stale, and neither `preview.ps1` nor
-  `preview.sh` takes the flag — so `preview.ps1`'s "Continue anyway?" can
-  still be asked of nobody, in the narrow case where a section has been
-  archived out of `course_config.json` while its scheduled deploy still exists.
-  `-NonInteractive` does not reach it either, because `preview.bat` starts a
-  new `powershell.exe`. GitHub issue #124.
+  **It used to stop at the deploy launcher.** `deploy` shells out to
+  `preview.bat --build-only` when the built site is stale, and at the time
+  neither `preview.ps1` nor `preview.sh` took the flag — so `preview.ps1`'s
+  "Continue anyway?" could still be asked of nobody, in the narrow case where a
+  section has been archived out of `course_config.json` while its scheduled
+  deploy still exists. `-NonInteractive` does not reach it either, because
+  `preview.bat` starts a new `powershell.exe`. That was GitHub issue #124, and
+  **both launchers take the flag as of 2026-09-09**: `preview.sh` on `dev`,
+  `preview.ps1` on `issue/130`, both refusing with the same exit 3. The mac
+  drives its refusal for real in `scripts/test_preview_sh_questions.py`.
 
   `ScheduledDeploy.Problem` already refuses to SCHEDULE a section that has
   never been deployed, so the commonest way into this is closed at the other

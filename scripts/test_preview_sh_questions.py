@@ -37,17 +37,36 @@ Copying them would mean two places to fix when a bash on some future machine
 reads a pipe differently — and the byte-encoding one was a real measured bug,
 not a style choice.
 
+**What Windows gets from this file, said plainly.** The two text-reading
+classes at the bottom run everywhere. The classes that START the launcher need
+a bash that can reach a scratch folder, and on Russell's Windows machine the
+`bash` on PATH is the System32 WSL launcher, which cannot open a Windows
+temporary directory at all — so they SKIP there rather than fail, which is the
+honest answer and keeps a red suite from arriving on the other platform as a
+surprise (CLAUDE.md rule 4). The launcher itself is driven on the mac.
+
 Pure stdlib. Run with:
 
     python3 scripts/test_preview_sh_questions.py
 """
 
 import json
+import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+# Set BEFORE the import below, and it has to be here rather than in the runner.
+# `scripts/` is a folder REFERENCE in the app's project, so whatever is in it is
+# copied into the bundle, mirrored into every working folder's `.toolchain/`,
+# and hashed into the image tag — a `__pycache__` written by a test run travels
+# all three of those. Windows' PythonToolchainTests sets PYTHONDONTWRITEBYTECODE
+# for its own reasons; `verify.sh` now does too, and this line means the file
+# is safe to run by hand as well.
+sys.dont_write_bytecode = True
 
 # Imported by bare name, which resolves because `verify.sh` runs these from
 # `scripts/` and Windows' PythonToolchainTests sets the same working directory.
@@ -130,6 +149,11 @@ class TheQuestionRefusesUnderTheFlag(unittest.TestCase):
         the following argument) was latent for exactly this reason: the wrapper
         happens to put the flag at the end, so the ONE caller that matters
         would not have shown it.
+
+        Not quite argument for argument: `--image` is inserted, which the
+        wrapper does not pass, so that no build recipe is resolved and no
+        container is wanted. The ORDER of the flags the wrapper does pass is
+        what this case is about, and it is preserved.
         """
         with tempfile.TemporaryDirectory() as tmp:
             folder = a_working_folder(tmp)
@@ -149,6 +173,10 @@ class TheQuestionRefusesUnderTheFlag(unittest.TestCase):
             folder = a_working_folder(tmp)
             run_preview(folder, [CODE_THAT_IS_ASKED_ABOUT, "1",
                                  "--image", "unused:tag", "--non-interactive"])
+            # The SCRATCH folder — the built site itself would land outside
+            # it, under Application Support, but only from the build-output
+            # block far below the guard. Anything at all appearing here means
+            # the run got further than the question.
             left_behind = sorted(entry.name for entry in folder.iterdir())
             self.assertEqual(
                 ["preview.sh"], left_behind,
@@ -262,6 +290,100 @@ class WithoutTheFlagNothingChanged(unittest.TestCase):
                 self.assertEqual(1, result.returncode)
 
 
+# Deliberately NOT gated on bash: this one reads preview.sh as text, and it is
+# the half that catches the question nobody wrote down.
+class EveryQuestionPreviewShAsksIsGuarded(unittest.TestCase):
+    """Every prompting `read` in `preview.sh` is preceded by `assert_can_ask`.
+
+    The completeness test below catches a question added to the CONTRACT. This
+    catches the likelier one: a question added to the LAUNCHER and written down
+    nowhere — which is how the flag would quietly stop meaning "every question
+    refuses" while every test still passed. Windows has this cover for
+    `deploy.sh` (`PublishAndLauncherContractTests`); nothing had it for
+    `preview.sh`, on either platform, which is the shape of hole issue #124 is
+    about in the first place.
+
+    Text-only and un-gated, so it runs on a machine with no usable bash too.
+    """
+
+    # `read -rp`, `read -rsp`, `read -p` — a read that PROMPTS. The other
+    # `read -r`s in the launcher take their input from a here-string or a
+    # pipe and ask nobody anything.
+    A_PROMPTING_READ = re.compile(r"\bread\s+-[a-zA-Z]*p\b")
+    A_FUNCTION_OPENS = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\(\)\s*\{")
+
+    def setUp(self):
+        self.lines = (REPOSITORY_ROOT / "preview.sh").read_text(
+            encoding="utf-8").splitlines()
+
+    def enclosing_function(self, index: int):
+        """The function a line sits in, or None for the top level."""
+        current = None
+        for line in self.lines[:index]:
+            opened = self.A_FUNCTION_OPENS.match(line)
+            if opened:
+                current = opened.group(1)
+            elif line.startswith("}"):
+                current = None
+        return current
+
+    def test_every_prompting_read_is_guarded(self):
+        prompts = [i for i, line in enumerate(self.lines)
+                   if self.A_PROMPTING_READ.search(line)]
+        self.assertTrue(
+            prompts,
+            "No prompting `read` found in preview.sh at all. Either the guard's "
+            "question was removed — in which case this file and the contract "
+            "both need revisiting — or the pattern has stopped matching, which "
+            "would make this test silently vacuous.",
+        )
+        for index in prompts:
+            with self.subTest(line=index + 1):
+                # The nearest line above that is neither blank nor a comment.
+                before = ""
+                for candidate in reversed(self.lines[:index]):
+                    stripped = candidate.strip()
+                    if stripped and not stripped.startswith("#"):
+                        before = stripped
+                        break
+                self.assertIn(
+                    "assert_can_ask", before,
+                    f"preview.sh line {index + 1} asks a question that nothing "
+                    "guards:\n"
+                    f"    {self.lines[index].strip()}\n"
+                    "Under --non-interactive it would be asked of nobody. Call "
+                    "assert_can_ask immediately before it, add the question to "
+                    "contracts/app-rules.json -> launcherFlags.nonInteractive."
+                    "refusals, and drive it in this file.",
+                )
+
+    def test_no_guard_sits_inside_a_function_whose_output_is_captured(self):
+        """The trap issue #92 met one launcher along, kept as a live check.
+
+        A refusal printed inside a function called as `X="$(f)"` goes into the
+        VARIABLE rather than to the teacher, and its `exit 3` ends only the
+        subshell — nothing on screen, the wrong exit code, and a scheduled run
+        recording the wrong reason. `preview.sh` has no such call site today;
+        this fails if one is ever introduced.
+        """
+        whole = "\n".join(self.lines)
+        for index, line in enumerate(self.lines):
+            if "assert_can_ask" not in line or line.strip().startswith("#"):
+                continue
+            if line.strip().startswith("assert_can_ask()"):
+                continue          # the definition itself
+            enclosing = self.enclosing_function(index)
+            if enclosing is None:
+                continue          # top level: its output reaches the teacher
+            self.assertNotIn(
+                f"$({enclosing}", whole,
+                f"preview.sh line {index + 1} guards a question inside "
+                f"`{enclosing}`, whose output is captured somewhere in the same "
+                "file. The refusal would land in a variable and the exit 3 "
+                "would end only the subshell.",
+            )
+
+
 # Deliberately NOT gated on bash: this one reads JSON and preview.sh as text.
 class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
     """What preview.sh asks and what this file drives are the same list.
@@ -276,6 +398,23 @@ class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
         "Fix course code to '<CODE>'? [Y/n]": "test_the_course_code_question_refuses",
     }
 
+    def test_the_tests_this_file_claims_to_have_are_here(self):
+        """The names above are checked, not decorative.
+
+        Without this the dict is a list of strings: delete the test it names
+        and the comparison below stays green while asserting the question is
+        "driven above". Found by review 2026-09-09; the deploy twin has the
+        same soft spot and this pattern is the one Windows will copy next.
+        """
+        for question, name in self.DRIVEN_ABOVE.items():
+            with self.subTest(question=question):
+                self.assertTrue(
+                    hasattr(TheQuestionRefusesUnderTheFlag, name),
+                    f"{name} is named as the test that drives {question!r}, and "
+                    "there is no such test. Either it was renamed or it was "
+                    "removed; either way nothing is driving that question.",
+                )
+
     def test_the_questions_driven_are_the_ones_the_contract_names(self):
         rules = json.loads(
             (REPOSITORY_ROOT / "contracts" / "app-rules.json").read_text(encoding="utf-8")
@@ -289,6 +428,15 @@ class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
                 continue          # deploy.py's own questions; tested next door.
             if refusal["question"].startswith("(not a question)"):
                 continue          # a rule about a saved credential, not a prompt.
+            # An entry may say which platforms it is about. Absent means both,
+            # which is what every entry meant before the key existed. Checked
+            # explicitly rather than left to the text probe below: a
+            # Windows-only question that happened to share wording with one of
+            # ours would otherwise be demanded of this file, and the reason it
+            # was skipped would be an accident rather than a decision.
+            applies_on = refusal.get("appliesOn")
+            if applies_on is not None and "mac" not in applies_on:
+                continue
             # The contract spells a question out with its explanation after an
             # em dash; the part before it is the question itself, and the
             # course-code guard carries a placeholder because the code varies.

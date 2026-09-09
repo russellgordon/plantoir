@@ -13,10 +13,13 @@ set -euo pipefail
 # What it does, in order:
 #   0. Runs the shared scripts' pure-Python unit tests (no Docker needed) so a
 #      broken script fails in milliseconds rather than after a full image
-#      build. Step 0 also RUNS deploy.sh — hollowed out with --image and a
-#      Keychain user that does not exist, so it needs no container, no network
-#      and no credentials — because a launcher that is only ever read is a
-#      launcher nobody has started (GitHub issue #129).
+#      build. Step 0 also RUNS deploy.sh AND preview.sh — hollowed out with
+#      --image and a Keychain user that does not exist, so they need no
+#      container, no network and no credentials — because a launcher that is
+#      only ever read is a launcher nobody has started (GitHub issues #129 and
+#      #124). Note that these tests are a written LIST here, not a discovery:
+#      a new scripts/test_*.py must be added below or it runs on Windows (whose
+#      PythonToolchainTests does discover them) and nowhere on the mac.
 #   1. Ensures the container runtime is up (shares an already-running Colima;
 #      never stops it — safe to run alongside other Colima-based toolchains).
 #   2. docker build -t quartz-teacher:dev-test .
@@ -89,6 +92,13 @@ fi
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
 # Docker build.
+# No .pyc files. `scripts/` is a folder reference in the app's project, so
+# anything left in it is copied into the bundle, mirrored into every working
+# folder's `.toolchain/`, and hashed into the image tag — which means a test run
+# here would hand teachers a rebuild for bytecode. Windows' PythonToolchainTests
+# sets the same variable.
+export PYTHONDONTWRITEBYTECODE=1
+
 if (cd scripts && python3 test_site_health.py) >/tmp/verify_site_health_test.log 2>&1; then
   pass "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
 else
