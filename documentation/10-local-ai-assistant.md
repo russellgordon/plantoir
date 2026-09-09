@@ -1597,6 +1597,89 @@ That sentence belongs in the alert.
 
 ---
 
+## Where the two surfaces' SCHEMAS differ, and why the mac emits only half of it
+
+Added 2026-09-08 (issue #83). Separate from the `TEACHERS SAY:` phrasings
+above: those are the words a model routes on, these are the argument SHAPES a
+client is sent.
+
+The mac's surface departs from the Windows server's in two ways, and until this
+landed the only record of either was a doc comment on `AssistToolSurface` —
+which meant Windows' own contract test restated them in a hand-written array.
+A rule with one home in a comment and a second in another platform's test is a
+rule with two homes, and this repository already knows how that ends.
+
+`contracts/assist-cases.json` → `toolSchemas.departures` now carries it:
+
+- **`listShapedStringParameters`** — every parameter that is a string carrying
+  a LIST, with the separator this surface ADVERTISES and the surfaces it
+  appears on. Nine today: seven semicolon-separated, and the two `codes`
+  parameters, which use COMMAS deliberately because an expectation code has no
+  comma in it and commas are what the Windows schema asks for — the one
+  separator the two surfaces agree on. Derived from the DECLARATION, a
+  `separatedList(separator:)` case on `AssistSchemaProperty.Kind`, and never
+  from the descriptions: those are measured artifacts nobody may reword
+  casually, so a generator matching English in them would depend on prose that
+  is frozen, and would silently drop a new list parameter worded differently.
+
+  **It shipped incomplete, and the fix is the lesson.** The first version
+  marked three call sites and emitted seven, missing `codesHelp` — so a record
+  the other platform is told is complete was not. Deriving from the
+  declaration protects against DRIFT and does nothing about an OMISSION, and
+  those are different failures. What closes it is a test in the other
+  direction: `AssistContractTests
+  .testEveryParameterThatSaysSeparatedByIsDeclaredAsAList` reads the
+  descriptions the generator refuses to read, and fails if one says
+  "separated by" while its declaration says plain string. The objection to the
+  generator reading prose does not apply to a test reading it — a reworded
+  description can only make the test DEMAND a declaration, never silently drop
+  one.
+- **`absentHere`** — the `preview` flag Windows has and this surface does not,
+  with the reason and the rejected alternative.
+
+**The design decision worth keeping, because it was nearly made the other
+way.** The first plan had each entry say `{"here": "string", "windows":
+"array"}`. That would have shipped **three false statements**: of the seven,
+`remember_timetable.dates`, `plan_remember_timetable.dates` and
+`plan_scheduled_deploy.classes` are strings on BOTH platforms and merely split
+on different characters — semicolons here, commas there. Windows asserts its
+departures as an exact set in both directions, so three phantom entries would
+have turned that suite red with "these departures are resolved, delete them".
+
+So the mac emits only what the mac can PROVE — the shape on its own surface —
+and leaves the intersection to the suite that can see both. That also caught
+the semicolon-versus-comma difference on `dates`, which was real, unrecorded,
+and invisible to a type-only comparison.
+
+**Not a routing change.** `separatedList` renders `"type": "string"`, so the
+emitted schemas are byte-identical: verified by diffing `toolSchemas.local`
+and `.mcp` before and after — 13 and 32 tools, unchanged, with `departures` the
+only new key. No re-measurement is owed. `AssistContractTests
+.testTheDeparturesNameEveryListShapedParameter` pins that the emitted type is
+still `string`, so a future change that made a departure alter the shape a
+model is shown would fail rather than pass quietly.
+
+**What is deliberately NOT here.** The arguments Windows' server takes that
+this surface does not DECLARE — 25 of them, in its `agreedExtras` list. They
+are mostly extra parameters on tools BOTH platforms serve: `re_date_classes`
+and `read_remembered_timetable` are the clearest, carrying the same NAME and
+different PARAMETERS on the two servers (`GUI-IMPROVEMENTS.md` row 447).
+
+An earlier draft of this section said they were tools the mac does not serve at
+all. That was simply wrong — the mac serves both, and every one of the 25 names
+a tool it serves. The real reason they stay on that side is narrower and more
+useful: the mac does not DECLARE those arguments, so it can neither test them
+nor notice when they change. Issue #83's premise was that this key would remove
+Windows' hand-written copy entirely; it removes the half that is shared.
+
+**One caution for anyone consuming this.** The separator recorded is what the
+schema tells the MODEL, not the only character the runner accepts.
+`AssistToolRunner` is deliberately forgiving — `pages` splits on semicolon or
+newline, `codes` and `dates` on comma, semicolon and newline — so a Windows
+comma-separated date list is parsed correctly here today. A separator
+difference is a difference in what each side ADVERTISES, and a suite should
+not assert an incompatibility from it.
+
 ## Further reading in this repository
 
 - [`09-mac-app.md`](09-mac-app.md) — the app the assistant lives in
