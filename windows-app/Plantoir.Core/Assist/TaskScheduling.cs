@@ -402,7 +402,16 @@ public static class TaskScheduling
     /// </summary>
     public static string? Cancel(string taskName)
     {
-        try { File.Delete(WrapperScriptPath(taskName)); } catch { /* best effort — litter, not a failure */ }
+        // The stand-in stands in for the WHOLE operation, not only for schtasks.
+        // This path resolves through AppDataRoot, which nothing redirects in a
+        // test process, so without the guard a test driving Cancel would delete
+        // a real teacher's wrapper script — and that damage is quieter than the
+        // one the seam already prevents: the scheduled task survives with
+        // nothing to run, so the overnight publish fails instead of being
+        // cleanly removed. Found by review, on a machine that had a real
+        // ICD2O wrapper sitting in that folder while the suite ran.
+        if (SchtasksForTests is null)
+            try { File.Delete(WrapperScriptPath(taskName)); } catch { /* best effort — litter, not a failure */ }
         var (exitCode, output) = Run(["/Delete", "/F", "/TN", taskName]);
         return exitCode == 0 ? null : output.Trim();
     }

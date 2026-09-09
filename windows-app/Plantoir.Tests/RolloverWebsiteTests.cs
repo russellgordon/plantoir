@@ -198,18 +198,62 @@ public class RolloverWebsiteTests : IDisposable
     [Fact]
     public void AMarkerThatCannotBeReleasedIsNotCalledNeverPublished()
     {
-        // A directory sitting where the kept file would go makes the move fail
-        // without touching the marker. The name has a timestamp in it, so it is
-        // built the same way the code builds it.
-        string folder = Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites");
-        Directory.CreateDirectory(Path.Combine(folder,
-            AssistWorkspace.ReleasedMarkerName(1, DateTime.Now.ToString("yyyy-MM-dd_HHmmss"))));
+        // The marker is held OPEN, so the MOVE cannot take the delete access it
+        // needs and fails — deterministic, and it leaves the marker exactly
+        // where it was. Shared with readers on purpose (FileShare.Read): the
+        // rollover's own backup reads every file in the course first, and a
+        // lock that shut it out failed the backup instead, which is a different
+        // refusal and not the one being pinned.
+        //
+        // The first version of this blocked the move instead, by making a
+        // directory at the name the kept file would take. That name has a
+        // TIMESTAMP in it, so the test computed one and the code computed
+        // another, and the two disagreed whenever the clock crossed a second
+        // between them: an intermittent failure that would have looked exactly
+        // like a production bug and was not one.
+        string marker = Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section1.json");
+        using var held = new FileStream(marker, FileMode.Open, FileAccess.Read, FileShare.Read);
 
         var release = Open().ReleaseSite(Open().Course("ICS3U"), 1);
 
         Assert.False(release.ReleasedAnything);
         Assert.True(release.SomethingIsStillPinned, "The section is still pinned and must say so.");
         Assert.Equal(".netlify_sites/section1.json", Assert.Single(release.StillPinned));
+        Assert.True(File.Exists(marker), "A release that failed must leave the marker where it was.");
+    }
+
+    /// <summary>
+    /// The LEGACY marker is released too — the one <c>deploy.py</c> still reads
+    /// and migrates back into the stable path.
+    /// </summary>
+    /// <remarks>
+    /// Leaving it would make a rollover report "never published" and then
+    /// publish over last year's site on the next deploy, in exactly the folders
+    /// old enough to have taught somebody something. Netlify only: there has
+    /// never been a Cloudflare equivalent.
+    ///
+    /// <para>This case is <c>&lt;CODE&gt;/.merged_output/section&lt;N&gt;/</c>, which is
+    /// where a folder carried across from a mac has one. The path THIS platform
+    /// reads is the build root's, and it is asserted separately in
+    /// <see cref="RolloverLegacyMarkerInTheBuildRootTests"/> — which has to set
+    /// an environment variable and so cannot live in this class.</para>
+    /// </remarks>
+    [Fact]
+    public void TheLegacyMarkerInAMacShapedFolderIsReleasedToo()
+    {
+        string output = Path.Combine(_folder, "courses", "ICS3U", ".merged_output", "section1");
+        Directory.CreateDirectory(output);
+        File.WriteAllText(Path.Combine(output, ".netlify_site.json"), "{\"site\":\"last-year\"}");
+
+        var release = Open().ReleaseSite(Open().Course("ICS3U"), 1);
+
+        Assert.False(File.Exists(Path.Combine(output, ".netlify_site.json")),
+            "deploy.py still reads this one and would migrate it back, so a rollover that " +
+            "leaves it publishes over last year's site.");
+        Assert.Contains(release.KeptFiles,
+            kept => kept.Contains(".netlify_site.previous-", StringComparison.Ordinal));
+        // Two markers, two entries: the stable one and the legacy one.
+        Assert.Equal(2, release.KeptFiles.Count);
     }
 
     /// <summary>A release can be taken back, which is what makes it safe to offer.</summary>
@@ -439,9 +483,138 @@ public class RolloverWebsiteTests : IDisposable
             "otherwise AssistAgent.ShowPlan returns early and the release never runs.");
     }
 
+    /// <summary>
+    /// A bare rollover on a section whose dates are already right STILL asks
+    /// about the website — including through the plan twin, which is where the
+    /// request stops in the default configuration.
+    /// </summary>
+    /// <remarks>
+    /// Found by review. With confirmation ON, <c>AssistAgent.ShowPlan</c>
+    /// returns early on a non-plan answer, so a twin that says only "everything
+    /// is already on the right day" ends the turn — and the teacher is never
+    /// asked, and the section stays pinned to last year's site. It is exactly
+    /// the state a teacher reaches on their SECOND attempt: roll over, ignore
+    /// the question, come back and ask again.
+    /// </remarks>
+    [Fact]
+    public async Task ABareRolloverStillAsksWhenTheDatesAreAlreadyRight()
+    {
+        await ReDate();   // dates are right from here on
+
+        foreach (var result in new[] { await Call(apply: false, rollover: "yes"),
+                                       await Call(apply: true, rollover: "yes") })
+        {
+            Assert.Contains(AssistWording.RolloverWebsiteQuestion, TeacherSummary(result));
+            Assert.Contains(AssistWording.RolloverWebsiteNotDecided, TeacherSummary(result));
+        }
+    }
+
+    /// <summary>
+    /// An ordinary re-date on a section that needs none says nothing about
+    /// websites, plan or write.
+    /// </summary>
+    /// <remarks>
+    /// The other half of the test above, and the one that would break if the
+    /// question were simply moved earlier: three of the four phrasings reaching
+    /// this tool are not rollovers at all.
+    /// </remarks>
+    [Fact]
+    public async Task AnOrdinaryReDateThatChangesNothingStillSaysNothingAboutWebsites()
+    {
+        await ReDate();
+
+        foreach (var result in new[] { await Call(apply: false), await Call(apply: true) })
+            Assert.DoesNotContain("website", TeacherSummary(result) + Body(result),
+                                  StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// A <c>website</c> value that is neither "new" nor "same" asks the
+    /// question rather than being ignored.
+    /// </summary>
+    /// <remarks>
+    /// "a new one" is an ordinary thing for a model to send. Dropping it
+    /// silently would give an ordinary re-date with the website untouched and
+    /// nothing said — the same silent-drop failure the schema argument is
+    /// about, one layer up.
+    /// </remarks>
+    [Fact]
+    public async Task AWebsiteValueNobodyRecognisesAsksRatherThanBeingIgnored()
+    {
+        string said = await ReDate(website: "a new one");
+
+        Assert.Contains(AssistWording.RolloverWebsiteQuestion, said);
+        Assert.True(
+            File.Exists(Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section1.json")),
+            "A value nobody recognises must not be read as \"new\" and cut the section loose.");
+    }
+
+    // ---- roll_over_section, which is this platform's alone ----------------
+
+    /// <summary>
+    /// <c>roll_over_section</c> tells the truth when the release FAILS.
+    /// </summary>
+    /// <remarks>
+    /// Found by review. It had its own copy of the sentences and got them wrong
+    /// in the way a copy does: a marker that existed and could not be moved
+    /// produced "this section had not been published anywhere yet" and "I could
+    /// not move this section off …" one after the other, and then a trail line
+    /// saying the section had been rolled onto a new website while it was still
+    /// pinned to last year's. It shares one code path with the re-date now.
+    /// </remarks>
+    [Fact]
+    public async Task RollOverSectionDoesNotSayNeverPublishedAboutASectionItCouldNotRelease()
+    {
+        string marker = Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section1.json");
+        using var held = new FileStream(marker, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        string said = await new PlantoirTools(Open()).RollOverSection(
+            "ICS3U", 1, timetable: ATimetableFile(), block: "F", cancellation: default,
+            pages: null, meetings: null, firstDay: "", startYear: 2026);
+
+        Assert.Contains(AssistWording.RolloverCouldNotStartANewWebsite(".netlify_sites/section1.json"),
+                        said);
+        Assert.DoesNotContain(AssistWording.RolloverHadNoWebsiteYet, said);
+    }
+
+    /// <summary>
+    /// And it leaves a scheduled publish ALONE when the release failed.
+    /// </summary>
+    /// <remarks>
+    /// A section still pinned has an agreed website, so its overnight publish
+    /// has nothing to ask. Turning it off would take away something the teacher
+    /// set up, on top of not doing the thing they asked for.
+    /// </remarks>
+    [Fact]
+    public async Task RollOverSectionLeavesAScheduledPublishAloneWhenItCouldNotRelease()
+    {
+        _scheduled.Add(TaskScheduling.NameFor("ICS3U", 1));
+        string marker = Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section1.json");
+        using var held = new FileStream(marker, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        await new PlantoirTools(Open()).RollOverSection(
+            "ICS3U", 1, timetable: ATimetableFile(), block: "F", cancellation: default,
+            pages: null, meetings: null, firstDay: "", startYear: 2026);
+
+        Assert.Empty(_deleted);
+    }
+
     // ---- Fixture ---------------------------------------------------------
 
     private AssistWorkspace Open() => new(_folder, _launcher);
+
+    /// <summary>
+    /// A two-meeting timetable on disk. <c>roll_over_section</c> takes a FILE
+    /// rather than falling back to the remembered dates the way
+    /// <c>re_date_classes</c> does, which is a divergence worth knowing and not
+    /// this class's to fix.
+    /// </summary>
+    private string ATimetableFile()
+    {
+        string path = Path.Combine(_folder, "timetable.csv");
+        File.WriteAllText(path, "F,\nSep-8,1,\nSep-10,2,\n");
+        return path;
+    }
 
     private async Task<string> ReDate(string website = "", string rollover = "", bool apply = true)
     {
