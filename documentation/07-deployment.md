@@ -546,7 +546,11 @@ proves the launcher is happy with itself.
 **First run on the mac: 2026-09-09, 44 passed, 0 failed, 0 skipped** — the run
 `RELEASING.md` requires with nothing skipped, and the one issue #129 was really
 asking for, since `deploy.sh` had gained `--non-interactive` on a machine that
-could not execute it. All three destinations published for real and fetched
+could not execute it. **Run again the same day, after Windows' issue #130
+merged, with the same result** — 44 passed, 0 failed, 0 skipped. That merge
+brought the fix for `deploy.sh`'s dead exit-3 pass-through, which is in the
+publishing path, so the pre-commit hook asked for it and it was owed rather
+than optional. All three destinations published for real and fetched
 back (folder 244 files, `ada1o-s1-2026-testing.netlify.app`,
 `ada1o-s1-2026-testing.pages.dev`), all three pairings, no live-reload client
 on any of them, and the no-front-page case refused and shipped nothing stale.
@@ -794,7 +798,11 @@ proved separately — by `scripts/test_deploy_non_interactive.py`, which reads t
 launcher, and since 2026-09-09 by `scripts/test_deploy_sh_questions.py`, which
 RUNS it to each of the four questions it can ask and checks the refusal is
 visible as well as the code being 3 — and end to end only by
-`verify-deploy.sh`, which publishes to real Netlify.
+`verify-deploy.sh`, which publishes to real Netlify. The BUILD leg's exit 3 is
+proved the same way from the same date, by
+`scripts/test_preview_sh_questions.py`, which runs `preview.sh` to its one
+question — including in the flag ORDER the launchd wrapper writes, which is
+the shape a parser bug would hide.
 
 **One narrow path can still produce the sentence #132 removed**, and it is
 filed as [issue #136](https://github.com/russellgordon/plantoir/issues/136)
