@@ -131,10 +131,21 @@ public class MilestoneContractTests
     /// <c>"EXAMPLE_COURSE_CODE="</c> were found: printed by
     /// <c>scripts/setup_course.py</c>, matched by BOTH apps' example-course
     /// task, and classified nowhere — because the mac's classification test
-    /// walks the contract's generated <c>milestones</c> readout, and
-    /// <c>AppRulesContract.milestones()</c> leaves that one task out of it. A
+    /// walked the contract's generated <c>milestones</c> readout, and
+    /// <c>AppRulesContract.milestones()</c> left that one task out of it. A
     /// forward check is only as complete as the list it walks; this one does
-    /// not walk a list at all.</para>
+    /// not walk a list at all, which is why it saw what the forward check could
+    /// not.</para>
+    ///
+    /// <para><b>The readout no longer omits the task</b> — issue #82 landed on
+    /// the mac on 2026-09-08, and <c>milestones</c> carries <c>exampleCourse</c>
+    /// now. The structural fix was better than the one-line one the issue
+    /// proposed: that side gained a <c>TaskMilestones.allLists</c> (this app had
+    /// <c>AllLists</c> already) and the readout ITERATES it, because a readout
+    /// assembled from a hand-kept list of what to read is a readout that can
+    /// silently omit things. This test is kept all the same: it is the check
+    /// that does not depend on any list being complete, and that is the property
+    /// that found the gap.</para>
     /// </summary>
     [Fact]
     public void AMarkerTheSharedScriptsPrintIsClassifiedAsShared()
@@ -249,14 +260,19 @@ public class MilestoneContractTests
             ["buildAndDeployToFolder"] = TaskMilestones.BuildAndDeployToFolder,
             ["buildAndDeployToCloudflare"] = TaskMilestones.BuildAndDeployToCloudflare,
 
-            // Answered before the contract asks. Both apps have an
-            // example-course task and always did, but the mac's
-            // AppRulesContract.milestones() omits it from the readout, so it is
-            // not in `milestones` yet — which is why its two markers were
-            // classified by nobody until 2026-09-06. Listing it here means the
-            // mac's fix (issue #82) regenerates the contract and
-            // lands GREEN, instead of failing this suite by name for a change
-            // that is entirely correct.
+            // Answered before the contract asked, and now the contract asks.
+            // Both apps have always had an example-course task, but the mac's
+            // AppRulesContract.milestones() omitted it from the readout, so its
+            // two markers were classified by nobody until 2026-09-06. Listing
+            // it here ahead of time is why the mac's fix (issue #82, landed
+            // 2026-09-08) regenerated the contract and arrived GREEN rather
+            // than failing this suite by name for a change that was entirely
+            // correct.
+            //
+            // Which is worth keeping as the pattern rather than deleting as
+            // history: answering a task the contract does not yet name costs
+            // one line, and it turns the other platform's correct change from
+            // a red suite into a no-op.
             ["exampleCourse"] = TaskMilestones.ExampleCourse,
         };
 
@@ -304,29 +320,20 @@ public class MilestoneContractTests
         }
     }
 
-    /// <summary>
-    /// The example-course task's markers are classified, even though the
-    /// contract's <c>milestones</c> readout does not yet mention that task.
-    ///
-    /// <para>Both apps have the task — the mac's
-    /// <c>TaskMilestones.exampleCourse</c> holds the same two markers — but
-    /// <c>AppRulesContract.milestones()</c> omits it from the readout, so the
-    /// parity test above never visits it and the mac's own classification test
-    /// never saw its markers. That is how they came to be printed by
-    /// <c>setup_course.py</c> and classified by nobody. Until the mac's readout
-    /// is fixed (issue #82), this is the only thing checking them.</para>
-    /// </summary>
-    [Fact]
-    public void TheExampleCourseMarkersAreClassifiedThoughTheReadoutOmitsTheTask()
-    {
-        var origins = Origins();
-        foreach (var milestone in TaskMilestones.ExampleCourse)
-        {
-            Assert.True(origins.ContainsKey(milestone.Marker) || AppearsInAWindowsLauncher(milestone.Marker),
-                $"\"{milestone.Marker}\" belongs to the example-course task, which the contract's " +
-                "milestones readout leaves out. That is not a reason for it to be unclassified: it " +
-                "is printed by the shared setup script, so it belongs in markerOrigins.origins like " +
-                "every other shared line.");
-        }
-    }
+    // TheExampleCourseMarkersAreClassifiedThoughTheReadoutOmitsTheTask stood
+    // here until 2026-09-09. It checked that the example-course task's two
+    // markers were classified even though the contract's milestones readout
+    // left that task out — "until the mac's readout is fixed (issue #82),
+    // this is the only thing checking them".
+    //
+    // The readout was fixed on 2026-09-08 and `milestones` now carries
+    // `exampleCourse`, so it is neither the only thing checking them nor
+    // checking anything the two tests above do not: EveryTaskShowsTheShared
+    // StepsTheMacShows now VISITS that task, and AMarkerTheSharedScriptsPrint
+    // IsClassifiedAsShared walks TaskMilestones.AllLists, which has always
+    // included ExampleCourse and never depended on the readout at all.
+    //
+    // Deleted rather than left passing, because a test whose own comment
+    // describes a state that no longer exists is read as the current state by
+    // whoever meets it next. Issue #121.
 }
