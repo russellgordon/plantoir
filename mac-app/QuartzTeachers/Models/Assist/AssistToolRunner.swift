@@ -2376,8 +2376,20 @@ final class AssistToolRunner {
     /// mid-semester snow day from ever being asked about abandoning the
     /// address students are reading right now.
     private func isARollover(_ arguments: [String: Any]) -> Bool {
-        return text("rollover", in: arguments).lowercased() == "yes"
-            || text("website", in: arguments).isEmpty == false
+        if text("rollover", in: arguments).lowercased() == "yes" {
+            return true
+        }
+        // Only a STRING counts as an answer, and that is not fussiness: `text`
+        // renders a number too, so a JSON `false` or `0` — an ordinary way for
+        // a caller to spell "no website answer" — arrives here as "0", which
+        // is not empty. Reading that as a rollover would ask a teacher
+        // re-dating after a snow day whether to abandon the address their
+        // students are reading right now, which is the one thing this must
+        // never do. The schema says a string; anything else is not an answer.
+        guard let answer = arguments["website"] as? String else {
+            return false
+        }
+        return answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
 
     /// What a rollover says about the website, and what it does about it.

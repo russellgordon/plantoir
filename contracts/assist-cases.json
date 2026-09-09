@@ -577,6 +577,24 @@
         "why" : "The answer is the SECOND turn, and by then the pages are already on their dates — so the re-date plan changes nothing, and an early return on that made the whole answer a no-op: the reply talked about dates, never mentioned the website, and left the section pinned to last year's, behind an offer that looked like it had worked. Nothing exercised two turns in a row, which is why it survived. Both turns go through the plan card here, because asking before changing is ON unless a teacher turns it off."
       },
       {
+        "expectTranscriptContains" : [
+          "tool(re_date_classes): wording.rolloverWebsiteQuestion",
+          "teacher: roll this section over to a new year",
+          "assistant: wording.rolloverWebsiteQuestion",
+          "assistant: wording.rolloverWebsiteNotDecided"
+        ],
+        "given" : {
+          "pending" : "re_date_classes",
+          "saying" : [
+            "roll this section over to a new year",
+            "roll this section over to a new year"
+          ]
+        },
+        "name" : "a bare rollover asked a second time still asks about the website",
+        "when" : "say",
+        "why" : "The mirror of the case above, and fixing that one left this one standing. That was the ANSWER turn returning early; this is the ASKING turn, one branch higher. A teacher who rolls over, ignores the question and comes back to ask again arrives with the dates already right \u2014 so the plan twin has nothing to propose, and returning \"already on the day it should be\" ended the turn there: asking before changing is ON by default and the surface returns early on anything that is not a plan, so the real call never ran and the teacher read nothing whatever about the website while the section stayed pinned to last year's site. With that setting turned OFF the same request was asked properly, which is what makes it a defect rather than a limitation: the question existed or not depending on a setting. The teacher line in the middle is load-bearing \u2014 it anchors the two sentences after it to the SECOND turn, and without it the first turn's reply satisfies them and the case cannot fail. `when` is \"say\" because the last turn is ANSWERED, not proposed: nothing is waiting to be agreed to, and a card there would offer a Go that changes nothing."
+      },
+      {
         "expectEvents" : [
           "stopPreview.begins",
           "stopPreview.ends",
@@ -681,7 +699,7 @@
         "why" : "The stop sits beside the WRITES, not beside the start: a preview left serving while the pages beneath it are rewritten serves a half-changed site, and the teacher's next refresh is a race they cannot see they are in. No expectReply on purpose — the reply is about the pages that changed, not about the preview; this case was written claiming the preview sentence, and running it said otherwise."
       }
     ],
-    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them."
+    "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION \u2014 what the teacher types, in order, each turn settled before the next \u2014 because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation \u2014 one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN."
   },
   "tools" : {
     "all" : [

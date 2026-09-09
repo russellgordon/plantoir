@@ -596,6 +596,32 @@ final class RolloverWebsiteTests: XCTestCase {
         )
     }
 
+    /// A `website` that is not a string at all is not an answer.
+    ///
+    /// **The cost of widening "what counts as a rollover", and it lands on the
+    /// request that must never be asked.** Arguments arrive as JSON, and the
+    /// runner renders a number into text — so `website: false`, an ordinary
+    /// way for a caller to spell "no answer here", would read as "0", which is
+    /// not empty. A teacher re-dating after a snow day would then be asked
+    /// whether to abandon the address their students are reading right now.
+    @MainActor
+    func testAWebsiteThatIsNotATextAnswerIsNotReadAsOne() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        for notAnAnswer in [false, 0] as [Any] {
+            let said: String = await reDate(
+                runner, course: course, arguments: ["website": notAnAnswer]
+            )
+            for fragment in ["website", "Website"] {
+                XCTAssertFalse(
+                    said.contains(fragment),
+                    "“\(notAnAnswer)” is not an answer — this must stay an ordinary re-date: \(said)"
+                )
+            }
+        }
+    }
+
     /// The other half of the same change: widening what counts as a rollover
     /// must not start asking an ORDINARY re-date about websites.
     ///
