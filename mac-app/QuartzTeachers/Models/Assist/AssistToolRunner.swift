@@ -2206,14 +2206,37 @@ final class AssistToolRunner {
             // back something that is not a plan, so returning "already on the
             // day it should be" here meant the real call never ran and the
             // website was never settled. In the default configuration that
-            // made the release unreachable.
+            // made the release unreachable. A rollover with NO answer is the
+            // exception below, and it is not a contradiction: it hands back
+            // "already on the day it should be" WITH the question attached,
+            // because there is nothing there to press Go on.
             let websiteAnswer: String = text("website", in: arguments).lowercased()
-            let isRollover: Bool = text("rollover", in: arguments).lowercased() == "yes"
+            let isRollover: Bool = isARollover(arguments)
             if asked.plan.changesNothing {
                 let already: String = "Every page in \(asked.located.course.code) Section "
                                     + "\(asked.located.sectionNumber) is already on the day it should be."
-                guard isRollover, websiteAnswer == "new" || websiteAnswer == "same" else {
+                guard isRollover else {
                     return AssistToolOutcome.wrote(already, detail: already)
+                }
+                guard websiteAnswer == "new" || websiteAnswer == "same" else {
+                    // A rollover that has not answered yet, on a section whose
+                    // dates are already right — which is exactly where a
+                    // teacher lands on their SECOND attempt: roll over, ignore
+                    // the question, come back and ask again. Returning
+                    // "already on the day it should be" alone left them
+                    // reading nothing whatever about the website while the
+                    // section stayed pinned to last year's site, so the
+                    // question existed or not depending on whether asking
+                    // before changing was switched on. It is the mirror of the
+                    // trap one branch below, and fixing that one left this one
+                    // standing.
+                    //
+                    // ANSWERED rather than proposed, on purpose: there is
+                    // nothing here to say yes to. The dates need no change,
+                    // and the website is settled by SAYING one of the two
+                    // sentences, not by pressing Go.
+                    let said: String = already + "\n\n" + AssistToolRunner.askingWhichWebsite
+                    return AssistToolOutcome.wrote(said, detail: said)
                 }
                 return AssistToolOutcome.planned(
                     already,
@@ -2325,6 +2348,65 @@ final class AssistToolRunner {
         }
     }
 
+    /// The whole question, in ONE place, because it is said from two.
+    ///
+    /// **Both halves or neither.** The question on its own would leave a
+    /// teacher who ignores it believing the website was dealt with, and the
+    /// two sentences that answer it are the only strings the matcher accepts —
+    /// so a copy that drifts from `AssistCardCommand` invites a sentence the
+    /// app then fails to understand. It is said by the write path, and — since
+    /// issue #120 — by the plan twin as well, on the turn where the dates are
+    /// already right and there is nothing to propose. Windows keeps the same
+    /// single home, `AskingWhichWebsite()`.
+    private static let askingWhichWebsite: String =
+        AssistWording.rolloverWebsiteQuestion + "\n\n"
+        + "Say “\(AssistCardCommand.rollOverOntoANewWebsite)” or "
+        + "“\(AssistCardCommand.rollOverKeepingTheSameWebsite)”.\n\n"
+        + AssistWording.rolloverWebsiteNotDecided
+
+    /// Whether this call is a rollover at all — the one definition, shared by
+    /// the plan twin and the write so they cannot answer it differently.
+    ///
+    /// **Any `website` at all counts, not only the two words that mean
+    /// something.** Over MCP there is no card, so `website` alone has to be
+    /// enough — and a model asked to say which website a teacher chose will
+    /// sooner or later send "a new one" rather than "new". Reading only the
+    /// two recognised words made that an ORDINARY re-date: no question, no
+    /// error, and no mention of the website, on the one call that was plainly
+    /// about the website. Treating any value as a rollover sends the question
+    /// back instead, which is the answer a caller can act on. An ordinary
+    /// re-date sets neither key and is untouched, which is what keeps a
+    /// mid-semester snow day from ever being asked about abandoning the
+    /// address students are reading right now.
+    private func isARollover(_ arguments: [String: Any]) -> Bool {
+        if text("rollover", in: arguments).lowercased() == "yes" {
+            return true
+        }
+        // Only a STRING counts as an answer, and that is not fussiness: `text`
+        // renders a number too, so a JSON `false` or `0` — an ordinary way for
+        // a caller to spell "no website answer" — arrives here as "0", which
+        // is not empty. Reading that as a rollover would ask a teacher
+        // re-dating after a snow day whether to abandon the address their
+        // students are reading right now, which is the one thing this must
+        // never do. The schema says a string; anything else is not an answer.
+        guard let answer = arguments["website"] as? String else {
+            return false
+        }
+        // **What this costs, kept rather than fixed.** A model told to leave
+        // the key out will sometimes send a PLACEHOLDER instead — "none",
+        // "n/a" — which counts here, so an ordinary re-date picks up a website
+        // question it should never have been asked, and reads two sentences
+        // that are untrue of a mid-semester section. Nothing on disk changes.
+        // The rule is still worth more: a real answer nobody recognised, read
+        // silently as an ordinary re-date, changes the WRONG THING quietly,
+        // which is the failure that has actually happened. The schema names
+        // the consequence to narrow it, and only Claude Code can put free text
+        // here, where a person reads every step. Windows has the identical
+        // property from the identical rule; a narrower list of words nobody
+        // means would drift apart on the two platforms within a release.
+        return answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
     /// What a rollover says about the website, and what it does about it.
     ///
     /// Returns the empty string for an ORDINARY re-date, which is three of the
@@ -2351,10 +2433,8 @@ final class AssistToolRunner {
         // question outright. Over MCP there is no card, so `website` alone has
         // to be enough — otherwise the one surface that cannot show a sheet
         // also cannot roll a section over, which is the hole this design was
-        // supposed to close. An ordinary re-date sets neither and is untouched.
-        let isRollover: Bool = text("rollover", in: arguments).lowercased() == "yes"
-                            || answer == "new" || answer == "same"
-        guard isRollover else {
+        // supposed to close.
+        guard isARollover(arguments) else {
             return ""
         }
         if answer == "same" {
@@ -2366,12 +2446,8 @@ final class AssistToolRunner {
             return AssistWording.rolloverKeptTheSameWebsite
         }
         guard answer == "new" else {
-            // Asked, and NOT acted on. The sentence says both halves: what was
-            // not changed, and how to change it.
-            return AssistWording.rolloverWebsiteQuestion + "\n\n"
-                 + "Say “\(AssistCardCommand.rollOverOntoANewWebsite)” or "
-                 + "“\(AssistCardCommand.rollOverKeepingTheSameWebsite)”.\n\n"
-                 + AssistWording.rolloverWebsiteNotDecided
+            // Asked, and NOT acted on.
+            return AssistToolRunner.askingWhichWebsite
         }
 
         let release: DeployCommand.SiteRelease = DeployCommand.releaseSite(

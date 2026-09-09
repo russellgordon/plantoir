@@ -612,7 +612,9 @@ extension AssistToolRunner {
             "website": AssistSchemaProperty(
                 kind: .string,
                 description: "Either \"new\" or \"same\", when a teacher rolling this section over "
-                           + "to a new year has said which website they want. Leave empty otherwise."
+                           + "to a new year has said which website they want. LEAVE THE KEY OUT "
+                           + "otherwise — any other text counts as a rollover and asks the teacher "
+                           + "which website they want, which an ordinary re-dating must never do."
             ),
         ],
         required: ["course", "section"],

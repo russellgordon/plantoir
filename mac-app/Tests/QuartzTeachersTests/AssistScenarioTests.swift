@@ -159,7 +159,7 @@ final class AssistScenarioTests: XCTestCase {
         }
 
         switch scenario.when {
-        case "approve", "decline":
+        case "approve", "decline", "say":
             try await runApproval(scenario, made: made)
         default:
             try await runTool(scenario, made: made)
@@ -276,7 +276,14 @@ final class AssistScenarioTests: XCTestCase {
                 )
                 continue
             }
-            if isLastTurn && scenario.when != "approve" {
+            // `say` means the last turn is ANSWERED rather than proposed, and
+            // a card there is the failure it exists to catch: a Go button on a
+            // turn where pressing it would change nothing.
+            XCTAssertFalse(
+                isLastTurn && scenario.when == "say",
+                "\(scenario.name): \"\(phrasing)\" put up a card, and this case says it is answered"
+            )
+            if isLastTurn && scenario.when == "decline" {
                 agent.declinePending()
             } else {
                 await agent.approvePending()
