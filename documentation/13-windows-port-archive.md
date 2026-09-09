@@ -980,7 +980,7 @@ perfectly well while you are debugging.
 
 ### Take the rules from the contract, do not re-derive them
 
-`problemReportRedaction` in [`contracts/shared-rules.json`](contracts/shared-rules.json)
+`problemReportRedaction` in [`contracts/shared-rules.json`](../contracts/shared-rules.json)
 — 14 cases, `input` → `expect`, run by `SharedRulesContractTests` on the mac
 and ready for an xUnit `[Theory]`. It also carries `placeholders` (the exact
 phrases left behind) and `secretLength`, so nothing has to be copied out of
