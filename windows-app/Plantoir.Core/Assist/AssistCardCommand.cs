@@ -47,7 +47,25 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
             ["re-date my classes"] = ("re_date_classes", new()),
             ["redate my classes"] = ("re_date_classes", new()),
             ["re-date this section"] = ("re_date_classes", new()),
-            ["roll this section over to a new year"] = ("re_date_classes", new()),
+            // A ROLLOVER, and only a rollover, carries `rollover`. The three
+            // phrasings above it are ordinary re-dating — a snow day, a
+            // timetable that shifted — and asking THOSE about websites would
+            // let a teacher answer "a new website" mid-semester and abandon
+            // the address their students are reading right now.
+            ["roll this section over to a new year"] = ("re_date_classes", new() { ["rollover"] = "yes" }),
+
+            // The two answers to the website question, as whole sentences
+            // rather than "a new website" — which is an exact match a teacher
+            // could type meaning something else entirely. Each also works as a
+            // FIRST thing to say, for a teacher who already knows which they
+            // want, because re-dating a section already on its dates changes
+            // nothing. Named from AssistWording rather than typed here: the
+            // assistant's own reply offers these back word for word, and a
+            // phrasing a teacher is TOLD to say must be one the matcher takes.
+            [AssistWording.RolloverSayToStartANewWebsite] =
+                ("re_date_classes", new() { ["rollover"] = "yes", ["website"] = "new" }),
+            [AssistWording.RolloverSayToKeepTheSameWebsite] =
+                ("re_date_classes", new() { ["rollover"] = "yes", ["website"] = "same" }),
         };
 
     private static readonly Dictionary<string, int> SpelledNumbers = new(StringComparer.OrdinalIgnoreCase)

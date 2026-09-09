@@ -717,11 +717,14 @@ public class AssistWorkspaceTests : IDisposable
         var workspace = Open();
         var course = workspace.Course("ICS3U");
 
-        string? kept = workspace.ReleaseSite(course, 1);
+        var release = workspace.ReleaseSite(course, 1);
 
-        Assert.NotNull(kept);
+        Assert.True(release.ReleasedAnything);
+        Assert.False(release.SomethingIsStillPinned);
         Assert.False(File.Exists(Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section1.json")));
-        string keptFull = Path.Combine(_folder, kept!.Replace('/', Path.DirectorySeparatorChar));
+        string keptFull = Path.Combine(
+            _folder, "courses", "ICS3U", ".netlify_sites",
+            Path.GetFileName(Assert.Single(release.KeptFiles)));
         Assert.True(File.Exists(keptFull));
         Assert.Contains("ics3u-s1-2026-gordon", File.ReadAllText(keptFull));
     }
@@ -731,7 +734,12 @@ public class AssistWorkspaceTests : IDisposable
     {
         File.Delete(Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section2.json"));
         var workspace = Open();
-        Assert.Null(workspace.ReleaseSite(workspace.Course("ICS3U"), 2));
+        var release = workspace.ReleaseSite(workspace.Course("ICS3U"), 2);
+        Assert.False(release.ReleasedAnything);
+        // And NOT "still pinned" — a section that was never published is a
+        // different answer from one that could not be released, and the two
+        // get opposite sentences.
+        Assert.False(release.SomethingIsStillPinned);
     }
 
     // ---- A session locked to one course ----------------------------------
@@ -1613,17 +1621,28 @@ public class AssistWorkspaceTests : IDisposable
     public void ReadRememberedTimetable_FormatsUpcomingClasses()
     {
         Page("ICS3U", "section1/All Classes/Unit 1, Day 1.md", draft: false);
-        var dates = new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 10), new DateOnly(2026, 9, 12) };
-        TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", new DateOnly(2026, 9, 1));
+
+        // RELATIVE to today, and that is the whole point of this change. The
+        // dates used to be written down — 2026-09-08, -10 and -12 — and
+        // "upcoming" means `date >= today` in PlantoirTools, so on the morning
+        // of 2026-09-09 the first of them stopped being upcoming and this test
+        // began failing for everybody, every run, having passed for a day. A
+        // fixture that names absolute days when the code under test compares
+        // against the clock has an expiry date baked into it, and the failure
+        // arrives looking exactly like a product fault.
+        //
+        // Starts at tomorrow rather than today so that a run crossing midnight
+        // cannot lose the first date either.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var dates = new[] { today.AddDays(1), today.AddDays(3), today.AddDays(5) };
+        TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", today.AddDays(-7));
 
         var tools = new Plantoir.Mcp.PlantoirTools(Open());
         var answer = tools.ReadRememberedTimetable("ICS3U", 1);
         string detail = answer.Detail();
 
         Assert.Contains("ICS3U Section 1", detail);
-        Assert.Contains("2026-09-08", detail);
-        Assert.Contains("2026-09-10", detail);
-        Assert.Contains("2026-09-12", detail);
+        foreach (var date in dates) Assert.Contains(date.ToString("yyyy-MM-dd"), detail);
         Assert.Contains("Where they came from: test sheet", detail);
     }
 
