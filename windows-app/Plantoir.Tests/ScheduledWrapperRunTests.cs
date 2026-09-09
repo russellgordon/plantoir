@@ -31,6 +31,18 @@ public class ScheduledWrapperRunTests : IDisposable
 
     public void Dispose()
     {
+        // The FOLDER-PROBLEM record, which the wrapper writes into the real
+        // %LOCALAPPDATA% and this class cannot substitute away.
+        //
+        // The outcome record is redirected (see RunWrapper), but $healthDir and
+        // $pendingDir resolve $env:LOCALAPPDATA at RUN time rather than being
+        // baked, so the stub launcher's PLANTOIR_HEALTH: line really does land
+        // in the teacher's own scheduled\folder-problems. It came out empty
+        // only because one test in this class happens to call Take afterwards
+        // and two others do not — so whether the machine is left clean depended
+        // on which tests ran and in what order, which is not something to leave
+        // to luck. Found by review 2026-09-09.
+        try { ScheduledHealthFindings.Take("ICS3U", 1); } catch { }
         try { Directory.Delete(_root, recursive: true); } catch { }
     }
 
