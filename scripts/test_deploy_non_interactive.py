@@ -58,6 +58,10 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
+from contextlib import redirect_stdout
+
+import deploy
+
 
 def _a_bash_that_can_run_deploy_sh():
     """A `bash` that can actually run this repository's launcher, or None.
@@ -118,9 +122,7 @@ def _a_bash_that_can_run_deploy_sh():
         except (OSError, subprocess.SubprocessError):
             continue
     return None
-from contextlib import redirect_stdout
 
-import deploy
 
 
 class RefusingRatherThanAsking(unittest.TestCase):
@@ -326,6 +328,46 @@ class TheFlagIsAccepted(unittest.TestCase):
                     "--non-interactive", case["expectArguments"],
                     "Only a scheduled deploy says nobody is here",
                 )
+
+
+class TheRebuildLegPassesItsRefusalOn(unittest.TestCase):
+    """`deploy.sh` rebuilds through `preview.sh` when it finds a preview-built
+    site, and a refusal there must reach the caller as 3, not as 1.
+
+    The bug this pins was DEAD CODE that read as working. The guard was
+    written `if ! "${PREVIEW_CMD}" ...; then _rc=$?`, and with `!` in front of
+    a pipeline the exit status is the logical NOT — so `$?` in the then-branch
+    is 0 and the `-eq 3` test could never fire. A scheduled publish whose
+    rebuild stopped for a question was reported as an ordinary failure, and the
+    teacher was told the wrong thing about the one run they are trying to
+    understand.
+
+    Asserted on the SHAPE rather than by running the launcher, because
+    reaching that branch needs a built site with a live-reload client in it.
+    """
+
+    def test_the_exit_code_is_captured_from_the_command_not_from_the_if(self):
+        launcher = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        self.assertNotIn(
+            'if ! "${PREVIEW_CMD}"', launcher,
+            "`if ! cmd; then _rc=$?` makes $? the logical NOT, so the exit-3 "
+            "branch below it is unreachable. Run the command, then read $?.",
+        )
+        self.assertIn('_rc=$?', launcher)
+        self.assertIn('if [[ $_rc -eq 3 ]]; then', launcher)
+
+    def test_bash_really_does_swallow_the_code_that_way(self):
+        """The measurement the fix rests on, run rather than remembered."""
+        shell = _a_bash_that_can_run_deploy_sh()
+        if shell is None:
+            self.skipTest("no usable bash on this machine")
+        result = subprocess.run(
+            [shell, "-c", 'f(){ return 3; }; if ! f; then echo "$?"; fi; f; echo "$?"'],
+            capture_output=True, timeout=60, encoding="utf-8", errors="replace",
+        )
+        self.assertEqual(["0", "3"], result.stdout.split(),
+                         "if this ever prints 3 first, the guard above was fine all along")
+
 
 
 if __name__ == "__main__":

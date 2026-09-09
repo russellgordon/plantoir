@@ -509,8 +509,19 @@ if [[ -n "$TO_FOLDER" ]]; then
     # script would then publish, successfully, against the wrong one.
     _PREVIEW_EXTRA=()
     if [[ "$NON_INTERACTIVE" == "true" ]]; then _PREVIEW_EXTRA+=(--non-interactive); fi
-    if ! "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only "${_PREVIEW_EXTRA[@]+"${_PREVIEW_EXTRA[@]}"}"; then
-      _rc=$?
+    # `$?` is captured from the command ITSELF, not from inside `if ! cmd`.
+    # With `!` in front of a pipeline the exit status IS the logical NOT, so
+    # `$?` in the then-branch is 0 and never 3 — measured on bash 5.3.15:
+    #   bash -c 'f(){ return 3; }; if ! f; then echo "$?"; fi'   ->  0
+    # This branch was therefore dead from the day it was written: a preview.sh
+    # refusal reached "Could not rebuild this site for publishing." and exited
+    # 1, so the scheduled wrapper recorded an ordinary failure where the
+    # teacher needed to be told a question had gone unanswered. Found by review
+    # on the Windows side 2026-09-09, whose deploy.ps1 mirror reads
+    # $LASTEXITCODE and was correct.
+    "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only "${_PREVIEW_EXTRA[@]+"${_PREVIEW_EXTRA[@]}"}"
+    _rc=$?
+    if [[ $_rc -ne 0 ]]; then
       if [[ $_rc -eq 3 ]]; then
         echo "❌ Could not rebuild this site for publishing: it needed an answer."
         exit 3
