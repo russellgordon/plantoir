@@ -9,13 +9,17 @@ import Foundation
 /// not know why" had no answer, and a run that stopped was indistinguishable
 /// from one that was never scheduled.
 ///
-/// **Broader than the Windows original, deliberately, and this is the one
-/// difference to know.** `ScheduledPublishQuestion` over there records only a
-/// publish that stopped because it NEEDED AN ANSWER (`deploy.py`'s exit 3).
-/// Russell's decision on 2026-09-09 was that a teacher should learn their
-/// overnight publish did not happen whatever the reason — a revoked token, a
-/// network that was down, a build that failed — because the silence is the
-/// complaint, not the cause. So this records both kinds and says which.
+/// **Every outcome is recorded, not only the unanswered question.** Russell's
+/// decision on 2026-09-09 was that a teacher should learn their overnight
+/// publish did not happen whatever the reason — a revoked token, a network
+/// that was down, a build that failed — because the silence is the complaint,
+/// not the cause. A run that got through is recorded for the same reason read
+/// the other way round.
+///
+/// Where this stands against Windows is compared in ONE place and deliberately
+/// not restated here, because a sentence naming what the other app does today
+/// is stale the week after it is written: `contracts/shared-rules.json` →
+/// `scheduledPublishStopped` → `platformDifferences`.
 ///
 /// The record is per SECTION and holds the FIRST destination that stopped. A
 /// course can publish to several places and only one may have gone wrong, so
@@ -26,15 +30,41 @@ nonisolated enum ScheduledPublishOutcome {
 
     // MARK: - Types
 
-    /// Why a scheduled publish stopped.
+    /// How a scheduled publish turned out.
     ///
-    /// Two kinds and not more, because these are the two the launcher can tell
-    /// apart without guessing: `deploy.sh` and `deploy.py` exit **3** when a
-    /// question went unanswered and **1** for everything else.
+    /// The two FAILURE kinds are the two a launcher can tell apart without
+    /// guessing: `deploy.sh` and `deploy.py` exit **3** when a question went
+    /// unanswered and **1** for everything else. `buildNeededAnAnswer` splits
+    /// the first of those by WHICH LEG stopped, because a scheduled publish
+    /// builds before it publishes and the two legs send a teacher to two
+    /// different buttons. The list here and the one in
+    /// `contracts/shared-rules.json` → `scheduledPublishStopped` → `kinds` are
+    /// pinned against each other by a test, so a kind added on one platform
+    /// cannot be missed on the other.
     enum Kind: String, Sendable, CaseIterable {
 
-        /// Exit 3 — a question was asked of nobody.
+        /// Exit 3 from a DESTINATION — a question was asked of nobody.
         case neededAnAnswer = "needed an answer"
+
+        /// Exit 3 from the BUILD, before any destination was reached.
+        ///
+        /// Proposed from Windows on 2026-09-09 (GitHub issue #132) and adopted
+        /// here the same day. A scheduled publish builds before it publishes,
+        /// and `preview.sh` has a question of its own — the 'Open' course-code
+        /// guard — so under `--non-interactive` it refuses with the same exit 3
+        /// having contacted nothing.
+        ///
+        /// A SEPARATE kind rather than `neededAnAnswer` with a stand-in
+        /// destination, which is what this side did until #132: there is no
+        /// destination to name, and telling a teacher that publishing to
+        /// Netlify needed an answer when Netlify was never reached sends them
+        /// to look in the wrong place. The sentence sends them to **Preview**
+        /// instead, because previewing is what asks the question.
+        ///
+        /// REJECTED, and recorded so it is not proposed again: filling the
+        /// destination in with the section's first configured one. It reads
+        /// correctly and it is false.
+        case buildNeededAnAnswer = "build needed an answer"
 
         /// Any other non-zero exit.
         case didNotFinish = "did not finish"
@@ -50,13 +80,13 @@ nonisolated enum ScheduledPublishOutcome {
 
         /// Whether this is something the teacher should be chased about.
         ///
-        /// Both failures are; a success is news rather than a problem, so it
+        /// All three failures are; a success is news rather than a problem, so it
         /// gets the sentence in the section and NOT a warning badge in the
         /// sidebar. A badge on every section that published fine overnight is
         /// a badge nobody reads by Wednesday.
         var needsAttention: Bool {
             switch self {
-            case .neededAnAnswer, .didNotFinish:
+            case .neededAnAnswer, .buildNeededAnAnswer, .didNotFinish:
                 return true
             case .succeeded:
                 return false
@@ -77,17 +107,28 @@ nonisolated enum ScheduledPublishOutcome {
     // MARK: - Stored properties
 
     /// The file's first line is the kind, the second the destination. A plain
-    /// text file rather than JSON because a shell wrapper writes it at half
-    /// six with no interpreter of ours running, and two `echo` lines cannot go
-    /// wrong the way a quoted JSON document can.
+    /// text file rather than JSON because a shell wrapper writes it, and two
+    /// `echo` lines cannot go wrong the way a quoted JSON document can.
+    ///
+    /// Not because nothing of ours is loaded — Plantoir runs the wrapper, and
+    /// writes the trail line itself the moment it returns. The record exists
+    /// because the APP the teacher opens is a different process, days later.
     static let recordSeparator: String = "\n"
 
     /// What the record calls the build, when the BUILD is what stopped.
     ///
     /// A scheduled publish builds before it publishes, so a run can stop
-    /// before any destination is reached. The sentence a teacher reads is
-    /// built from this the same way it is from a destination name, so it has
+    /// before any destination is reached. For a build that failed OUTRIGHT
+    /// this stands in for a destination in the teacher's sentence, so it has
     /// to read naturally in "publishing to ___ stopped".
+    ///
+    /// For `buildNeededAnAnswer` it is written to the record and never shown:
+    /// that sentence names no destination, because there was none. The line is
+    /// still written so every record has ONE shape — two lines, the kind and
+    /// then a name — which is what `stopped(inHomeFolder:course:section:)`
+    /// reads and what a person opening the file in TextEdit sees. A record
+    /// whose second line was sometimes absent would be a second format for a
+    /// shell script to get right at half six in the morning.
     static let buildDestinationName: String = "your website (it could not be built)"
 
     // MARK: - Functions
@@ -202,7 +243,10 @@ nonisolated enum ScheduledPublishOutcome {
     /// rested on a false premise: that nothing of ours is loaded when the
     /// wrapper runs. Plantoir runs the wrapper.
     ///
-    /// The line carries the course, the section and which destination stopped.
+    /// The line carries the course, the section and which destination stopped
+    /// — or, when the BUILD stopped for a question, that it stopped before any
+    /// destination was reached, because none was.
+    ///
     /// NEVER the question's own text: that comes from a launcher's console,
     /// and a line naming a credential prompt would put a teacher's own words
     /// on the trail.
@@ -223,6 +267,20 @@ nonisolated enum ScheduledPublishOutcome {
                 "a scheduled publish stopped, publishing to " + stopped.destination,
                 course: course, section: section, at: stopped.when
             )
+        case .buildNeededAnAnswer:
+            // The SAME event as the branch above, deliberately: that event is
+            // about a question going unasked, which is what happened. A fourth
+            // event would put a distinction on the trail that means nothing to
+            // the person reading it. Windows proposed it this way in issue
+            // #132 and the reasoning holds here.
+            //
+            // The line names no destination because none was reached — see
+            // `activityTrail.mustRecord` for that event, which says so.
+            ActivityTrail.note(
+                .scheduledPublishNeededAnAnswer,
+                "a scheduled publish stopped — building the pages needed an answer",
+                course: course, section: section, at: stopped.when
+            )
         case .didNotFinish:
             ActivityTrail.note(
                 .scheduledPublishDidNotFinish,
@@ -241,17 +299,26 @@ nonisolated enum ScheduledPublishOutcome {
 
     /// The sentence a teacher reads.
     ///
-    /// The `neededAnAnswer` wording is Windows' own, adopted verbatim so both
-    /// apps say one thing about one problem; it is pinned in
-    /// `contracts/shared-rules.json` → `scheduledPublishStopped`. The
-    /// `didNotFinish` wording is new here, because Windows does not record
-    /// that case yet.
+    /// Every one of these is pinned against
+    /// `contracts/shared-rules.json` → `scheduledPublishStopped` → `sentences`
+    /// by `SharedRulesContractTests`, so both apps say one thing about one
+    /// problem. They are retyped here rather than read from the contract at
+    /// run time — the app ships the JSON but does not parse it to speak, and
+    /// Windows retypes them too — which is why the test is the gate.
     static func sentence(for stopped: Stopped, course: String, section: Int) -> String {
         switch stopped.kind {
         case .neededAnAnswer:
             return "\(course) Section \(section) was set to publish on its own, and it stopped "
                  + "because publishing to \(stopped.destination) needed an answer nobody was "
                  + "there to give. Publish this section once yourself, answer the question, and "
+                 + "it can publish on its own after that."
+        case .buildNeededAnAnswer:
+            // No destination, on purpose: none was reached. And it sends the
+            // teacher to PREVIEW rather than Publish, because previewing is
+            // what asks the question.
+            return "\(course) Section \(section) was set to publish on its own, and it stopped "
+                 + "before it started, because building the pages needed an answer nobody was "
+                 + "there to give. Preview this section once yourself, answer the question, and "
                  + "it can publish on its own after that."
         case .didNotFinish:
             return "\(course) Section \(section) was set to publish on its own, and it did not "
