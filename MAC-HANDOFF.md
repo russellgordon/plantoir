@@ -51,6 +51,70 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
+**One proposed 2026-09-08, and the mac suite WILL go red for it: a new trail
+event, `scheduled publish needed an answer`** — `shared-rules.json` →
+`activityTrail.mustRecord`, branch `issue/92-non-interactive-deploy`, GitHub
+issue #92. Deliberately NOT scoped with `appliesOn`, because the mac's launchd
+wrapper has the identical problem and the identical fix is now available to it.
+
+**What it is for.** A publish set to happen on its own runs at half six with the
+app closed, so every question `deploy.py` or a launcher can ask is put to
+nobody. Both ways that ended have been SEEN: with a terminal, `input()` blocks
+— measured at 45 minutes, a `powershell.exe` and its `python.exe` child still
+waiting at the site-name prompt when they were swept up, the teacher's site
+simply not updated in the morning and nothing said. Without one, `prompt()`
+returns its DEFAULT silently and a Netlify name conflict auto-suffixes, so the
+site is published to an address nobody chose.
+
+**What the mac owes, and in what order.**
+
+1. **`deploy.sh` already takes `--non-interactive`** — changed in the same
+   commit, since `app-rules.json` → `launcherFlags.deployExtras` is checked
+   against BOTH launchers and a flag in one only would have failed the mac for
+   a launcher reason rather than as a request. **It has not been run**: this
+   machine has no bash-with-Docker, so `verify.sh` is owed from the mac. Four
+   `read` sites are guarded (two `read -rp`, and two **`read -rsp`** — a grep
+   for `read -rp` finds only two and looks complete), and the flag is forwarded
+   into the `docker exec` through a `NON_INTERACTIVE` environment variable.
+   `deploy.sh` looks for the flag TWICE, once in a pre-scan before its 'Open'
+   course-code guard, which asks a question before the flag loop runs;
+   `deploy.ps1` needs no pre-scan because it parses first and asks afterwards.
+2. **The launchd wrapper must pass the flag and read exit 3.** Exit **3** means
+   "a question went unanswered" and nothing else — every other exit in
+   `deploy.py` and in both launchers is 0 or 1, checked rather than assumed.
+3. **The event itself**, plus somewhere to say it. Windows writes a per-section
+   note under `%LOCALAPPDATA%\Plantoir\scheduled\unanswered\` and reads it in
+   `SectionDetailView` beside the folder problems, consume-on-read and
+   clear-on-clean-run.
+
+**Two things in the wrapper that look like tidiness and are not**, both found
+by writing them: the note is written only by the FIRST destination that stops
+(one note per section, several destinations, so overwriting reports the last
+thing that went wrong rather than the first), and it is cleared only AFTER
+every destination has run — clearing inside the loop meant a course whose
+Netlify leg stopped and whose folder leg then succeeded had the note deleted by
+the second leg, and the teacher was never told why the first did not go out.
+
+**Rejected, and logged so it is not retried.** (a) A `PLANTOIR_NEEDS_AN_ANSWER:`
+marker line on stdout, scanned from a captured log the way `PLANTOIR_HEALTH:`
+is. `TranscriptBuilder.CarriesTheHealthMarker` matches only the literal health
+marker, so a new one would be RENDERED in the teacher's console — machinery
+in front of a teacher, and half-copying a convention: the machine-readable part
+without the hiding part. (b) Capturing the deploy legs' output at all, which is
+the only reason a marker was wanted: the legs are plain `& launcher` today and
+converting them to `Start-Process` inherits four documented traps for a
+sentence the app can say better itself, knowing the course, section and
+destination already. (c) Redirecting the child's stdin to an empty file, which
+would make `isatty()` false by construction — needs the same conversion, and
+buys nothing once the flag refuses before any `input()` is reached.
+
+**Not affected:** `ScheduledDeploy.Problem` on both platforms already refuses to
+SCHEDULE a section that has never been deployed, for exactly this reason, so the
+commonest way in was already closed. What it cannot see is a site DELETED at the
+other end after the schedule was set, or a token revoked in between — which
+is how a real `verify-deploy.ps1` run hit this and hung until its own 900-second
+timeout.
+
 **One proposed 2026-09-08, and nothing goes red for it: the Marks list's title
 and caption** — `shared-rules.json` → `gradedFolders.wording`, branch
 `issue/marks-wording-contract`. The second Course Settings divergence,

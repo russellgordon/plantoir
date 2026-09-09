@@ -212,6 +212,12 @@
         "why": "A rollover that cuts a section loose is the moment its published address changes, and nothing else on the trail records it. The same act turns off any publish that was set to happen on its own \u2014 a section with no agreed website and a scheduled run with nobody to ask would otherwise create a website nobody named \u2014 so a teacher whose overnight publish stops happening has one line explaining both."
       },
       {
+        "carries": "the course code, the section number, and which destination stopped",
+        "event": "scheduled publish needed an answer",
+        "why": "The one thing that can happen to a scheduled publish that a teacher will otherwise never find out about. It runs at half six with the app closed, so a question it could not ask is asked of nobody and seen by nobody; before --non-interactive it either waited for ever (measured at 45 minutes) or took a default and published the site to an address nobody chose. The trail is where \"my site did not update on Tuesday and I do not know why\" gets answered, and without this line the run is indistinguishable from one that was never scheduled. The DESTINATION is carried because a course can publish to several and only one of them may have needed anything — \"it published to the folder and not to Netlify\" is the shape of the report. Dated to when the RUN wrote its record, never to when the app read it, or an overnight problem is filed under the wrong night. Never the question's TEXT: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail.",
+        "appliesOnWhy": "DELIBERATELY not scoped to one platform. The mac's launchd wrapper has the identical problem and the identical fix available — deploy.sh takes --non-interactive as of the same change — so this is owed on both. Proposed from Windows 2026-09-08; see MAC-HANDOFF.md, \"Contract cases waiting on the mac\"."
+      },
+      {
         "carries": "the course code and the section number",
         "event": "section kept its website",
         "why": "The OTHER answer, and the one a problem report is more likely to be about: a teacher writing in weeks later to say last year's class site was replaced is describing this branch. A trail recording only the cut-loose could not answer the question it would actually be read for. Both answers are recorded because the question is asked every time and neither answer is a default."
