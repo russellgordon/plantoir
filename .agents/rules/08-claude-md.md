@@ -11,7 +11,7 @@ description: "Plantoir project rules, part 8 of 9 - Where the truth lives, per k
 
 The same rule used to be written in four places at once, and three of them
 would drift — a sentence in the Swift that says it, in the test that pins it,
-in the log row that specified it, and in the handoff telling Windows to copy
+in the log row that specified it, and in the issue telling Windows to copy
 it. So each kind of truth now has **one** home, and everywhere else points at
 it rather than restating it:
 
@@ -37,15 +37,23 @@ assistant's sentences into a document or a test, don't — name it instead.**
 contract. A quoted copy is the one that keeps passing after the product's
 words change.
 
-## The two handoff documents, and where a Windows session begins
+## Where the work is tracked, and where a session begins
 
-There are exactly **two**, and they point in opposite directions:
+**Work still to do is in [GitHub
+issues](https://github.com/russellgordon/plantoir/issues), and nowhere else.**
+Since 2026-09-08: a `mac` / `windows` / `toolchain` / `assistant` label says
+which side it lands on, `decision` says it needs Russell to choose, and a
+milestone pins it to a release. Start a session by reading the open issues for
+your platform. Nothing is tracked in a Markdown list any more, and adding one
+back is the thing this replaced.
+
+The two handoff documents remain, as REFERENCE rather than as to-do lists —
+they point in opposite directions:
 
 - [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) — mac → Windows. Everything this
   side learned, written for somebody who cannot read the Swift.
-- [`MAC-HANDOFF.md`](MAC-HANDOFF.md) — Windows → mac. Work that originated
-  over there and needs attention here; entries are marked `✅ DONE` in place
-  rather than deleted.
+- [`MAC-HANDOFF.md`](MAC-HANDOFF.md) — Windows → mac. Things the mac must
+  KNOW, and the ledger of what has already landed here and why.
 
 (The old `AI-ASSIST-HANDOFF.md` is gone: it was a record of how the assistant
 was built, and it now lives in

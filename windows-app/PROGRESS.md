@@ -18,73 +18,27 @@ Docker Desktop) unless marked otherwise.
 | `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
 | `Plantoir.Mcp/` | On `main` (`Plantoir.sln` lists it) and **it ships**: `publish.ps1` publishes it, copies `plantoir-mcp.exe` into the app's own output beside `Plantoir.exe`, and includes it in the signing list. A standalone MCP server exposing one working folder to an AI assistant. Load-bearing at runtime — `Plantoir/Services/ClaudeCodeLauncher.cs` looks for it beside the app, and `Plantoir/Services/McpClient.cs` launches it. See [its README](Plantoir.Mcp/README.md). |
 
-## Where parity stands (2026-09-08)
+## Where parity stands
 
-`WINDOWS-HANDOFF.md`'s numbered list is the index. **Counted 2026-09-08 with
-the two commands below, after three branches merged into `dev`: 44 items, 39
-struck, FIVE open — 39, 40, 41, 42 and 44.**
+**The open work is in [GitHub
+issues](https://github.com/russellgordon/plantoir/issues?q=is%3Aopen+label%3Awindows),
+and this file no longer keeps a second copy of it.** Until 2026-09-08 it did —
+a table here mirroring `WINDOWS-HANDOFF.md`'s numbered list — and the two drifted
+exactly as often as anybody edited one and not the other. The count in this
+section was wrong the last three times it was read, which is what settled the
+argument for having one home rather than two.
 
-Item 36 closed 2026-09-07; item 37 (the Course Settings tip) and item 43 (the
-Marks wording) closed 2026-09-07 and 2026-09-08. **Item 41 came from the mac**
-— the MCP tool surface — and is the one with work in it rather than a decision.
-Items 42 and 44 were raised HERE, both while pinning wording: 42 is shared
-Python (`_dropping_excluded_items` matching case-insensitively where everything
-else matches exactly), 44 is the Course Settings divergence item 43 wrongly
-believed it had finished off. **39 and 40 both wait on the mac and both came
-from it**: 39 is a check and a re-read, 40 is the only open item that is code.
-
-**Three items were renumbered on 2026-09-08, and a reader of an older message
-should know it.** Two sessions worked in parallel and both appended to this
-list and to `GUI-IMPROVEMENTS.md`. The mac's MCP piece took item 41 and row
-447 first, so the Windows wording work moved down one: the exclusion item
-41→42, the Marks item 42→43, the coverage-notes item 43→44, and the log rows
-447→448 and 448→449. Every cross-reference was moved with them.
-
-**Count them rather than trusting this line.** It read "sixteen of its
-twenty-four" on a list that had grown to 32 items with eleven of them open,
-seven of which this table did not name at all. These two commands count it, run
-from the repository root — a plain `grep` over the whole file also counts every
-other numbered list in it, of which there are many:
+Five items were open when the cutover happened, and they are now issues #66
+and #68–#70 plus #99 (which absorbed the old item 42). Everything else on that
+list was struck through as done; the shipped record of it is
+`GUI-IMPROVEMENTS.md` and
+[`WINDOWS-HANDOFF-COMPLETED.md`](../WINDOWS-HANDOFF-COMPLETED.md).
 
 ```bash
-awk '/^### What is still genuinely outstanding/,/^## Windows no longer runs/' WINDOWS-HANDOFF.md | grep -c '^[0-9]\+\. '
-awk '/^### What is still genuinely outstanding/,/^## Windows no longer runs/' WINDOWS-HANDOFF.md | grep -c '^[0-9]\+\. ~~'
+gh issue list --repo russellgordon/plantoir --label windows
 ```
 
-The first is the total; the second is how many are struck, which is how many
-are done.
-
-**Striking an item in `WINDOWS-HANDOFF.md` means striking its row here too**,
-in the same session. This table is the second place the same fact lives, and a
-second place is only worth having if both are updated together — the whole
-reason the count above went wrong is that one of them was.
-
-What is genuinely left, smallest first:
-
-| Item | What is left | Size |
-|---|---|---|
-| ~~19~~ | ✅ Done 2026-09-07 — `working-folder.txt` is written by the app and adopted retroactively; the launch-time sweep removes only builds whose working folder the system says is not there. | — |
-| ~~30~~ | ✅ Done 2026-09-07 — Delete beside Restore in the detail panes, the picker's breadcrumbs with the main bar's affordances, and Rename Course in the File menu with F2. | — |
-| ~~32~~ | ✅ Done 2026-09-07 — the folders-help jargon sweep scans only what the product writes, keeps the four fixed names, and reaches the no-curriculum-folder branch. | — |
-| ~~28~~ | ✅ Done 2026-09-07 — the scheduled-deploy dialog names the unpublished classes, the main window comes forward for an assistant build when hidden, settings saves reach the trail, and the assistant window remembers its placement per section. | — |
-| ~~31~~ | ✅ Done 2026-09-07 — `Uri.EscapeDataString` replaced by a contract-driven encoder in both branches of `Spelled`; `FolderPathRewriterTests` deserialises every `linkRewriting` case. | — |
-| ~~36~~ | ✅ Done 2026-09-07 — decided: `verify-deploy.ps1` stays opt-in (it makes real sites), `.githooks/pre-commit` warns when a commit touches the publishing path, `RELEASING.md` requires a nothing-skipped run for a release that changes it, and the real win — all fifteen shared `scripts/test_*.py` now run inside `dotnet test`, which nothing here did before. | — |
-| ~~37~~ | ✅ Done 2026-09-07 — Russell chose WINDOWS' wording, not the mac's, and it is now `shared-rules.json` → `specialNames.contentStructureTip`: the literal is gone from `CourseSettingsView.xaml.cs`, `SpecialNames.ContentStructureTip` is the single source, and three facts pin it. "on this page" became "here" (matching `removeLeavesTheFolderOnDisk` in the same view) and "folders" became "folders and files" — the caption sits under four lists, two of them FILE lists, and both apps had promised only the folder half of what `build_site.py` actually does. The mac owes the adoption and is not red meanwhile; it is at the top of `MAC-HANDOFF.md`'s "Open". | — |
-| ~~43~~ | ✅ Done 2026-09-08 — the Marks list's title and caption are now `shared-rules.json` → `gradedFolders.wording`. Russell chose the MAC's title, so this app took "Folders whose work counts for marks"; the caption is a union whose middle sentence is `specialFoldersHelp`’s with ONE word changed — the map’s name, not identical to it — names the map "the curriculum coverage map" (matching the flyout and switch on this same screen — capital-C "Curriculum Coverage map" was the built PAGE title and was drift), and says "tick" rather than the mac's "add"/"remove", which named actions this tick list does not offer. The caption also MOVED below its list in both Course Settings and the wizard, so "a page in one of these" has something to refer to. Trap met: `FormBuilders` builds checkbox automation ids from the list title, and a UI test had the old one hard-coded — it now reads the contract. The mac owes only the caption and is not red. | — |
-| 44 | Found here 2026-09-08 reviewing item 43, which wrongly called itself the last Course Settings divergence: the coverage-notes toggle reads "Explain the map on the page" on the mac and "Include explanations on Curriculum Coverage page" here — in Course Settings AND the wizard, so twice — and the caption sentences beside it differ differently on each surface. **Eight strings, not four**, and a first draft of this row said the mac had no counterparts, which is true only of Course Settings: the mac has its own wizard captions and they are better. So the wizard is pick-one-of-two; Course Settings is the harder question. `WINDOWS-HANDOFF.md` item 43 quotes all of them. | Small |
-| 42 | Shared Python, found here 2026-09-07: `_dropping_excluded_items` matches `excluded_items` case-insensitively while every other consumer matches exactly, so `build_site.py` gives two answers in one file. **Do not fix it by case-folding the live path** — exact matching is the deliberate rule (`gradedFolders.choices.walk.excludedItems`, reasoned in `GUI-IMPROVEMENTS.md` row 412), and case-folding breaks that case and re-introduces the app/build disagreement 412 rejected. Full write-up in `TODO.md`; `WINDOWS-HANDOFF.md` item 41. Gateable here now that `dotnet test` runs the shared Python. | Small |
-| ~~39~~ | ✅ Done 2026-09-08 — **it cannot, and that was measured.** `Plantoir.UiTests` drives the app out of process, so killing the driven `Plantoir.exe` mid-test is an ordinary test failure (`InvalidOperationException` after the 30 s patience), not a host death; the full suite ran 11/11 in 5 m 17 s with no crash. The LESSON did apply though: a dead host and a failing test are both exit 1 here too, and `batch/run-batch.ps1` would have called a dead host "TESTS FAILED (0 failed)". `windows-app/TestRunOutcome.ps1` reads the totals instead, gated by `TheTestRunReaderTellsACrashFromAFailure`. `oneAlertAtATime` re-read: compliant by ordering, and it needs a retry as well because WinUI's `ShowAsync` returns when a dialog *begins* closing — see `MAC-HANDOFF.md`. | — |
-| ~~40~~ | ✅ Done 2026-09-08 — the row check loops `specialFoldersHelp.cases` through the `CourseFrom(figure)` helper the naming test already used, and asserts at the end that both the resolved-folder and placeholder branches were reached. Measured here rather than inherited: the reversion leaves the OLD test at 5/0 and fails the new one with 2 mismatches, naming both placeholder cases. It did NOT port line for line — xUnit's `Assert` throws where XCTest records and carries on, so mismatches are collected and asserted together, or the `continue` guard the item asked for would have been dead code. | — |
-| ~~18~~ | ✅ Done 2026-09-07 — the choice at the folder picker and the dismissable notice for a restored folder both exist, and `synced folder noticed` / `synced folder accepted` are emitted. | — |
-| ~~17~~ | ✅ Done 2026-09-07 — `CourseConfiguration.RecordOnDisk` (a fresh-read recorder beside an untouched `Write`) and the interrupted-rename record under `courses/.internal/renames`. | — |
-| ~~27~~ | ✅ Done 2026-09-07 — “Restore Section N…” puts a section back to how it was when the conversation started; the assistant now saves one copy per conversation rather than one per change. | — |
-| ~~26~~ | ✅ Done 2026-09-06 — the marks checklist offers folders nested up to four levels deep (`GradedFolderChoices`), and the frozen pool is fed from the same list. | — |
-| ~~25~~ | ✅ Done 2026-09-07 — the wizard asks the skeleton question with the mac's sentences, writes `use_skeleton`, and the structure editor shows the skeleton's folders. | — |
-| ~~35~~ | ✅ Done 2026-09-07 — the Create button is three `[UiFact]` cases in `NewCourseWizardUiTests` (suite 6 → 9, green in 4 m 12 s); the new-site dialog became a written hand-check, because `deploy.ps1`'s Credential Manager target is hardcoded and `--state-dir` does not redirect it. Found on the way: started with `UseShellExecute = false` the app is handed the `dotnet test` host's PIPE std handles, which leak into the ConPTY child — every launcher then fails in one second with an empty transcript. `ConPtyProcess.Start`'s own CAUTION had already said so. | — |
-| ~~13~~ | ✅ Done 2026-09-07 — the rename sheet, the apply method, every key carried across and `class_folder`/`curriculum_folder` materialised; Add creates the folder, Remove says it stays. | — |
-| ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
-
-Two more things, one of which is now ON that list:
+Two more things worth knowing here:
 
 - **The deploy gate exists, and item 36 decided what runs it (2026-09-07).**
   `verify-deploy.ps1` publishes to every destination and every pairing against
