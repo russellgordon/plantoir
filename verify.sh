@@ -11,8 +11,12 @@ set -euo pipefail
 # folder builds from locally.
 #
 # What it does, in order:
-#   0. Runs deploy.py's pure-Python unit tests (no Docker needed) so a broken
-#      script fails in milliseconds rather than after a full image build.
+#   0. Runs the shared scripts' pure-Python unit tests (no Docker needed) so a
+#      broken script fails in milliseconds rather than after a full image
+#      build. Step 0 also RUNS deploy.sh — hollowed out with --image and a
+#      Keychain user that does not exist, so it needs no container, no network
+#      and no credentials — because a launcher that is only ever read is a
+#      launcher nobody has started (GitHub issue #129).
 #   1. Ensures the container runtime is up (shares an already-running Colima;
 #      never stops it — safe to run alongside other Colima-based toolchains).
 #   2. docker build -t quartz-teacher:dev-test .
@@ -127,13 +131,6 @@ else
   cat /tmp/verify_build_output_link_test.log
 fi
 
-if (cd scripts && python3 test_deploy_non_interactive.py) >/tmp/verify_deploy_non_interactive_test.log 2>&1; then
-  pass "deploy.py: a publish set to happen on its own refuses rather than asking (scripts/test_deploy_non_interactive.py)"
-else
-  fail "deploy.py: a publish set to happen on its own refuses rather than asking (scripts/test_deploy_non_interactive.py)"
-  cat /tmp/verify_deploy_non_interactive_test.log
-fi
-
 if (cd scripts && python3 test_deploy_course_dir_resolution.py) >/tmp/verify_deploy_course_dir_test.log 2>&1; then
   pass "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
 else
@@ -146,6 +143,17 @@ if (cd scripts && python3 test_deploy_non_interactive.py) >/tmp/verify_deploy_no
 else
   fail "deploy: a publish nobody is there to answer questions for refuses rather than waiting or guessing (scripts/test_deploy_non_interactive.py)"
   cat /tmp/verify_deploy_non_interactive_test.log
+fi
+
+# RUNS deploy.sh, where the test above only reads it. That distinction is the
+# reason this exists: the flag was written on a machine with no bash, and
+# starting the script found two things in prompt_for_cf_account that reading it
+# had not (GitHub issue #129). No Docker, no network, no credentials.
+if (cd scripts && python3 test_deploy_sh_questions.py) >/tmp/verify_deploy_sh_questions_test.log 2>&1; then
+  pass "deploy.sh: every question it can ask refuses under the flag, and is still asked without it (scripts/test_deploy_sh_questions.py)"
+else
+  fail "deploy.sh: every question it can ask refuses under the flag, and is still asked without it (scripts/test_deploy_sh_questions.py)"
+  cat /tmp/verify_deploy_sh_questions_test.log
 fi
 
 if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
