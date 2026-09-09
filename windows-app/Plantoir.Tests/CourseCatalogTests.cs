@@ -5,7 +5,7 @@ namespace Plantoir.Tests;
 
 /// <summary>
 /// The New Course wizard's province-scoped course-code picker — no contract
-/// case for this (it's visual, see WINDOWS-HANDOFF.md), so these are plain
+/// case for this (it's visual, see documentation/12-windows-app.md), so these are plain
 /// unit tests mirroring the mac's CourseCatalog.matching behaviour.
 /// </summary>
 public class CourseCatalogTests

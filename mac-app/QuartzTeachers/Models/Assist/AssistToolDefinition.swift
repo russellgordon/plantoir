@@ -119,10 +119,44 @@ nonisolated struct AssistSchemaProperty: Sendable, Equatable {
 
     // MARK: - Types
 
-    enum Kind: String, Sendable {
+    enum Kind: Sendable, Equatable {
         case string
         case integer
         case boolean
+
+        /// A string that carries a LIST, and the separator it is split on.
+        ///
+        /// Renders as `"type": "string"`, so the schema a client is sent is
+        /// byte-identical to `.string`: this is NOT a routing change and owes
+        /// no re-measurement. What it buys is that the generator can say WHICH
+        /// string parameters are list-shaped from the DECLARATION rather than
+        /// by matching English in their descriptions — and the descriptions
+        /// are measured artifacts that must not be reworded casually, so a
+        /// generator reading them would be a generator whose output depends on
+        /// prose nobody may touch.
+        case separatedList(separator: String)
+
+        /// The `type` a client is sent.
+        var jsonType: String {
+            switch self {
+            case .string, .separatedList:
+                return "string"
+            case .integer:
+                return "integer"
+            case .boolean:
+                return "boolean"
+            }
+        }
+
+        /// The separator, for a list-shaped string. `nil` for everything else.
+        var listSeparator: String? {
+            switch self {
+            case .separatedList(let separator):
+                return separator
+            case .string, .integer, .boolean:
+                return nil
+            }
+        }
     }
 
     // MARK: - Stored properties
@@ -133,7 +167,7 @@ nonisolated struct AssistSchemaProperty: Sendable, Equatable {
     // MARK: - Computed properties
 
     var json: [String: Any] {
-        return ["type": kind.rawValue, "description": description]
+        return ["type": kind.jsonType, "description": description]
     }
 
     // MARK: - Functions

@@ -1,7 +1,7 @@
 """Prints the section fingerprint used by the " — Edited" title-bar marker.
 
 Ported from `SectionPublishState.Fingerprint` (Windows, `.cs`) / the mac's
-`SectionPublishState.swift` — see WINDOWS-HANDOFF.md, "A scheduled deploy
+`SectionPublishState.swift` — see documentation/05-build-pipeline.md, "A scheduled deploy
 needs its own path to the same record". Every rule here (which files count,
 symlink one-hop resolution, sort order, hash) MUST match those two byte for
 byte; this is a wire format, not an implementation detail.

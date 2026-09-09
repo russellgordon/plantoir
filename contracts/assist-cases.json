@@ -754,6 +754,86 @@
     "planTwinsNote" : "A write with a twin is shown as a plan first. Four writes have none, deliberately: rebuild_preview changes no page, undo_last_change IS the remedy, deploy_section waits on its own button whatever plan mode says, and a cancelled scheduled deploy is remedied by scheduling it again."
   },
   "toolSchemas" : {
+    "departures" : {
+      "absentHere" : [
+        {
+          "parameter" : "preview",
+          "rejected" : "Adding it for symmetry. There is no boolean anywhere on this surface at all; the last was includeLinked, which asked the MODEL how far a publish or an unpublish should reach — the exact reasoning this design exists to keep out of a router. The rules live in AssistPublishPlanner instead, where they are written down once and tested.",
+          "why" : "On Windows a batch of edits can be made with the preview suppressed and rebuilt once at the end. Here every change rebuilds, which is what the assistant's own system prompt promises a teacher, so there is nothing for the flag to mean."
+        }
+      ],
+      "advertisedNotAccepted" : "The separator is what the SCHEMA tells the model, not the only character the runner accepts. AssistToolRunner is deliberately forgiving and splits on several — pages on semicolon or newline, codes and dates on comma, semicolon, newline and more. So a difference recorded here is a difference in what each side TELLS the model, which is worth knowing; it is not necessarily an incompatibility, and a suite should not assert one from it.",
+      "howToReadThis" : "Each entry says a parameter is a string carrying a list, on which surfaces, and the separator this surface ADVERTISES to the model. It does NOT say what the other platform does — the mac cannot check that. A suite seeing both should intersect this list with its own schemas, and there are FOUR outcomes, not three: an ARRAY there is a real type departure; a string there with a DIFFERENT separator is a separator difference, worth asserting deliberately; a string there with the SAME separator is an agreement and nothing should be asserted about it; anything else is a real disagreement. Leaving the third case out turns a suite red for an agreement, which is how this note first read.",
+      "listShapedStringParameters" : [
+        {
+          "parameter" : "add_curriculum_mentions.codes",
+          "separator" : ",",
+          "surfaces" : [
+            "mcp"
+          ]
+        },
+        {
+          "parameter" : "plan_curriculum_mentions.codes",
+          "separator" : ",",
+          "surfaces" : [
+            "mcp"
+          ]
+        },
+        {
+          "parameter" : "plan_publish_pages.pages",
+          "separator" : ";",
+          "surfaces" : [
+            "mcp"
+          ]
+        },
+        {
+          "parameter" : "plan_remember_timetable.dates",
+          "separator" : ";",
+          "surfaces" : [
+            "mcp"
+          ]
+        },
+        {
+          "parameter" : "plan_scheduled_deploy.classes",
+          "separator" : ";",
+          "surfaces" : [
+            "mcp"
+          ]
+        },
+        {
+          "parameter" : "plan_unpublish_pages.pages",
+          "separator" : ";",
+          "surfaces" : [
+            "mcp"
+          ]
+        },
+        {
+          "parameter" : "publish_pages.pages",
+          "separator" : ";",
+          "surfaces" : [
+            "local",
+            "mcp"
+          ]
+        },
+        {
+          "parameter" : "remember_timetable.dates",
+          "separator" : ";",
+          "surfaces" : [
+            "mcp"
+          ]
+        },
+        {
+          "parameter" : "unpublish_pages.pages",
+          "separator" : ";",
+          "surfaces" : [
+            "local",
+            "mcp"
+          ]
+        }
+      ],
+      "note" : "How this surface's schemas differ from the Windows server's. Emitted so that side can READ them instead of keeping a hand-written copy — the copy is what made the two surfaces drift in the first place.",
+      "notEnumeratedHere" : "Arguments the Windows server takes that this surface does not DECLARE. Mostly extra parameters on tools BOTH platforms serve — re_date_classes and read_remembered_timetable are the clearest, with the same name and different parameters on the two servers (GUI-IMPROVEMENTS.md row 447). Said precisely because the first version of this key said they were tools the mac does not serve at all, which is false: it serves both. The reason they stay in that platform's own list is that the mac does not declare those arguments, so it can neither test them nor notice when they change."
+    },
     "local" : [
       {
         "function" : {
