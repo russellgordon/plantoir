@@ -718,6 +718,64 @@ final class SharedRulesContractTests: XCTestCase {
 
     // MARK: - Special names and folder protections
 
+    /// The record of platform-worded sentences is COMPLETE, not a snapshot.
+    ///
+    /// `platformWording.keys` names every `specialNames` sentence that says
+    /// "on your Mac", so the other platform's suite can substitute its own word
+    /// rather than assert the mac's. That list was written by hand and was
+    /// already wrong the day it was written — it named two sentences when there
+    /// were three — which is the whole argument for pinning it here instead of
+    /// trusting the next reader to notice. Windows was ahead of the record:
+    /// `FolderRenameApplyTests` already substituted the word on the third
+    /// sentence while the record still said there were two.
+    func testPlatformWordedKeysAreComplete() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let platformWording: [String: Any] = try XCTUnwrap(section["platformWording"] as? [String: Any])
+        let macWord: String = try XCTUnwrap(platformWording["mac"] as? String)
+
+        var found: [String] = []
+        collectKeyPaths(saying: macWord, in: section, prefix: "", into: &found)
+        found.sort()
+
+        var recorded: [String] = try XCTUnwrap(platformWording["keys"] as? [String])
+        recorded.sort()
+
+        XCTAssertEqual(
+            found,
+            recorded,
+            "The specialNames sentences saying \"\(macWord)\" are not the ones "
+            + "platformWording.keys names. Add the new sentence to that list, or a "
+            + "Windows suite comparing against this contract will assert the mac's word "
+            + "and put it in front of a Windows teacher."
+        )
+    }
+
+    /// Every dotted key path under `node` whose string value contains `phrase`.
+    ///
+    /// `platformWording` itself is skipped: it QUOTES the platform word as its
+    /// own `mac` value and in its explanation, so walking it would make the
+    /// list contain itself and the test would pass by accident.
+    private func collectKeyPaths(
+        saying phrase: String,
+        in node: [String: Any],
+        prefix: String,
+        into found: inout [String]
+    ) {
+        for (key, value) in node {
+            if prefix.isEmpty && key == "platformWording" {
+                continue
+            }
+            let path: String = prefix.isEmpty ? key : "\(prefix).\(key)"
+            if let text = value as? String {
+                if text.contains(phrase) {
+                    found.append(path)
+                }
+            } else if let child = value as? [String: Any] {
+                collectKeyPaths(saying: phrase, in: child, prefix: path, into: &found)
+            }
+        }
+    }
+
     func testSpecialNamesSentencesMatchContract() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
 
