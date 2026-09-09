@@ -1607,6 +1607,136 @@ That sentence belongs in the alert.
   runs the same model natively with Vulkan
 
 
+## What the `TEACHERS SAY:` phrasings were worth, and five traps in measuring it
+
+Written on Windows, 2026-09-08, closing the phrasings half of
+[issue #66](https://github.com/russellgordon/plantoir/issues/66). The numbers
+and their conditions are in `research/ai-assist/teachers-say-results.txt`; this
+is the reasoning, which is the half that does not fit in a results header. **The
+traps are the part that travels — the mac meets four of them the moment it
+measures anything.** Reference: `GUI-IMPROVEMENTS.md` row 457, branch
+`issue/41-teachers-say-phrasings`.
+
+**What it fixed.** `PlantoirTools.cs` had no `TEACHERS SAY:` clause at all on
+`add_next_class`, `plan_add_next_class`, `read_remembered_timetable` and
+`remember_timetable` — seventeen phrasings the mac shows the model and this
+side showed it nowhere. Then `dev` was merged mid-branch and the mac's six new
+MCP tools arrived, three of them (`add_classes`, `list_courses`,
+`make_room_for_classes`) carrying clauses their Windows equivalents lacked, so
+it ended as twenty phrasings across seven tools. All are now the contract's,
+character for character, and **pinned by a test** —
+`AssistSurfaceContractTests.TheTriggerPhrasingsAreTheContractsOwn`, with
+`check_section` as the one agreed departure.
+
+**Why only ten needed measuring.** `AssistAgent.ForTheLocalModel` holds
+thirteen names. Of the seven tools, only `add_next_class` and
+`read_remembered_timetable` are in it; the rest are read by Claude Code over
+MCP and by nothing else, and `Briefly()` puts the clause FIRST in what the
+local model reads. Issue #66 asked for the measurement and said only this
+side could take it — the mac cannot run this hardware.
+
+**Numbers, with the hardware.** Intel Core i5-8365U (4 cores / 8 logical),
+15.7 GB RAM — which picks the SMALL tier, the 16 GiB Large threshold being
+just out of reach — Intel UHD Graphics 620 over Vulkan with
+`--n-gpu-layers 999`, qwen2.5-1.5b-instruct-q4_k_m, llama.cpp build 10435,
+the exact arguments `LocalModel.BuildArguments` produces. 25 probes × 5
+trials, temperature 0. **The defensible headline is the probes under test:
+40/50 → 50/50, with no control regressing.** Overall went 95/125 (76%) →
+110/125 (88%), but a third of that gain is one control — "That was wrong,
+revert it" — flipping 0/5 → 5/5 for no reason anything in the change
+explains, so it is not claimed as a benefit. Median call 7.9 s → 6.9 s;
+server resident cost 1,494 MB.
+
+**The two probes the phrasings fixed were MISROUTES, not declines** —
+"Set up next day's lesson" was reaching `schedule_deploy` five times out of
+five, and "When does this class meet?" was reaching `check_section`. A
+sentence about writing a page answered by the tool that puts work in front of
+students is the expensive kind of wrong.
+
+**Five traps. This is the part that travels, and the mac meets four of them
+the moment it measures anything.** Three were found by adversarial review
+rather than by writing the code.
+
+1. **A hand copy of a shipping list goes stale silently.**
+   `research/ai-assist/narrow-tools.py` copies `ForTheLocalModel` by hand. It
+   was right when committed 2026-08-14 and wrong from 2026-08-17 (4089c752),
+   when the set went from fifteen names to thirteen: it was still keeping
+   four `plan_` tools the app no longer shows and MISSING both tools about to
+   be measured. Nothing could catch it — a research script runs by hand,
+   months apart — so `NarrowToolsMirrorTests` now fails on drift, proved by
+   perturbing the Python and watching it name the offender. REJECTED:
+   adjusting it by hand at measurement time, which is the arrangement that
+   had just failed. The three results files measured inside that window are
+   sound and are named in the script, so nobody discards them.
+2. **The dateline decides the answer.** `Say` appends
+   `" (Today is YYYY-MM-DD, a Weekday.)"` to every message the model sees. A
+   first pair of runs omitted it and was thrown away — but the ten test
+   probes were identical, leaving one clean comparison: **25/50 without the
+   dateline against 40/50 with it.** Three of those probes pass on the
+   dateline alone, with no phrasing change at all, so a before/after run
+   without it would have handed the phrasings credit for work the app was
+   already doing. `trimmed-surface-results.txt` had already recorded the same
+   line being worth fifteen points when prepended instead.
+3. **There are THREE interception layers before the model, not one:**
+   `PreviewAskedForPlainly` (thirteen exact sentences),
+   `AssistCardCommand.Matching` (`FixedShapes` plus its three parsers), and
+   four inline regexes in `AssistAgent.CardCommand` itself. Three controls
+   were sentences the app answers WITHOUT the model, so they measured
+   nothing. The mac's `AssistCardCommand.swift` has the same shape.
+4. **Making a research script stricter can delete a control.** Requiring the
+   course code in `narrow-tools.py` read as a tightening and would have
+   silently turned `trimmed-surface-suite.py --real-course` into a no-op,
+   destroying the A/B its own docstring rests on. Optional now, and says why.
+5. **A parity claim is only true of the surface it was checked against, and
+   of the PART of it that was checked.** The gap was closed against a 25-tool
+   shared surface and reopened hours later by the mac's six new tools. And
+   "the wording matches now" would be false: what matches is the
+   `TEACHERS SAY:` CLAUSE. Of the 32 shared tools, **29 full descriptions
+   differ**, and of the thirteen the local model is shown, **five differ in
+   the text `Briefly()` produces**. Re-run the comparison; never quote a
+   count from a write-up.
+
+**Also corrected, because it would have sent the next Windows session
+wrong:** `tools-from-contract.py` and `routing-suite.py` both told a reader
+to start a measurement from the contract. On Windows that scores the MAC's
+descriptions on Windows hardware, since the contract is generated there.
+
+**Still wrong on both platforms, recorded rather than fixed:** "Put it online
+tomorrow morning at 6:30" routes to `deploy_section` rather than
+`schedule_deploy` 5/5 (fails safe — deploying is gated by the button — but
+the teacher is asked to deploy NOW); "Don't send it in the morning after all"
+declines 5/5; and "Delete the Unit 1 folder" still picks a tool instead of
+declining, which `AssistAgent`'s own comment already names as unsolved.
+
+Reference: `windows-app/Plantoir.Mcp/PlantoirTools.cs`,
+`windows-app/Plantoir.Tests/AssistSurfaceContractTests.cs`,
+`windows-app/Plantoir.Tests/NarrowToolsMirrorTests.cs`,
+`research/ai-assist/teachers-say-suite.py`. The reasoning behind the two
+surfaces diverging is under "The two MCP surfaces are not the same product",
+above.
+
+**Only some of a clause gap is a routing change, and the split decides the
+work.** `AssistAgent.ForTheLocalModel` holds thirteen names. Of the seven tools
+whose `TEACHERS SAY:` clause Windows was missing, only `add_next_class` and
+`read_remembered_timetable` are in it — the rest are read by Claude Code over
+MCP and by nothing else. `Briefly()` puts the clause FIRST in what the local
+model reads, so those two are a change to the router's prompt and the others
+are not. Ten phrasings needed measuring; ten did not.
+
+**Do not start a Windows measurement from `tools-from-contract.py`.** The
+contract is generated on the mac, so its descriptions are the mac's. Dump the
+live surface with `dump-tools.ps1` and narrow it with `narrow-tools.py`. That
+file and `routing-suite.py` now say so; they used to say the opposite.
+
+**Two things the mac owes from this, and they are issues rather than lines
+here:** [#113](https://github.com/russellgordon/plantoir/issues/113)
+(`check_section`'s fourth trigger phrasing, the last clause difference between
+the two MCP surfaces) and
+[#114](https://github.com/russellgordon/plantoir/issues/114) (the two servers'
+tool descriptions differing in the sentence the router reads, and
+`unpublish_pages` describing different behaviour — two descriptions of one
+behaviour, or two behaviours?).
+
 ---
 
 [◀ Previous: The macOS App](09-mac-app.md) · [Back to index](README.md) · [Next: Release Strategy ▶](11-release-strategy.md)

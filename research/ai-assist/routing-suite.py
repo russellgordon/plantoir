@@ -16,6 +16,11 @@ For a measurement of what actually ships:
     python3 research/ai-assist/tools-from-contract.py local > /tmp/real-tools.json
     python3 research/ai-assist/shipped-surface-suite.py 8099 10 /tmp/real-tools.json
 
+On WINDOWS, do NOT start from the contract: it is generated from the mac, so
+its descriptions are the mac's and not the ones Windows' server publishes. Dump
+the live surface with `dump-tools.ps1` and narrow it with `narrow-tools.py`.
+See the note in `tools-from-contract.py`.
+
 A routing score measured against tools the app does not ship is worse than no
 score, because it reads as evidence.
 """
