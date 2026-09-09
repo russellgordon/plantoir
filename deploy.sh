@@ -509,18 +509,29 @@ if [[ -n "$TO_FOLDER" ]]; then
     # script would then publish, successfully, against the wrong one.
     _PREVIEW_EXTRA=()
     if [[ "$NON_INTERACTIVE" == "true" ]]; then _PREVIEW_EXTRA+=(--non-interactive); fi
-    # `$?` is captured from the command ITSELF, not from inside `if ! cmd`.
-    # With `!` in front of a pipeline the exit status IS the logical NOT, so
-    # `$?` in the then-branch is 0 and never 3 — measured on bash 5.3.15:
-    #   bash -c 'f(){ return 3; }; if ! f; then echo "$?"; fi'   ->  0
-    # This branch was therefore dead from the day it was written: a preview.sh
-    # refusal reached "Could not rebuild this site for publishing." and exited
-    # 1, so the scheduled wrapper recorded an ordinary failure where the
-    # teacher needed to be told a question had gone unanswered. Found by review
-    # on the Windows side 2026-09-09, whose deploy.ps1 mirror reads
-    # $LASTEXITCODE and was correct.
-    "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only "${_PREVIEW_EXTRA[@]+"${_PREVIEW_EXTRA[@]}"}"
-    _rc=$?
+    # `|| _rc=$?`, and BOTH halves of that are load-bearing under this script's
+    # `set -euo pipefail` (line 2). Two wrong shapes were shipped here in turn,
+    # so both are written down:
+    #
+    #   if ! CMD; then _rc=$?          `!` in front of a pipeline makes the
+    #                                  status the logical NOT, so `$?` is 0 and
+    #                                  the -eq 3 test below could NEVER fire.
+    #                                  Measured, bash 5.3.15:
+    #                                    if ! f; then echo "$?"; fi   ->  0
+    #
+    #   CMD                            `set -e` aborts the whole script the
+    #   _rc=$?                         instant CMD is non-zero, so `_rc=$?` is
+    #                                  never reached and NOTHING is printed.
+    #                                  Measured the same day: the guard line
+    #                                  never ran and the script exited 3 in
+    #                                  silence.
+    #
+    # An `||` list is exempt from `set -e`, and the right-hand side runs with
+    # `$?` still holding the real code. Verified both ways in
+    # scripts/test_deploy_non_interactive.py, which RUNS the comparison rather
+    # than asserting a shape.
+    _rc=0
+    "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only "${_PREVIEW_EXTRA[@]+"${_PREVIEW_EXTRA[@]}"}" || _rc=$?
     if [[ $_rc -ne 0 ]]; then
       if [[ $_rc -eq 3 ]]; then
         echo "❌ Could not rebuild this site for publishing: it needed an answer."

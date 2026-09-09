@@ -666,11 +666,21 @@ does its own post-run work.
   which is how the Windows side came to design a `.noted` sidecar against a
   mark this side does not keep.
 
-  **Windows marks it differently, and the difference is instructive.** That side
-  keeps the mark in a `.noted` SIDECAR file rather than in the record, because
-  its record's own modification time is what the notice is dated from — writing
-  a mark into it would change that date and file last night's problem under this
-  morning, which is the mistake an earlier draft here made and undid.
+  **Windows still needs a mark, and that is a real difference rather than a
+  copied one.** This paragraph used to say the sidecar existed because writing
+  a mark into the record would repeat "the mistake an earlier draft here made
+  and undid" — which drew a contrast with a mac behaviour that no longer
+  exists. It was written against the stale description above, and #135 is where
+  the mac said so.
+
+  The honest version: **this side needs no mark at all**, because the run IS
+  Plantoir and writes the line once as it finishes. Windows cannot do that —
+  Task Scheduler runs plain PowerShell with nothing of the app loaded — so the
+  line is written by a sweep when the app next opens, and a sweep with no memory
+  would write it again every launch. Hence a `.noted` sidecar, kept beside the
+  record rather than inside it because the record's modification time is what
+  dates the notice. Two platforms, one property — a line per run, dated to the
+  run — reached the only way each of them can.
 
 **Where a teacher meets it.** The sentence sits at the top of the section, above
 the console — a teacher opening a section after a failed overnight publish is

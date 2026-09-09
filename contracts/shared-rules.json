@@ -215,13 +215,13 @@
         "carries": "the course code, the section number, and where it published",
         "event": "scheduled publish finished",
         "why": "The positive case, and it is here for the same reason the two failures are, read the other way round: a scheduled publish that leaves NO trace cannot be told from one that never happened. Without this line the trail can answer \u201cwhy did my site not update?\u201d and cannot answer \u201cdid it?\u201d \u2014 and a teacher wondering whether last night's publish went out has nowhere to look. Added 2026-09-09 on Russell's instruction, after a real scheduled run showed the failures recorded and the successes silent.",
-        "appliesOnWhy": "Owed on both platforms for the same reason as the other two. Windows records neither today; see scheduledPublishStopped.platformDifferences and GitHub issue #130."
+        "appliesOnWhy": "Owed on both platforms for the same reason as the other two, and RECORDED on both as of 2026-09-09: the mac when Russell asked for it, Windows the same day (GitHub issue #130). This said \"Windows records neither today\" until that landed; nothing reads appliesOnWhy, so only a reader would have been misled, which is the quiet way a contract stops being true. scheduledPublishStopped.platformDifferences is where the two are compared."
       },
       {
         "carries": "the course code, the section number, and which destination stopped",
         "event": "scheduled publish did not finish",
         "why": "The same silence as \u201cneeded an answer\u201d, from a different cause \u2014 a revoked token, a network that was down, a build that failed. It is a SEPARATE event because the other one's own wording says a question went unasked, and filing a revoked token under it would make the trail say something untrue about the one run a teacher is trying to understand. Both matter for the same reason: a scheduled publish that did not happen is invisible unless something writes it down.",
-        "appliesOnWhy": "Added on the mac 2026-09-09, when Russell widened the readout to ANY failed scheduled publish rather than only an unanswered question. Windows records only the question case today and is owed this one; see scheduledPublishStopped.platformDifferences and GitHub issue #130. Until then the Windows suite is red on this list, which is the mechanism working rather than damage."
+        "appliesOnWhy": "Added on the mac 2026-09-09, when Russell widened the readout to ANY failed scheduled publish rather than only an unanswered question, and adopted by Windows the same day (GitHub issue #130) — so nothing is owed and neither suite is red on this list. The earlier wording said Windows records only the question case and that its suite was red until it caught up; that was true for about six hours and is kept here only as the reason this sentence changed."
       },
       {
         "carries": "the course code, the section number, and which destination stopped \u2014 or, when the BUILD stopped for a question, that it stopped before any destination was reached, because none was",
