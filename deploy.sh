@@ -502,7 +502,19 @@ if [[ -n "$TO_FOLDER" ]]; then
   if grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
     echo "🔁 This site was built by a preview, which bakes in a live-reload script"
     echo "   that students' browsers would ask about. Rebuilding it for publishing…"
-    if ! "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only; then
+    # Forward the flag. Without it this rebuild is a SECOND way a scheduled
+    # publish can meet a question nobody is there to answer: preview.sh has its
+    # own course-code guard, and preview.sh has no `set -e`, so unattended it
+    # would take the [Y/n] default and rebuild a DIFFERENT course — which this
+    # script would then publish, successfully, against the wrong one.
+    _PREVIEW_EXTRA=()
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then _PREVIEW_EXTRA+=(--non-interactive); fi
+    if ! "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only "${_PREVIEW_EXTRA[@]+"${_PREVIEW_EXTRA[@]}"}"; then
+      _rc=$?
+      if [[ $_rc -eq 3 ]]; then
+        echo "❌ Could not rebuild this site for publishing: it needed an answer."
+        exit 3
+      fi
       echo "❌ Could not rebuild this site for publishing."
       exit 1
     fi

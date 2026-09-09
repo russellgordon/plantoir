@@ -504,13 +504,13 @@
     },
     "deployExtras" : [
       {
+        "asymmetry" : "deploy.sh looks for this flag TWICE — once in a pre-scan before its 'Open' course-code guard, which asks a question before the flag loop runs, and once in the loop itself. deploy.ps1 needs no pre-scan: it parses its flags first and asks afterwards.",
         "flag" : "--non-interactive",
         "meaning" : "Refuse rather than ask. Every question this publish could put to a teacher is answered by stopping, saying which question it was, and exiting 3.",
         "usedFor" : [
           "a publish set to happen on its own"
         ],
-        "why" : "A scheduled publish runs at half six with the app closed, so every question is one NOBODY will answer, and both ways that ended have been seen. With a terminal, deploy.py's `input()` BLOCKS — measured at 45 minutes, the launcher and its Python child still waiting when they were swept up, and the teacher's site simply not updated in the morning with nothing said. Without one, `prompt()` returns its DEFAULT silently and a Netlify name conflict auto-suffixes, so the site is published to an address nobody chose. Exit code 3 means \"a question went unanswered\" and nothing else, so a caller can tell it from an ordinary failure and say something true to the teacher; every other exit in deploy.py and in both launchers is 0 or 1. PASSED BY THE SCHEDULED WRAPPER, never by the app's Deploy button — whether anybody is there to answer is a fact about who is RUNNING, not about the course, which is why it is not in `deployArguments`. Parsing it is not enough: both launchers must FORWARD it to deploy.py, where the site-name question lives.",
-        "asymmetry" : "deploy.sh looks for this flag TWICE — once in a pre-scan before its 'Open' course-code guard, which asks a question before the flag loop runs, and once in the loop itself. deploy.ps1 needs no pre-scan: it parses its flags first and asks afterwards."
+        "why" : "A scheduled publish runs at half six with the app closed, so every question is one NOBODY will answer, and both ways that ended have been seen. With a terminal, deploy.py's `input()` BLOCKS — measured at 45 minutes, the launcher and its Python child still waiting when they were swept up, and the teacher's site simply not updated in the morning with nothing said. Without one, `prompt()` returns its DEFAULT silently and a Netlify name conflict auto-suffixes, so the site is published to an address nobody chose. Exit code 3 means \"a question went unanswered\" and nothing else, so a caller can tell it from an ordinary failure and say something true to the teacher; every other exit in deploy.py and in both launchers is 0 or 1. PASSED BY THE SCHEDULED WRAPPER, never by the app's Deploy button — whether anybody is there to answer is a fact about who is RUNNING, not about the course, which is why it is not in `deployArguments`. Parsing it is not enough: both launchers must FORWARD it to deploy.py, where the site-name question lives."
       },
       {
         "flag" : "--diagnose",
@@ -536,15 +536,18 @@
       }
     ],
     "nonInteractive" : {
-      "note" : "What `--non-interactive` must refuse, on BOTH platforms. The list is the point: a flag that refuses in six places on one platform and four on the other is a scheduled publish that hangs on one of them. deploy.py is shared Python, so those refusals cannot drift; the launcher's own are per-platform and are written out here so the second one is copied rather than invented.",
-      "notRefused" : {
-        "question" : "Fix course code to '<CODE>'? [Y/n] — the guard for a code ending in a digit zero",
-        "state" : "DELIBERATELY UNCHANGED, and proposed rather than decided — see WINDOWS-HANDOFF.md and MAC-HANDOFF.md, 2026-09-06.",
-        "whatHappensToday" : "TWO different unattended failures, one per launcher, and a scheduled publish meets both because it builds before it publishes. `preview.sh` has no `set -e`: the read fails at end of input, the answer variable stays empty, the [Y/n] DEFAULT is taken, and the build retargets a DIFFERENT course code — announcing it with “Using corrected course code”, which nobody is there to read. `deploy.sh` has `set -euo pipefail`: the same failed read ends the script on the spot with exit 1. Measured: it prints the guard's two explanatory lines (“It looks like you entered 'ICS30'…”) and then stops — no prompt text, no error, no reason. So the shape today is “builds the wrong course, then stops mid-sentence”.",
-        "whoItReaches" : "MEASURED 2026-09-06, and it is narrower than the first draft of this entry claimed. The guard matches three letters, a digit and a zero — and NO code in either catalogue the wizard offers matches it: 0 of 1930 Ontario codes and 0 of 117 British Columbia codes (BC codes are MFMP-10 / MPREC11 shaped). A course code is free text up to twelve characters (CourseCodeRule), so it is still reachable — but only by a code a teacher typed freehand, which is exactly the case the guard was written for. That cuts BOTH ways in the decision below: refusing breaks far fewer real courses than feared, and the whole prompt is rarer than it looks.",
-        "why" : "Both candidate answers are defensible, so it is a product decision rather than a repair. REFUSING with a message is better than dying wordlessly but leaves those courses unpublishable unattended, and it needs a matching check in the app so the teacher hears about it when they set the alarm rather than the next morning. KEEPING THE CODE AS TYPED makes them work: the code came from course_config.json rather than a keyboard, so there is no typo to fix, and a genuine typo still fails loudly at “Course folder not found”. What is not in question is that the guard, written for a person typing at a prompt, is wrong for a room with nobody in it."
-      },
+      "note" : "What `--non-interactive` must refuse, on BOTH platforms. The list is the point: a flag that refuses in six places on one platform and four on the other is a scheduled publish that hangs on one of them. deploy.py is shared Python, so those refusals cannot drift; the launcher's own are per-platform and are written out here so the second one is copied rather than invented. The course-code guard is refused as of 2026-09-09; it is the FIRST entry below, and the entry carries what was rejected and why.",
       "refusals" : [
+        {
+          "bothLaunchers" : "deploy.sh AND preview.sh, and the second is the one that is easy to miss. A scheduled publish BUILDS before it publishes, and the mac's launchd agent runs preview.sh --build-only directly. preview.sh has no `set -e`, so without the flag its read fails at end of input, `${_ans:-Y}` takes the DEFAULT, and the build retargets a DIFFERENT course code — which then publishes successfully against the wrong course. That is a worse failure than a refusal, because nothing looks wrong.",
+          "question" : "Fix course code to '<CODE>'? [Y/n] — the guard for a code ending in a digit zero",
+          "reachedWhen" : "The course code matches three letters, a digit and a zero. DECIDED by Russell 2026-09-09 to refuse; it was deliberately unchanged before that, and the reasoning both ways is kept below because it was measured rather than guessed.",
+          "refuse" : "Say which question could not be asked, and that publishing or previewing this section once from Plantoir sorts it out.",
+          "rejected" : "KEEPING THE CODE AS TYPED, which was the other defensible answer and is recorded so it is not re-proposed as new: by the time a schedule exists the code came from course_config.json rather than a keyboard, so there is no typo to fix, and a genuinely wrong code still fails loudly at \"Course folder not found\". It was rejected because a silent retarget on the build leg is indistinguishable from success, and because a refusal that names the question is consistent with every other question under this flag. The cost is real and worth stating: a teacher whose course code is hand-typed in that shape — ENG10, MAT10 — cannot publish unattended until the code is changed.",
+          "whatHappenedBefore" : "TWO different unattended failures, one per launcher, and a scheduled publish meets both because it builds before it publishes. `preview.sh` has no `set -e`: the read fails at end of input, the answer variable stays empty, the [Y/n] DEFAULT is taken, and the build retargets a DIFFERENT course code — announcing it with “Using corrected course code”, which nobody is there to read. `deploy.sh` has `set -euo pipefail`: the same failed read ends the script on the spot with exit 1. Measured: it prints the guard's two explanatory lines (“It looks like you entered 'ICS30'…”) and then stops — no prompt text, no error, no reason. So the shape today is “builds the wrong course, then stops mid-sentence”.",
+          "where" : "launcher",
+          "whoItReaches" : "MEASURED 2026-09-06, and it is narrower than the first draft of this entry claimed. The guard matches three letters, a digit and a zero — and NO code in either catalogue the wizard offers matches it: 0 of 1930 Ontario codes and 0 of 117 British Columbia codes (BC codes are MFMP-10 / MPREC11 shaped). A course code is free text up to twelve characters (CourseCodeRule), so it is still reachable — but only by a code a teacher typed freehand, which is exactly the case the guard was written for. That cuts BOTH ways in the decision below: refusing breaks far fewer real courses than feared, and the whole prompt is rarer than it looks."
+        },
         {
           "question" : "Paste Netlify token",
           "reachedWhen" : "Netlify is not connected on this computer.",
@@ -617,6 +620,15 @@
           "the stop before a deploy"
         ],
         "why" : "Ending the host-side script leaves the build or server running INSIDE the container. Stop mode reclaims them, and it finds them by working directory — so it catches a running BUILD as well as a server, which is why a stop that has not finished will kill a rebuild that has just started."
+      },
+      {
+        "flag" : "--non-interactive",
+        "meaning" : "Refuse rather than ask. preview.sh asks one question — the 'Open' course-code guard — and under this flag it says which question it could not ask and exits 3, the same code deploy.sh and deploy.py use for it.",
+        "usedFor" : [
+          "the BUILD leg of a publish set to happen on its own",
+          "the rebuild deploy.sh does when a preview-built site would otherwise be published"
+        ],
+        "why" : "preview.sh needs this even though it publishes nothing, and the reason is the failure it prevents rather than tidiness. It has no `set -e`: unattended, the guard's read fails at end of input, `${_ans:-Y}` takes the DEFAULT, and the build quietly retargets a DIFFERENT course code — which the deploy then publishes successfully, against the wrong course. Nothing looks wrong. A refusal is the better failure. Two callers pass it: the mac's launchd wrapper runs preview.sh directly for the build leg, and deploy.sh forwards it to its own rebuild."
       }
     ],
     "setup" : [

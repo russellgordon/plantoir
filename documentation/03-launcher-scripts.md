@@ -300,6 +300,14 @@ Recreating the container is cheap because all state lives in the bind mount.
   pseudo-terminal so a question can come back as a dialog. What it refuses is
   listed in `contracts/app-rules.json` → `launcherFlags.nonInteractive`, and
   the flag itself is registered in `launcherFlags.deployExtras`.
+
+  **`preview.sh` takes it too**, and needs to: a scheduled publish BUILDS
+  before it publishes, the mac's launchd agent runs `preview.sh --build-only`
+  directly, and `deploy.sh` forwards the flag to its own rebuild. `preview.sh`
+  has no `set -e`, so without the flag its own course-code guard reads at end
+  of input, takes the `[Y/n]` DEFAULT, and rebuilds a DIFFERENT course — which
+  is then published successfully against the wrong one. A refusal is the
+  better failure. Registered in `launcherFlags.preview`.
 - Finally runs `deploy.py` inside the container
   (see [Deployment](07-deployment.md)).
 

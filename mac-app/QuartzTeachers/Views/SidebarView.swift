@@ -87,7 +87,22 @@ struct SidebarView: View {
                                     sectionNumber: sectionNumber,
                                     generation: scheduleGeneration
                                 )
-                                sectionRowLabel(sectionNumber: sectionNumber, scheduledFor: scheduledFor)
+                                // Read from disk during the row's render, the
+                                // same way the clock is asked of launchd: a
+                                // teacher who fixes the problem or dismisses
+                                // the notice should see the badge go without
+                                // the sidebar being rebuilt.
+                                let stoppedPublish: ScheduledPublishOutcome.Stopped? =
+                                    stoppedPublishBadge(
+                                        courseCode: course.code,
+                                        sectionNumber: sectionNumber,
+                                        generation: workspace.stoppedPublishGeneration
+                                    )
+                                sectionRowLabel(
+                                    sectionNumber: sectionNumber,
+                                    scheduledFor: scheduledFor,
+                                    stoppedPublish: stoppedPublish
+                                )
                                     .tag(SidebarSelection.section(course.code, sectionNumber))
                                     .accessibilityIdentifier("sidebar-\(course.code)-section\(sectionNumber)")
                                     .contextMenu {
@@ -507,18 +522,58 @@ struct SidebarView: View {
 
 
 
-    /// A section's row, wearing a clock when it is set to deploy on its own.
+    /// Whether this section has a stopped scheduled publish to warn about.
+    ///
+    /// `generation` is unused inside and that is the point: naming it as an
+    /// argument is what makes SwiftUI re-read the disk when it changes, which
+    /// is how the badge disappears the moment the teacher dismisses the notice
+    /// in the section view. `scheduledDeployTime` beside it takes one for the
+    /// identical reason.
+    func stoppedPublishBadge(
+        courseCode: String,
+        sectionNumber: Int,
+        generation: Int
+    ) -> ScheduledPublishOutcome.Stopped? {
+        return ScheduledPublishOutcome.stopped(
+            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            course: courseCode,
+            section: sectionNumber
+        )
+    }
+
+    /// A section's row, wearing a clock when it is set to deploy on its own
+    /// and a warning when a publish that was set to happen on its own did not
+    /// get through.
+    ///
+    /// The warning is here rather than only inside the section because a
+    /// teacher who does not know which section failed cannot open the right
+    /// one — and not knowing is the entire problem this feature exists for.
     @ViewBuilder
-    func sectionRowLabel(sectionNumber: Int, scheduledFor: Date?) -> some View {
-        if let scheduledFor {
+    func sectionRowLabel(
+        sectionNumber: Int,
+        scheduledFor: Date?,
+        stoppedPublish: ScheduledPublishOutcome.Stopped? = nil
+    ) -> some View {
+        if scheduledFor != nil || stoppedPublish != nil {
             HStack {
                 Label("Section \(sectionNumber)", systemImage: "doc.richtext")
                 Spacer()
-                Image(systemName: "clock")
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("scheduledDeployBadge-section\(sectionNumber)")
+                if stoppedPublish != nil {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .accessibilityIdentifier(
+                            "stoppedPublishBadge-section\(sectionNumber)"
+                        )
+                }
+                if let scheduledFor {
+                    Image(systemName: "clock")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier(
+                            "scheduledDeployBadge-section\(sectionNumber)"
+                        )
+                        .help(SidebarView.scheduledDeployTooltip(for: scheduledFor))
+                }
             }
-            .help(SidebarView.scheduledDeployTooltip(for: scheduledFor))
         } else {
             Label("Section \(sectionNumber)", systemImage: "doc.richtext")
         }

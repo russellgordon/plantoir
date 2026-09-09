@@ -1210,6 +1210,69 @@ final class SharedRulesContractTests: XCTestCase {
         }
     }
 
+    // MARK: - A scheduled publish that stopped
+
+    /// The sentences a teacher reads are the contract's, filled in.
+    ///
+    /// The `neededAnAnswer` wording is Windows' own, adopted verbatim so both
+    /// apps say one thing about one problem; `didNotFinish` is new on this
+    /// side, because Windows does not record that case yet.
+    func testTheStoppedPublishSentencesAreTheContractsOwn() throws {
+        let section: [String: Any] = try SharedRulesContractTests
+            .section("scheduledPublishStopped")
+        let sentences: [String: Any] = try XCTUnwrap(section["sentences"] as? [String: Any])
+
+        let cases: [(ScheduledPublishOutcome.Kind, String)] = [
+            (.neededAnAnswer, "neededAnAnswer"),
+            (.didNotFinish, "didNotFinish"),
+        ]
+        for (kind, key) in cases {
+            let template: String = try XCTUnwrap(sentences[key] as? String)
+            let expected: String = template
+                .replacingOccurrences(of: "{course}", with: "ICS3U")
+                .replacingOccurrences(of: "{section}", with: "2")
+                .replacingOccurrences(of: "{destination}", with: "Netlify")
+            let actual: String = ScheduledPublishOutcome.sentence(
+                for: ScheduledPublishOutcome.Stopped(
+                    kind: kind, destination: "Netlify", when: Date()
+                ),
+                course: "ICS3U",
+                section: 2
+            )
+            XCTAssertEqual(
+                actual, expected,
+                "The \(key) sentence and contracts/shared-rules.json → "
+                + "scheduledPublishStopped.sentences disagree. Both apps show this to a "
+                + "teacher; change it in the contract and in both apps, or not at all."
+            )
+        }
+    }
+
+    /// Every kind the contract names is a kind the app has, and the other way
+    /// round — so a kind added on one platform cannot be missed on the other.
+    func testTheStoppedPublishKindsAreTheOnesTheContractNames() throws {
+        let section: [String: Any] = try SharedRulesContractTests
+            .section("scheduledPublishStopped")
+        let kinds: [String: Any] = try XCTUnwrap(section["kinds"] as? [String: Any])
+
+        var named: [String] = []
+        for key in kinds.keys {
+            named.append(key)
+        }
+        named.sort()
+
+        var built: [String] = []
+        for kind in ScheduledPublishOutcome.Kind.allCases {
+            switch kind {
+            case .neededAnAnswer: built.append("neededAnAnswer")
+            case .didNotFinish: built.append("didNotFinish")
+            }
+        }
+        built.sort()
+
+        XCTAssertEqual(built, named)
+    }
+
     // MARK: - Stopping a section's preview
 
     /// The mac app does not implement this rule — it shells out to
