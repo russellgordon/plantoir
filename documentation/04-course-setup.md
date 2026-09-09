@@ -226,8 +226,15 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > rewritten to the new one on the same line and the old key removed, so the
 > page shows a one-line change in Obsidian. Nothing converts a course by
 > hand, and nothing needs to: the build reads both spellings. (The macOS app
-> kept the old key inverted until then; `contracts/file-formats.json` →
-> `pageVisibility.writingRules` carries the rule and the reasoning.) A page with
+> kept the old key inverted until 2026-09-09, when it adopted this too —
+> issue #107; `contracts/file-formats.json` → `pageVisibility.writingRules`
+> carries the rule and the reasoning, and `writingCases` beside it is the
+> runnable list both suites now check themselves against.) Two things are
+> deliberately NOT migrations: restoring a backup puts back the spelling the
+> backup held, because a restore is not an edit; and adding a section writes
+> the new section's `publishForSection<N>` while leaving the other sections'
+> keys exactly as they were, because adding a section changes nothing about
+> what any existing section publishes. A page with
 > **no** publication key at all is visible, so forgetting the key leaves work
 > showing rather than making it disappear unnoticed.
 

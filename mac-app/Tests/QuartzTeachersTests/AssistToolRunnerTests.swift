@@ -1238,10 +1238,11 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertTrue(text(ofPage: "Unit 1, Day 1", in: made.course).contains("publish: false"))
     }
 
-    /// The older spelling means the OPPOSITE, is read correctly, and is written
-    /// back in the spelling the teacher used.
+    /// The older spelling means the OPPOSITE, is read correctly, and is
+    /// MIGRATED to the current key the first time the assistant changes what
+    /// the page says — end to end, through the tool a teacher actually reaches.
     @MainActor
-    func testTheOlderDraftSpellingIsReadAndKept() async throws {
+    func testTheOlderDraftSpellingIsReadAndMigrated() async throws {
         let made = try makeRunner()
         defer { try? FileManager.default.removeItem(at: made.root) }
 
@@ -1271,8 +1272,12 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertFalse(published.shouldContinue)
         let after: String = text(ofPage: "Unit 1, Day 1", in: made.course)
-        XCTAssertTrue(after.contains("draft: false"), "The teacher's own spelling is kept, inverted.")
-        XCTAssertFalse(after.contains("publish:"), "No second key is invented behind their back.")
+        XCTAssertTrue(after.contains("publish: true"),
+                      "The page is migrated to the current spelling: \(after)")
+        XCTAssertFalse(after.contains("draft:"),
+                       "The legacy key goes, or the page carries two lines that mean opposite things.")
+        XCTAssertTrue(after.contains("created: 2026-09-08T07:00:00.000-0400"),
+                      "Only the visibility line moves — every other line is the teacher's.")
     }
 
     /// Choosing classes by date, so "hide everything from next Monday on" is

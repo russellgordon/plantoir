@@ -1582,6 +1582,14 @@ survives untouched where a course still uses it, a key the conversation ADDED
 is removed again, and every other section's keys plus the whole page body stay
 byte for byte.
 
+The first of those is worth saying out loud now that an ordinary edit
+MIGRATES that spelling (`AssistPageVisibility.setting`, issue #107): a restore
+still does not, and that is the point. A restore's job is to put back what the
+backup held, so a page the backup carried as `draftSection2: false` comes back
+that way. Migrating during a restore would mean handing the teacher something
+their backup never contained, in the one operation whose whole promise is that
+it does not.
+
 The section folder is emptied and refilled rather than swapped, for the same
 reason `restoreBackup` documents: Obsidian holds the folder open.
 
