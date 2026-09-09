@@ -213,7 +213,7 @@ to stop.
 ## Config is the contract
 
 `course_config.json` is shared between the app, the wizard, and the build.
-See [`documentation/08-course-config-reference.md`](documentation/08-course-config-reference.md).
+The full key-by-key reference is above.
 Keys the Windows settings UI must round-trip (per-section maps use
 `{"sections": {"sectionN": value}}`):
 
