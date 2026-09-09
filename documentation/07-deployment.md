@@ -334,7 +334,7 @@ pseudo-terminal rather than reasoning about it:
   instructions were invisible — and when they mistyped it they saw **nothing
   at all** before the script exited 1.
 - On the SUCCESS path the captured value was the instructions **and** the id:
-  115 bytes where 32 were meant. That blob went to `set_cf_account_keychain`,
+  **519 bytes where 32 were meant** (the here-doc body is 486 of them). That blob went to `set_cf_account_keychain`,
   so it was remembered and every later run skipped the question and reused
   it, and to wrangler as `CLOUDFLARE_ACCOUNT_ID`. First-time Cloudflare
   publishing from the command line did not work, and stayed broken until the
@@ -343,9 +343,13 @@ pseudo-terminal rather than reasoning about it:
 **Only the command line was exposed.** The GUI passes `--account` (see
 `DeployCommand`), and a scheduled publish carries it in the plist, so neither
 reaches this question; and the common case never reaches it either, because
-discovery usually answers first. `deploy.ps1` never had it: its twin says
-both of these at top level rather than inside a function whose output is
-captured.
+discovery usually answers first. `deploy.ps1` never had it, and avoids it a different way than "at top level",
+which is worth stating precisely because a Windows reader will go looking:
+`Read-CloudflareAccountId` says both of these inside the function too, but
+pipes them to `Out-Host` / `Write-Host`, which bypass the success stream that
+`$CF_ACCOUNT = Read-CloudflareAccountId` captures. PowerShell's host stream is
+doing the job stderr does here — so after this fix the two launchers solve the
+problem the same way rather than differently.
 
 Fixed by sending both to **stderr**, which is where `read -rp` already writes
 its own prompt, so the instructions now sit with the question they belong to.

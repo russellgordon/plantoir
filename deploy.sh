@@ -674,12 +674,20 @@ if data.get("success"):
 # on stdout the six-step "where to find your Account ID" block never
 # appeared, and a teacher who mistyped the ID saw NOTHING AT ALL before the
 # script exited 1 — they were asked to paste a code with no hint where it
-# lives, and told nothing when it was wrong. Same trap as the refusal that
-# issue #92 moved out to the call site; these two were left behind because
-# nobody had run the script this far. `read -rp` already writes its prompt
-# to stderr, so this puts the instructions where their own question is.
+# lives, and told nothing when it was wrong. Worse, on the SUCCESS path the
+# caller got the instructions AND the id — 519 bytes where 32 were meant —
+# which was then saved to the Keychain and handed to wrangler. Same trap as
+# the refusal that issue #92 moved out to the call site; these two were left
+# behind because nobody had run the script this far. `read -rp` already
+# writes its prompt to stderr, so this puts the instructions where their own
+# question is.
 #
-# deploy.ps1 never had this: its twin says both of these at top level.
+# deploy.ps1 never had this, and reaches the same place a different way:
+# Read-CloudflareAccountId says both of these INSIDE the function too, but
+# pipes them to `Out-Host` / `Write-Host`, which bypass the success stream
+# that `$CF_ACCOUNT = Read-CloudflareAccountId` captures. PowerShell's host
+# stream is doing exactly the job stderr does here, so after this fix the two
+# launchers solve it the same way rather than differently.
 prompt_for_cf_account() {
   cat >&2 <<'MSG'
 

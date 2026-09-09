@@ -18,9 +18,13 @@ touched.** Three things make that true, and each is load-bearing:
     first `docker` call, so the run never needs a container.
   * `USER` is set to an account name that does not exist, so the Keychain
     lookups (`/usr/bin/security ... -a "$USER"`) find nothing and the
-    questions fire. Nothing is written: under the flag the script exits
-    before `set_..._keychain` is reached, and where a test runs WITHOUT the
-    flag the Keychain writers are stubbed out.
+    questions fire. **Nothing is ever written to the Keychain**, checked by
+    replacing `/usr/bin/security` with a logging stub and reading what the
+    runs actually called: under the flag the script exits at the refusal long
+    before any `set_..._keychain`, and a run WITHOUT the flag makes exactly
+    one call — a `find-generic-password` that fails — because it then dies at
+    `read -rsp` on an exhausted stdin under `set -e`, before even the network
+    check. The one test that could get further stubs the writer outright.
   * A COPY of the launcher runs, in a scratch folder, because `deploy.sh`'s
     second line is `cd "$(dirname "$0")"` — the repository's own copy would
     ignore `cwd` and walk into the real working folder.
@@ -36,8 +40,9 @@ reader (issue #129, 2026-09-09):
      wrong. Same trap that issue #92 fixed for the refusal; these two were
      left behind because nobody had run the script this far.
   2. Worse, and only visible once (1) was understood: on the SUCCESS path the
-     captured value was the instructions AND the ID — 115 bytes where 32 were
-     meant. That blob went to `set_cf_account_keychain`, so it was remembered
+     captured value was the instructions AND the ID — **519 bytes where 32
+     were meant**. That blob went to `set_cf_account_keychain`, so it was
+     remembered
      and every later run skipped the question and reused it, and to wrangler
      as `CLOUDFLARE_ACCOUNT_ID`. First-time Cloudflare publishing from the
      command line did not work, and stayed broken until the Keychain entry was
@@ -91,20 +96,36 @@ def a_working_folder(tmp: str, course: str = "ICS3U", section: int = 1) -> Path:
 
 
 def run_launcher(folder: Path, arguments: list, answer: str = "",
-                 launcher: str = "deploy.sh") -> subprocess.CompletedProcess:
+                 launcher: str = "deploy.sh"):
     """Runs the copied launcher with a hollowed-out environment.
 
     `answer` is fed on stdin. Note that bash only DISPLAYS a `read -rp` prompt
     when stdin is a terminal, so a test that wants to see the question itself
     has to look at what the script echoes afterwards (or use a terminal); the
-    answer is still read from a pipe eitherway.
+    answer is still read from a pipe either way.
+
+    **The answer is sent as BYTES, and that is not a style choice.** With
+    `text=True`, `subprocess` wraps stdin in an `io.TextIOWrapper` whose
+    default `newline=None` translates every "\n" to `os.linesep` on the way
+    out — so on Windows the launcher would receive "y\r\n", `read` would put
+    `y\r` in `_ans`, and `[[ "$_ans" =~ ^[Yy]$ ]]` would not match. An empty
+    answer would arrive as "\r", which is not empty, so `${_ans:-Y}` would
+    never apply its default either. Measured on this mac by sending the two
+    endings to the real script: LF corrects the course code, CRLF silently
+    does not. Sending bytes means the test asks the same question on every
+    platform.
     """
     import os
     environment = dict(os.environ, USER=NOBODY)
-    return subprocess.run(
+    result = subprocess.run(
         ["bash", str(folder / launcher)] + arguments,
-        capture_output=True, text=True, timeout=180, cwd=str(folder),
-        input=answer, env=environment,
+        capture_output=True, timeout=180, cwd=str(folder),
+        input=answer.encode("utf-8"), env=environment,
+    )
+    return subprocess.CompletedProcess(
+        result.args, result.returncode,
+        result.stdout.decode("utf-8", "replace"),
+        result.stderr.decode("utf-8", "replace"),
     )
 
 
@@ -115,8 +136,10 @@ def with_credentials_stubbed(folder: Path) -> str:
     Needed for ONE question — the Cloudflare Account ID — which is reached
     only when a token is already saved and no account could be discovered.
     Getting there for real would mean putting a token in the teacher's
-    Keychain and calling Cloudflare. The five stubbed functions are the
-    credential and network lookups ONLY; `assert_can_ask`, the call site and
+    Keychain and calling Cloudflare. Four of the five stubs are credential and
+    network LOOKUPS; the fifth, `set_cf_account_keychain`, is a WRITER, and is
+    stubbed so that this file cannot put anything in the teacher's Keychain
+    even if a future edit got that far. `assert_can_ask`, the call site and
     `prompt_for_cf_account` — everything under test — are untouched, and the
     marker is asserted so a rename fails the test rather than skipping it.
     """
@@ -205,9 +228,21 @@ class EveryQuestionRefusesUnderTheFlag(unittest.TestCase):
 
 
 @unittest.skipUnless(HAS_BASH, "no bash on this machine, so deploy.sh cannot be run")
+@unittest.skipUnless(ON_A_MAC, "deploy.sh is the mac's launcher; a foreign bash "
+                               "reads a pipe in ways this machine cannot check")
 class WithoutTheFlagNothingChanged(unittest.TestCase):
     """The important half. A teacher at a keyboard must be asked exactly what
-    they were asked before, and their answer must be taken."""
+    they were asked before, and their answer must be taken.
+
+    Gated to macOS deliberately, though `deploy.sh` reaches the course-code
+    guard on any bash. What these assert is how the MAC launcher reads an
+    answer, and a Windows machine running them is testing a bash nobody here
+    can inspect — which is how a red suite arrives on the other side as a
+    surprise rather than as a request (CLAUDE.md rule 4). The bytes fix in
+    `run_launcher` means they would now pass there; that is a reason to let
+    Windows un-gate them if they want the coverage, not a reason for the mac
+    to assume it.
+    """
 
     def ask_the_course_code_question(self, answer: str) -> subprocess.CompletedProcess:
         with tempfile.TemporaryDirectory() as tmp:
@@ -259,6 +294,25 @@ class TheAccountQuestionSaysWhatItMeansTo(unittest.TestCase):
                    "test lifts it out with, so nothing below tested anything.")
         return match.group(0)
 
+    def test_the_call_site_really_does_capture_it(self):
+        """`call_it` below writes the call site out by hand, so it would keep
+        passing against a fiction if the real one stopped capturing.
+
+        That is not idle: dropping the command substitution — having the
+        function set CF_ACCOUNT itself — was the REJECTED alternative here,
+        and it would make every test in this class meaningless while green.
+        Windows' EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel
+        also depends on this exact shape, and no mac can run that suite.
+        """
+        text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            'CF_ACCOUNT="$(prompt_for_cf_account)"', text,
+            "deploy.sh no longer calls prompt_for_cf_account through a command "
+            "substitution. That may well be an improvement — but this class "
+            "reproduces the capture by hand, so it now proves nothing, and the "
+            "Windows guard test finds its single caller by that same text.",
+        )
+
     def call_it(self, typed: str):
         """Calls it exactly as deploy.sh does — captured — and returns what
         the caller would get and what the teacher would see."""
@@ -275,8 +329,10 @@ class TheAccountQuestionSaysWhatItMeansTo(unittest.TestCase):
 
     def test_a_good_id_is_captured_and_nothing_else_is(self):
         """The failure this closes: the caller got the instructions AND the
-        id — 115 bytes where 32 were meant — which was then remembered in the
-        Keychain and handed to wrangler as CLOUDFLARE_ACCOUNT_ID."""
+        id — 519 bytes where 32 were meant, measured by lifting the pre-fix
+        function out of 07952399^ and calling it the way the call site does —
+        which was then remembered in the Keychain and handed to wrangler as
+        CLOUDFLARE_ACCOUNT_ID."""
         identifier = "0123456789abcdef0123456789abcdef"
         captured, _ = self.call_it(identifier)
         self.assertEqual(identifier, captured,
@@ -324,18 +380,32 @@ class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
         )
         refusals = rules["launcherFlags"]["nonInteractive"]["refusals"]
 
+        # `where: "launcher"` does not say WHICH launcher, and `preview.sh`
+        # takes this flag too (issue #124). So the list is narrowed by asking
+        # deploy.sh itself whether it carries the question, rather than by a
+        # rule that would go stale: a preview-only question then belongs to a
+        # preview test, and this file does not go red demanding a deploy.sh
+        # test for a question deploy.sh never asks.
+        launcher_text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+
         named = set()
         for refusal in refusals:
             if refusal.get("where") != "launcher":
                 continue          # deploy.py's own questions; tested next door.
             if refusal["question"].startswith("(not a question)"):
                 continue          # a rule about a saved credential, not a prompt.
-            if "windows" in refusal.get("appliesOn", ["mac", "windows"]) \
-                    and "mac" not in refusal.get("appliesOn", ["mac", "windows"]):
-                continue          # preview.ps1 asks one deploy.sh does not.
             # The contract spells a question out with its explanation after an
             # em dash; the part before it is the question itself.
-            named.add(refusal["question"].split(" — ")[0].strip())
+            question = refusal["question"].split(" — ")[0].strip()
+            # The course-code guard is spelled with a placeholder in the
+            # contract because the code varies; match its fixed opening.
+            probe = question.split("<")[0].strip() or question
+            if probe not in launcher_text:
+                continue          # another launcher's question.
+            named.add(question)
+
+        self.assertTrue(named, "Nothing in the contract was matched to deploy.sh "
+                               "at all, which means this comparison is vacuous.")
 
         self.assertEqual(
             set(self.DRIVEN_ABOVE), named,
