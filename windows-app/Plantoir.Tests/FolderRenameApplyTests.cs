@@ -343,8 +343,16 @@ public sealed class FolderRenameApplyTests : IDisposable
     {
         var names = ContractLoader.LoadJson("shared-rules.json")["specialNames"]!;
         Assert.Equal(names["addCreatesTheFolder"]!["message"]!.ToString(), SpecialNames.AddCreatesTheFolder);
-        Assert.Equal(names["removeLeavesTheFolderOnDisk"]!["message"]!.ToString().Replace("on your Mac", "on this PC"),
-                     SpecialNames.RemoveLeavesTheFolderOnDisk);
+        // removeLeavesTheFolderOnDisk.message used to be checked here with a
+        // hand-written .Replace("on your Mac", "on this PC"). It is one of the
+        // three sentences shared-rules.json records under
+        // specialNames.platformWording, and it is now checked with the other
+        // two by SpecialFolderRenamerTests.EverySentenceTheContractCallsPlatformWordedSaysThisPc,
+        // which reads that list rather than naming sentences one at a time —
+        // so a FOURTH platform-worded sentence fails there by name instead of
+        // needing a fourth substitution to be noticed and written by hand
+        // (GitHub issue #118). Naming it in two places would put the rule back
+        // where it was, in two homes that can disagree.
         Assert.Equal(names["renameFolder"]!["interruptedRename"]!["message"]!.ToString(), SpecialNames.RenameInterrupted);
         foreach (string word in new[] { "record", "transaction", "config", "json", "script" })
             Assert.DoesNotContain(word, SpecialNames.RenameInterrupted.ToLowerInvariant());
