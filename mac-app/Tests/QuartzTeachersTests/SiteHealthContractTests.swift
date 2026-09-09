@@ -140,10 +140,11 @@ final class SiteHealthContractTests: XCTestCase {
     /// The sentence a teacher reads when a FOLDER is sitting where a section's
     /// front page belongs, deserialised rather than retyped.
     ///
-    /// Both apps have to say one thing about one problem. Windows answers
-    /// `Failed` here today with the generic "check the folder isn't locked or
-    /// read-only", which sends a teacher to look at permissions on a folder
-    /// that is not locked — so this is the sentence they adopt.
+    /// Both apps have to say one thing about one problem. Windows answered
+    /// `Failed` here until 2026-09-07, with the generic "check the folder isn't
+    /// locked or read-only", which sent a teacher to look at permissions on a
+    /// folder that is not locked — so this is the sentence it adopted, and both
+    /// apps say it now.
     func testTheRefusalSentenceIsTheOneInTheContract() throws {
         let repair: [String: Any] = try XCTUnwrap(siteHealth["repair"] as? [String: Any])
         let refused: [String: Any] = try XCTUnwrap(
