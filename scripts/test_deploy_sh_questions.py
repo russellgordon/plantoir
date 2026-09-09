@@ -296,5 +296,56 @@ class TheAccountQuestionSaysWhatItMeansTo(unittest.TestCase):
                       "script exited 1 in silence.")
 
 
+@unittest.skipUnless(HAS_BASH, "no bash on this machine")
+class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
+    """The four above are the four the contract names — asserted, not assumed.
+
+    Without this the file would quietly stop being "every question it can ask"
+    the day a fifth is added: the tests would still pass, and the new question
+    would be the one nobody had driven. `launcherFlags.nonInteractive.refusals`
+    is the register of what the flag must refuse, so it is the list to check
+    against rather than a count kept in step by hand.
+    """
+
+    # Keyed by the contract's own wording so a renamed question fails here
+    # rather than silently dropping out of the comparison.
+    DRIVEN_ABOVE = {
+        "Fix course code to '<CODE>'? [Y/n]": "test_the_course_code_question_refuses",
+        "Paste Netlify token": "test_the_netlify_token_question_refuses",
+        "Paste Cloudflare token": "test_the_cloudflare_token_question_refuses",
+        "Paste Cloudflare Account ID":
+            "test_the_cloudflare_account_question_refuses_ON_THE_SCREEN",
+    }
+
+    def test_the_four_questions_driven_are_the_four_the_contract_names(self):
+        import json
+        rules = json.loads(
+            (REPOSITORY_ROOT / "contracts" / "app-rules.json").read_text(encoding="utf-8")
+        )
+        refusals = rules["launcherFlags"]["nonInteractive"]["refusals"]
+
+        named = set()
+        for refusal in refusals:
+            if refusal.get("where") != "launcher":
+                continue          # deploy.py's own questions; tested next door.
+            if refusal["question"].startswith("(not a question)"):
+                continue          # a rule about a saved credential, not a prompt.
+            if "windows" in refusal.get("appliesOn", ["mac", "windows"]) \
+                    and "mac" not in refusal.get("appliesOn", ["mac", "windows"]):
+                continue          # preview.ps1 asks one deploy.sh does not.
+            # The contract spells a question out with its explanation after an
+            # em dash; the part before it is the question itself.
+            named.add(refusal["question"].split(" — ")[0].strip())
+
+        self.assertEqual(
+            set(self.DRIVEN_ABOVE), named,
+            "The questions this file drives and the ones the contract says "
+            "--non-interactive must refuse have come apart. Either a question "
+            "was added to the contract and nothing here starts the script to "
+            "check it, or one was renamed. Both end the same way: a question "
+            "nobody has ever seen refused.",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
