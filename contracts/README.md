@@ -217,6 +217,7 @@ recounted 2026-09-07.
 | What publishing and unpublishing do to linked pages, and what is never swept | `shared-rules.json` → `followingLinks` | SharedRulesContract (2), AssistToolRunner (3) |
 | Whether the assistant asks before changing anything, and when it says so | `shared-rules.json` → `assistantConfirmation` | SharedRulesContract (1), AssistPlanMode (6), AssistantSettings (6) |
 | Phrasings matched in code, including the four PARSED families | `assist-cases.json` → `cardPhrasings` | AssistContract (1), AssistPromptShelf (2), AssistToolRunner (4) |
+| The New Course wizard's affirmative button | `shared-rules.json` → `wizard` | SharedRulesContract (1); Windows also asserts it in `NewCourseWizardUiTests` |
 | Backup, archive and wizard zip names | `course-management.json` → `zipNames` | BackupItem, ArchivedItem (18) |
 | Adding a section: suggestion, refusals, wording | `course-management.json` → `sectionNumbers` | SectionAdder, SectionNumbersValidation (21) |
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
