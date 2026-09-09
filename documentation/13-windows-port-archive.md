@@ -1,16 +1,23 @@
-# Windows App — Completed Handoff Items
+# 13. Archive — the Windows port's shipped design decisions
 
-This file holds handoff sections moved out of
-[`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) for length, once code-level
-verification (2026-08-22) confirmed the work they describe has actually
-shipped on the Windows side (or, where noted, is shared code with nothing
-left to port). They are kept rather than deleted because the reasoning in
-them — why a design was chosen, what was rejected and why, what was measured
-— remains the reference for anyone touching that area again. Content is
-relocated verbatim; nothing here has been rewritten. If a section below turns
-out to describe something that has since regressed or been superseded, that
-is itself worth a note in `WINDOWS-HANDOFF.md` or `MAC-HANDOFF.md`, not a
-silent edit here.
+**This is history, not a specification.** It holds write-ups for work verified
+shipped in `windows-app/` as of 2026-08-22 (or shared code with nothing left to
+port), kept because the reasoning in them — why a design was chosen, what was
+rejected and why, what was measured — remains the reference for anyone touching
+that area again.
+
+Two things follow from it being an archive. **Read it as a record of what was
+true on its day**: where it and a contract disagree, the contract is what is
+true now, exactly as with `GUI-IMPROVEMENTS.md`. And **nothing new is written
+here** — it is append-only in the sense that it is closed. Current reference
+lives in the numbered pages 01-12; work still to do is a [GitHub
+issue](https://github.com/russellgordon/plantoir/issues).
+
+It arrived here on 2026-09-08, when the two handoff documents it was split out
+of were themselves absorbed into `documentation/` and deleted. Content is
+relocated verbatim; nothing has been rewritten. If a section turns out to
+describe something since regressed or superseded, that is worth an issue rather
+than a silent edit here.
 
 ---
 
@@ -131,7 +138,7 @@ the field is open.
    Finder's own Rename item carries no key equivalent for exactly this
    reason. Handle the key in the list instead, and ignore it when a field is
    already open so the field's own Return commits. If your framework has the
-   same precedence, do the same; if it does not, say so in `MAC-HANDOFF.md`.
+   same precedence, do the same; if it does not, say so in a `mac` issue.
 
 2. **Switching apps is not clicking away.** Clicking elsewhere should commit
    the rename, as Finder does. But a focused field cannot hold focus while
@@ -154,7 +161,7 @@ the field is open.
    hosts the ROW VIEW on its own and asserts a text field appears in it —
    deterministic, and no accessibility tree involved
    (`CourseRenameInterfaceTests`). If your framework's tree exposes list rows
-   honestly, that is worth a line in `MAC-HANDOFF.md`.
+   honestly, that is worth a `mac` issue.
 
 ### Obsidian: close it, rename, and open the vaults again
 
@@ -466,7 +473,7 @@ days to find:
 - **The teacher never learns the model's name.** A faster backend does not buy
   a licence to say "CUDA" or "Qwen" in the interface.
 
-When you have measured, write the numbers into `MAC-HANDOFF.md` — tokens per
+When you have measured, write the numbers into a `mac` issue — tokens per
 second per backend, on named hardware. The mac side has no way to find out what
 a Windows teacher's machine does, and those numbers are the only thing that
 makes the next decision on either side a measurement rather than a guess.
@@ -973,7 +980,7 @@ perfectly well while you are debugging.
 
 ### Take the rules from the contract, do not re-derive them
 
-`problemReportRedaction` in [`contracts/shared-rules.json`](contracts/shared-rules.json)
+`problemReportRedaction` in [`contracts/shared-rules.json`](../contracts/shared-rules.json)
 — 14 cases, `input` → `expect`, run by `SharedRulesContractTests` on the mac
 and ready for an xUnit `[Theory]`. It also carries `placeholders` (the exact
 phrases left behind) and `secretLength`, so nothing has to be copied out of
@@ -2250,7 +2257,7 @@ adds another such guard, it goes in the Dockerfile and it fails closed.
 
 ## The three one-time-setup explainer cases are retired (2026-08-20)
 
-Answering the request in `MAC-HANDOFF.md` rather than leaving it half-done:
+Answering the mac's request rather than leaving it half-done:
 the mac implemented ONE of the two failure-explanation cases proposed from
 that side and **retired the other three**.
 
@@ -3339,3 +3346,7 @@ Plantoir now supports course codes and curriculum registries beyond Ontario, sta
 > your BC payload against was wrong.
 
 
+
+---
+
+[◀ Previous: The Windows App](12-windows-app.md) · [Back to index](README.md)

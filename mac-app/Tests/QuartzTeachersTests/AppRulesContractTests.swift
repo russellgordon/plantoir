@@ -108,6 +108,49 @@ final class AppRulesContractTests: XCTestCase {
         )
     }
 
+    /// Every milestone list the app HAS reaches the readout.
+    ///
+    /// This is the test whose absence let #82 happen. `AppRulesContract` kept
+    /// its own array naming eight lists while `TaskMilestones` had nine, so
+    /// `exampleCourse` was in no readout — and
+    /// `testEveryMarkerIsClassifiedAndTheClassificationIsTrue` could not
+    /// notice, because it walks the READOUT rather than the code the readout
+    /// is of. A readout cannot catch a regression in the thing it reads, and
+    /// that applies to its COMPLETENESS as much as to its contents.
+    ///
+    /// The fix is structural — the readout is now built from
+    /// `TaskMilestones.allLists` — so this can no longer fail by omission. It
+    /// is kept so that a change reintroducing a second hand-kept array goes
+    /// red instead of quietly dropping a task again.
+    func testEveryMilestoneListReachesTheReadout() throws {
+        let milestones: [String: Any] = try XCTUnwrap(
+            (try AppRulesContractTests.readRules())["milestones"] as? [String: Any]
+        )
+
+        var expected: [String] = []
+        for entry in TaskMilestones.allLists {
+            expected.append(entry.name)
+        }
+        expected.sort()
+
+        var written: [String] = []
+        for key in milestones.keys {
+            if key != "note" {
+                written.append(key)
+            }
+        }
+        written.sort()
+
+        XCTAssertEqual(
+            written,
+            expected,
+            "contracts/app-rules.json → milestones does not name every list in "
+            + "TaskMilestones.allLists. A task missing here is a task whose markers "
+            + "nothing classifies, and a progress bar that stops moving is the only "
+            + "symptom.\n\nRegenerate it:\n    Plantoir --write-contracts contracts"
+        )
+    }
+
     /// **The one worth having.** Every marker is classified by where its text
     /// comes from, and the classification is checked against the actual files
     /// — because it decides whether Windows must match the string exactly.

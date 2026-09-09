@@ -95,22 +95,50 @@ enum SiteHealthRepair {
         if wanted.isEmpty {
             return nil
         }
-        let results: [String: Result] = repair(wanted, in: course)
+        let attempts: [Attempt] = repair(wanted, in: course)
 
+        // Each thing is named ONCE, however many findings produced it: two
+        // sections both missing a front page are two repairs and one sentence,
+        // and "Put the front page and the front page back." is not a sentence.
         var restored: [String] = []
         var failed: [String] = []
-        for (name, result) in results {
-            switch result {
+        // A repair the teacher must clear the way for before it can go ahead.
+        // It is a failure — it goes into `failed` with the rest, so the
+        // preview is not offered and "Could not put the front page back."
+        // still appears — but it brings its own reason, and that reason
+        // replaces the generic one below.
+        //
+        // Sorted before it is joined so that two of them — two sections each
+        // with a folder in the way, or a second blocked cause should one ever
+        // be added — land in one order every time. It is an alphabetical sort
+        // of the SENTENCES, so it does not promise section order: "section10"
+        // sorts before "section2". One stable order is all this needs.
+        var reasonsItCouldNotGoAhead: [String] = []
+        var somethingSimplyFailed: Bool = false
+        for attempt in attempts {
+            let name: String = attempt.finding.name
+            switch attempt.result {
             case .restored:
-                restored.append(name)
+                addOnce(name, to: &restored)
             case .failed:
-                failed.append(name)
+                addOnce(name, to: &failed)
+                somethingSimplyFailed = true
+            case .blockedByAFolderWhereTheFrontPageBelongs(let sectionNumber):
+                addOnce(name, to: &failed)
+                // Two blocked sections are two DIFFERENT sentences — each one
+                // names its own section folder — so both are wanted. What is
+                // filtered here is the same sentence twice, which is what the
+                // very same finding arriving twice would produce.
+                addOnce(folderWhereTheFrontPageBelongs(
+                    course: course.code, section: sectionNumber
+                ), to: &reasonsItCouldNotGoAhead)
             case .alreadyFine:
                 break
             }
         }
         restored.sort()
         failed.sort()
+        reasonsItCouldNotGoAhead.sort()
 
         // Nothing to do: every one of them was already there. Pressing Fix
         // twice must not read as a permissions problem.
@@ -122,10 +150,33 @@ enum SiteHealthRepair {
             )
         }
 
+        // Why it could not go ahead, in the order a teacher reads it.
+        //
+        // The generic explanation is added only when something failed for a
+        // reason nobody has a better sentence for — and it goes FIRST, with
+        // the specific refusals after it. Both orders were read aloud. Putting
+        // the refusal first ends the paragraph on "You can make it yourself in
+        // Obsidian", immediately after "…and Plantoir can put the front page
+        // back", so "it" lands on the front page — the one thing that cannot
+        // be made until the folder in the way has been moved. This order ends
+        // instead on the step the teacher can actually take.
+        //
+        // Reachable only when a file sits where Media belongs AND a folder
+        // sits where the front page belongs, in one course, at one moment.
+        // Rare, and it still has to read properly.
+        var whyNotInOrder: [String] = []
+        if somethingSimplyFailed || reasonsItCouldNotGoAhead.isEmpty {
+            whyNotInOrder.append(couldNotExplanation)
+        }
+        for reason in reasonsItCouldNotGoAhead {
+            whyNotInOrder.append(reason)
+        }
+        let whyNot: String = whyNotInOrder.joined(separator: " ")
+
         if restored.isEmpty {
             return Outcome(
                 headline: "Plantoir could not put that back.",
-                detail: couldNotExplanation,
+                detail: whyNot,
                 canRebuild: false
             )
         }
@@ -138,7 +189,7 @@ enum SiteHealthRepair {
         if let alsoFailed = whatCouldNotBePutBack(failed) {
             return Outcome(
                 headline: putBack,
-                detail: alsoFailed + " " + couldNotExplanation,
+                detail: alsoFailed + " " + whyNot,
                 canRebuild: false
             )
         }
@@ -157,6 +208,26 @@ enum SiteHealthRepair {
     static let couldNotExplanation: String =
         "You can make it yourself in Obsidian, or check that the folder holding "
         + "this course isn't locked or read-only."
+
+    /// What a teacher is told when a FOLDER is sitting where a section's front
+    /// page belongs.
+    ///
+    /// Named here and pinned to `contracts/shared-rules.json` →
+    /// `siteHealth.repair.refusedWhenSomethingIsInTheWay`, so the two apps say
+    /// one sentence about one problem rather than inventing two.
+    ///
+    /// It names the COURSE as well as the section folder because every course
+    /// has a `section1`, and the dialog this appears in shows only a headline
+    /// and this sentence — nothing else in it says which course is meant.
+    static func folderWhereTheFrontPageBelongs(
+        course courseCode: String, section sectionNumber: Int
+    ) -> String {
+        return "There is a folder called index.md in the section\(sectionNumber) folder "
+            + "of your \(courseCode) course, where the front page should be. Plantoir "
+            + "has left it exactly as it is, in case your own pages are inside it. Move "
+            + "anything you want to keep somewhere else, then delete or rename that "
+            + "folder, and Plantoir can put the front page back."
+    }
 
     static func whatCouldNotBePutBack(_ names: [String]) -> String? {
         guard let described = whatWasPutBack(names) else {
@@ -236,11 +307,6 @@ enum SiteHealthRepair {
         + "their site until you publish again. You can preview it now to check "
         + "the change looks right."
 
-    /// Repairs what can be repaired, and reports what it did.
-    ///
-    /// Never overwrites: every repair checks first, so pressing the button
-    /// twice, or pressing it after fixing the problem in Obsidian, changes
-    /// nothing.
     /// How one repair went.
     ///
     /// `alreadyFine` is a THIRD answer, and leaving it out was a bug: both
@@ -253,26 +319,102 @@ enum SiteHealthRepair {
         case restored
         case alreadyFine
         case failed
+        /// A repair that cannot go ahead until the TEACHER moves something.
+        ///
+        /// Counted as a failure, because it is one — but it carries its own
+        /// explanation, and that is the whole point of the case. A folder
+        /// named `index.md` used to satisfy a bare `fileExists` check and be
+        /// reported as "already put right", while the section still had no
+        /// front page; answering `failed` instead would at least be honest,
+        /// but the sentence that goes with it — "check the folder isn't
+        /// locked or read-only" — sends a teacher looking for the wrong
+        /// thing entirely.
+        ///
+        /// It carries the SECTION rather than the sentence: this type says
+        /// how a repair went, and `outcome(ofRepairing:in:)` chooses every
+        /// word in this file.
+        case blockedByAFolderWhereTheFrontPageBelongs(section: Int)
     }
 
+    /// One finding, and how its repair went.
+    ///
+    /// It exists so that the answer cannot COLLAPSE. This used to come back as
+    /// a dictionary keyed by the check's NAME, and two findings share a name
+    /// as soon as two sections are involved: two sections each missing a front
+    /// page are two repairs, both of which run, but only the last result was
+    /// reported. "Section 1 restored, section 2 was already there" therefore
+    /// read as "That is already put right. Nothing needed changing." — with no
+    /// preview offered — for a repair that really had put a page back.
+    ///
+    /// **It was unreachable from the app**, and is fixed anyway. A section
+    /// window owns one runner and the checks announce per section, so the
+    /// findings handed to a repair have always been one section's. What makes
+    /// it worth an hour is that the collapse was SILENT and the constraint was
+    /// written down nowhere: the next caller — the assistant, a second window,
+    /// a whole-course fix — would have met it as a wrong report rather than as
+    /// a compile error. Windows found it by porting this file line by line
+    /// (documentation/04-course-setup.md, 2026-09-06) and shipped this shape first; the mac is
+    /// catching up to it rather than inventing it.
+    ///
+    /// One thing it does NOT fix, deliberately. Section 1 restored and section
+    /// 2 FAILED, both `sectionIndexMissing`, still reads "Put the front page
+    /// back." followed by "Could not put the front page back." — one name, two
+    /// outcomes, and the sentence has no way to say which section is which.
+    /// Windows reads the same way. Inventing wording for it was rejected: it
+    /// is as unreachable as the collapse was, and a sentence nobody has
+    /// weighed is harder to take back than a paragraph of explanation. The
+    /// blocked case does not have the problem on EITHER platform — its own
+    /// sentence names the section folder. Windows adopted the named refusal on
+    /// 2026-09-07; until then a blocked section there fell into `failed` and
+    /// read namelessly too, which is what this comment used to describe. Pinned
+    /// over there by SiteHealthRepairTests
+    /// .TwoRefusedSectionsAreTwoSentencesBecauseEachNamesItsOwnFolder.
+    struct Attempt: Equatable {
+
+        // MARK: - Stored properties
+
+        let finding: SiteHealthFinding
+        let result: Result
+    }
+
+    /// Adds a name, or a sentence, only if it is not already there.
+    ///
+    /// What a teacher is told is a list of DISTINCT things, however many
+    /// findings produced them — see `Attempt`.
+    private static func addOnce(_ value: String, to list: inout [String]) {
+        if list.contains(value) {
+            return
+        }
+        list.append(value)
+    }
+
+    /// Repairs what can be repaired, and reports what each one did — one
+    /// `Attempt` per finding, in the order they were given.
+    ///
+    /// Never overwrites: every repair checks first, so pressing the button
+    /// twice, or pressing it after fixing the problem in Obsidian, changes
+    /// nothing.
     @discardableResult
     static func repair(
         _ findings: [SiteHealthFinding], in course: Course
-    ) -> [String: Result] {
-        var results: [String: Result] = [:]
+    ) -> [Attempt] {
+        var attempts: [Attempt] = []
         for finding in findings where canRepair(finding) {
             switch finding.name {
             case "mediaFolderMissing":
-                results[finding.name] = restoreMedia(in: course)
+                attempts.append(Attempt(
+                    finding: finding, result: restoreMedia(in: course)
+                ))
             case "sectionIndexMissing":
-                results[finding.name] = restoreIndex(
-                    forSection: finding.section, in: course
-                )
+                attempts.append(Attempt(
+                    finding: finding,
+                    result: restoreIndex(forSection: finding.section, in: course)
+                ))
             default:
                 break
             }
         }
-        return results
+        return attempts
     }
 
     static func restoreMedia(in course: Course) -> Result {
@@ -291,7 +433,29 @@ enum SiteHealthRepair {
         }
         let index: URL = course.sectionDirectoryURL(forSection: sectionNumber)
             .appendingPathComponent("index.md")
-        if FileManager.default.fileExists(atPath: index.path) {
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: index.path, isDirectory: &isDirectory) {
+            // A FOLDER named `index.md` is not "already fine" — the section
+            // still has no front page, so the build still produces no site and
+            // the publish still refuses. Without the `isDirectory:` form this
+            // reported the one dialog written to end silence as "that is
+            // already put right", which is the worst answer available: the
+            // teacher stops looking.
+            //
+            // And it REFUSES rather than clearing the way. Moving the folder
+            // aside and writing a proper front page was considered and
+            // rejected: that relocates a folder which may hold the teacher's
+            // own pages, without asking, and neither app can see what is
+            // inside it.
+            if isDirectory.boolValue {
+                ActivityTrail.note(
+                    .folderProblemNotRepaired,
+                    "found a folder called index.md where the front page belongs, "
+                    + "and left it alone",
+                    course: course.code, section: sectionNumber
+                )
+                return .blockedByAFolderWhereTheFrontPageBelongs(section: sectionNumber)
+            }
             return .alreadyFine
         }
         return restoreSectionIndex(forSection: sectionNumber, in: course) ? .restored : .failed

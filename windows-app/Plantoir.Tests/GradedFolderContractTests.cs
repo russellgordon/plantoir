@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 using Plantoir.Core.Models;
 
@@ -133,7 +134,8 @@ public class GradedFolderContractTests
             """));
 
         Assert.Null(config.GradedFolders);
-        Assert.Equal(new[] { "Tasks", "Thinking Tasks" }, config.MaterializedGradedFolders());
+        Assert.Equal(new[] { "Tasks", "Thinking Tasks" },
+            config.MaterializedGradedFolders(config.SharedFolders.Concat(config.PerSectionFolders)));
     }
 
     [Fact]
@@ -145,7 +147,8 @@ public class GradedFolderContractTests
              "graded_folders": ["Tasks"]}
             """));
 
-        Assert.Equal(new[] { "Tasks" }, config.MaterializedGradedFolders());
+        Assert.Equal(new[] { "Tasks" },
+            config.MaterializedGradedFolders(config.SharedFolders.Concat(config.PerSectionFolders)));
     }
 
     /// <summary>
@@ -264,5 +267,82 @@ public class GradedFolderContractTests
             """));
 
         Assert.Equal("Ontario Curriculum", config.ResolvedCurriculumFolder);
+    }
+
+    // ---- What a teacher reads on the Marks control ------------------------
+
+    /// <summary>
+    /// The list title and its caption are the contract's, word for word.
+    /// Pinned because they are sentences a teacher reads, and because the two
+    /// apps had worded them differently since the control was built with
+    /// nothing to catch it.
+    /// </summary>
+    [Fact]
+    public void TheMarksWordingIsTheContractsOwn()
+    {
+        var wording = SharedRules["gradedFolders"]!["wording"]!;
+        Assert.Equal(wording["listTitle"]!.ToString(), GradedFolderRule.ListTitle);
+        Assert.Equal(wording["caption"]!.ToString(), GradedFolderRule.Caption);
+    }
+
+    /// <summary>
+    /// The caption says "tick" and never "add" or "remove".
+    ///
+    /// <para>This list is a tick list: <c>MembershipToggleList</c> renders
+    /// checkboxes and offers no Add button, so a teacher told to "add Tests"
+    /// is being pointed at a control that cannot do it. And "remove what you
+    /// don't" invites the one action the product refuses outright — unticking
+    /// the last graded folder while the coverage map is on
+    /// (<see cref="SpecialNames.LastGradedFolderBlocked"/>). Both verbs were
+    /// in the mac's wording, which is why this is asserted rather than left
+    /// to review.</para>
+    /// </summary>
+    [Fact]
+    public void TheMarksCaptionNamesOnlyActionsThisControlOffers()
+    {
+        string caption = SharedRules["gradedFolders"]!["wording"]!["caption"]!.ToString();
+
+        Assert.Contains("tick", caption, StringComparison.OrdinalIgnoreCase);
+
+        // The exact verb forms, as whole words. Two failed alternatives are
+        // worth naming so they are not tried again: DoesNotContain("add ")
+        // lets through "adding", "add." and "add" at end-of-string, while the
+        // obvious tightening -- a \badd\w*\b pattern -- matches "ADDRESSES
+        // it", which this caption legitimately contains and which would fail
+        // the test for a word that is not a verb at all.
+        // IgnoreCase EXPLICITLY. The assertion this replaced was an
+        // OrdinalIgnoreCase string compare; xUnit's string overload builds a
+        // Regex with no options and .NET regex is case-SENSITIVE, so the
+        // tightening quietly stopped catching a sentence-initial "Add".
+        // The caption is three sentences: any of them can start with a verb.
+        foreach (string verb in new[] { "add", "adds", "adding", "remove", "removes", "removing" })
+            Assert.DoesNotMatch(new Regex(@"\b" + verb + @"\b", RegexOptions.IgnoreCase), caption);
+    }
+
+    /// <summary>
+    /// The map is called what the rest of THIS screen calls it.
+    ///
+    /// <para>Russell's choice, 2026-09-08. Two spellings are pinned: the
+    /// folders-help sheet says "the curriculum map", while the flyout raised
+    /// from this very list and the switch beside it both say "curriculum
+    /// coverage map". The caption follows the control it captions. Capital-C
+    /// "Curriculum Coverage map" is what this app used to say and is wrong:
+    /// that is the built page's TITLE, not a common noun.</para>
+    /// </summary>
+    [Fact]
+    public void TheMarksCaptionCallsTheMapWhatThisScreenCallsIt()
+    {
+        string caption = SharedRules["gradedFolders"]!["wording"]!["caption"]!.ToString();
+
+        // ORDINAL, because casing is the entire point. The phrase opens a
+        // sentence, so the article is capitalised and the noun is not:
+        // "The curriculum coverage map". A case-insensitive check here would
+        // have accepted "Curriculum Coverage map" -- the built PAGE's title,
+        // which is what this app used to say and what the next assertion
+        // exists to keep out.
+        Assert.Contains("curriculum coverage map", caption, StringComparison.Ordinal);
+        Assert.DoesNotContain("Curriculum Coverage map", caption, StringComparison.Ordinal);
+        Assert.Contains("curriculum coverage map", SpecialNames.LastGradedFolderBlocked,
+                        StringComparison.OrdinalIgnoreCase);
     }
 }

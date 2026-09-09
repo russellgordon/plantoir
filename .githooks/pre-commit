@@ -1,0 +1,158 @@
+#!/bin/sh
+#
+# Say, at the moment publishing code is committed, that one script is the only
+# thing that checks it for real.
+#
+# WHY THIS IS A REMINDER AND NOT A GATE
+# =====================================
+# `verify-deploy.ps1` (and `verify-deploy.sh` on the mac) publishes to every
+# destination and every pairing against REAL sites and fetches each one back.
+# It is the only automated check of publishing that actually publishes. It
+# needs three credentials, the network, and about twenty minutes, and it
+# creates real, globally unique sites — so it cannot run in a test suite, and
+# it cannot run here.
+#
+# The first design for this was a stamp file recording when that script last
+# passed, with a unit test going red whenever the publishing files changed
+# afterwards. It was dropped on measurement: over the sixty days to 2026-09-07
+# those files changed on 16 distinct days out of 22 active ones. A suite red
+# three days in four is not a forcing function — it is noise that gets waived
+# by reflex, and it would have hidden real failures in the same red.
+#
+# So this WARNS AND NEVER BLOCKS, deliberately. A blocking hook on files that
+# change 16 days in 22 gets `--no-verify`'d once and then never fires again,
+# which would be worse than saying nothing. It always exits 0.
+#
+# The real coverage lives elsewhere and is not what this reminds you about:
+# `PythonToolchainTests` runs all fifteen shared Python test files inside
+# `dotnet test` (156 tests, ~8 seconds, no credentials and no network), which
+# `verify.sh` has always done on the mac and nothing did here.
+#
+# It is committed rather than left in .git/hooks so it travels to the mac too.
+# Each clone must opt in ONCE:
+#
+#     git config core.hooksPath .githooks
+#
+# POSIX sh, deliberately, for the same reason commit-msg is: this runs under
+# Git Bash on Windows and a real shell on macOS.
+
+# The publishing closure: what a publish actually runs. `build_site.py` is in
+# it because `deploy.py` EXECUTES it — see `rebuild_for_production` and
+# `ensure_base_url_and_rebuild`, reached from both the Netlify and Cloudflare
+# legs, and `deploy.ps1`'s --to-folder branch, which shells
+# `preview.bat --build-only`. Leaving it out was the first draft's mistake.
+watched="
+deploy.ps1
+deploy.bat
+deploy.sh
+preview.ps1
+preview.bat
+preview.sh
+Dockerfile
+scripts/deploy.py
+scripts/build_site.py
+scripts/toolchain_paths.py
+scripts/netlify_badge.py
+scripts/site_health.py
+"
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+touched=""
+for path in $watched; do
+    if printf '%s\n' "$staged" | grep -qxF "$path"; then
+        touched="$touched  $path
+"
+    fi
+done
+
+if [ -n "$touched" ]; then
+    printf '\n'
+    printf 'This commit touches the publishing path:\n'
+    printf '%s' "$touched"
+    printf '\n'
+    printf 'The only automated check that really publishes is:\n'
+    printf '    Windows   powershell -NoProfile -ExecutionPolicy Bypass -File verify-deploy.ps1\n'
+    printf '    macOS     ./verify-deploy.sh\n'
+    printf '\n'
+    printf 'It publishes to every destination and pairing and fetches each site back.\n'
+    printf 'It needs credentials, the network, and about twenty minutes, and it makes\n'
+    printf 'real sites — so no suite runs it, and this hook will not stop you.\n'
+    printf 'Committing anyway is fine; running it before the work is called done is not\n'
+    printf 'optional. RELEASING.md requires it for a release that changes this path.\n'
+    printf '\n'
+fi
+
+# ---------------------------------------------------------------------------
+# Carriage returns in a file that should be LF.
+#
+# Added 2026-09-08, after a session committed four files as CRLF with stray
+# lone CRs in them: 7,672 insertions for 264 lines of work, and git blame on
+# WINDOWS-HANDOFF.md attributing all 6,655 of its lines to one commit. It was
+# caught by review, which is not a mechanism.
+#
+# .gitattributes closes most of it: an explicit "text" attribute stops git
+# mistaking a CR-carrying file for binary and skipping normalisation. It does
+# NOT close the case that actually happened. An editor writing CR CR LF leaves
+# one CR per line still in the blob, because git only strips the CR directly
+# before each newline. So this checks what is really about to be stored.
+#
+# Against the INDEX, not the working tree: on Windows the working tree is
+# legitimately CRLF for nearly everything, and only the blob matters.
+crlf=""
+for path in $(git diff --cached --name-only --diff-filter=ACM); do
+    case "$path" in
+        support/obsidian_defaults/.obsidian/themes/*) continue ;;
+    esac
+    # Binary blobs are nobody's business here; numstat prints "-" for them.
+    if git diff --cached --numstat -- "$path" | cut -f1 | grep -qx -- '-'; then
+        continue
+    fi
+    # Byte counts rather than a grep for CR: a CR inside a command
+    # substitution is stripped, which silently turns the pattern into the
+    # empty string and matches every file. That happened writing this.
+    with_cr=$(git cat-file blob ":$path" 2>/dev/null | wc -c)
+    without_cr=$(git cat-file blob ":$path" 2>/dev/null | tr -d '\015' | wc -c)
+    if [ "$with_cr" != "$without_cr" ]; then
+        crlf="$crlf  $path
+"
+    fi
+done
+
+if [ -n "$crlf" ]; then
+    printf '
+'
+    printf 'These staged files carry carriage returns, and this repository is LF:
+'
+    printf '%s' "$crlf"
+    printf '
+'
+    printf 'Almost always an editor wrote CRLF, or CR CR LF, into a file it was
+'
+    printf 'appending to. Left alone that produces a whole-file diff, destroys
+'
+    printf 'git blame for the file, and hands the other platform a file it will
+'
+    printf 'renormalise straight back.
+'
+    printf '
+'
+    printf 'To fix: rewrite the file with every CR removed, then git add it again.
+'
+    printf 'Collapse CR CR LF to one newline FIRST -- stripping CRs one at a time
+'
+    printf 'turns it into two newlines and double-spaces the whole file. That
+'
+    printf 'mistake was made too, fixing this one.
+'
+    printf '
+'
+    printf 'This hook will not stop you.
+'
+    printf '
+'
+fi
+
+# Never block. See the note at the top.
+exit 0

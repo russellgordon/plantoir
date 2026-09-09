@@ -36,19 +36,34 @@ go, without stopping to ask permission for each step.
    and 11 bind you as much as the mac side (11's model names are Claude
    Code's; its last two clauses — handoff as you go, documentation before
    "ready" — are unconditional).
-2. **`WINDOWS-HANDOFF.md`** — and inside it, **"Where Windows actually
-   stands"** is the section to read FIRST. It was pruned on 2026-08-22 once a
-   code-level pass confirmed most of the old work list had shipped; those
-   write-ups moved verbatim to `WINDOWS-HANDOFF-COMPLETED.md`, so this file now
-   holds only what is genuinely still open, plus architecture, the config
-   contract, the WSL2 background and the reasoning behind past decisions:
-   long, and the section headings are enough to navigate.
-3. **`contracts/README.md`**, then the eight JSON files. The coverage table
-   there says what is shared and what deliberately is not.
-4. **`GUI-IMPROVEMENTS.md`**, newest rows first, for what changed recently and
+2. **The open `windows` issues — read these FIRST, before any of the prose.**
+   They are the whole of what is outstanding on this side; nothing is tracked
+   in a Markdown list any more. A milestone says which release an issue is
+   pinned to, and `decision` means it needs Russell to choose rather than you
+   to implement.
+
+   ```powershell
+   gh issue list --repo russellgordon/plantoir --label windows --limit 100
+   gh issue view <number> --repo russellgordon/plantoir
+   ```
+
+   Pass `--limit`: `gh` shows 30 by default and silently hides the rest, which
+   is the failure this whole arrangement was made to stop.
+3. **[`documentation/`](documentation/README.md)** — reference, not a work
+   list. Architecture, the config contract, the WSL2 background and the
+   reasoning behind past decisions, numbered 01–13; each issue points at the
+   page that explains it. Read the page an issue names rather than all of them.
+   Write-ups for work that already shipped on this port are in
+   `documentation/13-windows-port-archive.md` — history, not a specification.
+4. **`contracts/README.md`**, then the ten JSON files. The coverage table
+   there says what is shared and what deliberately is not. Three of the ten are
+   GENERATED from the mac and must never be hand-edited; the other seven are
+   authored and can be corrected from either side — `contracts/README.md` says
+   which is which.
+5. **`GUI-IMPROVEMENTS.md`**, newest rows first, for what changed recently and
    why. Read it as HISTORY: where a row and a contract disagree, the contract
    is what is true now.
-5. **`windows-app/PROGRESS.md`** for where this app actually stands.
+6. **`windows-app/PROGRESS.md`** for where this app actually stands.
 
 ---
 
@@ -66,41 +81,25 @@ pure data and will show you the shape.
 
 ---
 
-## 3. Then fix what the cases fail on, in this order
+## 3. Then work the issues
 
-1. **Deploy** — `assist-cases.json` → scenarios *"deploy with a preview
-   running"* and *"deploy while that section is already busy"*. This side never
-   stops the preview before deploying, and `StartDeployForAutomation()` calls
-   `Deploy_Click` directly, walking past the `DeployButton.IsEnabled = !IsBusy`
-   guard. **Await the stop**: a stop still running when the build starts kills
-   the build, and what deploys is the site as it was before.
-2. **The working-folder path bar** — `shared-rules.json` →
-   `workingFolderPathBar`, and its section in `WINDOWS-HANDOFF.md`. Reported
-   missing in real use. Add the right-click menu with *Show in File Explorer*
-   and *Open Folder* as two separate actions, double-click to open, and a
-   full-path tooltip.
-3. **The approval line** — `AssistAgent.AskFirst` builds it by
-   underscore-swapping the TOOL NAME ("I'd like to run **deploy section**").
-   Replace it with `wording.deployApproval` followed by `wording.deployQuestion`.
-   Machinery must never appear in front of a teacher.
-4. **The activity trail** — `shared-rules.json` → `activityTrail.mustRecord`.
-   **Built — this was true when it was written and has not been since.**
-   `ActivityTrail.cs` writes the trail, and its location now comes from
-   `AppDataRoot`, so `--state-dir` moves it. What is still true is the reason
-   it came first: every feature after
-   it owes a line, and adding a trail to a dozen finished features costs
-   several times what having it first does.
-5. **The local model** — move it out of the container onto a hardware-accelerated
-   host backend, and add the two thinking flags when you add a Qwen3 tier.
-   See "The requirement: pick whatever makes it FASTEST on Windows". Measure
-   before choosing, and measure on **integrated graphics**, not only on your
-   own machine.
+**There is no ordered work list here any more, and putting one back is the
+thing this replaced.** The five items that used to stand in this section had
+all shipped, and one of them carried its own correction — *"Built: this was
+true when it was written and has not been since"* — for weeks before anybody
+noticed the other four were in the same state. Ordering lives on the issue now,
+in its milestone and in what it says, where closing it removes it from the
+list.
 
-Items 5 onwards — the 2026-08-16 assistant batch, re-dating's two
-corrections, the schedule prompt, course renaming, the assistant-choice
-panel, the token dialogs — are ordered with their reasoning in
-`WINDOWS-HANDOFF.md` → "Where Windows actually stands". Do not re-derive that
-order; it was chosen so each item makes the next one cheaper.
+Two things from that old list are worth carrying forward, because they are
+reasons rather than tasks:
+
+- **When you stop a preview before deploying, AWAIT the stop.** A stop still
+  running when the build starts kills the build, and what deploys is the site
+  as it was before.
+- **The activity trail came first for a reason.** Every feature after it owes
+  a line (`CLAUDE.md` rule 5), and retro-fitting a trail onto a dozen finished
+  features costs several times what having it from the start does.
 
 ---
 
@@ -125,19 +124,35 @@ order; it was chosen so each item makes the next one cheaper.
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
   `promptHistory`, and the case lists in the other files). Doing so will make
   the **mac** suite fail until they implement it — that is the mechanism
-  working. Name the case so it reads as a proposal and log it in
-  `MAC-HANDOFF.md` under "Contract cases waiting on the mac".
+  working. Name the case so it reads as a proposal and open a GitHub issue
+  labelled `mac` saying which case you added and what the mac has to implement
+  to make it pass — otherwise the red suite over there reads as damage.
 - **Do not run `--write-contracts`.** That is macOS-only.
-- **Anything the MAC must now do goes in `MAC-HANDOFF.md`'s "Open — what the
-  mac still owes", at the TOP of that section, in the same session.** Standing
-  instruction, `CLAUDE.md` rule 4. That section is the mac's to-do list from
-  you, exactly as `WINDOWS-HANDOFF.md`'s numbered list is yours from them —
-  both files are read top-down and abandoned partway, so an obligation that
-  lives only in prose lower down is one nobody picks up. Move it to the ledger
-  when it is done rather than deleting it.
-- **Write every change up before moving on**, to the template at the top of
-  `MAC-HANDOFF.md`: what changed, why, what you rejected, and — for anything
-  measured — the numbers **with the hardware they came from**. "The Vulkan
+- **Anything the MAC must now do is a GitHub issue labelled `mac`, opened in
+  the same session.** Standing instruction, `CLAUDE.md` rule 4. Those issues
+  are the mac's to-do list from you, exactly as the `windows` ones are yours
+  from them — an obligation that lives only in prose inside a long file is one
+  nobody picks up. Something the mac need only KNOW is not an issue; that goes
+  in the `documentation/` page that owns its subject.
+
+  ```powershell
+  gh issue create --repo russellgordon/plantoir --label mac --milestone v1.2.0 `
+    --title "..." --body-file issue-body.md
+  ```
+
+  Labels: `mac`, `windows`, `toolchain`, `assistant` for where it lands (more
+  than one is fine), and `decision` when it needs Russell to choose rather than
+  somebody to implement. **Plain `gh` is right here** as long as `gh auth
+  status` shows one account. `MAC-BOOTSTRAP.md` prefixes every call with
+  `GH_TOKEN=$(gh auth token --user russellgordon)` because THAT machine has
+  several accounts and `gh auth switch` is global — it would change every other
+  session running on it. Copy that form only if this machine grows a second
+  account; with one account, `--user russellgordon` naming nothing configured
+  fails confusingly.
+- **Write every change up before moving on**, to the template in
+  `CLAUDE.md` rule 4: what changed, why,
+  what you rejected, and — for anything measured — the numbers **with the
+  hardware they came from**. "The Vulkan
   build was faster" cannot be acted on; "43 tok/s against 11 on CPU, Intel Iris
   Xe" can. Anything a teacher can see also gets a row in `GUI-IMPROVEMENTS.md`.
 - **An affordance that lives only in a context menu is invisible to everyone
@@ -170,6 +185,14 @@ cd windows-app
 dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
+
+**Read the TOTALS line, not the exit code.** `dotnet test` exits 1 for a failing
+test, for a test host that DIED underneath the run, and for a project that did
+not compile; only the output tells them apart, and a dead host prints no totals
+line at all. `.\run-tests.ps1` (repo root) runs the same command and says which
+happened — a convenience, not a gate, so the raw command stays correct.
+`documentation/12-windows-app.md` → "Reading a test run" has the measured
+output of each, and why getting this wrong cost the mac a fortnight.
 
 **There is a second suite, and it is opt-in.** `run-ui-tests.ps1` (repo root)
 drives the REAL app through UI Automation, for the things `dotnet test` cannot
@@ -237,7 +260,18 @@ Tests touching **preview leases or the publish registry** belong in the
 xUnit parallelises test classes. Skipping that produces an intermittent failure
 that looks exactly like a production bug and is not one.
 
-`verify.sh` does **not** run here (bash, and it expects `docker` on PATH).
-Toolchain changes made on this side have no automated gate — verify them by
-driving a real publish through the app, and say so in `MAC-HANDOFF.md` so the
-mac re-runs `verify.sh` after the next sync.
+`verify.sh` does **not** run here (bash, and it expects `docker` on PATH), but
+"no automated gate" — what this said until 2026-09-07 — is no longer true.
+Split it in two:
+
+- **The shared Python IS gated here.** `dotnet test` runs every
+  `scripts/test_*.py` through `PythonToolchainTests` — all fifteen, the same
+  files `verify.sh` runs on the mac, in about eight seconds with no Docker,
+  network or credentials. Until then this side ran none of them, so a shared
+  file could be broken from this machine with every gate on it green.
+- **The IMAGE is not.** Nothing here builds the Docker image or checks the
+  baked files. Verify those by driving a real publish through the app, and say
+  so in a `mac` issue, so the mac re-runs `verify.sh` after the next sync.
+  For publishing specifically that means `verify-deploy.ps1`, which
+  `RELEASING.md` requires — with nothing skipped — for a release that changes
+  the publishing path.

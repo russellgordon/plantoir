@@ -45,6 +45,20 @@ nonisolated enum ActivityTrail {
         case assistantReady = "assistant ready"
         case assistantWouldNotStart = "assistant would not start"
         case assistantEngineSaid = "assistant engine said"
+        /// A teacher put a section back to how it was when an assistant
+        /// conversation started ("Restore Section N…"). Carries the course,
+        /// the section and the backup's FILE NAME — never a page.
+        ///
+        /// It is the one line that explains a section whose pages are older
+        /// than the conversation that changed them. Without it the trail shows
+        /// the assistant's changes and then nothing, which reads as a teacher
+        /// who never pressed the button — and "why are my pages back to how
+        /// they were on Tuesday?" is exactly the question that arrives a week
+        /// later, with the conversation long closed.
+        ///
+        /// Windows recorded this first (`AssistWindow.xaml.cs`); the mac had
+        /// the same button and wrote nothing.
+        case sectionRestored = "section restored"
         case assistantAsked = "assistant asked"
         case assistantChoseATool = "assistant chose a tool"
         case assistantCouldNotAnswer = "assistant could not answer"
@@ -62,6 +76,20 @@ nonisolated enum ActivityTrail {
         /// leaves nothing to look at: the marker is derived, so its
         /// absence and its presence look identical on disk.
         case sectionContentMarkedPublished = "section content marked published"
+        /// A rollover started a NEW website for a section: it is no longer
+        /// tied to the one it published to last year, and the next publish
+        /// will ask what to call the new one. Carries the course, the section
+        /// and where last year's details were kept.
+        case sectionStartedANewWebsiteOnRollover = "section started a new website"
+        /// A rollover kept LAST YEAR'S website, so the next publish replaces
+        /// what is already there.
+        ///
+        /// **Both answers are recorded, and this is the one that matters more
+        /// for a report.** A teacher who writes in weeks later saying their old
+        /// class site was overwritten is describing THIS branch, so a trail
+        /// that recorded only the release could not answer the question anyone
+        /// actually reads it for.
+        case sectionKeptItsWebsiteOnRollover = "section kept its website"
         /// A folder a feature depends on was missing, renamed or emptied.
         /// Carries the check's NAME, never its wording: the sentence is
         /// product wording and will be reworded, while the name is what
@@ -77,6 +105,21 @@ nonisolated enum ActivityTrail {
         /// somebody acted on it — and a trail that could not tell them apart
         /// would leave "did they ever fix it?" unanswerable.
         case folderProblemRepaired = "folder problem repaired"
+        /// A repair the teacher ASKED for did not happen. Carries the course,
+        /// the section, and what was in the way — never anything from inside
+        /// it. Recorded because the trail otherwise shows the problem being
+        /// found and then nothing at all, which reads exactly like a teacher
+        /// who never pressed the button; and the thing in the way is a folder
+        /// they will very likely have moved by the time they report it, so it
+        /// cannot be looked for afterwards.
+        ///
+        /// Named for the OUTCOME rather than for the one cause that writes it
+        /// today: only the "a folder is sitting where the front page belongs"
+        /// refusal records this, and a repair that simply failed — a read-only
+        /// volume, a permissions problem — still records nothing. That gap is
+        /// deliberate rather than forgotten, and this event is the line it
+        /// joins when it is closed, without a rename on either platform.
+        case folderProblemNotRepaired = "folder problem not repaired"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
         case itemExcluded = "item excluded"

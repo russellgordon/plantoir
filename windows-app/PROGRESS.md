@@ -1,8 +1,9 @@
 # Plantoir for Windows — Progress
 
 What each project in the solution is, and what state the app is in. First take
-built overnight 2026-08-11 by Claude Code, per
-[`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md); the assist subsystems folded
+built overnight 2026-08-11 by Claude Code, per `WINDOWS-HANDOFF.md` — a file
+since absorbed into [`documentation/`](../documentation/README.md) and deleted;
+the assist subsystems folded
 into `main` on 2026-08-14. Everything below was **verified live on the
 maintainer's Windows 11 machine** (WSL2 + Ubuntu-24.04 + Docker Engine 29, no
 Docker Desktop) unless marked otherwise.
@@ -18,47 +19,78 @@ Docker Desktop) unless marked otherwise.
 | `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
 | `Plantoir.Mcp/` | On `main` (`Plantoir.sln` lists it) and **it ships**: `publish.ps1` publishes it, copies `plantoir-mcp.exe` into the app's own output beside `Plantoir.exe`, and includes it in the signing list. A standalone MCP server exposing one working folder to an AI assistant. Load-bearing at runtime — `Plantoir/Services/ClaudeCodeLauncher.cs` looks for it beside the app, and `Plantoir/Services/McpClient.cs` launches it. See [its README](Plantoir.Mcp/README.md). |
 
-## Where parity stands (2026-09-06)
+## Where parity stands
 
-`WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
-date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Sixteen of its twenty-four
-items are done**, items 21, 23 and 24 having landed on 2026-09-06 (the
-folder-problems front end, the same findings reaching the assistant, and the
-overnight run's findings being captured and reported the next morning).
-What is genuinely left, smallest first:
+> **"item N" in this file means the retired numbered list.** Until 2026-09-08
+> outstanding work lived in a numbered list inside `WINDOWS-HANDOFF.md` (a file
+> since deleted), and
+> prose written before then cites it by number. Those numbers no longer resolve
+> to anything: what was still open became [GitHub
+> issues](https://github.com/russellgordon/plantoir/issues), and what was done
+> is recorded in `GUI-IMPROVEMENTS.md`. The numbers are left in historical
+> sentences rather than rewritten, because the sentence around one usually says
+> what it was; `git log` has the list itself if a number ever needs chasing.
 
-| Item | What is left | Size |
-|---|---|---|
-| 19 | The `working-folder.txt` marker AND a sweep that reads it. Do both or neither — the marker alone is ceremony. Two Windows specifics for the sweep are written into item 19. | Small |
-| 18 | The two VIEWS: the choice at the folder picker, and the dismissable notice for a folder the window restored. Detection, wording and the remembered-per-folder store are built — the store's API is `AppSettings.HasAcceptedSyncFor` / `RememberAcceptedSyncFor`, and the two moments belong in `WorkspacePickerView` (a folder just chosen) and `MainWindow`'s restore path (a folder the window reopened). | Medium |
-| 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
-| 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
-| ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
+**The open work is in [GitHub
+issues](https://github.com/russellgordon/plantoir/issues?q=is%3Aopen+label%3Awindows),
+and this file no longer keeps a second copy of it.** Until 2026-09-08 it did —
+a table here mirroring that numbered list — and the two drifted
+exactly as often as anybody edited one and not the other. The count in this
+section was wrong the last three times it was read, which is what settled the
+argument for having one home rather than two.
 
-Two things that are NOT in that list and should be known:
+Five items were open when the cutover happened, and they are now issues #66
+and #68–#70 plus #99 (which absorbed the old item 42). Everything else on that
+list was struck through as done; the shipped record of it is
+`GUI-IMPROVEMENTS.md` and
+[`documentation/13-windows-port-archive.md`](../documentation/13-windows-port-archive.md).
 
-- **The deploy gate exists now.** `verify-deploy.ps1` publishes to every
-  destination and every pairing against real sites and fetches each one back:
-  36 passed, 0 failed on 2026-09-06. It needs credentials and the network, so
-  it is opt-in and wired into nothing. Run it when the publishing path
-  changes. It is the only automated check of the PowerShell half of
-  publishing — `verify.sh` and `verify-deploy.sh` are bash and do not run
-  here.
+```bash
+gh issue list --repo russellgordon/plantoir --label windows
+```
+
+Two more things worth knowing here:
+
+- **The deploy gate exists, and item 36 decided what runs it (2026-09-07).**
+  `verify-deploy.ps1` publishes to every destination and every pairing against
+  real sites and fetches each one back: 36 passed, 0 failed on 2026-09-06. It
+  needs three credentials, the network and about twenty minutes, and it creates
+  real sites that nothing deletes — so **it stays opt-in and no suite runs
+  it**, which was the right posture all along; what was missing was anybody
+  being told. Now `.githooks/pre-commit` says so when a commit touches the
+  publishing path (a warning — it never blocks, because those files change on
+  16 of every 22 active days and a blocking hook would be `--no-verify`'d once
+  and never fire again), and `RELEASING.md` requires a run with **nothing
+  skipped** for a release that changes that path.
+
+  **The bigger find was underneath it.** `verify.sh` runs fifteen shared
+  `scripts/test_*.py` files on the mac; Windows ran **none** of them. All
+  fifteen pass here, so `PythonToolchainTests` now runs every one inside
+  `dotnet test` — 156 tests in about eight seconds, no Docker, no network, no
+  credentials. A rejected first design (a stamp file recording when
+  `verify-deploy.ps1` last passed, with a unit test reddening when the
+  publishing files changed afterwards) is written up in `documentation/07-deployment.md`
+  `git log -- WINDOWS-HANDOFF.md`, with the measurements that killed it — that
+  write-up went with the retired list rather than into `documentation/`.
 - **The unit suite is green**: 911 passed, 0 failed at the time this section
   was written; 945 after the folder-problems front end, and 979 once
   parity-tail was merged into it and the overnight capture was added. `dev` stood
   at 668 passed with 5 failing contract tests before this series; those five
   were each a real gap between what the contract says Windows does and what it
   did. **1,029 passed with 2 skipped** after item 29 wired the contract case
-  lists this suite was not reading (2026-09-06). The two skips are named
-  divergences rather than unfinished work: `use_skeleton` (item 25) and the
-  frontmatter-key question the mac has to settle, each carrying the test that
-  closes it.
+  lists this suite was not reading (2026-09-06), and **1,125 with 2 skipped**
+  after item 31 wired the twelfth of them — `linkRewriting`, which item 29's
+  audit missed because it was added the same day (2026-09-07); 1,150 with 2
+  skipped once items 26, 31, 33 and 34 were all merged; and **1,153 with 1
+  skipped** once item 25 made the wizard ask the skeleton question; and **no
+  skips at all** once the frontmatter-key divergence was decided in this
+  app's favour on 2026-09-07 (item 38) and its test rewritten to assert
+  migration.
 
 ## Every contract case list is now RUN here (2026-09-06)
 
-WINDOWS-HANDOFF item 29. Twenty-three lists the mac suite ran and this one did
+Closing the gap the 2026-09-06 contract audit found. Twenty-three lists the mac
+suite ran and this one did
 not read — none unreachable, each simply a test nobody had written.
 `contracts/README.md` now names which class runs which, so the audit does not
 have to be repeated.
@@ -99,9 +131,23 @@ and the one thing measurement added.
 Run it **from the repository root**, not from `windows-app/`:
 
 ```powershell
-.\run-ui-tests.ps1                 # all of it, about 3 minutes
+.\run-ui-tests.ps1                 # all of it, about 4 minutes
 .\run-ui-tests.ps1 -Filter "FullyQualifiedName~TheSheetCloses"
 ```
+
+**Two switches, both added 2026-09-07 with item 35.** `PLANTOIR_UI_KEEP=1`
+stops the run deleting its temporary folders — every test's, not just a failed
+one's, since the teardown cannot know the outcome — and the runner prints each
+path. A test that fails INSIDE the app has almost nothing to say from outside
+it, and the evidence (that run's `startup.log`, its trail, its per-run
+launcher log, its working folder) was being deleted on the way out. And the
+runner now sweeps orphaned `powershell.exe`/`python.exe` children afterwards,
+matched on **this run's token** — minted by the runner and folded by
+`DrivenApp` into every folder name (`plantoir-ui-<run>-<8 hex>`) — because
+matching the folder prefix would kill a parallel run's live launchers and a
+developer tailing a kept folder's log. Killing `Plantoir.exe` kills only
+`Plantoir.exe`: the whole-tree kill lives in `ConPty.Kill()` and runs when the
+APP ends a task, not when the app is ended from outside.
 
 It closes a running Plantoir before it starts, says so, and does not reopen it.
 `--state-dir` moves the whole state folder for the run, so nothing of the
@@ -114,6 +160,11 @@ s) and once in a full run (6/6, 3 m 16 s). It is the test that ticks a marks
 folder and waits for the sheet to be rebuilt through the dispatcher, and it
 already retries for 20 seconds at half-second intervals. Nothing in that run
 had touched the app or the UI project.
+
+**It did it again on 2026-09-07**, on the item 35 branch: one failure in a
+full run, then a pass alone (23 s) and a pass in a full run (9/9, 4 m 13 s) —
+so roughly one full run in four across two days, on a branch that had touched
+neither this test nor the view it drives. Second data point, same conclusion.
 
 **So: if it fails, re-run it alone before believing it.** Recorded because an
 intermittent nobody writes down is rediscovered as a regression by the next
@@ -132,32 +183,25 @@ the views are what remains.
 
 Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
-the types as dead code. The same goes for the four trail events below: the
-features that would raise them are these same two.
+the types as dead code.
 
-## SIX activity-trail events are declared but not yet emitted (2026-09-06; a seventh was, and now is)
+## ONE activity-trail event is declared without an emitter (2026-09-06; six were then, and all six have callers since 2026-09-07)
 
-`ActivityTrail.Event` names `folder renamed`, `folder created`,
+`ActivityTrail.Event` named `folder renamed`, `folder created`,
 `synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
-`settings saved` and `settings could not be saved`, which belong to no
-unbuilt view at all: `CourseSettingsView.Save_Click` writes the config and
-records nothing, while the mac records both. That last pair is a small fix
-rather than a feature, and it is handoff item 28. The first four are in
-`contracts/shared-rules.json` → `activityTrail.mustRecord`, and
-`ContractTests.SharedRules_ActivityTrailEvents_Exist` compares that list
-against the enum — so declaring them is what makes the suite green.
-
-**Nothing raises any of them yet**, because the features that would are only
-half built: WINDOWS-HANDOFF item 13's rename sheet does not exist (the model
-layer — `SpecialFolderRenamer`, `FolderPathRewriter` — does), and item 18's
-two views do not exist (the detection and the wording do).
-
-This is written here rather than left in a commit message because a green
-suite that is green on a promise is exactly the kind of thing a later session
-should be able to find. **When either feature's front end lands, the events
-must actually be recorded** — the count and the names are in the contract
-entries, and `ReclaimedProcesses` is the worked example of parsing something
-out and putting it on the trail.
+`settings saved` and `settings could not be saved`, which belonged to no
+unbuilt view at all: `CourseSettingsView.Save_Click` wrote the config and
+recorded nothing, while the mac records both. All six are emitted now: the
+settings pair since item 28 (2026-09-07), the synced-folder pair the same day
+with item 18's views, and `folder renamed` / `folder created` with item 13's
+rename sheet (`CourseSettingsView`, `RenameFolderAsync` and
+`CreateFolderForNewEntry`). The one member still without a caller is
+`AssistantAsked`, whose line is written by `NotePrompt` without going through
+the enum — a recount should not be surprised by it. Check with `grep -c` per
+member rather than trusting this paragraph: a green suite that is green on a
+promise is exactly the kind of thing a later session should be able to find,
+and `ReclaimedProcesses` is the worked example of parsing something out and
+putting it on the trail.
 
 **There was a FIFTH, and this section did not name it: `folder problem
 repaired`.** Declared when the trail was built, still with no call site on
@@ -244,11 +288,12 @@ entries 1–264 assessed). Nothing here duplicates it, because a second copy is
 a copy that goes stale — that count itself had been reading "179 rows" for
 days after the log passed 250.
 
-**What to do with that assessment** is the ordered list in
-[`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) → "Where Windows actually
-stands", written 2026-08-17 by reading this app's source from the mac. It was
-read rather than run — `dotnet` is not installed there — so treat it as a
-plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
+**What to do with that assessment** is the open `windows` issues, plus
+[`documentation/12-windows-app.md`](../documentation/12-windows-app.md) →
+"What is built and what is missing". Much of that page was written by reading
+this app's source from the mac, read rather than run — `dotnet` is not
+installed there — so treat it as a starting point, and report anything it gets
+wrong in a `mac` issue.
 
 ## Known rough edges for the next session
 
@@ -292,10 +337,17 @@ plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
   (`MainWindow.xaml`, handoff item 1). Corrected 2026-09-06: this paragraph
   outlived the work by a fortnight, and anyone planning from it would have
   built it twice.
-- Two paths proven underneath but never click-driven in-app: the wizard's
+- ~~Two paths proven underneath but never click-driven in-app: the wizard's
   Create button (the `setup.ps1` + answer-pump path ran to completion via
   PtyDriver), and the new-site dialog a BRAND-NEW section's deploy raises —
-  the verified deploy was a repeat publish to an existing site.
+  the verified deploy was a repeat publish to an existing site.~~ Closed
+  2026-09-07 as handoff item 35. The Create button is now click-driven by
+  `NewCourseWizardUiTests`; the new-site dialog is a hand-driven check with a
+  written procedure (`documentation/12-windows-app.md`), because reaching it
+  needs a real saved Netlify token and creates a real site. It was listed as
+  item 35 on 2026-09-06 — before that it was written down here and indexed
+  nowhere, so no session planning from the numbered list could see it, which
+  is the whole reason the audit added it.
 - Smoke-test hooks, all driving the real button code paths
   (`MainWindow.xaml.cs`, `RunAutomationHooks`): `--auto-select CODE N`,
   `--auto-preview CODE N`, `--auto-deploy CODE N`, `--auto-course CODE`,

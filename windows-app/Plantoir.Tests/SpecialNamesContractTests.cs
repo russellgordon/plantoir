@@ -161,4 +161,53 @@ public class SpecialNamesContractTests
             Assert.Contains(reason, shown);
         }
     }
+
+    /// <summary>
+    /// The caption under the four Content Structure lists, pinned because it is
+    /// a sentence a teacher reads with one right meaning. It was pinned by
+    /// nothing on either platform for two weeks, and in that time the two apps
+    /// drifted into wording the same rule differently -- which is the failure a
+    /// contract case exists to make impossible rather than to discover later.
+    /// </summary>
+    [Fact]
+    public void TheContentStructureTipMatchesContract()
+    {
+        Assert.Equal(SpecialNamesJson["contentStructureTip"]!["message"]!.ToString(),
+                     SpecialNames.ContentStructureTip);
+    }
+
+    /// <summary>
+    /// The tip promises its behaviour for BOTH kinds of thing the four lists
+    /// above it hold. Both apps used to say "folders" alone, while
+    /// <c>build_site.py</c> discovers and excludes files identically
+    /// (<c>discover_shared_items</c>, and the drop-and-skip pass over
+    /// <c>shared_files</c> / <c>per_section_files</c>) -- so a teacher who
+    /// removed a file met a permanent, silent rule that no sentence anywhere
+    /// warned them about.
+    ///
+    /// <para>Honest about its reach: this guards the PROMISE clause only. An
+    /// edit dropping "and files" from the first sentence fails here; one that
+    /// narrowed the second sentence back to folders would not, and no test
+    /// would catch it.</para>
+    /// </summary>
+    [Fact]
+    public void TheContentStructureTipCoversFilesAsWellAsFolders()
+    {
+        string message = SpecialNamesJson["contentStructureTip"]!["message"]!.ToString();
+        Assert.Contains("folders and files", message);
+    }
+
+    /// <summary>
+    /// It is a caption, not a removal-blocked sentence, so it deliberately
+    /// carries no <c>reason</c> key and
+    /// <see cref="NoBlockedSentenceInTheContractIsUnusedHere"/> steps over it.
+    /// Given a <c>reason</c> it would be demanded to be one of the seven
+    /// sentences that app shows in a flyout, and fail for a reason that has
+    /// nothing to do with what it says.
+    /// </summary>
+    [Fact]
+    public void TheContentStructureTipIsNotABlockedSentence()
+    {
+        Assert.Null(SpecialNamesJson["contentStructureTip"]!["reason"]);
+    }
 }

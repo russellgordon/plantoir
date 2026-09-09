@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Nodes;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 
@@ -44,9 +45,9 @@ public class SiteHealthRepairTests : IDisposable
         "{\"course_code\": \"ICS3U\", \"course_name\": \"Introduction to Computer Science\", " +
         "\"section_numbers\": [1, 2], \"num_sections\": 2}";
 
-    private Course MakeCourse()
+    private Course MakeCourse(string copy = "")
     {
-        string courseDir = Path.Combine(_root, "courses", "ICS3U");
+        string courseDir = Path.Combine(_root, "courses" + copy, "ICS3U");
         Directory.CreateDirectory(courseDir);
         File.WriteAllText(Path.Combine(courseDir, "course_config.json"), ConfigJson);
         return new Course("ICS3U", courseDir,
@@ -177,17 +178,101 @@ public class SiteHealthRepairTests : IDisposable
     }
 
     [Fact]
-    public void ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine()
+    public void AFolderSittingWhereTheFrontPageBelongsIsRefusedAndLeftExactlyAsItIs()
     {
         // File.Exists answers false for a directory, so without an explicit
-        // check the write below fails and the teacher is told to see whether
-        // their disk is read-only — which is not the problem. The mac reports
-        // this one as ALREADY PUT RIGHT, which is worse: the site still has no
-        // front page. See MAC-HANDOFF.
+        // check the write fails and the teacher is sent to see whether their
+        // disk is read-only — which is not the problem. This used to answer
+        // Failed, which was honest and still sent them to the wrong place;
+        // the mac's bare existence check answered ALREADY FINE, which was
+        // worse. Both now refuse, with a sentence of their own — contract
+        // siteHealth.repair.refusedWhenSomethingIsInTheWay.
+        var course = MakeCourse();
+        string folder = Path.Combine(course.SectionDirectory(1), "index.md");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "their-page.md"), "theirs");
+
+        Assert.Equal(SiteHealthRepair.Result.Refused, SiteHealthRepair.RestoreIndex(1, course));
+
+        // Nothing moved, renamed or deleted: the folder may hold their pages.
+        Assert.True(Directory.Exists(folder));
+        Assert.Equal("theirs", File.ReadAllText(Path.Combine(folder, "their-page.md")));
+
+        // The refusal leaves a line, because the folder in the way is something
+        // the teacher will very likely have moved by the time they report it.
+        Assert.Contains("ICS3U/1", Trail());
+        Assert.Contains("found a folder called index.md where the front page belongs, and left it alone", Trail());
+    }
+
+    [Fact]
+    public void ARefusalIsReportedWithItsOwnSentenceAndNotThePermissionsAdvice()
+    {
+        var course = MakeCourse();
+        Directory.CreateDirectory(Path.Combine(course.SectionDirectory(2), "index.md"));
+
+        var outcome = SiteHealthRepair.OutcomeOfRepairing(
+            new[] { Finding("sectionIndexMissing", section: 2) }, course);
+
+        Assert.Equal("Plantoir could not put that back.", outcome!.Headline);
+        Assert.Equal(SiteHealthRepair.FolderWhereTheFrontPageBelongs("ICS3U", 2), outcome.Detail);
+        // "check the folder isn't locked or read-only" is not what is wrong.
+        Assert.DoesNotContain(SiteHealthRepair.CouldNotExplanation, outcome.Detail);
+        Assert.False(outcome.CanRebuild);
+    }
+
+    [Fact]
+    public void WhenBothKindsOfFailureHappenTheGenericAdviceComesFirstAndTheRefusalLast()
+    {
+        // A file where Media belongs (simply failed) AND a folder where the
+        // front page belongs (refused). The paragraph must end on the step the
+        // teacher can actually take, not on advice that does not apply to it.
+        var course = MakeCourse();
+        File.WriteAllText(Path.Combine(course.DirectoryPath, "Media"), "a file, not a folder");
+        Directory.CreateDirectory(Path.Combine(course.SectionDirectory(1), "index.md"));
+
+        var outcome = SiteHealthRepair.OutcomeOfRepairing(
+            new[] { Finding("mediaFolderMissing"), Finding("sectionIndexMissing", section: 1) }, course);
+
+        Assert.Equal("Plantoir could not put that back.", outcome!.Headline);
+        Assert.Equal(
+            SiteHealthRepair.CouldNotExplanation + " " +
+            SiteHealthRepair.FolderWhereTheFrontPageBelongs("ICS3U", 1),
+            outcome.Detail);
+        Assert.False(outcome.CanRebuild);
+    }
+
+    [Fact]
+    public void ARefusalBesideARestoreNamesBothAndOffersNoPreview()
+    {
         var course = MakeCourse();
         Directory.CreateDirectory(Path.Combine(course.SectionDirectory(1), "index.md"));
 
-        Assert.Equal(SiteHealthRepair.Result.Failed, SiteHealthRepair.RestoreIndex(1, course));
+        var outcome = SiteHealthRepair.OutcomeOfRepairing(
+            new[] { Finding("mediaFolderMissing"), Finding("sectionIndexMissing", section: 1) }, course);
+
+        Assert.Equal("Put the Media folder back.", outcome!.Headline);
+        Assert.Equal(
+            "Could not put the front page back. " +
+            SiteHealthRepair.FolderWhereTheFrontPageBelongs("ICS3U", 1),
+            outcome.Detail);
+        Assert.False(outcome.CanRebuild);
+    }
+
+    [Fact]
+    public void TwoRefusedSectionsAreTwoSentencesBecauseEachNamesItsOwnFolder()
+    {
+        var course = MakeCourse();
+        Directory.CreateDirectory(Path.Combine(course.SectionDirectory(1), "index.md"));
+        Directory.CreateDirectory(Path.Combine(course.SectionDirectory(2), "index.md"));
+
+        var outcome = SiteHealthRepair.OutcomeOfRepairing(
+            new[] { Finding("sectionIndexMissing", section: 1), Finding("sectionIndexMissing", section: 2) },
+            course);
+
+        Assert.Equal(
+            SiteHealthRepair.FolderWhereTheFrontPageBelongs("ICS3U", 1) + " " +
+            SiteHealthRepair.FolderWhereTheFrontPageBelongs("ICS3U", 2),
+            outcome!.Detail);
     }
 
     [Fact]
@@ -202,26 +287,92 @@ public class SiteHealthRepairTests : IDisposable
         Assert.True(outcome.CanRebuild);
     }
 
-    [Fact]
-    public void TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer()
+    /// <summary>
+    /// The cases under <c>siteHealth.repair.reportedOncePerFinding</c>, built
+    /// exactly as its <c>howToRunACase</c> says: one finding per listed
+    /// section, all of the named check, all fixable, for a course whose
+    /// sections are exactly the listed numbers; <c>frontPage</c> says what is
+    /// on disk before the repair. The report and the results are asked of
+    /// SEPARATE copies of the course, because every repair runs as it goes.
+    /// </summary>
+    /// <remarks>
+    /// This replaced a hand-written test that pinned the same rule. Both apps
+    /// return one entry per finding — this side shipped the shape first — and
+    /// the rule became contract data on 2026-09-07 so it is checked against one
+    /// source on both sides rather than proved twice in parallel.
+    /// </remarks>
+    public static IEnumerable<object[]> ReportedOncePerFindingCases()
     {
-        // Both are repaired either way; what a name-keyed result loses is the
-        // REPORT. Section 1 restored and section 2 already fine would come back
-        // as "that is already put right", with no preview offered, because the
-        // second result overwrote the first.
-        var course = MakeCourse();
-        Directory.CreateDirectory(course.SectionDirectory(2));
-        File.WriteAllText(Path.Combine(course.SectionDirectory(2), "index.md"), "theirs");
-
-        var outcome = SiteHealthRepair.OutcomeOfRepairing(
-            new[] { Finding("sectionIndexMissing", section: 1), Finding("sectionIndexMissing", section: 2) },
-            course);
-
-        Assert.Equal("Put the front page back.", outcome!.Headline);
-        Assert.True(outcome.CanRebuild);
-        Assert.True(File.Exists(Path.Combine(course.SectionDirectory(1), "index.md")));
-        Assert.Equal("theirs", File.ReadAllText(Path.Combine(course.SectionDirectory(2), "index.md")));
+        var cases = ContractLoader.LoadJson("shared-rules.json")["siteHealth"]!["repair"]!
+            ["reportedOncePerFinding"]!["cases"]!.AsArray();
+        foreach (var c in cases)
+            yield return new object[] { c!["note"]!.ToString(), c.ToJsonString() };
     }
+
+    [Theory]
+    [MemberData(nameof(ReportedOncePerFindingCases))]
+    public void ARepairReportsOneResultPerFindingNeverOnePerCheckName(string note, string caseJson)
+    {
+        var c = JsonNode.Parse(caseJson)!;
+        string check = c["check"]!.ToString();
+        var sections = c["sections"]!.AsArray();
+        var expectResults = c["expectResults"]!.AsArray().Select(r => r!.ToString()).ToList();
+
+        var findings = sections
+            .Select(sec => Finding(check, section: sec!["number"]!.GetValue<int>()))
+            .ToList();
+
+        // One copy of the course for the results, one for the report.
+        var forResults = MakeCourse("results");
+        var forReport = MakeCourse("report");
+        foreach (var course in new[] { forResults, forReport })
+        {
+            Assert.Equal(sections.Select(sec => sec!["number"]!.GetValue<int>()).OrderBy(n => n),
+                         course.Configuration.SectionNumbers.OrderBy(n => n));
+            foreach (var sec in sections)
+            {
+                int number = sec!["number"]!.GetValue<int>();
+                string frontPage = sec["frontPage"]!.ToString();
+                if (frontPage == "theTeachersOwn")
+                {
+                    Directory.CreateDirectory(course.SectionDirectory(number));
+                    File.WriteAllText(Path.Combine(course.SectionDirectory(number), "index.md"), "theirs");
+                }
+                else Assert.Equal("missing", frontPage);
+            }
+        }
+
+        var results = SiteHealthRepair.Repair(findings, forResults);
+        Assert.Equal(expectResults,
+                     results.Select(r => Vocabulary(r.Result)).ToList());
+        // In the order given, so the finding beside each answer is the one
+        // it is about.
+        Assert.Equal(findings.Select(f => f.Section), results.Select(r => r.Finding.Section));
+
+        var outcome = SiteHealthRepair.OutcomeOfRepairing(findings, forReport);
+        Assert.Equal(c["expectHeadline"]!.ToString(), outcome!.Headline);
+        Assert.Equal(c["expectCanRebuild"]!.GetValue<bool>(), outcome.CanRebuild);
+
+        // A teacher's own page survived, whichever copy it was on.
+        foreach (var sec in sections)
+        {
+            if (sec!["frontPage"]!.ToString() != "theTeachersOwn") continue;
+            int number = sec["number"]!.GetValue<int>();
+            foreach (var course in new[] { forResults, forReport })
+                Assert.Equal("theirs", File.ReadAllText(Path.Combine(course.SectionDirectory(number), "index.md")));
+        }
+        Assert.NotEmpty(note);
+    }
+
+    /// <summary>The contract's answer words, mapped onto this app's results.</summary>
+    private static string Vocabulary(SiteHealthRepair.Result result) => result switch
+    {
+        SiteHealthRepair.Result.Restored => "restored",
+        SiteHealthRepair.Result.AlreadyFine => "alreadyFine",
+        SiteHealthRepair.Result.Failed => "failed",
+        SiteHealthRepair.Result.Refused => "refused",
+        _ => throw new ArgumentOutOfRangeException(nameof(result)),
+    };
 
     [Fact]
     public void WhenEverythingFailedTheHeadlineDoesNotTryToNameThem()

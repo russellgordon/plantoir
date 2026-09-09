@@ -131,37 +131,86 @@ final class SpecialFoldersHelpTests: XCTestCase {
 
     // MARK: - The rows themselves
 
-    /// Every row's explanation, in the contract's order. The sentences a
+    /// Every row's explanation, in the contract's order — for every course the
+    /// contract lists, rather than for one hand-typed fixture. The sentences a
     /// teacher reads are the contract's, character for character.
+    ///
+    /// **The single fixture this used to build had a curriculum folder, and
+    /// that is the hole the retired second sentence lived in.** The curriculum
+    /// row says the same thing whichever name it carries, but nothing pinned
+    /// the PLACEHOLDER branch's copy of it: putting the old sentence back —
+    /// "One page per expectation, in a folder whose name mentions the
+    /// curriculum", which published the matching rule in plain words — left
+    /// all five tests in this file green. Measured on this Mac on 2026-09-06
+    /// by doing exactly that: 5 tests, 0 failures. The jargon sweep below does
+    /// run that branch and still could not see it, because "mentions" is not a
+    /// banned word. Banning it would not be the fix either: a banned word
+    /// catches only that word, and "named after the curriculum" says the same
+    /// thing in different ones. Pinning the sentence catches any wording.
+    ///
+    /// Running the contract's own cases closes it without inventing a second
+    /// fixture to drift: two of them end up with no curriculum folder at all,
+    /// so both branches are now compared with the contract.
     func testTheRowsAreTheContractsRowsInTheContractsOrder() throws {
         let rows: [[String: Any]] = try SpecialFoldersHelpTests.rows()
-        let (root, course) = try makeCourse(from: [
-            "perSectionFolders": ["All Classes"],
-            "sharedFolders": ["Concepts", "Tasks", "Ontario Curriculum"],
-        ])
-        defer { try? FileManager.default.removeItem(at: root) }
+        let section: [String: Any] = try SpecialFoldersHelpTests.section()
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
 
-        let entries: [SpecialFolderEntry] = SpecialFoldersHelpView(course: course).entries
-        // Asserted AND enforced: a mismatch has to stop the loop below, or the
-        // subscript traps and takes the whole run down with it rather than
-        // failing this one test.
-        XCTAssertEqual(entries.count, rows.count,
-                       "no row is ever omitted — see rowsAreOrdered")
-        guard entries.count == rows.count else {
-            return
-        }
+        // Reaching both branches is asserted at the end rather than assumed. A
+        // case list edited until every course had a curriculum folder would
+        // leave this test green while covering exactly what it covered before
+        // — which is the shape of the failure this whole file exists to catch.
+        var sawResolvedFolder: Bool = false
+        var sawPlaceholder: Bool = false
 
-        for index in rows.indices {
-            let row: [String: Any] = rows[index]
-            let key: String = try XCTUnwrap(row["key"] as? String)
-            XCTAssertEqual(entries[index].what, row["what"] as? String, "row “\(key)”")
-            XCTAssertEqual(entries[index].why, row["why"] as? String, "row “\(key)”")
-            // A fixed row's name is the contract's; a course-named row's is
-            // not, and asserting it here would only restate the cases above.
-            if row["namedFrom"] as? String == "fixed" {
-                XCTAssertEqual(entries[index].name, row["name"] as? String, "row “\(key)”")
+        for figure in cases {
+            let name: String = try XCTUnwrap(figure["name"] as? String)
+            let (root, course) = try makeCourse(from: figure)
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let entries: [SpecialFolderEntry] = SpecialFoldersHelpView(course: course).entries
+            // Asserted AND enforced: a mismatch has to skip this case, or the
+            // subscript traps and takes the whole run down with it rather than
+            // failing one test. `continue` rather than `return`, so one bad
+            // case does not silence every case after it.
+            XCTAssertEqual(entries.count, rows.count,
+                           "case “\(name)”: no row is ever omitted — see rowsAreOrdered")
+            guard entries.count == rows.count else {
+                continue
+            }
+
+            for index in rows.indices {
+                let row: [String: Any] = rows[index]
+                let key: String = try XCTUnwrap(row["key"] as? String)
+                let place: String = "case “\(name)”, row “\(key)”"
+                XCTAssertEqual(entries[index].what, row["what"] as? String, place)
+                XCTAssertEqual(entries[index].why, row["why"] as? String, place)
+                // A fixed row's name is the contract's; a course-named row's is
+                // not, and asserting it here would only restate the cases above.
+                if row["namedFrom"] as? String == "fixed" {
+                    XCTAssertEqual(entries[index].name, row["name"] as? String, place)
+                }
+                if key == "curriculum" {
+                    if entries[index].name == SpecialFoldersHelpView.noCurriculumFolderYet {
+                        sawPlaceholder = true
+                    } else {
+                        sawResolvedFolder = true
+                    }
+                }
             }
         }
+
+        XCTAssertTrue(
+            sawResolvedFolder,
+            "no case names a real curriculum folder, so the explanation shown beside "
+                + "a folder the course HAS went unchecked"
+        )
+        XCTAssertTrue(
+            sawPlaceholder,
+            "no case leaves a course without a curriculum folder, so the explanation "
+                + "shown beside “\(SpecialFoldersHelpView.noCurriculumFolderYet)” went "
+                + "unchecked — which is the hole the retired second sentence lived in"
+        )
     }
 
     /// The sentences that are not rows: the button that opens the sheet, its

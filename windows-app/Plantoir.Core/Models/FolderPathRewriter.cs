@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Plantoir.Core.Models;
@@ -59,6 +61,69 @@ public static class FolderPathRewriter
     /// <summary>A URL scheme: http:, https:, mailto:, obsidian: and friends.</summary>
     private static readonly Regex Scheme =
         new(@"^[A-Za-z][A-Za-z0-9+.\-]*:", RegexOptions.Compiled);
+
+    /// <summary>
+    /// The characters that go into a link AS THEY STAND when escaping runs.
+    /// Everything else is percent-encoded as UTF-8.
+    ///
+    /// <para><b>This set was measured against the built site, not reasoned
+    /// about, and <c>Uri.EscapeDataString</c> is the wrong tool for it.</b>
+    /// Quartz resolves an internal link with JavaScript's <c>decodeURI</c>
+    /// (<c>quartz/util/path.ts</c>, <c>transformInternalLink</c>), and
+    /// <c>decodeURI</c> deliberately leaves the reserved set
+    /// <c>; / ? : @ &amp; = + $ , #</c> STILL ENCODED — that is what
+    /// distinguishes it from <c>decodeURIComponent</c>. <c>sluggify</c>, in the
+    /// same file, then maps <c>&amp;</c> to <c>-and-</c> and <c>%</c> to
+    /// <c>-percent</c> when it builds the address. So a folder called
+    /// "Tasks &amp; Quizzes" written as <c>Tasks%20%26%20Quizzes</c> decodes to
+    /// <c>Tasks %26 Quizzes</c> and slugs to <c>Tasks--percent26-Quizzes</c>,
+    /// while the real folder slugs to <c>Tasks--and--Quizzes</c>: a 404 for
+    /// students, and invisible to the teacher, because Obsidian decodes
+    /// <c>%26</c> perfectly well. <c>Uri.EscapeDataString</c> keeps only
+    /// <c>A-Za-z0-9-._~</c>, so it produces exactly that — and over-encodes
+    /// <c>,</c> the same way, which is the one that will actually happen here:
+    /// "Unit 1, Day 2" is this project's own naming pattern.</para>
+    ///
+    /// <para>Being precise about WHICH of its over-encodings break, because
+    /// the loose version of this sentence has been written twice: the ones
+    /// that 404 are the EIGHT characters <c>decodeURI</c> leaves encoded and
+    /// <c>sluggify</c> then turns into <c>-percent…</c> —
+    /// <c>; , @ &amp; = + $ ?</c>. <c>'</c>, <c>!</c> and <c>*</c> are
+    /// over-encoded too and come back out of <c>decodeURI</c> intact, so those
+    /// are merely noise. <c>?</c> is an ordinary member of the eight, not a
+    /// special case: <c>Why%20Not%3F</c> slugs to <c>Why-Not-percent3F</c> by
+    /// the same mechanism as the rest. What IS peculiar to <c>?</c> is why the
+    /// UNESCAPED spelling works — <c>sluggify</c> strips it from the real
+    /// folder's name too, so both sides land on <c>Why-Not</c>. The encoder
+    /// below is the answer to all eleven, and the eight that break include the
+    /// two a teacher will actually type.</para>
+    ///
+    /// <para>The set is what JavaScript's <c>encodeURI</c> leaves alone, minus
+    /// three — <c>(</c> and <c>)</c> close a destination, <c>#</c> starts a
+    /// heading — and minus <c>/</c> and <c>:</c>, which the rename sheet
+    /// refuses anyway. <c>?</c> IS in it: <c>sluggify</c> STRIPS a question
+    /// mark from the real folder's name, so "Why Not?" slugs to
+    /// <c>Why-Not</c>, an unescaped <c>Why%20Not?</c> slugs to the same and
+    /// resolves, and the escaped <c>Why%20Not%3F</c> slugs to
+    /// <c>Why-Not-percent3F</c> and 404s. A folder name may not contain a
+    /// question mark on Windows, but this is a pure string transform and the
+    /// rule is shared.</para>
+    ///
+    /// <para><b>Nothing is encoded unless escaping RUNS</b> — see
+    /// <see cref="WouldBreakAMarkdownTarget"/>, or a segment that arrived
+    /// percent-encoded. "Café" goes into a link as "Café"; "Café Notes" goes in
+    /// as <c>Caf%C3%A9%20Notes</c>. Both resolve, and reading this set as
+    /// "always encode everything else" is the way the two apps would write
+    /// different text for the same rename.</para>
+    ///
+    /// <para>Written down once, in
+    /// <c>contracts/shared-rules.json</c> →
+    /// <c>specialNames.renameFolder.linkRewriting.escapingSet.leaveUnescaped</c>,
+    /// and pinned character-for-character against this constant by
+    /// <c>FolderPathRewriterTests</c>. Change it there, not here.</para>
+    /// </summary>
+    internal const string CharactersThatSurviveQuartzUndecoded =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'?";
 
     /// <summary>
     /// Every link in <paramref name="text"/> that names <paramref name="oldName"/>
@@ -132,25 +197,75 @@ public static class FolderPathRewriter
     /// which neither Obsidian nor Quartz can follow. The rename would have
     /// broken every Markdown-style link into the folder, in a teacher's own
     /// pages, silently. Found by adversarial review 2026-09-06 and reproduced
-    /// before being fixed; the mac has the identical rule and the identical
-    /// defect, which is why it is going to MAC-HANDOFF rather than being
-    /// treated as a port error.</para>
+    /// before being fixed; the mac had the identical rule and the identical
+    /// defect, and took this fix unchanged.</para>
     ///
     /// <para>So: in a Markdown link, encode when the NEW name needs it,
     /// whatever the old one looked like. In a wikilink, keep the old style —
     /// <c>[[All Tasks/Quiz 1]]</c> is exactly how Obsidian writes a wikilink
     /// with a space in it, and escaping there would be the mirror-image
     /// mistake.</para>
+    ///
+    /// <para><b>Both branches encode the same way, and that is not an
+    /// accident.</b> The second one — a segment that ARRIVED percent-encoded
+    /// goes back percent-encoded, so a link a teacher already had keeps the
+    /// shape it had — is the older of the two rules and was kept rather than
+    /// replaced. It used <c>Uri.EscapeDataString</c> too, which is why fixing
+    /// only the first line would have left a name mis-spelled whenever the old
+    /// segment happened to arrive encoded. The contract has a case for each
+    /// branch.</para>
     /// </summary>
     private static string Spelled(string newName, bool wasEncoded, bool markdown)
     {
-        if (markdown && WouldBreakAMarkdownTarget(newName)) return Uri.EscapeDataString(newName);
-        return wasEncoded ? Uri.EscapeDataString(newName) : newName;
+        if (markdown && WouldBreakAMarkdownTarget(newName)) return PercentEncoded(newName);
+        return wasEncoded ? PercentEncoded(newName) : newName;
+    }
+
+    /// <summary>
+    /// The name percent-encoded so that Quartz gets the folder's REAL name back
+    /// out of it. See <see cref="CharactersThatSurviveQuartzUndecoded"/> for why
+    /// the allowed set is neither <c>Uri.EscapeDataString</c>'s nor the whole
+    /// reserved set — both were tried on the mac and both are wrong here.
+    ///
+    /// <para>The walk is over UTF-8 BYTES rather than characters, deliberately.
+    /// A character loop would have to encode each <c>char</c> on its own, which
+    /// splits a surrogate pair and produces two invalid sequences for one
+    /// letter. Every byte at or above <c>0x80</c> is outside the allowed set by
+    /// construction — the set is all ASCII — so testing the byte is exact.</para>
+    ///
+    /// <para>Upper-case hex, matching what the contract's cases expect and what
+    /// the mac's <c>addingPercentEncoding</c> writes.</para>
+    /// </summary>
+    private static string PercentEncoded(string name)
+    {
+        var built = new StringBuilder(name.Length);
+        foreach (byte value in Encoding.UTF8.GetBytes(name))
+        {
+            char character = (char)value;
+            if (value < 0x80 && CharactersThatSurviveQuartzUndecoded.IndexOf(character) >= 0)
+                built.Append(character);
+            else
+                built.Append('%').Append(value.ToString("X2", CultureInfo.InvariantCulture));
+        }
+        return built.ToString();
     }
 
     /// <summary>
     /// Whether this name, dropped into a Markdown link destination unescaped,
     /// would end the destination early or misparse it.
+    ///
+    /// <para>Whitespace and round brackets, and nothing else. <b>A lone
+    /// <c>%</c> was on this list for an afternoon and was taken back off</b>,
+    /// so do not put it back. The argument for it was that Quartz resolves an
+    /// internal link with JavaScript's <c>decodeURI</c> and
+    /// <c>decodeURI("10%/Quiz.md")</c> throws — true of <c>decodeURI</c> on its
+    /// own, and irrelevant here, because Quartz never sees a bare <c>%</c>: the
+    /// Markdown parser normalises it to <c>%25</c> on the way to HTML long
+    /// before the link transformer runs. Measured in the running image
+    /// 2026-09-06, <c>[b](Top10%/Quiz.md)</c> arrives as
+    /// <c>Top10%25/Quiz.md</c>. A <c>%</c> is still ENCODED whenever escaping
+    /// runs for another reason, which is what stops "Top 100%" becoming the
+    /// half-escaped <c>Top%20100%</c>.</para>
     /// </summary>
     private static bool WouldBreakAMarkdownTarget(string name)
     {

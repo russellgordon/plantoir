@@ -2,8 +2,8 @@ import AppKit
 import Foundation
 import Observation
 
-/// The twenty tools that exist — thirteen of them shown to the local model —
-/// and what running one does.
+/// The twenty-two tools that exist — thirteen of them shown to the local
+/// model — and what running one does.
 ///
 /// Four rules shape this surface. They are inherited from the Windows work
 /// rather than rediscovered, and every one of them is measured:
@@ -105,17 +105,20 @@ final class AssistToolRunner {
 
     /// The tools, as the LOCAL model sees them.
     ///
-    /// Thirteen of the twenty that exist. A small local model routes worse the
-    /// more it is shown, so anything it never has to NAME is kept off the list:
-    /// the six `plan_` twins, which plan mode calls in code, and
-    /// `remember_timetable`, whose dates must come from a teacher rather than
-    /// from a model. All of them still run when they are called.
+    /// Thirteen of the twenty-two that exist. A small local model routes worse
+    /// the more it is shown, so anything it never has to NAME is kept off the
+    /// list: the seven `plan_` twins, which plan mode calls in code, and two
+    /// more — `remember_timetable`, whose dates must come from a teacher rather
+    /// than from a model, and `re_date_classes`, whose phrasings are matched in
+    /// code. All of them still run when they are called.
     var definitions: [AssistToolDefinition] {
         return AssistToolRunner.localTools
     }
 
     /// The tools the MCP client sees: everything that exists, plus the ones
-    /// that ask for judgement a small local model has no business making.
+    /// it alone is offered — some asking for judgement a small local model has
+    /// no business making, the rest simply never needed by a window scoped to
+    /// one section, or already reachable there through a fixed phrasing.
     var mcpDefinitions: [AssistToolDefinition] {
         return AssistToolRunner.mcpTools
     }
@@ -246,6 +249,20 @@ final class AssistToolRunner {
             return await reDateClasses(arguments)
         case "add_next_class":
             return addNextClass(arguments)
+        case "explain_publishing":
+            return explainPublishing(arguments)
+        case "back_up_course":
+            return backUpCourse(arguments)
+        case "plan_make_room_for_classes":
+            return planMakeRoomForClasses(arguments)
+        case "make_room_for_classes":
+            return makeRoomForClasses(arguments)
+        case "plan_add_classes":
+            return planAddNextClass(addClassesArguments(from: arguments))
+        case "add_classes":
+            return addNextClass(addClassesArguments(from: arguments))
+        case "list_courses":
+            return listCourses()
         case "list_curriculum_expectations":
             return listCurriculumExpectations(arguments)
         case "plan_curriculum_mentions":
@@ -2182,10 +2199,39 @@ final class AssistToolRunner {
             askForTheTimetableIfReDatingNeedsIt(problem, arguments)
             return AssistToolOutcome.couldNotRead(problem.localizedDescription)
         case .success(let asked):
+            // A ROLLOVER carrying an answer is still a plan even when the
+            // dates are already right, and this is what makes the answer turn
+            // work at all under plan mode — which is ON unless a teacher has
+            // turned it off. `showPlan` returns early whenever the twin hands
+            // back something that is not a plan, so returning "already on the
+            // day it should be" here meant the real call never ran and the
+            // website was never settled. In the default configuration that
+            // made the release unreachable.
+            let websiteAnswer: String = text("website", in: arguments).lowercased()
+            let isRollover: Bool = text("rollover", in: arguments).lowercased() == "yes"
             if asked.plan.changesNothing {
                 let already: String = "Every page in \(asked.located.course.code) Section "
                                     + "\(asked.located.sectionNumber) is already on the day it should be."
-                return AssistToolOutcome.wrote(already, detail: already)
+                guard isRollover, websiteAnswer == "new" || websiteAnswer == "same" else {
+                    return AssistToolOutcome.wrote(already, detail: already)
+                }
+                return AssistToolOutcome.planned(
+                    already,
+                    plan: websiteAnswer == "new"
+                        ? "Start a new website for this section, so publishing it no longer replaces "
+                        + "last year's. Last year's details are kept, and any publish set to happen "
+                        + "on its own is turned off."
+                        : "Keep publishing this section to the same website as last year."
+                )
+            }
+            if isRollover, websiteAnswer == "new" {
+                return AssistToolOutcome.planned(
+                    "Worked out what rolling that section over would do.",
+                    plan: asked.plan.describe()
+                        + "\n\nIt would also start a new website for this section, so publishing it "
+                        + "no longer replaces last year's. Last year's details are kept, and any "
+                        + "publish set to happen on its own is turned off."
+                )
             }
             return AssistToolOutcome.planned(
                 "Worked out what re-dating that section would do.",
@@ -2204,7 +2250,30 @@ final class AssistToolRunner {
             if asked.plan.changesNothing {
                 let already: String = "Every page in \(asked.located.course.code) Section "
                                     + "\(asked.located.sectionNumber) is already on the day it should be."
-                return AssistToolOutcome.wrote(already, detail: already)
+                // The website is settled HERE TOO, and this is the SECOND TURN
+                // of the whole conversation. A teacher answers the website
+                // question by saying one of the two sentences, which comes back
+                // through this same tool — and by then the pages are already on
+                // their dates, so the plan changes nothing. Returning early on
+                // that made the answer a no-op: the reply talked about dates,
+                // never mentioned the website, and left the section pinned to
+                // last year's. An offer that looks like it worked is worse than
+                // no offer at all.
+                var said: String = already
+                let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
+                    arguments,
+                    course: asked.located.course,
+                    sectionNumber: asked.located.sectionNumber
+                )
+                // Into the SUMMARY, which is what a teacher reads. `detail` is
+                // shown only behind a "Show me" disclosure, and only when the
+                // outcome carries a `teacherDetail` — which `wrote` does not.
+                // Putting the question there made the whole feature invisible
+                // in the app and left it working over MCP alone.
+                if aboutTheWebsite.isEmpty == false {
+                    said += "\n\n" + aboutTheWebsite
+                }
+                return AssistToolOutcome.wrote(said, detail: said)
             }
 
             let backedUp: Bool = backUpOnceForThisConversation(
@@ -2241,8 +2310,449 @@ final class AssistToolRunner {
             ))
             detail += "\n\nNothing was published or hidden, so students see no change until you "
                     + "deploy."
-            return AssistToolOutcome.wrote(summary, detail: detail)
+            let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
+                arguments, course: asked.located.course, sectionNumber: asked.located.sectionNumber
+            )
+            // The website goes in the SUMMARY beside the count of what moved:
+            // it is the part a teacher has to answer, and `detail` is not shown
+            // to them at all for a write.
+            var said: String = summary
+            if aboutTheWebsite.isEmpty == false {
+                said += "\n\n" + aboutTheWebsite
+                detail += "\n\n" + aboutTheWebsite
+            }
+            return AssistToolOutcome.wrote(said, detail: detail)
         }
+    }
+
+    /// What a rollover says about the website, and what it does about it.
+    ///
+    /// Returns the empty string for an ORDINARY re-date, which is three of the
+    /// four phrasings that reach this tool — a snow day, a timetable that
+    /// shifted. Those must never be asked about websites: answering "a new
+    /// website" to a mid-semester re-date abandons the address students are
+    /// reading right now. Only the rollover carries `rollover`.
+    ///
+    /// **The question is answered by SAYING one of two things, not by a sheet,
+    /// and that is the whole design.** A sheet cannot appear for a request
+    /// arriving over MCP — and `AssistToolSurface` actively tells a Claude Code
+    /// session that "roll this section over to a new year" means this tool — so
+    /// a sheet would leave that path silently pinned to last year's site while
+    /// the write had already happened. Answering in words works identically in
+    /// both clients, and the reply always states which of the two happened, so
+    /// a question nobody answers is visible rather than silent.
+    private func settleTheWebsiteAfterARollover(
+        _ arguments: [String: Any],
+        course: Course,
+        sectionNumber: Int
+    ) -> String {
+        let answer: String = text("website", in: arguments).lowercased()
+        // Either the app's card phrasing said so, or a caller answered the
+        // question outright. Over MCP there is no card, so `website` alone has
+        // to be enough — otherwise the one surface that cannot show a sheet
+        // also cannot roll a section over, which is the hole this design was
+        // supposed to close. An ordinary re-date sets neither and is untouched.
+        let isRollover: Bool = text("rollover", in: arguments).lowercased() == "yes"
+                            || answer == "new" || answer == "same"
+        guard isRollover else {
+            return ""
+        }
+        if answer == "same" {
+            ActivityTrail.note(
+                .sectionKeptItsWebsiteOnRollover,
+                "kept last year's website when rolling the section over",
+                course: course.code, section: sectionNumber
+            )
+            return AssistWording.rolloverKeptTheSameWebsite
+        }
+        guard answer == "new" else {
+            // Asked, and NOT acted on. The sentence says both halves: what was
+            // not changed, and how to change it.
+            return AssistWording.rolloverWebsiteQuestion + "\n\n"
+                 + "Say “\(AssistCardCommand.rollOverOntoANewWebsite)” or "
+                 + "“\(AssistCardCommand.rollOverKeepingTheSameWebsite)”.\n\n"
+                 + AssistWording.rolloverWebsiteNotDecided
+        }
+
+        let release: DeployCommand.SiteRelease = DeployCommand.releaseSite(
+            forSection: sectionNumber, in: course
+        )
+        guard release.releasedAnything else {
+            // Still pinned is NOT the same as never published, and telling a
+            // teacher the wrong one of those is telling them the opposite of
+            // the truth about the only fact this feature turns on.
+            if release.somethingIsStillPinned {
+                return AssistWording.rolloverCouldNotStartANewWebsite(
+                    stillPinned: release.stillPinned.joined(separator: ", ")
+                )
+            }
+            ActivityTrail.note(
+                .sectionStartedANewWebsiteOnRollover,
+                "rolled the section over onto a new website — it had not been published anywhere yet",
+                course: course.code, section: sectionNumber
+            )
+            return AssistWording.rolloverHadNoWebsiteYet
+        }
+
+        history.record(
+            AssistChange(
+                whatHappened: "started a new website for Section \(sectionNumber)",
+                courseCode: course.code,
+                sectionNumber: sectionNumber,
+                // Nothing a build reads changed — the pages are untouched and
+                // the website this points at is only consulted when publishing.
+                rebuildsThePreview: false,
+                files: release.savedFiles
+            )
+        )
+
+        var said: String = AssistWording.rolloverStartedANewWebsite(
+            keptAs: release.keptFiles.joined(separator: ", ")
+        )
+        // Some destinations released and others not: say so, rather than
+        // letting the success sentence stand for the whole section.
+        if release.somethingIsStillPinned {
+            said += "\n\n" + AssistWording.rolloverCouldNotStartANewWebsite(
+                stillPinned: release.stillPinned.joined(separator: ", ")
+            )
+        }
+        switch turnOffAnyScheduledPublish(course: course, sectionNumber: sectionNumber) {
+        case .noneWasSet:
+            break
+        case .turnedOff:
+            said += "\n\n" + AssistWording.rolloverTurnedOffTheScheduledPublish
+        case .couldNotTurnOff:
+            said += "\n\n" + AssistWording.rolloverCouldNotTurnOffTheScheduledPublish
+        }
+        ActivityTrail.note(
+            .sectionStartedANewWebsiteOnRollover,
+            "rolled the section over onto a new website — last year's details kept at "
+            + release.keptFiles.joined(separator: ", "),
+            course: course.code, section: sectionNumber
+        )
+        return said
+    }
+
+    /// Turn off a publish that was set to happen on its own, and say whether
+    /// there was one.
+    ///
+    /// **Not politeness — the alternative is a website nobody named going
+    /// live.** A section cut loose has no agreed website to publish TO, and a
+    /// scheduled run has nobody to ask: `runScheduled` re-checks nothing, and
+    /// `deploy.py`'s name prompt returns its DEFAULT when there is no terminal
+    /// rather than failing. So the overnight run would create
+    /// `<code>-s<n>-<year>-<name>` and publish there, while the address the
+    /// teacher's students actually read quietly stopped updating. Renaming a
+    /// course turns scheduled publishes off for the same reason and says so.
+    private func turnOffAnyScheduledPublish(
+        course: Course, sectionNumber: Int
+    ) -> ScheduledPublishOutcome {
+        let plistURL: URL = ScheduledDeploy.plistURL(
+            courseCode: course.code, sectionNumber: sectionNumber
+        )
+        guard FileManager.default.fileExists(atPath: plistURL.path) else {
+            return .noneWasSet
+        }
+        // `runner: launchControl` is not optional here. The default runs the
+        // real `launchctl` against the real `~/Library/LaunchAgents`, so a test
+        // driving this would boot out and delete a scheduled publish belonging
+        // to whoever is running the suite — the fixture course is ICS3U, which
+        // is a course a teacher plausibly has.
+        let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
+            courseCode: course.code, sectionNumber: sectionNumber, runner: launchControl
+        )
+        // The failure is REPORTED, never swallowed: a plist left behind is
+        // loaded again at next login, so the publish really can still fire —
+        // with nobody to ask what the new website should be called, which is
+        // the whole thing turning it off exists to prevent.
+        return problem == nil ? .turnedOff : .couldNotTurnOff
+    }
+
+    /// What became of a publish that was set to happen on its own.
+    private enum ScheduledPublishOutcome {
+        case noneWasSet
+        case turnedOff
+        case couldNotTurnOff
+    }
+
+    /// Sections this conversation has already had the explanation for.
+    ///
+    /// **Per conversation, not per folder — a deliberate divergence.** Windows
+    /// remembers it on disk (`Briefing.AlreadyExplained`), so a teacher is told
+    /// once ever. Here it lasts as long as the runner: one assistant window, or
+    /// one `--mcp-stdio` session. The thing being prevented is a session that
+    /// re-explains before every action, and a session cannot repeat itself
+    /// after it has ended — while a mac session that DOES repeat it a week
+    /// later is talking to a teacher who may well have forgotten. Writing a
+    /// file to suppress a sentence is a bigger promise than the problem needs.
+    private var sectionsToldWhatPublishingMeans: Set<String> = []
+
+    /// What publishing and deploying mean, said once per section.
+    private func explainPublishing(_ arguments: [String: Any]) -> AssistToolOutcome {
+        let found: Result<Located, AssistToolRefusal> = locate(arguments)
+        guard case .success(let located) = found else {
+            return AssistToolOutcome.couldNotRead(refusal(from: found).message)
+        }
+        let key: String = "\(located.course.code)/\(located.sectionNumber)"
+        if sectionsToldWhatPublishingMeans.contains(key) {
+            let already: String = AssistWording.publishingAlreadyExplained(
+                course: located.course.code, section: String(located.sectionNumber)
+            )
+            return AssistToolOutcome.read(already, detail: already)
+        }
+        sectionsToldWhatPublishingMeans.insert(key)
+        return AssistToolOutcome.read(
+            AssistWording.whatPublishingMeans,
+            detail: AssistWording.whatPublishingMeans,
+            showingTheTeacher: AssistWording.whatPublishingMeans
+        )
+    }
+
+    /// A full copy of one course.
+    private func backUpCourse(_ arguments: [String: Any]) -> AssistToolOutcome {
+        let asked: String = text("course", in: arguments)
+        // Matched the way every other tool here matches a course code, so a
+        // teacher typing "ics3u" reaches the same course either way.
+        var found: Course? = nil
+        for candidate in workspace.courses
+        where candidate.code.lowercased() == asked.lowercased() && found == nil {
+            found = candidate
+        }
+        guard let course = found else {
+            return AssistToolOutcome.couldNotRead(
+                "There is no course called “\(asked)” in this working folder."
+            )
+        }
+        guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
+            return AssistToolOutcome.couldNotRead("No working folder is open.")
+        }
+        // **Attributed to the ASSISTANT, which takes a `section`.** Left to
+        // default it is recorded as the teacher's, so the Backups list says
+        // "made by you" about a copy they never made — and, worse, `pruneBackups`
+        // skips anything that is not the assistant's, so a session told to back
+        // up "before any bulk editing" would write a whole-course zip each time
+        // and none of them would ever be cleared. `mostBackupsKept` exists
+        // precisely to stop that.
+        let section: Int = number("section", in: arguments) ?? 1
+        do {
+            let backupURL: URL = try CourseArchiver.backUpCourse(
+                course, coursesDirectoryURL: coursesDirectoryURL,
+                madeBy: .assistant(sectionNumber: section)
+            )
+            let said: String = AssistWording.backedUpCourse(
+                course: course.code, to: backupURL.lastPathComponent
+            )
+            return AssistToolOutcome.wrote(said, detail: said)
+        } catch {
+            return AssistToolOutcome.refused(
+                "\(course.code) could not be backed up: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    /// What making room part-way through a unit would do.
+    private func planMakeRoomForClasses(_ arguments: [String: Any]) -> AssistToolOutcome {
+        switch roomPlan(arguments) {
+        case .couldNot(let message):
+            return AssistToolOutcome.couldNotRead(message)
+        case .planned(let asked):
+            // The ENGINE's own description, not a summary of it. It names
+            // every rename from → to, the link count, every date move and
+            // every problem — which is exactly what this tool's description
+            // promises a teacher will be shown, and a hand-rolled count of
+            // renames delivered none of it. The more dangerous tool was the
+            // one showing less.
+            var lines: [String] = [asked.plan.description]
+            lines.append("")
+            lines.append("The new pages start hidden, so nothing changes on the site until you publish them.")
+            if asked.plan.movesAnythingElse {
+                lines.append("")
+                lines.append(
+                    "Because other classes move, “Undo that” will not take this back afterwards — "
+                    + "the copy made before any of it is in Plantoir's Backups list."
+                )
+            }
+            return AssistToolOutcome.planned(
+                "Worked out what making room in that unit would do.",
+                plan: lines.joined(separator: "\n")
+            )
+        }
+    }
+
+    /// Make the room.
+    ///
+    /// **The undo caveat is the important half of the reply.** Once other
+    /// classes have been renamed, taking this back page by page would leave a
+    /// section half-renumbered — worse than not offering an undo at all — so
+    /// nothing is recorded on the undo list and the teacher is told the backup
+    /// is the way out. That is the same rule the duplicate path already lives
+    /// by, said out loud here because this tool moves more pages than anything
+    /// else on the surface.
+    private func makeRoomForClasses(_ arguments: [String: Any]) -> AssistToolOutcome {
+        switch roomPlan(arguments) {
+        case .couldNot(let message):
+            return AssistToolOutcome.couldNotRead(message)
+        case .planned(let asked):
+            // **Said BEFORE anything is written, because the engine reports
+            // both of these by returning a plan rather than by throwing.** A
+            // plan that adds nothing satisfies `changesNothing`, so `apply`
+            // answers "Nothing needed moving." and the `wouldNotFit` throw is
+            // never reached — which produced "Made room for 1 class" over a
+            // detail saying nothing moved, with the one actionable sentence
+            // ("add 3 more class dates and ask again") thrown away.
+            if asked.plan.added.isEmpty {
+                let why: String = asked.plan.problems.joined(separator: " ")
+                return AssistToolOutcome.refused(
+                    why.isEmpty
+                        ? "There is nothing to make room for there."
+                        : why
+                )
+            }
+
+            let backedUp: Bool = backUpOnceForThisConversation(
+                asked.located.course, forSection: asked.located.sectionNumber
+            )
+            let outcome: ClassChangeOutcome
+            do {
+                outcome = try ClassInsertionPlanner.apply(asked.plan, in: asked.located.course)
+            } catch {
+                return AssistToolOutcome.refused(
+                    "Nothing was changed: \(error.localizedDescription)"
+                )
+            }
+
+            var detail: String = outcome.message
+            detail += "\n\nThe new "
+                    + (asked.count == 1 ? "page is" : "pages are")
+                    + " hidden, so nothing changed on the site yet."
+            // Keyed on renames OR moves. Gating on renames alone missed the
+            // case that hurts most: making room in a short unit renames
+            // nothing inside it and re-dates every class of every LATER unit,
+            // so a teacher's whole year moved and the reply said nothing about
+            // undo at all — while "undo that" answered "nothing to undo".
+            if asked.plan.movesAnythingElse {
+                detail += "\n\nBecause other classes moved, “Undo that” will not take this back. "
+                        + "The copy made before any of it is in Plantoir's Backups list. Look the "
+                        + "section over in Plantoir before you publish."
+            }
+            if backedUp {
+                detail += "\n\n" + AssistToolRunner.backedUpNote
+            }
+            return AssistToolOutcome.wrote(
+                "Made room for \(asked.count) "
+                + (asked.count == 1 ? "class" : "classes")
+                + " at \(asked.located.course.configuration.unitWord) \(asked.unit), Day \(asked.atDay).",
+                detail: detail
+            )
+        }
+    }
+
+    /// A plan, or the sentence saying why there is not one.
+    private enum PlannedRoomOutcome {
+        case planned(PlannedRoom)
+        case couldNot(String)
+    }
+
+    private struct PlannedRoom {
+        let located: Located
+        let plan: ClassInsertionPlan
+        let unit: Int
+        let atDay: Int
+        let count: Int
+    }
+
+    /// Read the arguments and plan, or say why not.
+    private func roomPlan(_ arguments: [String: Any]) -> PlannedRoomOutcome {
+        let found: Result<Located, AssistToolRefusal> = locate(arguments)
+        guard case .success(let located) = found else {
+            return .couldNot(refusal(from: found).message)
+        }
+        guard let unit = number("unit", in: arguments) else {
+            return .couldNot(
+                "Which \(located.course.configuration.unitWord.lowercased()) should I make room in?"
+            )
+        }
+        guard let atDay = number("atDay", in: arguments) else {
+            return .couldNot("Which day should the new class take?")
+        }
+        // One unless asked for more, matching what the teacher means by "make
+        // room for a class".
+        let count: Int = number("howMany", in: arguments) ?? 1
+
+        do {
+            let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+                unit: unit, atDay: atDay, count: count,
+                forSection: located.sectionNumber, in: located.course
+            )
+            return .planned(
+                PlannedRoom(located: located, plan: plan, unit: unit, atDay: atDay, count: count)
+            )
+        } catch {
+            askForTheTimetableIfDuplicatingNeedsIt(error, located: located)
+            return .couldNot(error.localizedDescription)
+        }
+    }
+
+    /// `add_classes` said in the words the existing engine already speaks.
+    ///
+    /// The capability is not new — "add five more days to Unit 4" has reached
+    /// `NextClassPlanner.plan(addingDays:toUnit:)` for as long as that card
+    /// phrasing has existed — but it arrived through card-only keys the model
+    /// was never shown. Rather than a second path to the same planner, which
+    /// is how two behaviours drift apart, this renames the published arguments
+    /// onto the ones the tested path reads.
+    private func addClassesArguments(from arguments: [String: Any]) -> [String: Any] {
+        var translated: [String: Any] = arguments
+        translated["days"] = arguments["howMany"] ?? 0
+        return translated
+    }
+
+    /// Every course in this working folder, with what a caller needs to pick
+    /// one: the code to pass back, the name a teacher would recognise it by,
+    /// the sections it has, and where it publishes.
+    ///
+    /// **Sections and destination are here because leaving them out costs a
+    /// round trip each.** A caller that knows only codes must call
+    /// `check_section` to find out whether section 2 exists, and cannot warn a
+    /// teacher that the course they just asked to publish goes somewhere they
+    /// did not expect. Windows' version answers the same three things, so a
+    /// Claude Code session sees the same shape on either platform.
+    private func listCourses() -> AssistToolOutcome {
+        let courses: [Course] = workspace.courses
+        guard courses.isEmpty == false else {
+            return AssistToolOutcome.read(
+                AssistWording.noCoursesYet, detail: AssistWording.noCoursesYet
+            )
+        }
+
+        var lines: [String] = []
+        for course in courses {
+            var sections: [String] = []
+            for number in course.sectionNumbers {
+                sections.append(String(number))
+            }
+            let sectionList: String = sections.isEmpty
+                ? "none yet"
+                : sections.joined(separator: ", ")
+            lines.append(
+                "\(course.code) — \(course.configuration.courseName)\n"
+                + "  sections: \(sectionList)\n"
+                // `AssistToolRunner.destination(of:)`, NOT
+                // `DeployCommand.destinationDescription`: that one returns the raw
+                // PATH for a folder destination, which is machinery a teacher is not
+                // the audience for, disagrees with what the deploy card says two
+                // functions away, disagrees with Windows' "a folder on this computer",
+                // and prints BLANK for a course set to a folder that has not been
+                // chosen yet — a state the product models on purpose.
+                + "  publishes to: \(AssistToolRunner.destination(of: course))"
+            )
+        }
+
+        let said: String = lines.joined(separator: "\n")
+        let summary: String = courses.count == 1
+            ? "There is 1 course in this working folder."
+            : "There are \(courses.count) courses in this working folder."
+        return AssistToolOutcome.read(summary, detail: said, showingTheTeacher: said)
     }
 
     private struct PlannedReDate {

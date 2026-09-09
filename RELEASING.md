@@ -49,7 +49,7 @@ sentences and rules regardless of their OS. Three consequences:
   **Worked example, 2026-08-20 — the gate this rule was written for, run.**
   The mac's list was: implement the teacher-made-link explainer case, retire
   the three obsolete WSL-setup cases, run `./verify.sh` against the changed
-  shared scripts, and do the two verifications `MAC-HANDOFF.md` listed. All
+  shared scripts, and do the two verifications Windows asked for. All
   four came back green and **none of them required a behaviour change**, so
   the DMG joined v1.1.0 rather than becoming 1.1.1. The verifications are
   the part worth copying: both were "prove it against the real app", and
@@ -122,7 +122,7 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
-| 2026-09-05 | **If you keep your working folder in iCloud Drive (or Dropbox, or OneDrive) and use it on TWO Macs, update both of them.** A Mac still on the older version will not be able to build a course the newer one has touched, and will quietly undo the newer one's setup each time it opens the folder. | The mac now keeps built websites outside the working folder, and leaves a shortcut behind in their place (rows 402–406). That shortcut syncs. An older `build_site.py` cannot repair one that points somewhere it cannot see — it stops with "File exists", which reads as nonsense — and no version shipped before 2026-09-05 can be taught to. It is worse than one stale machine failing on its own, because the launchers and `.toolchain/` live INSIDE the synced folder: an older app refreshes them back to its own copies, and a publish scheduled on the up-to-date Mac then runs whatever it finds there. **Before this change a version mismatch between two Macs was harmless**, which is exactly why nobody will expect it. Merged to `dev` 2026-09-05, so it ships with the next tag. Reasoning: `contracts/shared-rules.json` → `buildOutputLocation.syncedFoldersFollowTheLink.aSecondMacMustBeUPDATED`; implementer's version in `WINDOWS-HANDOFF.md`. |
+| 2026-09-05 | **If you keep your working folder in iCloud Drive (or Dropbox, or OneDrive) and use it on TWO Macs, update both of them.** A Mac still on the older version will not be able to build a course the newer one has touched, and will quietly undo the newer one's setup each time it opens the folder. | The mac now keeps built websites outside the working folder, and leaves a shortcut behind in their place (rows 402–406). That shortcut syncs. An older `build_site.py` cannot repair one that points somewhere it cannot see — it stops with "File exists", which reads as nonsense — and no version shipped before 2026-09-05 can be taught to. It is worse than one stale machine failing on its own, because the launchers and `.toolchain/` live INSIDE the synced folder: an older app refreshes them back to its own copies, and a publish scheduled on the up-to-date Mac then runs whatever it finds there. **Before this change a version mismatch between two Macs was harmless**, which is exactly why nobody will expect it. Merged to `dev` 2026-09-05, so it ships with the next tag. Reasoning: `contracts/shared-rules.json` → `buildOutputLocation.syncedFoldersFollowTheLink.aSecondMacMustBeUPDATED`; implementer's version in `documentation/05-build-pipeline.md`. |
 
 ## The short version
 
@@ -152,6 +152,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 2. **Full test pass**: `dotnet test Plantoir.Tests` and the mac unit suite, plus
    a hand smoke of create → preview → publish on a real course.
 
+   > **Check the TOTALS line before calling it green**, or use
+   > `.\run-tests.ps1`, which reads it for you. `dotnet test` exits 1 for a
+   > failing test, for a dead test host and for a project that did not compile,
+   > and a release is exactly the moment that distinction gets waved through.
+
    > The hand smoke is **not optional, and not a formality**. The bundle carries
    > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, `contracts/`,
    > launchers)
@@ -159,10 +164,32 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > a green test run says nothing about the thing teachers actually run.
    > `verify.sh`, the real toolchain gate, is bash and expects `docker` on
    > `PATH`, which does not hold on Windows where Docker Engine lives in WSL2.
-   > **On Windows the hand smoke is the only toolchain verification there is.**
-   > If the release changes anything under `scripts/`, the Dockerfile or a
-   > launcher, smoke the publishing destination(s) it touches — there are three
-   > (Netlify, Cloudflare Pages, a folder) and they take different code paths.
+   > **On Windows the hand smoke is the only DOCKER verification there is.**
+   > (It is no longer the only toolchain verification: since 2026-09-07
+   > `PythonToolchainTests` runs all fifteen shared `scripts/test_*.py` files
+   > inside `dotnet test` — the same files `verify.sh` runs on the mac, which
+   > nothing ran here before. They need no Docker, so they cover the shared
+   > Python and say nothing about the image.)
+
+   **If the release changes anything under `scripts/`, the Dockerfile or a
+   launcher, run the publishing verifier rather than smoking it by hand** —
+   `verify-deploy.ps1` on Windows, `./verify-deploy.sh` on the mac. It is the
+   automation this step used to ask for in prose: it publishes to all three
+   destinations (Netlify, Cloudflare Pages, a folder — different code paths
+   each) and every pairing, then FETCHES EACH SITE BACK and reads it, which is
+   the only way to catch the two failures that have actually shipped here — a
+   preview build reaching a published site, and a publish that reported success
+   having copied the wrong thing or nothing.
+
+   > **Require a run with nothing skipped.** A destination with no credentials
+   > on the machine is skipped and the run still exits 0 — correct for everyday
+   > use, wrong for a release. Read the summary line: `passed, failed, skipped`.
+   > A cut is the moment "Cloudflare was skipped on that laptop" stops being
+   > acceptable, so get the credentials on the machine and run it again.
+   >
+   > It needs three credentials, the network and about twenty minutes, and it
+   > **creates real, globally unique sites that nothing deletes** — so no suite
+   > runs it and none should. Delete the sites it made when you are done.
 3. **Build the signed Windows bundle**:
 
        powershell -File publish.ps1 -Sign

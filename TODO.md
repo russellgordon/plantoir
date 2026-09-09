@@ -1,12 +1,69 @@
-# To Do
+# To Do — closed to new entries
 
-Ideas and deferred work, in no particular order. Add items freely; remove
-an item when it ships (finished behaviour is recorded in
-[`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
+**Work that still needs doing lives in [GitHub
+issues](https://github.com/russellgordon/plantoir/issues), not here.** Open a
+new issue instead of adding to this file, and label it `mac`, `windows`,
+`toolchain` or `assistant` for the platform it lands on (`decision` for
+something that needs Russell to choose). Pin it to a release with a milestone.
 
-- **The mac suite crashes intermittently inside AppKit, and it reads as a
-  failing test rather than as a crash** (mac, 2026-09-06, measured while
-  working on something else — NOT caused by that work, see below).
+What remains below is **append-only history**: entries that were finished or
+decided while this file was the to-do list. An entry records what was true on
+its day, and — as often as not — what the entry itself got wrong before the
+work was done; that is the part worth keeping, so nothing here is edited when
+the behaviour changes again. The twelve entries that were still open on
+2026-09-08 were moved to issues #88–#99 and removed from this file, and one
+half-finished entry left its unbuilt half behind as #100.
+
+- ~~**The mac suite crashes intermittently inside AppKit, and it reads as a
+  failing test rather than as a crash**~~ — ✅ **Done 2026-09-07** (mac,
+  raised 2026-09-06, measured while working on something else — NOT caused by
+  that work, see below).
+
+  **What it turned out to be, and what fixed it.** The diagnosis below is
+  right as far as it goes and one guess in it is wrong. `NSMoveHelper
+  _doAnimation` spins a NESTED runloop, and SwiftUI's `AppKitDialogBridge`
+  ends the modal session from inside `NSHostingView.layout()` — so the nested
+  runloop is spun from inside a display-cycle callback that is already
+  running, and the cycle is re-entered. One call stack on one thread, not a
+  race, which is why no amount of settling would have helped.
+
+  **The "two-line experiment" at the bottom of this entry does not work, and
+  that is the useful part to keep.** `-NSAutomaticWindowAnimationsEnabled NO`
+  reaches the process and is ignored for the sheet move: 0.268 s animating
+  without it, 0.268 s with it, measured by timing `_doAnimation` directly.
+  AppKit reads the key on this very path — hooking `-[NSUserDefaults
+  objectForKey:]` during a close shows it consulted, beside
+  `NSOrderOutSheetWhenEnded` — and does not act on it. Nor does
+  `NSWindow.animationBehavior = .none` on the sheet or its parent, nor
+  `endSheet` inside a zero-duration `NSAnimationContext` group, nor
+  `-NSOrderOutSheetWhenEnded NO`, nor an off-screen parent window. All six
+  landed between 0.264 s and 0.270 s. Reduce Motion was not tried and is
+  almost certainly a dead end too: no accessibility key is among the four
+  read on that path.
+
+  What DOES work is AppKit's own switch. `NSSheetMoveHelper` declares its own
+  `-shouldSkipAnimation`, overriding `NSMoveHelper`'s, and forcing it true is
+  how AppKit itself takes a sheet out of the animation — the same branch it
+  takes for `inhibitWindowAnimations`. One `method_setImplementation` on the
+  subclass leaves ordinary window moves animating. (An empty `_doAnimation`
+  override also works and was tried first; the switch was preferred because
+  AppKit's own skip path leaves the state AppKit intends to leave, and because
+  it needs no `class_addMethod` and no fallback branch.) It lives in the test
+  bundle (`mac-app/Tests/QuartzTeachersTests/SheetAnimationSuppressor.swift`)
+  and is installed from the bundle's `NSPrincipalClass`, so nothing in the
+  shipped app changes.
+
+  Measured on this Mac (Apple M4 Pro, macOS 26.6 25G72), same command, same
+  session: **10 crashes in 30 runs before, 0 in 30 after** for that class
+  alone, and the FULL suite 0 host deaths in 13 runs afterwards (1,062 cases
+  each; the one red case throughout was the `section restored` contract event
+  Windows proposed, unrelated to this work and adopted the same day — see
+  `GUI-IMPROVEMENTS.md` row 445). Those are two
+  separate measurements on purpose — the class-alone figure was clean while
+  the full suite was still aborting 8 times out of 8 on an unrelated crash
+  this work had just introduced, which is the whole reason to measure at the
+  scope a gate runs. See `GUI-IMPROVEMENTS.md` row 444 and
+  `WINDOWS-HANDOFF.md`.
 
   **What it looks like.** `xcodebuild ... test` exits 65 and prints
   `** TEST FAILED **` with a "Failing tests:" line naming one
@@ -38,189 +95,15 @@ an item when it ships (finished behaviour is recorded in
   `testACourseThatIsPreviewingIsNotRenamed` before noticing the totals say
   zero failures.
 
-  Not fixed here because it is not this piece's, and because the fix is a real
+  ~~Not fixed here because it is not this piece's, and because the fix is a real
   question rather than a tweak: whether these tests should drive a live
   `NSAlert` sheet at all (`beginSheetModalForWindow:` under a test host, with
   animations on), or assert the same thing without one. Worth checking
   `NSAnimationContext`/`reduce motion` in the test environment first — a
   disabled sheet animation would take the faulting frame out of the picture
-  entirely, and would be a two-line experiment.
-
-- **Two courses whose curriculum folder BOTH apps name is not the one the
-  build uses — decide whether they should read the vault to break the tie**
-  (mac, 2026-09-06, found by measuring the fix in `GUI-IMPROVEMENTS.md` row
-  425, not by a report). Written up as a decision rather than done, because it
-  changes a rule both platforms share and nobody was awake to agree it.
-
-  **What happens.** `CurriculumFolderRule` (mac) and `CurriculumFolderRule.cs`
-  (Windows) answer from `course_config.json` alone: the recorded
-  `curriculum_folder` if the course still has it, otherwise the alphabetically
-  first shared folder whose name mentions the curriculum.
-  `_find_curriculum_folder` in `scripts/build_site.py` asks in the same order
-  but only accepts a folder that HOLDS a page whose stem is an expectation
-  code. Two courses on this Mac keep an "Ontario Curriculum" and a "College
-  Board Curriculum" folder; the College Board pages are named "1.A", "1.B",
-  which is not expectation-code form, so the build builds the map from Ontario
-  Curriculum while the "Folders Plantoir uses" sheet names College Board, and
-  folder protection protects College Board. The tie-break itself is already a
-  contract case with those exact two names
-  (`shared-rules.json` → `specialNames.curriculumFolderResolution`), so the
-  two apps agree with each other — this is a shared limit, not drift.
-
-  **Why it was not just fixed.** The apps would have to look at the disk, and
-  that reaches further than it sounds: the sheet is built from a `Course`
-  loaded from configuration, folder protection runs while a teacher is typing
-  in Course Settings, and the wizard asks the same question before any folder
-  exists. A scan on every keystroke is the obvious way to make Settings feel
-  broken. It is also the kind of rule that must land on both platforms at once
-  or the contract case becomes a lie.
-
-  **Options, and what each costs.**
-  1. *Leave it.* Both apps stay wrong together for a course with two
-     curriculum folders, which is rare and, for the sheet, still better than
-     the placeholder it replaced — it names a real folder of the teacher's.
-     Costs nothing; the contract note now says so out loud.
-  2. *Break the tie by reading the vault, cached per course.* Right answer,
-     matches the build exactly. Costs a disk scan and a cache-invalidation
-     question nobody has asked yet.
-  3. *Record the answer instead of computing it* — have the build write back
-     the folder it actually used, the way `class_folder` and
-     `curriculum_folder` are already materialised on rename. Cheapest correct
-     answer at read time, and it makes the key mean what the build did rather
-     than what a manifest declared; but it puts a config write in the build,
-     which nothing there does today.
-
-  Rejected outright: making the SHEET read the disk while folder protection
-  does not. Two answers to "which folder is the curriculum folder" in one
-  settings window is worse than one wrong answer.
-
-- **The UI-test runner closes a running Plantoir without checking whether it
-  is BUSY, and leaves its leases behind** (Windows, 2026-09-06). Deliberate as
-  far as it goes: Russell's instruction that day was "kill my copy, I don't
-  care", and `run-ui-tests.ps1` and `DrivenApp` both do, and say so. But
-  CLAUDE.md's standing permission keeps one condition this does not honour —
-  not out from under work he can SEE happening, a build or a preview or a
-  deploy running in the app's own console.
-
-  **The signal already exists, which is what makes this cheap.** A busy app
-  writes `<COURSE>.<kind>.<pid>.lease` into
-  `<working folder>/courses/.internal/activity/` (`WorkLease`). The runner
-  could read the remembered working folders out of `settings.json`, look for a
-  live lease, and refuse THAT case only — leaving the ordinary "an idle window
-  is open" case killed silently as it is now.
-
-  **And a kill orphans those leases**, which CLAUDE.md asks the killer to
-  delete: a lease whose process is gone is ignored, so nothing locks up, but a
-  recycled process id whose name happens to match is the one case the
-  staleness check cannot see through. The runner should sweep the leases it
-  orphaned.
-
-  Not done now because neither half is reachable from the six tests that
-  exist: they drive Course Settings, which starts nothing.
-
-- 🟡 **PARTLY DONE on the mac 2026-09-06. A scheduled deploy has nobody to
-  answer a question, and `deploy` still asks them — found on Windows,
-  2026-09-06, and it is the same shape on both platforms.** Originally not
-  fixed, because the fix touches the launcher's argument contract and that is a
-  decision rather than a repair.
-
-  **What was done, 2026-09-06.** `--non-interactive` exists on `deploy.sh` and
-  `scripts/deploy.py`, passed by the scheduled deploy and by nothing else. Every
-  question it can meet is now a refusal that names the question: the three
-  credential pastes in the launcher, naming a new Netlify site (the state that
-  hung the harness), and the surname when a new Cloudflare project is being
-  named. **The open question below — “does Task Scheduler give the wrapper a
-  console?” — stops mattering once Windows passes the flag too**, and the
-  reason is the shared Python rather than anything platform-specific:
-  `prompt()` and `get_or_prompt_teacher_last_name()` test the flag BEFORE
-  `isatty()`, so the branch that waits is unreachable either way. `deploy.sh`
-  additionally drops the container's terminal under the flag, which is belt and
-  braces on the mac and has no Windows counterpart.
-  A saved credential that fails its check is now kept rather than cleared when
-  nobody is here. Refusal points: `contracts/app-rules.json` →
-  `launcherFlags.nonInteractive`. Not run: `verify.sh`.
-
-  **Still open, and deliberately so — each is a product decision:**
-  (1) the course-code guard, unchanged, with its two candidate answers set out
-  in the contract's `notRefused`; (2) what the app tells the teacher after a
-  refused overnight publish, and the trail line for it — the last paragraph of
-  this entry is still true, nothing reaches the trail; (3) the assistant and MCP
-  publish paths, which run through a pseudo-terminal with nobody to answer;
-  (4) the Windows mirror (`deploy.ps1`, `TaskScheduling.WriteWrapperScript`),
-  whose suite is red in two places until it lands. Everything below this point
-  is the original entry, kept as it was written.
-
-  **How it was found.** `verify-deploy.ps1`'s Netlify leg hung until its own
-  900-second timeout. The log says why: the site saved in
-  `.netlify_sites/section1.json` no longer exists on Netlify (deleted at the
-  other end at some point), so `deploy.ps1` did the sensible thing and fell
-  through to creating a fresh one — and asked for a name:
-
-      ⚠️ Saved Netlify site (e8ded3b5-…) was not found on Netlify.
-       Creating a fresh Netlify site for this section…
-       Enter Netlify site name [mcr3u-s1-2026-gordon]:
-
-  A person at a keyboard answers that in two seconds. The harness had a stdin
-  nobody was typing into, and waited forever.
-
-  **PARTLY CLOSED 2026-09-06, and the remaining half is the half this entry is
-  about.** The wrapper now runs with `-NonInteractive`
-  (`TaskScheduling.TaskRunCommand`), which makes PowerShell's own `Read-Host`
-  THROW instead of waiting — that closes `preview.ps1`'s "Continue anyway?"
-  question. It does **nothing** for the question described below, because
-  `deploy.py`'s `input()` runs in a PYTHON child and PowerShell's flag does not
-  reach it. What protects that one today is only `sys.stdin.isatty()` being
-  false, which takes the default silently rather than refusing.
-
-  **Why it matters beyond the harness.** `TaskScheduling.WriteWrapperScript`
-  generates `& <deploy.ps1> <args>` with no stdin redirection. The mac's `launchd` path has the same shape. (Whether
-  Task Scheduler gives it a console is exactly the open question below, and it
-  is not assumed here.) So the flagship "publish tomorrow's
-  class" feature, on a course whose site has been deleted upstream — or on a
-  course whose FIRST publish is the scheduled one, which also asks — reaches a
-  question nobody will ever answer. What happens next depends on one line, and
-  the paragraph after next says which.
-
-  **What a fix looks like, and why it was not just done.** A
-  `--non-interactive` flag that makes `deploy` REFUSE rather than ask, with a
-  trail line saying which question it could not ask, and the app then telling
-  the teacher their scheduled publish needs one answer before it can run
-  unattended. That changes what the app passes the launcher, which is pinned by
-  `app-rules.json` → `deployArguments` and run by both suites — so it is a
-  contract change, wants agreeing on both sides, and is Russell's call rather
-  than a Windows session's.
-
-  **The mechanism, corrected.** An earlier version of this entry blamed
-  PowerShell's `Read-Host`. It is not: the question comes from `deploy.py`'s
-  own `prompt()` helper (`scripts/deploy.py:325`), which guards every ask with
-  `sys.stdin.isatty()`. That single line decides which of two different bugs a
-  teacher gets, and BOTH have now been seen:
-
-  * **stdin IS a terminal → Python's `input()` blocks, forever.** Measured:
-    two harness runs left a `powershell.exe` and its `python.exe` child waiting
-    at that prompt for **45 minutes**, still alive when they were swept up. We
-    know it was this branch and not the other because the prompt TEXT was
-    printed, and `prompt()` prints nothing at all when `isatty()` is false. The
-    failure is "the overnight publish never happened and nothing said so" — the
-    teacher's site is simply not updated in the morning.
-  * **stdin is NOT a terminal → the default is taken silently.** No prompt is
-    printed, the site is created at whatever address the default suggests, and
-    a name conflict auto-suffixes (`deploy.py:430`). The failure is "published
-    to an address nobody chose", and on a machine with no saved surname the
-    address has no surname in it either.
-
-  **So the open question is narrow and answerable**: does Task Scheduler give
-  the wrapper a console, making `isatty()` true? That decides which of the two
-  a teacher meets. Both are bad, and a `--non-interactive` flag that REFUSES
-  rather than asking is the fix for both.
-
-  **Two things that follow whichever branch it takes.** The wedged processes
-  survive their parent being killed — including `Process.Kill($true)` on the
-  whole tree, which does not even exist under Windows PowerShell 5.1 and threw
-  silently in this harness for three runs — so a scheduler that gives up leaves
-  the launcher running. And NOTHING reaches the activity trail while they wait,
-  so the trail cannot tell a wedged overnight publish from one that was never
-  scheduled.
+  entirely, and would be a two-line experiment.~~ — the instinct was right and
+  the route was not; see the correction at the top of this entry. The tests
+  still drive a live `NSAlert` sheet, and still assert exactly what they did.
 
 - ✅ **Done 2026-09-05 — the two reliability findings from that day's review.**
   Kept rather than deleted because the SHAPE of each is worth recognising
@@ -318,17 +201,6 @@ an item when it ships (finished behaviour is recorded in
   from held locks, which can leave a partial state. The explanation a teacher
   reads names all three as effects, not mechanisms.
 
-- **Choosing a new working folder keeps the OLD window's selection.** Seen
-  2026-09-05 while driving row 399: with `ICS3U` selected in one folder,
-  choosing a different working folder (with no courses) showed "Course Not
-  Found — reload courses from the File menu, or choose a different working
-  folder" instead of the empty-folder state, because `chooseWorkspace(at:)`
-  reloads the courses but leaves `selection` pointing at a course the new
-  folder does not have. Pre-existing, cosmetic, one line to fix (clear the
-  selection when the folder changes) — but check `WindowRestorationScenarioTests`
-  first, since a RESTORED window sets its folder and then its selection in
-  that order and must keep doing so.
-
 - ~~**Move the mac's build output OUT of a synced working folder**~~ — ✅
   **Done 2026-09-05**, row 402. Built on the design sketched below: `.merged_output`
   is a SYMLINK to `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`
@@ -385,8 +257,18 @@ an item when it ships (finished behaviour is recorded in
   Rejected: a `.nosync` suffix (iCloud-only — Dropbox and OneDrive ignore it —
   and it moves the path just as much).
 
-- **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently —
-  and it is PRE-EXISTING, not caused by the special-folders work.** Measured
+- ~~**`CourseRenameInterfaceTests` crashes the whole unit run, intermittently —
+  and it is PRE-EXISTING, not caused by the special-folders work.**~~ —
+  ✅ **Done 2026-09-07.** The SAME defect as the "crashes intermittently inside
+  AppKit" entry near the top of this file,
+  written up twice a fortnight apart before anybody noticed they were one
+  thing; both are fixed by the same change. Everything below stands as
+  measured, and the closing paragraph's lead — "the cheapest lead is now
+  inside `CourseRenameInterfaceTests` itself" — was correct: the class's own
+  `renameProblem = nil` at line 175 is what lights the fuse. The full-suite
+  rate recorded here (about half of runs, 9 of 17 across two trees) is the
+  number that mattered most in the end, because it is the scope a merge gate
+  actually runs. Measured
   2026-08-23 on a clean `origin/dev` worktree with none of that branch's
   changes: **one crash in four full runs**, aborting the run partway
   (`Executed 419 tests` and an exit code of 65 with ZERO failed test CASES).
@@ -483,7 +365,9 @@ an item when it ships (finished behaviour is recorded in
 - ✅ **Half done 2026-09-01 — a course chooses its word for “Unit” when it is
   made.** Deferred 2026-08-23; built once Russell chose the scope on
   2026-09-01: **new courses plus configurable parsing, NOT renaming a course
-  already in use.**
+  already in use.** The unbuilt half is now
+  [issue #100](https://github.com/russellgordon/plantoir/issues/100); the
+  reasoning below is reproduced there.
 
   **What shipped.** `unit_word` in `course_config.json`, absent meaning “Unit”.
   The wizard asks every course, the ready-made payload is written in that word
@@ -522,7 +406,13 @@ an item when it ships (finished behaviour is recorded in
   the teacher's editor and they would see the old word every time they opened
   the vault — which is the place the rename was supposed to help.
 
-- **The assistant's first turn does not wait for its warm-up** — measured
+- **~~The assistant's first turn does not wait for its warm-up~~** — ✅ **Done
+  2026-08-20**, the same week it was written. `AssistSession.canSend` now reads
+  `guard readiness == .ready, hasFinishedWarmUp, let agent`, with a separate
+  `canAcceptTyping` so the composer explains itself while the model warms, and
+  `AssistWarmUpTests` pins it. The original entry follows.
+
+  The assistant's first turn does not wait for its warm-up — measured
   2026-08-20, while qualifying the mac for v1.1.0. `AssistSession` sets
   `readiness = .ready` (which is all `canSend` checks) and only THEN awaits
   `warmUp`, so a teacher who types straight away queues behind the
@@ -543,7 +433,14 @@ an item when it ships (finished behaviour is recorded in
   measurement above is the evidence it is worth doing, not a substitute
   for one.
 
-- **A mac problem report can carry nothing the engine said** — found the
+- **~~A mac problem report can carry nothing the engine said~~** — ✅ **Done
+  2026-08-20.** `AssistServerHost` writes to `logHandle ?? FileHandle.nullDevice`
+  — a FILE, never a pipe, which keeps exactly the no-blocking-read property this
+  entry insisted on — and a bounded tail (`engineLinesSinceLastLook(atMost: 200)`)
+  reaches the trail as `assistantEngineSaid`, a registered contract event. The
+  original entry follows.
+
+  A mac problem report can carry nothing the engine said — found the
   same day. `AssistServerHost` sends `llama-server`'s stdout and stderr to
   `FileHandle.nullDevice`. That is load-bearing (an unread pipe is what
   wedged the Windows server mid-request, and this is why the mac never
@@ -554,8 +451,24 @@ an item when it ships (finished behaviour is recorded in
   than piping the firehose, and keep the no-blocking-read property that
   makes the current arrangement safe.
 
-- **A preview's progress bar sits at 100% saying "Opening the preview…"
-  for the entire build** — found 2026-08-19, while re-shooting the
+- **~~A preview's progress bar sits at 100% saying "Opening the preview…"
+  for the entire build~~** — ✅ **Done.** `TaskMilestones` watches for
+  `"Done processing"`, `patches/build.ts` prints it and the Dockerfile bakes
+  that file into the image.
+
+  **This entry survived only because of its own closing instruction**, which
+  said to leave it until a mac had regenerated `app-rules.json`. A mac did, on
+  2026-09-01 (`13da5319`), and the contract has carried the right marker ever
+  since — so the sentence telling a reader the contract is stale had itself
+  gone stale, and acting on it would have meant redoing done work or
+  hand-editing a generated file. **Two things ARE still un-refreshed** and are
+  the only live part: `TaskMilestones.swift`'s comment still says the edit was
+  "authored on Windows and has NOT been built or tested on a mac", and
+  `MAC-HANDOFF.md` still lists it under "NEEDS A MAC BUILD/TEST/REGEN". Neither
+  is a code change. The original entry follows.
+
+  A preview's progress bar sits at 100% saying "Opening the preview…"
+  for the entire build — found 2026-08-19, while re-shooting the
   marketing screenshots; the "Building your site…" step is unreachable.
 
   **✅ Fixed on Windows, 2026-08-23** (`TaskMilestones.cs`, built and tested,
@@ -605,159 +518,127 @@ an item when it ships (finished behaviour is recorded in
   comment says — and the on-screen sentence is the accessibility VALUE of
   `taskMilestoneLabel`; its label is empty.
 
-- **Container recreation can kill live previews** — noted 2026-08-11.
-  Every launcher "ensures" the working folder's container, and on a
-  toolchain-recipe hash or mount mismatch it recreates it (`docker rm
-  -f`) — taking any live preview servers down with it. In steady state
-  hashes match and this never triggers; it can bite mid-session only in
-  rare cases (e.g. an app update refreshing `.toolchain` while another
-  window previews). A thorough fix would make the ensure-container step
-  decline (or warn) when the container hosts running previews. Low
-  priority — rare, and the next preview self-heals.
+## ✅ Done — A rolled-over section publishes over last year's website
 
-- **AI Assist — the rest of it**, updated 2026-08-14 after a full
-  live-tested day on the `ai-assist` branch, since folded into `main`
-  (not yet in any tagged release). The
-  Windows in-app assistant is now **working end to end**: approval gate
-  (deploys only), embedded model with a verified once-ever prompt cache,
-  the promise card handled as deterministic commands, page edits doing
-  stop-edit-offer around the app's own preview, and the whole loop moved
-  to `Plantoir.Core` with tests covering every promise —
-  [`research/ai-assist/HISTORY.md`](research/ai-assist/HISTORY.md) part 2 §10 is the record, and
-  `MAC-HANDOFF.md` carries the mac side's pickup entry. What remains:
+Noted 2026-09-06 on `issue/mcp-tool-surface-divergence`, while sorting the
+twelve MCP tools Windows serves and the mac does not (`MAC-HANDOFF.md`). Found
+by reading code, not by a teacher. **It is a DECISION, not a defect to fix
+quietly**, and it is open on BOTH platforms.
 
-  **(a) The CSV reschedule — built; what is left is around the edges.**
-  It shipped in the plan-then-write shape this item asked for.
-  `Plantoir.Core/Assist/Timetable.cs` reads a school's sheet without
-  assuming its layout — which row is the header, which column holds dates,
-  and how the dates are written are all worked out from the sheet itself —
-  and `ReDatePlan.cs` produces the diff table shown before anything is
-  written. The MCP surface is `read_timetable` → `plan_re_date_classes` →
-  `re_date_classes`, plus `roll_over_section` for a new year, all in
-  `Plantoir.Mcp/PlantoirTools.cs`, with tests in
-  `Plantoir.Tests/TimetableTests.cs`. §5 of the handoff records 26 classes
-  re-dated against a teacher's own spreadsheet, checked by an independent
-  parser. Two things are genuinely left:
+A teacher says *"roll this section over to a new year."* On both platforms that
+exact sentence is matched in code, never routed by the model, and goes to
+`re_date_classes` — `AssistCardCommand.swift:395` and `AssistCardCommand.cs:50`.
+On both platforms `re_date_classes` re-dates the section and stops there.
 
-  * **Only CSV comes off disk.** `TimetableSource` reads a local file as
-    plain text, or exports a shared Google Sheet by link. A teacher's
-    `.xlsx` sitting in Downloads is neither, so they have to export it
-    first — while the tool's own help text says “timetable.xlsx”. Not
-    worth fixing — teachers export to CSV without friction, and reading
-    `.xlsx` off disk buys little.
+Only `roll_over_section` calls `AssistWorkspace.ReleaseSite`
+(`PlantoirTools.cs:911`), and only Windows has `roll_over_section`. What
+`ReleaseSite` does is rename `courses/<CODE>/.netlify_sites/section<N>.json`
+(or `.cloudflare_sites/`) aside, so the next publish makes a NEW site instead of
+overwriting the old one. Shared `scripts/deploy.py` reads that marker, and
+nothing under `mac-app/` or `scripts/` renames, clears or year-scopes it —
+`CourseRenamer` deliberately leaves it alone and `DeployCommand.swift` only
+reads it.
 
-  **(b) The shared activity lease, finished.** `WorkLease` files under the
-  working folder now let the GUI decline a preview while the assistant
-  builds, but the full both-directions story (server honouring the GUI's
-  claims across every operation, and the mac app reading the same files)
-  is still a shared-design item — agree the remaining shape with the mac
-  side first.
+So the first publish after a rollover lands on **last year's URL, which last
+year's students may still be reading**, and the teacher is never asked what to
+call the new site. That last part is shared Python rather than either app:
+`deploy.py`'s `load_netlify_marker` (`scripts/deploy.py:454`) reuses the
+recorded site, and `maybe_create_netlify_site_simple` (`:415`) is the only
+thing that prompts for a name — it runs only when there is no marker to find.
+(The apps' own `hasDeployedBefore` reads the same marker, but it decides
+something else: whether a SCHEDULED deploy may be set up at all —
+`ScheduledDeploy.swift:225`.) Windows' own comment
+(`AssistWorkspace.cs:1915-1928`) says exactly why that is bad — and Windows
+still has the hole, because the sentence a teacher says does not reach the tool
+that closes it.
 
-  **(c) Re-measure the conversational residue — partially done, 2026-08-24.**
-  Re-run against Qwen2.5-1.5B (native, Vulkan) with a two-sentence prompt
-  tweak: full write-up and raw runs in
-  `research/ai-assist/conversational-residue-results.txt`. The **undo
-  over-salience** cluster (a "posted X by mistake" unpublish request
-  routed to `undo_last_change`) is fixed, and a related case not in the
-  original TODO wording — a hide request declined outright — is fixed as
-  a side effect; conversational-only accuracy went from 85% to 91-94%
-  across two runs, with no new failures elsewhere. Shipped in
-  `AssistAgent.cs` and `AssistAgent.swift` — **the Swift side is written
-  but, per the usual constraint of a Windows session, not yet built or
-  tested on a mac**; see `MAC-HANDOFF.md`.
+**Why this is a decision.** Whether a section keeps one address across years or
+starts a new site each September is a product choice, not an obvious bug.
+Plenty of teachers want one address forever, and a URL that changes every year
+breaks every link anybody saved. Windows made a choice and gave its reason; the
+mac has never made one. Three options:
 
-  **Still open: the deletion probe's decline never came back.** "Delete
-  the Unit 1 folder" still routes to `cancel_scheduled_deploy` instead of
-  declining, unchanged across every wording tried. A more explicit
-  sentence naming that tool directly was tried and made things worse
-  elsewhere (two previously-clean conversational cases regressed) — logged
-  in the results file as a rejected option so it isn't retried unmeasured.
-  Left for a future pass.
+- **Keep them separate, as Windows did.** `re_date_classes` re-dates;
+  something else cuts loose. Cheapest — and it leaves the card phrasing
+  pointing at the wrong one on BOTH platforms, so the phrasing has to move with
+  it or the bug stays exactly where it is.
+- **Make the cut-loose part of the rollover phrasing**, on both platforms,
+  since "roll over to a new year" is the sentence that means it. Risk: a
+  teacher who says it meaning only "fix the dates" loses their address.
+- **Ask.** The rollover already tells the teacher to preview and check before
+  deciding what students see; one more sentence — "should this be a new
+  website, or the same one as last year?" — is the only option that does not
+  guess. It is also the only one that needs new wording, which then belongs in
+  `contracts/` so both platforms say it identically.
 
-- **A "prepare for start of year" operation, and the audit behind it** —
-  deferred 2026-08-13, from a real session on the `ai-assist` branch.
+Whichever is chosen it needs the same sentence on both sides. Windows' half is
+item 45 in `WINDOWS-HANDOFF.md`.
 
-  A teacher asked for "every class past Unit 1, Day 1, and everything those
-  link to, into draft". Applied exactly, that rule left **32 course-level
-  pages in SNC1W still published** that no class page links to at all — a
-  whole unit's concepts, plus unassigned tasks and portfolio pages. The teacher
-  spotted one (`Concepts/Astronomical Phenomena`, reachable only from an
-  investigation that is itself unreferenced) and the rest fell out of an
-  audit script.
+### ✅ DECIDED 2026-09-08 by Russell — **ASK**, and leave visibility alone
 
-  **The lesson: link-reachability is a weak proxy for "not yet taught."** A
-  link-following rule cannot see a page no class links to, and those are
-  precisely the pages a teacher has written ahead. If Plantoir grows a bulk
-  start-of-year operation, base it on unit number, date, or an explicit
-  teacher-facing "not yet taught" flag — not on what is reachable.
+The third option. A rollover asks the teacher whether this should be a new
+website or the same one as last year, and does not guess either way.
 
-  The audit half of this shipped, as the read-only `check_section` tool in
-  `Plantoir.Mcp/PlantoirTools.cs`. It cross-references a section's pages
-  against every wikilink and reports two of the three groups: links on
-  visible pages that lead to a hidden one (a student clicks and finds
-  nothing), and pages nothing links to — still published, still listed in
-  Quartz's explorer, and invisible to any rule that follows links. That
-  second group is what proved the *rule* incomplete.
+**And a second question was settled at the same time, because the first one
+raised it.** Asked whether a rollover should HIDE the pages that were visible
+to students last year, Russell said **leave visibility alone**: re-dating moves
+dates, and hiding stays a separate deliberate act. So the two answers together
+are "ask about the address, change nothing about who can see what".
 
-  What is still missing is the third group, **linked-but-missed**: pages a
-  class does link to that a bulk change should have caught and did not. Its
-  being empty is what proved the job complete, and `check_section` cannot
-  say so today. Missing too is the bulk start-of-year operation itself —
-  worth having with or without any AI, and per the lesson above it should
-  key off unit number, date, or an explicit "not yet taught" flag rather
-  than reachability. (`LinkGraph.cs`'s doc comment quotes 50 unreachable
-  course-level pages, but for a "sample course" it does not name — a
-  different measurement from the 32 above, not a contradiction of it.)
+**His words on the shape of it:** *"Rollover should redate class pages but not
+immediately publish the revised class pages."* Re-dating already satisfies that
+and says so — `re_date_classes` deploys nothing and ends with "Nothing was
+published or hidden, so students see no change until you deploy." The one
+exception is not a bug and stays: overflow classes, which have no class date
+left to land on, are set to draft by `SectionReDatePlanner`
+(`SectionReDatePlanner.swift:142`) and the reply names each one.
 
-## A folder rename does not follow an angle-bracket Markdown link
+**What this means in practice, said plainly because it is the consequence of
+these two answers together.** Pages published last year stay published. So a
+teacher who rolls over, chooses "the same website", and then deploys, puts the
+whole re-dated year in front of students in one go. That is now a CHOSEN
+behaviour rather than an accident — the question at rollover is what makes it a
+choice — and the teacher who wants the year revealed class by class hides the
+pages themselves, which is an act they already have.
 
-Noted 2026-09-06, while fixing the neighbouring defect (a rename to a name
-containing a space broke every Markdown link into the folder —
-`GUI-IMPROVEMENTS.md` 424). Found by adversarial review, not by a teacher.
+**✅ BUILT 2026-09-08** on `issue/rollover-asks-about-the-website`,
+`GUI-IMPROVEMENTS.md` row 451. All three parts below are done on the MAC; the
+Windows half is `WINDOWS-HANDOFF.md` item 45. Three things were found by
+adversarial review while building and are worth keeping, because each was a
+way of shipping something worse than the defect:
 
-Markdown allows a destination to be wrapped in angle brackets, which is how a
-path containing a space is written WITHOUT percent-encoding:
+- **Cutting a section loose had to turn off any publish set to happen on its
+  own.** `runScheduled` re-validates nothing and `deploy.py`'s name prompt
+  returns its DEFAULT with no terminal rather than failing, so the overnight
+  run would have created a website nobody named while the address students read
+  stopped updating.
+- **Answering the question is the SECOND turn**, by which time the pages are
+  already on their dates — so the re-date plan changes nothing, and returning
+  early on that made the answer a no-op with an offer that looked like it had
+  worked.
+- **"Still pinned" and "never published" cannot share a sentence.** A marker
+  that could not be moved was reported as "had not been published anywhere
+  yet", which is the opposite of the truth about the one fact this turns on.
 
-    [q](<Tasks/Quiz 1.md>)
+The original list of what had to be built follows.
 
-Neither app's `FolderPathRewriter` matches it. The Markdown pattern is
-`(\]\()([^)\s]+)`, so the first segment reads as `<Tasks`, which is not the
-folder `Tasks`, so nothing is rewritten and the link is left pointing at the
-old name. Pre-existing on both platforms and unchanged by the 2026-09-06 fix —
-listed here so it is not later mistaken for a regression that fix introduced.
+**What was to BUILD — a separate piece, not done in the deciding session.**
 
-**Why it was left.** Obsidian does not write this form — it percent-encodes
-instead — so it can only appear in a link a teacher typed by hand, and the two
-apps have to agree about it before either changes, which makes it a contract
-case rather than a one-line patch. The fix itself is small: allow a
-`<`-wrapped destination in the pattern and strip the brackets before splitting
-into segments. What is NOT small is deciding how the new name is then spelled
-inside one — inside angle brackets a space needs no escaping at all, so it is a
-third spelling rule beside the two that now exist, and inventing it without a
-case both suites run is how the two apps drift.
-
-## Docker build cache is never cleared (deliberately, for now)
-
-`docker system df` on the dev mac, 2026-08-23: 1301 build-cache entries,
-14.30 GB, 14.25 GB reclaimable — a bigger number than the images that were
-leaking beside it (fixed 2026-08-23, `GUI-IMPROVEMENTS.md` 352).
-
-**Not fixed on purpose, and this is the record of why so it does not get
-re-proposed:** `docker builder prune` is GLOBAL. There is no per-project or
-per-tag filter, so a launcher calling it would throw away the build cache of
-every other project sharing this Colima VM (Supabase, among others) — the same
-constraint that shaped the image cleanup, but with no narrow form available.
-Clearing it stays a by-hand developer job:
-
-```bash
-docker builder prune          # global — read the size it offers first
-```
-
-A teacher's cache is also a fraction of this: the 14 GB here came from twelve
-days of toolchain edits, where a teacher builds on install and then not again.
-If this is ever revisited, the thing to find out first is whether BuildKit can
-be given a scoped cache per build context — a filtered prune, not a bigger
-hammer.
+1. **The sentence, in `contracts/`**, so both platforms ask identically. It is
+   the only part of this that is teacher-facing, and it is the reason this
+   option was the expensive one.
+2. **The mac needs the machinery at all.** There is no `ReleaseSite` anywhere
+   under `mac-app/` or `scripts/` — Windows' is at `AssistWorkspace.cs:1929`,
+   called from exactly one place, `roll_over_section`
+   (`PlantoirTools.cs:911`). It renames the marker aside rather than deleting
+   it, because the marker holds the site id and admin URL and a teacher who
+   changes their mind has no other way back. Copy that property.
+3. **The card phrasing has to move with it on BOTH platforms.** "Roll this
+   section over to a new year" is matched in code
+   (`AssistCardCommand.swift:395`, `AssistCardCommand.cs:50`) and routed
+   straight to `re_date_classes`. Until it reaches something that can ask the
+   question, the decision changes nothing a teacher meets — this is the step
+   that makes the other two matter, and it is the one easiest to leave out.
 
 ## ✅ Done — Publish stops an active preview itself
 
@@ -864,4 +745,3 @@ entry point checked for `--verify` while every doc taught
 triggering a real deploy instead of a read-only check). No `contracts/` or
 handoff entry — release tooling, not app behavior either platform's
 teacher-facing suite covers.
-

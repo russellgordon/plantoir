@@ -168,6 +168,135 @@ final class AssistContractTests: XCTestCase {
         }
     }
 
+    /// Every departure the contract names is a parameter that really is a
+    /// list-shaped string on this surface — and there is at least one.
+    ///
+    /// The emitted list is derived from `Kind.separatedList`, so this cannot
+    /// drift from the declaration. What it CAN do is go silently empty if the
+    /// three call sites are changed back to plain `.string`, and an empty list
+    /// would read to Windows as "the departures are resolved, delete them",
+    /// which is the opposite of true. Hence the count assertion.
+    func testTheDeparturesNameEveryListShapedParameter() throws {
+        let committed: [String: Any] = try readContract(named: AssistContract.casesFileName)
+        let schemas: [String: Any] = try XCTUnwrap(committed["toolSchemas"] as? [String: Any])
+        let departures: [String: Any] = try XCTUnwrap(schemas["departures"] as? [String: Any])
+        let listShaped: [[String: Any]] = try XCTUnwrap(
+            departures["listShapedStringParameters"] as? [[String: Any]]
+        )
+
+        XCTAssertFalse(
+            listShaped.isEmpty,
+            "No list-shaped parameters were emitted. If the separated-list kind has been removed "
+            + "this list goes empty, and Windows reads an empty list as \"these departures are "
+            + "resolved, delete them\" — the opposite of what it would mean."
+        )
+
+        for entry in listShaped {
+            let parameter: String = try XCTUnwrap(entry["parameter"] as? String)
+            let separator: String = try XCTUnwrap(entry["separator"] as? String)
+            XCTAssertFalse(separator.isEmpty, "\(parameter) is list-shaped with no separator")
+
+            let parts: [String] = parameter.components(separatedBy: ".")
+            XCTAssertEqual(parts.count, 2, "\(parameter) is not tool.parameter")
+            let toolName: String = parts[0]
+            let parameterName: String = parts[1]
+
+            var found: Bool = false
+            for definition in AssistToolRunner.mcpTools where definition.name == toolName {
+                let property: AssistSchemaProperty? = definition.parameters[parameterName]
+                XCTAssertNotNil(property, "\(parameter) is named as a departure and does not exist")
+                XCTAssertEqual(
+                    property?.kind.listSeparator, separator,
+                    "\(parameter): the emitted separator is not the declared one"
+                )
+                XCTAssertEqual(
+                    property?.json["type"] as? String, "string",
+                    "\(parameter) must still render as a string — a departure that changed the "
+                    + "emitted TYPE would be a routing change, not a record of one."
+                )
+                found = true
+            }
+            XCTAssertTrue(found, "\(parameter) names a tool this surface does not have")
+
+            // `surfaces` is a field Windows scopes its own list by, and nothing
+            // read it until now: a bug in the bookkeeping would have been
+            // self-consistent between generator and contract, and invisible.
+            let surfaces: [String] = try XCTUnwrap(entry["surfaces"] as? [String])
+            var isLocal: Bool = false
+            for definition in AssistToolRunner.localTools where definition.name == toolName {
+                isLocal = true
+            }
+            let emittedAsLocal: Bool = surfaces.contains("local")
+            XCTAssertEqual(
+                emittedAsLocal, isLocal,
+                "\(parameter): the emitted surfaces say local=\(emittedAsLocal) and the local tool "
+                + "list says \(isLocal)."
+            )
+            XCTAssertTrue(surfaces.contains("mcp"), "\(parameter): every tool is on the mcp surface")
+        }
+    }
+
+    /// A parameter whose description says it is separated is DECLARED as a list.
+    ///
+    /// The other direction of the departures test, and the one that matters:
+    /// that test checks every emitted entry is real, and would have passed
+    /// while the emitted list was incomplete — which it was. `codes` is a
+    /// comma-separated list on both platforms, was declared a plain `.string`,
+    /// and so sat outside a record Windows is told is complete.
+    ///
+    /// This reads the DESCRIPTIONS, which the generator deliberately does not.
+    /// The objection to the generator reading them does not apply here: a
+    /// reworded description can only make this test DEMAND a declaration it
+    /// then fails to find. It can never silently drop one, which is exactly
+    /// what a generator matching prose would do.
+    func testEveryParameterThatSaysSeparatedByIsDeclaredAsAList() throws {
+        for definition in AssistToolRunner.mcpTools {
+            for (parameterName, property) in definition.parameters {
+                if property.description.contains("separated by") {
+                    XCTAssertNotNil(
+                        property.kind.listSeparator,
+                        "\(definition.name).\(parameterName) tells the model it is separated and is "
+                        + "declared as a plain string, so it is missing from "
+                        + "toolSchemas.departures.listShapedStringParameters — a record the other "
+                        + "platform is told is complete. Declare it .separatedList."
+                    )
+                }
+            }
+        }
+    }
+
+    /// The `absentHere` claim is true: nothing on this surface is a `preview`
+    /// flag, and nothing on it is a boolean at all.
+    ///
+    /// The contract says both, so both are checked here rather than trusted.
+    /// The second is the load-bearing one — a boolean on a router is the shape
+    /// that asks the MODEL a question the code should answer.
+    func testNothingOnThisSurfaceIsAPreviewFlagOrAnyBoolean() throws {
+        var everyTool: [AssistToolDefinition] = []
+        for definition in AssistToolRunner.localTools {
+            everyTool.append(definition)
+        }
+        for definition in AssistToolRunner.mcpTools {
+            everyTool.append(definition)
+        }
+
+        for definition in everyTool {
+            for (parameterName, property) in definition.parameters {
+                XCTAssertNotEqual(
+                    parameterName, "preview",
+                    "\(definition.name) has a preview flag. The contract's departures say this "
+                    + "surface has none, because every change rebuilds here."
+                )
+                XCTAssertNotEqual(
+                    property.json["type"] as? String, "boolean",
+                    "\(definition.name).\(parameterName) is a boolean. The contract records that "
+                    + "there is no boolean anywhere on this surface; the last was includeLinked, "
+                    + "which asked the model how far a publish should reach."
+                )
+            }
+        }
+    }
+
     // MARK: - Private
 
     /// The repository's `contracts/` folder, found from this source file's own

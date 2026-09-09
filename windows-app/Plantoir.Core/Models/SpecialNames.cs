@@ -3,8 +3,10 @@ using System;
 namespace Plantoir.Core.Models;
 
 /// <summary>
-/// What a teacher is told when a folder or file a feature depends on cannot
-/// simply be removed.
+/// What a teacher is told about the folders and files a course is built from:
+/// which ones a feature depends on and so cannot simply be removed, what
+/// adding or removing one actually does, and how the lists in Course Settings
+/// relate to what they do in Obsidian.
 ///
 /// <para><b>Every sentence here is pinned to
 /// <c>contracts/shared-rules.json</c> -> <c>specialNames</c> by
@@ -186,7 +188,7 @@ public static class SpecialNames
     /// platform's wording rather than a shared one — the same deliberate
     /// difference as "Setting up this Mac" against "Setting up this PC" in
     /// app-rules.json's markerOrigins. Said here as "on this PC". Flagged in
-    /// MAC-HANDOFF so the contract can mark it platform-specific, rather than
+    /// documentation/09-mac-app.md so the contract can mark it platform-specific, rather than
     /// leaving the next reader to conclude that Windows drifted.</para>
     /// </summary>
     public const string RenameExplanation =
@@ -209,4 +211,43 @@ public static class SpecialNames
     /// <summary>"your Mac" in the contract; "this PC" here, as above.</summary>
     public const string RenameNothingWasThere =
         "There was no folder by that name on this PC, so only this course’s settings changed. Make it in Obsidian when you need it.";
+
+    /// <summary>Adding a name creates the folder; the teacher is told so.</summary>
+    public const string AddCreatesTheFolder =
+        "Plantoir made the folder “{name}” for you. Open it in Obsidian to put pages in it.";
+
+    /// <summary>Removal excludes; it has never deleted anything, and teachers could not tell.</summary>
+    public const string RemoveLeavesTheFolderOnDisk =
+        "“{name}” and everything in it stays on this PC — this only takes it off your website. Add it back here to include it again.";
+
+    /// <summary>
+    /// The caption under the four Content Structure lists in Course Settings.
+    ///
+    /// <para>The two apps had worded this rule differently since the day it was
+    /// written and neither pinned it; this wording was proposed from Windows
+    /// 2026-09-07 and is now <c>specialNames.contentStructureTip</c>. It says
+    /// "folders and files" because the caption sits under four lists of which
+    /// two are file lists, and exclusion works identically for both — the
+    /// earlier sentences on BOTH platforms promised only the folder half.</para>
+    ///
+    /// <para>Unlike its neighbours this is not a removal-blocked sentence, so
+    /// it carries no <c>reason</c> key in the contract and
+    /// <c>NoBlockedSentenceInTheContractIsUnusedHere</c> steps over it. It is
+    /// also deliberately absent from
+    /// <c>TheLongestSentenceIsStillTheOneTheFlyoutWasSizedFor</c>: it is a
+    /// caption that wraps, not a flyout sentence, and it is far longer than the
+    /// one that test exists to name.</para>
+    /// </summary>
+    public const string ContentStructureTip =
+        "Tip: you can also simply create new folders and files in Obsidian — they’re added to your site automatically the next time you preview. The exception is anything you remove here: it stays off your site, even if you make it again in Obsidian, until you add it back here.";
+
+    /// <summary>
+    /// Shown inside the rename sheet when it opens on a rename that stopped
+    /// after the folders moved: the field is filled with the name it was
+    /// heading for, and this says why. Proposed to the contract from Windows
+    /// 2026-09-07 (<c>specialNames.renameFolder.interruptedRename</c>); the mac
+    /// pre-fills silently.
+    /// </summary>
+    public const string RenameInterrupted =
+        "Plantoir started renaming “{old}” to “{new}” and did not finish — the folder has its new name, but this course’s settings still use the old one. Press Rename to finish.";
 }

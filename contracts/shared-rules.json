@@ -136,6 +136,16 @@
         "why": "A different event from finding the problem, deliberately: one records that something is wrong, the other that somebody acted on it, and a trail that could not tell them apart leaves \"did they ever fix it?\" unanswerable. Only the two genuinely repairable cases can produce it — a missing Media folder and a missing section front page."
       },
       {
+        "carries": "which course and section, and what was in the way — never anything from inside it. The one line written today is \"found a folder called index.md where the front page belongs, and left it alone\"",
+        "event": "folder problem not repaired",
+        "why": "A repair the teacher ASKED for that did not happen. Without it the trail shows the problem being found and then nothing at all, which reads exactly like a teacher who never pressed the button — and the thing in the way is a folder they will very likely have moved or deleted by the time they report it, so it cannot be looked for afterwards. Named for the OUTCOME rather than for its one cause: today only the \"a folder is sitting where the front page belongs\" refusal writes it, and a repair that simply failed (a read-only volume, a permissions problem) still records nothing. That gap is deliberate rather than forgotten, and this is the line it joins when it is closed, without a rename on either platform. See siteHealth.repair.refusedWhenSomethingIsInTheWay."
+      },
+      {
+        "carries": "which course and section, and the file name of the copy it was put back from — never a page",
+        "event": "section restored",
+        "why": "A teacher put a section back to how it was when an assistant conversation started (\"Restore Section N…\"). The one line that explains a section whose pages are older than the conversation that changed them: without it the trail shows the changes and then nothing, which reads as a teacher who never pressed the button. Windows recorded it first and proposed it on 2026-09-07 as appliesOn: [\"windows\"], because the mac had the same button and wrote nothing; the mac adopted it the same day and the appliesOn is gone, so it is pinned on both sides now. One gap is deliberate rather than forgotten, and is the same on both platforms: a restore that fails PART WAY (a permissions problem, a full disk) has already emptied the section folder, so the section is damaged, the teacher is told \"Nothing was put back\" — which is not true — and no line is written. Recording a restore there would be worse, since the restore did not happen; what is missing is a THIRD outcome both apps lack, and until one exists the trail is silent about the one case where its silence misleads."
+      },
+      {
         "carries": "which course and section, and a sentence naming what happened with the stable check NAME in brackets — 'found a problem with this course’s folders (curriculumCoverageFoundNothing)'. Never the product wording, which changes, and never anything written on a page",
         "event": "folder problem found",
         "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk — a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract."
@@ -195,6 +205,16 @@
         "carries": "which course and section, and HOW MANY website-builder processes were ended",
         "event": "section processes reclaimed",
         "why": "The count is the point. Stopping a preview, closing a window or cancelling a publish asks the launcher to end whatever that section still has running, and nothing else on the trail can tell “there was nothing left to stop” from “a build was still going and was ended” — which are the two competing explanations when a teacher reports that their publish stopped halfway. Recorded from 2026-09-05, when the sweep began ending a mid-flight BUILD and its driver rather than only a preview server: that is a change in what a teacher can lose, and it had no line describing it. The launcher prints the number and the app used to discard it."
+      },
+      {
+        "carries": "the course code, the section number, and \u2014 when there was a website to move away from \u2014 where last year's details were kept",
+        "event": "section started a new website",
+        "why": "A rollover that cuts a section loose is the moment its published address changes, and nothing else on the trail records it. The same act turns off any publish that was set to happen on its own \u2014 a section with no agreed website and a scheduled run with nobody to ask would otherwise create a website nobody named \u2014 so a teacher whose overnight publish stops happening has one line explaining both."
+      },
+      {
+        "carries": "the course code and the section number",
+        "event": "section kept its website",
+        "why": "The OTHER answer, and the one a problem report is more likely to be about: a teacher writing in weeks later to say last year's class site was replaced is describing this branch. A trail recording only the cut-loose could not answer the question it would actually be read for. Both answers are recorded because the question is asked every time and neither answer is a default."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -232,7 +252,7 @@
     }
   },
   "assistantModelChoice": {
-    "note": "Which assistant runs on a teacher's machine, and what they are allowed to do about it. Shared because these are rules with inputs and outputs, not pictures: the panel that holds them looks nothing alike on the two platforms and must BEHAVE identically. What is deliberately not here is the layout, the keyboard shortcut, and where the settings window lives - see WINDOWS-HANDOFF.md, 'Letting a teacher choose which assistant runs'.",
+    "note": "Which assistant runs on a teacher's machine, and what they are allowed to do about it. Shared because these are rules with inputs and outputs, not pictures: the panel that holds them looks nothing alike on the two platforms and must BEHAVE identically. What is deliberately not here is the layout, the keyboard shortcut, and where the settings window lives - see documentation/10-local-ai-assistant.md.",
     "defaultChoice": "automatic",
     "choices": [
       {
@@ -438,7 +458,7 @@
       "why": "The exclusions are checked BEFORE the referrer test, so narrowing what counts as a referrer cannot reach them. Narrowing a sweep rule makes every exclusion above it matter more than it did the day before, which is why the exclusions are the thing to re-test after any change to what gets swept."
     }
   },
-  "note": "Eight rule sets that both apps need and neither platform owns. The MECHANISMS behind several of them differ completely - launchd against Task Scheduler, AppKit against WinUI, ~/Library/Logs against %LOCALAPPDATA% - which is exactly why the rules are written here instead: what must be refused, matched, stripped, or taken out of a problem report does not change with the machinery that does it.",
+  "note": "The rule sets both apps need and neither platform owns. The MECHANISMS behind several of them differ completely - launchd against Task Scheduler, AppKit against WinUI, ~/Library/Logs against %LOCALAPPDATA% - which is exactly why the rules are written here instead: what must be refused, matched, stripped, or taken out of a problem report does not change with the machinery that does it.",
   "pageNaming": {
     "note": "What a page is CALLED when the assistant talks about it, which is not what its file is called. Shared because it is a rule with inputs and outputs and because both apps read the same folders: a teacher told that 'index' still links to a page has been told nothing, since every folder in a course has an index.md. Reported from a real course (ADA1O Section 1).",
     "theRule": [
@@ -481,6 +501,12 @@
     ]
   },
   "gradedFolders": {
+    "wording": {
+          "rule": "The title and the caption below, word for word, on ALL FOUR surfaces that ask this question — Course Settings and the New Course Wizard, on both platforms. The caption goes BELOW its list on every one of them: “a page in one of these” points at the list, and Windows used to put the caption above, where “these” had the section header “Marks” in front of it and nothing to refer to. One string rather than a per-surface variant, because the caption names no switch and no platform.",
+          "listTitle": "Folders whose work counts for marks",
+          "caption": "Tick the folders holding work that counts for marks. The curriculum coverage map shows an expectation as evaluated when a page in one of these addresses it. Most courses keep “Tasks”; tick “Tests” or anything else you mark.",
+          "why": "Proposed from Windows 2026-09-08, resolving the second Course Settings divergence after specialNames.contentStructureTip: the two apps had worded this title and caption differently since the control was built, and nothing pinned either. The TITLE is the mac's, Russell's choice — it is also the closer match to specialFoldersHelp's already-pinned “Work that counts for marks”, so it cost the mac nothing. The CAPTION is a union of the two apps' and its middle sentence is the specialFoldersHelp marks row’s with ONE word changed — the map’s name. It is not identical to that row, and this why claimed it was until 2026-09-08: the help sheet still says “the curriculum map”, deliberately, as recorded below. Three decisions inside it, each of which was argued the other way first. THE MAP'S NAME: “the curriculum coverage map”, Russell's choice 2026-09-08, because both spellings are already pinned and this is the one shown on THIS control — specialNames.lastGradedFolderBlocked says “while the curriculum coverage map is enabled” in the flyout raised from this very list, and the switch beside it is labelled “Publish the curriculum coverage map”, so the caption now makes three matching names on one screen. specialFoldersHelp's “the curriculum map” is knowingly left as the outlier on a different surface; that is a recorded mixed state, not drift to be tidied up. Windows' capital-C “the Curriculum Coverage map” WAS drift and is gone: that is the built page's title, not a common noun. THE VERBS: “tick”, not the mac's “add … and remove”. This list is a tick list with no Add button, so the mac's caption named two actions the control does not offer, and “remove what you don't” invited the one thing lastGradedFolderBlocked refuses — unticking the last graded folder while the coverage map is on. THE OPENING CLAUSE was kept rather than dropped as a restatement of the title above it: the title is a noun phrase and this is where the teacher is told what to DO, and it is what makes the sentence survive if any surface ever puts the caption back above its list. WHAT THE CAPTION DELIBERATELY DOES NOT SAY: it is a summary, and the full conditions are stricter. _coverage_counts in build_site.py also requires the page to be published rather than a draft, and to be one the course actually TEACHES — reachable from a class page directly or through one hop — and the map itself is absent when include_curriculum_coverage is off, or when the course has no curriculum folder or no expectations, which is the normal state of a from-scratch wizard course. Those conditions are spelled out to the teacher on the coverage page itself (COVERAGE_NOTES) and were left out here on purpose: this sentence has been shown in specialFoldersHelp in exactly this form since that sheet was written, and lengthening a caption to carry three exceptions would bury the one thing it is for. WHAT THE CAPTION GIVES UP, so it is not rediscovered later as a bug: the mac’s “add “Tests”” was wrong about the control but loosely right about something this sentence does not say — that a folder must EXIST before it can be ticked. The pool offered is the declared lists plus a disk walk (gradedFolders.choices), so a teacher who marks tests and has no Tests folder has nothing to tick here and is told nothing about making one. Judged the lesser fault, because naming a button the control has not got is a dead end while a missing folder is visible in the very list they are looking at. One inherited imprecision is flagged rather than fixed: the map's own word is “assessed”, while this sentence says “evaluated”. Changing it means changing the specialFoldersHelp row too, which is a separate piece on both platforms."
+    },
     "note": "Which folders hold work that COUNTS FOR MARKS. An expectation is \"assessed\" \u2014 the ring on a cell in the Curriculum Coverage map, and Ontario's requirement that every overall expectation be evaluated at least once \u2014 when a page addressing it lives in one of these. It used to be hardcoded: any folder whose name CONTAINED \"task\". A teacher who called theirs \"Tests\", or renamed \"Tasks\", silently lost every assessed mark on the map with nothing said.",
     "absentIsNotEmpty": {
       "rule": "An ABSENT `graded_folders` key means the teacher has never been asked, and the HISTORICAL rule applies: any folder segment containing \"task\", case-insensitive. An EMPTY list means they were asked and cleared it, which is a real answer and is honoured.",
@@ -489,6 +515,89 @@
     "matching": {
       "rule": "A FOLDER segment \u2014 never the file name \u2014 equals a pooled name, case-insensitively, at ANY depth.",
       "why": "At any depth so a teacher who files by unit inside `Tasks` does not lose credit. Never the file name, because a page is not assessed work on account of what it is called."
+    },
+    "choices": {
+      "rule": "The folders the Marks checklist OFFERS: the course's `shared_folders`, then its `per_section_folders`, then every folder found inside the course folder itself \u2014 in that order, de-duplicated by exact name.",
+      "why": "`matching` counts a folder at ANY depth, but a checklist built from the two top-level lists offers depth 1, and `absentIsNotEmpty` means the FIRST TICK FREEZES THE POOL. So anything the build counts today and this list omits loses its marks from that tick onwards, silently and permanently: a teacher who files assessed work in `Portfolios/Tasks` cannot tick it, and every expectation that folder addresses reads as never evaluated on the coverage map. The pool the first tick materialises must be built from this SAME list \u2014 a checklist that shows the walked names while the materialised value is inferred from the top-level lists alone loses the marks just as quietly, and a test covering only the visible list would not catch it.",
+      "walk": {
+        "maxDepth": 4,
+        "maxDepthWhy": "The course folder's immediate children are level 1, so levels 1 to 4 are offered and level 5 is not. An affordability judgement rather than completeness, and it is honest about that: a graded folder five levels down is still absent. It must be the same number on both platforms \u2014 a different cap would mean the two apps offer different pools for the same course, so a teacher's tick would freeze a different answer depending on which app they were sitting at.",
+        "skipped": [".merged_output", "merged_output", ".internal", ".obsidian", "node_modules", "Media", ".git"],
+        "skippedWhy": "Build output, Plantoir's own bookkeeping, and `Media`. Skipped at ANY depth, and never walked INTO. `Media` is defensible either way \u2014 a teacher grading video portfolios might want it \u2014 and stays out because media is not assessed work in either app today, and differing here would change what the coverage map says. The two build-output names are skipped even where built websites are kept outside the course folder, so a folder left behind from before that move cannot turn up in the list.",
+        "skippedMatching": "EXACT, case included. A teacher's own folder called `media` is offered.",
+        "hidden": "A folder whose name begins with a dot, or which the platform marks hidden, is never offered and never walked into.",
+        "links": "A symbolic link or junction is not followed — but a folder is only treated as one when it genuinely has a LINK TARGET, rather than merely carrying a reparse point. The distinction is a Windows caution: the Cloud Files API documents a sync provider's unmaterialised placeholders as reparse points, so an attribute test could skip every folder in a cloud-synced working folder and put that course straight back on the top-level-only list this rule exists to fix. NOT reproduced on the machine this was written on — probing its OneDrive with Files On-Demand on found no reparse-point directories at all — so read it as a hazard the narrower test costs nothing to avoid, rather than as a measured fault.",
+        "sectionFolders": "A `sectionN` folder is NOT offered, and its children ARE walked. Its contents are merged into the site and its own name never appears in a page's path there, so ticking it would count nothing \u2014 while a graded folder inside it certainly does count.",
+        "excludedItems": "A name in `excluded_items` is not offered and is not walked into. Filtered at the two levels the build's preflight scan actually discovers: the course folder's own children against `excluded_items.shared`, and a section folder's children against `excluded_items.per_section`. Matched EXACTLY, case included, the same way preflight matches. Without it, removing a folder from a course breaks the promise the removal confirmation makes \u2014 'Removing it will take it out of your course's marks pool' \u2014 on the very next redraw, because the folder is still sitting on disk; ticking it again then writes a `graded_folders` naming a folder `excluded_items` tells the build to skip, so nothing counts for marks while the settings claim something does. (It does NOT suppress the `noGradedFolders` warning, whatever an older comment on this side said: `_has_graded_folders` walks the MERGED tree, so a pool matching nothing published raises the finding exactly as an empty pool would.)",
+        "order": "Declared names first, in list order; then the walked names DEPTH-FIRST: each folder's children in case-insensitive name order, and a folder's children before its own next sibling. NOT shallowest-first — `Alpha/Middle` comes before a top-level `Zebra`. Directory enumeration order is the filesystem's business and is promised by neither platform, so children are sorted, to give a teacher the same list every time and to let these cases pin an order at all.",
+        "duplicates": "By exact name, so a folder name appearing in two places is offered once — at the position the walk FIRST reaches it, which, the walk being depth-first, may be the deeper of the two."
+      },
+      "cases": [
+        { "name": "a graded folder nested inside another is offered",
+          "sharedFolders": ["Concepts", "Portfolios"], "perSectionFolders": [],
+          "directories": ["Portfolios", "Portfolios/Tasks"],
+          "expect": ["Concepts", "Portfolios", "Tasks"],
+          "why": "The case the whole rule is for. `Portfolios/Tasks` counts for marks today under the historical rule, and a top-level-only list drops it at the first tick." },
+
+        { "name": "a section folder is not offered, but its children are",
+          "sharedFolders": [], "perSectionFolders": ["All Classes"],
+          "directories": ["section1", "section1/All Classes", "section1/Tasks"],
+          "expect": ["All Classes", "Tasks"] },
+
+        { "name": "the folders Plantoir looks after itself are never offered, at any depth",
+          "sharedFolders": ["Tasks"], "perSectionFolders": [],
+          "directories": [".obsidian", "Media", "Media/Portfolios", "merged_output", "node_modules", "Tasks", "Tasks/Media", "Tasks/Media/Clips", "Tasks/Unit 1"],
+          "expect": ["Tasks", "Unit 1"],
+          "why": "`Tasks/Media` pins that the skip list applies below the top level too, and `Media/Portfolios` that a skipped folder's contents are not walked." },
+
+        { "name": "the walk stops four levels down",
+          "sharedFolders": [], "perSectionFolders": [],
+          "directories": ["A", "A/B", "A/B/C", "A/B/C/D", "A/B/C/D/E"],
+          "expect": ["A", "B", "C", "D"] },
+
+        { "name": "declared folders first, then what is on disk",
+          "sharedFolders": ["Tasks"], "perSectionFolders": ["All Classes"],
+          "directories": ["Alpha", "Alpha/Middle", "Zebra", "section1", "section1/All Classes"],
+          "expect": ["Tasks", "All Classes", "Alpha", "Middle", "Zebra"],
+          "why": "Pins the ORDER, and that it is depth-first: breadth-first would put Zebra before Middle. `Alpha` sorts before `section1` before `Zebra` case-insensitively." },
+
+        { "name": "a folder on disk that is in neither list is still offered",
+          "sharedFolders": ["Concepts"], "perSectionFolders": [],
+          "directories": ["Concepts", "Old Tests"],
+          "expect": ["Concepts", "Old Tests"],
+          "why": "The next build's preflight scan adds a folder like this to `shared_folders`, after which it counts for marks \u2014 so offering it is right rather than premature. It is also what a teacher is promised, in the sentence pinned as `specialNames.contentStructureTip`: that a folder made in Obsidian is added to the site by itself. Named rather than quoted, because a quoted copy is the one that keeps passing after the product's words change." },
+
+        { "name": "nothing on disk: the declared lists stand alone",
+          "sharedFolders": ["Tasks"], "perSectionFolders": ["All Classes"],
+          "directories": [],
+          "expect": ["Tasks", "All Classes"],
+          "why": "A guard rather than a new rule: a course folder that cannot be read must still offer what the course declares." },
+
+        { "name": "hidden folders are never offered",
+          "sharedFolders": ["Tasks"], "perSectionFolders": [],
+          "directories": [".git", ".git/objects", ".obsidian", "Tasks"],
+          "expect": ["Tasks"] },
+
+        { "name": "the same folder name in two places is offered once",
+          "sharedFolders": [], "perSectionFolders": [],
+          "directories": ["Unit 1", "Unit 1/Tasks", "Unit 2", "Unit 2/Tasks"],
+          "expect": ["Unit 1", "Tasks", "Unit 2"] },
+
+        { "name": "numbered folders sort by character, not the way a person counts",
+          "proposedBy": "Windows, 2026-09-06",
+          "sharedFolders": [], "perSectionFolders": [],
+          "directories": ["Unit 2", "Unit 10", "Unit 1"],
+          "expect": ["Unit 1", "Unit 10", "Unit 2"],
+          "why": "Pins WHICH case-insensitive comparison. Ordinal puts `Unit 10` before `Unit 2`; a locale-aware or Finder-style comparison puts `Unit 2` first, and that is the comparison each platform reaches for by default. Without a case carrying a run of digits, both implementations pass and still show a teacher two different lists. Ordinal is what shipped rather than what is nicest to read — changing it to natural order would be a shared decision, and this case is where that argument has to be had." },
+
+        { "name": "a folder the teacher removed from the course is not offered back",
+          "proposedBy": "Windows, 2026-09-06",
+          "sharedFolders": ["Concepts"], "perSectionFolders": ["All Classes"],
+          "excludedItems": { "shared": ["Tasks"], "per_section": ["Handouts"] },
+          "directories": ["Concepts", "Tasks", "Tasks/Unit 1", "section1", "section1/All Classes", "section1/Handouts"],
+          "expect": ["Concepts", "All Classes"],
+          "why": "Proposed FROM Windows and not implemented on the mac yet. Walking the course folder is what makes this case exist at all: before it, a folder removed from a list simply left the checklist with it. Now the folder is still on disk, so without this it comes back unticked one redraw after the app told the teacher 'Removing it will take it out of your course's marks pool'. Its children go with it: nothing under a removed folder reaches the site either. The cost, recorded rather than hidden: a pooled name found ONLY inside the removed folder then has no row to untick until the folder is put back. It is not silent — the build's health check walks the MERGED tree, so a pool naming nothing the site publishes still reports that no folder counts for marks — and nothing is lost, because a pooled name with no row is preserved rather than dropped." }
+      ]
     },
     "cases": [
       { "name": "not configured: the historical substring rule", "configured": false, "graded": [], "path": "Tasks/Culminating.md", "expect": true },
@@ -816,9 +925,55 @@
         "rule": "Say what was put back, offer to preview it again, and say what the preview does NOT cover. After a repair reported while PUBLISHING, the sentence must name who this does not reach yet (students) and what changes that (publishing again) — the preview is still offered, because that is how a teacher checks the repair worked. The preview is NOT offered in three cases: nothing needed repairing, the repair failed, and a publish is running just now. And the publish sentence must not assert a past publish: it is shown after a FAILED deploy too, and for a first publish nothing has ever gone out.",
         "why": "The button is called \"Preview Again\", not \"Build Again\": the old label never said WHAT would be built, and the thing on offer already has a name the teacher knows. The preview was at first WITHHELD after a publish, reasoning that it does not change what students see — true, and beside the point: the teacher has just put a folder back and wants to SEE that it worked. Withholding it removed something useful to prevent a misunderstanding the words already prevent, so the words carry it instead. A repair whose outcome is invisible is one nobody trusts a second time, and the Media folder is somewhere a teacher cannot see from the app at all. A repair that FAILED must be reported too: both restores can fail on a read-only volume or a file sitting where the folder should be, and reporting only success made the two indistinguishable — silence on the failure path, in the feature written to end silence."
       },
+      "refusedWhenSomethingIsInTheWay": {
+        "rule": "A repair that cannot go ahead because something the TEACHER must move is sitting where it would write is refused, and reported as a failure — never as \"already put right\". Nothing is moved, renamed or deleted. The check that decides this asks whether the thing on disk is a file or a folder: a plain existence check is TRUE for a folder called index.md, and that is how a section with no front page came to be reported as already fine. The generic explanation offered for a repair that simply failed — the one that sends a teacher to check whether a folder is locked or read-only — is REPLACED by the sentence below, because permissions are not what is wrong. The preview is not offered. When BOTH kinds of failure happen at once, the generic explanation is said first and the sentence below last, so the paragraph ends on the step the teacher can actually take rather than on advice that does not apply to it.",
+        "cases": [
+          {
+            "check": "sectionIndexMissing",
+            "inTheWay": "a folder named index.md, where the section's front page belongs",
+            "expect": "refused",
+            "sentence": "There is a folder called index.md in the section{section} folder of your {course} course, where the front page should be. Plantoir has left it exactly as it is, in case your own pages are inside it. Move anything you want to keep somewhere else, then delete or rename that folder, and Plantoir can put the front page back."
+          }
+        ],
+        "namesTheCourse": "The sentence names the course as well as the section folder. Every course has a section1, and the dialog it appears in shows a headline and this sentence and nothing else — so without the course code a teacher with two courses is told to go and look in a folder that exists twice.",
+        "why": "\"That is already put right. Nothing needed changing.\" was said about a section that still had no front page, so the build still produced no site and the publish still refused. The one dialog written to end silence was telling the teacher the problem was dealt with, which is the worst answer available: they stop looking. Answering \"could not put that back\" is at least honest, but the explanation that goes with it sends them to check permissions on a folder that is not locked.",
+        "rejected": "Moving the folder aside and writing a proper front page in its place. It relocates a folder that may hold the teacher's own pages, without asking, and neither app can see what is inside it — a repair that moves a teacher's work to fix a warning is a worse outcome than the warning. Refusing costs one more step by hand and nothing else.",
+        "alsoRecorded": "The refusal leaves a line on the trail — activityTrail \"folder problem not repaired\" — because the folder in the way is something the teacher will very likely have moved by the time they report it."
+      },
+      "reportedOncePerFinding": {
+        "rule": "A repair reports one result per FINDING, never one per check NAME. Two sections each missing a front page are two findings with one name: both are repaired either way, but keyed by the name only the LAST result survives, so \"section 1 restored, section 2 was already there\" comes back as \"That is already put right. Nothing needed changing.\" with no preview offered — for a repair that really did put a page back. The SENTENCE, on the other hand, names each thing ONCE however many findings produced it: \"Put the front page and the front page back.\" is not a sentence.",
+        "cases": [
+          {
+            "check": "sectionIndexMissing",
+            "sections": [
+              {"number": 1, "frontPage": "missing"},
+              {"number": 2, "frontPage": "theTeachersOwn"}
+            ],
+            "expectResults": ["restored", "alreadyFine"],
+            "expectHeadline": "Put the front page back.",
+            "expectCanRebuild": true,
+            "note": "The case a name-keyed result gets wrong: the second answer overwrites the first, and the teacher is told nothing needed changing."
+          },
+          {
+            "check": "sectionIndexMissing",
+            "sections": [
+              {"number": 1, "frontPage": "missing"},
+              {"number": 2, "frontPage": "missing"}
+            ],
+            "expectResults": ["restored", "restored"],
+            "expectHeadline": "Put the front page back.",
+            "expectCanRebuild": true,
+            "note": "Two repairs, one sentence. The de-duplication that stops \"the front page and the front page\"."
+          }
+        ],
+        "howToRunACase": "One finding per listed section, all of the named `check`, all `fixable: true`, for a course whose `section_numbers` are exactly the listed numbers. `frontPage` says what is on disk in that section before the repair: \"missing\" is nothing at all, \"theTeachersOwn\" is an index.md the teacher wrote, which must survive untouched. `expectResults` is one answer per finding IN THE ORDER GIVEN, drawn from restored | alreadyFine | failed | refused (\"refused\" is refusedWhenSomethingIsInTheWay, which BOTH platforms now have). `expectHeadline` and `expectCanRebuild` are what the report says; the occasion does not matter here, because it only changes the DETAIL. Ask for the report and the results on separate copies of the course: every repair runs as it goes, so anything a first pass RESTORED answers alreadyFine to a second. (Only that much — a repair that failed or was refused answers the same again, which is why the vocabulary above still has those two words in it.)",
+        "reachability": "Unreachable from either app's own front end today, and fixed anyway. A section window owns one runner and the checks announce per section, so the findings handed to a repair have always been one section's. The collapse is SILENT and the constraint was written down nowhere, so the next caller — the assistant, a second window, a whole-course fix — would have met it as a wrong report rather than as a compile error. Recorded as latent rather than as a shipped bug, so nobody later reads it as damage a teacher met.",
+        "why": "Windows found it by porting the mac's file line by line and shipped the per-finding shape first (reported from Windows, 2026-09-06); the mac followed on 2026-09-07. Both now return one entry per finding and de-duplicate the names when building the sentence.",
+        "knownLimit": "One name with TWO different outcomes — section 1 restored, section 2 failed — still reads \"Put the front page back.\" followed by \"Could not put the front page back.\", because the sentence has no way to say which section is which. Left as it is on both platforms: it is as unreachable as the collapse was, and new wording nobody has weighed is harder to take back than a paragraph of explanation. The refusal case does not have the problem on either platform, because its own sentence names the section folder. Windows gained that case on 2026-09-07 (branch issue/33-repair-refused-folder-in-the-way): until then a blocked section there fell into `failed` with the generic explanation and the same nameless pairing, which is what this paragraph used to describe. That has stopped being a Windows limit; the limit above it is shared."
+      },
       "oneAlertAtATime": {
         "rule": "The outcome is shown AFTER the dialog it was requested from has gone, never raised from inside that dialog's own button action.",
-        "why": "A view presents one alert at a time; asking for a second while the first is dismissing loses one of them, and the one lost would be the report the teacher just asked for."
+        "why": "A view presents one alert at a time; asking for a second while the first is dismissing loses one of them, and the one lost would be the report the teacher just asked for. It is worse than a lost alert: on 2026-09-05 doing exactly this CRASHED the shipping app (GUI-IMPROVEMENTS.md row 391) — EXC_BAD_ACCESS in AppKitDialogBridge.updateExistingAlert, because AppKit tears the sheet down inside a layout pass and spins a nested runloop from inside a display-cycle callback already running."
       }
     },
     "checks": [
@@ -894,6 +1049,13 @@
       }
     ],
     "note": "The launchers' output is written for a terminal: colour codes, cursor moves, window-title sequences. Both apps show that output to a teacher, so both must strip the same things - and KEEP the same things. Newlines, carriage returns and tabs survive; every other control character does not. Inputs below use \\u001b for ESC and \\u0007 for BEL."
+  },
+  "wizard": {
+    "note": "What the New Course wizard says. AUTHORED rather than generated, and that is the whole point of the entry: a generated readout cannot fail when the code it reads changes, so a button label written by the generator would simply be rewritten to match whatever the button now says. Written by hand, each platform asserts its own constant against it and a drift goes red. Same reasoning as app-rules.json's split between milestones (a readout) and deployArguments (an expectation).",
+    "createCourseButton": "Create Course",
+    "whereItIsRendered": "The mac reads it from WizardWording.createCourseButton and renders it in NewCourseWizardView; Windows renders it in NewCourseDialog. Named in prose rather than as a structured key, the way buildOutputLocation names its sources, because nothing reads such a key and a rename would rot it silently.",
+    "whyThisOneString": "It is the first thing a teacher presses in this app. Both platforms have said Create Course since the wizard existed and nothing pinned it until 2026-09-08 — Windows asserted it only in NewCourseWizardUiTests, which is opt-in behind PLANTOIR_UI_TESTS=1 and part of no gate, and the mac asserted it nowhere. Two apps agreeing by habit is not two apps agreeing on purpose; the first notice of a drift would have been a teacher reading a different button from the one in the other platform's screenshots.",
+    "gatedTests": "Each platform's GATED test compares its constant to this key, which pins the constant rather than the rendered button. Only the UI suites see the button itself, and both are opt-in and part of no gate — QuartzTeachersUITests on the mac, [UiFact] under PLANTOIR_UI_TESTS=1 on Windows. Said plainly because the first version of this entry called Windows' arrangement the weakest place a shared sentence can live while the mac had the same arrangement and one fewer test."
   },
   "workingFolderPathBar": {
     "actions": [
@@ -1196,7 +1358,7 @@
         "placeholderWhenNone": "Your curriculum folder",
         "what": "Your curriculum expectations",
         "why": "One page per expectation. The curriculum map is built from these — without them there is nothing to measure your lessons against, and the map is left out.",
-        "whyPlaceholder": "The NAME is the only thing that changes: \"Your curriculum folder\" is the single piece of text in the sheet allowed to describe rather than name, and only for a course that has no such folder at all. The explanation beside it does not change - a course with no expectations needs to hear the same thing about what they are for. The mac used to add a SECOND sentence here (\"One page per expectation, in a folder whose name mentions the curriculum\"), which this contract deliberately never carried: it publishes the matching rule in plain words, which is what saysNoMachinery exists to stop. Retired on the mac 2026-09-06, so both apps now say exactly what is above. It survived unnoticed for a fortnight because \"mentions\" is not a banned word and every fixture course had a curriculum folder, so the branch never ran in a test - which is why the case list below now includes a course that has none."
+        "whyPlaceholder": "The NAME is the only thing that changes: \"Your curriculum folder\" is the single piece of text in the sheet allowed to describe rather than name, and only for a course that has no such folder at all. The explanation beside it does not change - a course with no expectations needs to hear the same thing about what they are for. The mac used to add a SECOND sentence here (\"One page per expectation, in a folder whose name mentions the curriculum\"), which this contract deliberately never carried: it publishes the matching rule in plain words, which is what saysNoMachinery exists to stop. Retired on the mac 2026-09-06, so both apps now say exactly what is above. It survived unnoticed for a fortnight because \"mentions\" is not a banned word and every fixture course had a curriculum folder, so the branch never ran in a test - which is why the case list below now includes a course that has none. The row check must run every one of those cases, so that the explanation beside the placeholder is compared with the one above it character for character: the case list on its own pins only the NAME, which is how a restored second sentence still passed every folders-help test on the mac as late as 2026-09-06, measured by putting it back. Both apps have done this since 2026-09-08 - the mac from 2026-09-06, Windows on closing item 40 in documentation/."
       },
       {
         "key": "graded",
@@ -1375,7 +1537,7 @@
         "expectNames": {
           "curriculum": "Ontario Curriculum"
         },
-        "why": "PROPOSED FROM WINDOWS, 2026-09-06; adopted by the mac the same day - see the ledger in MAC-HANDOFF.md. The build finds this course's curriculum folder perfectly well without the key being set, so the sheet must name it. Showing the placeholder here would tell a teacher to go and create a folder they already have, which is the one failure a sheet about folder names cannot afford."
+        "why": "PROPOSED FROM WINDOWS, 2026-09-06; adopted by the mac the same day - see the ledger in documentation/. The build finds this course's curriculum folder perfectly well without the key being set, so the sheet must name it. Showing the placeholder here would tell a teacher to go and create a folder they already have, which is the one failure a sheet about folder names cannot afford."
       },
       {
         "name": "a recorded name the course no longer has is not shown",
@@ -1419,6 +1581,17 @@
     ]
   },
   "specialNames": {
+    "platformWording": {
+      "keys": [
+        "renameFolder.explanation",
+        "renameFolder.doneNothingWasThere",
+        "removeLeavesTheFolderOnDisk.message"
+      ],
+      "mac": "on your Mac",
+      "windows": "on this PC",
+      "note": "These three sentences name the machine, and the two apps deliberately say it differently — the same choice already recorded for the launcher markers in app-rules.json → markerOrigins.knownDivergence. The contract stores the MAC spelling because the contract is written here; Windows says 'on this PC' and is not drifting by doing so. There are THREE, and which record missed which is worth being exact about, because two passes at this paragraph got it wrong in opposite directions. Issue #102 named two of them — renameFolder.explanation and doneNothingWasThere — and not removeLeavesTheFolderOnDisk.message. The mac's OWN log had all three from 2026-09-01 (GUI-IMPROVEMENTS.md rows 388 and 389, which name explanation with removeLeavesTheFolderOnDisk and then doneNothingWasThere), six days before Windows' FolderRenameApplyTests began substituting on the third. So nothing here was behind the code: one Windows-authored issue body was incomplete, and this block is simply the first place all three are named together as a rule rather than as log entries.",
+      "whyThisIsHere": "Two failures, both already met elsewhere in these contracts — app-rules.json → markerOrigins.knownDivergence records exactly this kind of deliberate platform difference, and is READ by MilestoneContractTests on Windows rather than merely written down. Without a record, the next reader compares the two apps, finds a difference, concludes one of them drifted, and 'fixes' it. And a contract-driven test asserting the stored sentence verbatim would put the word Mac in front of a Windows teacher — a test enforcing a bug, which is the one outcome nobody wants. A suite asserting these keys must compare everything EXCEPT the platform word, or assert its own platform's spelling. That is a proven pattern rather than a proposal: SpecialFolderRenamerTests.TheTwoPlatformWordedSentencesSayThisPcRatherThanYourMac and FolderRenameApplyTests both do it on Windows, comparing against this file with .Replace(\"on your Mac\", \"on this PC\"). On the mac, SharedRulesContractTests.testPlatformWordedKeysAreComplete pins the keys list itself: a fourth specialNames sentence containing the mac's platform word cannot be added without this record going red. It pins the RECORD rather than the behaviour, and the difference matters — nothing on Windows reads keys today, so a fourth sentence fails the mac and still leaves a Windows test to be written by hand. Driving those two Windows tests off this list, instead of naming sentences one at a time, is what would make it load-bearing."
+    },
     "excludedFolderIndexNote": {
       "noteBody": "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings.",
       "sentinelEnd": "<!-- plantoir:excluded-folder-note:end -->",
@@ -1485,6 +1658,10 @@
       "doneRelinkedMany": "{count} pages had links pointing into it, and they now point at the new name.",
       "doneRelinkedNone": "No page linked into it by name, so nothing else needed changing.",
       "doneNothingWasThere": "There was no folder by that name on your Mac, so only this course’s settings changed. Make it in Obsidian when you need it.",
+      "interruptedRename": {
+        "message": "Plantoir started renaming \u201c{old}\u201d to \u201c{new}\u201d and did not finish \u2014 the folder has its new name, but this course\u2019s settings still use the old one. Press Rename to finish.",
+        "why": "Proposed from Windows 2026-09-07. A rename interrupted after the folders moved is picked up the next time the sheet opens (the record under courses/.internal/renames names the target), and the field is filled in with that name so finishing is one keypress. The mac pre-fills silently; a filled-in field with nothing said leaves the teacher wondering why, and a modal on opening Course Settings would interrupt somebody who came for something else. One line, in the sheet, is the middle. The mac may adopt it or say why not."
+      },
       "carriesAcross": [
         "shared_folders",
         "per_section_folders",
@@ -1513,7 +1690,7 @@
           "leaveUnescaped": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'?",
           "onceEscapingIsTriggeredEncodeEverythingElse": "Nothing is encoded unless a name needs it — see needsEscapingInAMarkdownLink — or the old segment arrived encoded. `Café` goes into a link as `Café`; `Café Notes` goes in as `Caf%C3%A9%20Notes`. Both resolve; the Markdown parser normalises the first to `Caf%C3%A9` itself. Reading this key as “always encode” is the way the two apps would drift, so there is a case for it below.",
           "why": "Neither macOS’s `urlPathAllowed` nor .NET’s `Uri.EscapeDataString` is right, and both were tried. Quartz v4.5.0 resolves an internal link with `decodeURI` (`quartz/util/path.ts`, `transformInternalLink`), and `decodeURI` deliberately leaves the reserved set `; / ? : @ & = + $ , #` still encoded. It then slugs what comes back, turning `&` into `-and-` and `%` into `-percent` (`sluggify`, same file). So a folder called “Tasks & Quizzes” written as `Tasks%20%26%20Quizzes` decodes to `Tasks %26 Quizzes` and slugs to `Tasks--percent26-Quizzes`, while the real folder slugs to `Tasks--and--Quizzes`: a 404 on the published site, and invisible in Obsidian, which decodes `%26` perfectly well. The set here is what JavaScript’s `encodeURI` leaves alone, minus three — `(` and `)` close a destination, `#` starts a heading — and minus `/` and `:`, which the rename sheet refuses anyway. **`?` was excluded at first and was put back**, on the reasoning that a bare `?` is a query delimiter to any other reader of the file. That was never a rule the code applied — `?` is not in needsEscapingInAMarkdownLink, so `Why?` always went in unescaped — and it was measurably wrong when escaping DID run: `sluggify` strips a `?`, so the real folder `Why Not?` slugs to `Why-Not`, an unescaped `Why%20Not?` slugs to the same and resolves, and the escaped `Why%20Not%3F` slugs to `Why-Not-percent3F` and 404s. Excluding it meant a folder resolved when it was called `Why?` and not when it was called `Why Not?`. Verified against the running image 2026-09-06: `decodeURI` turns `Work%28new%29` into `Work(new)`, `Top%2010%25` into “Top 10%”, `Caf%C3%A9%20Notes` into “Café Notes”, and leaves `C%2B%2B` alone.",
-          "windowsMustReplaceEscapeDataString": "`Uri.EscapeDataString` keeps only `A-Za-z0-9-._~`, so it over-encodes `&`, `,`, `+`, `'`, `!` and `*` — every one of which `decodeURI` then leaves alone and `sluggify` turns into `-percent…`. **Three of the eleven cases fail on Windows today** — the ampersand, the comma and the question mark — and all three are fixed by the same single change: replace `EscapeDataString` in `Spelled` with an encoder driven by `leaveUnescaped`. The comma is the one to notice: “Unit 1, Day 2” is this project’s own naming pattern, and Windows writes `Unit%201%2C%20Day%202`, which slugs to `Unit-1-percent2C-Day-2` and 404s. The per-cent case passes there already — `Top 10%` triggers escaping on its space, and `EscapeDataString` encodes the `%` too — so do NOT add `%` to WouldBreakAMarkdownTarget."
+          "windowsMustReplaceEscapeDataString": "`Uri.EscapeDataString` keeps only `A-Za-z0-9-._~`, so it over-encodes `;`, `,`, `@`, `&`, `=`, `+`, `$`, `?`, `'`, `!` and `*`. **Only the first eight of those actually break a link**, and the distinction is worth keeping straight: `decodeURI` leaves exactly `; / ? : @ & = + $ , #` encoded, so those come back as `%XX` and `sluggify` turns each into `-percent…`, while `%27`, `%21` and `%2A` decode back to `'`, `!` and `*` and resolve fine — over-encoding them is noise rather than a 404. (An earlier draft of this note said all eleven broke. They do not, and the same encoder is still the right answer, because the eight that DO break include the two that will happen.) **Done on Windows 2026-09-07** (documentation/06-quartz-customizations.md): `Spelled` now calls a `PercentEncoded` driven by `leaveUnescaped`, in BOTH of its branches, and `FolderPathRewriterTests` deserialises every case below rather than retyping five of them. Three cases had been failing there — the ampersand, the comma and the question mark. The comma is the one that was going to bite: “Unit 1, Day 2” is this project’s own naming pattern, and Windows wrote `Unit%201%2C%20Day%202`, which slugs to `Unit-1-percent2C-Day-2` and 404s. The per-cent case passed there even before the fix — `Top 10%` triggers escaping on its space, and `EscapeDataString` encodes the `%` too — so do NOT add `%` to WouldBreakAMarkdownTarget. Kept here rather than deleted because the reasoning is what stops the encoder being “simplified” back to the framework call."
         },
         "cases": [
           {
@@ -1587,6 +1764,13 @@
             "why": "A name outside plain ASCII is still left alone when nothing about it needs escaping. Reading `leaveUnescaped` as “encode everything else, always” would give `Caf%C3%A9` here and make the two apps write different text for the same rename, with no case to catch it."
           },
           {
+            "given": "[q](All%20Tasks/Quiz.md)",
+            "oldName": "All Tasks",
+            "newName": "Q&A",
+            "expect": "[q](Q&A/Quiz.md)",
+            "why": "The OTHER branch of the same rule, and the only case that reaches it. A segment that ARRIVED percent-encoded goes back percent-encoded even when the new name needs nothing — and it goes back through the SAME encoder, so an ampersand is left as it stands here too. Every other case that escapes at all is triggered by a space or a bracket, and the two that escape nothing (`Assignments`, `Café`) reach no encoder — so a `Uri.EscapeDataString` left behind in this branch alone would spell `Q%26A` and still pass all eleven of them. Proposed from Windows 2026-09-07 while replacing that encoder; both apps already behave this way — `spelled(_:likeThe:in:)` calls `percentEncoded` in both branches — so it should be green on the mac the day it is read."
+          },
+          {
             "given": "[q](Tasks/Quiz.md)",
             "oldName": "Tasks",
             "newName": "Top 10%",
@@ -1604,6 +1788,10 @@
     "removeLeavesTheFolderOnDisk": {
       "message": "“{name}” and everything in it stays on your Mac — this only takes it off your website. Add it back here to include it again.",
       "why": "Removal excludes; it has never deleted anything, and teachers could not tell. Saying so is what makes the button safe to press, and it is also the sentence that explains why a folder they “removed” is still sitting in Obsidian. Deleting the folder was rejected outright: it holds the teacher’s work, and no button in Settings should be able to destroy it."
+    },
+    "contentStructureTip": {
+      "message": "Tip: you can also simply create new folders and files in Obsidian — they’re added to your site automatically the next time you preview. The exception is anything you remove here: it stays off your site, even if you make it again in Obsidian, until you add it back here.",
+      "why": "The caption under the four Content Structure lists in Course Settings. Proposed from Windows 2026-09-07, resolving a divergence: the two apps had worded the same rule differently since the day it was written (the mac in row 375, 2026-08-24; Windows a day later in its parity pass, because row 375’s Windows-notes cell never mentioned the callout), and neither sentence was pinned. Both halves matter. The FIRST is the promise that a teacher need not come here at all — preflight discovery appends anything new it finds at the top level. The SECOND is the one rule a teacher cannot infer and is not told anywhere else on this page: an exclusion is name-based and does not expire, so a folder removed here stays off the site even if it is deleted and made again in Obsidian, and only this page can undo it. That became more consequential, not less, after excluded_items was made authoritative at build time (GUI-IMPROVEMENTS row 377, the same day): preflight now DROPS an excluded name it finds back in a copy list. The mac’s wording said the exception in a six-word bracket — “(unless you have removed them here)” — and named no remedy; that was rejected as under-weight for a permanent, silent rule with a single escape. Windows’ wording was adopted with two changes. “on this page” became “here”, because the sibling sentence removeLeavesTheFolderOnDisk already says “Add it back here to include it again” and Windows was using two names for one place in one sentence; “in these lists” was rejected as more precise but breaking that parallel, and because no Plantoir sentence calls a mac Form a page. And “folders” became “folders and files”, because the caption sits under FOUR lists of which two are file lists, and the behaviour is identical for files — discovery appends top-level files (discover_shared_items / discover_section_items) and exclusion skips and drops them (build_site.py). Both apps had promised only the folder half, so a teacher who removed a file got the permanent, silent behaviour with nothing anywhere warning them. “pages” was rejected for the widened clause: discovery is not limited to .md, and “files” is the word the four list labels above the caption already use. ONE KNOWN EDGE, named here rather than papered over: “even if you make it again in Obsidian” is true when the name is remade as it was, which is the realistic case, and not when it is remade with different capitalisation. That is not a defect in the matching — exact, case-included matching is the RULE, stated in this same file at gradedFolders.choices.walk.excludedItems (“the same way preflight matches”) and reasoned in GUI-IMPROVEMENTS row 412: a case-insensitive answer would have the app believe a folder is excluded while the build published it. So a teacher who removes “Old Tests” and later makes “old tests” does get it published. What IS inconsistent is that _dropping_excluded_items lowercases both sides while every other consumer matches exactly, so build_site.py gives two answers in one file. Tracked in TODO.md (“_dropping_excluded_items matches excluded names case-insensitively…”) and as issue #99, with the warning that case-folding the live path would break walk.excludedItems and re-introduce what row 412 rejected. Not resolved here: it is a build-behaviour decision wanting its own piece, its own contract case and a verify.sh run."
     },
     "curriculumFolderResolution": {
       "cases": [
@@ -1665,7 +1853,7 @@
     "whatWasNotObvious": "The three were not three copies of one rule - they were three PARTIAL rules, and picking any one of them as 'the' implementation would have shipped that one's blind spot everywhere. A working directory catches what a command line cannot (a child launched by a relative path carries no directory: `npm install` runs exactly that way). A command line catches what a working directory cannot: the Python driver itself, which never calls os.chdir and so sits in the container's own folder for the whole build. So the shared rule is a DISJUNCTION of evidences plus a walk down the process tree, and it stops strictly more than any of the three did on its own.",
     "modes": {
       "everything": "The launcher's `--stop`. The teacher, or the app, has ended a preview and the container-side work must be reclaimed: the server, the build, the driver, and every child of them. A mid-flight build is most of the point - ending the host-side script leaves it burning CPU for a preview nobody is waiting for any more.",
-      "servingOnly": "`build_site.py --build-only`. A build for PUBLISHING is about to start and the only thing that must go is the preview SERVER, which would otherwise overwrite what was just built about a second later through its own host mirror. A build must never be stopped here, because the build being protected is itself a build of this section. Implemented today by `build_site.py` inside the container, and there ONLY: run natively on Windows there is no `/proc`, the process list comes back empty and this does nothing, so the overwrite race is still live on that platform. That is a gap, not a decision — see WINDOWS-HANDOFF.md item 20."
+      "servingOnly": "`build_site.py --build-only`. A build for PUBLISHING is about to start and the only thing that must go is the preview SERVER, which would otherwise overwrite what was just built about a second later through its own host mirror. A build must never be stopped here, because the build being protected is itself a build of this section. Implemented by `build_site.py` on BOTH platforms: inside the container on the mac, and natively on Windows since 2026-09-05, when `stop_preview.read_snapshot()` became a dispatcher and gained a `Get-CimInstance Win32_Process` reader beside the `/proc` one. Before that there was no dispatcher, `/proc` was the only reader, and a native Windows run of this mode always came back with an empty process list — so the overwrite race this mode exists to prevent was live there, with nothing anywhere saying so. That is why the dispatcher is ONE function rather than a branch at each caller: a platform that keeps its process list somewhere else is then a change in one place, instead of a rule that quietly does nothing. See documentation/03-launcher-scripts.md."
     },
     "identity": {
       "evidences": [
@@ -1713,17 +1901,17 @@
       {
         "thing": "How a process is ended",
         "mac": "SIGTERM, then SIGKILL a second later - ask, then insist. A node server closes its sockets and a Python driver runs its own cleanup.",
-        "windows": "`Stop-Process -Force`. Windows has no SIGTERM to send, so there is nothing to ask with. Deliberately not shared rather than papered over: the rule is WHICH processes, not how they end."
+        "windows": "`Stop-Process -Force` in `preview.ps1`, and `os.kill` — reached indirectly, through `stop_preview.stop_one`, from `build_site.py`'s `servingOnly` sweep, which runs natively there too since 2026-09-05. The indirection is deliberate, and the reason lives in `build_site.py`'s own comment above the call rather than being copied here. On Windows `os.kill` is `TerminateProcess` whatever signal number it is handed, so both spellings end the process outright and there is nothing to ask with. Said precisely, because the short version is wrong: `signal.SIGTERM` DOES exist on Windows and `build_site.py` hands it to `os.kill` as the fallback where `SIGKILL` is absent — what Windows has no is SIGTERM's SEMANTICS, a signal a process can catch and shut down cleanly on. Deliberately not shared rather than papered over: the rule is WHICH processes, not how they end."
       },
       {
         "thing": "Which processes are even considered",
         "mac": "Every process in the list. The evidences below are the whole filter.",
-        "windows": "`node.exe` and `python.exe` only, for DIRECT evidence — a pre-existing narrowing in `preview.ps1`, recorded here rather than left to be discovered. It is a real difference: a `cmd.exe` running `npm.cmd` with the section's folder on its command line is direct evidence on the mac and is reached on Windows only if some matched process happens to be its ancestor. Worth revisiting there; not worth the mac pretending to have the same filter."
+        "windows": "Every process in the list, the same as the mac, since 2026-09-05. Until then `preview.ps1` narrowed DIRECT evidence to `node.exe` and `python.exe` — a pre-existing narrowing recorded here rather than left to be discovered, and then removed once it had been: it refused most of this contract's own fixtures (`python3`, `npm`, `esbuild`, `sh`), which is a filter failing its own test suite rather than a defensible difference. The judgement this entry used to leave open has been made, and it went the mac's way: a process carrying this section's build directory on its command line IS this section's process, whatever its executable is called."
       },
       {
         "thing": "How hard a publish build insists",
         "mac": "`servingOnly` sends SIGKILL at once rather than asking first. The preview server has to be gone BEFORE the build writes anything, and a second spent waiting politely is a second in which its host mirror can overwrite the build — which is the whole failure being prevented. `everything` asks first, because there a build's own cleanup is worth having.",
-        "windows": "`Stop-Process -Force` throughout; there is nothing to ask with."
+        "windows": "`Stop-Process -Force` in `preview.ps1`, and `os.kill` from `build_site.py`'s own native sweep; both end the process outright, because there is nothing to ask with. The question of how hard to insist does not arise on that platform — the first ask is already final."
       }
     ],
     "cases": [

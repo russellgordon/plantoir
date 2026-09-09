@@ -1,8 +1,12 @@
 import XCTest
 @testable import QuartzTeachers
 
-/// Runs `contracts/shared-rules.json` — five rule sets that both apps need and
+/// Runs `contracts/shared-rules.json` — the rule sets both apps need and
 /// neither platform owns.
+///
+/// Deliberately no count. This said "five" while the file held twenty, and the
+/// file's own note said "eight"; a number in prose beside a list that grows is
+/// a number that goes stale, and both of these proved it.
 ///
 /// Two of them sit on top of machinery that could not be less alike: launchd
 /// against Task Scheduler, AppKit against WinUI. That is the argument for
@@ -502,10 +506,14 @@ final class SharedRulesContractTests: XCTestCase {
 
         var wanted: [String] = []
         for entry in required {
-            wanted.append(try XCTUnwrap(entry["event"] as? String))
+            let event: String = try XCTUnwrap(entry["event"] as? String)
             // An event nobody explained is an event nobody can implement.
             XCTAssertNotNil(entry["carries"] as? String, "\(entry) has no 'carries'")
             XCTAssertNotNil(entry["why"] as? String, "\(entry) has no 'why'")
+
+            if SharedRulesContractTests.macMustRecord(entry) {
+                wanted.append(event)
+            }
         }
         wanted.sort()
 
@@ -517,6 +525,55 @@ final class SharedRulesContractTests: XCTestCase {
             "The trail and the contract disagree. Add the event to ActivityTrail.Event, "
             + "or to contracts/shared-rules.json, whichever is behind."
         )
+    }
+
+    /// Whether a `mustRecord` entry is one the MAC has to record.
+    ///
+    /// `appliesOn` names the platforms an event belongs to; an entry without
+    /// it belongs to both.
+    ///
+    /// **Honouring it is not a loosening**, and that is the part worth
+    /// keeping. The assertion in the test above is still EQUALITY, so an event
+    /// this app records and the contract does not still fails, and so does a
+    /// both-platform event the app has forgotten. All this does is stop one
+    /// platform's event reddening the other's suite forever.
+    ///
+    /// Windows added the same filter to its twin first, and its reason is the
+    /// one that matters: the mac's own `built site moved out of the working
+    /// folder` is `appliesOn: ["mac"]`, and until Windows filtered it, it held
+    /// the WINDOWS suite red no matter what was implemented there — and a test
+    /// that cannot go green stops being read. The mac met the mirror image on
+    /// 2026-09-07, the day Windows proposed its first windows-only event.
+    ///
+    /// There is no windows-only entry in the contract as this is written —
+    /// `section restored` dropped its `appliesOn` when the mac adopted it —
+    /// so `SectionRestoredTrailTests` exercises this with entries of its own
+    /// rather than leaving it to be discovered wrong by whoever adds the next
+    /// one. (Windows' filter is still exercised by the data, because the
+    /// mac-only `built site moved out of the working folder` remains.)
+    ///
+    /// **Anything it cannot READ as a platform list means "both".** Not just a
+    /// value of the wrong type: an EMPTY list, or one naming no platform this
+    /// knows — `["macos"]`, `["Mac"]`, a typo like `["windwos"]` — would
+    /// otherwise excuse the event from both suites at once, silently, which is
+    /// the exact failure the list exists to prevent. Erring towards "required"
+    /// makes a typo show up as a red suite naming the event, which is a
+    /// five-minute fix; erring the other way makes it disappear, which is
+    /// nobody's five minutes because nobody finds out.
+    static func macMustRecord(_ entry: [String: Any]) -> Bool {
+        guard let platforms = entry["appliesOn"] as? [String] else {
+            return true
+        }
+        var namesAPlatformThisKnows: Bool = false
+        for platform in platforms {
+            if platform == "mac" || platform == "windows" {
+                namesAPlatformThisKnows = true
+            }
+        }
+        if !namesAPlatformThisKnows {
+            return true
+        }
+        return platforms.contains("mac")
     }
 
     /// The teacher's own words are behind a fixed prefix so a report can drop
@@ -588,6 +645,28 @@ final class SharedRulesContractTests: XCTestCase {
             )
         }
         return store
+    }
+
+    // MARK: - The New Course wizard's words
+
+    /// The button a teacher presses to make a course says what the contract says.
+    ///
+    /// AUTHORED rather than generated, deliberately. Were this key written by
+    /// `--write-contracts`, changing the button would rewrite the contract to
+    /// match it and this test could never fail — which is the difference
+    /// `AppRulesContract` draws between a readout and an expectation, and the
+    /// reason this one is written by hand.
+    func testTheWizardsCreateButtonIsTheOneInTheContract() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("wizard")
+
+        XCTAssertEqual(
+            WizardWording.createCourseButton,
+            section["createCourseButton"] as? String,
+            "The wizard's affirmative button and contracts/shared-rules.json → wizard "
+            + "disagree. Both apps show this button and have said the same word since "
+            + "the wizard existed; change it in the contract and in both apps, or not "
+            + "at all."
+        )
     }
 
     // MARK: - The working-folder path bar
@@ -664,6 +743,105 @@ final class SharedRulesContractTests: XCTestCase {
     }
 
     // MARK: - Special names and folder protections
+
+    /// The record of platform-worded sentences is COMPLETE, not a snapshot.
+    ///
+    /// `platformWording.keys` names every `specialNames` sentence containing the
+    /// mac's platform word, so the other platform's suite can substitute its own
+    /// word rather than assert the mac's.
+    ///
+    /// It pins the RECORD, not the behaviour, and the difference is worth
+    /// stating: nothing on Windows reads `keys` today — its two tests name the
+    /// sentences one at a time — so a fourth sentence fails HERE and still
+    /// leaves a Windows test to be written by hand. What this buys is that the
+    /// list cannot silently fall behind the contract it describes.
+    ///
+    /// The provenance, because two passes at the surrounding note got it wrong
+    /// in opposite directions: issue #102 named two of the three, the mac's own
+    /// log had all three from 2026-09-01 (GUI-IMPROVEMENTS.md rows 388-389),
+    /// and Windows began substituting on the third on 2026-09-07. The list was
+    /// never wrong; one issue body was.
+    func testPlatformWordedKeysAreComplete() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let platformWording: [String: Any] = try XCTUnwrap(section["platformWording"] as? [String: Any])
+        let macWord: String = try XCTUnwrap(platformWording["mac"] as? String)
+
+        var found: [String] = []
+        collectKeyPaths(saying: macWord, in: section, prefix: "", into: &found)
+        found.sort()
+
+        var recorded: [String] = try XCTUnwrap(platformWording["keys"] as? [String])
+        recorded.sort()
+
+        // Both empty is the one way this passes having checked nothing: an
+        // emptied `mac` matches nothing, and an emptied `keys` expects nothing.
+        // MilestoneContractTests guards its mirror of this the same way.
+        XCTAssertFalse(
+            found.isEmpty,
+            "No specialNames sentence contains the platform word \"\(macWord)\", so this "
+            + "test would pass against an empty record. Either the word changed or "
+            + "platformWording.mac is wrong."
+        )
+
+        XCTAssertEqual(
+            found,
+            recorded,
+            "The specialNames sentences containing \"\(macWord)\" are not the ones "
+            + "platformWording.keys names. Add the new sentence to that list — and note "
+            + "that doing so does not give it a Windows test, which still has to be "
+            + "written by hand, because nothing over there reads this list yet."
+        )
+    }
+
+    /// Every dotted key path under `node` whose string value contains `phrase`.
+    ///
+    /// `platformWording` itself is skipped: it QUOTES the platform word as its
+    /// own `mac` value and in its explanation, so walking it would make the
+    /// list contain itself and the test would pass by accident.
+    ///
+    /// ARRAYS are walked too. No array under `specialNames` carries a
+    /// platform-worded sentence today, but this contract's established shape
+    /// puts teacher sentences inside arrays of cases — `renameFolder`
+    /// .`linkRewriting`.`cases` and `curriculumFolderResolution`.`cases` are
+    /// both here already — so a fourth sentence added as a case would otherwise
+    /// be invisible to a test whose whole purpose is to notice a fourth
+    /// sentence.
+    private func collectKeyPaths(
+        saying phrase: String,
+        in node: [String: Any],
+        prefix: String,
+        into found: inout [String]
+    ) {
+        for (key, value) in node {
+            if prefix.isEmpty && key == "platformWording" {
+                continue
+            }
+            let path: String = prefix.isEmpty ? key : "\(prefix).\(key)"
+            collectKeyPaths(saying: phrase, inValue: value, path: path, into: &found)
+        }
+    }
+
+    /// One value of any shape, on the way to the strings inside it.
+    private func collectKeyPaths(
+        saying phrase: String,
+        inValue value: Any,
+        path: String,
+        into found: inout [String]
+    ) {
+        if let text = value as? String {
+            if text.contains(phrase) {
+                found.append(path)
+            }
+        } else if let child = value as? [String: Any] {
+            collectKeyPaths(saying: phrase, in: child, prefix: path, into: &found)
+        } else if let items = value as? [Any] {
+            var index: Int = 0
+            for item in items {
+                collectKeyPaths(saying: phrase, inValue: item, path: "\(path)[\(index)]", into: &found)
+                index += 1
+            }
+        }
+    }
 
     func testSpecialNamesSentencesMatchContract() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("specialNames")

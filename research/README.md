@@ -32,7 +32,7 @@ vetoed and for what, and what the flags cost.
 | `HISTORY.md` | The narrative: the feasibility investigation, the build handoff, and the original MCP proposal, merged with a status block saying what has since been overturned. |
 | `macos-native-10-trial-comparison.txt` | **The model decision.** Ten models × 29 probes × 10 trials on one identical tool surface. The source of the 3B veto (two unrelated families inverting on the same sentence), and of Qwen3-4B replacing the 7B. Cited from `AssistModelTier.swift`. |
 | `reasoning-flag-measurement.txt` | Why thinking must be turned off with **two** flags, and why the fault hid for days: llama.cpp parses the thinking out of the reply, so only the token count and the clock show it. |
-| `tools-from-contract.py` | **Start here for a new measurement.** Writes the tool surface the suites take as input, read from `contracts/assist-cases.json` — which is generated from the app, so a run cannot be against a surface that does not ship. `local` (13 tools) is what the on-device model sees; `mcp` (23) is Claude Code's. |
+| `tools-from-contract.py` | **Start here for a new measurement.** Writes the tool surface the suites take as input, read from `contracts/assist-cases.json` — which is generated from the app, so a run cannot be against a surface that does not ship. `local` (13 tools) is what the on-device model sees; `mcp` (32) is Claude Code's. |
 | `thirteen-tool-surface-results.txt` | The **current** shipping surface, 42 probes × 10 trials on both tiers. Also records the description-steer regression: fixing one probe in a tool description broke three others. |
 | `shelf-phrasings-results.txt` | **Every phrasing the assistant window offers**, word for word, 14 × 10 trials — the evidence the shelf is allowed to promise them. Also records a harness fault worth more than the result: measured without `AssistAgent.dateline()`, "Publish the class on Monday" resolved to a date a month away 10/10 and nearly cost a good card. |
 
@@ -46,10 +46,26 @@ vetoed and for what, and what the flags cost.
 
 **The harnesses** — `shelf-phrasings-suite.py` (the shelf, with the app's own system prompt AND its dateline), `trimmed-surface-suite.py` (the 29-probe suite the
 Windows-comparable numbers come from), `shipped-surface-suite.py`,
-`routing-suite.py`, `adversarial-suite.py`, `narrow-tools.py` (the real
-narrowing code, so a surface under test is the shipped one), and two
+`teachers-say-suite.py` (**Windows**, 25 probes: what the `TEACHERS SAY:`
+clauses on two tools are worth, before and after, with fifteen controls for
+the collateral damage a description change has caused before),
+`routing-suite.py`, `adversarial-suite.py`, `narrow-tools.py` (a hand copy of
+the real narrowing code, so a surface under test is the shipped one), and two
 PowerShell helpers for dumping a live tool list. The 42-probe suite that
 produced the newest results file was not committed; its results were.
+
+**`narrow-tools.py` was a hand copy that silently went stale, and now is not.**
+It was right when committed on 2026-08-14 and wrong from 2026-08-17, when
+`AssistAgent.ForTheLocalModel` went from fifteen names to thirteen and the
+Python was not followed through — so it kept narrowing to four `plan_` tools
+the app no longer shows and missing the two it had gained. Nothing could
+catch that: a research script is run by hand, months apart. Since 2026-09-08
+`NarrowToolsMirrorTests` in the Windows suite fails when the two lists differ,
+which is the only way a file like this stays honest. The three results files
+measured inside that 2026-08-14 to 17 window are sound; anything taken through
+it AFTER 2026-08-17 is not. **The general lesson, for any harness here:** a
+number is only as good as the surface it was taken against, and a hand copy of
+a shipping list needs something that runs on every commit to hold it in place.
 
 **To re-run any of it**: start `llama-server` by hand with the flags in the
 results file's header, point the suite at it, and compare like for like — the
