@@ -282,6 +282,15 @@ Recreating the container is cheap because all state lives in the bind mount.
     temp file (`umask 077`) and reading it inside the `docker exec` shell
     into the `NETLIFY_AUTH_TOKEN` environment variable — it never appears in
     a process argument list on the host.
+- **`--non-interactive` makes every question above REFUSE** rather than ask.
+  For a publish set to happen on its own, where nobody is there to answer: the
+  course-code correction, the Cloudflare Account ID and both token prompts each
+  say which question they could not ask and exit **3**, a code meaning that and
+  nothing else. The flag is FORWARDED to `deploy.py` as well, because the
+  question that matters most — what the website should be called — is
+  asked there. `deploy.sh` looks for it twice: once in a pre-scan before the
+  course-code guard, which asks before the flag loop runs, and once in the loop.
+  `deploy.ps1` needs no pre-scan, parsing its flags first.
 - Finally runs `deploy.py` inside the container
   (see [Deployment](07-deployment.md)).
 

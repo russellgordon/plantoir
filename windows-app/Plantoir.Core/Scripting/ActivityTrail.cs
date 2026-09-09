@@ -147,6 +147,20 @@ public static class ActivityTrail
         /// describing this branch.
         /// </summary>
         SectionKeptItsWebsite,
+        /// <summary>
+        /// A publish set to happen on its own stopped because it needed an
+        /// answer. Carries the course, the section and which destination
+        /// stopped — never the question's own text.
+        /// </summary>
+        /// <remarks>
+        /// The one thing that can happen to a scheduled publish that a teacher
+        /// would otherwise never find out about: it runs with the app closed,
+        /// so a question it could not ask is seen by nobody. The question's
+        /// TEXT is deliberately left out — it comes from a launcher's console,
+        /// and a line naming a credential prompt would put a teacher's own
+        /// words on the trail.
+        /// </remarks>
+        ScheduledPublishNeededAnAnswer,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -191,6 +205,7 @@ public static class ActivityTrail
         Event.RemovalBlocked => "removal blocked",
         Event.SectionStartedANewWebsite => "section started a new website",
         Event.SectionKeptItsWebsite => "section kept its website",
+        Event.ScheduledPublishNeededAnAnswer => "scheduled publish needed an answer",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

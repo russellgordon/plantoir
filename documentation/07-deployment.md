@@ -72,6 +72,20 @@ site name encodes everything a teacher needs to recognize it later:
   (Netlify site names are global) trigger a retry prompt with an
   auto-suggested `-02`, `-03`, … suffix.
 
+**None of those questions may be asked of a publish that runs on its own**, and
+`--non-interactive` is how that is enforced. A scheduled publish runs at half
+six with the app closed, so a question it puts to a teacher is put to nobody,
+and both ways that ended have been seen: with a terminal `input()` BLOCKS —
+measured at 45 minutes — and without one `prompt()` returns its DEFAULT
+silently, so the site is created at an address nobody chose. Under the flag
+every question refuses instead, saying which one it could not ask and exiting
+**3**, a code that means that and nothing else. Both launchers take the flag and
+FORWARD it, since the site-name question lives in the Python; both also guard
+their own four prompts (the "Open" course-code correction, the Cloudflare
+Account ID, and the two token prompts) with it. Nothing changes without the
+flag: a teacher at a keyboard gets every prompt they got before. See
+`contracts/app-rules.json` → `launcherFlags.deployExtras`.
+
 The created site's identity is saved as a **marker file** at
 `courses/<CODE>/.netlify_sites/section<N>.json` so subsequent deploys go to
 the same site. (An older layout stored the marker inside the merged output —

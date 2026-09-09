@@ -448,6 +448,15 @@
     },
     "deployExtras" : [
       {
+        "flag" : "--non-interactive",
+        "meaning" : "Refuse rather than ask. Every question this publish could put to a teacher is answered by stopping, saying which question it was, and exiting 3.",
+        "usedFor" : [
+          "a publish set to happen on its own"
+        ],
+        "why" : "A scheduled publish runs at half six with the app closed, so every question is one NOBODY will answer, and both ways that ended have been seen. With a terminal, deploy.py's `input()` BLOCKS — measured at 45 minutes, the launcher and its Python child still waiting when they were swept up, and the teacher's site simply not updated in the morning with nothing said. Without one, `prompt()` returns its DEFAULT silently and a Netlify name conflict auto-suffixes, so the site is published to an address nobody chose. Exit code 3 means \"a question went unanswered\" and nothing else, so a caller can tell it from an ordinary failure and say something true to the teacher; every other exit in deploy.py and in both launchers is 0 or 1. PASSED BY THE SCHEDULED WRAPPER, never by the app's Deploy button — whether anybody is there to answer is a fact about who is RUNNING, not about the course, which is why it is not in `deployArguments`. Parsing it is not enough: both launchers must FORWARD it to deploy.py, where the site-name question lives.",
+        "asymmetry" : "deploy.sh looks for this flag TWICE — once in a pre-scan before its 'Open' course-code guard, which asks a question before the flag loop runs, and once in the loop itself. deploy.ps1 needs no pre-scan: it parses its flags first and asks afterwards."
+      },
+      {
         "flag" : "--diagnose",
         "meaning" : "Print what the deploy would do and why it thinks so.",
         "usedFor" : [

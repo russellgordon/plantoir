@@ -401,6 +401,13 @@ public sealed partial class SectionDetailView : UserControl
     private void TakeAnythingTheScheduledDeployFound()
     {
         if (_healthDialogIsUp || _healthQueue.PendingCount > 0) return;
+        // BEFORE the folder problems are queued, not after. Both end up on the
+        // dispatcher and WinUI allows one ContentDialog at a time, so whichever
+        // is second is the one that cannot be shown — and this one is the more
+        // urgent of the two: a publish that did not happen beats a slightly
+        // inaccurate curriculum map. The put-back above covers the case where
+        // it loses the race anyway.
+        TakeAnyQuestionTheScheduledPublishCouldNotAsk();
         try
         {
             var waiting = ScheduledHealthFindings.Take(_course.Code, _sectionNumber);
@@ -409,6 +416,72 @@ public sealed partial class SectionDetailView : UserControl
         catch (Exception ex)
         {
             App.LogDiagnostic($"TakeAnythingTheScheduledDeployFound exception: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Tell the teacher their overnight publish stopped for a question nobody
+    /// was there to answer.
+    ///
+    /// <para>Read here for the same reason the folder problems are: the run
+    /// happened with the app closed, so this is the first moment there is
+    /// anybody to say it to. The record is CONSUMED as it is read, so it is
+    /// said once rather than every time the app opens, and a later run that
+    /// gets through clears it, so a question the teacher has since answered
+    /// stops being reported.</para>
+    ///
+    /// <para>The TRAIL line is written here too, dated to when the RUN wrote
+    /// the record rather than to this morning — a trail that dated an overnight
+    /// problem to whenever somebody happened to open the app would file it
+    /// under the wrong night. Nothing else records it at all: the run happened
+    /// with the app closed.</para>
+    /// </summary>
+    private void TakeAnyQuestionTheScheduledPublishCouldNotAsk()
+    {
+        ScheduledPublishQuestion.Unanswered? stopped;
+        try { stopped = ScheduledPublishQuestion.Take(_course.Code, _sectionNumber); }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"TakeAnyQuestionTheScheduledPublishCouldNotAsk exception: {ex}");
+            return;
+        }
+        if (stopped is null) return;
+
+        ActivityTrail.Note(
+            ActivityTrail.Event.ScheduledPublishNeededAnAnswer,
+            $"the publish set to happen on its own stopped — {stopped.Destination} needed an answer",
+            _course.Code, _sectionNumber, stopped.When);
+
+        string said = ScheduledPublishQuestion.Sentence(_course.Code, _sectionNumber, stopped.Destination);
+        bool queued = DispatcherQueue.TryEnqueue(async () =>
+        {
+            var shown = await ShowDialogSafelyAsync(new ContentDialog
+            {
+                Title = "Your scheduled publish did not go out",
+                Content = said,
+                CloseButtonText = "OK",
+            });
+            // NOT SHOWN MEANS NOT DELIVERED, and the record is already gone.
+            // WinUI allows one ContentDialog at a time, so a folder-problem
+            // dialog queued a moment earlier makes ShowAsync throw;
+            // ShowDialogSafelyAsync swallows it and answers null. Without this,
+            // an overnight run that produced BOTH a folder problem and a
+            // stopped publish told the teacher only about the first, for ever.
+            // The folder-problem queue puts its own batch back for the same
+            // reason. Put back with its original moment, so the next morning's
+            // reading still dates it to the night it happened.
+            if (shown is null)
+            {
+                ScheduledPublishQuestion.PutBack(_course.Code, _sectionNumber, stopped);
+                App.LogDiagnostic("Put the scheduled-publish question back: no dialog could be shown.");
+            }
+        });
+        // A refused enqueue means the dispatcher is shutting down. Put it back
+        // here too — the callback above will never run to do it.
+        if (!queued)
+        {
+            ScheduledPublishQuestion.PutBack(_course.Code, _sectionNumber, stopped);
+            App.LogDiagnostic("Could not show the scheduled-publish question: " + said);
         }
     }
 
