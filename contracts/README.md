@@ -92,12 +92,24 @@ classified because the line is still printed and a future list may want it.
 Two more — `"Example Course installed to"` and `"EXAMPLE_COURSE_CODE="` — went
 unclassified until 2026-09-06, and how is worth knowing, because the mechanism
 can hide any marker. Both apps have an example-course task and always did
-(`TaskMilestones.exampleCourse`), but `AppRulesContract.milestones()` does not
-list it, so the generated `milestones` readout has eight tasks where the mac
-has nine. The mac's classification test walks the READOUT, so a marker missing
-from it is invisible to the test however loudly the shared script prints it —
-and the classification is only as complete as the readout it is checked
-against.
+(`TaskMilestones.exampleCourse`), but `AppRulesContract.milestones()` kept its
+OWN array naming eight of the nine and did not list it — so the generated
+`milestones` readout had eight tasks where the mac had nine. The mac's
+classification test walks the READOUT, so a marker missing from it is invisible
+to the test however loudly the shared script prints it, and the classification
+is only as complete as the readout it is checked against.
+
+**Closed on 2026-09-08** (issue #82). The readout is now built from
+`TaskMilestones.allLists`, a single list of every task, rather than from a
+second hand-kept copy of what to read — so it cannot omit a task that exists,
+and `AppRulesContractTests.testEveryMilestoneListReachesTheReadout` pins the
+readout to that list in case a future change reintroduces a private copy.
+
+One hole is deliberately left open and is worth knowing about: a new
+`static let` added to `TaskMilestones` and NOT added to `allLists` is still
+invisible, because Swift cannot enumerate an enum's static properties at
+runtime. Windows' `AllLists` has the identical gap. Adding a task means adding
+it in both places, on both platforms.
 
 ## Proposing a case from the Windows side
 

@@ -91,16 +91,10 @@ enum AppRulesContract {
     /// Python, so it is a fact about the toolchain rather than about either
     /// app, and both apps must match the same strings.
     private static func milestones() -> [String: Any] {
-        let lists: [(String, [TaskMilestone])] = [
-            ("courseCreation", TaskMilestones.courseCreation),
-            ("preview", TaskMilestones.preview),
-            ("deploy", TaskMilestones.deploy),
-            ("buildAndDeploy", TaskMilestones.buildAndDeploy),
-            ("deployToCloudflare", TaskMilestones.deployToCloudflare),
-            ("buildAndDeployToCloudflare", TaskMilestones.buildAndDeployToCloudflare),
-            ("deployToFolder", TaskMilestones.deployToFolder),
-            ("buildAndDeployToFolder", TaskMilestones.buildAndDeployToFolder),
-        ]
+        // Read from TaskMilestones.allLists, never a copy of it. This was a
+        // private array naming eight of the nine until 2026-09-08, so
+        // `exampleCourse` reached no readout and the two shared-python markers
+        // only it carries were classified by nobody.
         var written: [String: Any] = [
             "note": "label is what a teacher reads; marker is the text in the shared scripts' output that "
                   + "means the step has been reached. The marker is the load-bearing half — it is matched "
@@ -108,7 +102,7 @@ enum AppRulesContract {
                   + "exactly. A drifted marker does not crash anything: the progress bar simply stops "
                   + "moving, and neither app can tell.",
         ]
-        for (name, list) in lists {
+        for (name, list) in TaskMilestones.allLists {
             var steps: [[String: String]] = []
             for milestone in list {
                 steps.append(["label": milestone.label, "marker": milestone.marker])
