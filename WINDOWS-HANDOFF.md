@@ -3622,8 +3622,8 @@ it.
 ### The two MCP surfaces are not the same product
 
 Written 2026-09-06 after a mac audit asked whether the parity list was
-COMPLETE rather than whether it was correct. The numbered item is 41; this is
-the manual for it.
+COMPLETE rather than whether it was correct. The numbered item was 41, now
+**GitHub issue #66**; this is the manual for it.
 
 **The measurement.** `Plantoir.Mcp/PlantoirTools.cs` declares **37** distinct
 `[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` served **25**
@@ -3712,6 +3712,93 @@ problem first — the mac has no engine for it AND nothing on the mac reports
 the date drift it fixes, because the mac has no equivalent of your `DateAudit`.
 The three `plan_` twins travel with their writes and are not separate
 decisions.
+
+### What the phrasings were worth, and the four traps in measuring it
+
+Written 2026-09-08, after closing the phrasings half of issue #66. The numbers
+and their conditions are in `research/ai-assist/teachers-say-results.txt`; this
+is the reasoning, which is the half that does not fit in a results header.
+
+**Only some of a clause gap is a routing change, and the split decides the
+work.** `AssistAgent.ForTheLocalModel` holds thirteen names. Of the seven tools
+whose `TEACHERS SAY:` clause Windows was missing, only `add_next_class` and
+`read_remembered_timetable` are in it — the rest are read by Claude Code over
+MCP and by nothing else. `Briefly()` puts the clause FIRST in what the local
+model reads, so those two are a change to the router's prompt and the others
+are not. Ten phrasings needed measuring; ten did not.
+
+**What it bought.** 25 probes × 5 trials at temperature 0, on the shipped
+surface dumped live from `plantoir-mcp`: the probes under test went **40/50 to
+50/50, with no control regressing**. Overall went 76% to 88%, but a third of
+that gain is one unrelated control flipping 0/5 to 5/5 for no reason anything
+in the change explains, so the under-test figure is the one to quote — and that
+flip is also the honest limit on the determinism claim, since it is what a null
+perturbation of this surface looks like.
+The two probes it fixed were confident MISROUTES rather than declines —
+"Set up next day's lesson" was reaching `schedule_deploy` five times out of
+five, which is a sentence about writing a page answered by the tool that puts
+work in front of students.
+
+**Four traps. Each one produces a number that looks fine, which is what makes
+them expensive.** Three were found by adversarial review rather than by writing
+the code, and any future routing measurement on this side meets them again.
+
+1. **A hand copy of a shipping list goes stale silently.**
+   `research/ai-assist/narrow-tools.py` copies `ForTheLocalModel` by hand. It
+   was right when committed on 2026-08-14 and wrong from 2026-08-17
+   (4089c752), when the set went from fifteen names to thirteen: it was still
+   keeping four `plan_` tools the app no longer shows and MISSING both tools
+   about to be measured. Nothing could catch it, because a research script is
+   run by hand months apart, so `NarrowToolsMirrorTests` now fails on drift.
+   REJECTED: adjusting the list by hand at measurement time, which is exactly
+   the arrangement that had just failed. The results files measured inside
+   that three-day window are sound and are named in the script, so nobody
+   throws them away on the strength of this.
+2. **The dateline decides the answer.** `AssistAgent.Say` appends
+   `" (Today is YYYY-MM-DD, a Weekday.)"` to every message the model sees. A
+   first pair of runs omitted it and was discarded — but the ten probes under
+   test were identical in both, leaving one clean comparison: **25/50 without
+   the dateline against 40/50 with it.** The three probes the dateline fixes on
+   its own would otherwise have been credited to the phrasings, reporting five
+   fixes where the truth is two. `trimmed-surface-results.txt` had already
+   recorded the same line being worth fifteen points when PREPENDED instead;
+   this is the second time it has decided a measurement here.
+3. **There are THREE interception layers before the model, not one.**
+   `PreviewAskedForPlainly` (thirteen exact sentences), then
+   `AssistCardCommand.Matching` (`FixedShapes` plus its `WholeUnit`,
+   `MoreDays` and `DuplicateClass` parsers), then four inline regexes in
+   `AssistAgent.CardCommand` itself. A suite that checks only the middle one
+   measures the router on sentences the app never routes; three controls were
+   lost that way, and were being answered without a model at all.
+4. **Making a research script stricter can delete a control.** Requiring the
+   course code in `narrow-tools.py` read as a tightening, and would have
+   silently turned `trimmed-surface-suite.py --real-course` into a no-op,
+   destroying the A/B its own docstring rests on. It is optional now,
+   un-substituted by default, with the reason written down.
+
+**And a fifth, learned the same day: a parity claim is only true of the surface
+it was checked against, and of the PART of it that was checked.** The gap was
+closed against a 25-tool shared surface and reopened hours later, when the mac
+shipped six new MCP tools and three of them arrived with clauses their Windows
+equivalents lacked (`add_classes`, `list_courses`, `make_room_for_classes` —
+closed in the same branch, and none of them local-facing). And "the wording
+matches now" would be false in a way that is easy to write by accident: what
+matches is the `TEACHERS SAY:` CLAUSE. Of the 32 shared tools **29 full
+descriptions differ**, and of the thirteen the local model is shown **five
+differ in the text `Briefly()` actually produces** — `add_next_class`,
+`check_section`, `publish_pages`, `read_remembered_timetable` and
+`unpublish_pages`. Most of that is deliberate (this server writes for Claude
+Code), but not obviously all of it: the mac's `unpublish_pages` tells the model
+it takes down "any page ONLY they link to; a page another class still links to
+stays put", where this one says "optionally along with every page they link
+to". Whether that is two descriptions of one behaviour or two behaviours is a
+`mac`/`decision` issue, not something to quietly align. Re-run the comparison;
+never quote a count out of a write-up.
+
+**Do not start a Windows measurement from `tools-from-contract.py`.** The
+contract is generated on the mac, so its descriptions are the mac's. Dump the
+live surface with `dump-tools.ps1` and narrow it with `narrow-tools.py`. That
+file and `routing-suite.py` now say so; they used to say the opposite.
 
 ### The model's list is SHORTER than the server's
 

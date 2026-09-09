@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""The TRIMMED surface (AssistAgent.NarrowToLocal, 15 tools), measured.
+"""The TRIMMED surface (AssistAgent.NarrowToLocal), measured.
+
+**The surface was FIFTEEN tools when this ran on 2026-08-14, and is thirteen
+now** — `AssistAgent.ForTheLocalModel` dropped four `plan_` tools and gained
+`read_remembered_timetable` and `add_next_class` on 2026-08-17 (4089c752).
+The results below are of the fifteen and are sound; `narrow-tools.py` will
+hand this suite THIRTEEN today, so a re-run is not comparable to them
+without saying so.
 
 Answers the question HISTORY.md part 2 section 6.1 left open: did the
 TEACHERS SAY phrasings and the trim fix the 69%? Measured 2026-08-14

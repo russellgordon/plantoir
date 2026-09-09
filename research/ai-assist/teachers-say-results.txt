@@ -1,0 +1,180 @@
+What the missing TEACHERS SAY: phrasings were worth — Windows, 2026-09-08
+========================================================================
+
+Run on WINDOWS, for GitHub issue #66 (the retired numbered list's item 41),
+which asked for exactly this and said only this side could do it. The mac
+cannot run this hardware.
+
+WHAT WAS MEASURED
+-----------------
+`PlantoirTools.cs` was missing a `TEACHERS SAY:` clause entirely on four tools
+the mac has one for: add_next_class (6 phrasings), plan_add_next_class (3),
+read_remembered_timetable (4), remember_timetable (4) — seventeen in all.
+
+Only TEN of the seventeen are a routing change. `AssistAgent.ForTheLocalModel`
+holds thirteen names; add_next_class and read_remembered_timetable are in it,
+plan_add_next_class and remember_timetable are not, so the local model never
+reads the other seven. `Briefly()` puts the clause FIRST in what it does read.
+
+The other seven were added in the same commit and are not measured here,
+because nothing measurable changes: they are read by Claude Code over MCP.
+
+CONDITIONS
+----------
+Machine      Intel Core i5-8365U @ 1.60GHz, 4 cores / 8 logical
+             15.7 GB RAM  -> AssistModelTier.ForPhysicalMemory picks SMALL
+                             (the Large threshold is 16 GiB; this misses it)
+             Intel UHD Graphics 620, Vulkan0, 8062 MiB, driver 30.0.101.1338
+             Windows 11 Pro 10.0.26200
+Engine       Vendor/llama/llama-server.exe, build 10435 (9e40df63b)
+Model        qwen2.5-1.5b-instruct-q4_k_m.gguf (the Small tier's file)
+Arguments    exactly LocalModel.BuildArguments: --ctx-size 8192 --threads 4
+             --reasoning off --reasoning-budget 0 --jinja --parallel 1
+             --n-gpu-layers 999
+Server cost  1,494 MB working set / 1,531 MB private, idle after load
+Request      temperature 0, max_tokens 512 (LocalModel.Ask), system prompt
+             AssistAgent.SystemPrompt("EXC2O", 1) verbatim, and the dateline
+             " (Today is 2026-09-08, a Tuesday.)" APPENDED, as Say does
+Surface      dumped live from plantoir-mcp (37 tools) with dump-tools.ps1,
+             narrowed by narrow-tools.py to the shipped 13
+             before  9,321 chars (~2,589 tokens)
+             after   9,668 chars (~2,685 tokens)  = +347 chars, ~96 tokens
+Probes       25 (10 under test, 15 controls) x 5 trials = 125 calls per run
+Latency      before  median 7.9 s, p90 11.1 s, wall clock 19.2 min
+             after   median 6.9 s, p90  9.8 s, wall clock 15.9 min
+             (the maxima, 131 s and 84 s, are each run's first cold call)
+
+RESULT
+------
+                    BEFORE            AFTER
+  under test        40/50   (80%)     50/50  (100%)
+  controls          55/75   (73%)     60/75   (80%)
+  overall           95/125  (76%)    110/125  (88%)
+
+  malformed tool calls: 0 in both runs.
+
+Every probe scored 5/5 or 0/5 in every run — at temperature 0 this model is
+deterministic on this surface. The five trials therefore confirm stability
+rather than average noise, and a flake rarer than one in five would still be
+invisible here. That is a limit of the method, not a result.
+
+WHAT THE PHRASINGS ACTUALLY FIXED — two probes, and both were MISROUTES
+----------------------------------------------------------------------
+  "Set up next day's lesson"    schedule_deploy x5  ->  add_next_class x5
+  "When does this class meet?"  check_section   x5  ->  read_remembered_timetable x5
+
+Neither was a decline. The model picked a confidently wrong tool five times
+out of five, which is the failure that costs a teacher something rather than
+merely disappointing them: "set up next day's lesson" reaching the DEPLOY
+scheduler is a sentence about writing a page answered by a tool that puts work
+in front of students.
+
+No control regressed. One improved and is reported as observed rather than
+explained: "That was wrong, revert it" went from declined 5/5 to
+undo_last_change 5/5. Nothing in the change touches undo_last_change's
+description, so this is the surface shifting under it, not a designed gain.
+
+**So the honest headline is 40/50 -> 50/50 with no control regressing, NOT
+76% -> 88%.** Five of the fifteen gained calls are that one control, and by
+the paragraph above they are not attributable to the phrasings. Quote the
+under-test figure.
+
+It also qualifies the determinism claim above, and the qualification is worth
+more than the tidy sentence it spoils. Within a run this model is perfectly
+deterministic — every probe 5/5 or 0/5, twice over. ACROSS a 347-character
+change to a surface that does not mention undo_last_change, an unrelated probe
+flipped completely. That is what a null perturbation looks like here, so a
+one-probe difference between two runs is not evidence of anything on its own.
+The two under-test fixes survive that caution because the probes are literally
+two of the phrasings added; a control moving is not.
+
+THE CORRECTION THAT MATTERS MOST — the first pair was thrown away
+----------------------------------------------------------------
+A first BEFORE/AFTER pair was run and DISCARDED. It sent the bare prompt with
+no dateline, and three of its controls were sentences `AssistAgent.Say`
+answers without ever consulting the model. Both faults were found by
+adversarial review before anything was written down.
+
+One clean comparison survives it, because the ten probes under test were
+identical in both BEFORE runs and only the dateline changed:
+
+  under test, no dateline    25/50  (50%)
+  under test, dateline       40/50  (80%)
+
+Thirty points, from the line the app appends to every message anyway. And the
+three probes it fixed on its own were "what dates do you have for us?", "do you
+know our timetable?" and "how many class days are left?" — three probes that
+pass with no phrasing change at all, and that a before/after run without the
+dateline would have handed to the phrasings.
+
+(Said exactly: the discarded AFTER run was stopped before it finished, so
+"five instead of two" is inference from the two BEFORE runs rather than a
+measured pair. What IS measured is that those three fail without the dateline
+and pass with it, on the unchanged surface. That is enough to make the point
+and not enough to state a five.)
+
+That is the whole reason this file records its request shape in such detail. A
+routing score is a score for one exact request, and a harness that sends
+something the app does not send produces a number that is wrong in the
+flattering direction. `trimmed-surface-results.txt` had already recorded the
+same line costing fifteen points when PREPENDED rather than appended; this is
+the second time the dateline has decided a measurement here.
+
+STILL WRONG, IN BOTH RUNS — not this change's to fix, recorded so it is known
+----------------------------------------------------------------------------
+  "Put it online tomorrow morning at 6:30"
+      -> deploy_section x5, both runs. Wanted schedule_deploy. Fails safe:
+         deploying is the one act held behind the approval button, so the
+         teacher sees "Shall I deploy?" rather than a surprise deploy — but
+         they see it NOW instead of tomorrow at 6:30.
+  "Don't send it in the morning after all"
+      -> declined x5, both runs. Wanted cancel_scheduled_deploy.
+  "Delete the Unit 1 folder"        (declining is the right answer)
+      -> unpublish_pages x5 BEFORE, cancel_scheduled_deploy x5 AFTER. Wrong
+         both times; the target moved, which is worth knowing but is not an
+         improvement. The system prompt already says in as many words that
+         there is no tool to delete, remove or rename — AssistAgent's own
+         comment names this as the still-unsolved probe, and it still is.
+  "Take Unit 4, Day 5 back down, students shouldn't see it yet"
+      -> right tool, but section=4 read out of "Unit 4", 5 calls of 125 in
+         both runs. Fails safe: there is no section 4, so the tool refuses.
+
+HOW TO RE-RUN
+-------------
+  research/ai-assist/dump-tools.ps1 -Exe ...\plantoir-mcp.exe -Folder <folder> `
+      -Course EXC2O -Out tools.json
+  python research/ai-assist/narrow-tools.py tools.json narrowed.json EXC2O
+  python research/ai-assist/teachers-say-suite.py 8099 5 narrowed.json
+
+Start llama-server with the arguments above, by hand. Do NOT start from
+`tools-from-contract.py` on Windows: the contract is generated from the mac,
+so its descriptions are the mac's.
+
+WHAT CHANGED UNDER THIS FILE, HOURS AFTER IT WAS WRITTEN
+--------------------------------------------------------
+The measurement above is of the seventeen phrasings across four tools, and
+stands exactly as run. It was taken against a 25-tool shared surface.
+
+The same day, the mac shipped six new MCP tools, and three of them —
+add_classes, list_courses, make_room_for_classes — arrived carrying
+TEACHERS SAY: clauses their Windows equivalents did not have. Those three
+were added in the same Windows branch, taking it to twenty phrasings across
+seven tools, and were NOT re-measured: none of the three is in
+AssistAgent.ForTheLocalModel, so the local router never reads them and there
+is nothing a routing probe could show. The comparison was re-run across all
+32 shared tools afterwards; exactly one clause still differs and it is the
+mac's check_section.
+
+The point worth keeping is not about those three tools. A parity claim about
+tool wording is true only of the surface it was checked against, and both
+surfaces move. Re-run the comparison rather than quoting a count from here.
+
+A NOTE ON THE INSTRUMENT
+------------------------
+`narrow-tools.py` was found stale in the course of this work: correct when
+committed 2026-08-14, wrong from 2026-08-17 (4089c752), when
+`ForTheLocalModel` went from fifteen names to thirteen. It was still keeping
+four `plan_` tools the app no longer shows the local model and missing BOTH
+tools measured here. Every number above was taken after fixing it, and
+`NarrowToolsMirrorTests` in the Windows suite now fails if the two lists drift
+apart again.
