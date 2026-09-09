@@ -470,6 +470,187 @@ final class RolloverWebsiteTests: XCTestCase {
         )
     }
 
+    /// A bare rollover on a section whose dates are already right must STILL
+    /// ask about the website — and that is the state a teacher is in on their
+    /// SECOND attempt.
+    ///
+    /// **The mirror of the trap above, one branch higher up, and fixing that
+    /// one left this one standing.** That one was about the ANSWER turn
+    /// returning early; this is about the ASKING turn. `showPlan` returns
+    /// early on anything the twin hands back that is not a plan, so a twin
+    /// that said only "already on the day it should be" ended the turn there:
+    /// the real call never ran, and the teacher read nothing whatever about
+    /// the website while the section stayed pinned to last year's site. With
+    /// asking-before-changing turned OFF the same request went straight to the
+    /// write path and was asked properly — so the question existed or not
+    /// depending on a setting, which is what made it worth fixing rather than
+    /// documenting.
+    ///
+    /// Driven through the real agent because that is where the defect lived:
+    /// every direct-to-the-tool test passed while this was broken.
+    @MainActor
+    func testABareRolloverStillAsksWhenTheDatesAreAlreadyRight() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let agent: AssistAgent = AssistFixture.makeAgent(tools: runner)
+
+        // First attempt: re-dates, and asks. The teacher ignores the question,
+        // which is the ordinary thing to do with a question you were not
+        // expecting.
+        await agent.say("roll this section over to a new year")
+        await agent.approvePending()
+
+        // Second attempt, with the pages already on their days by now.
+        await agent.say("roll this section over to a new year")
+
+        var transcript: [String] = []
+        for entry in agent.entries {
+            transcript.append(entry.text)
+        }
+        let readTheSecondTime: String = transcript[transcript.count - 1]
+        XCTAssertTrue(
+            readTheSecondTime.contains(AssistWording.rolloverWebsiteQuestion),
+            "Asking again must ask again: \(readTheSecondTime)"
+        )
+        XCTAssertTrue(
+            readTheSecondTime.contains(AssistCardCommand.rollOverOntoANewWebsite),
+            readTheSecondTime
+        )
+        XCTAssertTrue(
+            readTheSecondTime.contains(AssistCardCommand.rollOverKeepingTheSameWebsite),
+            readTheSecondTime
+        )
+        XCTAssertTrue(
+            readTheSecondTime.contains(AssistWording.rolloverWebsiteNotDecided),
+            "A teacher who does not answer must be told the website is unchanged: \(readTheSecondTime)"
+        )
+
+        let live: URL = course.directoryURL.appendingPathComponent(".netlify_sites/section1.json")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: live.path),
+            "An unanswered question must not cut the section loose."
+        )
+    }
+
+    /// The twin ANSWERS rather than proposing, and both halves of that matter.
+    ///
+    /// There is nothing here to press Go on: the dates need no change, and the
+    /// website is settled by SAYING one of the two sentences. So the twin
+    /// hands back a reply — which `showPlan` puts in the transcript verbatim —
+    /// rather than a plan with a Go button that would do nothing. Pinned
+    /// separately from the agent test above because it is the reason that one
+    /// passes, and a twin that started returning a PLAN carrying the question
+    /// would show the teacher `forTheCard` instead and quietly lose it.
+    @MainActor
+    func testTheTwinAnswersTheWebsiteQuestionRatherThanProposingIt() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        _ = await reDate(runner, course: course, arguments: ["rollover": "yes"])
+
+        let twin: AssistToolOutcome = await runTool(
+            runner, course: course, arguments: ["rollover": "yes"], tool: "plan_re_date_classes"
+        )
+        XCTAssertFalse(
+            twin.isPlan,
+            "There is nothing to agree to — a plan card here offers a Go that changes nothing."
+        )
+        XCTAssertTrue(twin.summary.contains(AssistWording.rolloverWebsiteQuestion), twin.summary)
+        XCTAssertTrue(twin.summary.contains(AssistWording.rolloverWebsiteNotDecided), twin.summary)
+
+        // And the write says the same thing, so the question does not depend
+        // on whether asking-before-changing is switched on.
+        let written: AssistToolOutcome = await runTool(
+            runner, course: course, arguments: ["rollover": "yes"]
+        )
+        XCTAssertTrue(written.summary.contains(AssistWording.rolloverWebsiteQuestion), written.summary)
+        XCTAssertTrue(written.summary.contains(AssistWording.rolloverWebsiteNotDecided), written.summary)
+    }
+
+    /// A `website` value nobody recognises asks the question back rather than
+    /// being ignored.
+    ///
+    /// **An MCP client has no card, so `website` is the whole of what it can
+    /// say — and a model asked which website a teacher chose will sooner or
+    /// later send "a new one" rather than "new".** Reading only the two
+    /// recognised words made that an ORDINARY re-date: no question, no error,
+    /// and nothing said about the website at all, on the one call that was
+    /// plainly about the website. Any value at all now counts as a rollover,
+    /// so an unrecognised one gets the question — an answer a caller can act
+    /// on — instead of silence.
+    @MainActor
+    func testAWebsiteValueNobodyRecognisesAsksRatherThanBeingIgnored() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // No `rollover` key, as an MCP client would call it.
+        let said: String = await reDate(runner, course: course, arguments: ["website": "a new one"])
+        XCTAssertTrue(said.contains(AssistWording.rolloverWebsiteQuestion), said)
+        XCTAssertTrue(said.contains(AssistWording.rolloverWebsiteNotDecided), said)
+
+        let live: URL = course.directoryURL.appendingPathComponent(".netlify_sites/section1.json")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: live.path),
+            "A value nobody recognised must not be read as “start a new website”."
+        )
+    }
+
+    /// A `website` that is not a string at all is not an answer.
+    ///
+    /// **The cost of widening "what counts as a rollover", and it lands on the
+    /// request that must never be asked.** Arguments arrive as JSON, and the
+    /// runner renders a number into text — so `website: false`, an ordinary
+    /// way for a caller to spell "no answer here", would read as "0", which is
+    /// not empty. A teacher re-dating after a snow day would then be asked
+    /// whether to abandon the address their students are reading right now.
+    @MainActor
+    func testAWebsiteThatIsNotATextAnswerIsNotReadAsOne() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        for notAnAnswer in [false, 0] as [Any] {
+            let said: String = await reDate(
+                runner, course: course, arguments: ["website": notAnAnswer]
+            )
+            for fragment in ["website", "Website"] {
+                XCTAssertFalse(
+                    said.contains(fragment),
+                    "“\(notAnAnswer)” is not an answer — this must stay an ordinary re-date: \(said)"
+                )
+            }
+        }
+    }
+
+    /// The other half of the same change: widening what counts as a rollover
+    /// must not start asking an ORDINARY re-date about websites.
+    ///
+    /// The existing test above covers the turn where pages actually move. This
+    /// covers the one where they do not — a teacher re-dating a section that
+    /// is already right — because that is the branch the fix rewrote, and a
+    /// mid-semester snow day landing there must still hear nothing about
+    /// abandoning the address students are reading right now.
+    @MainActor
+    func testAnOrdinaryReDateWhoseDatesAreAlreadyRightStillSaysNothingAboutWebsites() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        _ = await reDate(runner, course: course, arguments: [:])
+
+        let twin: AssistToolOutcome = await runTool(
+            runner, course: course, arguments: [:], tool: "plan_re_date_classes"
+        )
+        let written: AssistToolOutcome = await runTool(runner, course: course, arguments: [:])
+        for said in [twin.summary, twin.detail, written.summary, written.detail] {
+            for fragment in ["website", "Website"] {
+                XCTAssertFalse(
+                    said.contains(fragment),
+                    "An ordinary re-date must not raise websites at all: \(said)"
+                )
+            }
+        }
+    }
+
     // MARK: - Helpers
 
 
