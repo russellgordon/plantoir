@@ -48,6 +48,8 @@ Pure stdlib, no Docker, no network, no credentials. Run with:
 
 import io
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -55,6 +57,67 @@ import unittest
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _a_bash_that_can_run_deploy_sh():
+    """A `bash` that can actually run this repository's launcher, or None.
+
+    THIS IS NOT PEDANTRY, and it cost a test run to find. Since 2026-09-07 the
+    Windows app runs every `scripts/test_*.py` inside `dotnet test`
+    (`PythonToolchainTests`), so this file is a gate on BOTH platforms. It is
+    also the only shared test that shells out to `bash`, and on Windows the
+    plain name is a trap twice over:
+
+      * `bash` on PATH is `C:\\Windows\\System32\\bash.exe`, the WSL LAUNCHER
+        rather than a shell. On a machine whose WSL wants updating it prints
+        "Windows Subsystem for Linux must be updated to the latest version to
+        proceed" — in UTF-16, so the failure arrives as a wall of NUL bytes —
+        and the test fails for a reason that has nothing to do with publishing.
+      * Even where WSL WORKS it is the wrong shell here. The launcher copy is
+        written to a Windows temporary folder and handed over as
+        `C:\\Users\\...\\deploy.sh`, a path no Linux filesystem can open.
+
+    So a Windows-hosted `bash` is accepted only if it is NOT the System32 one:
+    in practice Git for Windows, which every clone of this repository already
+    has because git itself ships it. Verified by RUNNING it rather than by
+    trusting the path, since a `.exe` that exists and cannot start is exactly
+    the case above.
+
+    Returns None when there is no such shell, and the caller skips — visibly,
+    with the reason — rather than failing. A skip that says why is honest; a
+    failure that says "WSL must be updated" sends the next person looking for a
+    bug in the launcher.
+    """
+    candidates = []
+    if os.name == "nt":
+        for base in (os.environ.get("ProgramFiles", r"C:\Program Files"),
+                     os.environ.get("ProgramW6432", r"C:\Program Files"),
+                     os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")):
+            candidates.append(Path(base) / "Git" / "bin" / "bash.exe")
+            candidates.append(Path(base) / "Git" / "usr" / "bin" / "bash.exe")
+
+    on_path = shutil.which("bash")
+    if on_path:
+        candidates.append(Path(on_path))
+
+    system_root = Path(os.environ.get("SystemRoot", r"C:\Windows")).resolve()
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+            if not resolved.exists():
+                continue
+            # The WSL launcher, rejected by WHERE it lives rather than by what
+            # it says, because what it says depends on the machine's WSL state.
+            if os.name == "nt" and system_root in resolved.parents:
+                continue
+            # 7 rather than 0: a stub that fails to start also exits non-zero,
+            # and a shell that ran nothing would exit 0.
+            if subprocess.run([str(resolved), "-c", "exit 7"],
+                              capture_output=True, timeout=60).returncode == 7:
+                return str(resolved)
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return None
 from contextlib import redirect_stdout
 
 import deploy
@@ -194,12 +257,29 @@ class TheFlagIsAccepted(unittest.TestCase):
         before anything needs Docker, but only AFTER parsing the flags,
         which is what this is really asking about.
         """
+        shell = _a_bash_that_can_run_deploy_sh()
+        if shell is None:
+            self.skipTest(
+                "no bash on this machine that can run a launcher from a native path "
+                "(on Windows the `bash` on PATH is the WSL launcher, not a shell). "
+                "The mac runs this for real; every other test in this file still runs here."
+            )
+
         with tempfile.TemporaryDirectory() as tmp:
             launcher = Path(tmp) / "deploy.sh"
             launcher.write_bytes((REPOSITORY_ROOT / "deploy.sh").read_bytes())
+            # encoding= rather than text=, because text= decodes with the
+            # machine's LOCALE encoding: on a Windows box that is cp1252, and
+            # deploy.sh's own sentences carry em-dashes and curly quotes, so the
+            # read threw UnicodeDecodeError in a subprocess reader thread and
+            # the test failed with "unsupported operand type(s) for +: 'NoneType'
+            # and 'str'" — which names neither the launcher nor the encoding.
+            # errors="replace" for the same reason: this test reads the output
+            # for two SENTENCES, and a stray byte must not be able to stop it.
             result = subprocess.run(
-                ["bash", str(launcher), "ICS3U", "1", "--non-interactive"],
-                capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL,
+                [shell, str(launcher), "ICS3U", "1", "--non-interactive"],
+                capture_output=True, timeout=120, stdin=subprocess.DEVNULL,
+                encoding="utf-8", errors="replace",
             )
             self.assertNotIn("Unknown option", result.stdout + result.stderr)
             self.assertIn(

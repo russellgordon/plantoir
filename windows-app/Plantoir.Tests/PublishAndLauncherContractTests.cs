@@ -411,30 +411,103 @@ public class PublishAndLauncherContractTests
     [Fact]
     public void EveryQuestionTheDeployLauncherAsksIsGuarded()
     {
-        var lines = File.ReadAllLines(Path.Combine(RepoRoot, "deploy.ps1"));
-        var unguarded = new List<int>();
-
-        for (int i = 0; i < lines.Length; i++)
-        {
-            if (!lines[i].Contains("Read-Host", StringComparison.Ordinal)) continue;
-            // The guard sits on the line immediately above the question, which
-            // is the only placement that reads correctly: a guard further away
-            // is one somebody moves code past.
-            // TrimStart before the "#" test, and the "#" test at all, because
-            // the first version of this counted a COMMENTED-OUT guard as a
-            // guard — proved by commenting one out and watching the test still
-            // pass, which is the only way that kind of hole is ever found.
-            string above = i == 0 ? "" : lines[i - 1].TrimStart();
-            if (above.StartsWith("#", StringComparison.Ordinal)
-                || !above.Contains("Assert-CanAsk", StringComparison.Ordinal))
-                unguarded.Add(i + 1);
-        }
+        var unguarded = UnguardedQuestionLines("deploy.ps1");
 
         Assert.True(unguarded.Count == 0,
             "deploy.ps1 asks a question with no Assert-CanAsk above it, at line(s) " +
             string.Join(", ", unguarded) + ". Under --non-interactive that question is put to " +
             "nobody: the publish either waits for ever or takes a default and publishes the " +
             "teacher's site to an address they never chose.");
+    }
+
+    /// <summary>
+    /// Every question <c>preview.ps1</c> asks is guarded too, and the guard
+    /// comes BEFORE the question.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>A build launcher needs this as much as the publishing one, and
+    /// that is the part that is easy to miss.</b> A scheduled publish BUILDS
+    /// before it publishes — <c>TaskScheduling.WriteWrapperScript</c> runs
+    /// <c>preview.ps1 &lt;course&gt; &lt;section&gt; --build-only</c> as its
+    /// first step — so every question this script asks at half six in the
+    /// morning is put to nobody just as surely.</para>
+    ///
+    /// <para>What happens then is worse than a hang. A <c>Read-Host</c> with no
+    /// console reads end of input and returns empty, and both questions here
+    /// have a DEFAULT: the course-code guard's is "yes, fix it", which
+    /// retargets the build at a DIFFERENT course code and announces it to
+    /// nobody — and the publish that follows then succeeds against the wrong
+    /// course, with nothing anywhere looking wrong.</para>
+    ///
+    /// <para><b>This script asks TWO things and the shared contract lists
+    /// one.</b> <c>preview.sh</c> has only the course-code guard;
+    /// "Continue anyway?" — the warning when a section is not listed in
+    /// <c>course_config.json</c> — is this platform's alone, so
+    /// <c>app-rules.json</c> → <c>launcherFlags.nonInteractive.refusals</c>
+    /// does not name it. That file is GENERATED on the mac, so the entry was
+    /// asked for by issue rather than added here; this test is what holds the
+    /// behaviour in the meantime.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryQuestionThePreviewLauncherAsksIsGuarded()
+    {
+        var unguarded = UnguardedQuestionLines("preview.ps1");
+
+        Assert.True(unguarded.Count == 0,
+            "preview.ps1 asks a question with no Assert-CanAsk above it, at line(s) " +
+            string.Join(", ", unguarded) + ". A scheduled publish builds before it publishes, so " +
+            "that question is put to nobody — and an unanswered [Y/n] takes its default, which " +
+            "for the course-code guard means building a DIFFERENT course and publishing it.");
+
+        // And the flag is really parsed, not merely mentioned in the help text.
+        // A launcher that printed it and then said "Unknown option: " is, to a
+        // teacher, a scheduled publish that simply did not happen.
+        Assert.Contains("'--non-interactive'               { $NON_INTERACTIVE = $true",
+                        File.ReadAllText(Path.Combine(RepoRoot, "preview.ps1")),
+                        StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Which lines of a launcher ask a question with no <c>Assert-CanAsk</c>
+    /// directly above them. One scanner for both launchers, because the rule is
+    /// one rule.
+    /// </summary>
+    /// <remarks>
+    /// <para>Three properties, each of which was a hole first.</para>
+    ///
+    /// <para><b>The guard must be on the line IMMEDIATELY above the
+    /// question.</b> Anywhere else is a guard somebody moves code past.</para>
+    ///
+    /// <para><b>A COMMENTED-OUT guard is not a guard.</b> The first version of
+    /// this counted one — proved by commenting a real guard out and watching
+    /// the test stay green, which is the only way that kind of hole is ever
+    /// found.</para>
+    ///
+    /// <para><b>A COMMENT that merely mentions Read-Host is not a
+    /// question.</b> Found on 2026-09-09, the moment this scanner was pointed
+    /// at preview.ps1 — whose own explanation of why the flag exists says the
+    /// words "a Read-Host with no console reads end of input". The scan
+    /// reported two unguarded questions that do not exist. A test that fails
+    /// for prose is one somebody deletes.</para>
+    /// </remarks>
+    private static List<int> UnguardedQuestionLines(string launcherFileName)
+    {
+        var lines = File.ReadAllLines(Path.Combine(RepoRoot, launcherFileName));
+        var unguarded = new List<int>();
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i].TrimStart();
+            if (line.StartsWith("#", StringComparison.Ordinal)) continue;
+            if (!line.Contains("Read-Host", StringComparison.Ordinal)) continue;
+
+            string above = i == 0 ? "" : lines[i - 1].TrimStart();
+            if (above.StartsWith("#", StringComparison.Ordinal)
+                || !above.Contains("Assert-CanAsk", StringComparison.Ordinal))
+                unguarded.Add(i + 1);
+        }
+
+        return unguarded;
     }
 
     /// <summary>
