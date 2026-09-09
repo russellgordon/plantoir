@@ -551,14 +551,26 @@ enum ScheduledDeploy {
         // the course-code guard and exits 3, and every deploy line below is
         // skipped when READY=0 — so without this the teacher would be told
         // nothing at all about the one failure this change introduced.
+        //
+        // Exit 3 HERE is its own kind, and not the one a destination gets.
+        // Nothing was published because nothing was reached, so the sentence
+        // names no destination and sends the teacher to Preview — previewing
+        // is what asks the question. Until GitHub issue #132, proposed from
+        // Windows, this wrote `neededAnAnswer` with a stand-in destination and
+        // told a teacher that publishing to a site nobody had contacted needed
+        // an answer.
         lines.append("    /bin/mkdir -p \(shellQuoted(stoppedDirectory))")
         lines.append("    if [ $BUILD_RC -eq 3 ]; then")
-        lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.neededAnAnswer.rawValue))"
+        lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.buildNeededAnAnswer.rawValue))"
             + " > \(shellQuoted(stoppedRecord))")
         lines.append("    else")
         lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.didNotFinish.rawValue))"
             + " > \(shellQuoted(stoppedRecord))")
         lines.append("    fi")
+        // Written for BOTH build branches. The outright failure puts it in
+        // the teacher's sentence; buildNeededAnAnswer never shows it, and it
+        // is written anyway so every record has one shape for the reader — see
+        // ScheduledPublishOutcome.buildDestinationName.
         lines.append("    /bin/echo \(shellQuoted(ScheduledPublishOutcome.buildDestinationName))"
             + " >> \(shellQuoted(stoppedRecord))")
         lines.append("  fi")
@@ -587,8 +599,14 @@ enum ScheduledDeploy {
         // alone; it is tested BEFORE the general non-zero branch because it is
         // also non-zero. Any other failure is recorded too — a revoked token, a
         // network that was down — because the SILENCE is the teacher's
-        // complaint, not the cause. (Windows records only exit 3 today; issue
-        // filed.)
+        // complaint, not the cause. Where the two platforms stand on this is
+        // compared in contracts/shared-rules.json → scheduledPublishStopped →
+        // platformDifferences, and nowhere else, so it cannot rot in four
+        // places at once.
+        //
+        // This is the DESTINATION leg, so exit 3 here is `neededAnAnswer` and
+        // not the build's own kind: a destination WAS reached and can be
+        // named.
         //
         // The FIRST destination that stopped is the one kept: a course can
         // publish to several and only one may have gone wrong, so overwriting

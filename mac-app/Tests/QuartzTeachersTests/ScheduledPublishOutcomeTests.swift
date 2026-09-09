@@ -245,7 +245,14 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
     /// skipped when the build did not succeed — so without a record here the
     /// teacher would be told nothing at all about the one failure this change
     /// introduced.
-    func testABuildThatNeededAnAnswerIsRecorded() throws {
+    /// And it is its OWN kind, not the one a destination gets.
+    ///
+    /// Nothing was published, because nothing was reached — the stub deploy
+    /// here exits 0, so a wrapper that ran it anyway would leave the success
+    /// sentinel behind and the section would be marked published. Asserting
+    /// the sentinel's absence is the property a teacher cares about; the kind
+    /// is only how they are told.
+    func testABuildThatNeededAnAnswerIsRecordedAndNothingIsPublished() throws {
         try writeStubLaunchers(deployExit: 0, previewExit: 3)
         try runWrapper(
             course: "ZZQ7U", section: 1,
@@ -254,8 +261,16 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         let stopped = ScheduledPublishOutcome.stopped(
             inHomeFolder: home, course: "ZZQ7U", section: 1
         )
-        XCTAssertEqual(stopped?.kind, .neededAnAnswer)
+        XCTAssertEqual(stopped?.kind, .buildNeededAnAnswer)
+        // Written even though the sentence never shows it, so every record has
+        // one shape. See ScheduledPublishOutcome.buildDestinationName.
         XCTAssertEqual(stopped?.destination, ScheduledPublishOutcome.buildDestinationName)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: ScheduledDeploy.successSentinelURL(
+                courseCode: "ZZQ7U", sectionNumber: 1, inHomeFolder: home
+            ).path),
+            "the build stopped, so nothing was published and nothing may say it was"
+        )
     }
 
     func testABuildThatFailedOutrightIsRecordedToo() throws {
@@ -383,7 +398,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
     }
 
-    /// The two kinds go on the trail as two different events.
+    /// A record is noted on the trail, and a section with none is not.
     func testTheTrailEventMatchesTheKind() throws {
         ScheduledPublishOutcome.recordStopped(
             ScheduledPublishOutcome.Stopped(
@@ -402,6 +417,29 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
     }
 
+    /// A build that stopped for a question files under the EXISTING
+    /// "needed an answer" event rather than a fourth one.
+    ///
+    /// Deliberate, and Windows' reasoning adopted: that event is about a
+    /// question going unasked, which is what happened, and a fourth event
+    /// would put a distinction on the trail that means nothing to the person
+    /// reading it. What this can prove without reading the trail file is that
+    /// the branch exists and notes something; `ActivityTrailWiringTests` is
+    /// what holds the event list and the code together.
+    func testABuildThatStoppedForAQuestionIsNotedOnTheTrail() throws {
+        ScheduledPublishOutcome.recordStopped(
+            ScheduledPublishOutcome.Stopped(
+                kind: .buildNeededAnAnswer,
+                destination: ScheduledPublishOutcome.buildDestinationName,
+                when: Date()
+            ),
+            inHomeFolder: home, course: "ZZQCU", section: 1
+        )
+        XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
+            inHomeFolder: home, course: "ZZQCU", section: 1
+        ))
+    }
+
     // MARK: - What a teacher reads
 
     func testTheSentenceForAnUnansweredQuestionIsTheContractsOwn() throws {
@@ -414,6 +452,34 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         XCTAssertTrue(sentence.contains("ICS3U Section 2"))
         XCTAssertTrue(sentence.contains("needed an answer nobody was there to give"))
         XCTAssertTrue(sentence.contains("Publish this section once yourself"))
+    }
+
+    /// A build that stopped for a question names no destination, and sends
+    /// the teacher to PREVIEW.
+    ///
+    /// Both halves matter. The record still carries `buildDestinationName` on
+    /// its second line, so asserting the sentence does NOT contain it is what
+    /// pins "no destination is named" rather than a wish about the wording.
+    /// And previewing is what asks the question, so "Publish this section" —
+    /// which is what this case said until GitHub issue #132 — sent a teacher
+    /// to the wrong button.
+    func testTheSentenceForAStoppedBuildSendsTheTeacherToPreview() throws {
+        let stopped = ScheduledPublishOutcome.Stopped(
+            kind: .buildNeededAnAnswer,
+            destination: ScheduledPublishOutcome.buildDestinationName,
+            when: Date()
+        )
+        let sentence: String = ScheduledPublishOutcome.sentence(
+            for: stopped, course: "ICS3U", section: 2
+        )
+        XCTAssertTrue(sentence.contains("ICS3U Section 2"))
+        XCTAssertTrue(sentence.contains("building the pages needed an answer"))
+        XCTAssertTrue(sentence.contains("Preview this section once yourself"))
+        XCTAssertFalse(sentence.contains("Publish this section once yourself"))
+        XCTAssertFalse(
+            sentence.contains(ScheduledPublishOutcome.buildDestinationName),
+            "no destination was reached, so none may be named"
+        )
     }
 
     func testTheSentenceForAnOrdinaryFailureSaysNothingWentUp() throws {
