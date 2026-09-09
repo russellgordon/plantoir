@@ -73,7 +73,7 @@ public static class ScheduledPublishOutcome
         /// to Netlify needed an answer" when Netlify was never contacted would
         /// send them to look in the wrong place. Proposed to
         /// <c>shared-rules.json</c> from this side; the mac's launchd path can
-        /// reach the identical state, and GitHub issue #133 asks them to adopt
+        /// reach the identical state, and GitHub issue #132 asks them to adopt
         /// the sentence.</para>
         /// </remarks>
         BuildNeededAnAnswer,
