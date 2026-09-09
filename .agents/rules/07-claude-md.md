@@ -47,8 +47,10 @@ and does not get from that, corrected 2026-09-07 — this used to say toolchain
 changes made there have "no automated gate" at all, which is no longer true:
 
 - **The shared Python IS gated there now.** `PythonToolchainTests` runs every
-  `scripts/test_*.py` — all fifteen, the same files `verify.sh` runs — inside
-  `dotnet test`, in about eight seconds. They need no Docker, no network and no
+  `scripts/test_*.py` — DISCOVERED rather than listed, so no count is kept in
+  step by hand (fifteen when this was written on 2026-09-07, seventeen on
+  2026-09-09) — the same files `verify.sh` runs, inside `dotnet test`, in about
+  eight seconds. They need no Docker, no network and no
   credentials, and until 2026-09-07 Windows ran none of them, so a shared file
   could be broken from that machine with every gate on it staying green.
 - **The IMAGE is still ungated there**, and that part stands: nothing on

@@ -74,10 +74,14 @@ Three consequences that catch people out:
   publishing path (a warning; it never blocks), and `RELEASING.md` requires a
   run with nothing skipped for a release that changes that path.
 
-  **The Python half of `verify.sh` does run here now.** All fifteen shared
-  `scripts/test_*.py` files execute inside `dotnet test` via
+  **The Python half of `verify.sh` does run here now.** Every shared
+  `scripts/test_*.py` file executes inside `dotnet test` via
   `PythonToolchainTests` — 156 tests in about eight seconds, no Docker, no
-  network, no credentials. `verify.sh` has always run them on the mac and
+  network, no credentials. (That was fifteen files and 156 tests when measured
+  here on 2026-09-07; there are **seventeen** as of 2026-09-09. The runner
+  DISCOVERS them rather than listing them, so the number is not something
+  either side has to keep in step — count them with `ls` rather than trusting
+  this sentence, which is why it no longer names one.) `verify.sh` has always run them on the mac and
   nothing ran them here, so a shared file could be broken from this machine
   with every gate on it green. The runner sets `PYTHONUTF8=1` and
   `PYTHONIOENCODING=utf-8`, which is what the launchers set

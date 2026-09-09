@@ -301,6 +301,18 @@ Recreating the container is cheap because all state lives in the bind mount.
   listed in `contracts/app-rules.json` → `launcherFlags.nonInteractive`, and
   the flag itself is registered in `launcherFlags.deployExtras`.
 
+  All four refusals are DRIVEN, not just described:
+  `scripts/test_deploy_sh_questions.py` runs the real `deploy.sh` to each
+  question — with `--image` so no build recipe is resolved and no container is
+  needed, and a Keychain user that does not exist so the lookups come back
+  empty — and checks the refusal is SAID as well as the exit code being 3. It
+  also pins the other half, that a teacher at a keyboard is asked exactly what
+  they were asked before and their answer is taken. It exists because this
+  flag was written on a machine with no bash and the launcher had never been
+  started; doing so found two bugs in `prompt_for_cf_account` that reading it
+  had not (issue #129, written up in
+  [publishing](07-deployment.md#asking-once-and-the-subshell-that-ate-the-question-2026-09-09)).
+
   **`preview.sh` takes it too**, and needs to: a scheduled publish BUILDS
   before it publishes, the mac's launchd agent runs `preview.sh --build-only`
   directly, and `deploy.sh` forwards the flag to its own rebuild. `preview.sh`

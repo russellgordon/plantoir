@@ -314,6 +314,93 @@ Two things are needed, and only one comes from the teacher directly:
   last "asking once" is a refusal instead, naming the Account ID and pointing
   at the course's own settings.
 
+### Asking once, and the subshell that ate the question (2026-09-09)
+
+That "asking once" is `prompt_for_cf_account`, and until issue #129 it did
+not work from the command line. It is called as
+
+```bash
+CF_ACCOUNT="$(prompt_for_cf_account)" || exit 1
+```
+
+and a command substitution is a **subshell that captures stdout**, so the
+function's stdout is its RETURN VALUE — nothing else may go there. Its
+six-step "where to find your Account ID" instructions and its "that doesn't
+look like an Account ID" error both went to stdout anyway. Two consequences,
+both measured on 2026-09-09 by driving the real `deploy.sh` through a
+pseudo-terminal rather than reasoning about it:
+
+- A teacher was asked to paste a code **with no hint where it lives** — the
+  instructions were invisible — and when they mistyped it they saw **nothing
+  at all** before the script exited 1.
+- On the SUCCESS path the captured value was the instructions **and** the id:
+  **519 characters — 521 bytes — where 32 were meant** (the instruction block
+  is 489 bytes of it; the two-byte gap between the counts is one em dash). That blob went to `set_cf_account_keychain`,
+  so it was remembered and every later run skipped the question and reused
+  it, and to wrangler as `CLOUDFLARE_ACCOUNT_ID`. First-time Cloudflare
+  publishing from the command line did not work, and stayed broken until the
+  Keychain entry was cleared by hand.
+
+**Only the command line was exposed.** The GUI passes `--account` (see
+`DeployCommand`), and a scheduled publish carries it in the plist, so neither
+reaches this question; and the common case never reaches it either, because
+discovery usually answers first. `deploy.ps1` never had it, and avoids it a different way than "at top level",
+which is worth stating precisely because a Windows reader will go looking:
+`Read-CloudflareAccountId` says both of these inside the function too, but
+pipes them to `Out-Host` / `Write-Host`, which bypass the success stream that
+`$CF_ACCOUNT = Read-CloudflareAccountId` captures. PowerShell's host stream is
+doing the job stderr does here — so after this fix the two launchers solve the
+problem the same way rather than differently.
+
+Fixed by sending both to **stderr**, which is where `read -rp` already writes
+its own prompt, so the instructions now sit with the question they belong to.
+
+**Rejected: making the function set `CF_ACCOUNT` directly** and dropping the
+command substitution. It is the more structural fix — it removes the trap
+rather than documenting it — but the call site is parsed as TEXT by Windows'
+`PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`,
+which finds the single caller by searching for `prompt_for_cf_account)`. A
+mac with no `dotnet` cannot check that suite, so the change would have turned
+it red for a reason it has no way to verify. The invariant that matters — a
+question inside a function whose output is captured — is already gated by
+that test, which is what makes stderr sufficient here.
+
+**Fixing the printing does nothing for a teacher the bug already reached, and
+that is a separate repair.** The blob was written to the Keychain by
+`set_cf_account_keychain`, and the line that reads it back —
+`CF_ACCOUNT="$(get_cf_account_keychain)"` — trusted it without looking. So a
+teacher who answered the question correctly *once*, on a released build, would
+have had the question never asked again and wrangler handed nonsense on every
+run for ever. **Both released versions can have done this** (v1.0.0,
+2026-08-19; v1.1.0, 2026-08-20). The remembered value is therefore CHECKED
+before it is used: anything that is not 32 hex characters is discarded, the
+Keychain entry removed, and the question asked again — which is the state the
+teacher would have been in had the bug never happened.
+
+The repair is deliberately silent. "Your saved Account ID was wrong" invites a
+support question about something already put right, and the very next line asks
+for the ID anyway. If somebody needs to do it by hand, the entry is
+`containerized-quartz-cloudflare-account`:
+
+```bash
+security delete-generic-password -s containerized-quartz-cloudflare-account
+```
+
+`ATeacherAlreadyBittenGetsOutOfIt` in `scripts/test_deploy_sh_questions.py`
+pins both halves, and pins them against the REAL blob — it lifts the pre-fix
+function out of `07952399^`, runs it, and feeds what it actually produced back
+in as the remembered value, rather than a tidy short string that would not
+have caught this.
+
+**This is the same trap issue #92 fixed**, one function along. That issue
+moved the `--non-interactive` REFUSAL out to the call site for exactly this
+reason; the instructions and the error were left behind, because nobody had
+started the script and watched it. Which is the real lesson: `deploy.sh`
+changed on a machine with no bash, was syntax-checked and reviewed carefully,
+and reading it found neither of these. `scripts/test_deploy_sh_questions.py`
+now RUNS the launcher to every question it can ask — no Docker, no network,
+no credentials — and `verify.sh` runs it at step 0.
+
 Naming a NEW project asks the teacher nothing, and that is the one place this
 path differs from Netlify's: the project name is derived (course, section,
 year, surname) rather than offered for editing. So under `--non-interactive`
@@ -454,7 +541,20 @@ looks further. Wait on the whole tree; `deploy.ps1` already does.
 New on 2026-09-05, at the repository root. It publishes to a folder, to Netlify
 and to Cloudflare, and runs all three primary+secondary pairings, then **fetches
 every published site back and reads it** — the launcher's own output only
-proves the launcher is happy with itself. 42 checks.
+proves the launcher is happy with itself.
+
+**First run on the mac: 2026-09-09, 44 passed, 0 failed, 0 skipped** — the run
+`RELEASING.md` requires with nothing skipped, and the one issue #129 was really
+asking for, since `deploy.sh` had gained `--non-interactive` on a machine that
+could not execute it. All three destinations published for real and fetched
+back (folder 244 files, `ada1o-s1-2026-testing.netlify.app`,
+`ada1o-s1-2026-testing.pages.dev`), all three pairings, no live-reload client
+on any of them, and the no-front-page case refused and shipped nothing stale.
+Nothing about a teacher at a keyboard changed. The Windows counterpart
+`verify-deploy.ps1` was run before the merge: 36 passed, 0 failed, 0 skipped.
+The two counts differ because the suites are not identical, not because
+anything was skipped — count the cases in each script rather than comparing
+the numbers.
 
 **It is deliberately NOT part of `verify.sh`.** The gate must be runnable at any
 moment, on any machine, without credentials and without touching anything
@@ -594,8 +694,11 @@ is what we meant to write and nothing about what bash does with it.
 
 The limit worth stating: those runs use **stub launchers** that exit with a
 chosen code. That the real `deploy.sh` exits 3 in the states we think it does is
-proved separately, by `scripts/test_deploy_non_interactive.py`, and end to end
-only by `verify-deploy.sh`, which publishes to real Netlify.
+proved separately — by `scripts/test_deploy_non_interactive.py`, which reads the
+launcher, and since 2026-09-09 by `scripts/test_deploy_sh_questions.py`, which
+RUNS it to each of the four questions it can ask and checks the refusal is
+visible as well as the code being 3 — and end to end only by
+`verify-deploy.sh`, which publishes to real Netlify.
 
 ---
 
