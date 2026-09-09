@@ -2641,6 +2641,85 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Issues #66 and #69 are closed on this side: the rollover port landed, both
+  Windows defects were real, and the LEGACY MARKER PATH IS NOT THE MAC'S**
+  (Windows, 2026-09-08, branch `issue/66-rollover-website-question`,
+  `GUI-IMPROVEMENTS.md` row 458). **Nothing for the mac to implement** — the
+  design, the sentences and the marker rules all came from `contracts/` and
+  were not re-invented. Four things are worth knowing here.
+
+  **The legacy `.netlify_site.json` is in a different place on each platform,
+  and the mac's write-up gives only its own.** `merged_output_root()` returns
+  `PLANTOIR_BUILD_ROOT/<CODE>` — with **no `.merged_output` level at all** —
+  whenever that variable is set, and `deploy.ps1` sets it unconditionally in
+  `Enter-NativeRuntime`. So the path `deploy.py` reads on Windows is
+  `%LOCALAPPDATA%\Plantoir\builds\<folder id>\<CODE>\section<N>\.netlify_site.json`,
+  and releasing the mac's literal `<CODE>/.merged_output/section<N>/…` here
+  would have repeated the mac's own first-cut mistake in the other direction —
+  a path that has never held a marker under this layout, so the release would
+  do nothing and the section would go on publishing over last year's site.
+  Windows releases **both**, guarded by existence, so a folder carried here
+  from a mac is covered too. `documentation/08-course-config-reference.md` now
+  says both spellings; it used to give only the mac's.
+
+  **`rollover` is on Windows' published schema and on neither of the mac's,
+  and this is a platform fact rather than a preference.** Plantoir's own
+  assistant window reaches its tools THROUGH `plantoir-mcp` over JSON-RPC, and
+  the SDK's binder **drops** an argument the method does not declare rather
+  than refusing it. Measured against ModelContextProtocol 2.2.0 by sending a
+  made-up key to a real server over stdio: the call completed, `IsError =
+  false`, the key gone. So leaving `rollover` off the schema here would make
+  the rollover phrasing run as an ordinary re-date **with nothing anywhere
+  reporting a fault** — the quietest possible version of the defect the whole
+  feature exists to fix. The mac's card and its runner share a process, so no
+  binder stands between them and it can keep the key off. `plan_re_date_classes`
+  needs `website` and `rollover` here for the same reason once removed: plan
+  mode is on by default, so the card's arguments reach the TWIN first. All
+  three are recorded in `AssistSurfaceContractTests`' agreed departures. It
+  costs no routing accuracy on either side — `re_date_classes` is in neither
+  platform's local-model list. **Rejected:** folding `rollover` into `website`
+  (e.g. `website: "ask"`), which needs no new key — the contract's
+  `cardPhrasings` pins `{"rollover": "yes"}` on all three phrasings and both
+  suites assert every key and value, so the conclusion is forced rather than
+  preferred.
+
+  **All three of the traps the mac's write-up named were present here too**,
+  which is worth knowing because it means they are properties of the DESIGN and
+  not of the Swift: the answer turn arrives once the dates are already right
+  and both the plan and the apply path returned early on that; `ShowPlan`
+  returns early whenever the twin hands back a non-plan, so the release was
+  unreachable in the default configuration; and the question had to go in the
+  teacher's SUMMARY rather than the detail. The mac's own tests for these
+  ported almost line for line.
+
+  **Two things the mac may want, neither of them owed.** (a) Windows'
+  `roll_over_section` — a tool the mac does not have — now says
+  `rolloverStartedANewWebsite` / `rolloverHadNoWebsiteYet` instead of prose of
+  its own, and turns off any scheduled publish for the same reason the re-date
+  path does; two sentences for one event was exactly the drift `AssistWording`
+  exists to stop. (b) Three phrasings were added to `nearMisses` — "a new
+  website", "new one please", "roll this section over onto a new site" — which
+  **both apps already pass**, so nothing goes red. They record a KNOWN LIMIT:
+  the reply offers two sentences word for word, those exact strings are the
+  only way back in, `re_date_classes` is shown to no local model, and a teacher
+  who paraphrases matches nothing at all and is told nothing.
+
+- **A defect found while porting it, filed as issue #116 and NOT fixed here:
+  "publish tomorrow's class" fails in Plantoir's own window on Windows.** The
+  eight `publish_class_on` card phrasings set `when` (a relative day) and the
+  tool takes `date` (an absolute one, and required), so the binder drops `when`
+  and refuses. Confirmed against the real server over stdio, not reasoned
+  about. **The mac cannot have this bug** — its card and runner share a
+  process, so `AssistToolRunner` reads `when` itself — and the contract's
+  `publish_class_on` shape is the mac's and is right. Recorded here only
+  because the test that found it,
+  `AssistSurfaceContractTests.TheCardsArgumentsReachTheToolThatReadsThem`, is
+  a shape the mac has no equivalent of and might want: it walks every phrasing
+  in `cardPhrasings`, builds the JSON the app would really send, and asserts
+  every key is one the tool declares. Every existing test on both sides either
+  builds arguments by hand or calls the method directly, which is precisely
+  why a mismatch on the commonest request in the product survived this long.
+
 - **Item 40 is closed. Two things to know: xUnit's `Assert` throws where
   XCTest records and carries on, and Windows edited one sentence of authored
   prose in `shared-rules.json`** (Windows, 2026-09-08, branch

@@ -45,6 +45,31 @@ public class ContractTests
         Assert.Equal(wording["undoDoesNotReachTheLiveSite"]!.ToString(), AssistWording.UndoDoesNotReachTheLiveSite);
         Assert.Equal(wording["whereTheOutputIs"]!.ToString(), AssistWording.WhereTheOutputIs);
         Assert.Equal(wording["nothingToDo"]!.ToString(), AssistWording.NothingToDo);
+
+        // Rolling a section over to a new year. Pinned here rather than merely
+        // present in AssistWording, because the two sentences a teacher is
+        // OFFERED are the two AssistCardCommand must accept verbatim — a
+        // reply that invites a phrasing the matcher does not take is worse
+        // than one that offers nothing.
+        Assert.Equal(wording["rolloverWebsiteQuestion"]!.ToString(), AssistWording.RolloverWebsiteQuestion);
+        Assert.Equal(wording["rolloverSayToStartANewWebsite"]!.ToString(), AssistWording.RolloverSayToStartANewWebsite);
+        Assert.Equal(wording["rolloverSayToKeepTheSameWebsite"]!.ToString(), AssistWording.RolloverSayToKeepTheSameWebsite);
+        Assert.Equal(wording["rolloverIsOnANewWebsite"]!.ToString(), AssistWording.RolloverIsOnANewWebsite);
+        Assert.Equal(wording["rolloverHadNoWebsiteYet"]!.ToString(), AssistWording.RolloverHadNoWebsiteYet);
+        Assert.Equal(wording["rolloverKeptTheSameWebsite"]!.ToString(), AssistWording.RolloverKeptTheSameWebsite);
+        Assert.Equal(wording["rolloverWebsiteNotDecided"]!.ToString(), AssistWording.RolloverWebsiteNotDecided);
+        Assert.Equal(wording["rolloverTurnedOffTheScheduledPublish"]!.ToString(),
+                     AssistWording.RolloverTurnedOffTheScheduledPublish);
+        Assert.Equal(wording["rolloverCouldNotTurnOffTheScheduledPublish"]!.ToString(),
+                     AssistWording.RolloverCouldNotTurnOffTheScheduledPublish);
+
+        // The two with a value in them carry the generator's own example, the
+        // same way `deployed` above carries "{course}" and "{section}".
+        Assert.Equal(wording["rolloverStartedANewWebsite"]!.ToString(),
+                     AssistWording.RolloverStartedANewWebsite(
+                         ".netlify_sites/section1.previous-2026-09-08_071500.json"));
+        Assert.Equal(wording["rolloverCouldNotStartANewWebsite"]!.ToString(),
+                     AssistWording.RolloverCouldNotStartANewWebsite(".netlify_sites/section1.json"));
     }
 
     [Fact]

@@ -175,6 +175,36 @@ public class AssistSurfaceContractTests
             "plan_re_date_classes.timetable", "plan_re_date_classes.block",
             "plan_re_date_classes.pages", "plan_re_date_classes.meetings",
             "plan_re_date_classes.firstDay", "plan_re_date_classes.startYear",
+
+            // The rollover's website question. `website` itself IS in the
+            // contract and so is not listed here; these three are ours alone,
+            // for a reason that is a platform fact rather than a preference.
+            //
+            // Plantoir's own assistant window reaches these tools THROUGH this
+            // MCP server over JSON-RPC (Plantoir/Services/McpClient.cs), and
+            // an argument the tool does not DECLARE is DROPPED by the SDK's
+            // binder rather than refused — measured against
+            // ModelContextProtocol 2.2.0 by sending a made-up key: the call
+            // completed, IsError false, the key gone. So an undeclared
+            // `rollover` would make the rollover phrasing run as an ordinary
+            // re-date with nothing anywhere reporting a fault, which is why
+            // TheCardsArgumentsReachTheToolThatReadsThem asserts arrival and
+            // not merely presence on the schema. On the mac the card and the
+            // tool runner share a process, so no binder stands between them
+            // and `rollover` is deliberately absent from its published schema
+            // — the same aim, reached differently because the two apps are
+            // built differently.
+            //
+            // `plan_re_date_classes` needs both for the same reason once
+            // removed: plan mode is ON by default, so the card's arguments
+            // reach the TWIN first, and a twin that cannot see them proposes an
+            // ordinary re-date and the answer is lost.
+            //
+            // Costs no routing accuracy: re_date_classes and its twin are not
+            // in AssistAgent.ForTheLocalModel, so no local model reads either
+            // schema.
+            "re_date_classes.rollover",
+            "plan_re_date_classes.website", "plan_re_date_classes.rollover",
         }.Where(e => tools.Contains(e[..e.IndexOf('.')])).ToList();
 
         var unagreedExtras = onlyHere.Except(agreedExtras).OrderBy(e => e, StringComparer.Ordinal).ToList();
@@ -267,9 +297,16 @@ public class AssistSurfaceContractTests
             var (required, types) = Parameters(method!);
             var (expectedRequired, expectedTypes) = Expected(tool);
 
-            Assert.Equal(
-                expectedRequired.OrderBy(p => p, StringComparer.Ordinal).ToList(),
-                required.OrderBy(p => p, StringComparer.Ordinal).ToList());
+            // Named, because a bare Assert.Equal here reports two lists of
+            // argument names and not which of the tools they belong to — and
+            // the loop stops at the first failure, so the reader has no other
+            // clue either.
+            Assert.True(
+                expectedRequired.OrderBy(p => p, StringComparer.Ordinal)
+                    .SequenceEqual(required.OrderBy(p => p, StringComparer.Ordinal)),
+                $"\"{name}\" must require exactly the arguments the contract says it does. " +
+                $"Contract: [{string.Join(", ", expectedRequired.OrderBy(p => p, StringComparer.Ordinal))}]; " +
+                $"here: [{string.Join(", ", required.OrderBy(p => p, StringComparer.Ordinal))}].");
 
             foreach (var (parameter, type) in expectedTypes)
             {
@@ -324,9 +361,16 @@ public class AssistSurfaceContractTests
             var (required, types) = Parameters(method);
             var (expectedRequired, expectedTypes) = Expected(tool);
 
-            Assert.Equal(
-                expectedRequired.OrderBy(p => p, StringComparer.Ordinal).ToList(),
-                required.OrderBy(p => p, StringComparer.Ordinal).ToList());
+            // Named, because a bare Assert.Equal here reports two lists of
+            // argument names and not which of the tools they belong to — and
+            // the loop stops at the first failure, so the reader has no other
+            // clue either.
+            Assert.True(
+                expectedRequired.OrderBy(p => p, StringComparer.Ordinal)
+                    .SequenceEqual(required.OrderBy(p => p, StringComparer.Ordinal)),
+                $"\"{name}\" must require exactly the arguments the contract says it does. " +
+                $"Contract: [{string.Join(", ", expectedRequired.OrderBy(p => p, StringComparer.Ordinal))}]; " +
+                $"here: [{string.Join(", ", required.OrderBy(p => p, StringComparer.Ordinal))}].");
 
             foreach (var (parameter, type) in expectedTypes)
             {
@@ -352,6 +396,98 @@ public class AssistSurfaceContractTests
         AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere,
             tools.Select(t => t!["function"]!["name"]!.ToString()));
     }
+
+    /// <summary>
+    /// Every argument a card phrasing sets is an argument the tool it routes to
+    /// actually DECLARES.
+    ///
+    /// <para><b>Presence on the schema is not the property that matters —
+    /// arrival is.</b> Plantoir's own assistant window sends
+    /// <c>AssistCardCommand.ToJsonObject</c> to this server over JSON-RPC, and
+    /// the SDK's binder DROPS a key the method does not declare rather than
+    /// refusing it: measured against ModelContextProtocol 2.2.0 by sending a
+    /// made-up argument, the call completed with <c>IsError = false</c> and the
+    /// key simply gone. So a phrasing whose argument the tool has forgotten to
+    /// take runs as though the teacher had said the plainer sentence, with
+    /// nothing anywhere reporting a fault. "Roll this section over to a new
+    /// year" would quietly become an ordinary re-date, and the section would go
+    /// on publishing over last year's website — the defect this whole feature
+    /// exists to fix.</para>
+    ///
+    /// <para>Across every phrasing rather than one case, because the failure is
+    /// silent and so is invisible to any test that does not go looking.</para>
+    /// </summary>
+    [Fact]
+    public void TheCardsArgumentsReachTheToolThatReadsThem()
+    {
+        var served = ServedTools();
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+        var missing = new List<string>();
+        var stillDropped = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var phrasing in doc["cardPhrasings"]!["matches"]!.AsArray())
+        {
+            string typed = phrasing!["phrasing"]!.ToString();
+            var matched = AssistCardCommand.Matching(typed);
+            if (matched is null) continue;   // the phrasing itself is another test's business
+            if (!served.TryGetValue(matched.ToolName, out var method)) continue;
+
+            var takes = method.GetParameters()
+                .Select(p => p.Name!)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (string key in matched.ToJsonObject("ICS3U", 1).Select(pair => pair.Key))
+            {
+                if (takes.Contains(key)) continue;
+                string pair = $"{matched.ToolName}.{key}";
+                if (KnownToBeDropped.ContainsKey(pair)) { stillDropped.Add(pair); continue; }
+                missing.Add($"“{typed}” sets \"{key}\" and {matched.ToolName} does not take it");
+            }
+        }
+
+        Assert.True(missing.Count == 0,
+            "These card arguments are dropped on the way to the tool, silently: " +
+            string.Join("; ", missing) + ". The request then runs as though the teacher had said " +
+            "something simpler, and nothing reports a fault.");
+
+        // The other direction, so the list cannot rot: a pair recorded as
+        // broken and no longer broken has been FIXED, and leaving it here would
+        // turn this into a record of what once went wrong.
+        var mended = KnownToBeDropped.Keys.Except(stillDropped).OrderBy(p => p, StringComparer.Ordinal);
+        Assert.True(!mended.Any(),
+            "These are recorded as arguments the binder drops and they now arrive: " +
+            string.Join(", ", mended) + ". Delete them from KnownToBeDropped, and close the issue " +
+            "the entry names.");
+    }
+
+    /// <summary>
+    /// Card arguments the tool does not declare, each with the reason it is
+    /// listed rather than fixed.
+    /// </summary>
+    /// <remarks>
+    /// <para>Listed rather than tolerated: the test above fails on anything NOT
+    /// here, and fails again when something here is mended and not deleted, so
+    /// this is a short-lived record rather than a licence.</para>
+    /// </remarks>
+    private static readonly Dictionary<string, string> KnownToBeDropped = new(StringComparer.Ordinal)
+    {
+        // HARMLESS, and correct as it stands. The undo history is per
+        // conversation, so the tool needs neither — the card sends course and
+        // section to every tool it can reach, and these two are simply surplus.
+        ["undo_last_change.course"] = "the undo history is per conversation, so the argument is surplus",
+        ["undo_last_change.section"] = "the undo history is per conversation, so the argument is surplus",
+
+        // A REAL DEFECT, filed as issue #116 and deliberately not fixed inside
+        // the rollover work that found it. The eight publish_class_on phrasings
+        // send `when` (a relative day) and the tool takes `date` (an absolute
+        // one), which is required — so "publish tomorrow's class", the
+        // commonest request in the product and one of the shelf's suggested
+        // prompts, fails in the app with "That tool couldn't be run". Confirmed
+        // against the real server over stdio, not reasoned about. The fix has a
+        // wording decision in it (does "monday" include today when today is
+        // Monday?), which is why it is its own piece of work.
+        ["publish_class_on.when"] = "issue #116 — the card's relative day never becomes the tool's date",
+    };
 
     /// <summary>
     /// How far this app's MCP surface has drifted ahead of the contract's,

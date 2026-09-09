@@ -129,6 +129,24 @@ public static class ActivityTrail
         /// report support will receive; this line says which rule refused.
         /// </summary>
         RemovalBlocked,
+        /// <summary>
+        /// A rollover cut a section loose from last year's website. Carries
+        /// the course, the section and — when there was a website to move away
+        /// from — where last year's details were kept.
+        /// </summary>
+        /// <remarks>
+        /// The same act turns off any publish that was set to happen on its
+        /// own, so a teacher whose overnight publish stops happening has one
+        /// line explaining both.
+        /// </remarks>
+        SectionStartedANewWebsite,
+        /// <summary>
+        /// A rollover kept last year's website. The OTHER answer, and the one
+        /// a problem report is more likely to be about: a teacher writing in
+        /// weeks later to say last year's class site was replaced is
+        /// describing this branch.
+        /// </summary>
+        SectionKeptItsWebsite,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -171,6 +189,8 @@ public static class ActivityTrail
         Event.ItemExcluded => "item excluded",
         Event.ItemReIncluded => "item re-included",
         Event.RemovalBlocked => "removal blocked",
+        Event.SectionStartedANewWebsite => "section started a new website",
+        Event.SectionKeptItsWebsite => "section kept its website",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

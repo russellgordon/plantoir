@@ -443,8 +443,29 @@ public static class TaskScheduling
         return null;
     }
 
+    /// <summary>
+    /// Stands in for <c>schtasks.exe</c>, so a test can drive scheduling
+    /// without a real scheduled task.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Not convenience — the alternative deletes a teacher's real
+    /// publish.</b> <see cref="Cancel"/> runs <c>schtasks /Delete /F</c>
+    /// against the real Task Scheduler, and the fixture course in this suite
+    /// is ICS3U, which is a course a teacher plausibly has. A test that
+    /// exercised the rollover's "turn off the scheduled publish" branch with
+    /// no seam would silently remove whoever is running the suite's own
+    /// overnight publish. The mac reached the same conclusion about
+    /// <c>launchctl</c> and injects a runner for it.</para>
+    ///
+    /// <para>Process-wide, so anything setting it belongs in the
+    /// <c>SharedActivityState</c> serialized collection and must put it back.</para>
+    /// </remarks>
+    internal static Func<IReadOnlyList<string>, (int ExitCode, string Output)>? SchtasksForTests;
+
     private static (int ExitCode, string Output) Run(IEnumerable<string> arguments)
     {
+        if (SchtasksForTests is { } stand_in) return stand_in(arguments.ToList());
+
         var info = new ProcessStartInfo
         {
             FileName = "schtasks.exe",
