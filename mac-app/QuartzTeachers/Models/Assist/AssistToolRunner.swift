@@ -58,9 +58,16 @@ final class AssistToolRunner {
     /// back.
     private let history: AssistChangeHistory = AssistChangeHistory()
 
-    /// The day "tomorrow" is counted from. Injectable so a test is not a
-    /// different test depending on when it runs.
-    private let today: CalendarDay
+    /// How the day "tomorrow" is counted from is READ, rather than what it
+    /// was when this runner was made.
+    ///
+    /// A function rather than a date, because this object outlives a day. It
+    /// is built once per conversation and once per `--mcp-stdio` process, and
+    /// a stored date meant a window left open across midnight resolved
+    /// "tomorrow" against the day the conversation BEGAN — publishing the
+    /// wrong class and reporting success. Injectable so a test is not a
+    /// different test depending on when it runs, and so a test can MOVE it.
+    private let readToday: () -> CalendarDay
 
     /// How a scheduled deploy reaches launchd. Injectable for the same reason
     /// the app's own schedule sheet injects it: a test that really bootstrapped
@@ -103,6 +110,18 @@ final class AssistToolRunner {
         return conversationBackupURL != nil
     }
 
+    /// The day a relative word is counted from, read afresh every time it is
+    /// asked for.
+    ///
+    /// Readable from outside because `AssistAgent` settles the day of a call
+    /// BEFORE the plan twin and the act both run against it, and the two must
+    /// use the same clock: a second reading of the machine's own clock there
+    /// would be a second clock in the process, and every test that pins this
+    /// one would stop pinning what the teacher's request resolves to.
+    var today: CalendarDay {
+        return readToday()
+    }
+
     /// The tools, as the LOCAL model sees them.
     ///
     /// Thirteen of the twenty-two that exist. A small local model routes worse
@@ -127,12 +146,12 @@ final class AssistToolRunner {
 
     init(workspace: WorkspaceModel,
          siteWork: AssistSiteWork? = nil,
-         today: CalendarDay = CalendarDay.today(),
+         today: @escaping () -> CalendarDay = { return CalendarDay.today() },
          launchControl: LaunchControlRunning = LaunchControl(),
          openMainWindow: (@MainActor () -> Void)? = nil) {
         self.workspace = workspace
         self.siteWork = siteWork ?? AssistToolchainWork(workspace: workspace)
-        self.today = today
+        self.readToday = today
         self.launchControl = launchControl
         self.openMainWindow = openMainWindow
     }
@@ -3161,6 +3180,12 @@ final class AssistToolRunner {
     /// another; both are read, because a dropped argument reads to a teacher as
     /// the assistant ignoring them.
     private func text(_ key: String, in arguments: [String: Any]) -> String {
+        return AssistToolRunner.text(key, in: arguments)
+    }
+
+    /// The same reading, available before there is a runner to ask — the day
+    /// of a call is settled by `AssistAgent` while the call is being made.
+    private static func text(_ key: String, in arguments: [String: Any]) -> String {
         guard let value = arguments[key] else {
             return ""
         }
@@ -3289,6 +3314,51 @@ final class AssistToolRunner {
             }
         }
         return found
+    }
+
+    /// The same arguments, with a relative day settled into the date it means.
+    ///
+    /// Called ONCE, where a call is created, so a word like "tomorrow" cannot
+    /// resolve TWICE against two readings of the clock. Plan mode runs the
+    /// `plan_` twin and then, on Go, the act, from one set of arguments: a
+    /// word carried through would be read again at the second moment, so a
+    /// plan shown at 23:59 and agreed to at 00:01 publishes a class the plan
+    /// never described. Rare, silent, and a wrong day nobody would think to
+    /// look for. Settling it here makes the plan and the act the same day by
+    /// construction, which is what the frozen clock used to buy and what
+    /// reading the clock afresh would otherwise have cost.
+    ///
+    /// **Which argument carries a day is asked of the TOOL, not of a list
+    /// kept here.** Only a tool that declares `date` takes a class day —
+    /// `publish_class_on` and its plan twin today, and whatever declares one
+    /// next. `schedule_deploy`'s `when` is a MOMENT, a day and a time, and is
+    /// excluded by construction rather than by being remembered. The card's
+    /// own spelling `when` is settled for those same tools, because the eight
+    /// fixed phrasings send it; it is not RENAMED, because `AssistCardCommand`
+    /// is generated into the contract and both suites assert that key.
+    ///
+    /// A word this cannot read is left exactly as it arrived, so the sentence
+    /// a teacher sees is still the runner's own refusal rather than a silent
+    /// change of subject.
+    static func settlingTheClassDay(in arguments: [String: Any],
+                                    forTool definition: AssistToolDefinition,
+                                    today: CalendarDay) -> [String: Any] {
+        guard definition.parameters["date"] != nil else {
+            return arguments
+        }
+        var settled: [String: Any] = arguments
+        // The precedence `classPlan` itself reads them in.
+        for key in ["date", "when"] {
+            let raw: String = AssistToolRunner.text(key, in: arguments)
+            if raw.isEmpty {
+                continue
+            }
+            guard let day = AssistToolRunner.day(named: raw, today: today) else {
+                continue
+            }
+            settled[key] = day.text
+        }
+        return settled
     }
 
     /// A day the teacher named: `2026-09-15`, or the handful of words the
