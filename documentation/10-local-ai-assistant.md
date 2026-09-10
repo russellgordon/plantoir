@@ -903,10 +903,10 @@ shows its END (`tooLongForTheSpace`, 2026-09-05 — an iCloud path runs through
 only one that differs between a teacher's folders and it was the one lost), and
 a path that FITS starts beside the label (`fitsInTheSpace`, 2026-09-09, issue
 #145). The second was written four days after the first, because the first
-BROKE it. The mac's bar is a horizontal `ScrollView`; a scroll view fills
-whatever width it is given, so once the content was anchored at the trailing
-edge, a short path was pinned to the far end of the window with the label
-stranded at the other — reported from a screenshot, on every window, for four
+BROKE it. The mac's bar was then a horizontal `ScrollView` (it is the last
+of three forms now — see below); a scroll view fills whatever width it is given,
+so once the content was anchored at the trailing edge, a short path was pinned
+to the far end of the window with the label stranded at the other — reported from a screenshot, on every window, for four
 days.
 
 **The shape of that mistake is worth more than the fix**, because it is not
@@ -914,7 +914,8 @@ about SwiftUI: a greedy container handed an alignment meant for the OVERFLOW
 case applies it just as happily to the case that fits, and the case that fits is
 the ordinary one. The fix is to prefer the natural-size form —
 `ViewThatFits(in: .horizontal)` on the mac, choosing the plain row and falling
-back to the scrolling one. It lives inside `FinderPathBarView` rather than at a
+back — through the collapsed row added the same day, below — to the scrolling
+one. It lives inside `FinderPathBarView` rather than at a
 call site, which matters: the folder picker had already met this and wrapped its
 own copy in a `ViewThatFits`, so the knowledge existed in the repository while
 the window's bar went on being wrong, and a third caller would have inherited
@@ -928,6 +929,33 @@ not a decision anyone made, so a surface that ever replaced it with a
 hand-rolled `ScrollViewer` of crumbs would need `HorizontalAlignment="Left"` on
 its content and would meet exactly this.
 
+**What "shows its END" LOOKS like, decided by watching Finder rather than by
+taste.** Russell's instruction on 2026-09-09 was "no ellipsis on macOS, please",
+with a screenshot of Finder's own path bar, and Finder was then measured at five
+window widths before anything was written. It shrinks the middle names first;
+then goes icon-only from the left, keeping the volume and the last crumb or two
+named longest; and at its narrowest it clips the TAIL. The mac's bar now takes
+the middle of that — every crumb keeps its icon and chevron, only the folder
+itself keeps its name — and **two of Finder's behaviours are deliberately not
+copied**. The intermediate step, names shrinking before they vanish, is
+per-crumb width negotiation for a state a teacher passes through rather than
+sits in. And the clipping is the very defect fixed on 2026-09-05: at 520 points
+Finder had lost the folder's own name off the right-hand edge, which is what
+`tooLongForTheSpace` exists to forbid. So when even icons and chevrons will not
+fit, this bar falls back to its own end-anchored scroll rather than to Finder's
+clipping — three forms, and `ViewThatFits` picks the first that fits.
+
+**The ellipsis belongs on Windows and only there.** `BreadcrumbBar` replaces the
+leftmost nodes with one, which is right on that platform because it is that
+platform's control; putting it in front of a Mac teacher would be the same
+mistake as saying "on this PC" to them, which is why the contract now records
+the divergence beside the rule the way `specialNames.platformWording` does.
+
+**A hidden name is not a lost one.** Every crumb keeps its tooltip, its
+double-click and its context menu when collapsed, so hovering an icon still
+says which folder it is — which is also why the collapse is safe to prefer over
+scrolling: nothing becomes unreachable, only quieter.
+
 **Pinned by measurement, not by eye.** A layout rule asserted in words is a rule
 nothing runs. `PathBarWidthTests` proposes 1,400 points to the bar and reads
 back the width it CLAIMS — the defect being precisely "claims all the width
@@ -935,7 +963,14 @@ offered" — the way `CloudSyncNoticeLayoutTests` reads height for the notice
 above it. 175 points with the fix; 1,400 with it taken out, for a row that draws
 in 175. A third case squeezes a long path to 320 and requires it to take all
 320, so "ask for less" cannot be satisfied by a bar that clips instead of
-scrolling.
+scrolling. The collapse is checked the same way and indirectly on purpose, which
+makes it stronger: a row that draws no ancestor names cannot change width when
+those names change length, so two paths of the same depth — one with very long
+ancestor names, one with short — must collapse to the SAME width while their
+full rows differ. What that does NOT exclude, said rather than
+hidden: a fixed-width truncation would pass it, since both paths' ancestors
+would get the same room. What it catches is the regression that would actually
+happen — SwiftUI squeezing the names variably as the space tightens.
 
 **The general lesson, which is why this went unnoticed for months.** An
 affordance that lives ONLY in a context menu is invisible to everything: no
