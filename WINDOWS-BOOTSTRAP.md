@@ -118,9 +118,21 @@ reasons rather than tasks:
 
 ## 5. Rules while you work
 
-- **Never hand-edit the generated keys** in `contracts/` — `cardPhrasings`,
-  `tools`, `milestones`. The mac overwrites them and the diff looks like
-  vandalism.
+- **Never hand-edit the generated keys** in `contracts/`. The mac overwrites
+  them and the diff looks like vandalism. **Read which they are from each
+  file's own `generated.keys`**, never from a list somebody typed into prose:
+  this line named three of them until 2026-09-10 and had `toolSchemas` — where
+  every tool's ARGUMENTS live — missing, which is why a `back_up_course` that
+  gained a `section` on the mac arrived here looking like it came from nowhere.
+- **A red contract test is a HANDOVER arriving, and the issue naming it is
+  probably already open.** The mac opens a `windows` issue in the session it
+  changes a contract (`CLAUDE.md` rule 3), so a failure in
+  `AssistCardCommandTests`, `AssistSurfaceContractTests` or `ContractTests`
+  means the mac moved and this side has not followed yet. **Read the open
+  `windows` issues before filing a new one** — issue #146 was written because
+  four bare `Assert.NotNull() Failure: Value is null` messages were met
+  mid-task and read as nobody having said anything, when #70 had named all five
+  phrasings the evening before. Those assertions say where to look now.
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
   `promptHistory`, and the case lists in the other files). Doing so will make
   the **mac** suite fail until they implement it — that is the mechanism
