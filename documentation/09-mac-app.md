@@ -99,6 +99,39 @@ curriculum folder is what let the retired sentence sit unguarded, and the
 banned-word sweep could not stand in for it — a banned word catches only that
 word.
 
+## The caption under the four Content Structure lists
+
+The tip below the Shared folders / Shared files / Per-section folders /
+Per-section files editors is `SpecialNames.contentStructureTip`, asserted
+against `contracts/shared-rules.json` → `specialNames.contentStructureTip`.
+The sentence itself, the alternatives rejected and the one edge it does not
+cover are in that contract entry's `why`; the rule it glosses — an exclusion
+is by NAME, is authoritative at build time and never expires — is in
+[`05-build-pipeline.md`](05-build-pipeline.md). None of that is repeated here.
+
+**What is worth knowing on this side is how it is guarded, because the obvious
+guard does not reach.** A contract test proves the constant matches the
+contract and stays green if the line that RENDERS it is deleted — measured, not
+assumed: with `Text(SpecialNames.contentStructureTip)` removed from
+`CourseSettingsView`, the three contract facts all still passed. Windows
+answered that with an opt-in UI-Automation test that reads the real form
+(`CourseSettingsCaptionUiTests`). The mac has no such harness, so
+`testCourseSettingsDrawsTheContentStructureTipFromOneHome` uses the source scan
+issue #71 established for the Marks wording: it reads `CourseSettingsView.swift`
+and asserts the constant is referenced on a non-comment line, and that no other
+product file carries a pasted copy of the sentence's opening. That failed with
+the line removed and passes with it back.
+
+**Its limits, so nobody trusts it further than it goes.** It sees a reference,
+not a rendering: it cannot tell that the `Text` is inside the Content Structure
+section, that the section can be reached, or that anything is on screen. A
+paraphrase evades the paste-back half, as does a copy split before the needle's
+24th character. It is a paste-back and deletion guard standing in for a UI
+test, and choosing it over a hosted-view geometry check was the same call
+[`04-course-setup.md`](04-course-setup.md) records for the Marks caption:
+`Form` and `Section` render lazily on macOS, so walking the view tree means
+fighting the layout for an answer the source already gives.
+
 ## Renaming a course folder
 
 Folder rows in Course Settings carry a pencil. It renames the folder **on
