@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
@@ -41,6 +42,19 @@ namespace Plantoir.Mcp;
 [McpServerToolType]
 public sealed class PlantoirTools(AssistWorkspace workspace)
 {
+    /// <summary>
+    /// Today, read at the moment a tool runs rather than when this was built.
+    /// </summary>
+    /// <remarks>
+    /// <para>A property so a test can pin the day; a FUNCTION rather than a
+    /// stored date because this server outlives a calendar day. One
+    /// <c>plantoir-mcp</c> can stay open for as long as an editor session
+    /// does, and a stored "today" would have it publishing "tomorrow's class"
+    /// against the day the process STARTED - a wrong day that reports success.
+    /// </para>
+    /// </remarks>
+    internal Func<DateOnly> Today { get; init; } = () => DateOnly.FromDateTime(DateTime.Now);
+
     // ---- Looking around --------------------------------------------------
 
     [McpServerTool(Name = "list_courses", Title = "List courses", ReadOnly = true, Destructive = false)]
@@ -1570,7 +1584,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(ClassDateHelp)] string date)
-        => Guarded(() => Proposing(PlanForDay(course, section, date, publishes: true)));
+        => Guarded(() => Proposing(PlanForDay(course, section, DayFor(date), publishes: true)));
 
     [McpServerTool(Name = "publish_class_on", Title = "Publish a day's class",
                    Destructive = false, Idempotent = true)]
@@ -1594,7 +1608,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     {
         try
         {
-            var plan = PlanForDay(course, section, date, preview);
+            var day = DayFor(date);
+            var plan = PlanForDay(course, section, day, preview);
             if (plan.NothingToDoSentence is { } already) return Answering(already);
 
             var result = await workspace.Apply(plan, preview, Relay(progress), cancellation);
@@ -1606,20 +1621,45 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // The teacher named a DAY, so the day is what they are told about.
             // Which pages that turned out to mean, and what happened to the
             // section's front page, are the model's business.
+            // The DAY that was settled on, never the word that was sent. A
+            // caller saying "tomorrow" would otherwise be told "Published the
+            // class on tomorrow", which is not a date anybody can check
+            // against their timetable a week later.
             return result.Succeeded
-                ? Answering($"Published the class on {date}.", text.ToString())
+                ? Answering($"Published the class on {day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.",
+                            text.ToString())
                 : Answering(text.ToString());
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
     }
 
-    private PublishPlan PlanForDay(string course, int section, string date, bool publishes)
+    /// <summary>
+    /// The class taught on a day, planned.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>A relative day is understood here too.</b> Plantoir's own
+    /// window settles "tomorrow" into a date before it ever reaches this
+    /// server (<c>AssistCardCommand.ToJsonObject</c>), so the words arrive
+    /// only from an MCP client - Claude Code, say - where nothing renames or
+    /// resolves anything. The mac's runner has always forgiven whatever
+    /// arrives; without this the two MCP surfaces would answer the same
+    /// sentence differently. It is the same shared reader the window uses, so
+    /// "monday" means one thing in this product.</para>
+    ///
+    /// <para>Tried BEFORE <see cref="ParseDate"/> and harmless: the reader is
+    /// strict, and hands back null for anything that is not one of its words
+    /// or a <c>yyyy-MM-dd</c> date.</para>
+    /// </remarks>
+    private DateOnly DayFor(string date) =>
+        SectionScheduleSource.ReadRelativeDay(date, Today())
+            ?? ParseDate(date, "date")
+            ?? throw new AssistRefusal("No date was given for the class to publish.");
+
+    private PublishPlan PlanForDay(string course, int section, DateOnly when, bool publishes)
     {
         var found = workspace.Course(course);
         int number = workspace.Section(found, section);
-        var when = ParseDate(date, "date")
-            ?? throw new AssistRefusal("No date was given for the class to publish.");
         string page = workspace.ClassOn(found, number, when);
 
         return workspace.PlanPublish(course, number,

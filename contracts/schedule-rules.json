@@ -57,9 +57,49 @@
         "expectDate": null,
         "input": "next Thursday",
         "why": "Not understood, and refused rather than guessed: a date guessed wrong dates a class wrong, silently."
+      },
+      {
+        "expectDate": "2026-09-08",
+        "input": "tuesday",
+        "why": "TODAY COUNTS. The contract's today is a Tuesday, and a teacher asking on Tuesday for Tuesday's class means the class they are about to teach, not the one a week away - the same reading a person gives it. This is the case that fails if a platform decides a named day must always be at least a day off, which is defensible in the abstract and wrong every Monday morning."
+      },
+      {
+        "expectDate": "2026-09-09",
+        "input": "wednesday",
+        "why": "Tomorrow, reached by its name instead."
+      },
+      {
+        "expectDate": "2026-09-14",
+        "input": "monday",
+        "why": "Forwards, within the next seven days: the Monday coming, six days off, never the Monday just gone. 'Publish Monday's class' is said while preparing; a teacher who means a class already taught has its Unit and Day in front of them and says so."
+      },
+      {
+        "expectDate": "2026-09-13",
+        "input": "sunday",
+        "why": "The far end of the week still lands inside it."
+      },
+      {
+        "expectDate": "2026-09-11",
+        "input": "Friday",
+        "why": "Casing is the teacher's, not the matcher's. Compared as a day of the week rather than as a formatted name, so a machine whose language is not English still reads it."
+      },
+      {
+        "expectDate": "2026-09-14",
+        "input": "monday's",
+        "why": "The apostrophe belongs to the phrasing, not to the day. Both spellings of it, because which one a teacher types depends on their keyboard and on what autocorrect did to it."
+      },
+      {
+        "expectDate": null,
+        "input": "next monday",
+        "why": "Refused for the same reason as 'next Thursday' above, and named here because it is the near miss of a day that IS understood: 'next Monday' can mean the coming Monday or the one after it, people genuinely disagree about which, and the model answers it with today's date in front of it."
+      },
+      {
+        "expectDate": null,
+        "input": "mondays",
+        "why": "A day, not a habit. Nothing in the product means one class by it, so it is refused rather than read as the nearest thing that parses."
       }
     ],
-    "note": "The words that reach the tools literally, because the card phrasings that carry them are matched in code and never sent to the model. 'Tomorrow' arriving as the word 'tomorrow' has to be understood where it lands.",
+    "note": "The words that reach the tools literally, because the card phrasings that carry them are matched in code and never sent to the model. 'Tomorrow' arriving as the word 'tomorrow' has to be understood where it lands. The seven weekday names arrive the same way, from the eight fixed 'publish <day>'s class' phrasings, and mean the NEXT such day counting today. WHERE the word is understood is a platform matter and deliberately not pinned here: the mac reads it inside its tool runner, while Windows settles it before the call crosses into plantoir-mcp (its binder would drop an argument the tool does not declare) and understands it in the tool as well, for MCP callers that have no card. What both must agree on is which day the word names, which is what these cases are.",
     "today": "2026-09-08"
   },
   "slashOrdering": {

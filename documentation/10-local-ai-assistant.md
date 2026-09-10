@@ -1035,7 +1035,7 @@ assistant's contract and is now the whole product's:
 | `contracts/assist-wording.json` | Every sentence the assistant says to a teacher, with `{course}` and `{section}` where values go. **Count the keys rather than trusting a number here** — it was written as "nineteen" and there are forty-one. |
 | `contracts/assist-cases.json` | The phrasings matched in code, the near misses that must NOT match, the three tool lists with approvals and plan twins, **the full tool SCHEMAS as a client sends them**, the scenarios, and the arrow-key prompt history. A scenario is `given` / `when` / an expectation: `given.saying` makes it a CONVERSATION rather than one turn, `when` is `approve`, `decline`, `say` (the last turn is ANSWERED, and a card there fails the case) or a tool name, and the expectation is `expectEvents`, `expectReply`, `expectTranscript` or `expectTranscriptContains`. The file's own `scenarios.note` is the authority; counts here rot. |
 | `contracts/app-rules.json` | Launcher arguments per configuration, the validation a teacher reads, failure output turned into a sentence, whether a deploy must build first, the progress markers and where each one's text comes from, the preview's ports. |
-| `contracts/schedule-rules.json` | Every accepted date form, how an ambiguous `08/09/2026` column is settled or asked about, what a pasted Google Sheet address becomes. |
+| `contracts/schedule-rules.json` | Every accepted date form, how an ambiguous `08/09/2026` column is settled or asked about, what a pasted Google Sheet address becomes, and which day a word like “tomorrow” or “Monday” names. |
 | `contracts/class-planning.json` | Which titles carry numbers, what the next class is called, and the ORDER renames must run in. |
 | `contracts/course-management.json` | The three kinds of zip and how they are told apart, the section number offered next and the refusals, grade labels from a course code. |
 | `contracts/file-formats.json` | Every `course_config.json` key with type and default, and the frontmatter that decides who sees a page — `publish:`, the legacy `draft:` that means the opposite, and the per-section keys. |
@@ -1758,9 +1758,10 @@ which is exactly the gap a binder sits in.
 `AssistSurfaceContractTests.TheCardsArgumentsReachTheToolThatReadsThem` walks
 every phrasing in `cardPhrasings`, builds the JSON the app would really send,
 and asserts every key is one the tool declares. It found a live defect on its
-first run — the eight `publish_class_on` phrasings send `when` and the tool
-takes `date`, so "publish tomorrow's class" fails in the app (issue #116). The
-mac has no equivalent check and may want one.
+first run — the eight `publish_class_on` phrasings sent `when` and the tool
+took `date`, so "publish tomorrow's class" failed in the app (issue #116, fixed
+2026-09-09; the argument is in "Publish tomorrow's class: where a relative day
+becomes a date" below). The mac has no equivalent check and may want one.
 
 **The three traps the mac's own write-up named were all present on Windows
 too**, which means they belong to the design rather than to the Swift: the
@@ -1888,6 +1889,125 @@ on purpose.
 wrong is silent in both directions — see
 [`08-course-config-reference.md`](08-course-config-reference.md), which gives
 both spellings.
+
+## "Publish tomorrow's class": where a relative day becomes a date
+
+Written on Windows, 2026-09-09, fixing issue #116 — found by the gate the
+rollover port left behind (`TheCardsArgumentsReachTheToolThatReadsThem`) and
+confirmed against the real `plantoir-mcp` over stdio rather than reasoned
+about. It is the same seam as the rollover section above, met from the other
+side, and the general lesson is there rather than repeated here.
+
+**What was broken.** The eight fixed phrasings — "publish tomorrow's class"
+and the seven weekdays — set the argument `when`, carrying a word like
+`tomorrow`. `publish_class_on` and its plan twin take `date`, and `date` has no
+default, so it is REQUIRED. The binder drops a key the method does not declare
+and then refuses for the one it never got, so the commonest request in the
+product, reachable by CLICKING it on the prompt shelf, answered "That tool
+couldn't be run: …" — a sentence naming machinery, for a request that was
+perfectly well understood. Plan mode is on by default, so it failed at the
+twin, before anything was written; nothing was ever corrupted.
+
+**Why it could not be fixed by renaming the card's argument.**
+`contracts/assist-cases.json` → `cardPhrasings` is GENERATED from the mac's
+`AssistCardCommand.fixedShapes`, both suites assert every key and every value,
+and `when` is the mac's shape and is right there: its card and its runner share
+a process, so the runner simply reads whichever name arrived. The card keeps
+saying `when`. What changed is the JSON.
+
+### Three places a day could be settled, and why it is the one it is
+
+The choice is not "which layer is tidiest" but "whose clock, and how many
+times".
+
+- **`AssistCardCommand.ToJsonObject`, which is what shipped.** The one place
+  the card becomes the wire. It renames `when` to `date` for these two tools
+  only — `schedule_deploy` genuinely takes a `when`, being a day AND a time —
+  and settles the word into a date as it goes.
+- **Inside the tool, only.** Rejected as the sole home, because
+  `AssistAgent.RunCommand` synthesises ONE arguments object and uses it twice:
+  first for the plan twin, then, if the teacher presses Go, for the act. A word
+  carried through resolves twice, against two different readings of the clock,
+  so a plan shown at 23:59 and agreed to at 00:01 publishes a class the plan
+  never described. Rare, silent, and a wrong day nobody would think to look
+  for. Settling it at match time makes the plan and the act the same day by
+  construction.
+- **Both.** Which is what shipped, for a reason that is not belt-and-braces:
+  an MCP client — Claude Code — reaches `publish_class_on` with no card in
+  front of it and nothing to rename anything, and the mac's runner has always
+  forgiven a relative day. Leaving the tool strict would have made the same
+  sentence mean different things on the two MCP surfaces. Both paths call the
+  same `SectionScheduleSource.ReadRelativeDay`, so there is exactly one answer
+  to what "monday" means, and `PlantoirTools.Today` is a `Func<DateOnly>` read
+  per call rather than a stored date, because one `plantoir-mcp` can stay open
+  longer than a calendar day.
+
+**The tool DESCRIPTIONS were deliberately not touched, so no routing
+re-measurement is owed.** `ClassDateHelp` still tells the model to work the
+date out itself. A tool that has become more forgiving owes the model no
+announcement, and this repository has already measured what a clarifying
+sentence costs: one added to `publish_pages` took the promise-card score from
+110/110 to 90/110. Steer with code.
+
+### What "Monday" means, and where that decision lives
+
+`contracts/schedule-rules.json` → `relativeDays`, which both suites run — the
+mac against `AssistToolRunner.day(named:today:)`, Windows against
+`SectionScheduleSource.ReadRelativeDay`. The eight cases added here write down
+a rule the mac has always had in code and nobody had ever pinned:
+
+- **The next such day, counting TODAY when today is one.** Asked on a Tuesday
+  for Tuesday's class, a teacher means the class they are about to teach.
+  Rejected: always looking forward at least a day, which is defensible in the
+  abstract and wrong every Monday morning, on the day the request is most
+  likely to be made.
+- **Forwards only, inside seven days.** It is said while preparing. A teacher
+  who means a class already taught has its Unit and Day in front of them.
+- **`monday's` is `monday`** — the apostrophe belongs to the phrasing. Both
+  spellings of it, because which one a teacher types depends on their keyboard
+  and on what autocorrect did to it.
+- **`next monday` is refused, not guessed**, alongside the `next Thursday`
+  case that was already there: it can mean the coming Monday or the one after,
+  people genuinely disagree, and a date guessed wrong dates a class wrong in
+  silence. The model answers that one, with today's date in front of it. It is
+  in `nearMisses` too, as the near miss of a phrasing that DOES match.
+
+WHERE the word is understood is deliberately NOT pinned — that is the platform
+difference above. WHICH day it names is, because the same sentence must mean
+the same day on either machine.
+
+**Compare days of the WEEK, never formatted names.** `ToString("dddd")` asks
+the machine's culture what Monday is called, so on a French-locale machine the
+seven phrasings would quietly stop working for one teacher and nobody else; the
+mac pins `en_US_POSIX` on its formatter for the same reason. The same trap
+applies on the way out: `ToString("yyyy-MM-dd")` renders the year in the
+machine's DEFAULT CALENDAR, which is 2569 on a Thai-locale Windows machine, so
+the date is written with `InvariantCulture` and the tool is then looking for a
+class on a day no course has.
+
+### Two things this deliberately did not fix
+
+- **The absolute-date halves still differ.** Windows' `ParseDate` is
+  `DateOnly.TryParse` with `InvariantCulture` and accepts `9/14/2026` and
+  `14 September 2026`; the mac's `CalendarDay(text:)` is strict ten-character
+  `yyyy-MM-dd`. Only the relative WORDS are now the same on both. Worth
+  knowing before anybody writes a contract case asserting otherwise.
+- **`“x” isn't a date date can use.”`** Both platforms build that sentence
+  from the parameter's own name (`AssistPublishPlan.unreadableDate`,
+  `PlantoirTools.ParseDate`), so the class-date path reads "a date date can
+  use". It is a shared wording defect rather than a Windows one, unreachable
+  from any of the eight phrasings, and fixing it on one side alone would make
+  the two apps say different things — so it is written down here instead.
+
+**What the trail does and does not carry.** "assistant matched a fixed phrase"
+records the tool, and "assistant chose a tool" records argument NAMES and never
+values, deliberately — the values are the teacher's page titles. So a report of
+"it published the wrong day" cannot be diagnosed from the trail on either
+platform, and neither app changed that here: it would mean putting a value on
+the trail, against a rule `contracts/shared-rules.json` states with its
+reasoning. The published date is in what the teacher was told instead
+("Published the class on 2026-09-09."), which is why that sentence names the
+day it settled on rather than the word it was sent.
 
 ## Further reading in this repository
 

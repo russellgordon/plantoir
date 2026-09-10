@@ -635,16 +635,12 @@ public class AssistSurfaceContractTests
         ["undo_last_change.course"] = "the undo history is per conversation, so the argument is surplus",
         ["undo_last_change.section"] = "the undo history is per conversation, so the argument is surplus",
 
-        // A REAL DEFECT, filed as issue #116 and deliberately not fixed inside
-        // the rollover work that found it. The eight publish_class_on phrasings
-        // send `when` (a relative day) and the tool takes `date` (an absolute
-        // one), which is required — so "publish tomorrow's class", the
-        // commonest request in the product and one of the shelf's suggested
-        // prompts, fails in the app with "That tool couldn't be run". Confirmed
-        // against the real server over stdio, not reasoned about. The fix has a
-        // wording decision in it (does "monday" include today when today is
-        // Monday?), which is why it is its own piece of work.
-        ["publish_class_on.when"] = "issue #116 — the card's relative day never becomes the tool's date",
+        // Issue #116 was here — the eight publish_class_on phrasings sending
+        // `when` at a tool that takes `date`. Fixed 2026-09-09:
+        // `AssistCardCommand.ToJsonObject` settles the relative day and sends
+        // it as `date`, so nothing is dropped and nothing is missing. The
+        // entry is deleted rather than kept as history, because the check
+        // below fails on a pair that is listed and mended.
     };
 
     /// <summary>

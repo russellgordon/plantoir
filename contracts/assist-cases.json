@@ -379,11 +379,12 @@
     "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. The rest — nearMisses, scenarios — is hand-written intent and is preserved."
   },
   "nearMisses" : {
-    "note" : "Must NOT match — each one only looks like a card phrasing, and answering the wrong question with total confidence is worse than routing it. The last three are the rollover's website question, and they record a KNOWN LIMIT rather than guarding a near-miss: the reply offers two sentences word for word, those exact strings are the only way back in, and a teacher who paraphrases matches nothing at all — re_date_classes is shown to no local model, so nothing catches the paraphrase and the section stays pinned to last year's website with nothing said. Both apps already pass these, so nothing goes red; they are written down so the limit is visible, and so a future looser matcher has to change this list on purpose.",
+    "note" : "Must NOT match — each one only looks like a card phrasing, and answering the wrong question with total confidence is worse than routing it. The last three are the rollover's website question, and they record a KNOWN LIMIT rather than guarding a near-miss: the reply offers two sentences word for word, those exact strings are the only way back in, and a teacher who paraphrases matches nothing at all — re_date_classes is shown to no local model, so nothing catches the paraphrase and the section stays pinned to last year's website with nothing said. Both apps already pass these, so nothing goes red; they are written down so the limit is visible, and so a future looser matcher has to change this list on purpose. \"publish next monday's class\" is a different shape again: it is the near miss of a phrasing that DOES match, and it must reach the model precisely because \"next Monday\" is the one weekday word neither app will settle on its own - see schedule-rules.json, relativeDays.",
     "phrasings" : [
       "Undo that change to Unit 2, Day 3",
       "Deploy this section now, but only the published pages",
       "Publish tomorrow's class, but not the linked pages",
+    "publish next monday's class",
       "a new website",
       "new one please",
       "roll this section over onto a new site",
