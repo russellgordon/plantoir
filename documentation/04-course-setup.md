@@ -441,7 +441,7 @@ The list is the course's `shared_folders`, then its `per_section_folders`, then
 every folder found inside the course itself, four levels down — because the
 build counts a graded folder at ANY depth, and a checklist built from the two
 top-level lists alone would let the first tick freeze a pool without
-`Portfolios/Tasks` in it. The rule, its skip list, its depth cap and its 13
+`Portfolios/Tasks` in it. The rule, its skip list, its depth cap and its 14
 cases are `contracts/shared-rules.json` → `gradedFolders.choices`, run by
 `GradedFolderChoicesTests` on both platforms against REAL directory trees: a
 walk over a fixture is not a walk.
@@ -487,7 +487,17 @@ taking marks OFF the map:
 
 Both fall out of one instruction: recompute what the checklist offers AFTER the
 removal is recorded, and drop the name only if it is no longer among them AND
-the course had already been asked. **Order is the whole subject.** Ask before
+the course had already been asked.
+
+Two edges of that, recorded rather than left to be met. The second exception
+says "still OFFERED", not "still counts": the checklist sees four levels and the
+build counts at any depth, so a `Tasks` five levels down is dropped from the
+pool and goes on counting. And the "at least one folder must count for marks"
+floor — the one that refuses to unpick the last pooled folder while the coverage
+map is on — asks whether this is the last NAME in the pool, not whether the pool
+would survive the removal. So it still blocks removing a top-level `Tasks` on a
+course where `Portfolios/Tasks` would have kept the name. Conservative, rare,
+and the same on both platforms; sharpening it would be a shared change. **Order is the whole subject.** Ask before
 the exclusion is written and the removed folder is still on the list, so the
 pool freezes — which is what the mac did until 2026-09-09 and what Windows still
 does, from a walk cached one `BuildForm` pass earlier ([issue
@@ -541,7 +551,7 @@ disagree for the one that would have been broken by it.
 `contracts/shared-rules.json` → `gradedFolders` (10 cases for which folders
 COUNT, run by `scripts/test_graded_folders.py` in the image — neither app
 implements that rule, so neither suite runs them) and `gradedFolders.choices`
-(13 cases for what the checklist OFFERS, run by both apps). The key itself is in
+(14 cases for what the checklist OFFERS, run by both apps). The key itself is in
 `contracts/file-formats.json`.
 
 ## “Where do the class pages live?” had four answers
