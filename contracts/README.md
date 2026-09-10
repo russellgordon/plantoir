@@ -38,7 +38,7 @@ the boundary is a TOP-LEVEL key — the file names them under `generated.keys`:
 |---|---|
 | `cardPhrasings` | `AssistCardCommand.fixedShapes` |
 | `tools` | `AssistToolRunner.tools` / `.localTools` / `.mcpOnlyTools`, and each definition's `needsApproval` and `planTwinName` |
-| `toolSchemas` | `AssistToolRunner.localTools` and `.mcpTools`, emitted as each client really sends them — every argument, every description. **This row was missing until 2026-09-10**, and its absence is not a typo with no consequence: `toolSchemas` is where a tool's ARGUMENTS live, so when the mac gave `back_up_course` a `section` on 2026-09-08 the change travelled in a key that every list of "the generated keys" written in PROSE left out — the files themselves always declared it. Windows' `AssistSurfaceContractTests` went red for it, no issue named the schema move, and issue [#146](https://github.com/russellgordon/plantoir/issues/146) was left inferring where the value had come from. |
+| `toolSchemas` | `AssistToolRunner.localTools` and `.mcpTools`, emitted as each client really sends them — every argument, every description. **This row was missing until 2026-09-10**; what its absence cost is under "Reading a red suite" below. |
 | `nearMisses`, `scenarios` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and a decision lives in the `documentation/` page that owns its subject, with a GitHub issue pointing at it when the other platform owes work — the handoff documents that used to hold them were retired on 2026-09-08. |
 
 In `app-rules.json` the same split applies: `milestones` is a readout of
@@ -131,7 +131,7 @@ other platform, opened in the same session, naming what changed and what they
 have to do. `CLAUDE.md` rule 3 requires it going one way and rule 4 the other;
 neither is optional, and neither is satisfied by committing the diff.
 
-### Reading a red suite: four failures, four different causes
+### Reading a red suite: four failures, three different causes
 
 Worth walking through, because on 2026-09-09 a Windows session part-way
 through unrelated work ran `dotnet test`, found four failures, and filed
@@ -142,26 +142,41 @@ which half was which.
 
 **Two of them had an issue, and an unreadable failure.**
 [#70](https://github.com/russellgordon/plantoir/issues/70) was open, labelled
-`windows`, and named all five card phrasings with the failure spelled out —
-*"Three more card phrasings will make your suite red"* — at 23:52 on the
-evening of the regeneration. Rule 3 was followed exactly. But the two tests
-that failed for it said `Assert.NotNull() Failure: Value is null` and nothing
-else, so nobody meeting them had a phrasing, a tool or a term to search for.
-Those assertions now name all three, and say that an unmatched contract
-phrasing is a handover to look up rather than a bug to file.
+`windows`, and named the card phrasings with the failure spelled out — *"Three
+more card phrasings will make your suite red"*, and separately *"Your
+`AssistCardCommandTests` will go red until the phrasing exists on your side"*
+of the parsed `make room for ... at Unit 3, Day 4` family, which is what the
+second of the two tests actually failed on. Rule 3 was followed exactly. But
+both tests said `Assert.NotNull() Failure: Value is null` and nothing else, so
+nobody meeting them had a phrasing, a tool or a term to search for. Those
+assertions now name all three, and say that an unmatched contract phrasing is a
+handover to look up rather than a bug to file.
 
 **One had a perfect failure and no issue at all, and this is the half #146 got
-right.** `back_up_course` gained a `section` in the same regeneration, and
-`AssistSurfaceContractTests` said so as clearly as a test can — *"must require
-exactly the arguments the contract says it does. Contract: [course, section];
-here: [course]"*. The reader knew precisely what had changed, went looking for
-the issue that explained it, and there was none: #70 discusses
-`back_up_course`'s plan twin and never mentions its arguments. **That is a rule
-3 lapse, and the lesson is that an issue must name every generated key the
-regeneration moved, not only the interesting one.** A schema change is easy to
-omit because it is not the feature you were building — it travels in
-`toolSchemas` alongside it. It did not help that no prose anywhere listed
-`toolSchemas` as generated at all; the table above has it now.
+right.** `AssistSurfaceContractTests` said as clearly as a test can that
+`back_up_course`'s arguments had moved — *"must require exactly the arguments
+the contract says it does. Contract: [course, section]; here: [course]"*. The
+reader knew precisely what had changed, went looking for the issue explaining
+it, and there was none.
+
+The sequence is worth having exactly, because it is not the careless one it
+looks like:
+
+| When (local) | What |
+|---|---|
+| 18:54 | `0f34c54d` builds `back_up_course` on the mac, requiring `[course]` — the same shape Windows had had since 2026-08-13. Nothing diverges. |
+| 19:14 | `b0913344` fixes a real defect in it: the copy was filed as the TEACHER's, so the Backups list credited them with a copy they never made and `pruneBackups` — which skips anything not the assistant's — would have kept every one for ever. The fix takes a `section` and attributes the copy. The schema moves. |
+| 19:52 | #70 is opened. It names `back_up_course`, its plan twin and its briefing persistence. It does not mention the argument. |
+
+So the thing that travelled unannounced was **a defect fix**, which is the
+worst kind to travel unannounced: Windows had the identical defect, and found
+it only because the contract went red and somebody chased it
+(`GUI-IMPROVEMENTS.md` row 478). **The lesson is not "open an issue" — one was
+open. It is that a fix made after the feature, in a separate commit, moves the
+contract too, and the issue written afterwards describes the feature.**
+`git diff contracts/` before writing it, and let the diff say what to list. It
+did not help that no prose anywhere listed `toolSchemas` as a generated key;
+the table above has it now.
 
 **One belonged to nobody but this app** — a Windows test that had retyped a
 contract value into a literal, so it failed when the contract GREW. No issue on
@@ -197,9 +212,15 @@ Two things make that failure read as a request instead of as damage:
   the one that stops being true. Three places said "`cardPhrasings`, `tools`,
   `milestones`" until 2026-09-10: two keys of one file plus one key of another,
   missing both `toolSchemas` (where a tool's arguments live) and
-  `credentialRequests`. `assist-wording.json` is the exception with no
-  `generated` block, because it is generated in FULL — it says so in its own
-  `note`, and there is no authored half of it to protect.
+  `credentialRequests`.
+
+  **Only the two MIXED files carry that key**, because it exists to mark a
+  boundary: `assist-cases.json` and `app-rules.json` are part generated and
+  part authored, so they say where the line falls. `assist-wording.json` has no
+  `generated` block because it is generated in FULL and says so in its `note`;
+  the seven authored files have none because there is no generated half to
+  mark. So the question "is this key generated?" is answered by
+  `generated.keys` in exactly the two files where it can be asked.
 
 ## Regenerating
 

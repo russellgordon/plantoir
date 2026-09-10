@@ -1117,23 +1117,30 @@ naming every phrasing.
 - **Never hand-edit the GENERATED keys.** Those are readouts of mac code; the
   next regeneration overwrites your edit and the diff looks like vandalism.
   **`assist-cases.json` and `app-rules.json` each declare their own under
-  `generated.keys`, and that is the list to read**; `assist-wording.json` has
-  no such key because it is generated in FULL, and says so in its `note`. This
-  passage named `cardPhrasings`, `tools` and `milestones` until 2026-09-10,
-  which was two keys of `assist-cases.json` plus one of `app-rules.json`, and
-  left out both `toolSchemas` — the key carrying every tool's arguments, and
-  therefore the one that moved when `back_up_course` gained a `section` — and
-  `credentialRequests`. Two other places said the same three; a list of
-  generated keys typed into prose is exactly the copy this whole folder exists
-  to stop.
-- **Name every key a regeneration moved when you write the `windows` issue,
-  not only the one you were working on.** Learned from the same failure. The
-  mac added six tools on 2026-09-08 and issue #70 named the card phrasings
-  they brought with them, carefully and in full — but `back_up_course` also
-  gained a `section` argument in that commit, which travels in `toolSchemas`
-  rather than in the feature, and nothing said so. Windows' surface test
-  reported it perfectly and its reader had nothing to look up. A schema change
-  is the easy one to omit precisely because it is not the thing you built.
+  `generated.keys`, and that is the list to read** — those two are the MIXED
+  files, and the key marks where the generated half ends.
+  `assist-wording.json` has none because it is generated in FULL and says so in
+  its `note`; the seven authored files have none because there is no generated
+  half to mark. This passage named `cardPhrasings`, `tools` and `milestones`
+  until 2026-09-10, which was two keys of `assist-cases.json` plus one of
+  `app-rules.json`, and left out both `toolSchemas` — the key carrying every
+  tool's arguments, and therefore the one that moved when `back_up_course`'s
+  signature changed — and `credentialRequests`. Two other places said the same
+  three; a list of generated keys typed into prose is exactly the copy this
+  whole folder exists to stop.
+- **Name every key a regeneration moved when you write the `windows` issue —
+  including the ones your REVIEW FIXES moved.** Learned from the same failure,
+  and the timing is the whole lesson. `back_up_course` was built at 18:54 on
+  2026-09-08 requiring `[course]`, exactly matching the tool Windows had had
+  since August. Twenty minutes later a review fix (`b0913344`) gave it a
+  `section`, because it had been filing the copy as the TEACHER's and
+  `pruneBackups` would have kept every one for ever. #70 was opened at 19:52
+  and described the FEATURE — the tool, its plan twin, its briefing
+  persistence — which is what anyone writing up an afternoon remembers. The
+  argument was not mentioned. Windows had the identical defect and found it
+  only because the contract went red and somebody chased it, so what travelled
+  unannounced was a defect FIX, which is the worst kind. Run `git diff
+  contracts/` before writing the issue rather than working from memory.
 - **Write it to the template.** `CLAUDE.md` rule 4 says what a `mac` issue
   carries — title and source, what it fixed and WHY (including what
   was rejected), numbers with the hardware they came from, the file and test

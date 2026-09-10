@@ -19,19 +19,20 @@ public class AssistCardCommandTests
     /// On 2026-09-09 a session mid-way through unrelated work met two of these
     /// red, saw <c>Assert.NotNull() Failure: Value is null</c> — naming no
     /// phrasing, no tool and nothing to look up — and filed issue #146 saying
-    /// nobody had been told. Issue #70 had named all five phrasings and
-    /// predicted this exact failure, in these words, at 23:52 the evening
-    /// before. The assertions carried no message; the mac's equivalent
+    /// nobody had been told. Issue #70 had named the phrasings and predicted
+    /// this exact failure, in these words, at 19:52 the evening before. The
+    /// assertions carried no message; the mac's equivalent
     /// (<c>AssistScenarioTests.swift</c>) has named the phrasing all along.</para>
     ///
     /// <para><b>It is "usually", not "always", and the same run proved it.</b>
     /// Two other tests failed alongside these. One was
-    /// <c>AssistSurfaceContractTests</c> reporting that <c>back_up_course</c>
-    /// had gained a <c>section</c> — a real contract move that NO issue named,
-    /// so a reader who followed this advice would rightly have found nothing
-    /// and should have opened a <c>mac</c> issue. The other was a test of this
-    /// app's own that had retyped a contract value into a literal. Check the
-    /// issues; do not assume one exists.</para>
+    /// <c>AssistSurfaceContractTests</c> reporting that <c>back_up_course</c>'s
+    /// arguments had moved — a real contract change that NO issue named,
+    /// because it came from a review fix made after the feature the issue
+    /// described. A reader following this advice would rightly have found
+    /// nothing, and should have opened a <c>mac</c> issue. The other was a test
+    /// of this app's own that had retyped a contract value into a literal.
+    /// Check the issues; do not assume one exists.</para>
     /// </summary>
     private const string Handover =
         "A phrasing the contract carries and this app does not match is usually a HANDOVER: " +

@@ -122,10 +122,12 @@ reasons rather than tasks:
   them and the diff looks like vandalism. **Read which they are from each
   file's own `generated.keys`**, never from a list somebody typed into prose:
   this line named three of them until 2026-09-10 and had `toolSchemas` — where
-  every tool's ARGUMENTS live — missing, which is why a `back_up_course` that
-  gained a `section` on the mac arrived here looking like it came from nowhere.
-  (`assist-wording.json` has no such key: it is generated in full and says so
-  in its `note`.)
+  every tool's ARGUMENTS live — missing, which is why `back_up_course`'s
+  arguments changing on the mac arrived here looking like it came from nowhere.
+  Only `assist-cases.json` and `app-rules.json` carry that key, because they
+  are the two MIXED files and it marks the boundary; `assist-wording.json` is
+  generated in full and says so in its `note`, and the seven authored files
+  have no generated half to mark.
 - **A red contract test is usually a HANDOVER arriving, and the issue naming it
   is often already open.** The mac opens a `windows` issue in the session it
   changes a contract (`CLAUDE.md` rule 3), so a failure in
