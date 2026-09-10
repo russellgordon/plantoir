@@ -229,6 +229,24 @@ the one image that can never be reclaimed is the one nobody will ever use
 again. Small (an orphan per deleted folder, and a teacher deletes none), noted
 so the write-up is not read as "container hygiene is solved".
 
+**A second measurement, 2026-09-08, on how much the sweep actually reclaims.**
+Nine `teaching-quartz:src-*` images on disk (about 2.42 GB each) against **two**
+containers, so eight were unreferenced. The sweep works; it is simply narrow by
+construction. It runs only on the SUCCESS branch of a build — `build_image_if_missing`
+in `setup.sh` and `preview.sh`, `ensure_image_present` in `deploy.sh` — so a run
+that finds its image already present touches nothing, and superseded tags wait
+for the next recipe change. The age guard above then spares anything younger
+than a day or two, which is why a machine in the middle of toolchain work is
+exactly where several survive each sweep. Add the orphan-container case in the
+paragraph above and nine against two is what you would expect rather than a
+fault.
+
+If that count climbs well past nine on a machine that is NOT mid-toolchain-work,
+that is the signal to open an issue — with a number, since this paragraph is the
+baseline. Deliberately no remedy proposed here: giving the sweep a second
+trigger has hazards of its own, and the success-branch placement is what keeps a
+run that reuses an image from touching anything.
+
 **Windows has nothing to port.** You dropped Docker on 2026-08-19 for the
 native runtime — no image, no tag, no container, nothing to accumulate. (An
 earlier `TODO-TODAY.md` note on the mac claimed "their launchers have the same
@@ -242,6 +260,54 @@ behind anywhere it can accumulate across a school year? That is the shape of
 the failure the mac hit: a disk filling with something the teacher has never
 heard of and cannot connect to this app. Nobody here can see a Windows
 machine to answer it, so it is a question rather than a finding.
+
+## The build cache is never cleared, on purpose
+
+Separate from the images above, and easy to conflate with them: BuildKit keeps
+its own build cache, nothing in this repository clears it, and nothing should.
+
+**`docker builder prune` is GLOBAL.** There is no per-project and no per-tag
+filter, so a launcher that called it would throw away the build cache of every
+other project sharing this Colima VM — Supabase's, among others. That is the
+same constraint that shaped the image cleanup one section up, except that there
+the narrow form exists (remove `teaching-quartz:src-*` except the tag just
+built) and here it does not. So clearing the cache stays a by-hand developer
+job:
+
+```bash
+docker builder prune          # global — read the size it offers before agreeing
+```
+
+**A teacher's cache is nothing like a developer's.** The 14 GB in the table below
+came from twelve days of toolchain edits, each minting a new recipe hash. A
+teacher builds the image on install and then does not build again until a
+Plantoir update changes the recipe.
+
+**Measured twice on the dev mac**, sixteen days apart:
+
+| | Build cache | Images |
+|---|---|---|
+| 2026-08-23 | 1301 entries, 14.30 GB, 14.25 GB reclaimable | 139 images, 50.09 GB — before that day's cleanup landed |
+| 2026-09-08 | 632 entries, 4.81 GB, 2.56 GB reclaimable | 37 images, 31.22 GB, **12.39 GB reclaimable** |
+
+The 2026-08-23 note that this migrated from said the cache was "a bigger number
+than the images that were leaking beside it". **It was not, and the same page
+disproves it** — the images section above records 139 images and 50.09 GB that
+day against the cache's 14.30 GB. The claim is repeated here only so that
+nobody re-derives it from the old wording and acts on it. What the second
+measurement does show is that the cache fell to a third of itself unaided,
+while the images stayed the larger reclaimable number throughout.
+
+**None of which touches the decision**, and that is the point worth keeping: it
+never rested on the size. It rests on `prune` having no narrow form.
+
+**If this is ever revisited, the thing to find out first** is whether BuildKit
+can be given a scoped cache per build context — a filtered prune rather than a
+bigger hammer. Reaching for the global command because the number looks large
+is the move this note exists to prevent.
+
+**Windows has nothing to port here either**, for the reason the images section
+gives: no Docker, no BuildKit, no cache.
 
 ---
 
