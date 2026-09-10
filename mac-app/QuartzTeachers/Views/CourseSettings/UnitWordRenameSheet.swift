@@ -7,9 +7,12 @@ import SwiftUI
 /// way: it commits to disk straight away and says so. What it adds is the
 /// plan — how many pages, in which sections, how many links — shown BEFORE
 /// the teacher agrees, because this renames pages their links point at.
-/// The survey is made once, when the sheet opens; the counts do not depend
-/// on the word typed. What does depend on it — a page already sitting where
-/// a renamed page would go — is checked when Rename is pressed.
+/// The survey is made when the sheet opens and again after a failure, from
+/// the course's CURRENT word alone: it is a preview made before a word has
+/// been typed, so when a stopped rename is being finished it counts the
+/// pages still to move rather than the links the plan will also follow.
+/// What depends on the word — a page already sitting where a renamed page
+/// would go — is checked when Rename is pressed.
 ///
 /// The walks leave the main actor (`Task.detached`), for the reason the
 /// folder rename gives: reading every page in an iCloud-backed vault
@@ -96,6 +99,11 @@ struct UnitWordRenameSheet: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("unitWordRenameField")
                     .disabled(isRenaming)
+                    .onChange(of: proposedWord) {
+                        // A failure is about the word it was tried with; a
+                        // new word gets the live objection instead.
+                        failure = nil
+                    }
                     .onSubmit {
                         Task { await performRename() }
                     }
@@ -168,14 +176,22 @@ struct UnitWordRenameSheet: View {
     // MARK: - Functions
 
     /// Fills the field and makes the survey — off the main actor, because it
-    /// reads every page in the course.
+    /// reads every page in the course. Run when the sheet opens, and AGAIN
+    /// after a rename fails part way, so the sheet's own rules about a
+    /// stopped rename apply to its own failure: without that, a teacher
+    /// could retry with a different word and leave three words in one course.
     func lookOverTheCourse() async {
+        if proposedWord.isEmpty {
+            proposedWord = currentWord
+        }
         let facts: UnitWordRenameCourseFacts = UnitWordRenamer.facts(for: course)
         let interrupted: String? = await Task.detached(priority: .userInitiated) {
             return UnitWordRenamer.interruptedRenameTarget(facts: facts)
         }.value
         interruptedTarget = interrupted
-        proposedWord = interrupted ?? currentWord
+        if let interrupted {
+            proposedWord = interrupted
+        }
         survey = await Task.detached(priority: .userInitiated) {
             return UnitWordRenamer.survey(facts: facts)
         }.value
@@ -269,6 +285,11 @@ struct UnitWordRenameSheet: View {
                 )
             }
             failure = sentence
+            // The course may now be part way through a rename; look again so
+            // the field is held to that rename's word.
+            survey = nil
+            await lookOverTheCourse()
+            failure = sentence
             return
         }
 
@@ -283,6 +304,9 @@ struct UnitWordRenameSheet: View {
                 + " links, backup " + outcome.backupURL.lastPathComponent
                 + ") but could not write it to this course's settings — " + error.localizedDescription
             )
+            failure = error.localizedDescription
+            survey = nil
+            await lookOverTheCourse()
             failure = error.localizedDescription
             return
         }

@@ -1407,6 +1407,10 @@ final class SharedRulesContractTests: XCTestCase {
             UnitWordRenameWording.problemBusy(courseCode: "ICS3U"),
             (problems["busy"] as? String)?.replacingOccurrences(of: "{code}", with: "ICS3U")
         )
+        XCTAssertEqual(
+            UnitWordRenameWording.problemRecordNotWritten(reason: "read-only"),
+            (problems["recordNotWritten"] as? String)?.replacingOccurrences(of: "{reason}", with: "read-only")
+        )
 
         let preview: [String: Any] = try XCTUnwrap(rename["preview"] as? [String: Any])
         XCTAssertEqual(
