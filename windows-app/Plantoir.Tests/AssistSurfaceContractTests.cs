@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Text.Json.Nodes;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Plantoir.Core.Assist;
 using Plantoir.Mcp;
@@ -553,6 +554,51 @@ public class AssistSurfaceContractTests
 
         AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere, typesHere,
             tools.Select(t => t!["function"]!["name"]!.ToString()));
+    }
+
+    /// <summary>
+    /// Every plan twin the confirmation gate runs can MARK its answer as a
+    /// plan.
+    /// </summary>
+    /// <remarks>
+    /// <para>A tool that returns a bare <c>string</c> cannot carry
+    /// <c>_meta</c>, so <see cref="AssistToolAnswer.IsPlanKey"/> never reaches
+    /// the window — and <c>AssistAgent.ShowPlan</c> reads an unmarked answer
+    /// as a REFUSAL: it prints the plan and never offers Go. The write it was
+    /// gating then cannot be run from the app at all.</para>
+    ///
+    /// <para><b>Invisible to every other kind of test</b>, which is why this
+    /// one is structural. Claude Code reads the WORDS and is perfectly happy
+    /// with a plain string; so is any test that asserts on the plan's text.
+    /// <c>plan_make_room_for_classes</c> shipped that way and only mattered
+    /// the day <c>make_room_for_classes</c> gained a fixed phrasing and an
+    /// entry in <c>PlanTwins</c> (issue #70). The return TYPE is the honest
+    /// check: it is the thing that makes the mark possible.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryPlanTwinTheGateRunsCanSayItIsAPlan()
+    {
+        var served = ServedTools();
+        var unmarkable = new List<string>();
+
+        foreach (var (write, twin) in AssistAgent.PlanTwins)
+        {
+            Assert.True(served.ContainsKey(twin),
+                $"{write} is gated behind \"{twin}\", and this server does not serve it.");
+            // An async tool is just as able to mark its answer, so the check
+            // is on what it eventually RETURNS, not on whether it awaits.
+            var returns = served[twin].ReturnType;
+            if (returns.IsGenericType && returns.GetGenericTypeDefinition() == typeof(Task<>))
+                returns = returns.GetGenericArguments()[0];
+
+            if (returns != typeof(CallToolResult))
+                unmarkable.Add($"{twin} returns {served[twin].ReturnType.Name}");
+        }
+
+        Assert.True(unmarkable.Count == 0,
+            "These plan twins cannot mark their answer as a plan, so the window reads it as a " +
+            "refusal and never offers Go — the write behind each becomes unrunnable from the app: " +
+            string.Join("; ", unmarkable) + ".");
     }
 
     /// <summary>
