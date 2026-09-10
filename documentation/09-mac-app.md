@@ -314,10 +314,22 @@ Things that were decided, with what was rejected:
 - **A stopped rename is finished with its own word or not at all.** While a
   record is on disk only its target is accepted; any other word would plan
   from the old word alone, leave the pages already moved matching neither,
-  and end with three words in one course. The record is believed only when
-  the disk agrees — at least one class page under the new word — and a
-  restored backup clears the records itself, so "did not finish — press
-  Rename" can never describe a rename the restore undid.
+  and end with three words in one course. That holds inside the open sheet
+  too: after a failure part way, the sheet looks over the course again and
+  holds the field to that rename's word — the third review found that the
+  first fix covered only a sheet opened afterwards. The record is believed
+  only when the disk agrees — at least one class page SPELLED the new way,
+  meaning it parses under the new word and begins with it, case-sensitively.
+  Parsing alone is not enough (the parser ignores case, so "Unit 1, Day 1"
+  parses under "unit"), and "does not begin with the old word" is wrong the
+  other way ("Units 1, Day 1" begins with "Unit"); the spelling rule is right
+  for a different word, a change of capitalisation, and either word being a
+  prefix of the other, and a test covers all four. A restored backup clears
+  the records itself (`CourseRestorer.restoreBackup`), so "did not finish —
+  press Rename" can never describe a rename the restore undid. A record that
+  cannot be WRITTEN refuses the rename with its own sentence, since "renamed
+  0 of 3 and could not rename Unit 1, Day 1" would blame a page nothing had
+  touched.
 - **Nothing is moved onto itself.** The parser is case-insensitive, so on a
   re-run of a capitalisation change the pages already spelled the new way
   match the old word too; a page whose new title equals its title is left
@@ -326,9 +338,15 @@ Things that were decided, with what was rejected:
   of the spelling, so a case-sensitive volume still sees a genuine clash.
 - **The trail line is owed whenever the course changed**, which is not the
   same as whether a page was counted: the first page can be retitled and
-  then fail to move. `UnitWordRenameProblem` carries `changedTheCourse` for
-  exactly that, and a page whose links could not be written back is counted
-  and said rather than silently shrinking the number the teacher was shown.
+  then fail to move. `UnitWordRenameProblem` carries `changedTheCourse`,
+  decided by what actually happened (a retitle written, a page moved) rather
+  than by where the loop stopped — the third review caught a version that
+  set it to true for any failure, which a test then passed against as if it
+  were a constant. A page whose links could not be written back is counted
+  and said rather than silently shrinking the number the teacher was shown,
+  and the links sentence is shown whenever any link was touched, because
+  finishing a rename that stopped during its link pass moves nothing and
+  rewrites plenty.
 - **A display-only rename** (titles say Thread while files stay Unit) was
   rejected on 2026-09-01 and stays rejected: Obsidian is the teacher's editor
   and they would see the old word every time they opened the vault, which is

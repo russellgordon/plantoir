@@ -726,26 +726,26 @@
           "Unit 1, Day 2": "Module 1, Day 2"
         },
         "why": "A rename that stopped after the first page. Running it again must finish: the moved page is under the new word and is not planned again, but a link written as [[Unit 1, Day 1]] still needs to follow it, so the link map covers both."
-        },
-        {
-          "name": "finishing an interrupted change of capitalisation: a page already spelled the new way is not moved onto itself",
-          "from": "Unit",
-          "to": "unit",
-          "pages": [
-            {"section": 1, "title": "unit 1, Day 1"},
-            {"section": 1, "title": "Unit 1, Day 2"}
-          ],
-          "expectRenames": [
-            {"section": 1, "from": "Unit 1, Day 2", "to": "unit 1, Day 2"}
-          ],
-          "expectSections": [1],
-          "expectLinkMap": {
-            "unit 1, Day 1": "unit 1, Day 1",
-            "Unit 1, Day 2": "unit 1, Day 2"
-          },
-          "why": "The parser is case-insensitive, so on a re-run the page already moved matches the OLD word too. Its new title equals its title: it is left where it is rather than moved onto itself — which the mac's filesystem tolerates and others may not — and stays in the link map so [[Unit 1, Day 1]] is still repointed. Found by the implementation review, 2026-09-10."
-        }
+      },
+      {
+        "name": "finishing an interrupted change of capitalisation: a page already spelled the new way is not moved onto itself",
+        "from": "Unit",
+        "to": "unit",
+        "pages": [
+          {"section": 1, "title": "unit 1, Day 1"},
+          {"section": 1, "title": "Unit 1, Day 2"}
         ],
+        "expectRenames": [
+          {"section": 1, "from": "Unit 1, Day 2", "to": "unit 1, Day 2"}
+        ],
+        "expectSections": [1],
+        "expectLinkMap": {
+          "unit 1, Day 1": "unit 1, Day 1",
+          "Unit 1, Day 2": "unit 1, Day 2"
+        },
+        "why": "The parser is case-insensitive, so on a re-run the page already moved matches the OLD word too. Its new title equals its title: it is left where it is rather than moved onto itself — which the mac's filesystem tolerates and others may not — and stays in the link map so [[Unit 1, Day 1]] is still repointed. Found by the implementation review, 2026-09-10."
+      }
+    ],
     "linkCases": {
       "note": "How links follow renamed pages. Each case rewrites `text` with the link map a rename from `from` to `to` builds over `pageTitles`, and expects `expect`. The rewriter is the one the insertion planner already uses (WikiLinkRewriter on the mac): it changes only the page name between the brackets and stops at #, | and ].",
       "cases": [

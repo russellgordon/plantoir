@@ -210,10 +210,7 @@ nonisolated enum UnitWordRenamer {
             try recordRenameStarting(from: plan.from, to: plan.to, courseDirectory: facts.directoryURL)
         } catch {
             throw UnitWordRenameProblem(
-                sentence: UnitWordRenameWording.halfDone(
-                    renamed: 0, of: plan.renames.count,
-                    stoppedAt: plan.renames.first?.from ?? plan.from, reason: error.localizedDescription
-                ),
+                sentence: UnitWordRenameWording.problemRecordNotWritten(reason: error.localizedDescription),
                 pagesRenamed: 0, linksRewritten: 0, changedTheCourse: false
             )
         }
@@ -223,22 +220,29 @@ nonisolated enum UnitWordRenamer {
         // file name — so an interruption between the two leaves nothing that
         // a second run cannot finish.
         var pagesRenamed: Int = 0
+        // Whether anything in the COURSE is different yet — a page retitled
+        // counts, the record under `.internal` does not. Decided by what
+        // happened rather than by where the loop stopped: the first page can
+        // be retitled and then fail to move, and the trail is owed for that.
+        var changedTheCourse: Bool = false
         for index in 0..<plan.renames.count {
             let rename: UnitWordPageRename = plan.renames[index]
             do {
                 let retitled: String = PageFrontmatter.settingTitle(in: texts[index], to: rename.to)
                 if retitled != texts[index] {
                     try retitled.write(to: rename.fromURL, atomically: true, encoding: .utf8)
+                    changedTheCourse = true
                 }
                 try fileManager.moveItem(at: rename.fromURL, to: rename.toURL)
                 pagesRenamed += 1
+                changedTheCourse = true
             } catch {
                 throw UnitWordRenameProblem(
                     sentence: UnitWordRenameWording.halfDone(
                         renamed: pagesRenamed, of: plan.renames.count,
                         stoppedAt: rename.from, reason: error.localizedDescription
                     ),
-                    pagesRenamed: pagesRenamed, linksRewritten: 0, changedTheCourse: true
+                    pagesRenamed: pagesRenamed, linksRewritten: 0, changedTheCourse: changedTheCourse
                 )
             }
         }
@@ -386,10 +390,10 @@ nonisolated enum UnitWordRenamer {
     /// configuration and the disk. A record whose `from` is no longer the
     /// course's word is stale — the configuration was written and only the
     /// clearing failed, or the word was edited by hand. A record with no
-    /// class page under its `to` describes a rename that moved nothing — or
-    /// one a restored backup has undone — and "some class pages have the new
-    /// word" would be false. Either is cleared rather than believed, so it
-    /// cannot live forever and cannot prefill a word from another day.
+    /// class page SPELLED its `to` way describes a rename that moved nothing
+    /// — or one a restored backup has undone — and "some class pages have the
+    /// new word" would be false. Either is cleared rather than believed, so
+    /// it cannot live forever and cannot prefill a word from another day.
     static func interruptedRenameTarget(facts: UnitWordRenameCourseFacts) -> String? {
         let marker: URL = renameMarkerURL(courseDirectory: facts.directoryURL)
         guard let data = try? Data(contentsOf: marker),
@@ -404,10 +408,14 @@ nonisolated enum UnitWordRenamer {
         }
         var somethingMoved: Bool = false
         for page in classFolderPages(facts: facts) {
-            // A page that parses with the NEW word and not as itself under the
-            // old — for a change of capitalisation the two coincide, and the
-            // file name is the tell.
-            if UnitDay(pageTitle: page.title, term: to) != nil && !page.title.hasPrefix(from) {
+            // A page SPELLED the new way: it parses under the new word and
+            // begins with it, case-sensitively. Parsing alone is not enough —
+            // the parser ignores case, so "Unit 1, Day 1" parses under "unit"
+            // — and "does not begin with the old word" is wrong the other
+            // way, because "Units 1, Day 1" begins with "Unit". Right for all
+            // four shapes: a different word, a change of capitalisation, an
+            // old word that is a prefix of the new, and the reverse.
+            if UnitDay(pageTitle: page.title, term: to) != nil && page.title.hasPrefix(to) {
                 somethingMoved = true
                 break
             }
@@ -652,10 +660,12 @@ nonisolated struct UnitWordRenameProblem: LocalizedError, Sendable {
     let pagesRenamed: Int
     let linksRewritten: Int
 
-    /// Whether anything on disk is different from before — the record, a
-    /// retitled page, a moved one. The trail line is owed whenever it is,
-    /// which is not the same as whether a page was counted as renamed: the
-    /// first page can be retitled and then fail to move.
+    /// Whether anything in the COURSE is different from before — a page
+    /// retitled, a page moved. The record under `.internal` does not count;
+    /// it is cleared on its own the next time the sheet opens if nothing
+    /// moved. The trail line is owed whenever this is true, which is not the
+    /// same as whether a page was counted as renamed: the first page can be
+    /// retitled and then fail to move.
     let changedTheCourse: Bool
 
     // MARK: - Computed properties

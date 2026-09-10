@@ -81,6 +81,14 @@ enum UnitWordRenameWording {
         return "Plantoir is part way through renaming to “\(target)”. Finish that first — press Rename with “\(target)” — and then rename again."
     }
 
+    /// The note of a rename under way could not be written, so nothing was
+    /// tried — a rename with no note is one that cannot be recognised if it
+    /// stops. Its own sentence, because "renamed 0 of 3 and could not rename
+    /// Unit 1, Day 1" would blame a page nothing had touched.
+    nonisolated static func problemRecordNotWritten(reason: String) -> String {
+        return "Plantoir could not write its note of the rename under way (\(reason)), so nothing was renamed. Check that the working folder can be written to, then try again."
+    }
+
     /// Links the rename could not follow because their page could not be
     /// written. Said, because the teacher was shown a count and would
     /// otherwise be told a smaller one with no explanation.
@@ -158,7 +166,10 @@ enum UnitWordRenameWording {
         from old: String, to new: String, pages: Int, links: Int, pagesNotWritten: Int = 0
     ) -> String {
         var pieces: [String] = [done(from: old, to: new), donePages(count: pages)]
-        if pages > 0 {
+        // Links are reported whenever any were touched, not only when a page
+        // moved: finishing a rename that stopped during its link pass moves
+        // nothing and rewrites plenty.
+        if pages > 0 || links > 0 || pagesNotWritten > 0 {
             pieces.append(doneLinks(count: links))
             if pagesNotWritten > 0 {
                 pieces.append(doneLinksNotWritten(pages: pagesNotWritten))
