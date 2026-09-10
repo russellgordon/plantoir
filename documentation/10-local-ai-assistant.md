@@ -918,11 +918,15 @@ back to the scrolling one. It lives inside `FinderPathBarView` rather than at a
 call site, which matters: the folder picker had already met this and wrapped its
 own copy in a `ViewThatFits`, so the knowledge existed in the repository while
 the window's bar went on being wrong, and a third caller would have inherited
-the bug again. Windows is not affected — `BreadcrumbBar` in a `*` column lays
-out leading-first and collapses the START of the path — but that is the
-platform's control being right, not a decision anyone made, so a hand-rolled
-`ScrollViewer` of crumbs there would need `HorizontalAlignment="Left"` on its
-content and would meet exactly this.
+the bug again. Windows is not affected, and the reason is documented rather
+than inferred: `MainWindow.xaml` puts a `BreadcrumbBar` in a `*` column, and
+Microsoft's page for that control says it "displays each node in a horizontal
+line" and that "if the app is resized so that there is not enough space to show
+all the nodes, the breadcrumbs collapse and an ellipsis replaces the leftmost
+nodes" — both halves of the rule. That is the platform's control being right,
+not a decision anyone made, so a surface that ever replaced it with a
+hand-rolled `ScrollViewer` of crumbs would need `HorizontalAlignment="Left"` on
+its content and would meet exactly this.
 
 **Pinned by measurement, not by eye.** A layout rule asserted in words is a rule
 nothing runs. `PathBarWidthTests` proposes 1,400 points to the bar and reads
