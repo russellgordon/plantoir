@@ -669,6 +669,184 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
+    // MARK: - What a teacher reads on the Marks control
+
+    /// The Marks tick list's title and its caption are the contract's, word
+    /// for word. Pinned because they are sentences a teacher reads, and
+    /// because the two apps worded them differently from the day the control
+    /// was built with nothing to catch it — `gradedFolders.wording`, proposed
+    /// from Windows 2026-09-08 and adopted here 2026-09-09 (issue #71).
+    func testTheMarksWordingIsTheContractsOwn() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("gradedFolders")
+        let wording: [String: Any] = try XCTUnwrap(section["wording"] as? [String: Any])
+
+        XCTAssertEqual(
+            GradedFolderWording.listTitle,
+            wording["listTitle"] as? String,
+            "The Marks list's title and contracts/shared-rules.json → gradedFolders.wording "
+            + "disagree. Four surfaces show this title — Course Settings and the New Course "
+            + "wizard, on both platforms — so change it in the contract and in both apps, or "
+            + "not at all."
+        )
+        XCTAssertEqual(
+            GradedFolderWording.caption,
+            wording["caption"] as? String,
+            "The Marks list's caption and contracts/shared-rules.json → gradedFolders.wording "
+            + "disagree. Same four surfaces, same rule."
+        )
+    }
+
+    /// The caption names only actions this control actually offers.
+    ///
+    /// It is a tick list: `MembershipToggleListView` draws check boxes and has
+    /// no Add button, so a teacher told to "add Tests" is being pointed at a
+    /// control that cannot do it — and "remove what you don't" invites the one
+    /// action the product refuses outright, unticking the last graded folder
+    /// while the coverage map is on (`SpecialNames.lastGradedFolderBlocked`).
+    /// **Both verbs were the mac's own wording until this test existed**,
+    /// which is why the correction is asserted rather than left to review.
+    ///
+    /// Whole words, and that matters twice over: a plain "does not contain
+    /// add" lets through "adding" and a sentence-initial "Add", while the
+    /// obvious tightening — anything starting "add" — matches "ADDRESSES it",
+    /// which this caption legitimately contains. Windows' half of this
+    /// (`TheMarksCaptionNamesOnlyActionsThisControlOffers`) records the same
+    /// two failed alternatives.
+    func testTheMarksCaptionNamesOnlyActionsThisControlOffers() {
+        let caption: String = GradedFolderWording.caption
+
+        XCTAssertTrue(
+            SharedRulesContractTests.caption(caption, containsWord: "tick"),
+            "The Marks caption stopped telling a teacher to tick anything."
+        )
+
+        var verbsFound: [String] = []
+        for verb in ["add", "adds", "adding", "remove", "removes", "removing"] {
+            if SharedRulesContractTests.caption(caption, containsWord: verb) {
+                verbsFound.append(verb)
+            }
+        }
+        XCTAssertEqual(
+            verbsFound, [],
+            "The Marks caption names an action this control does not offer: "
+            + "\(verbsFound). It is a tick list with no Add button, and unticking the "
+            + "last graded folder while the coverage map is on is refused outright."
+        )
+    }
+
+    /// Both surfaces draw these sentences from the one constant, and no third
+    /// copy exists.
+    ///
+    /// A contract test alone cannot see this: `GradedFolderWording` could
+    /// match the contract perfectly while a view quietly went on rendering a
+    /// literal of its own, which is the state this whole issue was fixing.
+    /// The scan is the shape `ActivityTrailWiringTests` uses — and reuses its
+    /// scanner rather than growing a second one.
+    func testBothSurfacesDrawTheMarksWordingFromOneHome() throws {
+        let productFolderURL: URL = ActivityTrailWiringTests.productSourceFolderURL()
+        let viewFileNames: [String] = ["CourseSettingsView.swift", "NewCourseWizardView.swift"]
+
+        for fileName in viewFileNames {
+            let fileURL: URL = try XCTUnwrap(
+                SharedRulesContractTests.fileNamed(fileName, under: productFolderURL),
+                "\(fileName) was not found where this test expects it, so the checks below would pass vacuously."
+            )
+            let contents: String = try String(contentsOf: fileURL, encoding: .utf8)
+            XCTAssertTrue(
+                contents.contains("GradedFolderWording.listTitle"),
+                "\(fileName) no longer takes the Marks list's title from GradedFolderWording, so it can drift from the contract without a test noticing."
+            )
+            XCTAssertTrue(
+                contents.contains("GradedFolderWording.caption"),
+                "\(fileName) no longer takes the Marks caption from GradedFolderWording, so it can drift from the contract without a test noticing."
+            )
+        }
+
+        // A fragment rather than the whole sentence: a second copy written as
+        // concatenated pieces across lines — which is exactly how the near-twin
+        // at SpecialFoldersHelpView is written — would slip past a
+        // whole-sentence search. Taken from the constant, never retyped, so the
+        // needle cannot drift from what the app shows.
+        let captionOpening: String = String(GradedFolderWording.caption.prefix(24))
+        var filesWithACopy: [String] = []
+        for fileURL in ActivityTrailWiringTests.swiftFiles(under: productFolderURL) {
+            if fileURL.lastPathComponent == "GradedFolderWording.swift" {
+                continue
+            }
+            let contents: String = try String(contentsOf: fileURL, encoding: .utf8)
+            for line in contents.components(separatedBy: "\n") {
+                let trimmedLine: String = line.trimmingCharacters(in: .whitespaces)
+                if trimmedLine.hasPrefix("//") {
+                    continue
+                }
+                if trimmedLine.contains(captionOpening) || trimmedLine.contains(GradedFolderWording.listTitle) {
+                    filesWithACopy.append(fileURL.lastPathComponent)
+                    break
+                }
+            }
+        }
+        XCTAssertEqual(
+            filesWithACopy, [],
+            "These files carry their own copy of a Marks sentence: \(filesWithACopy). "
+            + "There is one home for both of them, GradedFolderWording, because four "
+            + "literals on two surfaces is the state issue #71 fixed."
+        )
+    }
+
+    /// The caption is drawn BELOW its list, which the contract requires by
+    /// name (`gradedFolders.wording.rule`): it says "a page in one of these",
+    /// and above the list "these" follows the section header "Marks" and
+    /// refers to nothing. Windows drew it above until 2026-09-08 and moved.
+    ///
+    /// Source order IS stacking order inside the `Section` and `VStack` these
+    /// two live in, so this reads it there. **A hosted-view geometry check was
+    /// rejected**: `Form` and `Section` render lazily on macOS, so a walk of
+    /// the view tree would have to fight the layout for an answer source order
+    /// already gives — Windows can assert real tree order because its list is
+    /// built into a panel eagerly.
+    func testTheMarksCaptionIsDrawnBelowItsList() throws {
+        let productFolderURL: URL = ActivityTrailWiringTests.productSourceFolderURL()
+
+        for fileName in ["CourseSettingsView.swift", "NewCourseWizardView.swift"] {
+            let fileURL: URL = try XCTUnwrap(
+                SharedRulesContractTests.fileNamed(fileName, under: productFolderURL),
+                "\(fileName) was not found where this test expects it."
+            )
+            let lines: [String] = try String(contentsOf: fileURL, encoding: .utf8)
+                .components(separatedBy: "\n")
+
+            var titleLine: Int = -1
+            var captionLine: Int = -1
+            var lineNumber: Int = 0
+            for line in lines {
+                if titleLine < 0 && line.contains("GradedFolderWording.listTitle") {
+                    titleLine = lineNumber
+                }
+                if captionLine < 0 && line.contains("GradedFolderWording.caption") {
+                    captionLine = lineNumber
+                }
+                lineNumber += 1
+            }
+
+            XCTAssertGreaterThan(titleLine, -1, "\(fileName) does not draw the Marks list.")
+            // Answered here and not left to the comparison below: a missing
+            // caption makes captionLine -1, which loses to any title line, so
+            // the comparison would report a caption drawn ABOVE its list when
+            // there is no caption at all. Measured — it said exactly that.
+            if captionLine < 0 {
+                XCTFail("\(fileName) does not draw the Marks caption at all.")
+                continue
+            }
+            XCTAssertGreaterThan(
+                captionLine, titleLine,
+                "\(fileName) draws the Marks caption ABOVE its list. The caption says "
+                + "\"a page in one of these\", which points at the list; above it, "
+                + "\"these\" refers to the section header and to nothing else. "
+                + "contracts/shared-rules.json → gradedFolders.wording.rule requires it below."
+            )
+        }
+    }
+
     // MARK: - The working-folder path bar
 
     /// Only the crumb LIST is testable here — the gestures and the menu live
@@ -1027,6 +1205,30 @@ final class SharedRulesContractTests: XCTestCase {
     }
 
     // MARK: - Functions
+
+    /// Whether a caption uses a word AS a word — so "addresses" is not a use
+    /// of "add", and a sentence-initial "Add" is. Letters only: the caption's
+    /// curly quotes and semicolon are separators like any other.
+    private static func caption(_ caption: String, containsWord word: String) -> Bool {
+        let wordsInCaption: [String] = caption.lowercased()
+            .components(separatedBy: CharacterSet.letters.inverted)
+        for wordInCaption in wordsInCaption {
+            if wordInCaption == word.lowercased() {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// The one product source file with this name, or nil.
+    private static func fileNamed(_ fileName: String, under folderURL: URL) -> URL? {
+        for fileURL in ActivityTrailWiringTests.swiftFiles(under: folderURL) {
+            if fileURL.lastPathComponent == fileName {
+                return fileURL
+            }
+        }
+        return nil
+    }
 
     private static func name(ofRefusal said: String) -> String {
         if said.contains("has already passed") {
