@@ -209,7 +209,20 @@ public class AssistScenarioTests : IDisposable
             // "publish tomorrow's class", and the card reads TOMORROW off the
             // real clock — this app pins no date the way the mac's fixture does
             // — so the page has to be dated from the same clock.
-            Class("Unit 1, Day 1", DateTime.Now.AddDays(1).ToString("yyyy-MM-dd"), published: false);
+            //
+            // TWO pages, and the second one is not padding. The fixture reads
+            // the clock here and AssistCardCommand reads it again a moment
+            // later, so a run that crosses midnight between the two would leave
+            // "tomorrow" pointing at a day with no class on it — the plan would
+            // then be a refusal, no card would appear, and the case would fail
+            // once in however many thousand runs, looking exactly like a
+            // production bug. This page covers whichever of the two days the
+            // card lands on. (documentation/12-windows-app.md → "Two testing
+            // lessons that recur": a clock-dependent fixture has already made
+            // dev red here for a morning.)
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            Class("Unit 1, Day 1", today.AddDays(1).ToString("yyyy-MM-dd"), published: false);
+            Class("Unit 1, Day 2", today.AddDays(2).ToString("yyyy-MM-dd"), published: false);
         }
 
         if (pending == "re_date_classes")
