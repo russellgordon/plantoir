@@ -536,15 +536,24 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "\"add Unit 2 Days 1 through 10\". Dates come from the section's remembered timetable, skipping " +
                  "days already taken by an existing class, so the new unit follows on from the work already there. " +
                  "Show the teacher what it says, word for word, then wait.")]
-    public string PlanAddClasses(
+    public CallToolResult PlanAddClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
         [Description("How many class pages to add.")] int howMany)
-        => Guarded(() => workspace
-            .PlanAddClasses(course, section, unit,
-                            workspace.DayToCarryOnFrom(course, section, unit), howMany)
-            .Describe());
+        // MARKED, for the reason `plan_make_room_for_classes` is: a bare
+        // string cannot carry the mark, and `AssistAgent.ShowPlan` reads an
+        // unmarked answer as a REFUSAL. `add_classes` is reached by no fixed
+        // phrasing today, so no teacher can meet it — which is exactly the
+        // state the make-room twin was in until the day it gained one.
+        => Guarded(() =>
+        {
+            var plan = workspace.PlanAddClasses(course, section, unit,
+                                                workspace.DayToCarryOnFrom(course, section, unit), howMany);
+            return plan.ChangesNothing
+                ? Answering(plan.Describe())
+                : Proposing(plan.Describe());
+        });
 
     [McpServerTool(Name = "add_classes", Title = "Add class pages", Destructive = false, Idempotent = false)]
     [Description("TEACHERS SAY: \"add five more days to Unit 4\". " +

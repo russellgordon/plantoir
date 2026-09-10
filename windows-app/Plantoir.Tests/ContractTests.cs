@@ -547,17 +547,10 @@ public class ContractTests
         Assert.Equal(needsApproval, AssistAgent.DeploysToStudents);
 
         // The tools the CONTRACT says the mac shows an MCP client and not its
-        // local model. Written out rather than counted, so the list moving is
-        // a decision somebody makes here rather than a number that drifts.
-        //
-        // It went from three to ten on 2026-09-08, when the mac built the six
-        // tools this app had had all along plus their plan twins — see issue
-        // #70. Every one of them is served here (this app's surface is wider
-        // still, and `TheExtraToolsThisServerOffersAreTheOnesWeKnowAbout`
-        // pins by how much), so what changed for Windows was not the tools
-        // but the FIXED PHRASINGS that reach them: MCP-only means no local
-        // model is shown a tool, and says nothing about whether a teacher may
-        // ask for it in words the matcher knows.
+        // local model. It went from three to ten on 2026-09-08, when the mac
+        // built the six this app had had all along plus their plan twins — see
+        // issue #70. What changed for Windows was not the tools, which were
+        // already served, but the FIXED PHRASINGS that reach them.
         // MCP-only means the local MODEL is not SHOWN a tool. Asserted about
         // THIS app rather than by retyping the contract's list: an inline copy
         // goes red only when the contract moves, and the fix is always to
