@@ -21,11 +21,11 @@ import Foundation
 /// certainly still says "Day 3", and a second configurable word would double
 /// the migration for something nobody asked for.
 ///
-/// **The choice is offered at course creation and nowhere else.** The
-/// ready-made pages are poured in the teacher's word as the course is made;
-/// renaming three thousand pages and their wikilinks in a course already in
-/// use is a different and far more dangerous piece of work, and it is not on
-/// offer.
+/// **The choice is offered at course creation, and again in Course Settings
+/// once the course is in use.** The ready-made pages are poured in the
+/// teacher's word as the course is made; renaming a course's pages later is
+/// `UnitWordRenamer`, which renames every class page, retitles it and
+/// follows the links, with a backup first and a record of a rename under way.
 enum ClassPageTerm {
 
     // MARK: - Stored properties

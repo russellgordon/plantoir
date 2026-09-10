@@ -571,6 +571,18 @@ safety rules cannot drift between the two clients. The app answers this
 itself — `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` —
 rather than shipping a second binary.
 
+One thing to KNOW about that process, recorded 2026-09-10 when renaming a
+course's word for a unit made it matter: the MCP server reads the working
+folder ONCE, when it starts, and never reloads it. A Claude Code session left
+open across a change made in the app — a folder rename, or the word for a
+unit going from "Unit" to "Module" — keeps the course as it was and goes on
+writing "Unit N" pages until it is restarted. The in-app assistant does not
+have this problem, because it shares the window's own courses and the
+configuration is updated in memory as it is written to disk. Windows'
+`plantoir-mcp.exe` has the same exposure. Nothing here re-reads on a timer,
+deliberately: a server that silently swapped its courses under a conversation
+would be worse than one that has to be restarted.
+
 Claude Code is offered a **longer** list than the local model: 32 tools
 against 13 — the twenty-two that exist, plus ten served only over MCP.
 (Windows' separate `plantoir-mcp.exe` serves 37; the gap is recorded in
