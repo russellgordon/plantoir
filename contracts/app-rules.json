@@ -510,7 +510,7 @@
         "usedFor" : [
           "a publish set to happen on its own"
         ],
-        "why" : "A scheduled publish runs at half six with the app closed, so every question is one NOBODY will answer, and both ways that ended have been seen. With a terminal, deploy.py's `input()` BLOCKS — measured at 45 minutes, the launcher and its Python child still waiting when they were swept up, and the teacher's site simply not updated in the morning with nothing said. Without one, `prompt()` returns its DEFAULT silently and a Netlify name conflict auto-suffixes, so the site is published to an address nobody chose. Exit code 3 means \"a question went unanswered\" and nothing else, so a caller can tell it from an ordinary failure and say something true to the teacher; every other exit in deploy.py and in both launchers is 0 or 1. PASSED BY THE SCHEDULED WRAPPER, never by the app's Deploy button — whether anybody is there to answer is a fact about who is RUNNING, not about the course, which is why it is not in `deployArguments`. Parsing it is not enough: both launchers must FORWARD it to deploy.py, where the site-name question lives."
+        "why" : "A scheduled publish runs at half six with the app closed, so every question is one NOBODY will answer, and both ways that ended have been seen. With a terminal, deploy.py's `input()` BLOCKS — measured at 45 minutes, the launcher and its Python child still waiting when they were swept up, and the teacher's site simply not updated in the morning with nothing said. Without one, `prompt()` returns its DEFAULT silently and a Netlify name conflict auto-suffixes, so the site is published to an address nobody chose. Exit code 3 means \"a question went unanswered\" and nothing else, so a caller can tell it from an ordinary failure and say something true to the teacher; every other exit in deploy.py and in both launchers is 0 or 1. PASSED BY THE SCHEDULED WRAPPER, never by the app's Deploy button — whether anybody is there to answer is a fact about who is RUNNING, not about the course, which is why it is not in `deployArguments`. Parsing it is not enough: both launchers must FORWARD it to deploy.py, where the site-name question lives. Refusing is the only answer that neither hangs nor publishes something unasked for. The launcher passes the same flag on to deploy.py, and asks for no terminal at all when it is set, so the waiting branch cannot exist."
       },
       {
         "flag" : "--diagnose",
@@ -525,14 +525,6 @@
         "macOnly" : true,
         "meaning" : "Publish using a particular already-built image instead of the one the recipe hashes to.",
         "why" : "NOT shared, recorded 2026-09-06 when this list was first run against the launchers. `deploy.sh` parses it; `deploy.ps1` does not, and cannot — Windows dropped Docker for a native runtime on 2026-08-19 (GUI-IMPROVEMENTS.md entry 290), so there is no image for a tag to name. The right answer was to write the divergence down rather than add a flag that does nothing to a launcher so a test would pass. `--diagnose` above IS shared and both launchers take it."
-      },
-      {
-        "flag" : "--non-interactive",
-        "meaning" : "Nobody is at the computer. Anything that would stop and ask — a Netlify or Cloudflare credential, a name for a website that does not exist yet — stops the publish instead, saying which question it could not ask.",
-        "usedFor" : [
-          "a scheduled publish, which runs at a time the teacher chose and then went to bed for"
-        ],
-        "why" : "Both alternatives were seen for real (TODO.md, 2026-09-06). With a terminal on standard input, deploy.py's input() WAITS — two measured runs sat at one prompt for 45 minutes — and the teacher's site is simply not updated in the morning, with nothing to say why. Without one, sys.stdin.isatty() is false and the DEFAULT is taken silently, so the site is published at an address nobody chose. Refusing is the only answer that neither hangs nor publishes something unasked for. The launcher passes the same flag on to deploy.py, and asks for no terminal at all when it is set, so the waiting branch cannot exist."
       }
     ],
     "nonInteractive" : {

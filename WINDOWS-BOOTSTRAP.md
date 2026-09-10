@@ -122,7 +122,9 @@ reasons rather than tasks:
   `tools`, `milestones`. The mac overwrites them and the diff looks like
   vandalism.
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
-  `promptHistory`, and the case lists in the other files). Doing so will make
+  `promptHistory`, and the case lists in the other files) — unless what you
+  are proposing is a SENTENCE, which is a sweep line (the bullet below on wording differences), not a
+  case and not an issue. A behaviour case: doing so will make
   the **mac** suite fail until they implement it — that is the mechanism
   working. Name the case so it reads as a proposal and open a GitHub issue
   labelled `mac` saying which case you added and what the mac has to implement
@@ -149,6 +151,23 @@ reasons rather than tasks:
   session running on it. Copy that form only if this machine grows a second
   account; with one account, `--user russellgordon` naming nothing configured
   fails confusingly.
+- **A wording difference is NOT an issue — add a line to the sentence
+  sweep instead.** `CLAUDE.md` rule 2, decided 2026-09-10: the mac owns every
+  sentence a teacher reads, on both platforms. When you find the two apps
+  wording one thing differently, or a sentence in the contract on neither
+  side, add ONE checklist line to the open issue titled `Sentence sweep —
+  vX.Y.Z` (labelled `mac` and `windows`, so it is in your list) — the
+  sentence, where it lives on each side, which is better if you have a view —
+  and move on. Do not open an issue, and do not change your wording to
+  something the mac does not say. A mac session works the whole list once per
+  release and posts "decided — Windows' turn"; then you fix every line in one
+  pass and close it. Where you must word something the mac has no counterpart
+  for, word it deliberately and put it on the sweep. Text the local model
+  reads — tool descriptions, `TEACHERS SAY` phrasings — goes on the same issue
+  under its *Measured* heading: changing it is a routing change you re-measure
+  on your own hardware after the sweep, once, and a measured regression is a
+  departure you record in `agreedDepartures` with its numbers rather than a
+  reason to keep the old text quietly.
 - **Write every change up before moving on**, to the template in
   `CLAUDE.md` rule 4: what changed, why,
   what you rejected, and — for anything measured — the numbers **with the

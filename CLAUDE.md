@@ -56,6 +56,79 @@ Neither app contains toolchain logic of its own: they write the same
      the `documentation/` page that owns its subject (rules 3 and 4), and an
      issue nobody can close is the thing that arrangement avoids.
 
+     **The mac owns the sentence; the contract owns the record.** Decided by
+     Russell on 2026-09-10, when a triage of the open issues found FIVE whose
+     whole content was a wording difference between the apps, or a sentence a
+     teacher reads that was pinned in no contract (#68, #76, #87, #110, #127),
+     each waiting on a negotiation about which sentence wins. Three consequences, and the first is the one that ends the stream:
+
+     - **A wording difference is NOT its own issue.** There is ONE standing
+       issue per release, titled `Sentence sweep — vX.Y.Z`, labelled `mac`
+       AND `windows` for its whole life so both sides' session briefs find
+       it. A session on EITHER platform that finds the two apps wording one
+       thing differently, or a sentence a teacher reads that is in the
+       contract on neither, adds ONE checklist line — the sentence, where it
+       lives on each side, which is better if you have a view — and moves on.
+       No new issue, no comment thread deciding the winner. **The exception to
+       rules 3 and 4** is exactly this wide: a SENTENCE, new or divergent, is
+       a sweep line; a case that changes BEHAVIOUR is still an issue.
+     - **Once per release, a mac session works the sweep, in one pass.** It
+       decides every line, moves every string into the contract
+       (`AssistWording`, or the authored file that owns the subject),
+       regenerates, commits, then posts "decided — Windows' turn" on the issue
+       and opens the NEXT release's sweep, empty, in the same act, so a line
+       found afterwards has somewhere to go. A Windows session then fixes
+       every line in one pass and CLOSES it. **A tag is not cut while the
+       release's sweep is open on either side** (`RELEASING.md`): one number
+       naming two sets of sentences is what "one version series" forbids.
+     - **The mac's wording survives** wherever the two apps differ — unless
+       the sweep session judges the Windows sentence better and ADOPTS it,
+       which makes it the mac's. Windows never changes a teacher-facing
+       sentence to something the mac does not say; where it must word
+       something the mac has no counterpart for, it words it deliberately and
+       puts it on the sweep. The "this Mac" / "this PC" substitution stands,
+       and so does `contracts/README.md`'s list of sentences the contract
+       deliberately does not carry.
+
+     **What the sweep is NOT.** It does not replace the red-test mechanism,
+     and the first draft of this rule claimed it would ("the Windows suite
+     goes red once"), which was false twice over. A key the mac CHANGES still
+     goes red on Windows the day it is regenerated — `assist-wording.json` was
+     regenerated six times on 2026-09-08 alone — and that stays a rule-3
+     `windows` issue naming the keys. And a key the sweep ADDS goes red on
+     Windows only if a scenario case carries it (`AssistScenarioTests`
+     resolves `wording.X` from the file); a key with no scenario — every UI
+     label, every plan sentence — goes red there not at all, because
+     `ContractTests.AssistWording_MatchesContract` is a hand-typed list of keys
+     (39 of 41 on 2026-09-10) rather than a walk over `wording`. Making it walk
+     the file is a `windows` issue opened with this rule. The sweep is
+     where DIVERGENCES are decided, in a batch, by the side that owns them.
+
+     **One carve-out, for text the local MODEL reads** — tool descriptions,
+     `TEACHERS SAY` phrasings, the system prompt. It converges on the mac's
+     text too (issue #114, decided 2026-09-09), but it is a routing input, not
+     wording: one clarifying sentence once took a probe score from 110/110 to
+     90/110. So those lines sit under a *Measured* heading on the same sweep
+     issue, each platform re-measures its own routing after the sweep — once
+     per release, never per phrasing, because the numbers do not transfer
+     between Metal and Vulkan — and **a measured regression is a legitimate
+     departure**: Windows records it in its `agreedDepartures` list WITH the
+     numbers, and a batch that regresses is bisected or reverted as a batch,
+     not argued sentence by sentence.
+
+     **Why the mac, and what was rejected.** `Plantoir --write-contracts`
+     runs on the mac, three of the ten contract files are already its readout,
+     Russell reads Swift and works at the mac, and the Windows author cannot
+     read the Swift — so the direction already existed in the architecture
+     and this only stops pretending otherwise. Rejected: Windows as owner,
+     which fights the generator and would round-trip every sentence through
+     a mac regeneration anyway; and "the contract alone is canonical, no
+     platform is", which is what this rule already said and is exactly how
+     the divergence issues arose — strings escaped it, and nothing can
+     mechanically prove that every SwiftUI or XAML literal maps to a key.
+     What the sweep buys is not tidiness: it is two issues per release where
+     there were a dozen, each of which cost a negotiation.
+
    The failure this prevents is the quiet one: a behaviour that exists in one
    app, is described nowhere the other app's tests can reach, and is discovered
    months later as a difference nobody chose. **It binds both ways** — see
@@ -78,7 +151,9 @@ Neither app contains toolchain logic of its own: they write the same
      read off the code, the reason for it cannot.
    - **a GitHub issue is opened, labelled `windows`, in the same session** —
      one short paragraph naming what the change is, what Windows inherits free,
-     what they owe, and a pointer to the section that explains it. Give it a
+     what they owe, and a pointer to the section that explains it. (A change
+     that is ONLY a sentence is a line on the release's sentence sweep
+     instead — rule 2 — not an issue of its own.) Give it a
      milestone if it is pinned to a release, and `decision` as well if it needs
      Russell to choose. Close it when it is done rather than editing the title;
      the issue keeps its own history that way.
@@ -115,7 +190,8 @@ Neither app contains toolchain logic of its own: they write the same
      rejected; numbers with the hardware they came from for anything measured;
      the file and test names to look at, which outlast commit hashes; and
      whether the mac must MATCH it or merely know. **A proposed contract case
-     is an issue too**, so a red mac suite reads as a request rather than as
+     is an issue too** — unless the case is a SENTENCE, which is a sweep line
+     (rule 2) — so a red mac suite reads as a request rather than as
      damage; say in it which case was added and what the mac has to implement
      to make it pass.
    - **anything the MAC must merely KNOW, rather than do, goes in the

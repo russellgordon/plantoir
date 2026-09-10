@@ -61,6 +61,13 @@ contract. **If you are about to type one of the assistant's sentences into a
 test or a document, name it instead.** A quoted copy is the one that keeps
 passing after the product's words change.
 
+**The mac owns the sentence** (`CLAUDE.md` rule 2, decided 2026-09-10). That
+is not a licence to reword freely — it is the reason a sentence you write here
+is the one Windows will be made to say. So write it as the product's, not as
+this platform's, and put it in the contract in the same change. If you notice
+the two apps already wording one thing differently, that is NOT an issue: add
+a line to the open `Sentence sweep — vX.Y.Z` issue and carry on.
+
 ### 3. Regenerate the contract when the app's own facts change
 
 After touching `AssistWording`, `AssistCardCommand`, the tool surface,
@@ -219,3 +226,28 @@ the `documentation/` page that owns it, in the same change. If it settles a
 question they asked,
 say so where they will look. A handoff that only travels one way is a report,
 not a conversation.
+
+### 5. Work the sentence sweep once per release
+
+One open issue is titled `Sentence sweep — vX.Y.Z`, labelled `mac` and
+`windows`, and holds a checklist of every wording difference either side found
+since the last release, plus every teacher-facing sentence found in the
+contract on neither side. It is worked ONCE, in one pass, by a mac session —
+not line by line as lines arrive:
+
+1. Decide each line. The mac's wording survives unless the Windows sentence is
+   better, in which case adopt it here so it becomes the mac's.
+2. Put every string in the contract — `AssistWording` for the assistant's,
+   otherwise the authored file that owns the subject — and regenerate
+   (`Plantoir --write-contracts`).
+3. Lines under the *Measured* heading are text the local model reads. Change
+   them, then re-run the routing suite on Metal before committing; the
+   Windows numbers do not transfer, and theirs is their own measurement.
+4. Commit, push, and post "decided — Windows' turn" on the issue with the
+   list of keys that will be red over there — including any NEW key, which
+   their wording test may not yet walk. Do not relabel; both labels stay.
+5. **Open the next release's sweep in the same act**, empty, with the same
+   title shape and the next milestone (`cut-release/SKILL.md` carries the
+   body), so a line found after your pass has somewhere to go. A Windows
+   session fixes its lines and closes this one; `RELEASING.md` refuses a tag
+   while the release's sweep is open on either side.

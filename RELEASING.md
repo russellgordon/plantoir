@@ -129,8 +129,10 @@ commit that moves the version line.
 For future-you, mid-school-year, who remembers nothing. The whys are below.
 
 1. **Everything merged and green?** Both sides on `main`; `dotnet test` passes
-   in `windows-app/`; the mac unit suite passes. Then **actually publish a
-   section from an app** — see step 2 for why that is not optional.
+   in `windows-app/`; the mac unit suite passes; and the issue titled
+   `Sentence sweep — v<this>` is CLOSED, if one exists (see the checklist
+   below, item 2). Then **actually publish
+   a section from an app** — see step 2 for why that is not optional.
 2. **Check the version** in `windows-app/Plantoir/Plantoir.csproj` and
    `mac-app/project.yml`; they must match each other and the tag you are about
    to cut.
@@ -151,6 +153,17 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    the mac side, so re-run `xcodegen generate` after changing it.
 2. **Full test pass**: `dotnet test Plantoir.Tests` and the mac unit suite, plus
    a hand smoke of create → preview → publish on a real course.
+
+   > **And the release's sentence sweep is closed.** Since 2026-09-10
+   > (`CLAUDE.md` rule 2) wording differences between the apps collect on one
+   > issue per release, `Sentence sweep — vX.Y.Z`, worked by the mac and then
+   > fixed on Windows. A tag cut while it is open on either side puts two
+   > sets of sentences under one version number, which is precisely what
+   > "one version series" above exists to prevent. Green suites do not prove
+   > this — a key the sweep ADDS is not walked by the Windows wording test
+   > unless a scenario case carries it — so check the issue, not the tests.
+   > **A version with NO sweep issue at all is fine**: the rule postdates
+   > v1.2.0, so that release has none, and the first is v1.3.0's.
 
    > **Check the TOTALS line before calling it green**, or use
    > `.\run-tests.ps1`, which reads it for you. `dotnet test` exits 1 for a

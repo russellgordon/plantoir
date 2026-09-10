@@ -138,6 +138,18 @@ Two things make that failure read as a request instead of as damage:
   Those are readouts of mac code; an edit there is overwritten on the next
   regeneration and the diff looks like vandalism.
 
+**A wording difference is not a proposal and not an issue.** Since 2026-09-10
+(`CLAUDE.md` rule 2) the mac owns every sentence a teacher reads, and the two
+apps are brought into step ONCE per release by a mac session working the open
+`Sentence sweep — vX.Y.Z` issue. Finding a sentence the two apps word
+differently, or one that is in no contract file, means adding a checklist line
+to that issue, from either side — not proposing a case for it, and not opening
+an issue of its own. The sweep puts the strings here, regenerates, and hands
+the red keys to Windows in one batch. Ordinary regenerations are unchanged:
+a key the mac CHANGES still reddens the Windows suite the day it lands, and
+the mac session that regenerates it opens the `windows` issue naming the keys
+(`CLAUDE.md` rule 3), so that red arrives as work rather than as noise.
+
 ## Regenerating
 
 ```bash

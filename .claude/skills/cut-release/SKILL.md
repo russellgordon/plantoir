@@ -105,6 +105,41 @@ this skill automates its steps 5–6 and the note-writing.
    first with `gh repo view russellgordon/plantoir` — if that fails, stop and
    say so rather than publishing.
 
+7. **Check the sentence sweep, and make sure the next one exists.**
+   `CLAUDE.md` rule 2 (decided 2026-09-10): wording differences between the
+   two apps are not issues of their own — they are checklist lines on ONE
+   standing issue per release, worked once by a mac session. **Before the
+   tag** (this is in `RELEASING.md`'s checklist too): the issue titled
+   `Sentence sweep — v<this>` must be CLOSED if it exists; if it is open on
+   either side, stop and say so — a tag over an open sweep ships two sentence
+   sets under one number. A version with no sweep issue at all is fine (the
+   rule postdates v1.2.0, so that cut has none). The mac session that worked
+   it should already have opened `Sentence sweep — v<next>`; if none exists,
+   create it:
+
+   ```bash
+   GH_TOKEN=$(gh auth token --user russellgordon) \
+     gh issue create -R russellgordon/plantoir --label mac --label windows \
+       --milestone "v<next>" --title "Sentence sweep — v<next>" \
+       --body-file - <<'BODY'
+   Checklist of every wording difference between the two apps, and every
+   sentence a teacher reads that is in the contract on neither side, found
+   since v<just-cut>. Either platform adds a line; a mac session works the
+   whole list once and posts "decided — Windows' turn"; a Windows session
+   fixes its red keys in one pass and closes it. Rule: `CLAUDE.md` rule 2, "The
+   mac owns the sentence". Procedure: `MAC-BOOTSTRAP.md` §B.5.
+
+   ## Sentences
+   - [ ] _(sentence — where it lives on the mac — where on Windows — which is better, if you have a view)_
+
+   ## Measured — text the local model reads
+   - [ ] _(a `TEACHERS SAY` phrasing or tool description; changing it is a routing change, re-measured per platform after the sweep)_
+   BODY
+   ```
+
+   The milestone must exist first (`gh api repos/russellgordon/plantoir/milestones`
+   lists them); create it if the release cut did not.
+
 ## Write the notes
 
 Style rules, in order of importance:
