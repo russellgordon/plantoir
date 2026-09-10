@@ -1112,17 +1112,28 @@ go and look for the issue, and issue #146 exists because four of them were met
 mid-task and read as nobody having said anything at all, while #70 sat open
 naming every phrasing.
 
-**Four things to know before you use them.**
+**What to know before you use them.**
 
 - **Never hand-edit the GENERATED keys.** Those are readouts of mac code; the
   next regeneration overwrites your edit and the diff looks like vandalism.
-  **Each file declares its own under `generated.keys`, and that is the list to
-  read.** This passage named `cardPhrasings`, `tools` and `milestones` until
-  2026-09-10, which was two keys of `assist-cases.json` plus one of
-  `app-rules.json` and left out `toolSchemas` — the key carrying every tool's
-  arguments, and therefore the one that moved when `back_up_course` gained a
-  `section`. Two other places said the same three; a list of generated keys
-  typed into prose is exactly the copy this whole folder exists to stop.
+  **`assist-cases.json` and `app-rules.json` each declare their own under
+  `generated.keys`, and that is the list to read**; `assist-wording.json` has
+  no such key because it is generated in FULL, and says so in its `note`. This
+  passage named `cardPhrasings`, `tools` and `milestones` until 2026-09-10,
+  which was two keys of `assist-cases.json` plus one of `app-rules.json`, and
+  left out both `toolSchemas` — the key carrying every tool's arguments, and
+  therefore the one that moved when `back_up_course` gained a `section` — and
+  `credentialRequests`. Two other places said the same three; a list of
+  generated keys typed into prose is exactly the copy this whole folder exists
+  to stop.
+- **Name every key a regeneration moved when you write the `windows` issue,
+  not only the one you were working on.** Learned from the same failure. The
+  mac added six tools on 2026-09-08 and issue #70 named the card phrasings
+  they brought with them, carefully and in full — but `back_up_course` also
+  gained a `section` argument in that commit, which travels in `toolSchemas`
+  rather than in the feature, and nothing said so. Windows' surface test
+  reported it perfectly and its reader had nothing to look up. A schema change
+  is the easy one to omit precisely because it is not the thing you built.
 - **Write it to the template.** `CLAUDE.md` rule 4 says what a `mac` issue
   carries — title and source, what it fixed and WHY (including what
   was rejected), numbers with the hardware they came from, the file and test

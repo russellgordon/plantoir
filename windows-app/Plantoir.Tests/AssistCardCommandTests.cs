@@ -16,13 +16,22 @@ public class AssistCardCommandTests
     /// arriving.</para>
     ///
     /// <para><b>This sentence exists because the failure was misread once.</b>
-    /// On 2026-09-09 a session mid-way through unrelated work found four of
-    /// these red, saw <c>Assert.NotNull() Failure: Value is null</c> — naming
-    /// no phrasing, no tool and nothing to look up — and filed issue #146
-    /// saying nobody had been told. Issue #70 had named all five phrasings and
+    /// On 2026-09-09 a session mid-way through unrelated work met two of these
+    /// red, saw <c>Assert.NotNull() Failure: Value is null</c> — naming no
+    /// phrasing, no tool and nothing to look up — and filed issue #146 saying
+    /// nobody had been told. Issue #70 had named all five phrasings and
     /// predicted this exact failure, in these words, at 23:52 the evening
     /// before. The assertions carried no message; the mac's equivalent
     /// (<c>AssistScenarioTests.swift</c>) has named the phrasing all along.</para>
+    ///
+    /// <para><b>It is "usually", not "always", and the same run proved it.</b>
+    /// Two other tests failed alongside these. One was
+    /// <c>AssistSurfaceContractTests</c> reporting that <c>back_up_course</c>
+    /// had gained a <c>section</c> — a real contract move that NO issue named,
+    /// so a reader who followed this advice would rightly have found nothing
+    /// and should have opened a <c>mac</c> issue. The other was a test of this
+    /// app's own that had retyped a contract value into a literal. Check the
+    /// issues; do not assume one exists.</para>
     /// </summary>
     private const string Handover =
         "A phrasing the contract carries and this app does not match is usually a HANDOVER: " +
@@ -76,6 +85,13 @@ public class AssistCardCommandTests
             string example = p["example"]!.ToString();
             string expectedTool = p["tool"]!.ToString();
             string notThis = p["notThis"]!.ToString();
+            // The contract gives each near miss its OWN reason, and they are
+            // not the same reason: make_room's is that a count and a noun
+            // disagreeing would rename pages a teacher's links point at, while
+            // "publish unit 4, day 3" is refused because a comma names a page
+            // rather than a unit. Rendering one entry's reason for all five
+            // would be the retyping this file exists to catch.
+            string because = p["becauseNotThis"]?.ToString() ?? "";
 
             var matched = AssistCardCommand.Matching(example);
             Assert.True(matched is not null,
@@ -88,9 +104,8 @@ public class AssistCardCommandTests
             var nearMiss = AssistCardCommand.Matching(notThis);
             Assert.True(nearMiss is null,
                 $"\"{notThis}\" is the near miss the contract pairs with \"{example}\" and this app " +
-                $"MATCHED it, sending it to {nearMiss?.ToolName}. A parsed shape refuses a sentence " +
-                "whose halves disagree because guessing which half a teacher meant renames pages " +
-                "their links point at — a widened pattern is how that protection is lost.");
+                $"MATCHED it, sending it to {nearMiss?.ToolName}. The contract's own reason it must " +
+                $"not: {because}");
         }
     }
 

@@ -38,7 +38,7 @@ the boundary is a TOP-LEVEL key — the file names them under `generated.keys`:
 |---|---|
 | `cardPhrasings` | `AssistCardCommand.fixedShapes` |
 | `tools` | `AssistToolRunner.tools` / `.localTools` / `.mcpOnlyTools`, and each definition's `needsApproval` and `planTwinName` |
-| `toolSchemas` | `AssistToolRunner.localTools` and `.mcpTools`, emitted as each client really sends them — every argument, every description. **This row was missing until 2026-09-10**, and its absence is not a typo with no consequence: `toolSchemas` is where a tool's ARGUMENTS live, so when the mac gave `back_up_course` a `section` on 2026-09-08 the change travelled in a key that three separate lists of "the generated keys" did not mention. Windows' `AssistSurfaceContractTests` went red for it and issue [#146](https://github.com/russellgordon/plantoir/issues/146) had to work out from first principles where the moved value had come from. |
+| `toolSchemas` | `AssistToolRunner.localTools` and `.mcpTools`, emitted as each client really sends them — every argument, every description. **This row was missing until 2026-09-10**, and its absence is not a typo with no consequence: `toolSchemas` is where a tool's ARGUMENTS live, so when the mac gave `back_up_course` a `section` on 2026-09-08 the change travelled in a key that every list of "the generated keys" written in PROSE left out — the files themselves always declared it. Windows' `AssistSurfaceContractTests` went red for it, no issue named the schema move, and issue [#146](https://github.com/russellgordon/plantoir/issues/146) was left inferring where the value had come from. |
 | `nearMisses`, `scenarios` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and a decision lives in the `documentation/` page that owns its subject, with a GitHub issue pointing at it when the other platform owes work — the handoff documents that used to hold them were retired on 2026-09-08. |
 
 In `app-rules.json` the same split applies: `milestones` is a readout of
@@ -131,33 +131,48 @@ other platform, opened in the same session, naming what changed and what they
 have to do. `CLAUDE.md` rule 3 requires it going one way and rule 4 the other;
 neither is optional, and neither is satisfied by committing the diff.
 
-### Reading a red suite: it is a request, and somebody has already written it down
+### Reading a red suite: four failures, four different causes
 
-Said explicitly because it was got wrong on 2026-09-09, and the correction is
-more useful than the rule. A Windows session part-way through unrelated work
-ran `dotnet test`, found four failures, and filed
-[#146](https://github.com/russellgordon/plantoir/issues/146) reporting that the
-contract had moved with nobody told and no issue naming it. The mac side had
-done everything right: [#70](https://github.com/russellgordon/plantoir/issues/70)
-was open, labelled `windows`, and named all five phrasings with the failure
-spelled out — *"Three more card phrasings will make your suite red"* — at 23:52
-on the evening of the regeneration.
+Worth walking through, because on 2026-09-09 a Windows session part-way
+through unrelated work ran `dotnet test`, found four failures, and filed
+[#146](https://github.com/russellgordon/plantoir/issues/146) reporting them as
+one thing: the contract had moved with nobody told. They were not one thing.
+Half of that report was wrong and half was right, and the useful lesson is in
+which half was which.
 
-Two things made the handover invisible anyway, and both are fixed:
+**Two of them had an issue, and an unreadable failure.**
+[#70](https://github.com/russellgordon/plantoir/issues/70) was open, labelled
+`windows`, and named all five card phrasings with the failure spelled out —
+*"Three more card phrasings will make your suite red"* — at 23:52 on the
+evening of the regeneration. Rule 3 was followed exactly. But the two tests
+that failed for it said `Assert.NotNull() Failure: Value is null` and nothing
+else, so nobody meeting them had a phrasing, a tool or a term to search for.
+Those assertions now name all three, and say that an unmatched contract
+phrasing is a handover to look up rather than a bug to file.
 
-- **The failures named nothing.** `Assert.NotNull() Failure: Value is null`,
-  six times over, with no phrasing and no tool in it. Those assertions now say
-  which phrasing, which tool, and that an unmatched contract phrasing is a
-  handover to look up rather than a bug to file.
-- **`toolSchemas` was not on any list of the generated keys**, so the moved
-  `back_up_course` signature appeared to come from nowhere. The table above has
-  it now.
+**One had a perfect failure and no issue at all, and this is the half #146 got
+right.** `back_up_course` gained a `section` in the same regeneration, and
+`AssistSurfaceContractTests` said so as clearly as a test can — *"must require
+exactly the arguments the contract says it does. Contract: [course, section];
+here: [course]"*. The reader knew precisely what had changed, went looking for
+the issue that explained it, and there was none: #70 discusses
+`back_up_course`'s plan twin and never mentions its arguments. **That is a rule
+3 lapse, and the lesson is that an issue must name every generated key the
+regeneration moved, not only the interesting one.** A schema change is easy to
+omit because it is not the feature you were building — it travels in
+`toolSchemas` alongside it. It did not help that no prose anywhere listed
+`toolSchemas` as generated at all; the table above has it now.
 
-So: **the open issues are the index, and a red contract test mid-task is not
-evidence that nobody told you.** Read them before writing a new one. The rest
-of the failure — a Windows test that had retyped a contract value into a
-literal, and so asserted nothing about this app at all — was this side's own,
-and no issue on either platform could have named it.
+**One belonged to nobody but this app** — a Windows test that had retyped a
+contract value into a literal, so it failed when the contract GREW. No issue on
+either platform could have named that, and `CLAUDE.md`'s "deserialise, don't
+retype" is the whole of its diagnosis.
+
+So, both ways round: **a red contract test mid-task is usually a handover, and
+the open issues are the index — read them before writing a new one.** And when
+you are the side that moved the contract, name every key that moved, because
+the one you did not think worth mentioning is the one that arrives with no
+explanation attached.
 
 ## Proposing a case from the Windows side
 
@@ -181,7 +196,10 @@ Two things make that failure read as a request instead of as damage:
   `generated.keys`, and that is the copy to read** — a list typed into prose is
   the one that stops being true. Three places said "`cardPhrasings`, `tools`,
   `milestones`" until 2026-09-10: two keys of one file plus one key of another,
-  missing `toolSchemas` altogether, which is where a tool's arguments live.
+  missing both `toolSchemas` (where a tool's arguments live) and
+  `credentialRequests`. `assist-wording.json` is the exception with no
+  `generated` block, because it is generated in FULL — it says so in its own
+  `note`, and there is no authored half of it to protect.
 
 ## Regenerating
 

@@ -512,23 +512,34 @@ afternoon. The mac opens a GitHub issue labelled `windows` in the session it
 changes a contract (`CLAUDE.md` rule 3), so there is already a page naming what
 moved and what this app owes.
 
-**Read the open `windows` issues before filing a new one.** On 2026-09-09 a
-session mid-way through unrelated work met four of these, filed
-[#146](https://github.com/russellgordon/plantoir/issues/146) reporting that a
-contract had moved with nobody told, and
-[#70](https://github.com/russellgordon/plantoir/issues/70) had been open since
-23:52 the previous evening naming all five phrasings and the failure itself —
-*"Three more card phrasings will make your suite red"*. Nothing was wrong with
-the process; the assertions simply said `Assert.NotNull() Failure: Value is
-null` and gave the reader nothing to search for. They name the phrasing, the
-tool and the handover now, which is the durable half of that fix — a session
-that meets one is told where to look without having to remember this page.
+**Read the open `windows` issues before filing a new one — and then check,
+because "usually" is not "always".** On 2026-09-09 a session mid-way through
+unrelated work met four of these and filed
+[#146](https://github.com/russellgordon/plantoir/issues/146) reporting them as
+one thing: a contract had moved with nobody told. They were four different
+things, and the run is worth knowing as a set.
 
-Two things it is NOT, both met in the same run: a test that retyped a contract
-value into a literal fails when the contract GROWS, which is this side's own
-bug and no issue elsewhere can name it; and a case proposed FROM here, which
-turns the MAC's suite red on purpose and is a request rather than damage
-([`contracts/README.md`](../contracts/README.md) covers both directions).
+- **Two had an issue and an unreadable failure.**
+  [#70](https://github.com/russellgordon/plantoir/issues/70) had been open since
+  23:52 the previous evening naming all five phrasings and the failure itself —
+  *"Three more card phrasings will make your suite red"*. The assertions said
+  `Assert.NotNull() Failure: Value is null` and gave the reader nothing to
+  search for. They name the phrasing, the tool and the handover now, which is
+  the durable half of the fix: a session that meets one is told where to look
+  without having to remember this page.
+- **One had a perfect failure and no issue at all.** `back_up_course` gained a
+  `section` in the same regeneration, `AssistSurfaceContractTests` reported it
+  exactly — *"must require exactly the arguments the contract says it does"* —
+  and nothing on either platform explained it; #70 discusses that tool and never
+  its arguments. **So when you look and genuinely find nothing, you have found a
+  real gap**: say so, and open an issue labelled `mac`.
+- **One was this app's own** — a test that had retyped a contract value into a
+  literal, so it failed when the contract GREW. No issue elsewhere could have
+  named it.
+
+The fourth thing a red contract test can be is a case proposed FROM here, which
+turns the MAC's suite red on purpose and is a request rather than damage;
+[`contracts/README.md`](../contracts/README.md) covers both directions.
 
 ## Driving the real interface
 

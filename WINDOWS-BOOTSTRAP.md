@@ -124,15 +124,21 @@ reasons rather than tasks:
   this line named three of them until 2026-09-10 and had `toolSchemas` — where
   every tool's ARGUMENTS live — missing, which is why a `back_up_course` that
   gained a `section` on the mac arrived here looking like it came from nowhere.
-- **A red contract test is a HANDOVER arriving, and the issue naming it is
-  probably already open.** The mac opens a `windows` issue in the session it
+  (`assist-wording.json` has no such key: it is generated in full and says so
+  in its `note`.)
+- **A red contract test is usually a HANDOVER arriving, and the issue naming it
+  is often already open.** The mac opens a `windows` issue in the session it
   changes a contract (`CLAUDE.md` rule 3), so a failure in
   `AssistCardCommandTests`, `AssistSurfaceContractTests` or `ContractTests`
-  means the mac moved and this side has not followed yet. **Read the open
-  `windows` issues before filing a new one** — issue #146 was written because
-  four bare `Assert.NotNull() Failure: Value is null` messages were met
-  mid-task and read as nobody having said anything, when #70 had named all five
-  phrasings the evening before. Those assertions say where to look now.
+  usually means the mac moved and this side has not followed yet. **Read the
+  open `windows` issues before filing a new one** — issue #146 was written
+  because two tests failed with a bare `Assert.NotNull() Failure: Value is
+  null` and were read as nobody having said anything, when #70 had named all
+  five phrasings the evening before. Those assertions say where to look now.
+  **But check rather than assume**, because #146 was also half RIGHT: a third
+  failure in the same run, `back_up_course` gaining a `section`, had no issue
+  anywhere. When you find none, say so and open one labelled `mac` — that is
+  the same courtesy in reverse, not a complaint.
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
   `promptHistory`, and the case lists in the other files). Doing so will make
   the **mac** suite fail until they implement it — that is the mechanism
