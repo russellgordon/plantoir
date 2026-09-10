@@ -132,6 +132,15 @@ final class RelativeDayFreshnessTests: XCTestCase {
         )
     }
 
+    /// Both keys settle, and `date` still wins — the precedence `classPlan`
+    /// reads them in. Pinned because settling reads BOTH and the runner reads
+    /// ONE, and nothing else says those two orders must agree.
+    func testTheDateIsPreferredToTheCardsWord() throws {
+        let settled: [String: Any] = try settle(["date": "2026-10-01", "when": "tomorrow"])
+        XCTAssertEqual(settled["date"] as? String, "2026-10-01", "The date the caller gave stands")
+        XCTAssertEqual(settled["when"] as? String, "2026-09-09", "And the word beside it is still read")
+    }
+
     /// The list of what carries a class day is the TOOL SURFACE, not a list
     /// kept beside it — so a tool added later cannot be quietly left out.
     func testEveryToolThatTakesAClassDateHasItSettled() throws {

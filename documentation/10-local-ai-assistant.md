@@ -2171,6 +2171,21 @@ renamed to `date`: `AssistCardCommand` is generated into
 key. A word the settler cannot read is left exactly as it arrived, so the
 sentence a teacher sees is still the runner's own refusal.
 
+**The dateline had to move too, or the claim below would have been false.**
+`AssistAgent.dateline()` read `Date()` and is appended to every model-routed
+message — it is how the model does its own date arithmetic — so leaving it
+alone would have kept a second reading of the clock in the very class that had
+just settled the first. It takes the day now (`dateline(on: tools.today)`).
+Building it from a `CalendarDay` took the LOCALE out of it as a side effect,
+and that half was a live latent fault rather than tidying: the old version
+asked `DateFormatter` for `EEEE` with no locale pinned, so a French-locale Mac
+would have told the model "a mardi" and a Thai-locale one would have dated it
+2569 — the same trap the Windows section above measured, in the one place on
+this side that was still exposed to it. `CalendarDay` is three integers and
+`String(format:)`, and its `weekdayName` pins `en_US_POSIX`. The sentence is
+byte-identical on an English machine, so the routing measurements stand and no
+tool description was touched.
+
 **Against the RUNNER's clock, not the machine's** — `tools.today`, not a second
 `CalendarDay.today()` in the agent. Two clocks in one process is two answers to
 what today is, differing on one night in a thousand, and no test able to pin

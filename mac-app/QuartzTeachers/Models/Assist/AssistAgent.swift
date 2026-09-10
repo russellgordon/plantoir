@@ -186,7 +186,7 @@ final class AssistAgent {
         // The date goes on the END of the message. Prepended, the same line
         // cost 15 points of routing accuracy on the Windows measurements —
         // the position really is the finding, not the presence.
-        messages.append(AssistMessage.user("\(trimmed) \(AssistAgent.dateline())"))
+        messages.append(AssistMessage.user("\(trimmed) \(AssistAgent.dateline(on: tools.today))"))
         await think()
     }
 
@@ -538,13 +538,24 @@ final class AssistAgent {
     }
 
     /// Today, in the form the model reads best.
-    nonisolated static func dateline() -> String {
-        let formatter: DateFormatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let day: DateFormatter = DateFormatter()
-        day.dateFormat = "EEEE"
-        let now: Date = Date()
-        return "(Today is \(formatter.string(from: now)), a \(day.string(from: now)).)"
+    ///
+    /// **Given the day rather than reading one.** This is the other half of
+    /// what the model needs to answer "publish the class tomorrow please" —
+    /// it does that arithmetic itself, from this sentence — so a dateline
+    /// built from its own reading of the clock would be the second clock in
+    /// the process that `withTheDaySettled` above says there is not. One
+    /// reading, `tools.today`, for both.
+    ///
+    /// Built from a `CalendarDay` rather than by formatting a `Date`, which
+    /// also takes the locale out of it: the previous version asked
+    /// `DateFormatter` for `EEEE` with no locale pinned, so a French-locale
+    /// Mac would have told the model "a mardi", and a Thai-locale one would
+    /// have dated it in the Buddhist calendar — 2569 for 2026. `CalendarDay`
+    /// is three integers and `String(format:)`, and its `weekdayName` pins
+    /// `en_US_POSIX`. The sentence is unchanged on an English machine, which
+    /// is what the routing measurements were made against.
+    nonisolated static func dateline(on day: CalendarDay) -> String {
+        return "(Today is \(day.text), a \(day.weekdayName).)"
     }
 
     /// What the model is told it is.
