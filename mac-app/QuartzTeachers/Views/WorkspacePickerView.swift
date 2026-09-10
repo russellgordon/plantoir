@@ -44,10 +44,10 @@ struct WorkspacePickerView: View {
             // of which are about it.
             if let chosenURL = workspace.workspaceURL, workspace.workspaceCanBeInitialized || workspace.needsCloudSyncDecision {
                 // No `ViewThatFits` wrapper here any more: the bar itself
-                // now prefers its natural size and falls back to the
-                // scrolling form only when the path is too long for the
-                // space, which is what this stack used to arrange for
-                // itself. It moved into FinderPathBarView on 2026-09-09
+                // now prefers its natural size, collapses the ancestors to
+                // icons when the path is too long for the space, and only
+                // scrolls when even that does not fit — the first of which
+                // is what this stack used to arrange for itself. It moved into FinderPathBarView on 2026-09-09
                 // because the WINDOW's bar had the same need and did not
                 // have the same workaround (issue #145).
                 FinderPathBarView(folderURL: chosenURL)
