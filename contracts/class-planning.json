@@ -554,7 +554,7 @@
     "why": "Chosen at course creation and, until this, nowhere else — because renaming an existing course's word means rewriting every class page's name, its frontmatter title and every wikilink pointing at it, and a half-finished pass leaves a broken site. What made it safe was not scale (a ready-made course holds 84–87 class pages, 42 for CHV2O and GLC2O) but an undo: the operation is its own inverse (rename it back), a backup of the whole course is saved first, and a rename that stops part way is recognised and finished by running it again. REJECTED: a display-only rename (titles say Thread while files stay Unit — Obsidian is the teacher's editor and they would see the old word every time); rewriting prose ('by the end of Unit 3' is the teacher's own writing after creation); skipping a page that already sits where a renamed page would go (two numbering schemes in one section); skipping a page that cannot be read (the configuration would then name a word half the pages do not use).",
     "howAPageIsRenamed": {
       "rule": "The title inside the frontmatter is set to the new name IN PLACE, then the file is MOVED. Never copied and deleted.",
-      "why": "A move is atomic on one volume, so there is never a moment with two copies or none — an interruption leaves a page under its old name whose title says the new one, which is harmless because every reader goes by the file name, and a second run finishes it. Copy-then-delete (the insertion planner's shape) interrupted between the two leaves both files, and the plan's own collision rule would then refuse the very re-run meant to finish it. A page with no title line is moved without one: Quartz falls back to the file name."
+      "why": "A move is atomic on one volume, so there is never a moment with two copies or none — an interruption leaves a page under its old name whose title says the new one, which is harmless because every reader goes by the file name, and a second run finishes it. Copy-then-delete (the insertion planner's shape) interrupted between the two leaves both files, and the plan's own collision rule would then refuse the very re-run meant to finish it. A page with no title line is moved without one: Quartz falls back to the file name. Whether a destination that 'exists' is the SOURCE — a change of capitalisation on a case-insensitive volume — is asked of the filesystem's file identity, never of the spelling, so a case-sensitive volume still sees a genuine clash."
     },
     "order": [
       "read every planned page (an unreadable one refuses everything)",
@@ -726,8 +726,26 @@
           "Unit 1, Day 2": "Module 1, Day 2"
         },
         "why": "A rename that stopped after the first page. Running it again must finish: the moved page is under the new word and is not planned again, but a link written as [[Unit 1, Day 1]] still needs to follow it, so the link map covers both."
-      }
-    ],
+        },
+        {
+          "name": "finishing an interrupted change of capitalisation: a page already spelled the new way is not moved onto itself",
+          "from": "Unit",
+          "to": "unit",
+          "pages": [
+            {"section": 1, "title": "unit 1, Day 1"},
+            {"section": 1, "title": "Unit 1, Day 2"}
+          ],
+          "expectRenames": [
+            {"section": 1, "from": "Unit 1, Day 2", "to": "unit 1, Day 2"}
+          ],
+          "expectSections": [1],
+          "expectLinkMap": {
+            "unit 1, Day 1": "unit 1, Day 1",
+            "Unit 1, Day 2": "unit 1, Day 2"
+          },
+          "why": "The parser is case-insensitive, so on a re-run the page already moved matches the OLD word too. Its new title equals its title: it is left where it is rather than moved onto itself — which the mac's filesystem tolerates and others may not — and stays in the link map so [[Unit 1, Day 1]] is still repointed. Found by the implementation review, 2026-09-10."
+        }
+        ],
     "linkCases": {
       "note": "How links follow renamed pages. Each case rewrites `text` with the link map a rename from `from` to `to` builds over `pageTitles`, and expects `expect`. The rewriter is the one the insertion planner already uses (WikiLinkRewriter on the mac): it changes only the page name between the brackets and stops at #, | and ].",
       "cases": [

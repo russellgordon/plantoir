@@ -131,10 +131,6 @@ final class UnitWordRenamerTests: XCTestCase {
         }
         XCTAssertFalse(froms.contains("Field Trip"))
         XCTAssertFalse(froms.contains("index"))
-        XCTAssertEqual(
-            plan.previewLines[0],
-            UnitWordRenameWording.previewPages(courseCode: "ICS3U", pages: 3, sections: [1, 2], old: "Unit", new: "Module")
-        )
     }
 
     // MARK: - Carrying it out
@@ -230,6 +226,78 @@ final class UnitWordRenamerTests: XCTestCase {
         XCTAssertEqual(course.configuration.unitWord, "unit")
         let page: String = try XCTUnwrap(text(of: "section1/All Classes/unit 1, Day 1.md", in: course))
         XCTAssertTrue(page.hasPrefix("---\ntitle: unit 1, Day 1\n"), page)
+        // The links follow the new spelling too — the rewriter matches names
+        // without regard to case, which is what makes this work at all.
+        XCTAssertEqual(outcome.linksRewritten, 4)
+        let index: String = try XCTUnwrap(text(of: "section1/All Classes/index.md", in: course))
+        XCTAssertTrue(index.contains("[[unit 1, Day 1|the first day]]"), index)
+        let shared: String = try XCTUnwrap(text(of: "Concepts/Loops.md", in: course))
+        XCTAssertTrue(shared.contains("[[unit 1, Day 2]]"), shared)
+
+        // Run again — as if it had stopped part way — and nothing is moved
+        // onto itself.
+        let again: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Unit", to: "unit", in: course)
+        XCTAssertTrue(again.canProceed, again.problems.joined(separator: " "))
+        XCTAssertTrue(again.renames.isEmpty, "Pages already spelled the new way have nothing to move")
+        XCTAssertEqual(again.linkMap["unit 1, Day 1"], "unit 1, Day 1")
+    }
+
+    // MARK: - Only the stopped rename's own word may finish it
+
+    func testWhileARenameIsUnderWayOnlyItsTargetWordIsAccepted() {
+        XCTAssertEqual(
+            UnitWordRenamer.problem(renaming: "Unit", to: "Thread", interruptedTarget: "Module"),
+            UnitWordRenameWording.problemMustFinishFirst(target: "Module")
+        )
+        XCTAssertNil(UnitWordRenamer.problem(renaming: "Unit", to: "Module", interruptedTarget: "Module"))
+        XCTAssertNil(UnitWordRenamer.problem(renaming: "Unit", to: " Module ", interruptedTarget: "Module"))
+    }
+
+    // MARK: - The survey the sheet shows
+
+    func testTheSurveyCountsWhatThePlanWouldRename() throws {
+        let (course, root) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let survey: UnitWordSurvey = UnitWordRenamer.survey(facts: UnitWordRenamer.facts(for: course))
+        XCTAssertEqual(survey.pages, 3)
+        XCTAssertEqual(survey.sections, [1, 2])
+        XCTAssertEqual(survey.links, 4)
+    }
+
+    // MARK: - A record nobody should believe
+
+    func testARecordWithNoPageUnderTheNewWordIsCleared() throws {
+        let (course, root) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        // As after restoring a pre-rename backup by hand: the record says a
+        // rename is under way, and no page shows it.
+        try UnitWordRenamer.recordRenameStarting(from: "Unit", to: "Module", courseDirectory: course.directoryURL)
+        XCTAssertNil(UnitWordRenamer.interruptedRenameTarget(in: course))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: UnitWordRenamer.renameMarkerURL(courseDirectory: course.directoryURL).path
+        ))
+    }
+
+    /// The trail is owed whenever the course changed, and the first page
+    /// can be retitled and then fail to move — so the problem says which.
+    func testAFailedFirstMoveStillReportsTheCourseAsChanged() throws {
+        let (course, root) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let plan: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Unit", to: "Module", in: course)
+        let texts: [String] = try UnitWordRenamer.readEveryPage(of: plan)
+        // A read-only folder: the retitle (an atomic write, which needs the
+        // folder too) or the move fails on the first page either way.
+        let folder: URL = course.directoryURL.appendingPathComponent("section1/All Classes")
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path) }
+        XCTAssertThrowsError(try UnitWordRenamer.carryOut(
+            plan, texts: texts, facts: UnitWordRenamer.facts(for: course), backupURL: root
+        )) { error in
+            let problem: UnitWordRenameProblem? = error as? UnitWordRenameProblem
+            XCTAssertEqual(problem?.pagesRenamed, 0)
+            XCTAssertEqual(problem?.changedTheCourse, true)
+            XCTAssertTrue(problem?.sentence.hasPrefix("Plantoir renamed 0 of 3 class pages") == true, problem?.sentence ?? "")
+        }
     }
 
     // MARK: - What refuses it
@@ -284,7 +352,6 @@ final class UnitWordRenamerTests: XCTestCase {
         let plan: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Unit", to: "Module", in: course)
         XCTAssertTrue(plan.canProceed)
         XCTAssertEqual(plan.renames.count, 0)
-        XCTAssertEqual(plan.previewLines.count, 1)
         let outcome: UnitWordRenameOutcome = try UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
         try UnitWordRenamer.record(plan, in: course)
         XCTAssertEqual(outcome.pagesRenamed, 0)
@@ -305,7 +372,7 @@ final class UnitWordRenamerTests: XCTestCase {
         // As if the first page had moved and then the app quit: the record is
         // there, one page is under the new word, the settings say the old one
         // and a link still points at the old name.
-        UnitWordRenamer.recordRenameStarting(from: "Unit", to: "Module", courseDirectory: course.directoryURL)
+        try UnitWordRenamer.recordRenameStarting(from: "Unit", to: "Module", courseDirectory: course.directoryURL)
         try FileManager.default.moveItem(
             at: course.directoryURL.appendingPathComponent("section1/All Classes/Unit 1, Day 1.md"),
             to: course.directoryURL.appendingPathComponent("section1/All Classes/Module 1, Day 1.md")
@@ -332,7 +399,7 @@ final class UnitWordRenamerTests: XCTestCase {
         let (course, root) = try makeCourse(word: "Module")
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         // The settings were written and only the clearing failed.
-        UnitWordRenamer.recordRenameStarting(from: "Unit", to: "Module", courseDirectory: course.directoryURL)
+        try UnitWordRenamer.recordRenameStarting(from: "Unit", to: "Module", courseDirectory: course.directoryURL)
         XCTAssertNil(UnitWordRenamer.interruptedRenameTarget(in: course))
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: UnitWordRenamer.renameMarkerURL(courseDirectory: course.directoryURL).path

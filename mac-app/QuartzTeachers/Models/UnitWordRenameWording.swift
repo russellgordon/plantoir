@@ -34,6 +34,10 @@ enum UnitWordRenameWording {
     nonisolated static let problemUnchanged: String =
         "That is already this course’s word."
 
+    /// Shown while the plan is being worked out.
+    nonisolated static let lookingOver: String =
+        "Looking over the course’s pages…"
+
     nonisolated static let previewLinksNone: String =
         "No links point at those names, so nothing else needs changing."
 
@@ -68,6 +72,23 @@ enum UnitWordRenameWording {
     /// word — a literal "Unit" here would lie the moment a rename landed.
     nonisolated static func rowCaption(word: String) -> String {
         return "Class pages are named “\(word) 1, Day 1”."
+    }
+
+    /// A rename that stopped part way must be finished with the SAME word.
+    /// Any other word would plan from the old word alone, leave the pages
+    /// already moved matching neither, and end with three words in one course.
+    nonisolated static func problemMustFinishFirst(target: String) -> String {
+        return "Plantoir is part way through renaming to “\(target)”. Finish that first — press Rename with “\(target)” — and then rename again."
+    }
+
+    /// Links the rename could not follow because their page could not be
+    /// written. Said, because the teacher was shown a count and would
+    /// otherwise be told a smaller one with no explanation.
+    nonisolated static func doneLinksNotWritten(pages: Int) -> String {
+        if pages == 1 {
+            return "One page could not be written, so its links still use the old names."
+        }
+        return "\(pages) pages could not be written, so their links still use the old names."
     }
 
     nonisolated static func problemPageInTheWay(courseCode: String, sectionNumber: Int, name: String) -> String {
@@ -133,10 +154,15 @@ enum UnitWordRenameWording {
     }
 
     /// The whole sentence a teacher reads after it worked.
-    nonisolated static func doneSentence(from old: String, to new: String, pages: Int, links: Int) -> String {
+    nonisolated static func doneSentence(
+        from old: String, to new: String, pages: Int, links: Int, pagesNotWritten: Int = 0
+    ) -> String {
         var pieces: [String] = [done(from: old, to: new), donePages(count: pages)]
         if pages > 0 {
             pieces.append(doneLinks(count: links))
+            if pagesNotWritten > 0 {
+                pieces.append(doneLinksNotWritten(pages: pagesNotWritten))
+            }
             pieces.append(donePublish)
         }
         pieces.append(doneBackup)

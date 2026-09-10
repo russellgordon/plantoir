@@ -26,7 +26,9 @@ import Foundation
 /// teacher's word as the course is made; renaming a course's pages later is
 /// `UnitWordRenamer`, which renames every class page, retitles it and
 /// follows the links, with a backup first and a record of a rename under way.
-enum ClassPageTerm {
+/// `nonisolated`, like the rest of the pure helpers a rename runs off the
+/// main actor: it reads nothing but its arguments.
+nonisolated enum ClassPageTerm {
 
     // MARK: - Stored properties
 

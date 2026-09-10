@@ -6,7 +6,10 @@ import Foundation
 /// left out of the operations that shuffle classes around: a teacher's "Field
 /// Trip" or "Exam Review" cannot be renumbered without inventing a number for
 /// it, and inventing one would be worse than not touching it.
-struct UnitDay: Equatable, Hashable {
+///
+/// `nonisolated`: pure over its arguments, and read off the main actor by the
+/// unit-word rename.
+nonisolated struct UnitDay: Equatable, Hashable {
 
     // MARK: - Stored properties
 
@@ -245,8 +248,9 @@ enum ClassPages {
         return pages
     }
 
-    /// Every markdown page under a folder, recursively.
-    static func markdownPages(under root: URL) -> [URL] {
+    /// Every markdown page under a folder, recursively. `nonisolated` because
+    /// the unit-word rename walks class folders off the main actor.
+    nonisolated static func markdownPages(under root: URL) -> [URL] {
         var pages: [URL] = []
         let fileManager: FileManager = FileManager.default
         var isDirectory: ObjCBool = false
