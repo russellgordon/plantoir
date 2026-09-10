@@ -1185,8 +1185,8 @@ final class SharedRulesContractTests: XCTestCase {
     ///
     /// Asserted HERE, on the side that can act on it, because the cost lands
     /// on the OTHER side: Windows'
-    /// `NoBlockedSentenceInTheContractIsUnusedHere` sweeps every `reason`
-    /// under `specialNames` and demands each be one of the seven sentences
+    /// `NoBlockedSentenceInTheContractIsUnusedHere` sweeps every top-level
+    /// entry's `reason` under `specialNames` and demands each be one of the seven sentences
     /// that app shows in a flyout. A `reason` added to this entry would fail
     /// the Windows suite for something that has nothing to do with what the
     /// sentence says — and `shared-rules.json` is an AUTHORED contract file
@@ -1199,7 +1199,7 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertNil(
             tip["reason"],
             "specialNames.contentStructureTip gained a `reason` key. It is a caption rather "
-            + "than a removal-blocked sentence, and Windows sweeps every `reason` here "
+            + "than a removal-blocked sentence, and Windows sweeps every top-level `reason` here "
             + "expecting to find it in a flyout — so this breaks that suite for a reason "
             + "unrelated to the wording."
         )
@@ -1212,10 +1212,15 @@ final class SharedRulesContractTests: XCTestCase {
     /// stays perfectly green if the line that renders it is deleted. Windows
     /// answered that with an opt-in UI-Automation test
     /// (`CourseSettingsCaptionUiTests`), MEASURED to fail with the caption
-    /// commented out. The mac has no such harness, so this is the nearest
-    /// equivalent it does have — the source scan issue #71 established for the
-    /// Marks wording (`testBothSurfacesDrawTheMarksWordingFromOneHome`), which
-    /// reads the view rather than the screen.
+    /// commented out. The mac HAS an XCUITest target that could do the same,
+    /// but it is outside the gate (`-only-testing:QuartzTeachersTests` runs
+    /// this target only), and an attempt at it reached this caption — four
+    /// list editors down the form — in one run out of four. So this is the
+    /// gated guard: the source scan issue #71 established for the Marks
+    /// wording (`testBothSurfacesDrawTheMarksWordingFromOneHome`), which
+    /// reads the view rather than the screen. What went wrong with the UI
+    /// attempt, and which part of it is worth fixing, is in
+    /// `documentation/09-mac-app.md`.
     ///
     /// **What it reaches, plainly**: that the view references the constant on
     /// a non-comment line, and that no other product file carries a pasted
