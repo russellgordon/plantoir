@@ -208,6 +208,11 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
     /// (<c>PlantoirTools.PlanForDay</c>); it is the same shared reader either
     /// way, so there is one answer to what "monday" means.</para>
     ///
+    /// <para>No card sets both <c>when</c> and <c>date</c>, and none should:
+    /// the two would race on the order the dictionary happens to yield them.
+    /// The fixed shapes are written out one by one a few hundred lines above,
+    /// which is where that stays true.</para>
+    ///
     /// <para>A word that cannot be read is passed through as the <c>date</c>
     /// unchanged, so the tool answers with its own sentence about the date
     /// rather than the binder throwing about a parameter a teacher has never

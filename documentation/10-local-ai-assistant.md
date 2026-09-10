@@ -1942,6 +1942,15 @@ times".
   per call rather than a stored date, because one `plantoir-mcp` can stay open
   longer than a calendar day.
 
+**The guarantee is the CARD path's, and only its.** When the MODEL sends
+`date: "tomorrow"` — which `ClassDateHelp` tells it not to, and which a small
+model will sometimes do anyway — the twin and the act each call `DayFor` and
+each read the clock, so the 23:59/00:01 case above still exists on that path.
+It is not closed here because closing it means either steering the model with
+description text (below) or resolving inside `AssistAgent` for arguments the
+model chose, which is a routing change and owes a re-measurement. Worth knowing
+before anybody reads the paragraph above as covering everything.
+
 **The tool DESCRIPTIONS were deliberately not touched, so no routing
 re-measurement is owed.** `ClassDateHelp` still tells the model to work the
 date out itself. A tool that has become more forgiving owes the model no
@@ -1981,9 +1990,20 @@ the machine's culture what Monday is called, so on a French-locale machine the
 seven phrasings would quietly stop working for one teacher and nobody else; the
 mac pins `en_US_POSIX` on its formatter for the same reason. The same trap
 applies on the way out: `ToString("yyyy-MM-dd")` renders the year in the
-machine's DEFAULT CALENDAR, which is 2569 on a Thai-locale Windows machine, so
-the date is written with `InvariantCulture` and the tool is then looking for a
-class on a day no course has.
+machine's DEFAULT CALENDAR, which is 2569 on a Thai-locale Windows machine
+(measured: `2569-09-09` against `2026-09-09`), so the date is written with
+`InvariantCulture` and the tool is not left looking for a class on a day no
+course has.
+
+**The rule is applied at the boundary this piece owns, and nowhere else.**
+Sixty-six other sites in `windows-app` still render a date with no culture, and
+three of them WRITE one — `PageFrontmatter.cs:187` is the stamp every re-date
+puts into a page's `created:`, so an affected machine would corrupt a section's
+dates durably rather than merely print them oddly. That sweep is its own piece
+of work, with its own review: [issue
+#144](https://github.com/russellgordon/plantoir/issues/144). The mac is immune
+by construction — `CalendarDay.text` is `String(format: "%04d-%02d-%02d", …)`,
+three integers and no calendar.
 
 ### Two things this deliberately did not fix
 
