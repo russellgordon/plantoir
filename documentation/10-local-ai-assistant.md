@@ -1225,7 +1225,10 @@ set equality in both directions, and it is a good test; it simply pins a
 **different class**. It compares the contract against
 `AssistAgent.ForTheLocalModel` and `.DeploysToStudents`, which is the in-app
 assistant, while the 37 live in `PlantoirTools`. Its `mcpOnly` third compares
-the contract against three names typed inline in the test file. Twelve
+the contract against names typed inline in the test file — three of them
+until 2026-09-09, when Windows updated the list to the ten the contract has
+named since the mac built the six (issue #70). Written out rather than counted,
+so the list moving stays a decision somebody makes. Twelve
 additions went through that gap without a single red test.
 
 **Windows closed it, on the same day and from the other direction.**

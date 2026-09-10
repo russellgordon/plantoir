@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json.Nodes;
 using Plantoir.Core;
 using Plantoir.Core.Assist;
@@ -524,6 +525,15 @@ public class ContractTests
         }
     }
 
+    /// <summary>Every tool name <c>plantoir-mcp</c> declares.</summary>
+    private static readonly HashSet<string> PlantoirToolNames = typeof(Plantoir.Mcp.PlantoirTools)
+        .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+        .Select(method => method
+            .GetCustomAttribute<ModelContextProtocol.Server.McpServerToolAttribute>())
+        .Where(attribute => attribute is not null)
+        .Select(attribute => attribute!.Name!)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     [Fact]
     public void AssistCases_Tools_MatchesContract()
     {
@@ -548,21 +558,31 @@ public class ContractTests
         // but the FIXED PHRASINGS that reach them: MCP-only means no local
         // model is shown a tool, and says nothing about whether a teacher may
         // ask for it in words the matcher knows.
+        // MCP-only means the local MODEL is not SHOWN a tool. Asserted about
+        // THIS app rather than by retyping the contract's list: an inline copy
+        // goes red only when the contract moves, and the fix is always to
+        // retype it — which is the pattern issue #146 called out and CLAUDE.md
+        // means by "deserialise, don't retype".
+        //
+        // The two halves are the whole meaning of the word. Nothing MCP-only
+        // may be in the local surface, which is what protects the measured
+        // routing accuracy of the thirteen; and every one of them must still
+        // be reachable, because MCP-only says nothing about whether a teacher
+        // may ask for it — six of these ten are reached by a fixed phrasing,
+        // matched in code, that no model ever sees (issue #70).
         var mcpOnly = tools["mcpOnly"]!.AsArray().Select(t => t!.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var expectedMcpOnly = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        Assert.NotEmpty(mcpOnly);
+
+        foreach (string tool in mcpOnly)
         {
-            "list_courses",
-            "plan_add_classes",
-            "add_classes",
-            "plan_make_room_for_classes",
-            "make_room_for_classes",
-            "explain_publishing",
-            "back_up_course",
-            "list_curriculum_expectations",
-            "plan_curriculum_mentions",
-            "add_curriculum_mentions",
-        };
-        Assert.Equal(expectedMcpOnly, mcpOnly);
+            Assert.False(AssistAgent.ForTheLocalModel.Contains(tool),
+                $"{tool} is MCP-only in the contract and this app shows it to the local model, " +
+                "which spends routing accuracy the measurement was taken against.");
+
+            Assert.True(PlantoirToolNames.Contains(tool),
+                $"{tool} is MCP-only in the contract and this server does not offer it at all, " +
+                "so nothing here can reach it — by a fixed phrasing or otherwise.");
+        }
     }
 
     /// <summary>
@@ -571,10 +591,19 @@ public class ContractTests
     /// silently does nothing for it — a teacher who asked to be shown what
     /// would happen is shown nothing, and only for some requests.
     ///
-    /// Deliberately scoped to the local surface. The contract lists twins for
-    /// writes the local model is never offered (re_date_classes), and gating
-    /// one of those here would hold a write behind a proposal this loop never
-    /// asks for.
+    /// Deliberately scoped to the local surface: the contract lists twins for
+    /// writes the local model is never offered, and this loop cannot check
+    /// what it does not route.
+    ///
+    /// <para><b>It is a floor, not a ceiling, and the difference matters.</b>
+    /// "The local model is never offered it" does NOT mean nothing reaches it
+    /// — a FIXED PHRASING reaches a tool no model is shown, and then wants the
+    /// same gate. <c>re_date_classes</c> has been in
+    /// <see cref="AssistAgent.PlanTwins"/> for exactly that reason, and
+    /// <c>make_room_for_classes</c> joined it on 2026-09-09 (issue #70). So
+    /// the loop below skips what it cannot judge; the check underneath it,
+    /// that nothing is gated behind a twin the CONTRACT does not know, is what
+    /// keeps the additions honest.</para>
     /// </summary>
     [Fact]
     public void PlanTwins_CoverEveryLocalWriteThatHasOne()
