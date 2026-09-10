@@ -2119,20 +2119,24 @@ date a teacher remembered lands 543 years in the future and nothing reports a
 fault. That sweep is its own piece of work, with its own review: [issue
 #144](https://github.com/russellgordon/plantoir/issues/144). **`CalendarDay`
 is immune by construction** — `.text` is `String(format: "%04d-%02d-%02d", …)`,
-three integers and no calendar — **but the mac is not, and this line used to
+three integers and no calendar — **but the mac was not, and this line used to
 say it was.** Two `DateFormatter`s in mac product code set a `dateFormat` and
-pin no locale, so they render in the machine's default calendar:
+pinned no locale, so they rendered in the machine's default calendar:
 `CourseArchiver.timestampedName`, which builds archive and backup FILENAMES,
-and `ArchivedItem.date(fromStamp:)`, which reads them back. On the Thai-locale
-machine measured above, a mac writes `ICS3U_2569-08-09_141530.zip` against a
+and `ArchivedItem.date(fromStamp:)`, which read them back. On the Thai-locale
+machine measured above, a mac wrote `ICS3U_2569-08-09_141530.zip` against a
 form `contracts/course-management.json` pins as `yyyy-MM-dd_HHmmss`. Symmetric
-on one machine and broken between two, which is why nobody has met it. Two
-files, not a sweep, and with a migration in it — the reader must go on
-accepting the old spelling or a teacher's own history vanishes from the list
-the day they update: [issue #160](https://github.com/russellgordon/plantoir/issues/160).
-Everywhere else is pinned to `en_US_POSIX`, and the third instance was
-`AssistAgent.dateline()`, fixed below because that line was being rewritten
-anyway.
+on one machine and broken between two, which is why nobody met it. **Fixed on
+2026-09-10** ([issue #160](https://github.com/russellgordon/plantoir/issues/160)):
+`ArchiveStamp` now owns both ends, and it goes on reading the old spellings,
+because a teacher on such a machine has zips already named that way and the
+date in one of those names decides which backup gets DELETED. The whole of it
+— including the Ethiopic case, which is the one an ordinary sanity check
+cannot catch — is in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "What an archive or a backup
+is CALLED, and the calendar it is stamped in". Everywhere else is pinned to
+`en_US_POSIX`, and the third instance was `AssistAgent.dateline()`, fixed
+below because that line was being rewritten anyway.
 
 ### The mac's half: settled where the call is made, and a clock that is read
 
