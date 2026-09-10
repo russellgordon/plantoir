@@ -38,7 +38,10 @@ places, and which one is a judgement about portability rather than effort:
 - **[`contracts/`](contracts/README.md)** if it is a sentence a teacher reads,
   a rule with inputs and expected outputs, or a sequence that must happen in
   order. Add the case, run it here, commit the diff — the Windows suite then
-  runs the identical case.
+  runs the identical case. **It still owes an issue**, which is not a second
+  home for the behaviour but the notification that it moved: step 3 below says
+  why, and rule 4 already spells out the same thing for a case travelling the
+  other way.
 - **A [GitHub issue](https://github.com/russellgordon/plantoir/issues)
   labelled `windows`** if it cannot be expressed as data: anything visual,
   anything with platform mechanics (Colima, port leases, WebKit), anything
@@ -73,7 +76,19 @@ Plantoir --write-contracts contracts     # or the built binary in DerivedData
 It preserves the hand-written halves (`scenarios`, `nearMisses`,
 `promptHistory`, every case list) and rewrites only the readouts. It is
 idempotent, so a run that changes nothing produces no diff. **Commit the diff —
-that diff is how the Windows side finds out.**
+that diff is how the change travels.**
+
+**It is not how they find out**, and the difference has cost real time. Nobody
+reads a folder of JSON for changes; what the Windows side meets is its own
+suite going red, days later, part-way through something else. So the issue step
+6 asks for is not a courtesy on top of the diff — it is the whole of the
+notification, and the diff is only the payload. **Say in it which key moved and
+which of their tests will go red**, the way
+[#70](https://github.com/russellgordon/plantoir/issues/70) did: *"Three more
+card phrasings will make your suite red"*, with the three quoted. That is what
+turns a failure into a task instead of into
+[#146](https://github.com/russellgordon/plantoir/issues/146), which was filed
+reporting that nobody had been told, on a day when somebody had.
 
 ### 4. Run the tests, and read what they say
 

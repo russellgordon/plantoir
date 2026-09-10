@@ -38,6 +38,7 @@ the boundary is a TOP-LEVEL key — the file names them under `generated.keys`:
 |---|---|
 | `cardPhrasings` | `AssistCardCommand.fixedShapes` |
 | `tools` | `AssistToolRunner.tools` / `.localTools` / `.mcpOnlyTools`, and each definition's `needsApproval` and `planTwinName` |
+| `toolSchemas` | `AssistToolRunner.localTools` and `.mcpTools`, emitted as each client really sends them — every argument, every description. **This row was missing until 2026-09-10**, and its absence is not a typo with no consequence: `toolSchemas` is where a tool's ARGUMENTS live, so when the mac gave `back_up_course` a `section` on 2026-09-08 the change travelled in a key that three separate lists of "the generated keys" did not mention. Windows' `AssistSurfaceContractTests` went red for it and issue [#146](https://github.com/russellgordon/plantoir/issues/146) had to work out from first principles where the moved value had come from. |
 | `nearMisses`, `scenarios` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and a decision lives in the `documentation/` page that owns its subject, with a GitHub issue pointing at it when the other platform owes work — the handoff documents that used to hold them were retired on 2026-09-08. |
 
 In `app-rules.json` the same split applies: `milestones` is a readout of
@@ -112,13 +113,53 @@ invisible, because Swift cannot enumerate an enum's static properties at
 runtime. Windows' `AllLists` has the identical gap. Adding a task means adding
 it in both places, on both platforms.
 
-## Proposing a case from the Windows side
+## A change here is a handover, in whichever direction it travels
 
 The generator runs on the **mac** — `Plantoir --write-contracts` — so Windows
 cannot regenerate the derived halves. The AUTHORED halves are a different
 matter and can be proposed from either side: `scenarios`, `nearMisses`,
 `promptHistory`, and every case list in the other four files survive a mac
 regeneration untouched.
+
+**Both directions work the same way, and the rule is one rule.** A change
+committed to this folder makes the OTHER app's suite go red, because the other
+app deserialises these files and runs them. That is the mechanism, and it is
+the reason these files exist. But a red suite says only that something moved —
+it cannot say who moved it, why, or what the other side is expected to build.
+So the commit that changes a contract owes a GitHub issue labelled for the
+other platform, opened in the same session, naming what changed and what they
+have to do. `CLAUDE.md` rule 3 requires it going one way and rule 4 the other;
+neither is optional, and neither is satisfied by committing the diff.
+
+### Reading a red suite: it is a request, and somebody has already written it down
+
+Said explicitly because it was got wrong on 2026-09-09, and the correction is
+more useful than the rule. A Windows session part-way through unrelated work
+ran `dotnet test`, found four failures, and filed
+[#146](https://github.com/russellgordon/plantoir/issues/146) reporting that the
+contract had moved with nobody told and no issue naming it. The mac side had
+done everything right: [#70](https://github.com/russellgordon/plantoir/issues/70)
+was open, labelled `windows`, and named all five phrasings with the failure
+spelled out — *"Three more card phrasings will make your suite red"* — at 23:52
+on the evening of the regeneration.
+
+Two things made the handover invisible anyway, and both are fixed:
+
+- **The failures named nothing.** `Assert.NotNull() Failure: Value is null`,
+  six times over, with no phrasing and no tool in it. Those assertions now say
+  which phrasing, which tool, and that an unmatched contract phrasing is a
+  handover to look up rather than a bug to file.
+- **`toolSchemas` was not on any list of the generated keys**, so the moved
+  `back_up_course` signature appeared to come from nowhere. The table above has
+  it now.
+
+So: **the open issues are the index, and a red contract test mid-task is not
+evidence that nobody told you.** Read them before writing a new one. The rest
+of the failure — a Windows test that had retyped a contract value into a
+literal, and so asserted nothing about this app at all — was this side's own,
+and no issue on either platform could have named it.
+
+## Proposing a case from the Windows side
 
 So a behaviour invented on Windows can be written here as a case, and **the
 mac suite will then fail until the mac implements it.** That is the mechanism
@@ -134,9 +175,13 @@ Two things make that failure read as a request instead of as damage:
   that arrived from Windows, and it is what turns a red suite over there into a
   request. (Until 2026-09-08 this said to write it into `MAC-HANDOFF.md` under
   "Contract cases waiting on the mac"; that section no longer exists.)
-- **Do not touch the generated keys** (`cardPhrasings`, `tools`, `milestones`).
-  Those are readouts of mac code; an edit there is overwritten on the next
-  regeneration and the diff looks like vandalism.
+- **Do not touch the generated keys.** Those are readouts of mac code; an edit
+  there is overwritten on the next regeneration and the diff looks like
+  vandalism. **Which keys those are is written in each file's own
+  `generated.keys`, and that is the copy to read** — a list typed into prose is
+  the one that stops being true. Three places said "`cardPhrasings`, `tools`,
+  `milestones`" until 2026-09-10: two keys of one file plus one key of another,
+  missing `toolSchemas` altogether, which is where a tool's arguments live.
 
 ## Regenerating
 
@@ -150,6 +195,11 @@ generator in-process and fails when what is committed no longer matches, naming
 that command. **So a changed sentence fails on the mac first**, in the same run
 that changed it, and arrives on the Windows side as a diff in this folder
 rather than as a bug report from a teacher.
+
+That diff is how the change TRAVELS, and the issue is how the other side finds
+out — see "A change here is a handover" above. Committing one without opening
+the other leaves a suite that goes red for reasons its reader has no way to
+look up.
 
 ## Why these are not in `support/`
 
