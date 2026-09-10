@@ -127,10 +127,11 @@ earn its place — worth knowing before anyone tries again.** `QuartzTeachersUIT
 exists and drives Course Settings already, so a test asserting the caption is
 visible looked like fifteen lines. Three things were met, in this order, and the
 first two are cheap to fix: the sidebar row must be matched on LABEL (`["EXC2O"]`
-resolves by identifier or label and found several elements in one run; asking for
-the identifier alone found none), and a 260-character sentence cannot go through
-the `staticTexts[…]` subscript at all — XCUITest refuses a string identifier over
-128 characters and wants an `NSPredicate` on `label`. The third is why it was
+resolves against identifier, label, title or value, and found several elements in
+one run; asking for the identifier alone found none), and a 269-character
+sentence cannot go through the `staticTexts[…]` subscript at all — XCUITest
+refuses a string identifier over 128 characters and wants an `NSPredicate` on
+one of the properties it names, `label` being the applicable one here. The third is why it was
 dropped: **the caption sits below four list editors, and the window-level
 `swipeUp()` loop reached it in one run out of four** — twenty-five swipes, ~160
 seconds, then nothing found. `MarketingScreenshotTests.scrollSettings` dispatches
