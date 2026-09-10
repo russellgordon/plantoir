@@ -548,5 +548,220 @@
         }
       ]
     }
+  },
+  "renamingTheUnitWord": {
+    "note": "Renaming a course's word for a unit after the course is in use (issue #100, 2026-09-10). Pure rules over page titles: which pages are renamed, what refuses the whole rename, and how links follow. The sentences are in shared-rules.json → specialNames.renameUnitWord. Reference implementation: UnitWordRenamer (mac). Each case builds a course with the given sections and pages, plans a rename from `from` to `to`, and compares. `expectRefused` true means the plan lists NO renames and at least one problem; `expectRenames` is every page that would move, as {section, from, to}; anything not listed is left alone.",
+    "why": "Chosen at course creation and, until this, nowhere else — because renaming an existing course's word means rewriting every class page's name, its frontmatter title and every wikilink pointing at it, and a half-finished pass leaves a broken site. What made it safe was not scale (a ready-made course holds 84–87 class pages, 42 for CHV2O and GLC2O) but an undo: the operation is its own inverse (rename it back), a backup of the whole course is saved first, and a rename that stops part way is recognised and finished by running it again. REJECTED: a display-only rename (titles say Thread while files stay Unit — Obsidian is the teacher's editor and they would see the old word every time); rewriting prose ('by the end of Unit 3' is the teacher's own writing after creation); skipping a page that already sits where a renamed page would go (two numbering schemes in one section); skipping a page that cannot be read (the configuration would then name a word half the pages do not use).",
+    "howAPageIsRenamed": {
+      "rule": "The title inside the frontmatter is set to the new name IN PLACE, then the file is MOVED. Never copied and deleted.",
+      "why": "A move is atomic on one volume, so there is never a moment with two copies or none — an interruption leaves a page under its old name whose title says the new one, which is harmless because every reader goes by the file name, and a second run finishes it. Copy-then-delete (the insertion planner's shape) interrupted between the two leaves both files, and the plan's own collision rule would then refuse the very re-run meant to finish it. A page with no title line is moved without one: Quartz falls back to the file name."
+    },
+    "order": [
+      "read every planned page (an unreadable one refuses everything)",
+      "back up the whole course",
+      "write the record that a rename is under way",
+      "retitle and move every page",
+      "rewrite links across every page of the course, shared folders included",
+      "write unit_word to course_config.json",
+      "clear the record"
+    ],
+    "orderWhy": "Disk first, configuration last: if a move fails nothing has been written and the course is as it was. Links after moves so a link can never point at a name that is not there yet. The backup before the record, so a record can never exist without a way back.",
+    "cases": [
+      {
+        "name": "every numbered page in every section moves; anything else stays",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Unit 1, Day 1"
+          },
+          {
+            "section": 1,
+            "title": "Unit 1, Day 2"
+          },
+          {
+            "section": 1,
+            "title": "Field Trip"
+          },
+          {
+            "section": 2,
+            "title": "Unit 2, Day 1"
+          },
+          {
+            "section": 2,
+            "title": "index"
+          }
+        ],
+        "expectRenames": [
+          {
+            "section": 1,
+            "from": "Unit 1, Day 1",
+            "to": "Module 1, Day 1"
+          },
+          {
+            "section": 1,
+            "from": "Unit 1, Day 2",
+            "to": "Module 1, Day 2"
+          },
+          {
+            "section": 2,
+            "from": "Unit 2, Day 1",
+            "to": "Module 2, Day 1"
+          }
+        ],
+        "expectSections": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "a page named with a different word is not a class page and is left alone",
+        "from": "Module",
+        "to": "Thread",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Module 1, Day 1"
+          },
+          {
+            "section": 1,
+            "title": "Unit 1, Day 1"
+          }
+        ],
+        "expectRenames": [
+          {
+            "section": 1,
+            "from": "Module 1, Day 1",
+            "to": "Thread 1, Day 1"
+          }
+        ],
+        "expectSections": [
+          1
+        ],
+        "why": "Only the course's CURRENT word names a class page. 'Unit 1, Day 1' in a Module course is somebody's own page, whatever it looks like."
+      },
+      {
+        "name": "the match is case-insensitive, as the parser already is",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "unit 3, day 4"
+          }
+        ],
+        "expectRenames": [
+          {
+            "section": 1,
+            "from": "unit 3, day 4",
+            "to": "Module 3, Day 4"
+          }
+        ],
+        "expectSections": [
+          1
+        ]
+      },
+      {
+        "name": "a page already sitting where a renamed page would go refuses the whole rename",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Unit 1, Day 1"
+          },
+          {
+            "section": 1,
+            "title": "Unit 1, Day 2"
+          },
+          {
+            "section": 1,
+            "title": "Module 1, Day 2"
+          }
+        ],
+        "expectRefused": true,
+        "why": "Not one page skipped — the whole rename refused. Two numbering schemes in one section is worse than no rename."
+      },
+      {
+        "name": "a course with no class pages yet is allowed: only the settings would change",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Field Trip"
+          }
+        ],
+        "expectRenames": [],
+        "expectSections": [],
+        "why": "A brand-new course, or one whose class pages are all named some other way. The word still decides what the next class is called, so changing it is meaningful."
+      },
+      {
+        "name": "finishing an interrupted rename: pages already moved are not matched, and links to their old names are still followed",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Module 1, Day 1"
+          },
+          {
+            "section": 1,
+            "title": "Unit 1, Day 2"
+          }
+        ],
+        "expectRenames": [
+          {
+            "section": 1,
+            "from": "Unit 1, Day 2",
+            "to": "Module 1, Day 2"
+          }
+        ],
+        "expectSections": [
+          1
+        ],
+        "expectLinkMap": {
+          "Unit 1, Day 1": "Module 1, Day 1",
+          "Unit 1, Day 2": "Module 1, Day 2"
+        },
+        "why": "A rename that stopped after the first page. Running it again must finish: the moved page is under the new word and is not planned again, but a link written as [[Unit 1, Day 1]] still needs to follow it, so the link map covers both."
+      }
+    ],
+    "linkCases": {
+      "note": "How links follow renamed pages. Each case rewrites `text` with the link map a rename from `from` to `to` builds over `pageTitles`, and expects `expect`. The rewriter is the one the insertion planner already uses (WikiLinkRewriter on the mac): it changes only the page name between the brackets and stops at #, | and ].",
+      "cases": [
+        {
+          "name": "a plain link, an alias, a heading and a transclusion all follow; the alias is the teacher's own words",
+          "from": "Unit",
+          "to": "Module",
+          "pageTitles": [
+            "Unit 2, Day 3"
+          ],
+          "text": "See [[Unit 2, Day 3]] and [[Unit 2, Day 3|the lesson on loops]], [[Unit 2, Day 3#Agenda]], ![[Unit 2, Day 3]].",
+          "expect": "See [[Module 2, Day 3]] and [[Module 2, Day 3|the lesson on loops]], [[Module 2, Day 3#Agenda]], ![[Module 2, Day 3]]."
+        },
+        {
+          "name": "prose that mentions a unit by number is not touched",
+          "from": "Unit",
+          "to": "Module",
+          "pageTitles": [
+            "Unit 3, Day 1"
+          ],
+          "text": "By the end of Unit 3 you will link to [[Unit 3, Day 1]] and read Unit 3 of the textbook.",
+          "expect": "By the end of Unit 3 you will link to [[Module 3, Day 1]] and read Unit 3 of the textbook."
+        },
+        {
+          "name": "a link to a page that is not a class page is not touched even when it starts with the word",
+          "from": "Unit",
+          "to": "Module",
+          "pageTitles": [
+            "Unit 2, Day 1"
+          ],
+          "text": "[[Unit 2 Test]] and [[Unit 2, Day 1]]",
+          "expect": "[[Unit 2 Test]] and [[Module 2, Day 1]]"
+        }
+      ]
+    }
   }
 }

@@ -1286,6 +1286,19 @@ class WorkspaceModel {
                 }
             }
             try CourseRestorer.restoreBackup(item, coursesDirectoryURL: coursesDirectoryURL)
+            // The built site goes with the pages it was built from, for the
+            // reason `CourseRestorer.restoreSection` gives: the restored
+            // files carry the timestamps they had when they were backed up,
+            // which can be OLDER than the site built since — so the
+            // freshness check would read "up to date" and a deploy would
+            // publish the pages the teacher has just undone. Missed here
+            // until 2026-09-10, when renaming a course's word for a unit made
+            // this backup its last resort: a site built under "Module" over a
+            // vault restored to "Unit" is exactly that case.
+            BuildOutputLocation.discardBuild(
+                forWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
+                courseCode: item.courseCode
+            )
         } catch {
             backupProblem = error.localizedDescription
             reloadCourses()
