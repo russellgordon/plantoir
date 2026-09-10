@@ -266,38 +266,31 @@ Neither app contains toolchain logic of its own: they write the same
 
    End every commit message with the `Co-Authored-By` trailer naming the
    agent that did the work. Claude sessions use the trailer their harness
-   supplies. **An Antigravity or Gemini session must use
-   `Co-Authored-By: Antigravity <noreply@google.com>` — never
-   `antigravity@google.com`.** GitHub resolves co-author emails to whatever
-   account has the address registered, and `antigravity@google.com` belongs
-   to a stranger's personal account (`shimonenator`), so every commit
-   carrying it credits that person as a contributor to this repository —
-   found 2026-08-19, after seven commits had already done exactly that.
-   `noreply@google.com` was checked the same day and maps to no account at
-   all, which is the property that makes it safe.
+   supplies.
 
-   **A `commit-msg` hook now enforces this**, because a written rule depends on
-   every agent having read it and the hook does not: `.githooks/commit-msg`
-   rewrites the bad address to the safe one at commit time, and says that it
-   did. It is committed rather than left in `.git/hooks` so it reaches the
-   Windows machine too — but hooks are not installed by cloning, so **each
-   clone must opt in once**:
+   **`.githooks/pre-commit` is committed rather than left in `.git/hooks`** so
+   it reaches the Windows machine too — but hooks are not installed by
+   cloning, so **each clone must opt in once**:
 
    ```bash
    git config core.hooksPath .githooks
    ```
 
    Do that on any machine that has not, and check `git config --get
-   core.hooksPath` before assuming you are covered. `.githooks/pre-commit`
-   rides on the same opt-in and does two things, neither of which blocks: it
-   says when a commit touches the publishing path, and — since 2026-09-08 — it
-   says when a staged file carries carriage returns, this repository being LF.
-   `.gitattributes` handles ordinary CRLF drift on its own; the hook exists for
-   the shape it cannot, an editor writing CR CR LF, which git normalises only
-   halfway and which once produced 7,672 insertions for 264 lines of work. The seven bad commits are
-   left as they are: removing them from GitHub's contributor list would mean
-   rewriting `main` and `dev` and breaking every existing clone, which costs
-   more than it buys. The failure
+   core.hooksPath` before assuming you are covered. The hook does two things,
+   neither of which blocks: it says when a commit touches the publishing path,
+   and — since 2026-09-08 — it says when a staged file carries carriage
+   returns, this repository being LF. `.gitattributes` handles ordinary CRLF
+   drift on its own; the hook exists for the shape it cannot, an editor
+   writing CR CR LF, which git normalises only halfway and which once produced
+   7,672 insertions for 264 lines of work.
+
+   **A note on this repository's contributor list**, so nobody investigates it
+   twice: seven commits from August 2026 carry a co-author trailer whose
+   address resolves to an unrelated person's GitHub account, which credits
+   them here. They are left as they are — removing them would mean rewriting
+   `main` and `dev` and breaking every existing clone, which costs more than
+   it buys. The failure
    the commit-per-piece order prevents is unchanged: one session's worth of
    unrelated work in one working tree — forty files, a dozen decisions
    tangled together, no way to undo one piece without unpicking the rest —
@@ -312,9 +305,13 @@ Neither app contains toolchain logic of its own: they write the same
    The Swift in `mac-app/` avoids `map`/`filter`/`reduce`, uses `@Observable`
    (never `ObservableObject`) and `// MARK: -` sections, and prefers clarity
    over concision. Those rules live in Russell's MACHINE-WIDE instructions
-   (`~/.claude/CLAUDE.md`, mirrored to `~/.gemini/GEMINI.md`), not in this
-   repository, because they govern his Swift everywhere rather than this
-   project in particular.
+   (`~/.claude/CLAUDE.md`), not in this repository, because they govern his
+   Swift everywhere rather than this project in particular. There is ONE
+   copy, and that is the point: the `~/.gemini/GEMINI.md` mirror this line
+   used to name was removed on 2026-09-09 along with the agent that read it,
+   and it had already drifted — 203 lines against 263, missing the rule
+   against `DispatchQueue` entirely. A mirror nobody re-syncs is a second
+   answer to the same question.
 
    **A Windows session is therefore not missing a rule set** — decided
    2026-08-17, when it turned out that machine has no global instructions
@@ -952,7 +949,7 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, and the frozen asset names both platforms depend on. |
 | [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, and `--deploy` publishes it to Netlify — the site is not Git-connected, so nothing deploys on push. `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
 | [`TODO.md`](TODO.md) | **Closed to new entries** since 2026-09-08 — deferred work is a GitHub issue now. What is left is append-only history like a `GUI-IMPROVEMENTS.md` row: an entry records what was true on its day and what the entry itself got wrong, and is not rewritten when the behaviour changes again. |
-| [`AGENTS.md`](AGENTS.md) · `.agents/rules/` | How this file reaches an agent that reads `AGENTS.md` rather than `CLAUDE.md` — Google Antigravity, among others. `.agents/rules/*.md` is a GENERATED copy of THIS file, split into parts because Antigravity silently truncates a rule file that is too long. **After changing CLAUDE.md, run `python3 .agents/sync-rules.py`** or the copy goes stale. |
+| [`AGENTS.md`](AGENTS.md) | How this file reaches an agent that looks for `AGENTS.md` rather than `CLAUDE.md`. It is a POINTER, four sentences long, and deliberately carries no rules of its own — a second copy of the rules is a second copy to keep in step, and the one that used to live beside it went stale exactly that way. |
 | [`research/`](research/README.md) | Measurement records the code cites as evidence — the assistant's model choices, the preview-staleness findings. Not an automated gate; each file states its own conditions. |
 | [`mac-app/README.md`](mac-app/README.md) · [`windows-app/PROGRESS.md`](windows-app/PROGRESS.md) | Per-app build, test and layout notes. |
 | [`README.md`](README.md) | The repository's front page: sends teachers to plantoir.app and orients developers who want to fork. [`PRESENTATION.md`](PRESENTATION.md) is the 2025 workshop document it replaced, preserved as a historical artifact — leave it as it stands. |
