@@ -318,24 +318,15 @@ struct CourseSettingsView: View {
     /// that silently dropped it. That is the same silent mark-loss that made
     /// seeding every course with ["Tasks"] unsafe, arriving through the
     /// interface instead.
+    ///
+    /// The rule itself is `GradedFolderChoices`, so that the walk — its depth
+    /// cap, its skip list, its order and the folders a teacher has REMOVED —
+    /// can be run against the contract's own cases instead of living in a view
+    /// nothing tests.
     var gradedFolderChoices: [String] {
-        var choices: [String] = []
-        for folder in course.configuration.sharedFolders {
-            if !choices.contains(folder) {
-                choices.append(folder)
-            }
-        }
-        for folder in course.configuration.perSectionFolders {
-            if !choices.contains(folder) {
-                choices.append(folder)
-            }
-        }
-        for folder in CourseSettingsView.nestedFolderNames(in: course) {
-            if !choices.contains(folder) {
-                choices.append(folder)
-            }
-        }
-        return choices
+        return GradedFolderChoices.choices(
+            for: course.configuration, courseDirectory: course.directoryURL
+        )
     }
 
     /// The pool, shown as ticks.
@@ -641,58 +632,5 @@ struct CourseSettingsView: View {
             return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
         }
         return .ordinary
-    }
-
-    /// Folder names below the top level of a course, so the marks list can
-    /// offer what the build can actually count.
-    ///
-    /// Deliberately shallow and cheap: build outputs, Plantoir's own
-    /// bookkeeping and `Media` are skipped, and it stops at four levels deep.
-    ///
-    /// That cap means the list is not exhaustive, and the earlier claim that it
-    /// was "complete before it can be frozen" was too strong — a graded folder
-    /// buried five levels down is still absent. It is far more complete than
-    /// the top-level lists alone, which is what the case that mattered needed,
-    /// and the cap is what keeps this affordable on a course of a few thousand
-    /// pages.
-    static func nestedFolderNames(in course: Course) -> [String] {
-        let skipped: Set<String> = [
-            ".merged_output", "merged_output", ".internal", ".obsidian",
-            "node_modules", "Media", ".git",
-        ]
-        // A section folder is not somewhere work lives — its CONTENTS are
-        // merged into the site and its own name never appears in a page's path
-        // there, so ticking it would count nothing. Its children are still
-        // walked, because a graded folder inside a section certainly does count.
-        let isSectionFolder: (String) -> Bool = { name in
-            return name.lowercased().hasPrefix("section")
-                && Int(name.dropFirst("section".count)) != nil
-        }
-        var names: [String] = []
-        let manager: FileManager = FileManager.default
-        guard let walker = manager.enumerator(
-            at: course.directoryURL,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return names
-        }
-        for case let url as URL in walker {
-            if walker.level > 4 {
-                walker.skipDescendants()
-                continue
-            }
-            let name: String = url.lastPathComponent
-            if skipped.contains(name) {
-                walker.skipDescendants()
-                continue
-            }
-            let isDirectory: Bool = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?
-                .isDirectory ?? false
-            if isDirectory && !isSectionFolder(name) && !names.contains(name) {
-                names.append(name)
-            }
-        }
-        return names
     }
 }
