@@ -625,9 +625,30 @@ dialog has never been seen by anybody checking that it works.
    `.toolchain\scripts` after the first reload would survive — worth knowing
    before anyone reaches for it, but it rescues nothing, because reason 2 stops
    the run before `deploy.py` is reached.)
-5. **`verify-deploy.ps1` cannot cover it, by design.** It redirects stdin from
-   a file precisely so `sys.stdin.isatty()` is false and `deploy.py` asks
-   nothing at all (`verify-deploy.ps1:166-185`).
+5. **`verify-deploy.ps1` covers the QUESTIONS now, and still not the dialog.**
+   It used to redirect stdin from a file precisely so `sys.stdin.isatty()` was
+   false and `deploy.py` asked nothing at all, which left the whole
+   first-publish path — surname, site name, the fallback when a saved site
+   has been deleted — covered by no automated check. Since 2026-09-09 (issue
+   #123) it drives every launcher through `PtyDriver` under a pseudoconsole and
+   ANSWERS by prompt text, the way the mac's `verify-deploy.sh` has done through
+   `expect` for months.
+
+   What it still cannot reach is what this section is about: the **dialog**.
+   The harness answers the launcher's console questions; a teacher meets a
+   WinUI sheet. Those are different surfaces and only one of them has a
+   pseudoconsole.
+
+   **One deliberate difference from the mac's `expect` block, recorded so it is
+   not read as an oversight.** That side ends with a catch-all,
+   `-re {\(y/n\): } { send "y\r" }`, which answers YES to any yes/no question.
+   This side carries no such rule: nothing in the Windows publish path asks one
+   — the only `[Y/n]` is `deploy.ps1`'s course-code guard, which cannot fire
+   for a code that does not end in a digit-zero. A catch-all that says yes to
+   whatever is asked is a bet that nobody ever adds a destructive question, and
+   the failure modes here are asymmetric: a rule that does not match makes the
+   run hang and be reported, where a rule that matches too eagerly claims a
+   globally unique web address. Few and tight beats broad.
 
 **What to check, and what NOT to.** Do not eyeball the dialog's title,
 explanation or its three steps: those are contract data
@@ -675,8 +696,9 @@ globally unique.
 no.** It was left open as the same question as the publishing-gate work, which is now
 settled, so this one is too, and separately from it. `RELEASING.md` requires
 `verify-deploy.ps1` with nothing skipped for a release that changes the
-publishing path, and that script deliberately cannot reach this dialog: it
-redirects stdin from a file precisely so `deploy.py` asks nothing. Adding the
+publishing path, and that script cannot reach this dialog — it answers the
+launcher's CONSOLE questions through a pseudoconsole, where the dialog is a
+WinUI sheet the app puts up instead. Adding the
 hand-check to the cut would mean a release step that creates a real, globally
 unique Netlify site that nothing deletes, on top of the ones the verifier
 already makes, to check five things that change about once a year. Do it when
