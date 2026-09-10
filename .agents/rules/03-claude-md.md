@@ -50,8 +50,39 @@ description: "Plantoir project rules, part 3 of 9 - Rules that override default 
      not. "A coherent piece" keeps its old meaning — one thing a teacher
      could notice, with its tests and its write-up; not one file, and not a
      whole afternoon. When Russell approves the merge, merge with `--no-ff`
-     so the piece stays one readable unit in history, and delete the branch
-     after it merges.
+     so the piece stays one readable unit in history.
+   - **Then DELETE the branch — local and remote — in the same session, as
+     the last step of the merge.** Standing order from Russell, 2026-09-09,
+     replacing the trailing clause "and delete the branch after it merges"
+     that used to end the point above. Same instruction; it is its own step
+     now because a clause at the end of a sentence about merge strategy was
+     read as advice and skipped, and by the day this was written the remote
+     carried **26 branches of which 25 were fully merged** — 0 commits
+     ahead, nothing unique in any of them.
+
+     ```bash
+     git branch -d issue/<number>-<slug>                      # local
+     git push origin --delete issue/<number>-<slug>           # remote
+     ```
+
+     Use `-d`, never `-D`: the lowercase form refuses a branch that is not
+     fully merged, which is the check, not an inconvenience to work around.
+     A branch it refuses is telling you something — go and look before you
+     force it.
+
+     **The cost is not tidiness.** A list where 25 of 26 entries are dead is
+     a list nobody reads, so the one LIVE branch — somebody else's work in
+     flight, on a repository where two agents and a session can be running
+     at once — is invisible in it. That happened here the same day: this
+     session read the eight most recently committed branches, called them
+     live without checking, and warned Russell about a duplicate that did
+     not exist. Every branch that survives its merge makes the next reader's
+     answer worse.
+
+     **Deleting the branch is not what finishes the WORK** — the issue's
+     closing comment is (rules 3 and 4), and the branch goes after it, so a
+     merged piece leaves exactly two traces: the `--no-ff` merge commit and
+     the closed issue.
    - **Autonomy moves with the model, and it stops at the issue branch.**
      Committing as you go on the issue branch, and pushing that branch to
      `origin`, are the standing order — no per-session permission.
@@ -125,45 +156,3 @@ description: "Plantoir project rules, part 3 of 9 - Rules that override default 
    (`~/.claude/CLAUDE.md`, mirrored to `~/.gemini/GEMINI.md`), not in this
    repository, because they govern his Swift everywhere rather than this
    project in particular.
-
-   **A Windows session is therefore not missing a rule set** — decided
-   2026-08-17, when it turned out that machine has no global instructions
-   configured and the agent there could see only a rule about a language it
-   never touches. `windows-app/` is ordinary idiomatic C#, LINQ included
-   (`Where`, `Select` and friends appear about 105 times in product code
-   today), and that is the intended state, not drift to be tidied up. Do not
-   "bring the C# into line" with the Swift rules, and do not propose it: the
-   two apps are written by different hands in different languages, and one
-   house style stretched across both would buy nothing a teacher can see.
-9. **Driving the interface leaves the machine as you found it — and gives the
-   terminal back.** Written for **macOS sessions**, where the setup is known:
-   Russell works at this Mac with the session running in iTerm. (A Windows
-   session owes the same courtesy to whatever terminal it was launched from,
-   by whatever means that platform offers.)
-
-   Verifying a change by driving the real app — activating it, sending
-   keystrokes through System Events, taking screenshots — is encouraged: it
-   has already caught bugs that every unit test passed. But when that stretch
-   of work is done, not merely at the end of the whole task, **bring the
-   terminal back to the front**:
-
-   ```bash
-   osascript -e 'tell application "iTerm" to activate'
-   ```
-
-   Russell watches progress at a glance from across the room, and an app left
-   frontmost hides the transcript, so he has to walk over to find out what is
-   happening. The same rule covers everything else a test borrowed: put the
-   system appearance back if you toggled Dark Mode, restore another
-   application's state if you changed it (Obsidian's vault registry, say —
-   back it up first, and check afterwards that it matches), and leave no
-   half-finished edit open in the app. Say what you touched and that you put
-   it back.
-
-10. **When you think the work is done, rebuild the app before you say so.**
-    Not after every edit — at the point you believe the change addresses what
-    was asked and you are about to report back. That is the moment Russell goes
-    to test it, and his Dock icon points at the Debug build in DerivedData
-    (`~/Library/Developer/Xcode/DerivedData/Plantoir-*/Build/Products/Debug/Plantoir.app`,
-    the same bundle `xcodebuild` writes), so "rebuild it" and "make it ready to
-    test" are the same act:
