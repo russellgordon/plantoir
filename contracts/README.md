@@ -238,6 +238,7 @@ recounted 2026-09-07.
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
+| What a removal does to the marks pool | `shared-rules.json` → `gradedFolders.removingAFolder` | `GradedFolderChoices` (6 cases), played through Course Settings in the order it really happens. Proposed FROM the mac 2026-09-09: **Windows freezes a never-asked pool where this rule leaves it absent**, so that suite is red for these until [#142](https://github.com/russellgordon/plantoir/issues/142) is settled — a request, not damage. |
 | Which folders the marks checklist OFFERS | `shared-rules.json` → `gradedFolders.choices` | `GradedFolderChoices` (13 cases, the depth cap and the skip list), against real directory trees — a walk over a fixture is not a walk. Proposed from Windows 2026-09-06 and run on the mac since 2026-09-09 (issues [#79](https://github.com/russellgordon/plantoir/issues/79) and [#112](https://github.com/russellgordon/plantoir/issues/112)); both platforms now go red for it. |
 | What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (25), and `scripts/test_site_health.py` |
 

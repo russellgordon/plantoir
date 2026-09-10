@@ -467,15 +467,31 @@ silent, because `_has_graded_folders` walks the MERGED tree, so a pool matching
 nothing published reports that no folder counts for marks exactly as an empty
 pool would.
 
-**And a consequence of that filter, which is a change in its own right:**
-removing a folder from a course that has never been asked no longer FREEZES the
-pool, because the name is gone from the choices by the time the pool is touched.
-That is the better answer rather than an oversight. Freezing wrote the
-historical rule's answer minus the removed folder, and on the ordinary course
-whose only marked folder is `Tasks` that is an EMPTY pool: nothing counting for
-marks, permanently, from a removal the teacher was told only would take one
-folder out of it. An absent key keeps the historical rule running, so a
-`Thinking Tasks` still counts and putting the folder back restores it.
+**And a consequence of that filter, which is a rule in its own right** —
+`gradedFolders.removingAFolder`, six cases. Removing a folder takes its name out
+of the marks pool, with two exceptions, and both exist to stop a removal quietly
+taking marks OFF the map:
+
+- **A course that has NEVER been asked is left unasked.** Freezing wrote the
+  historical rule's answer minus the removed folder, and on the ordinary course
+  whose only marked folder is `Tasks` that is an EMPTY pool: nothing counting
+  for marks, permanently, from a removal the teacher was told only would take
+  one folder out of it. An absent key keeps the historical rule running, so a
+  `Thinking Tasks` still counts and putting the folder back restores it.
+- **A name that still counts somewhere else keeps its place.** The pool is a
+  list of NAMES, so when `Portfolios/Tasks` survives a top-level `Tasks`, the
+  checklist still offers `Tasks` and it still names published work. This is in
+  slight tension with the confirmation's literal words — the FOLDER left the
+  course, a folder of that name did not — and the trade is deliberate: a pool
+  entry naming published work is worth more than a sentence read to the letter.
+
+Both fall out of one instruction: recompute what the checklist offers AFTER the
+removal is recorded, and drop the name only if it is no longer among them AND
+the course had already been asked. **Order is the whole subject.** Ask before
+the exclusion is written and the removed folder is still on the list, so the
+pool freezes — which is what the mac did until 2026-09-09 and what Windows still
+does, from a walk cached one `BuildForm` pass earlier ([issue
+#142](https://github.com/russellgordon/plantoir/issues/142)).
 
 Nothing new is written to the activity trail for any of this. The removal
 already leaves its own line (`item excluded`), and what changed is only which

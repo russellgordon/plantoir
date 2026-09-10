@@ -385,12 +385,32 @@ struct CourseSettingsView: View {
 
     /// A folder removed from the course leaves the marks pool as well, so the
     /// confirmation's promise ("Removing it will take it out of your course's
-    /// marks pool") is kept, and `graded_folders` never names a folder the
-    /// build has been told to exclude. Goes through `gradedFoldersBinding` so
-    /// a never-asked course (nil pool) is materialised on the way, exactly as
-    /// a tick would do it.
+    /// marks pool") is kept and `graded_folders` never names a folder the
+    /// build has been told to exclude — with two conditions, both of which
+    /// exist to stop a removal quietly taking marks OFF the coverage map.
+    ///
+    /// The rule and its six cases are `contracts/shared-rules.json` →
+    /// `gradedFolders.removingAFolder`. Called after the name has already left
+    /// its list and been written into `excluded_items`, which is what makes
+    /// `gradedFolderChoices` the right question to ask here.
     func dropFromMarksPool(_ name: String) {
-        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        // Still offered? Then a folder of that name is still in the course —
+        // `Portfolios/Tasks`, when the top-level `Tasks` was the one removed —
+        // and the pool entry still names work the build publishes. Dropping it
+        // would stop counting a folder nobody removed, and the checklist would
+        // go on showing an untickable row for it.
+        if gradedFolderChoices.contains(name) {
+            return
+        }
+        // A course that has NEVER been asked is left unasked, rather than
+        // frozen to the historical rule's answer minus this folder. On the
+        // ordinary course whose only marked folder is `Tasks`, freezing writes
+        // `[]` — asked and answered, nothing counting for marks ever again,
+        // from a gesture the teacher was told would take one folder out of the
+        // pool. An absent key keeps the historical rule running instead.
+        guard let currentGraded = course.configuration.gradedFolders else {
+            return
+        }
         if !currentGraded.contains(name) {
             return
         }
@@ -400,7 +420,7 @@ struct CourseSettingsView: View {
                 remaining.append(folder)
             }
         }
-        gradedFoldersBinding.wrappedValue = remaining
+        course.configuration.gradedFolders = remaining
     }
 
     // MARK: - Renaming a folder

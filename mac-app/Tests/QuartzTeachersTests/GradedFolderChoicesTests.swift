@@ -74,7 +74,7 @@ final class GradedFolderChoicesTests: XCTestCase {
         return Course(code: "ICS3U", directoryURL: courseURL, configuration: configuration)
     }
 
-    private static func choicesRule() throws -> [String: Any] {
+    private static func gradedFoldersSection() throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -82,8 +82,11 @@ final class GradedFolderChoicesTests: XCTestCase {
         let all: [String: Any] = try XCTUnwrap(
             try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
         )
-        let gradedFolders: [String: Any] = try XCTUnwrap(all["gradedFolders"] as? [String: Any])
-        return try XCTUnwrap(gradedFolders["choices"] as? [String: Any])
+        return try XCTUnwrap(all["gradedFolders"] as? [String: Any])
+    }
+
+    private static func choicesRule() throws -> [String: Any] {
+        return try XCTUnwrap(try gradedFoldersSection()["choices"] as? [String: Any])
     }
 
     // MARK: - The contract's own cases
@@ -93,8 +96,8 @@ final class GradedFolderChoicesTests: XCTestCase {
             try GradedFolderChoicesTests.choicesRule()["cases"] as? [[String: Any]]
         )
         XCTAssertGreaterThanOrEqual(
-            cases.count, 13,
-            "The contract lost graded-folder-choice cases: \(cases.count) present, 13 expected at least."
+            cases.count, 14,
+            "The contract lost graded-folder-choice cases: \(cases.count) present, 14 expected at least."
         )
 
         var index: Int = 0
@@ -177,6 +180,73 @@ final class GradedFolderChoicesTests: XCTestCase {
         // nothing under a removed folder reaches the site either.
         XCTAssertEqual(view.gradedFolderChoices, ["Concepts"])
         XCTAssertEqual(course.configuration.gradedFolders, [])
+    }
+
+    // MARK: - What a removal does to the pool
+
+    /// `contracts/shared-rules.json` → `gradedFolders.removingAFolder`, played
+    /// through the interface in the order Course Settings really does it: the
+    /// list editor's binding takes the name out of its list, `onRemove`
+    /// records the exclusion, and only then is the pool touched.
+    ///
+    /// The order is the whole subject. Ask what the checklist offers BEFORE
+    /// the exclusion is written and the removed folder is still there, so the
+    /// pool gets frozen — which is what the mac did until 2026-09-09 and what
+    /// Windows still does, from a walk cached one pass earlier.
+    func testWhatARemovalDoesToTheMarksPoolMatchesTheContract() throws {
+        let rule: [String: Any] = try GradedFolderChoicesTests.gradedFoldersSection()["removingAFolder"] as? [String: Any] ?? [:]
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 6,
+            "The contract lost removal cases: \(cases.count) present, 6 expected at least."
+        )
+
+        var index: Int = 0
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let sharedFolders: [String] = try XCTUnwrap(testCase["sharedFolders"] as? [String])
+            let perSectionFolders: [String] = try XCTUnwrap(testCase["perSectionFolders"] as? [String])
+            let course: Course = try makeCourse(
+                named: "removal\(index)",
+                sharedFolders: sharedFolders,
+                perSectionFolders: perSectionFolders,
+                gradedFolders: testCase["graded"] as? [String],
+                directories: try XCTUnwrap(testCase["directories"] as? [String])
+            )
+            index += 1
+            let view: CourseSettingsView = CourseSettingsView(course: course)
+
+            let removal: [String: Any] = try XCTUnwrap(testCase["remove"] as? [String: Any])
+            let removed: String = try XCTUnwrap(removal["name"] as? String)
+            let scope: FolderScope =
+                (try XCTUnwrap(removal["scope"] as? String)) == "per_section" ? .perSection : .shared
+            switch scope {
+            case .shared:
+                course.configuration.sharedFolders = GradedFolderChoicesTests.list(sharedFolders, without: removed)
+            case .perSection:
+                course.configuration.perSectionFolders = GradedFolderChoicesTests.list(perSectionFolders, without: removed)
+            }
+            course.configuration.exclude(removed, inScope: scope.exclusionKey)
+            view.dropFromMarksPool(removed)
+
+            if let expected = testCase["expectGraded"] as? [String] {
+                XCTAssertEqual(course.configuration.gradedFolders, expected, name)
+            } else {
+                XCTAssertNil(
+                    course.configuration.gradedFolders,
+                    "\(name): the pool should have been left as it was, and it says "
+                        + String(describing: course.configuration.gradedFolders)
+                )
+            }
+        }
+    }
+
+    private static func list(_ names: [String], without removed: String) -> [String] {
+        var remaining: [String] = []
+        for name in names where name != removed {
+            remaining.append(name)
+        }
+        return remaining
     }
 
     // MARK: - The walk itself

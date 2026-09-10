@@ -325,10 +325,18 @@ final class SpecialFoldersProtectionTests: XCTestCase {
 
         // The confirmation promises the folder leaves the marks pool, and
         // the build must never be handed a pool naming an excluded folder.
+        // Played in the order Course Settings does it — the list editor drops
+        // the name, then `onRemove` excludes it — because since 2026-09-09 the
+        // drop asks what the checklist offers, and it offers what the lists
+        // and the disk still hold.
+        course.configuration.sharedFolders = ["Concepts", "Tests"]
+        course.configuration.exclude("Tasks", inScope: FolderScope.shared.exclusionKey)
         view.dropFromMarksPool("Tasks")
         XCTAssertEqual(course.configuration.gradedFolders, ["Tests"])
 
         // A name that was never in the pool changes nothing.
+        course.configuration.sharedFolders = ["Tests"]
+        course.configuration.exclude("Concepts", inScope: FolderScope.shared.exclusionKey)
         view.dropFromMarksPool("Concepts")
         XCTAssertEqual(course.configuration.gradedFolders, ["Tests"])
     }
@@ -350,7 +358,16 @@ final class SpecialFoldersProtectionTests: XCTestCase {
     /// from one removal the teacher was told only would "take it out of your
     /// course's marks pool". Leaving the key absent keeps the historical rule
     /// running, so a `Thinking Tasks` still counts and putting the folder back
-    /// restores it. Windows has always behaved this way.
+    /// restores it.
+    ///
+    /// **Windows does NOT do this, and an earlier draft of this comment said
+    /// it did.** `DropFromMarksPool` there materialises over a walk cached by
+    /// the previous `BuildForm` pass — taken before the exclusion was written
+    /// — so the removed folder is still among the choices and the pool is
+    /// written. Its own doc comment says the intent is that a legacy course
+    /// "does not get one CREATED as an empty list by a removal", which is what
+    /// this rule delivers and what the cached walk does not. The difference is
+    /// pinned by `gradedFolders.removingAFolder` and handed over as an issue.
     func testRemovingAGradedFolderLeavesANeverAskedCourseUnasked() throws {
         let root: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("test-prot-\(UUID().uuidString)")
@@ -371,10 +388,5 @@ final class SpecialFoldersProtectionTests: XCTestCase {
         view.dropFromMarksPool("Tasks")
 
         XCTAssertNil(course.configuration.gradedFolders)
-
-        // A folder still in the course freezes the pool as it always did, so
-        // what changed is the removed folder and nothing else.
-        view.dropFromMarksPool("Homework Tasks")
-        XCTAssertEqual(course.configuration.gradedFolders, [])
     }
 }
