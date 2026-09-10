@@ -178,9 +178,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                    Destructive = false, Idempotent = true)]
     [Description("Call this FIRST, before doing anything else with a section. It returns a short explanation of " +
                  "what publishing and deploying mean in Plantoir — say it to the teacher word for word. " +
-                 "It only returns the explanation the first time for a given section; after that it says so and " +
-                 "you should get straight on with what they asked. Never re-explain a section you have been told " +
-                 "is already covered.")]
+                 "It only returns the explanation the first time for a given section in this conversation; after " +
+                 "that it says so and you should get straight on with what they asked. Never re-explain a section " +
+                 "you have been told is already covered.")]
     public string ExplainPublishing(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section)
