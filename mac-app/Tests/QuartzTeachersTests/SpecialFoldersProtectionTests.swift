@@ -333,7 +333,25 @@ final class SpecialFoldersProtectionTests: XCTestCase {
         XCTAssertEqual(course.configuration.gradedFolders, ["Tests"])
     }
 
-    func testRemovingAGradedFolderMaterialisesANeverAskedPool() throws {
+    /// Removing a folder from a course that has NEVER been asked leaves the
+    /// pool unasked — it does not freeze it.
+    ///
+    /// This test asserted the opposite until 2026-09-09, and passed only
+    /// because it left out the `exclude` that Course Settings does first. Once
+    /// the Marks checklist stopped offering a removed folder (issue #79), the
+    /// name is gone from the choices by the time the pool is touched, so
+    /// `dropFromMarksPool` finds nothing to drop and `graded_folders` stays
+    /// absent.
+    ///
+    /// **That is the better answer, not a side effect to be repaired.**
+    /// Freezing here wrote the historical rule's answer MINUS the removed
+    /// folder — and on the ordinary course whose only marked folder is
+    /// `Tasks`, that is an empty pool: nothing counts for marks, permanently,
+    /// from one removal the teacher was told only would "take it out of your
+    /// course's marks pool". Leaving the key absent keeps the historical rule
+    /// running, so a `Thinking Tasks` still counts and putting the folder back
+    /// restores it. Windows has always behaved this way.
+    func testRemovingAGradedFolderLeavesANeverAskedCourseUnasked() throws {
         let root: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("test-prot-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -346,7 +364,17 @@ final class SpecialFoldersProtectionTests: XCTestCase {
         )
         let view: CourseSettingsView = CourseSettingsView(course: course)
 
+        // In the order Course Settings really does it: the list editor drops
+        // the name, `onRemove` excludes it, and only then is the pool touched.
+        course.configuration.sharedFolders = ["Concepts", "Homework Tasks"]
+        course.configuration.exclude("Tasks", inScope: FolderScope.shared.exclusionKey)
         view.dropFromMarksPool("Tasks")
-        XCTAssertEqual(course.configuration.gradedFolders, ["Homework Tasks"])
+
+        XCTAssertNil(course.configuration.gradedFolders)
+
+        // A folder still in the course freezes the pool as it always did, so
+        // what changed is the removed folder and nothing else.
+        view.dropFromMarksPool("Homework Tasks")
+        XCTAssertEqual(course.configuration.gradedFolders, [])
     }
 }
