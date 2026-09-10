@@ -20,43 +20,70 @@ struct FinderPathBarView: View {
     // MARK: - Body
 
     var body: some View {
-        // Two forms of the same row, and the one that FITS is preferred.
+        // Three forms of the same row, and the FIRST that fits is used.
         //
-        // A scroll view fills whatever width it is given, so on its own it
-        // takes the whole bar however short the path is — and with the
-        // content anchored at the trailing edge (below), a short path ended
-        // up at the far end of the window from the "Working folder:" label
-        // that introduces it, with the width of a window in between.
-        // Reported from a screenshot 2026-09-09; the folder picker had
-        // already met it and wrapped its own copy in a `ViewThatFits`, so
-        // the behaviour lives HERE now and both callers get it.
+        // Finder's own answer to a path too long for the space is not an
+        // ellipsis and not a scroll: it drops the ancestors' NAMES and keeps
+        // their icons and chevrons, so the depth of the path and the folder's
+        // own name both survive. Measured against the real Finder at five
+        // window widths on 2026-09-09 — it shrinks the middle names first,
+        // then goes icon-only from the left, keeping the volume and the last
+        // crumb or two named longest.
+        //
+        // Two things it does are deliberately NOT copied. The intermediate
+        // step, where middle names shrink before they vanish, needs
+        // per-crumb width negotiation for a state a teacher passes through
+        // rather than sits in. And at its narrowest Finder clips the TAIL,
+        // losing the folder's own name — which is the exact defect fixed
+        // here on 2026-09-05 (an iCloud path cut off before the one crumb
+        // that differs between a teacher's folders). So the last resort is
+        // this bar's own rule instead: scroll, anchored at the end.
         ViewThatFits(in: .horizontal) {
             pathRow
-            scrollingPathRow
+            collapsedRow
+            scrollingCollapsedRow
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Folder location: \(folderURL.path)")
         .accessibilityIdentifier("finderPathBar")
     }
 
-    /// The row when the space is too narrow for it: scrollable, and showing
-    /// its END rather than its start.
+    /// Every crumb named — what a teacher sees whenever there is room.
+    ///
+    /// Also rendered directly by snapshot tests, where `ScrollView` cannot
+    /// lay out offscreen.
+    var pathRow: some View {
+        return row(namingEveryCrumb: true)
+    }
+
+    /// The ancestors as icons and chevrons, with only the folder itself
+    /// named: Finder's answer, and no ellipsis anywhere.
+    ///
+    /// A hidden name is not a lost one — every crumb keeps its tooltip, its
+    /// double-click and its context menu, so hovering still says which folder
+    /// an icon is.
+    var collapsedRow: some View {
+        return row(namingEveryCrumb: false)
+    }
+
+    /// The last resort, when even icons and chevrons do not fit: the
+    /// collapsed row, scrollable, showing its END rather than its start.
     ///
     /// The folder itself is the part a teacher is looking for, and the start
     /// ("Macintosh HD › Users › …") is the same for every folder they own.
     /// Seen first with an iCloud Drive folder, whose real path runs through
     /// ~/Library/Mobile Documents/com~apple~CloudDocs and was cut off before
     /// reaching the folder's own name.
-    var scrollingPathRow: some View {
+    var scrollingCollapsedRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            pathRow
+            collapsedRow
         }
         .defaultScrollAnchor(.trailing)
     }
 
-    /// The icons-names-chevrons row itself (also rendered directly by
-    /// snapshot tests, where ScrollView cannot lay out offscreen).
-    var pathRow: some View {
+    /// The icons-chevrons-names row, drawn with every crumb named or with
+    /// only the last one named.
+    func row(namingEveryCrumb: Bool) -> some View {
         HStack(spacing: 4) {
             ForEach(Array(ancestorPaths.indices), id: \.self) { index in
                 if index > 0 {
@@ -68,8 +95,10 @@ struct FinderPathBarView: View {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: ancestorPaths[index]))
                         .resizable()
                         .frame(width: 16, height: 16)
-                    Text(FileManager.default.displayName(atPath: ancestorPaths[index]))
-                        .font(.callout)
+                    if namingEveryCrumb || index == ancestorPaths.count - 1 {
+                        Text(FileManager.default.displayName(atPath: ancestorPaths[index]))
+                            .font(.callout)
+                    }
                 }
                 // Finder's own path bar opens a folder on a double-click and
                 // reveals it from the context menu; this one does the same.
