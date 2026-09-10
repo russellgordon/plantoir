@@ -226,8 +226,8 @@ public sealed class AssistAgent
     public static bool NeedsApproval(string name) => DeploysToStudents.Contains(name);
 
     /// <summary>
-    /// The <c>plan_</c> twin of each write the local model can reach — what
-    /// the assistant runs, and reads out, before it does the thing itself.
+    /// The <c>plan_</c> twin of each write the assistant can reach — what it
+    /// runs, and reads out, before it does the thing itself.
     ///
     /// This is the CONFIRMATION setting's machinery. Deploying always waits
     /// for a button; everything else waits only while the teacher has "ask
@@ -242,6 +242,17 @@ public sealed class AssistAgent
     /// no page, <c>undo_last_change</c> IS the remedy, <c>deploy_section</c>
     /// waits on its own button whatever this setting says, and a cancelled
     /// scheduled deploy is remedied by scheduling it again.
+    ///
+    /// <para><b>"The local model can reach" is the wrong test, and reading it
+    /// that way left a hole.</b> A FIXED PHRASING reaches a tool no model is
+    /// shown — <c>AssistCardCommand</c> matches the sentence in code and
+    /// <c>RunCommand</c> consults this map exactly as a routed call does. So
+    /// <c>make_room_for_classes</c> belongs here even though it is MCP-only:
+    /// it is the most dangerous tool on the surface, renaming pages a
+    /// teacher's links point at, and without the entry it would have been the
+    /// ONE card that ran with no plan shown first. The mac never had this gap
+    /// because it derives twins from its tool surface rather than listing
+    /// them; a hand-written list has to be told.</para>
     /// </summary>
     internal static readonly Dictionary<string, string> PlanTwins = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -251,6 +262,7 @@ public sealed class AssistAgent
         ["add_next_class"] = "plan_add_next_class",
         ["remember_timetable"] = "plan_remember_timetable",
         ["re_date_classes"] = "plan_re_date_classes",
+        ["make_room_for_classes"] = "plan_make_room_for_classes",
     };
 
     /// <summary>

@@ -2553,9 +2553,13 @@ final class AssistToolRunner {
 
     /// Sections this conversation has already had the explanation for.
     ///
-    /// **Per conversation, not per folder — a deliberate divergence.** Windows
-    /// remembers it on disk (`Briefing.AlreadyExplained`), so a teacher is told
-    /// once ever. Here it lasts as long as the runner: one assistant window, or
+    /// **Per conversation, not per folder.** Once a divergence — Windows
+    /// remembered it on disk, so a teacher was told once ever — and no longer:
+    /// they adopted this on 2026-09-09 when "what does publishing mean?"
+    /// became a fixed phrasing there too, which made the caller a TEACHER
+    /// asking a question rather than a model being reminded, and a file on
+    /// disk meant the answer arrived once per working folder for ever. Here it
+    /// lasts as long as the runner: one assistant window, or
     /// one `--mcp-stdio` session. The thing being prevented is a session that
     /// re-explains before every action, and a session cannot repeat itself
     /// after it has ended — while a mac session that DOES repeat it a week

@@ -1,5 +1,3 @@
-using Plantoir.Core.Models;
-
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -19,36 +17,22 @@ namespace Plantoir.Core.Assist;
 /// A teacher who has not been told that will reasonably hear "I've published
 /// tomorrow's class" as "students can see it now" — and act, or fail to act,
 /// on that. So the assistant says it plainly the first time it works on a
-/// section, and never again for that section: a tool that re-explains itself
-/// every conversation is one a teacher learns to skim.
+/// section, and not again in the same conversation: a tool that re-explains
+/// itself every few turns is one a teacher learns to skim.
 ///
-/// Kept per SECTION rather than per course or per machine because that is the
-/// unit a teacher works in, and because a teacher who takes on a second
-/// section months later has usually forgotten.
+/// Kept per SECTION rather than per course because that is the unit a teacher
+/// works in, and because a teacher who takes on a second section months later
+/// has usually forgotten.
+///
+/// **Who remembers, and for how long, is not here.** That is
+/// <c>AssistWorkspace.NoteExplainedThisConversation</c>, and it is per
+/// CONVERSATION. This class used to write a marker file per working folder,
+/// which outlived the reason for it once a fixed phrasing let a TEACHER call
+/// the tool; the reasoning is recorded on that method. This one holds only
+/// the words.
 /// </summary>
 public static class Briefing
 {
-    private static string FileFor(string workspacePath, string courseCode, int sectionNumber) =>
-        Path.Combine(Workspace.CoursesDirectory(workspacePath), ".internal", "assist",
-            $"{courseCode.ToUpperInvariant()}.section{sectionNumber}.explained");
-
-    public static bool AlreadyExplained(string workspacePath, string courseCode, int sectionNumber)
-    {
-        try { return File.Exists(FileFor(workspacePath, courseCode, sectionNumber)); }
-        catch { return false; }
-    }
-
-    public static void MarkExplained(string workspacePath, string courseCode, int sectionNumber)
-    {
-        try
-        {
-            string path = FileFor(workspacePath, courseCode, sectionNumber);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, $"{DateTime.UtcNow:O}\n");
-        }
-        catch { /* failing to remember is not worth failing the conversation over */ }
-    }
-
     /// <summary>
     /// The words themselves, in the app's voice: short, concrete, and about
     /// what the teacher will see rather than about how any of it works.

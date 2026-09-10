@@ -702,14 +702,19 @@ extension AssistToolRunner {
     /// schema, so no MCP client could ask for it. This publishes the same
     /// capability under a name of its own, which is how Windows has it.
     ///
-    /// **No `firstDay`, and that is a deliberate divergence.** Windows takes
+    /// **No `firstDay`, and both platforms now agree.** Windows used to take
     /// one, defaulting to 1, described as "1 unless the earlier days already
     /// exist" — which is a question the caller has to answer by looking. The
-    /// mac's planner works it out: it continues from the last day that EXISTS
-    /// in that unit, published or not, because a page a teacher has written
-    /// and not yet shown anybody is still a day of the course and numbering
-    /// over it would collide with a real file. An argument nobody can get
-    /// wrong is better than one with a sensible default.
+    /// planner works it out instead: it continues from the last day that
+    /// EXISTS in that unit, published or not, because a page a teacher has
+    /// written and not yet shown anybody is still a day of the course and
+    /// numbering over it would collide with a real file. An argument nobody
+    /// can get wrong is better than one with a sensible default.
+    ///
+    /// Windows dropped theirs on 2026-09-09, having measured what the default
+    /// cost: "add five more days to Unit 4" on a unit already holding Days 1–3
+    /// planned Days 1–5, reported three as already there, and created TWO
+    /// pages for a teacher who asked for five.
     private static let planAddClassesTool: AssistToolDefinition = AssistToolDefinition(
         name: "plan_add_classes",
         description: "Work out what adding several class pages to a unit would do, and change nothing. "
