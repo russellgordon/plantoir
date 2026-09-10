@@ -92,7 +92,7 @@ final class NextClassTests: XCTestCase {
         let runner: AssistToolRunner = AssistToolRunner(
             workspace: workspace,
             siteWork: siteWork,
-            today: CalendarDay(year: 2026, month: 9, day: 8)!
+            today: { return CalendarDay(year: 2026, month: 9, day: 8)! }
         )
         return (root, course, runner, siteWork)
     }

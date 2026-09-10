@@ -420,7 +420,7 @@ final class AssistCurriculumMentionsTests: XCTestCase {
         let runner: AssistToolRunner = AssistToolRunner(
             workspace: workspace,
             siteWork: SilentSiteWork(),
-            today: CalendarDay(year: 2026, month: 9, day: 8)!,
+            today: { return CalendarDay(year: 2026, month: 9, day: 8)! },
             launchControl: SilentLaunchControl()
         )
         return (root, course, runner)

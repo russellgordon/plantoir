@@ -149,6 +149,13 @@ enum AssistMCPServer {
                 )
             )
 
+            // Straight to the runner, with no `settlingTheClassDay` first —
+            // which is what the assistant WINDOW does before a plan and an act
+            // share one arguments object. Here they are two requests with
+            // nothing in between, so each resolves its own words against the
+            // clock as it is asked. The runner reads that clock afresh, so a
+            // server left open for days is not answering with the day it
+            // started on.
             let outcome: AssistToolOutcome = await runner.run(call: call)
             return success(id: identifier, result: [
                 "content": [["type": "text", "text": outcome.detail]],
