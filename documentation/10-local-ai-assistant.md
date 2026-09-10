@@ -345,15 +345,17 @@ in Part 5 — some of those are perfect because they are not questions.
 ### The dateline, and why its position is a finding
 
 A model has no clock. Every message the teacher sends therefore carries
-`(Today is 2026-08-15, a Saturday.)` — **appended**, never prepended, and
-built from the day the TOOLS are counting from (`dateline(on: tools.today)`)
-rather than from a reading of its own, so that one process cannot hold two
-answers to what today is. See "The mac's half" below for why that matters. That is
-not a style choice: prepending the same sentence cost 15 points of routing
-accuracy in measurement, and the effect reproduced on a second model. A line
-of context at the front appears to compete with the instruction for the
+`(Today is 2026-08-15, a Saturday.)` — **appended**, never prepended. The
+position is not a style choice: prepending the same sentence cost 15 points of
+routing accuracy in measurement, and the effect reproduced on a second model.
+A line of context at the front appears to compete with the instruction for the
 model's attention; at the back it reads as a footnote to a request already
 understood.
+
+The day in it comes from what the TOOLS are counting from
+(`dateline(on: tools.today)`) rather than from a reading of its own, so one
+process cannot hold two answers to what today is. See "The mac's half" below
+for why that matters.
 
 ### Step 1 — What Swift sends
 
@@ -2057,7 +2059,8 @@ It does not.
 
 **Done on the mac on 2026-09-10, and still owed on Windows** — see "The mac's
 half" below, and [issue #159](https://github.com/russellgordon/plantoir/issues/159).
-It cost about forty lines and no re-measurement, exactly as predicted here.
+It cost fifty lines of code — 170 with the comments that explain them — and
+no re-measurement, exactly as predicted here.
 
 **The tool DESCRIPTIONS were deliberately not touched, so no routing
 re-measurement is owed.** `ClassDateHelp` still tells the model to work the
@@ -2148,9 +2151,14 @@ the conversation BEGAN — for every request in it, not only one approved across
 the boundary — published the class before the one meant, and said "Published
 the class on …" naming a day the teacher had not asked for. A Claude Code
 session holding the MCP server open for days is the sharper version of the
-same thing. The model-routed path never had the fault, because every message
-carries a fresh dateline, so one long-lived window could answer "publish
-tomorrow's class" and "publish the class tomorrow please" with different days.
+same thing. The model-routed path never had the fault when the model worked the
+date out ITSELF, because every message carries a fresh dateline — so one
+long-lived window could answer "publish tomorrow's class" and "publish the
+class tomorrow please" with different days. It did have it whenever a small
+model passed the word `tomorrow` straight through as its `date` argument
+instead, which `classDateHelp` tells it not to do and which it sometimes does
+anyway; issue #143 made the same simplification, and that case is exactly what
+the settler below covers.
 
 **Why the obvious fix is wrong on its own.** Making `today` compute
 `CalendarDay.today()` per use fixes the staleness and breaks something the
