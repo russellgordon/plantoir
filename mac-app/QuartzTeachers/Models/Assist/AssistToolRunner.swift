@@ -113,6 +113,11 @@ final class AssistToolRunner {
     /// The day a relative word is counted from, read afresh every time it is
     /// asked for.
     ///
+    /// Not observable, and deliberately: `@Observable` sees stored properties,
+    /// and this is a hand-written computed one over a closure. A view that
+    /// displayed it would not redraw when the day turned. Nothing displays it
+    /// today — `AssistAgent` is the only reader.
+    ///
     /// Readable from outside because `AssistAgent` settles the day of a call
     /// BEFORE the plan twin and the act both run against it, and the two must
     /// use the same clock: a second reading of the machine's own clock there
@@ -3340,6 +3345,14 @@ final class AssistToolRunner {
     /// A word this cannot read is left exactly as it arrived, so the sentence
     /// a teacher sees is still the runner's own refusal rather than a silent
     /// change of subject.
+    ///
+    /// **`AssistMCPServer` deliberately does not call this**, and is the only
+    /// caller that makes a call and does not. Over stdio the twin and the act
+    /// are two separate requests with nothing between them to settle at, so
+    /// each resolves its own words against the clock as it is asked; the trade
+    /// is argued in `documentation/10-local-ai-assistant.md` under "The mac's
+    /// half". Anywhere a plan and an act share one arguments object, this must
+    /// run first.
     static func settlingTheClassDay(in arguments: [String: Any],
                                     forTool definition: AssistToolDefinition,
                                     today: CalendarDay) -> [String: Any] {
