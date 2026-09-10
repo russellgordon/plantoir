@@ -111,7 +111,7 @@ final class ListCoursesTests: XCTestCase {
         let runner: AssistToolRunner = AssistToolRunner(
             workspace: workspace,
             siteWork: StubSiteWork(),
-            today: CalendarDay(year: 2026, month: 9, day: 8)!,
+            today: { return CalendarDay(year: 2026, month: 9, day: 8)! },
             launchControl: SilentLaunchControl()
         )
         let said: String = await run(runner)

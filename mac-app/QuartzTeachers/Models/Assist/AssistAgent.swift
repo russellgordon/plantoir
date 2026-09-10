@@ -75,7 +75,13 @@ final class AssistAgent {
     let planMode: AssistPlanMode
 
     /// The messages actually sent, including tool results.
-    private var messages: [AssistMessage] = []
+    ///
+    /// Readable from a test, not writable: two things about the user message
+    /// are measured findings rather than preferences — the dateline goes on
+    /// the END (prepending it cost 15 points of routing accuracy) and it
+    /// carries the runner's day rather than a second reading of the clock —
+    /// and neither could be asserted while this was private.
+    private(set) var messages: [AssistMessage] = []
 
     /// Where the record of each turn is written. Replaceable so a test can
     /// point it somewhere of its own.
@@ -186,7 +192,7 @@ final class AssistAgent {
         // The date goes on the END of the message. Prepended, the same line
         // cost 15 points of routing accuracy on the Windows measurements —
         // the position really is the finding, not the presence.
-        messages.append(AssistMessage.user("\(trimmed) \(AssistAgent.dateline())"))
+        messages.append(AssistMessage.user("\(trimmed) \(AssistAgent.dateline(on: tools.today))"))
         await think()
     }
 
@@ -355,8 +361,51 @@ final class AssistAgent {
         )
     }
 
+    /// The same call, with "tomorrow" already turned into the date it means.
+    ///
+    /// **Here, and once.** Everything below reads these arguments more than
+    /// once: plan mode runs the `plan_` twin on them, the card holds them
+    /// while the teacher decides, and `approvePending` hands the very same
+    /// call to `execute`. A relative WORD carried through all of that is read
+    /// again at each step, against a clock that has moved — so a plan shown at
+    /// 23:59 and agreed to at 00:01 publishes a class the plan never
+    /// described. The runner used to be safe from that by freezing its idea of
+    /// today when it was built, which bought the agreement and cost the
+    /// freshness: a window left open across midnight then resolved "tomorrow"
+    /// against the day the conversation BEGAN. Settling the word once, here,
+    /// buys both.
+    ///
+    /// **Against the RUNNER's clock, not the machine's.** A second reading
+    /// here would be a second clock in the process — two answers to what
+    /// "today" is, differing on one night in a thousand, and no test able to
+    /// pin the one the teacher's request actually used.
+    ///
+    /// This covers the model-routed path as well as the card's. The model is
+    /// told to work the date out itself and a small one sometimes sends
+    /// `date: "tomorrow"` anyway; it costs no routing accuracy to be ready
+    /// for that, because the model sees nothing of what happens here.
+    private func withTheDaySettled(_ call: AssistToolCall) -> AssistToolCall {
+        guard let definition = tools.definition(named: call.function.name) else {
+            return call
+        }
+        let settled: [String: Any] = AssistToolRunner.settlingTheClassDay(
+            in: call.argumentValues, forTool: definition, today: tools.today
+        )
+        guard let data = try? JSONSerialization.data(withJSONObject: settled),
+              let rewritten = String(data: data, encoding: .utf8) else {
+            return call
+        }
+        // The id and the type are the call's identity, not its content: the
+        // tool result is matched back to the model's request by `id`.
+        return AssistToolCall(
+            id: call.id,
+            type: call.type,
+            function: AssistToolCall.Function(name: call.function.name, arguments: rewritten)
+        )
+    }
+
     private func run(call rawCall: AssistToolCall) async {
-        let call: AssistToolCall = boundToThisSection(rawCall)
+        let call: AssistToolCall = withTheDaySettled(boundToThisSection(rawCall))
         guard let definition = tools.definition(named: call.function.name) else {
             messages.append(AssistMessage.toolResult(
                 callID: call.id, name: call.function.name,
@@ -495,13 +544,24 @@ final class AssistAgent {
     }
 
     /// Today, in the form the model reads best.
-    nonisolated static func dateline() -> String {
-        let formatter: DateFormatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let day: DateFormatter = DateFormatter()
-        day.dateFormat = "EEEE"
-        let now: Date = Date()
-        return "(Today is \(formatter.string(from: now)), a \(day.string(from: now)).)"
+    ///
+    /// **Given the day rather than reading one.** This is the other half of
+    /// what the model needs to answer "publish the class tomorrow please" —
+    /// it does that arithmetic itself, from this sentence — so a dateline
+    /// built from its own reading of the clock would be the second clock in
+    /// the process that `withTheDaySettled` above says there is not. One
+    /// reading, `tools.today`, for both.
+    ///
+    /// Built from a `CalendarDay` rather than by formatting a `Date`, which
+    /// also takes the locale out of it: the previous version asked
+    /// `DateFormatter` for `EEEE` with no locale pinned, so a French-locale
+    /// Mac would have told the model "a mardi", and a Thai-locale one would
+    /// have dated it in the Buddhist calendar — 2569 for 2026. `CalendarDay`
+    /// is three integers and `String(format:)`, and its `weekdayName` pins
+    /// `en_US_POSIX`. The sentence is unchanged on an English machine, which
+    /// is what the routing measurements were made against.
+    nonisolated static func dateline(on day: CalendarDay) -> String {
+        return "(Today is \(day.text), a \(day.weekdayName).)"
     }
 
     /// What the model is told it is.
