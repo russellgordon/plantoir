@@ -60,7 +60,8 @@ Neither app contains toolchain logic of its own: they write the same
      Russell on 2026-09-10, when a triage of the open issues found FIVE whose
      whole content was a wording difference between the apps, or a sentence a
      teacher reads that was pinned in no contract (#68, #76, #87, #110, #127),
-     each waiting on a negotiation about which sentence wins. Three consequences, and the first is the one that ends the stream:
+     each waiting on a negotiation about which sentence wins. Three
+     consequences, and the first is the one that ends the stream:
 
      - **A wording difference is NOT its own issue.** There is ONE standing
        issue per release, titled `Sentence sweep — vX.Y.Z`, labelled `mac`

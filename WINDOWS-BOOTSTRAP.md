@@ -123,8 +123,9 @@ reasons rather than tasks:
   vandalism.
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
   `promptHistory`, and the case lists in the other files) — unless what you
-  are proposing is a SENTENCE, which is a sweep line (the bullet below on wording differences), not a
-  case and not an issue. A behaviour case: doing so will make
+  are proposing is a SENTENCE, which is a sweep line (the bullet below on
+  wording differences), not a case and not an issue. A behaviour case: doing
+  so will make
   the **mac** suite fail until they implement it — that is the mechanism
   working. Name the case so it reads as a proposal and open a GitHub issue
   labelled `mac` saying which case you added and what the mac has to implement
