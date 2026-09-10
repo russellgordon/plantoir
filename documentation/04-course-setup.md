@@ -455,7 +455,11 @@ confirmation's own promise — "Removing it will take it out of your course's
 marks pool" — is broken on the very next redraw. Filtered at the two levels the
 build's preflight scan discovers: the course's own children against
 `excluded_items.shared`, a section folder's children against
-`excluded_items.per_section`, matched exactly, case included. The cost is
+`excluded_items.per_section`, matched exactly, case included. (A `sectionN`
+folder hands that per-section scope to its children wherever it is found, not
+only directly inside the course — both apps have always done it, it falls out
+of passing the scope down a recursive walk, and a case now says so rather than
+leaving the two to drift apart the first time anyone tidies one of them.) The cost is
 recorded rather than hidden: a pooled name found ONLY inside the removed folder
 then has no row to untick until the folder is put back. Nothing is lost — a
 pooled name with no row is preserved rather than dropped — and it is not
@@ -472,6 +476,11 @@ whose only marked folder is `Tasks` that is an EMPTY pool: nothing counting for
 marks, permanently, from a removal the teacher was told only would take one
 folder out of it. An absent key keeps the historical rule running, so a
 `Thinking Tasks` still counts and putting the folder back restores it.
+
+Nothing new is written to the activity trail for any of this. The removal
+already leaves its own line (`item excluded`), and what changed is only which
+folders are OFFERED — which is not something a teacher DOES, and a trail line
+for it would record a redraw.
 
 **The ORDER is ordinal, case-insensitive, and every shorter way of asking for
 that is a different question.** Directory enumeration order is the filesystem's
