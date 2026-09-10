@@ -72,6 +72,26 @@ enum SpecialNames {
     nonisolated static let renameFolderProblemIsMedia: String =
         "Plantoir looks after the Media folder itself, so nothing else can be called Media."
 
+    /// The caption under the four Content Structure lists in Course Settings.
+    ///
+    /// Both halves are load-bearing. The first is the promise that a teacher
+    /// need not come here at all — preflight discovery appends anything new it
+    /// finds at the top level, files as well as folders. The second is the one
+    /// rule a teacher cannot infer and is told nowhere else on this page: an
+    /// exclusion is by NAME and does not expire, so a folder or file removed
+    /// here stays off the site even if it is deleted and made again in
+    /// Obsidian, and only this page can undo it.
+    ///
+    /// Worded on Windows and chosen by Russell 2026-09-07; the mac's own
+    /// sentence said the exception in a six-word bracket — "(unless you have
+    /// removed them here)" — and named no remedy, which was rejected as
+    /// under-weight for a permanent, silent rule with a single escape. The
+    /// reasoning, the rejected alternatives and the one known edge (a name
+    /// remade with different capitalisation is NOT still excluded) are in
+    /// `contracts/shared-rules.json` → `specialNames.contentStructureTip.why`.
+    nonisolated static let contentStructureTip: String =
+        "Tip: you can also simply create new folders and files in Obsidian — they’re added to your site automatically the next time you preview. The exception is anything you remove here: it stays off your site, even if you make it again in Obsidian, until you add it back here."
+
     // MARK: - Functions
 
     nonisolated static func curriculumFolderBlockedByCurriculumPages(jurisdiction: String) -> String {
