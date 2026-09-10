@@ -642,10 +642,23 @@ Keychain never comes into it, because the real launcher never runs.
 | The app's DIALOG — surname sheet once, address pre-filled, Cancel cancels, typed name is what is sent, trail records the ask | **Not covered, and automatable.** Needs a UI test with a stubbed `deploy.sh`. |
 | A publish with a genuinely invalid saved token | **Not covered and not automatable**, for the Keychain reason above. |
 
-Note the first row is the reverse of Windows: `verify-deploy.ps1` redirects
-stdin so `sys.stdin.isatty()` is false and `deploy.py` asks nothing, so that
-platform has no launcher-level coverage of first publish at all — raised as
-[#123](https://github.com/russellgordon/plantoir/issues/123).
+The first row used to be the reverse of Windows: `verify-deploy.ps1` redirected
+stdin so `sys.stdin.isatty()` was false and `deploy.py` asked nothing, leaving
+that platform with no launcher-level coverage of first publish at all. That was
+[#123](https://github.com/russellgordon/plantoir/issues/123), and it was closed
+on 2026-09-09 — Windows now drives every launcher through `PtyDriver` under a
+pseudoconsole and answers by prompt text, the same technique this side has used
+through `expect` for months. **The two platforms cover the same row the same
+way now**, and the second row — the DIALOG — remains uncovered on both.
+
+Two things from that work are worth knowing here rather than being rediscovered.
+Windows carries **no `(y/n)` catch-all**, which this side's `expect` block does:
+nothing in the Windows publish path asks one, and a rule that says yes to
+whatever is asked is a bet that nobody adds a destructive question. And its
+harness **audits itself afterwards** — it re-reads which prompts were answered
+and fails the run if any is not one `deploy.py` actually asks, which is worth
+copying here, because a rule matching a prompt it was not written for has
+already replied by the time a person could read the log.
 
 ### Why this is written down rather than done
 

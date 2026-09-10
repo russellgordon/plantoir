@@ -132,6 +132,27 @@ var reader = new Thread(() =>
 reader.Start();
 
 long respondedVersion = -1;
+
+// The last line we actually replied to, so an IDENTICAL line is not answered
+// twice for the same question.
+//
+// MEASURED, 2026-09-09: a rule replying {ENTER} sends a bare CR, which the
+// terminal echoes without producing any new visible text - so the prompt is
+// still the last non-empty line. If the child then goes silent (deploy.py does
+// exactly this: it accepts the site name and says nothing while POSTing to
+// Netlify), the settle window expires with a matching line still showing and
+// the reply fires AGAIN. A stub that answers one question and sleeps eight
+// seconds got TWO replies.
+//
+// The noisy log is the least of it. The extra CR sits in the child's input
+// buffer and PRE-ANSWERS the next prompt with its default, with no "# prompt:"
+// line written for it - so a harness auditing which questions it answered
+// cannot see that it accepted one. On deploy.py's name-conflict path that means
+// silently taking a fallback web address.
+//
+// Cleared as soon as the last line CHANGES, so a genuinely repeated prompt
+// separated by other output is still answered.
+string? repliedTo = null;
 int responsesSent = 0;
 var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
 while (!pty.HasExited)
@@ -149,11 +170,14 @@ while (!pty.HasExited)
                 if (transcript.Lines[i].Trim().Length > 0) { lastLine = transcript.Lines[i].Trim(); break; }
     }
     if (version == respondedVersion) continue;                       // nothing new since last reply
+    if (repliedTo is not null && lastLine == repliedTo) continue;    // same question, already answered
+    if (repliedTo is not null && lastLine != repliedTo) repliedTo = null;
     if ((DateTime.UtcNow - silentSince).TotalMilliseconds < settleMs) continue;
     foreach (var (pattern, reply) in rules)
     {
         if (!pattern.IsMatch(lastLine)) continue;
         respondedVersion = version;
+        repliedTo = lastLine;
         if (++responsesSent > 300) { Note("# SAFETY VALVE — killing"); pty.Kill(); break; }
         Note($"# prompt: {lastLine}");
         Note($"# reply : {reply}");
