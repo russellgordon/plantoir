@@ -167,7 +167,7 @@ is cheap now and expensive later:
 
 1. On Windows: Run `powershell -File publish.ps1 -Sign` -> Copy `PlantoirSetup.exe` to Mac (or shared staging).
 2. On Mac: Run `./mac-app/publish.sh -Sign` -> produces `Plantoir-macOS.dmg`.
-3. In terminal / assistant: Ask Claude / Antigravity to **"Cut the release"**.
+3. In terminal / assistant: Ask Claude to **"Cut the release"**.
 4. The automated skill drafts teacher-friendly release notes, confirms SHA-256 hashes, creates the draft release, uploads both assets, publishes the release, updates `site.json`, redraws the social card, and pushes to `main`.
 
 ## The Windows icon derives from `mac-app/Plantoir.icon`
