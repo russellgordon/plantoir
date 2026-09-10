@@ -51,6 +51,19 @@ public class ContractTests
         // OFFERED are the two AssistCardCommand must accept verbatim — a
         // reply that invites a phrasing the matcher does not take is worse
         // than one that offers nothing.
+        // Both said straight to a teacher now that "back up this course" and
+        // "what does publishing mean?" are fixed phrasings, matched in code.
+        Assert.Equal(wording["backedUpCourse"]!.ToString(),
+                     AssistWording.BackedUpCourse("{course}", "{course}_backup_2026-09-08_190000.zip"));
+
+        // Said when a teacher asks what publishing means twice in one
+        // conversation. Pinned here rather than merely present, because a
+        // fixed phrasing lets a TEACHER reach it — the sentence it replaced
+        // was addressed to a model, and the mac made and corrected that same
+        // mistake, so the two apps saying one thing is the point.
+        Assert.Equal(wording["publishingAlreadyExplained"]!.ToString(),
+                     AssistWording.PublishingAlreadyExplained("{course}", "{section}"));
+
         Assert.Equal(wording["rolloverWebsiteQuestion"]!.ToString(), AssistWording.RolloverWebsiteQuestion);
         Assert.Equal(wording["rolloverSayToStartANewWebsite"]!.ToString(), AssistWording.RolloverSayToStartANewWebsite);
         Assert.Equal(wording["rolloverSayToKeepTheSameWebsite"]!.ToString(), AssistWording.RolloverSayToKeepTheSameWebsite);
@@ -523,9 +536,28 @@ public class ContractTests
         var needsApproval = tools["needsApproval"]!.AsArray().Select(t => t!.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Equal(needsApproval, AssistAgent.DeploysToStudents);
 
+        // The tools the CONTRACT says the mac shows an MCP client and not its
+        // local model. Written out rather than counted, so the list moving is
+        // a decision somebody makes here rather than a number that drifts.
+        //
+        // It went from three to ten on 2026-09-08, when the mac built the six
+        // tools this app had had all along plus their plan twins — see issue
+        // #70. Every one of them is served here (this app's surface is wider
+        // still, and `TheExtraToolsThisServerOffersAreTheOnesWeKnowAbout`
+        // pins by how much), so what changed for Windows was not the tools
+        // but the FIXED PHRASINGS that reach them: MCP-only means no local
+        // model is shown a tool, and says nothing about whether a teacher may
+        // ask for it in words the matcher knows.
         var mcpOnly = tools["mcpOnly"]!.AsArray().Select(t => t!.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var expectedMcpOnly = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            "list_courses",
+            "plan_add_classes",
+            "add_classes",
+            "plan_make_room_for_classes",
+            "make_room_for_classes",
+            "explain_publishing",
+            "back_up_course",
             "list_curriculum_expectations",
             "plan_curriculum_mentions",
             "add_curriculum_mentions",

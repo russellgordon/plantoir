@@ -1453,13 +1453,60 @@ public class AssistWorkspaceTests : IDisposable
     {
         // A teacher told "I've published tomorrow's class" will reasonably
         // hear "students can see it now". Said plainly the first time, and
-        // never again — a tool that re-explains itself gets skimmed.
-        Assert.False(Briefing.AlreadyExplained(_folder, "ICS3U", 1));
+        // not twice in the same conversation — a tool that re-explains itself
+        // gets skimmed.
+        var workspace = Open();
 
-        Briefing.MarkExplained(_folder, "ICS3U", 1);
+        Assert.False(workspace.NoteExplainedThisConversation("ICS3U", 1));
+        Assert.True(workspace.NoteExplainedThisConversation("ICS3U", 1));
+        Assert.False(workspace.NoteExplainedThisConversation("ICS3U", 2));   // per section, not per course
+    }
 
-        Assert.True(Briefing.AlreadyExplained(_folder, "ICS3U", 1));
-        Assert.False(Briefing.AlreadyExplained(_folder, "ICS3U", 2));   // per section, not per course
+    /// <summary>
+    /// The memory is per CONVERSATION, and a new one starts clean.
+    /// </summary>
+    /// <remarks>
+    /// It used to be a marker file under <c>courses/.internal/assist/</c>, so
+    /// a section briefed once was never briefed again in that folder — and
+    /// once "what does publishing mean?" became a fixed phrasing, that meant a
+    /// teacher who ASKED the question got a brush-off instead of an answer,
+    /// once per folder for ever. This asserts the file is gone as much as it
+    /// asserts the behaviour: a leftover marker would restore the old bug
+    /// silently.
+    /// </remarks>
+    [Fact]
+    public void TheBriefingIsOfferedAgainInTheNextConversation()
+    {
+        Assert.False(Open().NoteExplainedThisConversation("ICS3U", 1));
+        Assert.True(Open().NoteExplainedThisConversation("ICS3U", 1) is false);
+
+        Assert.False(Directory.Exists(Path.Combine(_folder, "courses", ".internal", "assist")),
+            "the briefing is remembered in the conversation, not on disk");
+    }
+
+    /// <summary>
+    /// The second asking is answered with a sentence written for the TEACHER.
+    /// </summary>
+    /// <remarks>
+    /// It used to read "Don’t repeat it — carry on with what the teacher
+    /// asked", which is an instruction to a model. That was invisible while
+    /// <c>explain_publishing</c> was MCP-only; a fixed phrasing lets a teacher
+    /// call it directly, and a tool result is rendered as an ordinary
+    /// assistant bubble. There is no channel here only a model sees.
+    /// </remarks>
+    [Fact]
+    public void AskedTwiceInOneConversation_TheAnswerIsForTheTeacher()
+    {
+        var workspace = Open();
+        var tools = new Plantoir.Mcp.PlantoirTools(workspace);
+
+        string first = tools.ExplainPublishing("ICS3U", 1);
+        Assert.Contains("built into your site", first);
+
+        string second = tools.ExplainPublishing("ICS3U", 1);
+        Assert.Equal(AssistWording.PublishingAlreadyExplained("ICS3U", "1"), second);
+        Assert.DoesNotContain("the teacher", second);
+        Assert.DoesNotContain("Don’t repeat", second);
     }
 
     [Fact]

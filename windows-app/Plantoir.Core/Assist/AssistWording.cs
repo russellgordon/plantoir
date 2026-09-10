@@ -71,6 +71,44 @@ public static class AssistWording
     public static string DeployToMultipleDestinationsDidNotFinish(string course, string section) =>
         $"The deploy of {course} Section {section} did not finish, on any of its destinations. {WhereTheOutputIs}";
 
+    /// <summary>Where the copy went, after "back up this course".</summary>
+    /// <remarks>
+    /// Names the FILE and where to find it, not a path. This used to be
+    /// "Backed up to courses/_backups/ICS3U/ICS3U_backup_….zip", which is a
+    /// location on disk rather than an answer — and rule 1 of CLAUDE.md keeps
+    /// the machinery out of what a teacher reads. It became a teacher's
+    /// sentence rather than a caller's the day "back up this course" turned
+    /// into a fixed phrasing. The contract has pinned these words since the
+    /// tool arrived; the mac has always said them.
+    /// </remarks>
+    public static string BackedUpCourse(string course, string fileName) =>
+        $"Backed up {course} to {fileName}. It is in Plantoir's Backups list, and restoring " +
+        "from it puts the whole course back as it is right now.";
+
+    /// <summary>
+    /// Said instead of the briefing when this section has already had it, in
+    /// this conversation.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Written for the TEACHER, who is who reads it.</b> The sentence
+    /// this replaced was addressed to a model — "Don’t repeat it — carry on
+    /// with what the teacher asked" — which was harmless only while
+    /// <c>explain_publishing</c> was MCP-only and a model was the only caller.
+    /// A fixed phrasing ("what does publishing mean?") lets a teacher call it
+    /// directly, and a tool result is rendered as an ordinary assistant
+    /// bubble: there is no channel here that only a model sees. The mac made
+    /// and corrected the same mistake, and the wording is the contract's, so
+    /// both apps now say one thing.</para>
+    ///
+    /// <para>"In this conversation" is the truth on this side too, since
+    /// 2026-09-09 — see <c>AssistWorkspace.NoteExplainedThisConversation</c>.
+    /// It used to be a file on disk, which made the sentence a lie a month
+    /// later and, worse, meant a teacher who ASKED the question got this
+    /// instead of an answer.</para>
+    /// </remarks>
+    public static string PublishingAlreadyExplained(string course, string section) =>
+        $"I explained that for {course} Section {section} earlier in this conversation.";
+
     public static string SectionIsBusy(string course, string section) =>
         $"{course}-S{section} is already busy in Plantoir. Wait for that to finish, then deploy.";
 
