@@ -39,9 +39,9 @@ final class ArchiveStampTests: XCTestCase {
         XCTAssertEqual(ArchiveStamp.text(for: ArchiveStampTests.moment), "2026-08-09_141530")
     }
 
-    /// The four calendars macOS offers that a teacher might actually be
-    /// running, each writing the same moment its own way — measured, not
-    /// guessed. A Mac set to any of them wrote these names before the fix.
+    /// Six of the calendars macOS offers, each writing the same moment its
+    /// own way — measured, not guessed. A Mac set to any of them wrote these
+    /// names before the fix.
     func testANameWrittenInTheMachinesOwnCalendarIsStillRead() {
         let spellings: [(calendar: String, name: String)] = [
             (calendar: "buddhist", name: "2569-08-09_141530"),
