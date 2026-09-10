@@ -385,12 +385,25 @@ the reader pinned one. Measured here on macOS 26 for 2026-08-09 14:15:30:
 | Hebrew | `5786-11-26_141530` |
 | Ethiopic | `2018-12-03_141530` |
 
+**And the DIGITS move too, not just the year.** An Arabic-locale Mac wrote
+`١٤٤٨-٠٢-٢٦_١٤١٥٣٠`, a Persian one `۱۴۰۵-۰۵-۱۸_۱۴۱۵۳۰`, and a Nepali one
+`२०२६-०८-०९_१४१५३०` — that last with the right YEAR, in Devanagari. Foundation
+parses native digits back whatever locale the reading formatter carries, so
+all three are recovered to the right second; it is worth knowing anyway,
+because it is the reason the reading half of this is not proposed as a shared
+contract case. .NET's `TryParseExact` does not treat them the same way, so a
+case the mac passes could be un-passable on Windows, and pinning what you
+cannot check on the other side is how a contract turns into a complaint.
+
 Nothing looked wrong on such a machine, which is why nobody met it: the same
 unpinned formatter wrote and read, so it was symmetric — with one measured
 exception, the Chinese calendar, whose `yyyy` is a year within a sixty-year
-cycle. It wrote `0043-06-27_141530` for that moment and read its own name back
-as **2595-08-14**. That one was already broken before this fix and is the one
-old spelling the migration below cannot recover; it is also unchanged by it.
+cycle rather than a count from an epoch. It wrote `0043-06-27_141530` for that
+moment and read its own name back as **2595-08-14 BC** — four and a half
+thousand years the wrong way. That one was already broken before this fix, is
+the one old spelling the migration below cannot recover, and is unchanged by
+it. (`dangi`, Korea's, writes the identical string and reads it back
+correctly, so the exception is `chinese` alone.)
 What was NOT symmetric was everything else — the name disagreed with what `contracts/` says Plantoir
 writes, a folder carried to another machine stopped sorting, and the wizard's
 own zip sat in the same folder stamped `2026` in Python's always-Gregorian
@@ -412,7 +425,7 @@ them on whether a reading could be TRUE, not on whether it parsed.** That is
 the trap: `2569-08-09_141530` parses perfectly well as the Gregorian year
 2569, so "try the pinned reading, fall back if it fails" never falls back at
 all. `couldHaveBeenStamped(_:)` is the discriminator — at or after 2025-01-01,
-and not more than a day in the future.
+and not more than two days in the future.
 
 **Why that floor, and why it is not arbitrary.** The archive feature was
 written on 2026-08-09 (`git log --reverse -- CourseArchiver.swift`), so no zip
@@ -486,11 +499,15 @@ wrong-clock one. Accepted deliberately: the alternative is deleting a zip
 whose date is the one thing known to be wrong about it, and the only copy of a
 course is not a good thing to be wrong about.
 
-**A carried-over zip sits at the top of the list**, since both lists sort
-newest first (`WorkspaceModel.findArchivedItems`, `findBackupItems`), and it
-is dated "11 August 2569". That is what a teacher on a Gregorian Mac would
-actually notice, and it is the honest signal that the folder came from
-somewhere else.
+**A carried-over zip sits at one END of the list or the other**, since both
+lists sort newest first (`WorkspaceModel.findArchivedItems`,
+`findBackupItems`), and which end depends on which way that calendar's year
+runs. A Buddhist or Hebrew name reads far into the future and pins itself to
+the TOP, dated "11 August 2569"; a Japanese, Islamic or Ethiopic one reads
+into the past and sinks to the bottom, where a teacher may never scroll. So
+the position is a signal only half the time, and nothing here relies on the
+teacher noticing it: the guard in the pruner is what keeps such a zip safe,
+not their attention.
 
 ## Reporting a problem
 
