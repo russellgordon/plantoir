@@ -435,6 +435,71 @@ already ticked, so a teacher sees what is actually happening rather than a blank
 list. Nothing is written until they change something — and the moment they do,
 the answer is explicit and the historical rule stops applying to that course.
 
+### What the checklist OFFERS, and the two traps in walking a folder to find out
+
+The list is the course's `shared_folders`, then its `per_section_folders`, then
+every folder found inside the course itself, four levels down — because the
+build counts a graded folder at ANY depth, and a checklist built from the two
+top-level lists alone would let the first tick freeze a pool without
+`Portfolios/Tasks` in it. The rule, its skip list, its depth cap and its 13
+cases are `contracts/shared-rules.json` → `gradedFolders.choices`, run by
+`GradedFolderChoicesTests` on both platforms against REAL directory trees: a
+walk over a fixture is not a walk.
+
+Two things about it cost real time, and both were found by one platform and
+paid for by the other.
+
+**A folder the teacher REMOVED is still on disk, so the walk hands it back.**
+`excluded_items` is what a removal writes, and the walk must consult it or the
+confirmation's own promise — "Removing it will take it out of your course's
+marks pool" — is broken on the very next redraw. Filtered at the two levels the
+build's preflight scan discovers: the course's own children against
+`excluded_items.shared`, a section folder's children against
+`excluded_items.per_section`, matched exactly, case included. The cost is
+recorded rather than hidden: a pooled name found ONLY inside the removed folder
+then has no row to untick until the folder is put back. Nothing is lost — a
+pooled name with no row is preserved rather than dropped — and it is not
+silent, because `_has_graded_folders` walks the MERGED tree, so a pool matching
+nothing published reports that no folder counts for marks exactly as an empty
+pool would.
+
+**And a consequence of that filter, which is a change in its own right:**
+removing a folder from a course that has never been asked no longer FREEZES the
+pool, because the name is gone from the choices by the time the pool is touched.
+That is the better answer rather than an oversight. Freezing wrote the
+historical rule's answer minus the removed folder, and on the ordinary course
+whose only marked folder is `Tasks` that is an EMPTY pool: nothing counting for
+marks, permanently, from a removal the teacher was told only would take one
+folder out of it. An absent key keeps the historical rule running, so a
+`Thinking Tasks` still counts and putting the folder back restores it.
+
+**The ORDER is ordinal, case-insensitive, and every shorter way of asking for
+that is a different question.** Directory enumeration order is the filesystem's
+business, so the children of each folder are sorted — otherwise the same course
+lists differently on two machines, and no case could pin an order at all. Which
+comparison, measured on a Mac 2026-09-09 while adopting the rule:
+
+| Asked this way | `Unit 10` vs `Unit 2` | `_Archive` vs `Alpha` |
+|---|---|---|
+| `localizedStandardCompare` (Finder order) | `Unit 2` first | `_Archive` first |
+| `compare(options: [.caseInsensitive])` | `Unit 10` first ✅ | `_Archive` first |
+| C# `OrdinalIgnoreCase` — what shipped | `Unit 10` first ✅ | `Alpha` first ✅ |
+
+The trap is the middle row: it looks right, and it is right about digits, and
+it is wrong about the six ASCII characters between `Z` and `a` (`[ \ ] ^ _ `)
+because Foundation folds to LOWER case where C# folds to UPPER. `_Archive` and
+`~Old` are ordinary names for a folder a teacher wants at one end of a list. The
+mac therefore precomposes, upper-cases, and compares UTF-16 code units by hand
+(`GradedFolderChoices.sortsBefore`), and a contract case pins each row of that
+table, so the two suites disagree rather than the teachers. Accented names are
+deliberately NOT pinned: macOS hands back decomposed spellings and Windows
+precomposed ones, and a case would promise what neither platform can keep on the
+other's files.
+
+Finder order is arguably nicer for a person reading a list. If anyone wants it,
+it is a shared change to the contract and both apps — not something to reach for
+on one side because it looked more natural there.
+
 ### Content declares its own pool
 
 All 38 payload manifests and all 50 skeleton families now carry
@@ -448,9 +513,11 @@ disagree for the one that would have been broken by it.
 
 ### Where the rules live
 
-`contracts/shared-rules.json` → `gradedFolders` (9 cases, run by
-`scripts/test_graded_folders.py` in the image) and `contracts/file-formats.json`
-for the key itself.
+`contracts/shared-rules.json` → `gradedFolders` (10 cases for which folders
+COUNT, run by `scripts/test_graded_folders.py` in the image — neither app
+implements that rule, so neither suite runs them) and `gradedFolders.choices`
+(13 cases for what the checklist OFFERS, run by both apps). The key itself is in
+`contracts/file-formats.json`.
 
 ## “Where do the class pages live?” had four answers
 
