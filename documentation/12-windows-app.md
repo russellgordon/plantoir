@@ -1346,6 +1346,12 @@ scenario test fixture (`AssistScenarioTests.cs`) never wired
 mac's own scenario tests exercise the equivalent async production seam or
 only a sync stand-in.
 
+**(2) is now settled on this side**, 2026-09-09: the scenario fixture wires
+`StartDeployInAppAsync` and nothing else, so every deploy scenario goes
+through the production seam. The mac's own fake window has always returned
+a result from its `deploy` closure (`FakePreview.swift`), so it never had
+the sync-only gap. See "The scenario runner runs the REAL tools" below.
+
 ## Two testing lessons that recur, and both cost a red branch
 
 **A test proving a date was FRESHENED must compare against a date in the PAST.**
@@ -1371,6 +1377,65 @@ housekeeping: when it does not work, the operating system will get to it. **The
 same shape is available on the mac** with Spotlight indexing, and whether the
 mac's suites have it has never been checked.
 
+## The scenario runner runs the REAL tools
+
+`windows-app/Plantoir.Tests/AssistScenarioTests.cs` runs the cases in
+`contracts/assist-cases.json`. Until 2026-09-09 it answered every tool call
+with the string `"Done."`, and it read neither `given.saying` nor
+`expectTranscriptContains` — the only two keys the three rollover cases carry.
+Each of those ran a single turn with every assert block skipped, so they passed
+having checked nothing whatever (issue #141). **That is the failure the shared
+contract exists to prevent, wearing the contract's own colours: a case both
+platforms believe the other one is covering.**
+
+**A fixture that invents its own answers cannot assert the product's
+sentences.** The rollover cases name `wording.rolloverWebsiteQuestion` and
+`wording.rolloverWebsiteNotDecided`, which only `PlantoirTools.ReDate` can
+produce. So the fixture stopped inventing them: `RealTools` dispatches to the
+real `PlantoirTools` against a course in a temp folder, which is the shape
+`AssistFixture.makeRunner` has had on the mac since the scenario suite shipped.
+
+Five things about it are decisions rather than details.
+
+- **The launcher is the only seam**, as `AssistSiteWork` is on the mac.
+  `FakeLauncher` records what it was asked to run and reports success, so
+  `AssistWorkspace.Deploy` runs for real above it — every refusal it checks,
+  every destination, and the real `AssistWording.Deployed` at the end. A deploy
+  scenario would otherwise build a Docker image. The mac asserts
+  `siteWork.deploys == 1` where this asserts one `deploy` run on the launcher;
+  the contract's own name for that is `runLauncherDirectly`.
+- **Reflection over `PlantoirTools`, not a `plantoir-mcp` process.** Driving the
+  server over stdio works and leaves a process holding `Plantoir.Core.dll` open
+  if anything goes wrong, which fails the NEXT build with a lock error reading
+  "the app is open" when the app is not open at all. `AssistSurfaceContractTests`
+  made the same trade. The binder drops an argument the tool does not declare,
+  as the SDK's own binder does — `AssistAgent.RunTool` sets `preview` on tools
+  that do not all take it — but an argument that IS declared and cannot be
+  converted throws, because a runner that quietly drops one is #141 again.
+- **A "write" is noted when the watched page changes ON DISK**, not when the
+  tool is called. `FakeSectionWindow` mirrors the mac's `FakePreview`: the order
+  is the assertion, and stopping, writing and starting can all happen and still
+  be wrong. A preview stopped *after* the pages were rewritten was serving a
+  half-changed site in between, which is the fault the case exists for. Recording
+  "write" at call time would assert the order the fixture chose rather than the
+  order that happened.
+- **`schtasks` is stubbed** through `TaskScheduling.SchtasksForTests`, and the
+  class is therefore in the `SharedActivityState` serialized collection. Without
+  it, a rollover that cuts a section loose runs `schtasks /Delete /F` against
+  whoever's Task Scheduler is running the suite. `RolloverWebsiteTests` reached
+  the same conclusion first.
+- **`sectionWindowOpen` defaults to FALSE**, as on the mac. It defaulted to true
+  here, which quietly gave every card scenario a section window it had not asked
+  for and answered its deploy by pressing a button instead of running a launcher.
+
+**Verify a scenario runner by falsification, never by a green run** — green is
+exactly what the broken one was. Each of these was run against a temporary edit
+to `PlantoirTools.cs` and reverted: reintroducing the #120 answer-turn no-op
+fails case 2 on `rolloverIsOnANewWebsite`; making the bare rollover say nothing
+about the website fails case 3; making it propose rather than answer fails case
+3 on the card that `when: "say"` forbids; and moving the website sentences into
+the model's half only — the exact defect the case's own `why` describes — fails
+all three. A case that cannot be made to fail is not testing anything.
 
 ---
 
