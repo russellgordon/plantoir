@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace Plantoir.Core.Assist;
@@ -165,7 +166,64 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
         return null;
     }
 
-    public JsonObject ToJsonObject(string course, int section)
+    /// <summary>
+    /// The two tools that publish ONE day's class, whose card argument is a
+    /// relative day and whose parameter is an absolute date.
+    /// </summary>
+    private static readonly HashSet<string> PublishesADaysClass = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "publish_class_on",
+        "plan_publish_class_on",
+    };
+
+    /// <summary>
+    /// The card as the JSON this app really sends, with <c>when</c> turned
+    /// into the <c>date</c> the tool takes.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why the rename happens here.</b> The eight fixed phrasings
+    /// ("publish tomorrow's class", and the seven weekdays) set <c>when</c>,
+    /// which is the mac's shape and is pinned by
+    /// <c>contracts/assist-cases.json</c> -&gt; <c>cardPhrasings</c>, so the
+    /// card cannot simply be changed to say <c>date</c>. On the mac the card
+    /// and the runner share a process and the runner reads either name; here
+    /// the call crosses <c>plantoir-mcp</c> over JSON-RPC, and the SDK's
+    /// binder drops a key the method does not declare - and then refuses for
+    /// the required <c>date</c> it never got. That is issue #116: the
+    /// commonest request in the product, and one of the prompt shelf's
+    /// suggested prompts, answered with "That tool couldn't be run".
+    /// So this method - the one place the card becomes the wire - is where
+    /// the two names meet, and where they are reconciled.</para>
+    ///
+    /// <para><b>Why the day is settled HERE rather than in the tool.</b>
+    /// <c>AssistAgent.RunCommand</c> synthesises ONE arguments object and
+    /// reuses it: first for the plan twin, then, if the teacher presses Go,
+    /// for the act itself. Settling "tomorrow" at the moment the phrasing is
+    /// matched means the plan a teacher read and the class that gets published
+    /// are the same day even when the two are minutes apart across midnight.
+    /// Resolving inside the tool instead would let the second call land on a
+    /// different day than the first proposed - rare, silent, and exactly the
+    /// kind of wrong day nobody would think to look for. The tool understands
+    /// these words as well, for MCP callers that have no card
+    /// (<c>PlantoirTools.PlanForDay</c>); it is the same shared reader either
+    /// way, so there is one answer to what "monday" means.</para>
+    ///
+    /// <para>No card sets both <c>when</c> and <c>date</c>, and none should:
+    /// the two would race on the order the dictionary happens to yield them.
+    /// The fixed shapes are written out one by one a few hundred lines above,
+    /// which is where that stays true.</para>
+    ///
+    /// <para>A word that cannot be read is passed through as the <c>date</c>
+    /// unchanged, so the tool answers with its own sentence about the date
+    /// rather than the binder throwing about a parameter a teacher has never
+    /// heard of. No card can reach that branch - all eight words resolve - and
+    /// it is a guard rather than a behaviour.</para>
+    /// </remarks>
+    /// <param name="today">
+    /// The day to count from, for tests. Left null, it is the real today, read
+    /// at the moment the phrasing is matched.
+    /// </param>
+    public JsonObject ToJsonObject(string course, int section, DateOnly? today = null)
     {
         var obj = new JsonObject
         {
@@ -179,7 +237,19 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
         }
         foreach (var (k, v) in Arguments)
         {
-            if (k == "pages")
+            if (k == "when" && PublishesADaysClass.Contains(ToolName))
+            {
+                var day = SectionScheduleSource.ReadRelativeDay(
+                    v, today ?? DateOnly.FromDateTime(DateTime.Now));
+                // InvariantCulture, because a machine set to a non-Gregorian
+                // default calendar renders "yyyy" in ITS year - 2569 for Thai
+                // Buddhist - and the tool would then look for a class on a day
+                // no course has.
+                obj["date"] = day is { } read
+                    ? read.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    : v;
+            }
+            else if (k == "pages")
             {
                 obj[k] = new JsonArray(JsonValue.Create(v));
             }
