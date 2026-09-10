@@ -88,17 +88,26 @@ which of their tests will go red**, the way
 card phrasings will make your suite red"*, with the three quoted. That is what
 turns a failure into a task.
 
-**Name EVERY key the regeneration moved, not only the one you were building**,
-and this is the half #70 missed. The same commit that added those tools also
-gave `back_up_course` a `section` argument, which travels in `toolSchemas`
-rather than in the feature. Nothing said so. Windows'
-`AssistSurfaceContractTests` reported it exactly — *"must require exactly the
-arguments the contract says it does"* — and its reader had a perfectly clear
-failure and nowhere to look it up, which is half of why
+**Name every key the regeneration moved, and remember that the FIX you made
+after the feature moved one too.** This is the half #70 missed, and the shape
+of it is worth knowing because it is not carelessness:
+
+| When | What |
+|---|---|
+| 18:54 | `0f34c54d` builds `back_up_course`, requiring `[course]` — the same shape Windows had had since August. Nothing diverges. |
+| 19:14 | `b0913344` fixes a real defect in it: the copy was filed as the TEACHER's, so `pruneBackups` would have kept every one for ever. The fix takes a `section`. The schema moves. |
+| 19:52 | #70 is opened. It names the tool, its plan twin and its briefing persistence — everything except the argument. |
+
+The issue describes the FEATURE, because that is what you set out to build; the
+review fix twenty minutes later is the part memory drops. And it is the worse
+part to drop — Windows had the identical defect and found it only because the
+contract went red and somebody chased it. Windows'
+`AssistSurfaceContractTests` reported the change exactly — *"must require
+exactly the arguments the contract says it does"* — and its reader had a
+perfectly clear failure and nowhere to look it up, which is half of why
 [#146](https://github.com/russellgordon/plantoir/issues/146) was filed saying
-nobody had been told. A schema change is the easy one to omit precisely because
-it is not the thing you set out to build. `git diff contracts/` before you
-write the issue, and let the diff tell you what to list.
+nobody had been told. **`git diff contracts/` before you write the issue**, and
+let the diff tell you what to list rather than your memory of the afternoon.
 
 ### 4. Run the tests, and read what they say
 
