@@ -1773,9 +1773,9 @@ def install_payload_file(source: Path, destination: Path, now_str: str,
 
     `unit_word` is the teacher's word for a unit. A course that says "Module"
     gets its pages named, titled and linked "Module 2, Day 3" as they are
-    poured, which is the whole reason the choice is offered at setup and not
-    afterwards: renaming three thousand pages and their wikilinks in a course
-    already in use is a different and far more dangerous piece of work.
+    poured, so nothing needs renaming afterwards. Changing the word once the
+    course is in use is Plantoir's Course Settings → Rename…, which renames
+    the class pages and follows the links; it is not this launcher's job.
     """
     if destination.exists():
         return False
@@ -2196,10 +2196,9 @@ def setup_course(no_backup: bool = False):
 
     # ---------- What this course calls a unit -------------------------------
     # Asked of EVERY course, ready-made or not: the payload is poured in the
-    # teacher's own word rather than renamed afterwards, and the choice is
-    # offered here rather than in Settings because renaming three thousand
-    # pages and their wikilinks in a course already in use is a different and
-    # far more dangerous piece of work.
+    # teacher's own word rather than renamed afterwards. Changing it on a
+    # course already in use is the app's Course Settings → Rename…, which
+    # renames the class pages and follows the links (since 2026-09-10).
     # Whether this course has been set up BEFORE — which is not the same as
     # whether its folder exists. `course_path.mkdir` runs a couple of hundred
     # lines above, so testing the folder made the answer always "yes" and a
