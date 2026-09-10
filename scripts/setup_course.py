@@ -1714,14 +1714,17 @@ def prompt_unit_word(saved_config: dict, has_been_set_up_before: bool) -> str:
     rewrite the configuration and rename nothing: the pages would still say
     "Unit 2, Day 3" and the build would have stopped recognising them —
     "built, and then recognised by nothing", the exact state this whole piece
-    exists to prevent. Renaming an existing course's word is deliberately not
-    on offer anywhere; it is in TODO.md with the reasons.
+    exists to prevent. Renaming a course already in use is the app's job
+    (Course Settings → Rename…, since 2026-09-10): it renames every class
+    page, retitles it and follows the links, with a backup first. This
+    launcher only says where to go.
     """
     current = class_pages.word_from_config(saved_config)
     if has_been_set_up_before:
         if current != class_pages.DEFAULT_UNIT_WORD:
-            print(f"\n📘 This course calls its units “{current}”. Changing that now would "
-                  f"rename nothing, so it is not offered.")
+            print(f"\n📘 This course calls its units “{current}”. To change that, use "
+                  f"Rename… beside the word in Plantoir's Course Settings, which renames "
+                  f"the class pages too.")
         return current
     print("\nClass pages are named like “Unit 1, Day 1”.")
     print("Some teachers organise by Module or Thread instead.")
