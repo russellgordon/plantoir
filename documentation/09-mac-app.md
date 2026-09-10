@@ -436,11 +436,13 @@ for: read as Gregorian, Buddhist 2569, Hebrew 5786 and Ethiopic-Amete-Alem
 7518 land in the future, while Japanese 0008, Islamic 1448, Persian 1405,
 Indian 1948, Coptic 1742 and Ethiopic 2018 land before Plantoir existed.
 
-**Ethiopic is the case that decided the shape of the code**, and it is worth
-knowing because it is the only one in macOS's calendar list that a
-"sensible-looking date" test cannot catch: seven years and eight months behind
-the Gregorian calendar, so its old spelling of this moment is `2018-12-03` —
-an ordinary date, in the past, that a person would not blink at. Only "could
+**Ethiopic is the case that decided the shape of the code.** It is seven
+years and eight months behind the Gregorian calendar, so its old spelling of
+this moment is `2018-12-03` — an ordinary date, in the past, that a person
+would not blink at. It is not the only such date (Indian writes `1948-05-18`
+and Coptic `1742-12-03`, both perfectly ordinary-looking), but it is the only
+one in macOS's list that lands after the year 2000, and the plan this replaced
+had floored the window there. That is what makes it the case: only "could
 Plantoir have written it" separates it, because Plantoir did not exist in
 2018.
 
@@ -452,7 +454,7 @@ name before the question is ever asked, and it is measurably correct in both
 eras — a simulated read in 2035 gives the same answer for every calendar in
 the list. Machine-first was tried and rejected for exactly that reason.
 
-### What was rejected
+### What was rejected — five things
 
 - **Guessing which calendar wrote a stamp this Mac cannot explain.** A zip
   carried here from a Buddhist Mac reads as the year 2569, and 2569 − 543
@@ -498,6 +500,19 @@ old-calendar Mac holds at most the five that machine kept), unbounded in the
 wrong-clock one. Accepted deliberately: the alternative is deleting a zip
 whose date is the one thing known to be wrong about it, and the only copy of a
 course is not a good thing to be wrong about.
+
+**Nothing new is recorded on the breadcrumb trail, and that is a decision.**
+The trail carries no line today for a backup being MADE or PRUNED — only the
+file name of one, where a restore or a unit-word rename names the copy it
+worked from — so a single event about a prune that SKIPPED something would be
+the only line about pruning in the file, and it still would not answer the
+question it looks like it answers ("why do I have forty of these?"), which is
+a count rather than an event. The one teacher-visible consequence, a Mac with
+a wrong clock whose assistant backups stop being cleared, is a state to look
+at rather than a moment to record: it is visible in the Backups list itself,
+and every one of those names carries the date that explains it. If this ever
+does earn a line, it belongs with a `backup made` event rather than on its
+own, and both go in `contracts/shared-rules.json` → `activityTrail` together.
 
 **What a teacher is told about such a copy was left alone**, deliberately.
 `BackupItem.keptDescription` says "The assistant made this one; its five most

@@ -68,16 +68,19 @@ nonisolated enum ArchiveStamp {
     /// 2569, so "try the pinned reading, fall back if it fails" would never
     /// fall back at all. `couldHaveBeenStamped(_:)` is what separates them.
     ///
-    /// `machineLocale` is passed only by the tests, standing in for a Mac
-    /// whose calendar is not Gregorian. Nothing in the app passes it.
-    static func moment(from stamp: String, machineLocale: Locale = Locale.current) -> Date? {
+    /// `machineLocale` and `now` are passed only by the tests, standing in
+    /// for a Mac whose calendar is not Gregorian and for a later year.
+    /// Nothing in the app passes either. `now` earns its place: the reason
+    /// the pinned reading goes first is a claim about the year 2034, and a
+    /// claim nothing can re-run is one nobody can check.
+    static func moment(from stamp: String, machineLocale: Locale = Locale.current, now: Date = Date()) -> Date? {
         let asPlantoirWritesIt: Date? = formatter(reading: Locale(identifier: "en_US_POSIX")).date(from: stamp)
-        if let asPlantoirWritesIt, couldHaveBeenStamped(asPlantoirWritesIt) {
+        if let asPlantoirWritesIt, couldHaveBeenStamped(asPlantoirWritesIt, now: now) {
             return asPlantoirWritesIt
         }
 
         let asThisMacOnceWroteIt: Date? = formatter(reading: machineLocale).date(from: stamp)
-        if let asThisMacOnceWroteIt, couldHaveBeenStamped(asThisMacOnceWroteIt) {
+        if let asThisMacOnceWroteIt, couldHaveBeenStamped(asThisMacOnceWroteIt, now: now) {
             return asThisMacOnceWroteIt
         }
 
@@ -90,8 +93,11 @@ nonisolated enum ArchiveStamp {
         return asThisMacOnceWroteIt ?? asPlantoirWritesIt
     }
 
-    /// Whether a moment is one Plantoir could have stamped into a name:
-    /// after the archive feature existed, and not in the future.
+    /// Whether a moment is one Plantoir could have stamped into a name: not
+    /// before it could have written one, and not in the future. The bounds
+    /// are contract data — `contracts/course-management.json` → `zipNames`
+    /// → `couldHaveBeenStamped` — because both apps need them and one of
+    /// them decides what gets deleted.
     ///
     /// A stamp this refuses is still READ — see `moment(from:)` — but it is
     /// not allowed to decide anything destructive: `CourseArchiver.pruneBackups`
@@ -111,7 +117,7 @@ nonisolated enum ArchiveStamp {
     /// name written today as 2034 — a moment that is by then perfectly
     /// plausible — but the pinned reading of that same name is 2026, it is
     /// plausible too, and it is settled before the question is asked.
-    static func couldHaveBeenStamped(_ moment: Date) -> Bool {
+    static func couldHaveBeenStamped(_ moment: Date, now: Date = Date()) -> Bool {
         let gregorian: Calendar = Calendar(identifier: .gregorian)
         guard let earliest = gregorian.date(from: earliestPossible) else {
             return false
@@ -124,7 +130,7 @@ nonisolated enum ArchiveStamp {
         // nothing: no wrong reading of any calendar lands within a year of
         // the ceiling.
         let twoDays: TimeInterval = 2 * 24 * 60 * 60
-        return moment >= earliest && moment <= Date().addingTimeInterval(twoDays)
+        return moment >= earliest && moment <= now.addingTimeInterval(twoDays)
     }
 
     /// A formatter for one calendar's spelling of the stamp.

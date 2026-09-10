@@ -143,6 +143,45 @@ final class ArchiveStampTests: XCTestCase {
         }
     }
 
+    /// The claim the ordering rests on, re-run rather than asserted.
+    ///
+    /// Both orders — pinned reading first, machine reading first — are right
+    /// today. They part company in about 2034, when an Ethiopic Mac's reading
+    /// of a name written now (2026 → 2034) stops being in the future and
+    /// becomes plausible in its own right. Pinned-first settles the name
+    /// before the question is asked, so it is still right then; this reads
+    /// today's name with the clock moved to 2035 and proves it, and it is
+    /// the reason `moment(from:)` takes a `now` at all.
+    func testTheAnswerIsStillRightTenYearsFromNow() throws {
+        var pieces: DateComponents = DateComponents()
+        pieces.year = 2035
+        pieces.month = 6
+        pieces.day = 1
+        let inTenYears: Date = try XCTUnwrap(Calendar(identifier: .gregorian).date(from: pieces))
+        let written: String = ArchiveStamp.text(for: ArchiveStampTests.moment)
+
+        for calendar in ["gregorian", "buddhist", "japanese", "islamic-umalqura", "ethiopic", "hebrew", "persian"] {
+            let machine: Locale = Locale(identifier: "en_CA@calendar=\(calendar)")
+            XCTAssertEqual(
+                ArchiveStamp.moment(from: written, machineLocale: machine, now: inTenYears),
+                ArchiveStampTests.moment,
+                "a \(calendar) Mac reading today's name in 2035"
+            )
+        }
+
+        // And the migration still works then, which is the other half: a
+        // teacher's archives from before the fix do not start reading
+        // differently just because time passed.
+        XCTAssertEqual(
+            ArchiveStamp.moment(
+                from: "2018-12-03_141530",
+                machineLocale: Locale(identifier: "en_CA@calendar=ethiopic"),
+                now: inTenYears
+            ),
+            ArchiveStampTests.moment
+        )
+    }
+
     /// How a Mac set to `calendar` spelled a moment before the fix — the same
     /// unpinned formatter the writer used to be.
     private static func spelled(_ moment: Date, in machineLocale: Locale) -> String {
