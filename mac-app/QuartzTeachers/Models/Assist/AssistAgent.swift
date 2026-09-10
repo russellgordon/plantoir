@@ -355,8 +355,51 @@ final class AssistAgent {
         )
     }
 
+    /// The same call, with "tomorrow" already turned into the date it means.
+    ///
+    /// **Here, and once.** Everything below reads these arguments more than
+    /// once: plan mode runs the `plan_` twin on them, the card holds them
+    /// while the teacher decides, and `approvePending` hands the very same
+    /// call to `execute`. A relative WORD carried through all of that is read
+    /// again at each step, against a clock that has moved — so a plan shown at
+    /// 23:59 and agreed to at 00:01 publishes a class the plan never
+    /// described. The runner used to be safe from that by freezing its idea of
+    /// today when it was built, which bought the agreement and cost the
+    /// freshness: a window left open across midnight then resolved "tomorrow"
+    /// against the day the conversation BEGAN. Settling the word once, here,
+    /// buys both.
+    ///
+    /// **Against the RUNNER's clock, not the machine's.** A second reading
+    /// here would be a second clock in the process — two answers to what
+    /// "today" is, differing on one night in a thousand, and no test able to
+    /// pin the one the teacher's request actually used.
+    ///
+    /// This covers the model-routed path as well as the card's. The model is
+    /// told to work the date out itself and a small one sometimes sends
+    /// `date: "tomorrow"` anyway; it costs no routing accuracy to be ready
+    /// for that, because the model sees nothing of what happens here.
+    private func withTheDaySettled(_ call: AssistToolCall) -> AssistToolCall {
+        guard let definition = tools.definition(named: call.function.name) else {
+            return call
+        }
+        let settled: [String: Any] = AssistToolRunner.settlingTheClassDay(
+            in: call.argumentValues, forTool: definition, today: tools.today
+        )
+        guard let data = try? JSONSerialization.data(withJSONObject: settled),
+              let rewritten = String(data: data, encoding: .utf8) else {
+            return call
+        }
+        // The id and the type are the call's identity, not its content: the
+        // tool result is matched back to the model's request by `id`.
+        return AssistToolCall(
+            id: call.id,
+            type: call.type,
+            function: AssistToolCall.Function(name: call.function.name, arguments: rewritten)
+        )
+    }
+
     private func run(call rawCall: AssistToolCall) async {
-        let call: AssistToolCall = boundToThisSection(rawCall)
+        let call: AssistToolCall = withTheDaySettled(boundToThisSection(rawCall))
         guard let definition = tools.definition(named: call.function.name) else {
             messages.append(AssistMessage.toolResult(
                 callID: call.id, name: call.function.name,
