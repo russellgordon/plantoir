@@ -1441,6 +1441,123 @@ about the website fails case 3; making it propose rather than answer fails case
 the model's half only — the exact defect the case's own `why` describes — fails
 all three. A case that cannot be made to fail is not testing anything.
 
+## A fixed phrasing reaches a tool no model is shown — and inherits none of the model's guardrails
+
+Added 2026-09-09 with issue #70's five card phrasings and the parsed
+`make room for <count> class|classes at unit <U>, day <D>` family.
+
+**The idea is worth more than the five sentences.** A card phrasing is matched
+in `AssistCardCommand` and never reaches a model, so adding one costs the
+router nothing — the measured 13-tool local surface is what routing accuracy
+was measured against, and it is untouched. That means MCP-only is a statement
+about what the MODEL is SHOWN, not about what a teacher may ask for. Anything
+MCP-only is a candidate.
+
+**What it does NOT inherit is every check that hangs off being routed**, and
+that is where the afternoon went. Four defects, each invisible until a
+phrasing made a teacher the caller:
+
+- **`AssistAgent.PlanTwins` is a hand-written map**, and it was written
+  against "writes the local model can reach". `make_room_for_classes` is
+  MCP-only, so it was not in it — and it is the most far-reaching tool on the
+  surface, renaming pages a teacher's links point at. Without the entry it
+  would have been the ONE card that ran with nothing shown first. The mac has
+  never had this hole because `AssistToolDefinition.planTwinName` DERIVES the
+  twin from the tool; a list has to be told. If you add a card phrasing, check
+  that map by hand.
+- **A plan twin that returns a bare `string` cannot say it is a plan.** The
+  mark is `_meta["plantoir.app/isPlan"]`, set only by `PlantoirTools.Proposing`,
+  and `AssistAgent.ShowPlan` reads an unmarked answer as a REFUSAL: it prints
+  the words and never offers Go. `plan_make_room_for_classes` shipped that way
+  and nothing noticed, because Claude Code reads the words either way and so
+  does every test that asserts on the plan's TEXT. Adding it to `PlanTwins`
+  would have made the tool unrunnable from the app — a plan a teacher could
+  read and never accept. `AssistSurfaceContractTests.EveryPlanTwinTheGateRunsCanSayItIsAPlan`
+  now checks the RETURN TYPE of every twin the gate runs, which is the thing
+  that makes the mark possible; it unwraps `Task<>`, since an async tool marks
+  just as well.
+- **A sentence written for a model becomes a sentence a teacher reads.**
+  `explain_publishing`'s second answer said "Don't repeat it — carry on with
+  what the teacher asked", which was harmless while a model was the only
+  caller. A tool result renders as an ordinary assistant bubble; there is no
+  channel here only a model sees. The mac made and corrected this same
+  mistake, and the contract pins the replacement (`publishingAlreadyExplained`).
+  `back_up_course` had the same shape: it answered with a path on disk, which
+  rule 1 of `CLAUDE.md` keeps out of what a teacher reads, and the contract's
+  `backedUpCourse` was already the sentence to say.
+- **Suppression that suits a model does not suit a teacher.** `Briefing` wrote
+  a marker file under `courses/.internal/assist/`, so a section briefed once
+  was never briefed again in that folder. Defensible for a model: it is the
+  model the repetition would bore, and a session cannot repeat itself after it
+  has ended anyway. Once a teacher can TYPE the question, a file on disk means
+  the answer arrives once per working folder, ever — and answering a question
+  with "I explained that before" is refusing to answer it. It is now
+  `AssistWorkspace.NoteExplainedThisConversation`, beside `_conversationBackups`
+  and living exactly as long: one assistant window, or one `plantoir-mcp`
+  process. Old `.explained` files are inert and are not cleaned up; nothing
+  reads them.
+
+### Two more the same pass turned up
+
+**`back_up_course` credited the teacher with a copy they never made.**
+`AssistWorkspace.BackUp` called `CourseArchiver.BackUpCourse` with no
+`BackupMaker`, so it recorded `DefaultTeacher`. Two consequences, and the
+second is the one that bites: the Backups list says "made by you", and
+`PruneBackups` deliberately skips anything that is not the assistant's — so a
+session following the tool's own advice to back up "before any bulk editing"
+would write a whole-course zip every time and none would ever be cleared, with
+`MostBackupsKept` never applying. The tool now takes the `section` the contract
+has required of it since it arrived, and attributes to `BackupMaker.Assistant`.
+
+**`add_classes` and `plan_add_classes` took a `firstDay` the caller could get
+wrong.** It defaulted to 1 and was described as "1 unless the earlier days
+already exist" — a question answerable only by going and looking at the
+section. Measured: "add five more days to Unit 4" on a unit already holding
+Days 1–3 planned Days 1–5, reported three as already there, and created **two**
+pages for a teacher who asked for five. `AssistWorkspace.DayToCarryOnFrom`
+works it out from the pages on disk, published or NOT — a class a teacher has
+written and not yet shown anybody is still a day of the course, and numbering
+over it would collide with a real file. The logic already existed inside
+`PlanAddNextClass`; it was only the tools that asked. This closes the
+divergence issue #70 described, in the direction it suggested: an argument
+nobody can get wrong beats one with a sensible default.
+
+### The check that found the one still open
+
+`TheCardsArgumentsReachTheToolThatReadsThem` walked only `cardPhrasings.matches`
+— the LITERAL phrasings. It now walks `cardPhrasings.parsed` as well, which is
+the half where an argument is most easily misnamed, because it is built in code
+from a number rather than written out beside the sentence. It found a live
+defect on its first run: `add_next_class` declares no `duplicate` parameter, so
+"duplicate Unit 3, Day 2 as my next class" — a sentence `AssistPromptShelf`
+OFFERS — has the argument dropped by the binder and quietly makes a **blank**
+page. Recorded in `KnownToBeDropped` naming issue #149, the way #116 was
+carried there until it was fixed.
+
+**The general lesson**: a silent drop is invisible to any test that does not go
+looking, and "the tool ran and returned something sensible" is exactly what it
+looks like.
+
+### A generated contract can only describe what the generating side declared
+
+`cardPhrasings` is a GENERATED key — `contracts/README.md` says so, and
+`AssistContract.generatedCaseKeys` rebuilds it wholesale from the mac's
+`AssistCardCommand`. A case added to it from here is deleted by the next
+`Plantoir --write-contracts`, with nothing to say it has gone. The authored
+halves are `scenarios`, `nearMisses` and `promptHistory`; a near miss proposed
+from Windows survives, a parsed FAMILY does not.
+
+That is not only a rule about where to type. The parsed family for make-room
+described its count as "a number — words up to twelve are understood", and the
+mac's matcher also takes the article: `"a": 1` sits in its spelled table and is
+in none of its output. So **"make room for a class at Unit 3, Day 4" — the
+sentence issue #70 uses as its example, and the tool's own `TEACHERS SAY`
+clause — was the one form this app did not match**, and the contract test
+stayed green because its example says "two classes". A form one side supports
+and does not DECLARE is invisible to the other. If a family here accepts
+something the contract's `shape` does not spell out, that is a case to propose,
+not a detail to leave in the code.
+
 ---
 
 [◀ Previous: Release Strategy](11-release-strategy.md) · [Back to index](README.md)

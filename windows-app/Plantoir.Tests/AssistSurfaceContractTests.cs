@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Text.Json.Nodes;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Plantoir.Core.Assist;
 using Plantoir.Mcp;
@@ -316,20 +317,20 @@ public class AssistSurfaceContractTests
     /// each side tells the MODEL, which is worth knowing; it is not an
     /// incompatibility and nothing should assert one from it.</para>
     ///
-    /// <para><b>Honest limit: only the LOCAL surface reaches this code today.</b>
+    /// <para><b>This list is now EXERCISED, and was not when it was written.</b>
     /// All five entries below belong to MCP-only tools, and
-    /// <c>EveryToolTheContractsMcpSurfaceNamesIsServedTheSameWayHere</c> has
-    /// been failing on <c>dev</c> since before this was written — so it stops
-    /// at an earlier assertion and never gets here. Verified rather than
-    /// assumed, by clearing the blockers in a scratch copy and re-running:
-    /// there are at least THREE stacked divergences on that surface, each
-    /// hidden behind the one before it — <c>back_up_course</c> requiring
-    /// <c>section</c> there and not here, the same tool's <c>section</c>
-    /// property, and <c>add_classes.firstDay</c> / <c>plan_add_classes.firstDay</c>
-    /// being undeclared in the contract. They belong to GitHub issue #114 and
-    /// are none of #122's business, but the consequence is: this list is
-    /// COMPILED and not yet EXERCISED, and it starts being exercised the day
-    /// that test goes green.</para>
+    /// <c>EveryToolTheContractsMcpSurfaceNamesIsServedTheSameWayHere</c> used
+    /// to stop at an earlier assertion and never reach them: it had been red
+    /// on <c>dev</c> since before this was written, behind THREE stacked
+    /// divergences, each hidden by the one before it — <c>back_up_course</c>
+    /// requiring <c>section</c> there and not here, the same tool's
+    /// <c>section</c> property, and <c>add_classes.firstDay</c> /
+    /// <c>plan_add_classes.firstDay</c> being undeclared in the contract.
+    /// Issue #70 closed all three on 2026-09-09, in the direction the contract
+    /// had it: the section is taken and attributed, and the day a unit carries
+    /// on from is worked out rather than asked for. The test is green, so this
+    /// list is load-bearing from here on — an entry that stops being a
+    /// departure now fails it.</para>
     /// </remarks>
     private static readonly Dictionary<string, string> SeparatorHere = new(StringComparer.Ordinal)
     {
@@ -556,6 +557,74 @@ public class AssistSurfaceContractTests
     }
 
     /// <summary>
+    /// Every plan twin the confirmation gate runs can MARK its answer as a
+    /// plan.
+    /// </summary>
+    /// <remarks>
+    /// <para>A tool that returns a bare <c>string</c> cannot carry
+    /// <c>_meta</c>, so <see cref="AssistToolAnswer.IsPlanKey"/> never reaches
+    /// the window — and <c>AssistAgent.ShowPlan</c> reads an unmarked answer
+    /// as a REFUSAL: it prints the plan and never offers Go. The write it was
+    /// gating then cannot be run from the app at all.</para>
+    ///
+    /// <para><b>Invisible to every other kind of test</b>, which is why this
+    /// one is structural. Claude Code reads the WORDS and is perfectly happy
+    /// with a plain string; so is any test that asserts on the plan's text.
+    /// <c>plan_make_room_for_classes</c> shipped that way and only mattered
+    /// the day <c>make_room_for_classes</c> gained a fixed phrasing and an
+    /// entry in <c>PlanTwins</c> (issue #70). The return TYPE is the honest
+    /// check: it is the thing that makes the mark possible.</para>
+    ///
+    /// <para><b>It walks the CONTRACT's twins as well as this app's map, and
+    /// the difference is the whole point.</b> Checking only
+    /// <c>AssistAgent.PlanTwins</c> asks "is anything broken that we already
+    /// gate?", which is a question about today. The defect above was invisible
+    /// for exactly as long as nothing routed to it, so a test that waits for
+    /// the map to name a tool waits until the damage is possible.
+    /// <c>plan_add_classes</c> was the next one along: a contract twin, still
+    /// returning a bare string, one fixed phrasing away from the same
+    /// failure.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryPlanTwinTheGateRunsCanSayItIsAPlan()
+    {
+        var served = ServedTools();
+        var unmarkable = new List<string>();
+
+        var twins = new Dictionary<string, string>(AssistAgent.PlanTwins, StringComparer.OrdinalIgnoreCase);
+        foreach (var (write, twin) in ContractLoader.LoadJson("assist-cases.json")!["tools"]!["planTwins"]!.AsObject())
+            twins[write] = twin!.ToString();
+        Assert.NotEmpty(twins);
+
+        foreach (var (write, twin) in twins)
+        {
+            // A twin the contract names and this server does not serve is
+            // another test's business — this one is about SHAPE.
+            if (!served.TryGetValue(twin, out var method)) continue;
+
+            // An async tool is just as able to mark its answer, so the check
+            // is on what it eventually RETURNS, not on whether it awaits.
+            var returns = method.ReturnType;
+            if (returns.IsGenericType && returns.GetGenericTypeDefinition() == typeof(Task<>))
+                returns = returns.GetGenericArguments()[0];
+
+            if (returns != typeof(CallToolResult))
+                unmarkable.Add($"{twin} (the twin of {write}) returns {method.ReturnType.Name}");
+        }
+
+        Assert.True(unmarkable.Count == 0,
+            "These plan twins cannot mark their answer as a plan, so the window reads it as a " +
+            "refusal and never offers Go — the write behind each becomes unrunnable from the app " +
+            "the moment anything routes to it: " + string.Join("; ", unmarkable) + ".");
+
+        // And every twin the gate DOES run has to exist here, which is the
+        // other way this can be wrong.
+        foreach (var (write, twin) in AssistAgent.PlanTwins)
+            Assert.True(served.ContainsKey(twin),
+                $"{write} is gated behind \"{twin}\", and this server does not serve it.");
+    }
+
+    /// <summary>
     /// Every argument a card phrasing sets is an argument the tool it routes to
     /// actually DECLARES.
     ///
@@ -583,12 +652,11 @@ public class AssistSurfaceContractTests
         var missing = new List<string>();
         var stillDropped = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var phrasing in doc["cardPhrasings"]!["matches"]!.AsArray())
+        void Check(string typed)
         {
-            string typed = phrasing!["phrasing"]!.ToString();
             var matched = AssistCardCommand.Matching(typed);
-            if (matched is null) continue;   // the phrasing itself is another test's business
-            if (!served.TryGetValue(matched.ToolName, out var method)) continue;
+            if (matched is null) return;   // the phrasing itself is another test's business
+            if (!served.TryGetValue(matched.ToolName, out var method)) return;
 
             var takes = method.GetParameters()
                 .Select(p => p.Name!)
@@ -602,6 +670,19 @@ public class AssistSurfaceContractTests
                 missing.Add($"“{typed}” sets \"{key}\" and {matched.ToolName} does not take it");
             }
         }
+
+        foreach (var phrasing in doc["cardPhrasings"]!["matches"]!.AsArray())
+            Check(phrasing!["phrasing"]!.ToString());
+
+        // The PARSED families too, which this walked past until 2026-09-09.
+        // They are the half where an argument is most easily misnamed, because
+        // it is built in code from a number rather than written out beside the
+        // sentence — and `make_room_for_classes`, whose three are `unit`,
+        // `atDay` and `howMany`, is the most dangerous tool on the surface.
+        // A dropped `atDay` there would make room at the wrong day and rename
+        // a run of the teacher's pages to prove it.
+        foreach (var family in doc["cardPhrasings"]!["parsed"]!.AsArray())
+            Check(family!["example"]!.ToString());
 
         Assert.True(missing.Count == 0,
             "These card arguments are dropped on the way to the tool, silently: " +
@@ -634,6 +715,24 @@ public class AssistSurfaceContractTests
         // section to every tool it can reach, and these two are simply surplus.
         ["undo_last_change.course"] = "the undo history is per conversation, so the argument is surplus",
         ["undo_last_change.section"] = "the undo history is per conversation, so the argument is surplus",
+
+        // HARMLESS for the same reason, and MEASURED rather than assumed.
+        // Driving the real plantoir-mcp.exe over stdio (ModelContextProtocol
+        // 2.2.0) with both keys present, `list_courses` answered with the
+        // folder's three courses and `IsError` was false. `list_courses` is
+        // about the FOLDER, so a course and a section are nothing it could
+        // use; `back_up_course` copies a whole course, sections and all.
+        ["list_courses.course"] = "list_courses is about the folder, so both are surplus",
+        ["list_courses.section"] = "list_courses is about the folder, so both are surplus",
+
+        // NOT harmless, and listed for exactly that reason — the way #116 was
+        // carried here until it was fixed. "Duplicate Unit 3, Day 2 as my next
+        // class" is offered by the prompt shelf and pinned by the contract,
+        // and add_next_class has no `duplicate` parameter at all: the binder
+        // drops it and the teacher gets a BLANK next class where they asked
+        // for a copy of a lesson. Issue #149 builds it; delete this entry then,
+        // which the check below insists on.
+        ["add_next_class.duplicate"] = "issue #149 — the tool cannot duplicate a page yet",
 
         // Issue #116 was here — the eight publish_class_on phrasings sending
         // `when` at a tool that takes `date`. Fixed 2026-09-09:

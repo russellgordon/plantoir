@@ -1224,9 +1224,18 @@ covered by decisions recorded elsewhere.
 set equality in both directions, and it is a good test; it simply pins a
 **different class**. It compares the contract against
 `AssistAgent.ForTheLocalModel` and `.DeploysToStudents`, which is the in-app
-assistant, while the 37 live in `PlantoirTools`. Its `mcpOnly` third compares
-the contract against three names typed inline in the test file. Twelve
+assistant, while the 37 live in `PlantoirTools`. Its `mcpOnly` third compared
+the contract against three names typed inline in the test file, and twelve
 additions went through that gap without a single red test.
+
+**Windows replaced that third on 2026-09-09** (issue #70). Retyping the
+contract's list only ever went red when the CONTRACT moved, and the fix was
+always to retype it — the comparison touched no Windows code at all. It now
+asserts what MCP-only MEANS on this side: nothing the contract calls MCP-only
+may be in `AssistAgent.ForTheLocalModel`, which is what protects the measured
+routing accuracy of the thirteen, and every one of them must still be served by
+`PlantoirTools`, because MCP-only says nothing about whether a teacher may ask
+for it — six of the ten are reached by a fixed phrasing no model ever sees.
 
 **Windows closed it, on the same day and from the other direction.**
 `AssistSurfaceContractTests` (branch `issue/29-windows-contract-case-lists`,

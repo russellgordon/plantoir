@@ -178,9 +178,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                    Destructive = false, Idempotent = true)]
     [Description("Call this FIRST, before doing anything else with a section. It returns a short explanation of " +
                  "what publishing and deploying mean in Plantoir — say it to the teacher word for word. " +
-                 "It only returns the explanation the first time for a given section; after that it says so and " +
-                 "you should get straight on with what they asked. Never re-explain a section you have been told " +
-                 "is already covered.")]
+                 "It only returns the explanation the first time for a given section in this conversation; after " +
+                 "that it says so and you should get straight on with what they asked. Never re-explain a section " +
+                 "you have been told is already covered.")]
     public string ExplainPublishing(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section)
@@ -188,15 +188,18 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var found = workspace.Course(course);
             int number = workspace.Section(found, section);
-            if (Briefing.AlreadyExplained(workspace.FolderPath, found.Code, number))
-                return $"{found.Code} Section {number} has had this explained already. " +
-                       "Don’t repeat it — carry on with what the teacher asked.";
+
+            // Said once per section per CONVERSATION, and the sentence for the
+            // second asking is written for a TEACHER: "what does publishing
+            // mean?" is a fixed phrasing now, matched in code, so the caller
+            // here need not be a model at all.
+            if (workspace.NoteExplainedThisConversation(found.Code, number))
+                return AssistWording.PublishingAlreadyExplained(found.Code, number.ToString());
 
             // The SAME answer a deploy gives, so the briefing cannot promise
             // one destination while the deploy uses another — and a folder is
             // named rather than described, since "the folder you publish into"
             // tells a teacher with two courses nothing at all.
-            Briefing.MarkExplained(workspace.FolderPath, found.Code, number);
             return Briefing.Words(found.Code, number, AssistWorkspace.DestinationOf(found));
         });
 
@@ -483,13 +486,27 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "\n\nThis is the most far-reaching change there is — it renames pages other pages link to — so " +
                  "read the whole plan to the teacher, word for word, and wait. The link count especially: they " +
                  "cannot check that themselves without opening every page in the course.")]
-    public string PlanMakeRoomForClasses(
+    public CallToolResult PlanMakeRoomForClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
         [Description("The day number the new class takes. Existing days from here on are renumbered.")] int atDay,
         [Description("How many classes to make room for. 1 unless the teacher asked for more.")] int howMany = 1)
-        => Guarded(() => workspace.PlanInsertClasses(course, section, unit, atDay, howMany).Describe());
+        // MARKED as a plan, which a bare string is not. Until 2026-09-09 this
+        // returned one, and that was invisible while only an MCP client called
+        // it — Claude Code reads the words either way. Plantoir's own window
+        // does not: AssistAgent.ShowPlan reads an unmarked answer as a REFUSAL,
+        // prints it, and never offers Go. So the moment "make room for a class
+        // at Unit 3, Day 4" became a fixed phrasing with a plan twin, an
+        // unmarked plan would have made the tool unrunnable from the app — a
+        // plan a teacher could read and never accept.
+        => Guarded(() =>
+        {
+            var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
+            return plan.ChangesNothing
+                ? Answering(plan.Describe())
+                : Proposing(plan.Describe());
+        });
 
     [McpServerTool(Name = "make_room_for_classes", Title = "Make room for classes",
                    Destructive = false, Idempotent = false)]
@@ -519,14 +536,24 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "\"add Unit 2 Days 1 through 10\". Dates come from the section's remembered timetable, skipping " +
                  "days already taken by an existing class, so the new unit follows on from the work already there. " +
                  "Show the teacher what it says, word for word, then wait.")]
-    public string PlanAddClasses(
+    public CallToolResult PlanAddClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
-        [Description("How many class pages to add.")] int howMany,
-        [Description("The day number to start at within the unit. 1 unless the earlier days already exist.")]
-        int firstDay = 1)
-        => Guarded(() => workspace.PlanAddClasses(course, section, unit, firstDay, howMany).Describe());
+        [Description("How many class pages to add.")] int howMany)
+        // MARKED, for the reason `plan_make_room_for_classes` is: a bare
+        // string cannot carry the mark, and `AssistAgent.ShowPlan` reads an
+        // unmarked answer as a REFUSAL. `add_classes` is reached by no fixed
+        // phrasing today, so no teacher can meet it — which is exactly the
+        // state the make-room twin was in until the day it gained one.
+        => Guarded(() =>
+        {
+            var plan = workspace.PlanAddClasses(course, section, unit,
+                                                workspace.DayToCarryOnFrom(course, section, unit), howMany);
+            return plan.ChangesNothing
+                ? Answering(plan.Describe())
+                : Proposing(plan.Describe());
+        });
 
     [McpServerTool(Name = "add_classes", Title = "Add class pages", Destructive = false, Idempotent = false)]
     [Description("TEACHERS SAY: \"add five more days to Unit 4\". " +
@@ -539,12 +566,14 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
-        [Description("How many class pages to add.")] int howMany,
-        [Description("The day number to start at within the unit. 1 unless the earlier days already exist.")]
-        int firstDay = 1)
+        [Description("How many class pages to add.")] int howMany)
         => GuardedResult(() =>
         {
-            var plan = workspace.PlanAddClasses(course, section, unit, firstDay, howMany);
+            // Where the unit CARRIES ON from, worked out here rather than
+            // asked of the caller — see AssistWorkspace.DayToCarryOnFrom for
+            // what the argument this replaced got wrong.
+            var plan = workspace.PlanAddClasses(course, section, unit,
+                                                workspace.DayToCarryOnFrom(course, section, unit), howMany);
             return workspace.ApplyAddClasses(plan).Message;
         });
 
@@ -1742,8 +1771,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "Do this before any bulk editing of a course's files — including edits you make directly rather than " +
                  "through these tools. Course folders are not in version control, so a backup is the only undo.")]
     public CallToolResult BackUpCourse(
-        [Description("The course code, for example ICS3U.")] string course)
-        => GuardedResult(() => $"Backed up to {workspace.BackUp(course)}");
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description("The section number, for example 1.")] int section)
+        => GuardedResult(() => AssistWording.BackedUpCourse(
+            workspace.Course(course).Code,
+            System.IO.Path.GetFileName(workspace.BackUp(course, section))));
 
     // ---- Shared ----------------------------------------------------------
 

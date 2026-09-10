@@ -56,6 +56,102 @@ public sealed class InsertClassesTests : IDisposable
                 $"---\ntitle: {titles[i]}\npublish: true\ncreated: {dates[i]}T07:00:00.000-0400\n---\nBody.\n");
     }
 
+    // ---- Reaching it from a fixed phrasing --------------------------------
+
+    /// <summary>
+    /// The plan twin's answer is MARKED as a plan, so the window offers Go.
+    /// </summary>
+    /// <remarks>
+    /// <para>This is the half a unit test could not see until it was asked to.
+    /// <c>plan_make_room_for_classes</c> returned a bare string, and every
+    /// caller that only reads the WORDS — Claude Code, and every test — was
+    /// perfectly happy with it. Plantoir's own window is not:
+    /// <c>AssistAgent.ShowPlan</c> reads an unmarked answer as a REFUSAL,
+    /// prints it and never offers Go. So the moment "make room for a class at
+    /// Unit 3, Day 4" became a fixed phrasing with a plan twin, the tool
+    /// became unrunnable from the app — a plan a teacher could read and never
+    /// accept, with nothing in any suite going red.</para>
+    /// </remarks>
+    [Fact]
+    public void ThePlanTwinsAnswerIsMarkedAsAPlan()
+    {
+        FourClasses();
+
+        var planned = new Plantoir.Mcp.PlantoirTools(Open())
+            .PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 1, howMany: 1);
+
+        Assert.NotEqual(true, planned.IsError);
+        Assert.Equal(true, planned.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>());
+    }
+
+    /// <summary>
+    /// A plan that would change NOTHING is an answer, not a proposal — and so
+    /// is a REFUSAL. Both reach the window unmarked.
+    /// </summary>
+    /// <remarks>
+    /// <para>"Shall I go ahead?" under an explanation of why nothing can be
+    /// done invites a teacher to approve a dead end, so the mark is withheld
+    /// and the window says the sentence instead of offering Go.</para>
+    ///
+    /// <para>The two arrive by different routes and both are checked, because
+    /// the first version of this test only THOUGHT it covered the first one: a
+    /// section with no classes throws <c>AssistRefusal</c> long before a plan
+    /// exists, so it was exercising the refusal path under the other one's
+    /// name. Emptying the timetable instead is what actually reaches
+    /// <c>InsertPlan.ChangesNothing</c> — every later class has to move onto a
+    /// later meeting day, and there are none left to move onto.</para>
+    /// </remarks>
+    [Fact]
+    public void NeitherARefusalNorANoOpIsOfferedForApproval()
+    {
+        var tools = new Plantoir.Mcp.PlantoirTools(Open());
+
+        // A REFUSAL: no pages named "Unit N, Day N", so there is nothing to
+        // make room in.
+        var refused = tools.PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 1, howMany: 1);
+        Assert.Null(refused.Meta?[AssistToolAnswer.IsPlanKey]);
+
+        // A NO-OP: four classes and exactly four class days, so the class that
+        // would be pushed along has nowhere to go and the plan adds, renames
+        // and moves nothing.
+        FourClasses();
+        TimetableMemory.Write(_folder, "ICS3U", 1,
+            new[] { "2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14" }
+                .Select(DateOnly.Parse),
+            "block H", new DateOnly(2026, 8, 14));
+
+        var noop = new Plantoir.Mcp.PlantoirTools(Open())
+            .PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 1, howMany: 1);
+
+        Assert.Null(noop.Meta?[AssistToolAnswer.IsPlanKey]);
+        Assert.Contains("Nothing would change", TextOf(noop));
+    }
+
+    private static string TextOf(ModelContextProtocol.Protocol.CallToolResult result) =>
+        string.Join(" ", result.Content
+            .OfType<ModelContextProtocol.Protocol.TextContentBlock>()
+            .Select(block => block.Text));
+
+    /// <summary>
+    /// The fixed phrasing routes to the tool, fills the three numbers, and is
+    /// gated behind the plan the teacher can still say no to.
+    /// </summary>
+    [Fact]
+    public void TheFixedPhrasingCarriesTheNumbersAndIsGatedBehindItsPlan()
+    {
+        var matched = AssistCardCommand.Matching("Make room for a class at Unit 3, Day 4.");
+
+        Assert.NotNull(matched);
+        Assert.Equal("make_room_for_classes", matched.ToolName);
+        Assert.Equal("3", matched.Arguments["unit"]);
+        Assert.Equal("4", matched.Arguments["atDay"]);
+        Assert.Equal("1", matched.Arguments["howMany"]);
+
+        // Without this entry the riskiest tool on the surface would be the one
+        // card that ran with nothing shown first.
+        Assert.Equal("plan_make_room_for_classes", AssistAgent.PlanTwins["make_room_for_classes"]);
+    }
+
     // ---- What it plans ----------------------------------------------------
 
     [Fact]

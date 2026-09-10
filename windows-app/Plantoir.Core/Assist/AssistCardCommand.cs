@@ -12,6 +12,30 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
     private static readonly Dictionary<string, (string Tool, Dictionary<string, string> Args)> FixedShapes =
         new(StringComparer.OrdinalIgnoreCase)
         {
+            // The publish/deploy distinction, on demand. The local model is
+            // told it every turn in its system prompt and a teacher never was
+            // — the shelf explains what the assistant can DO, not what its
+            // words mean.
+            //
+            // `explain_publishing` is MCP-only, and this is the point issue
+            // #70 makes generally: MCP-only means the local MODEL is not SHOWN
+            // a tool, which is what keeps routing accuracy at the measured
+            // thirteen. It says nothing about whether a teacher may ask for
+            // it. A fixed phrasing is compared in code and never reaches a
+            // model, so adding one costs the router nothing.
+            ["what does publishing mean?"] = ("explain_publishing", new()),
+            ["what is the difference between publishing and deploying?"] = ("explain_publishing", new()),
+
+            // A copy before a big edit. No arguments: the assistant window is
+            // scoped to one course, so the only course it could mean is that
+            // one.
+            ["back up this course"] = ("back_up_course", new()),
+
+            // Answered for a teacher who is looking at one section and wants
+            // to know what else is in the folder.
+            ["what courses do i have?"] = ("list_courses", new()),
+            ["list my courses"] = ("list_courses", new()),
+
             ["what would students see in this section right now?"] = ("check_section", new()),
             ["what do students see right now?"] = ("check_section", new()),
             ["preview"] = ("rebuild_preview", new()),
@@ -87,7 +111,68 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
 
         if (WholeUnit(tidied) is { } unit) return unit;
         if (MoreDays(tidied) is { } more) return more;
+        if (MakeRoom(tidied) is { } room) return room;
         return DuplicateClass(tidied, message);
+    }
+
+    /// <summary>
+    /// "Make room for a class at Unit 3, Day 4", and the same with a count.
+    /// </summary>
+    /// <remarks>
+    /// <para>PARSED rather than listed, because the sentence is a fixed frame
+    /// with two numbers and a count in it and no judgement anywhere. Reading an
+    /// integer off a fixed shape is not something anybody needs a language
+    /// model for — and this tool is MCP-only, so no local model is shown it at
+    /// all. Without a phrasing here the sentence would reach a model that has
+    /// never heard of the tool.</para>
+    ///
+    /// <para><b>The count and the noun must agree, and that half is the point.</b>
+    /// "Make room for two class at Unit 3, Day 4" is a sentence somebody typed
+    /// carelessly rather than one of these shapes, and this tool RENAMES pages
+    /// the teacher's links point at. Guessing which half they meant — two
+    /// classes, or one — is exactly what a fixed shape exists to avoid, so a
+    /// disagreement refuses and the sentence goes to the model instead.</para>
+    /// </remarks>
+    private static AssistCardCommand? MakeRoom(string tidied)
+    {
+        const string opening = "make room for ";
+        if (!tidied.StartsWith(opening, StringComparison.Ordinal)) return null;
+
+        // The comma in "Unit 3, Day 4" is punctuation in the FRAME rather than
+        // part of any value, so it goes before the words are counted.
+        string[] words = tidied[opening.Length..]
+            .Replace(',', ' ')
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        // <count> class|classes at unit <unit> day <day>
+        if (words.Length != 7) return null;
+        if (words[2] != "at" || words[3] != "unit" || words[5] != "day") return null;
+        if (words[1] != "class" && words[1] != "classes") return null;
+
+        // "a class" is how a teacher writes one of them, and it is the form
+        // the tool's own description and the issue both use as the example.
+        // Taken HERE and not in SpelledNumbers, because "add a more days to
+        // unit 4" is not a sentence — the article belongs to this frame only.
+        int howMany;
+        if (words[0] == "a") howMany = 1;
+        else if (SpelledNumbers.TryGetValue(words[0], out int spelled)) howMany = spelled;
+        else if (!int.TryParse(words[0], NumberStyles.None, CultureInfo.InvariantCulture, out howMany)) return null;
+
+        if (howMany <= 0) return null;
+        if (!int.TryParse(words[4], NumberStyles.None, CultureInfo.InvariantCulture, out int unit) || unit <= 0)
+            return null;
+        if (!int.TryParse(words[6], NumberStyles.None, CultureInfo.InvariantCulture, out int day) || day <= 0)
+            return null;
+
+        // A plural count with a singular noun, or the reverse.
+        if ((howMany == 1) != (words[1] == "class")) return null;
+
+        return new AssistCardCommand("make_room_for_classes", new Dictionary<string, string>
+        {
+            ["unit"] = unit.ToString(CultureInfo.InvariantCulture),
+            ["atDay"] = day.ToString(CultureInfo.InvariantCulture),
+            ["howMany"] = howMany.ToString(CultureInfo.InvariantCulture),
+        });
     }
 
     private static AssistCardCommand? WholeUnit(string tidied)

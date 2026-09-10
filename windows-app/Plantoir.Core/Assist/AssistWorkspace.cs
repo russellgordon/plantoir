@@ -61,6 +61,38 @@ public sealed class AssistWorkspace
     private readonly Dictionary<string, string> _conversationBackups = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// The sections this conversation has already been told what publishing
+    /// means, as <c>CODE/N</c>. Lives beside <see cref="_conversationBackups"/>
+    /// and for the same span, which is the same span the mac's
+    /// <c>sectionsToldWhatPublishingMeans</c> lives for.
+    /// </summary>
+    private readonly HashSet<string> _sectionsToldWhatPublishingMeans = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Note that this section has now had the briefing, and say whether it
+    /// had already had it BEFORE this call.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Per conversation, not per folder — changed 2026-09-09.</b>
+    /// This used to be a marker file under <c>courses/.internal/assist/</c>,
+    /// so a section briefed once was never briefed again on that machine.
+    /// That was defensible while a MODEL was the only caller: it is the model
+    /// the repetition would bore, and a model cannot repeat itself after its
+    /// session has ended anyway.</para>
+    ///
+    /// <para>A fixed phrasing changed the question. "What does publishing
+    /// mean?" is now matched in code and reaches this tool directly, so the
+    /// caller is a TEACHER asking a question — and a file on disk meant the
+    /// answer arrived once per working folder, ever, with every later asking
+    /// brushed off. Answering a question with "I explained that before" is
+    /// refusing to answer it. A conversation cannot repeat itself after it has
+    /// ended, and a teacher back a month later may genuinely have forgotten,
+    /// so the smaller promise is the right one.</para>
+    /// </remarks>
+    public bool NoteExplainedThisConversation(string courseCode, int sectionNumber) =>
+        !_sectionsToldWhatPublishingMeans.Add($"{courseCode}/{sectionNumber}");
+
+    /// <summary>
     /// The copy saved before this conversation's FIRST change, or null while
     /// it has only read. What "Restore Section N…" puts back. The most recent
     /// one when a session unlocked to a course has changed several.
@@ -2307,10 +2339,26 @@ public sealed class AssistWorkspace
     }
 
     /// <summary>A whole-course backup, on its own.</summary>
-    public string BackUp(string courseCode)
+    /// <remarks>
+    /// <para><b>Attributed to the ASSISTANT, which is what the section is
+    /// for.</b> Left to default, <see cref="CourseArchiver.BackUpCourse"/>
+    /// records <see cref="BackupMaker.DefaultTeacher"/> — so the Backups list
+    /// says "made by you" about a copy the teacher never made, and, worse,
+    /// <see cref="CourseArchiver.PruneBackups"/> deliberately skips anything
+    /// that is not the assistant's. A session following this tool's own advice
+    /// to back up "before any bulk editing" would write a whole-course zip
+    /// every time and none of them would ever be cleared;
+    /// <see cref="CourseArchiver.MostBackupsKept"/> exists precisely to stop
+    /// that. The mac takes the section for the same reason, and
+    /// <c>contracts/assist-cases.json</c> has required it of both since the
+    /// tool arrived.</para>
+    /// </remarks>
+    public string BackUp(string courseCode, int sectionNumber)
     {
         var course = Course(courseCode);
-        return Relative(CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)));
+        int number = Section(course, sectionNumber);
+        return Relative(CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
+                                                    new BackupMaker.Assistant(number)));
     }
 
     // ---- Helpers ---------------------------------------------------------
@@ -2842,6 +2890,44 @@ public sealed class AssistWorkspace
     /// next seven days this class actually meets rather than the next seven
     /// days in the calendar. A teacher should never have to work that out.
     /// </summary>
+    /// <summary>
+    /// The day number a unit's next class takes: one past the highest day that
+    /// already EXISTS in it, or 1 for a unit with no pages yet.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Worked out rather than asked for, since 2026-09-09.</b>
+    /// <c>add_classes</c> and <c>plan_add_classes</c> used to take a
+    /// <c>firstDay</c> argument described as "1 unless the earlier days
+    /// already exist" — a question the caller could only answer by going and
+    /// looking at the section, and one it could get wrong. Left at its
+    /// default, "add five more days to Unit 4" on a unit that already has
+    /// Days 1–3 planned Days 1–5, reported three of them as already there,
+    /// and created TWO pages for a teacher who asked for five.</para>
+    ///
+    /// <para>Counted from the pages on disk, published or NOT: a class a
+    /// teacher has written and not yet shown anybody is still a day of the
+    /// course, and numbering over it would collide with a real file. The mac
+    /// has never taken the argument, and
+    /// <c>contracts/assist-cases.json</c> describes neither tool as having
+    /// one — an argument nobody can get wrong beats one with a sensible
+    /// default. See issue #70.</para>
+    /// </remarks>
+    public int DayToCarryOnFrom(string courseCode, int sectionNumber, int unit)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+
+        int highestDay = 0;
+        foreach (string page in ClassPages(course, section))
+        {
+            string title = Path.GetFileNameWithoutExtension(page) ?? "";
+            if (UnitDay.Parse(title, course.Configuration.UnitWord) is { } found
+                && found.Unit == unit && found.Day > highestDay)
+                highestDay = found.Day;
+        }
+        return highestDay + 1;
+    }
+
     public NewClassesPlan PlanAddClasses(string courseCode, int sectionNumber, int unit,
                                          int firstDay, int count)
     {
@@ -2931,15 +3017,8 @@ public sealed class AssistWorkspace
         var existingTitles = existing.Select(p => Path.GetFileNameWithoutExtension(p) ?? "").ToList();
 
         if (days is { } howMany && howMany > 0 && int.TryParse(unitAsked, out int specificUnit))
-        {
-            int highestDay = 0;
-            foreach (var t in existingTitles)
-            {
-                if (UnitDay.Parse(t, course.Configuration.UnitWord) is { } ud && ud.Unit == specificUnit && ud.Day > highestDay)
-                    highestDay = ud.Day;
-            }
-            return PlanAddClasses(courseCode, sectionNumber, specificUnit, highestDay + 1, howMany);
-        }
+            return PlanAddClasses(courseCode, sectionNumber, specificUnit,
+                                  DayToCarryOnFrom(courseCode, sectionNumber, specificUnit), howMany);
 
         bool startingANewUnit = string.Equals(unitAsked, "next", StringComparison.OrdinalIgnoreCase);
         UnitDay next = startingANewUnit

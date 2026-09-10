@@ -51,6 +51,12 @@ public sealed class NewClassesTests : IDisposable
     private string ClassPath(string title) =>
         Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", title + ".md");
 
+    /// <summary>A class page already on disk, dated, shown to students or not.</summary>
+    private void Written(string title, string date, bool published) =>
+        File.WriteAllText(ClassPath(title),
+            $"---\ntitle: {title}\npublish: {(published ? "true" : "false")}\n" +
+            $"created: {date}T07:00:00.000-0400\n---\nBody.\n");
+
     // ---- Refusing for a good reason --------------------------------------
 
     [Fact]
@@ -239,5 +245,51 @@ public sealed class NewClassesTests : IDisposable
             Assert.Throws<AssistRefusal>(() => Open().PlanAddClasses("ICS3U", 1, 0, 1, 1)).Message);
         Assert.Contains("at least one class",
             Assert.Throws<AssistRefusal>(() => Open().PlanAddClasses("ICS3U", 1, 1, 1, 0)).Message);
+    }
+
+    // ---- Where a unit carries on from ------------------------------------
+
+    /// <summary>
+    /// Asking for five more days on a unit that already has three gives FIVE.
+    /// </summary>
+    /// <remarks>
+    /// <para>The story behind dropping <c>add_classes</c>' <c>firstDay</c>
+    /// argument (issue #70). It defaulted to 1 and was described as "1 unless
+    /// the earlier days already exist" — a question the caller could only
+    /// answer by going and looking. Left at its default this planned Days 1–5,
+    /// reported three of them as already there, and created TWO pages for a
+    /// teacher who asked for five.</para>
+    ///
+    /// <para>Counted from the pages on disk, published or NOT: a class a
+    /// teacher has written and not yet shown anybody is still a day of the
+    /// course, and numbering over it would collide with a real file.</para>
+    /// </remarks>
+    [Fact]
+    public void AddingMoreDaysCarriesOnFromTheDaysTheUnitAlreadyHas()
+    {
+        RememberTenDates();
+        Written("Unit 2, Day 1", "2026-09-08", published: true);
+        Written("Unit 2, Day 2", "2026-09-10", published: true);
+        Written("Unit 2, Day 3", "2026-09-12", published: false);   // written, not yet shown
+
+        var workspace = Open();
+        Assert.Equal(4, workspace.DayToCarryOnFrom("ICS3U", 1, unit: 2));
+
+        var plan = workspace.PlanAddClasses("ICS3U", 1, 2,
+            workspace.DayToCarryOnFrom("ICS3U", 1, unit: 2), count: 5);
+
+        Assert.Equal(new[] { "Unit 2, Day 4", "Unit 2, Day 5", "Unit 2, Day 6",
+                             "Unit 2, Day 7", "Unit 2, Day 8" },
+                     plan.Classes.Select(c => c.Title));
+        Assert.Empty(plan.AlreadyThere);
+    }
+
+    /// <summary>A unit with no pages yet starts at Day 1.</summary>
+    [Fact]
+    public void AUnitWithNoPagesStartsAtDayOne()
+    {
+        Written("Unit 2, Day 1", "2026-09-08", published: true);
+
+        Assert.Equal(1, Open().DayToCarryOnFrom("ICS3U", 1, unit: 7));
     }
 }
