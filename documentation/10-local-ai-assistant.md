@@ -345,7 +345,10 @@ in Part 5 — some of those are perfect because they are not questions.
 ### The dateline, and why its position is a finding
 
 A model has no clock. Every message the teacher sends therefore carries
-`(Today is 2026-08-15, a Saturday.)` — **appended**, never prepended. That is
+`(Today is 2026-08-15, a Saturday.)` — **appended**, never prepended, and
+built from the day the TOOLS are counting from (`dateline(on: tools.today)`)
+rather than from a reading of its own, so that one process cannot hold two
+answers to what today is. See "The mac's half" below for why that matters. That is
 not a style choice: prepending the same sentence cost 15 points of routing
 accuracy in measurement, and the effect reproduced on a second model. A line
 of context at the front appears to compete with the instruction for the
@@ -2111,9 +2114,22 @@ remembered class dates in the machine's calendar and `TimetableMemory.Read`
 parses them back with `InvariantCulture`, so on a Thai-locale machine every
 date a teacher remembered lands 543 years in the future and nothing reports a
 fault. That sweep is its own piece of work, with its own review: [issue
-#144](https://github.com/russellgordon/plantoir/issues/144). The mac is immune
-by construction — `CalendarDay.text` is `String(format: "%04d-%02d-%02d", …)`,
-three integers and no calendar.
+#144](https://github.com/russellgordon/plantoir/issues/144). **`CalendarDay`
+is immune by construction** — `.text` is `String(format: "%04d-%02d-%02d", …)`,
+three integers and no calendar — **but the mac is not, and this line used to
+say it was.** Two `DateFormatter`s in mac product code set a `dateFormat` and
+pin no locale, so they render in the machine's default calendar:
+`CourseArchiver.timestampedName`, which builds archive and backup FILENAMES,
+and `ArchivedItem.date(fromStamp:)`, which reads them back. On the Thai-locale
+machine measured above, a mac writes `ICS3U_2569-08-09_141530.zip` against a
+form `contracts/course-management.json` pins as `yyyy-MM-dd_HHmmss`. Symmetric
+on one machine and broken between two, which is why nobody has met it. Two
+files, not a sweep, and with a migration in it — the reader must go on
+accepting the old spelling or a teacher's own history vanishes from the list
+the day they update: [issue #160](https://github.com/russellgordon/plantoir/issues/160).
+Everywhere else is pinned to `en_US_POSIX`, and the third instance was
+`AssistAgent.dateline()`, fixed below because that line was being rewritten
+anyway.
 
 ### The mac's half: settled where the call is made, and a clock that is read
 
@@ -2180,8 +2196,11 @@ Building it from a `CalendarDay` took the LOCALE out of it as a side effect,
 and that half was a live latent fault rather than tidying: the old version
 asked `DateFormatter` for `EEEE` with no locale pinned, so a French-locale Mac
 would have told the model "a mardi" and a Thai-locale one would have dated it
-2569 — the same trap the Windows section above measured, in the one place on
-this side that was still exposed to it. `CalendarDay` is three integers and
+2569 — the same trap the Windows section above measured, live in the sentence
+the model reads most often. Not the last instance on this side: the audit it
+prompted found two more, in the archive filenames, which are
+[issue #160](https://github.com/russellgordon/plantoir/issues/160) rather than
+this piece, because a durable name cannot be respelled without a migration. `CalendarDay` is three integers and
 `String(format:)`, and its `weekdayName` pins `en_US_POSIX`. The sentence is
 byte-identical on an English machine, so the routing measurements stand and no
 tool description was touched.

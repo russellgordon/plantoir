@@ -75,7 +75,13 @@ final class AssistAgent {
     let planMode: AssistPlanMode
 
     /// The messages actually sent, including tool results.
-    private var messages: [AssistMessage] = []
+    ///
+    /// Readable from a test, not writable: two things about the user message
+    /// are measured findings rather than preferences — the dateline goes on
+    /// the END (prepending it cost 15 points of routing accuracy) and it
+    /// carries the runner's day rather than a second reading of the clock —
+    /// and neither could be asserted while this was private.
+    private(set) var messages: [AssistMessage] = []
 
     /// Where the record of each turn is written. Replaceable so a test can
     /// point it somewhere of its own.
