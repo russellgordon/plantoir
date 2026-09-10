@@ -1946,10 +1946,14 @@ times".
 `date: "tomorrow"` — which `ClassDateHelp` tells it not to, and which a small
 model will sometimes do anyway — the twin and the act each call `DayFor` and
 each read the clock, so the 23:59/00:01 case above still exists on that path.
-It is not closed here because closing it means either steering the model with
-description text (below) or resolving inside `AssistAgent` for arguments the
-model chose, which is a routing change and owes a re-measurement. Worth knowing
-before anybody reads the paragraph above as covering everything.
+It is not closed here because this piece is the card path, and that is the only
+honest reason: normalising a model-supplied `date` inside `AssistAgent` after
+the model has already CHOSEN the tool would cost no routing accuracy at all —
+the model sees nothing of it — and is exactly the "steer with code" move
+recommended below. Cheap, and simply not done yet. Worth knowing before
+anybody reads the paragraph above as covering everything, and before anybody
+talks themselves out of the fix on the grounds that it needs a re-measurement.
+It does not.
 
 **The tool DESCRIPTIONS were deliberately not touched, so no routing
 re-measurement is owed.** `ClassDateHelp` still tells the model to work the
@@ -1996,11 +2000,16 @@ machine's DEFAULT CALENDAR, which is 2569 on a Thai-locale Windows machine
 course has.
 
 **The rule is applied at the boundary this piece owns, and nowhere else.**
-Sixty-six other sites in `windows-app` still render a date with no culture, and
-three of them WRITE one — `PageFrontmatter.cs:187` is the stamp every re-date
-puts into a page's `created:`, so an affected machine would corrupt a section's
-dates durably rather than merely print them oddly. That sweep is its own piece
-of work, with its own review: [issue
+Sixty-six sites in this app's product code still format a date with no culture,
+and several of them WRITE one, which is the half that matters: an affected
+machine would corrupt a section's dates DURABLY rather than merely print them
+oddly. `PageFrontmatter.SetCreated` is the stamp every re-date puts into a
+page's `created:`. `TimetableMemory.Write` is worse again, and is the example
+to keep in mind, because the asymmetry is inside one file: it writes the
+remembered class dates in the machine's calendar and `TimetableMemory.Read`
+parses them back with `InvariantCulture`, so on a Thai-locale machine every
+date a teacher remembered lands 543 years in the future and nothing reports a
+fault. That sweep is its own piece of work, with its own review: [issue
 #144](https://github.com/russellgordon/plantoir/issues/144). The mac is immune
 by construction — `CalendarDay.text` is `String(format: "%04d-%02d-%02d", …)`,
 three integers and no calendar.
