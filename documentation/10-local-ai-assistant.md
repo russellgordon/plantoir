@@ -903,10 +903,10 @@ shows its END (`tooLongForTheSpace`, 2026-09-05 — an iCloud path runs through
 only one that differs between a teacher's folders and it was the one lost), and
 a path that FITS starts beside the label (`fitsInTheSpace`, 2026-09-09, issue
 #145). The second was written four days after the first, because the first
-BROKE it. The mac's bar is a horizontal `ScrollView`; a scroll view fills
-whatever width it is given, so once the content was anchored at the trailing
-edge, a short path was pinned to the far end of the window with the label
-stranded at the other — reported from a screenshot, on every window, for four
+BROKE it. The mac's bar was then a horizontal `ScrollView` (it is the last
+of three forms now — see below); a scroll view fills whatever width it is given,
+so once the content was anchored at the trailing edge, a short path was pinned
+to the far end of the window with the label stranded at the other — reported from a screenshot, on every window, for four
 days.
 
 **The shape of that mistake is worth more than the fix**, because it is not
@@ -914,7 +914,8 @@ about SwiftUI: a greedy container handed an alignment meant for the OVERFLOW
 case applies it just as happily to the case that fits, and the case that fits is
 the ordinary one. The fix is to prefer the natural-size form —
 `ViewThatFits(in: .horizontal)` on the mac, choosing the plain row and falling
-back to the scrolling one. It lives inside `FinderPathBarView` rather than at a
+back — through the collapsed row added the same day, below — to the scrolling
+one. It lives inside `FinderPathBarView` rather than at a
 call site, which matters: the folder picker had already met this and wrapped its
 own copy in a `ViewThatFits`, so the knowledge existed in the repository while
 the window's bar went on being wrong, and a third caller would have inherited
@@ -966,8 +967,10 @@ scrolling. The collapse is checked the same way and indirectly on purpose, which
 makes it stronger: a row that draws no ancestor names cannot change width when
 those names change length, so two paths of the same depth — one with very long
 ancestor names, one with short — must collapse to the SAME width while their
-full rows differ. No amount of truncating or ellipsising would satisfy that,
-since a shortened name still occupies the room it was given.
+full rows differ. What that does NOT exclude, said rather than
+hidden: a fixed-width truncation would pass it, since both paths' ancestors
+would get the same room. What it catches is the regression that would actually
+happen — SwiftUI squeezing the names variably as the space tightens.
 
 **The general lesson, which is why this went unnoticed for months.** An
 affordance that lives ONLY in a context menu is invisible to everything: no

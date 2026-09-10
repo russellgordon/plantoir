@@ -156,20 +156,35 @@ final class PathBarWidthTests: XCTestCase {
         )
     }
 
-    /// A path too long for the space still takes the whole space — that is
-    /// the scrolling form doing its job, and the rule the trailing anchor
+    /// A path too long even to COLLAPSE still takes the whole space — that
+    /// is the scrolling form doing its job, and the rule the trailing anchor
     /// exists for. Without this, "ask for less" could be satisfied by a bar
     /// that never scrolls and clips instead.
+    ///
+    /// The precondition is not decoration. This test was written when the
+    /// form that had to overflow was the FULL row, hundreds of points over
+    /// 320; the collapsed row added for issue #148 is much narrower, so the
+    /// margin is now small enough that a change in icon or chevron metrics
+    /// could let it fit — at which point `ViewThatFits` would rightly draw
+    /// the collapsed row, this would fail, and the failure would read as a
+    /// product bug rather than as a fixture that had gone stale.
     @MainActor
-    func testALongPathStillFillsTheSpaceItIsGiven() {
+    func testAPathTooLongEvenToCollapseStillFillsTheSpaceItIsGiven() {
         let longPath: String = "/Users/teacher/Library/Mobile Documents/com~apple~CloudDocs/Teaching/Course Notes/Semester Two"
         let bar: FinderPathBarView = FinderPathBarView(folderURL: URL(fileURLWithPath: longPath))
-        let measured: CGFloat = measuredWidth(of: bar, proposing: 320)
 
+        XCTAssertGreaterThan(
+            measuredWidth(of: bar.collapsedRow, proposing: 4000), 320,
+            "This fixture now COLLAPSES into 320 points, so it no longer reaches the "
+            + "scrolling form and the assertion below would be testing the wrong form. "
+            + "Deepen the path rather than relaxing the check."
+        )
+
+        let measured: CGFloat = measuredWidth(of: bar, proposing: 320)
         XCTAssertEqual(
             measured, 320, accuracy: 1,
-            "Squeezed to 320 points, a long path claimed \(measured) — it should take the "
-            + "space it is given and scroll inside it, showing its END."
+            "Squeezed to 320 points, a path too long even to collapse claimed \(measured) — "
+            + "it should take the space it is given and scroll inside it, showing its END."
         )
     }
 }
