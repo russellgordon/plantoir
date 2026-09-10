@@ -85,22 +85,52 @@ public sealed class InsertClassesTests : IDisposable
     }
 
     /// <summary>
-    /// A plan that would change NOTHING is an answer, not a proposal.
+    /// A plan that would change NOTHING is an answer, not a proposal — and so
+    /// is a REFUSAL. Both reach the window unmarked.
     /// </summary>
     /// <remarks>
-    /// "Shall I go ahead?" under an explanation of why nothing can be done
-    /// invites a teacher to approve a dead end — so the mark is withheld and
-    /// the window says the sentence instead of offering Go.
+    /// <para>"Shall I go ahead?" under an explanation of why nothing can be
+    /// done invites a teacher to approve a dead end, so the mark is withheld
+    /// and the window says the sentence instead of offering Go.</para>
+    ///
+    /// <para>The two arrive by different routes and both are checked, because
+    /// the first version of this test only THOUGHT it covered the first one: a
+    /// section with no classes throws <c>AssistRefusal</c> long before a plan
+    /// exists, so it was exercising the refusal path under the other one's
+    /// name. Emptying the timetable instead is what actually reaches
+    /// <c>InsertPlan.ChangesNothing</c> — every later class has to move onto a
+    /// later meeting day, and there are none left to move onto.</para>
     /// </remarks>
     [Fact]
-    public void APlanThatChangesNothingIsNotOfferedForApproval()
+    public void NeitherARefusalNorANoOpIsOfferedForApproval()
     {
-        // No classes at all, so there is nothing to make room in.
-        var answered = new Plantoir.Mcp.PlantoirTools(Open())
+        var tools = new Plantoir.Mcp.PlantoirTools(Open());
+
+        // A REFUSAL: no pages named "Unit N, Day N", so there is nothing to
+        // make room in.
+        var refused = tools.PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 1, howMany: 1);
+        Assert.Null(refused.Meta?[AssistToolAnswer.IsPlanKey]);
+
+        // A NO-OP: four classes and exactly four class days, so the class that
+        // would be pushed along has nowhere to go and the plan adds, renames
+        // and moves nothing.
+        FourClasses();
+        TimetableMemory.Write(_folder, "ICS3U", 1,
+            new[] { "2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14" }
+                .Select(DateOnly.Parse),
+            "block H", new DateOnly(2026, 8, 14));
+
+        var noop = new Plantoir.Mcp.PlantoirTools(Open())
             .PlanMakeRoomForClasses("ICS3U", 1, unit: 2, atDay: 1, howMany: 1);
 
-        Assert.Null(answered.Meta?[AssistToolAnswer.IsPlanKey]);
+        Assert.Null(noop.Meta?[AssistToolAnswer.IsPlanKey]);
+        Assert.Contains("Nothing would change", TextOf(noop));
     }
+
+    private static string TextOf(ModelContextProtocol.Protocol.CallToolResult result) =>
+        string.Join(" ", result.Content
+            .OfType<ModelContextProtocol.Protocol.TextContentBlock>()
+            .Select(block => block.Text));
 
     /// <summary>
     /// The fixed phrasing routes to the tool, fills the three numbers, and is
