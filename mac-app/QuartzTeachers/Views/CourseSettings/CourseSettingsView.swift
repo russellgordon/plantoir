@@ -10,6 +10,11 @@ struct CourseSettingsView: View {
     let course: Course
 
     @State var isShowingFoldersHelp: Bool = false
+    @State var isRenamingUnitWord: Bool = false
+
+    /// What the last unit-word rename did, shown under the row until the
+    /// sheet is opened again.
+    @State var unitWordNotice: String? = nil
     @State var saveProblem: String?
     @State var didJustSave: Bool = false
 
@@ -55,6 +60,32 @@ struct CourseSettingsView: View {
                     Picker("Sidebar folders expand when clicking", selection: $configuration.expandOnFolderClick) {
                         Text("Chevron or folder name").tag(true)
                         Text("Chevron only (name opens the folder)").tag(false)
+                    }
+
+                    // NOT a field saved with the form. Changing the word
+                    // renames every class page in the course, so it goes
+                    // through a sheet that shows the plan and commits straight
+                    // away — Save and Revert never touch `unit_word`.
+                    LabeledContent(UnitWordRenameWording.fieldLabel) {
+                        HStack {
+                            Text(configuration.unitWord)
+                                .accessibilityIdentifier("unitWordValue")
+                            Button(UnitWordRenameWording.renameButton) {
+                                unitWordNotice = nil
+                                isRenamingUnitWord = true
+                            }
+                            .accessibilityIdentifier("renameUnitWordButton")
+                        }
+                    }
+                    Text(UnitWordRenameWording.rowCaption(word: configuration.unitWord))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    if let unitWordNotice {
+                        Text(unitWordNotice)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("unitWordNotice")
                     }
                 } header: {
                     FormSectionHeader("Settings — Overall")
@@ -268,6 +299,11 @@ struct CourseSettingsView: View {
                 .help("Edit this course's pages in Obsidian")
                 .sheet(isPresented: $isShowingFoldersHelp) {
                     SpecialFoldersHelpView(course: course)
+                }
+                .sheet(isPresented: $isRenamingUnitWord) {
+                    UnitWordRenameSheet(course: course) { sentence in
+                        unitWordNotice = sentence
+                    }
                 }
                 .accessibilityIdentifier("openCourseInObsidianButton")
             }

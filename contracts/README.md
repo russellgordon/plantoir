@@ -209,6 +209,7 @@ recounted 2026-09-07.
 | Which of a course's OWN folders the build treats specially, and what the sheet says about each | `shared-rules.json` → `specialFoldersHelp` | SpecialFoldersHelpContract (5) on Windows, SpecialFoldersHelpTests (5) on the mac — both sides adopted 2026-09-06 |
 | Which folder holds class pages, and which count | `class-planning.json` → `classFolder` | ClassFolderContractTests (6), and `scripts/test_class_folder.py` |
 | What a course calls a unit | `class-planning.json` → `pageNaming` (the `term` field) and `file-formats.json` → `unit_word` | ClassPageTerm (11), and `scripts/test_class_pages.py` |
+| Renaming that word after the course is in use: which pages move, what refuses it, how links follow, and the order it happens in | `class-planning.json` → `renamingTheUnitWord`; the sentences in `shared-rules.json` → `specialNames.renameUnitWord`; the trail line in `activityTrail.mustRecord` | ClassPlanningContractTests (3), SharedRulesContractTests (1), UnitWordRenamerTests (19) on the mac — added 2026-09-10, [#100](https://github.com/russellgordon/plantoir/issues/100); Windows goes red until it implements them |
 | Whether a deploy must build first | `app-rules.json` → `buildFreshness` | BuildFreshness (6) |
 | Preview ports and the websocket offset | `app-rules.json` → `previewPorts` | PreviewLease (7) |
 | The browser-safe address | `app-rules.json` → `linkRules` | BrowserSafeURL (2) |
@@ -363,7 +364,8 @@ each lives only in the mac's Swift, and each is one a port has to word for
 itself — so word it deliberately rather than discovering the gap:
 
 - **`ClassPageTerm.problem(with:)`** — the two wizard refusals for a unit word
-  containing a digit or a comma.
+  containing a digit or a comma. (The rename sheet reuses them; every OTHER
+  sentence it shows is in `specialNames.renameUnitWord`.)
 - **`SpecialFolderRenamer.rename`'s half-failure sentence** — "Plantoir renamed
   N of M copies of 'X' and then could not rename the one in section3: …". The
   SHAPE is what matters and is worth copying: the count moved, and the section
