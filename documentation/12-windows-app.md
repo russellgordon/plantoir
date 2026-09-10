@@ -1410,8 +1410,12 @@ Five things about it are decisions rather than details.
   "the app is open" when the app is not open at all. `AssistSurfaceContractTests`
   made the same trade. The binder drops an argument the tool does not declare,
   as the SDK's own binder does — `AssistAgent.RunTool` sets `preview` on tools
-  that do not all take it — but an argument that IS declared and cannot be
-  converted throws, because a runner that quietly drops one is #141 again.
+  that do not all take it — but everything else about it fails LOUDLY, because
+  a runner that quietly drops an argument is #141 again: a declared argument
+  that cannot be converted throws, a required one nobody sent throws rather
+  than binding `null`, and names are matched case-SENSITIVELY, since the
+  object the server really receives is a case-sensitive JSON object and a case
+  sending `Course` must not pass here while failing on the wire.
 - **A "write" is noted when the watched page changes ON DISK**, not when the
   tool is called. `FakeSectionWindow` mirrors the mac's `FakePreview`: the order
   is the assertion, and stopping, writing and starting can all happen and still
