@@ -176,13 +176,18 @@ final class BackupTests: XCTestCase {
     /// deleted — because this list is sorted by date before its tail is
     /// thrown away.
     ///
-    /// The name here is what a Buddhist-calendar Mac wrote before 2026-09-10,
-    /// carried to this one in a working folder. Nothing can tell that 2569
-    /// was ever meant to be 2026 — reading it as Buddhist would mean deciding
-    /// another machine's calendar on its behalf — so it keeps the date it
-    /// has, and sorts as the newest thing in the folder. Counted, it would
-    /// take one of the five kept places and push a real backup out of the
-    /// list and off the disk.
+    /// In the wild this is a zip carried here from a Mac whose calendar is
+    /// not Gregorian: one made before 2026-09-10 on a Thai Mac is stamped
+    /// 2569, nothing can tell it was ever meant to be 2026, and it sorts as
+    /// the newest thing in the folder. Counted, it would take one of the five
+    /// kept places and push a real backup out of the list and off the disk.
+    ///
+    /// The fixture uses a stamp NO calendar can explain rather than that
+    /// Thai name, and the difference matters: `BackupItem.from` reads through
+    /// `Locale.current`, so on a Thai Mac — the very machine this is about —
+    /// 2569 reads back as an ordinary 2026 and the case would quietly stop
+    /// being the case. `ArchiveStampTests` covers the calendar-by-calendar
+    /// readings, where the machine can be named instead of assumed.
     @MainActor
     func testABackupWhoseStampCannotBeTrueIsNeitherCountedNorDeleted() throws {
         let fixture: BackupFixture = try BackupFixture()
@@ -194,16 +199,20 @@ final class BackupTests: XCTestCase {
             .appendingPathComponent("ICS3U")
         try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
 
-        let carriedOver: String = "ICS3U_backup_2569-08-09_141530_assistant-section1.zip"
+        let cannotBeTrue: String = "ICS3U_backup_9999-12-31_235959_assistant-section1.zip"
+
+        // SIX real ones, one more than is kept, so the pruning loop actually
+        // runs. With five it returns early and the test would prove nothing
+        // about what gets deleted.
         var assistantNames: [String] = []
-        for daysAgo in 1...5 {
+        for daysAgo in 1...6 {
             assistantNames.append(
                 "ICS3U_backup_\(BackupTests.stamp(daysAgo: daysAgo))_assistant-section1.zip"
             )
         }
 
         var namesToPlant: [String] = assistantNames
-        namesToPlant.append(carriedOver)
+        namesToPlant.append(cannotBeTrue)
         for name in namesToPlant {
             try Data("planted".utf8).write(to: folderURL.appendingPathComponent(name))
         }
@@ -212,18 +221,26 @@ final class BackupTests: XCTestCase {
             forCourseCode: "ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL
         )
 
-        for name in assistantNames {
+        // The five newest REAL ones survive, and the sixth — genuinely the
+        // oldest — is the one that went. Counted, the unreadable stamp would
+        // have sorted newest and taken a real one's place, which is the whole
+        // point of leaving it out.
+        for index in 0...4 {
             XCTAssertTrue(
-                fileManager.fileExists(atPath: folderURL.appendingPathComponent(name).path),
-                "\(name) is one of the five real backups and must survive"
+                fileManager.fileExists(atPath: folderURL.appendingPathComponent(assistantNames[index]).path),
+                "\(assistantNames[index]) is among the five newest and must survive"
             )
         }
+        XCTAssertFalse(
+            fileManager.fileExists(atPath: folderURL.appendingPathComponent(assistantNames[5]).path),
+            "\(assistantNames[5]) is genuinely the oldest, and pruning is still meant to happen"
+        )
         XCTAssertTrue(
-            fileManager.fileExists(atPath: folderURL.appendingPathComponent(carriedOver).path),
+            fileManager.fileExists(atPath: folderURL.appendingPathComponent(cannotBeTrue).path),
             "A backup with an unreadable date is still the teacher's, and is not ours to delete"
         )
         XCTAssertNotNil(
-            BackupItem.from(fileURL: folderURL.appendingPathComponent(carriedOver), courseCode: "ICS3U"),
+            BackupItem.from(fileURL: folderURL.appendingPathComponent(cannotBeTrue), courseCode: "ICS3U"),
             "…and it goes on being listed, so they can restore or delete it themselves"
         )
     }

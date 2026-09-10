@@ -2210,9 +2210,11 @@ asked `DateFormatter` for `EEEE` with no locale pinned, so a French-locale Mac
 would have told the model "a mardi" and a Thai-locale one would have dated it
 2569 — the same trap the Windows section above measured, live in the sentence
 the model reads most often. Not the last instance on this side: the audit it
-prompted found two more, in the archive filenames, which are
+prompted found two more, in the archive filenames, which were
 [issue #160](https://github.com/russellgordon/plantoir/issues/160) rather than
-this piece, because a durable name cannot be respelled without a migration. `CalendarDay` is three integers and
+this piece, because a durable name cannot be respelled without a migration —
+fixed the same day, in `ArchiveStamp`, with that migration written
+([09-mac-app.md](09-mac-app.md) → "What an archive or a backup is CALLED"). `CalendarDay` is three integers and
 `String(format:)`, and its `weekdayName` pins `en_US_POSIX`. The sentence is
 byte-identical on an English machine, so the routing measurements stand and no
 tool description was touched.

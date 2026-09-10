@@ -386,8 +386,12 @@ the reader pinned one. Measured here on macOS 26 for 2026-08-09 14:15:30:
 | Ethiopic | `2018-12-03_141530` |
 
 Nothing looked wrong on such a machine, which is why nobody met it: the same
-unpinned formatter wrote and read, so it was symmetric. What was NOT symmetric
-was everything else — the name disagreed with what `contracts/` says Plantoir
+unpinned formatter wrote and read, so it was symmetric — with one measured
+exception, the Chinese calendar, whose `yyyy` is a year within a sixty-year
+cycle. It wrote `0043-06-27_141530` for that moment and read its own name back
+as **2595-08-14**. That one was already broken before this fix and is the one
+old spelling the migration below cannot recover; it is also unchanged by it.
+What was NOT symmetric was everything else — the name disagreed with what `contracts/` says Plantoir
 writes, a folder carried to another machine stopped sorting, and the wizard's
 own zip sat in the same folder stamped `2026` in Python's always-Gregorian
 `strftime` while the app's archive beside it said `2569`.
@@ -454,6 +458,11 @@ the list. Machine-first was tried and rejected for exactly that reason.
   the moment it was copied, so it answers confidently and wrongly exactly
   when a folder has been moved between machines, which is the case this is
   all about.
+- **A one-day ceiling on "not in the future".** The stamp is written and read
+  in `TimeZone.current`, so a zip written this morning at UTC+14 and read the
+  same morning at UTC−12 is 26 hours ahead of this Mac's idea of now. Two days
+  costs nothing — no wrong reading of any calendar lands within a year of the
+  ceiling — and one day would have refused a name that is perfectly real.
 
 ### One `if` in the pruner, because a date here is a DELETION key
 
@@ -463,6 +472,25 @@ carried from a Buddhist Mac reads as 2569, which sorts as the newest thing in
 the folder, and counted it would take one of the five places and push a real
 backup off the disk. Left out, it stays listed, and the teacher can restore
 or delete it themselves — the same standing every backup of their own has.
+
+Excluding can only ever DELETE LESS, which is why it is the safe direction and
+why counting-but-not-deleting was not worth the extra rule. It does hand the
+same free pass to a second thing, and this is the cost, stated so nobody has
+to rediscover it: a Mac whose clock is persistently wrong — more than two days
+fast, or set before 2025 after losing time sync — stamps names this test
+refuses, so the assistant's backups of that course stop being pruned and grow
+without bound, which is the disk-filling failure `mostBackupsKept` exists to
+prevent. Bounded in the case that matters (a folder carried from an
+old-calendar Mac holds at most the five that machine kept), unbounded in the
+wrong-clock one. Accepted deliberately: the alternative is deleting a zip
+whose date is the one thing known to be wrong about it, and the only copy of a
+course is not a good thing to be wrong about.
+
+**A carried-over zip sits at the top of the list**, since both lists sort
+newest first (`WorkspaceModel.findArchivedItems`, `findBackupItems`), and it
+is dated "11 August 2569". That is what a teacher on a Gregorian Mac would
+actually notice, and it is the honest signal that the folder came from
+somewhere else.
 
 ## Reporting a problem
 

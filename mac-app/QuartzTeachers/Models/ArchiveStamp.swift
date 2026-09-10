@@ -6,10 +6,12 @@ import Foundation
 /// **Why this is a type of its own rather than a formatter at each end.**
 /// Three kinds of zip share `courses/_backups/<CODE>/` and the same stamp:
 /// archives (`ArchivedItem`), backups (`BackupItem`) and the setup wizard's
-/// automatic copies. One of them is written here and all three are read here,
-/// so the spelling is settled in ONE place instead of at each end — a writer
-/// and a reader that drift apart is exactly the fault this file was added to
-/// fix. The form itself is contract data, shared with the Windows app:
+/// automatic copies. This writes and reads the first two — the wizard's are
+/// written by `scripts/setup_course.py`, whose `strftime` is Gregorian
+/// always, and are deliberately read by neither parser. So the spelling is
+/// settled in ONE place instead of at each end: a writer and a reader that
+/// drift apart is exactly the fault this file was added to fix. The form
+/// itself is contract data, shared with the Windows app:
 /// [`contracts/course-management.json`](../../../contracts/course-management.json)
 /// → `zipNames`.
 ///
@@ -91,6 +93,10 @@ nonisolated enum ArchiveStamp {
     /// Whether a moment is one Plantoir could have stamped into a name:
     /// after the archive feature existed, and not in the future.
     ///
+    /// A stamp this refuses is still READ — see `moment(from:)` — but it is
+    /// not allowed to decide anything destructive: `CourseArchiver.pruneBackups`
+    /// asks this before sorting by date and throwing the tail away.
+    ///
     /// **This is the whole discriminator, so here is what it is measured
     /// against.** Read as Gregorian, the old spellings land far outside it —
     /// Buddhist 2569 and Hebrew 5786 are in the future, Ethiopic 2018,
@@ -110,8 +116,15 @@ nonisolated enum ArchiveStamp {
         guard let earliest = gregorian.date(from: earliestPossible) else {
             return false
         }
-        let oneDay: TimeInterval = 24 * 60 * 60
-        return moment >= earliest && moment <= Date().addingTimeInterval(oneDay)
+        // Two days of room at the top, not one. The stamp says what the clock
+        // on the wall said, so a zip written this morning in Kiritimati
+        // (UTC+14) and read the same morning on Baker Island (UTC−12) is 26
+        // hours ahead of this Mac's idea of now. Absurd as travel, ordinary
+        // as a folder in a cloud drive, and the cost of the extra day is
+        // nothing: no wrong reading of any calendar lands within a year of
+        // the ceiling.
+        let twoDays: TimeInterval = 2 * 24 * 60 * 60
+        return moment >= earliest && moment <= Date().addingTimeInterval(twoDays)
     }
 
     /// A formatter for one calendar's spelling of the stamp.
