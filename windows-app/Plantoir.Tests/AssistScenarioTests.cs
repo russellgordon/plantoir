@@ -174,11 +174,11 @@ public class AssistScenarioTests : IDisposable
 
         if (when is "approve" or "decline" or "say")
         {
-            await RunConversation(agent, tools, transcript, given, when, pending);
+            await RunConversation(agent, transcript, given, when, pending);
         }
         else
         {
-            toolAnswer = await RunOneTool(agent, tools, transcript, when);
+            toolAnswer = await RunOneTool(agent, transcript, when);
         }
 
         AssertEvents(scenario, scenarioName);
@@ -271,7 +271,7 @@ public class AssistScenarioTests : IDisposable
     /// <c>saying</c> is absent, one turn is run using whichever fixed phrasing
     /// reaches <c>given.pending</c>.</para>
     /// </summary>
-    private async Task RunConversation(AssistAgent agent, RealTools tools, List<string> transcript,
+    private async Task RunConversation(AssistAgent agent, List<string> transcript,
                                        JsonObject? given, string when, string? pending)
     {
         var conversation = new List<string>();
@@ -331,8 +331,7 @@ public class AssistScenarioTests : IDisposable
         }
     }
 
-    private async Task<AssistToolAnswer> RunOneTool(AssistAgent agent, RealTools tools,
-                                                    List<string> transcript, string when)
+    private async Task<AssistToolAnswer> RunOneTool(AssistAgent agent, List<string> transcript, string when)
     {
         var arguments = new JsonObject { ["course"] = Course, ["section"] = SectionNumber };
         if (when == "unpublish_pages") arguments["pages"] = new JsonArray("Unit 1, Day 1");
@@ -377,9 +376,23 @@ public class AssistScenarioTests : IDisposable
     {
         foreach (var line in lines)
         {
-            transcript.Add(line.Speaker == "tools"
-                ? $"tool({answering}): {line.Text}"
-                : $"{line.Speaker}: {line.Text}");
+            if (line.Speaker != "tools")
+            {
+                transcript.Add($"{line.Speaker}: {line.Text}");
+                continue;
+            }
+            // A tool result this runner cannot name, said plainly rather than
+            // rendered as "tool(): …" for an expectation to fail against
+            // mysteriously. `AssistAgent.CardCommand` matches four shapes of its
+            // OWN — "what would publishing X change?" among them — that never
+            // pass through AssistCardCommand.Matching, so a case built on one
+            // of those arrives here unnamed. The real repair is to put the name
+            // on AssistAgent.Line where the window and the mac both have it,
+            // which is a change to Core rather than to a test.
+            Assert.False(answering.Length == 0,
+                "A tool answered and this runner does not know which one. The phrasing is matched by " +
+                $"AssistAgent's own shapes rather than by AssistCardCommand: “{line.Text}”");
+            transcript.Add($"tool({answering}): {line.Text}");
         }
     }
 
