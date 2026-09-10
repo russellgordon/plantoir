@@ -163,9 +163,11 @@ enum GradedFolderChoices {
 
     /// - Parameter scopeOfChildren: which `excluded_items` scope this
     ///   directory's children are discovered into, or nil where the build
-    ///   discovers nothing — the shared scope directly inside the course, the
-    ///   per-section scope directly inside a section folder, and nothing
-    ///   anywhere deeper.
+    ///   discovers nothing — the shared scope directly inside the course, and
+    ///   the per-section scope directly inside a `sectionN` folder, wherever
+    ///   that section folder was found. Nowhere else: a folder two levels down
+    ///   an ordinary folder is not something the build's preflight scan
+    ///   discovers, so nothing there is excluded by name.
     nonisolated private static func walk(
         _ directory: URL, depth: Int, scopeOfChildren: FolderScope?,
         found: inout [String], excludedShared: [String], excludedPerSection: [String]
