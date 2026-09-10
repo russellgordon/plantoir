@@ -20,19 +20,38 @@ struct FinderPathBarView: View {
     // MARK: - Body
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        // Two forms of the same row, and the one that FITS is preferred.
+        //
+        // A scroll view fills whatever width it is given, so on its own it
+        // takes the whole bar however short the path is — and with the
+        // content anchored at the trailing edge (below), a short path ended
+        // up at the far end of the window from the "Working folder:" label
+        // that introduces it, with the width of a window in between.
+        // Reported from a screenshot 2026-09-09; the folder picker had
+        // already met it and wrapped its own copy in a `ViewThatFits`, so
+        // the behaviour lives HERE now and both callers get it.
+        ViewThatFits(in: .horizontal) {
             pathRow
+            scrollingPathRow
         }
-        // A path too long for the space shows its END, not its start:
-        // the folder itself is the part a teacher is looking for, and the
-        // start ("Macintosh HD › Users › …") is the same for every folder
-        // they own. Seen first with an iCloud Drive folder, whose real path
-        // runs through ~/Library/Mobile Documents/com~apple~CloudDocs and
-        // was cut off before reaching the folder's own name.
-        .defaultScrollAnchor(.trailing)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Folder location: \(folderURL.path)")
         .accessibilityIdentifier("finderPathBar")
+    }
+
+    /// The row when the space is too narrow for it: scrollable, and showing
+    /// its END rather than its start.
+    ///
+    /// The folder itself is the part a teacher is looking for, and the start
+    /// ("Macintosh HD › Users › …") is the same for every folder they own.
+    /// Seen first with an iCloud Drive folder, whose real path runs through
+    /// ~/Library/Mobile Documents/com~apple~CloudDocs and was cut off before
+    /// reaching the folder's own name.
+    var scrollingPathRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            pathRow
+        }
+        .defaultScrollAnchor(.trailing)
     }
 
     /// The icons-names-chevrons row itself (also rendered directly by

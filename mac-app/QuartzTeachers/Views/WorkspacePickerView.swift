@@ -43,17 +43,15 @@ struct WorkspacePickerView: View {
             // empty-folder offer, and before the note about syncing, both
             // of which are about it.
             if let chosenURL = workspace.workspaceURL, workspace.workspaceCanBeInitialized || workspace.needsCloudSyncDecision {
-                // The bar's scroll view greedily fills any width it is
-                // given, pinning a short path to the left of centred
-                // content. At its natural size the stack can centre
-                // it; only a path too long for the cap gets the
-                // full-width scrolling form.
-                ViewThatFits(in: .horizontal) {
-                    FinderPathBarView(folderURL: chosenURL)
-                        .fixedSize(horizontal: true, vertical: false)
-                    FinderPathBarView(folderURL: chosenURL)
-                }
-                .frame(maxWidth: 520)
+                // No `ViewThatFits` wrapper here any more: the bar itself
+                // now prefers its natural size and falls back to the
+                // scrolling form only when the path is too long for the
+                // space, which is what this stack used to arrange for
+                // itself. It moved into FinderPathBarView on 2026-09-09
+                // because the WINDOW's bar had the same need and did not
+                // have the same workaround (issue #145).
+                FinderPathBarView(folderURL: chosenURL)
+                    .frame(maxWidth: 520)
             }
 
             // A folder a cloud service keeps in sync: say so here, where the
