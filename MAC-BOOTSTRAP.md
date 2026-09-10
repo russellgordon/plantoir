@@ -86,9 +86,19 @@ notification, and the diff is only the payload. **Say in it which key moved and
 which of their tests will go red**, the way
 [#70](https://github.com/russellgordon/plantoir/issues/70) did: *"Three more
 card phrasings will make your suite red"*, with the three quoted. That is what
-turns a failure into a task instead of into
-[#146](https://github.com/russellgordon/plantoir/issues/146), which was filed
-reporting that nobody had been told, on a day when somebody had.
+turns a failure into a task.
+
+**Name EVERY key the regeneration moved, not only the one you were building**,
+and this is the half #70 missed. The same commit that added those tools also
+gave `back_up_course` a `section` argument, which travels in `toolSchemas`
+rather than in the feature. Nothing said so. Windows'
+`AssistSurfaceContractTests` reported it exactly — *"must require exactly the
+arguments the contract says it does"* — and its reader had a perfectly clear
+failure and nowhere to look it up, which is half of why
+[#146](https://github.com/russellgordon/plantoir/issues/146) was filed saying
+nobody had been told. A schema change is the easy one to omit precisely because
+it is not the thing you set out to build. `git diff contracts/` before you
+write the issue, and let the diff tell you what to list.
 
 ### 4. Run the tests, and read what they say
 
