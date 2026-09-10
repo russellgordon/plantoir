@@ -498,6 +498,38 @@ than implying every line came off a run. **Nothing here has ever been seen to
 crash its host**; this exists so that if one ever does, it is read correctly
 the first time.
 
+### And when the failure IS real: a red contract test is a handover
+
+Everything above is about telling a genuine failure from a crash or an empty
+run. This is the case where the totals line is honest, the named test really
+did fail, and it is still not what it looks like.
+
+`AssistCardCommandTests`, `AssistSurfaceContractTests` and `ContractTests`
+deserialise `contracts/*.json` and run what they find. Those files are written
+on the mac, so **a failure in one of them usually means the mac moved and this
+side has not followed yet** — not that somebody broke something here this
+afternoon. The mac opens a GitHub issue labelled `windows` in the session it
+changes a contract (`CLAUDE.md` rule 3), so there is already a page naming what
+moved and what this app owes.
+
+**Read the open `windows` issues before filing a new one.** On 2026-09-09 a
+session mid-way through unrelated work met four of these, filed
+[#146](https://github.com/russellgordon/plantoir/issues/146) reporting that a
+contract had moved with nobody told, and
+[#70](https://github.com/russellgordon/plantoir/issues/70) had been open since
+23:52 the previous evening naming all five phrasings and the failure itself —
+*"Three more card phrasings will make your suite red"*. Nothing was wrong with
+the process; the assertions simply said `Assert.NotNull() Failure: Value is
+null` and gave the reader nothing to search for. They name the phrasing, the
+tool and the handover now, which is the durable half of that fix — a session
+that meets one is told where to look without having to remember this page.
+
+Two things it is NOT, both met in the same run: a test that retyped a contract
+value into a literal fails when the contract GROWS, which is this side's own
+bug and no issue elsewhere can name it; and a case proposed FROM here, which
+turns the MAC's suite red on purpose and is a request rather than damage
+([`contracts/README.md`](../contracts/README.md) covers both directions).
+
 ## Driving the real interface
 
 `run-ui-tests.ps1` launches the x64 Debug build and drives it with UI
