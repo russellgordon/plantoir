@@ -2052,6 +2052,10 @@ anybody reads the paragraph above as covering everything, and before anybody
 talks themselves out of the fix on the grounds that it needs a re-measurement.
 It does not.
 
+**Done on the mac on 2026-09-10, and still owed on Windows** — see "The mac's
+half" below, and [issue #159](https://github.com/russellgordon/plantoir/issues/159).
+It cost about forty lines and no re-measurement, exactly as predicted here.
+
 **The tool DESCRIPTIONS were deliberately not touched, so no routing
 re-measurement is owed.** `ClassDateHelp` still tells the model to work the
 date out itself. A tool that has become more forgiving owes the model no
@@ -2110,6 +2114,99 @@ fault. That sweep is its own piece of work, with its own review: [issue
 #144](https://github.com/russellgordon/plantoir/issues/144). The mac is immune
 by construction — `CalendarDay.text` is `String(format: "%04d-%02d-%02d", …)`,
 three integers and no calendar.
+
+### The mac's half: settled where the call is made, and a clock that is read
+
+Written on the mac, 2026-09-10, closing the second half of
+[issue #143](https://github.com/russellgordon/plantoir/issues/143) — the
+finding Windows handed back with the eight cases above. The first half needed
+no code: the mac already passed all thirteen `relativeDays` cases, which is
+what the issue asked it to confirm.
+
+**What was wrong.** `AssistToolRunner` took `today` in its initializer and
+STORED it. The runner is built once per conversation
+(`AssistSession.beginConversation`) and once per `--mcp-stdio` process
+(`AssistMCPServer.serve`), so the day was fixed for the life of both. An
+assistant window left open across midnight resolved "tomorrow" against the day
+the conversation BEGAN — for every request in it, not only one approved across
+the boundary — published the class before the one meant, and said "Published
+the class on …" naming a day the teacher had not asked for. A Claude Code
+session holding the MCP server open for days is the sharper version of the
+same thing. The model-routed path never had the fault, because every message
+carries a fresh dateline, so one long-lived window could answer "publish
+tomorrow's class" and "publish the class tomorrow please" with different days.
+
+**Why the obvious fix is wrong on its own.** Making `today` compute
+`CalendarDay.today()` per use fixes the staleness and breaks something the
+freeze was quietly buying. Plan mode reads ONE arguments object twice — the
+`plan_` twin first, then, if the teacher presses Go, the act — so a word still
+carried at Go time is read a second time against a clock that has moved. A
+plan shown at 23:59 then publishes something else at 00:01. That is the same
+trap Windows met from the other side and wrote down above, and it is why this
+was raised as a decision rather than as a defect with an obvious fix.
+
+**What landed: settle the word once, then read the clock freely.**
+
+- `AssistAgent.withTheDaySettled(_:)` turns the word into the date it means at
+  the moment the call is created, beside the existing `boundToThisSection(_:)`
+  rewrite. Everything downstream — the approval card, the plan twin, and
+  `approvePending` handing the very same call to `execute` — then carries an
+  absolute date, so the plan and the act agree BY CONSTRUCTION rather than by
+  a frozen clock. It covers the model-routed path as well as the card's, which
+  is the fix the Windows write-up above called cheap and not yet done.
+- `AssistToolRunner.today` is a computed property over an injected
+  `() -> CalendarDay`. Nothing captures a date any more, so the two remaining
+  readers — the upcoming-classes summary and `remember_timetable`'s planning —
+  and the whole MCP process are fresh.
+
+**Which argument carries a day is asked of the tool surface**, not of a list
+kept beside the settling code: only a tool that declares a `date` parameter is
+touched, which is `publish_class_on` and its twin today. `schedule_deploy`'s
+`when` is a MOMENT — a day and a time, parsed by `moment(named:)` — and is
+excluded by construction rather than by being remembered, which is the same
+argument `AssistAgent` already makes for asking the surface whether a plan twin
+exists. The card's own spelling `when` is settled for those tools too, but NOT
+renamed to `date`: `AssistCardCommand` is generated into
+`contracts/assist-cases.json` → `cardPhrasings` and both suites assert that
+key. A word the settler cannot read is left exactly as it arrived, so the
+sentence a teacher sees is still the runner's own refusal.
+
+**Against the RUNNER's clock, not the machine's** — `tools.today`, not a second
+`CalendarDay.today()` in the agent. Two clocks in one process is two answers to
+what today is, differing on one night in a thousand, and no test able to pin
+the one a teacher's request actually used. Measured rather than argued: an
+earlier draft read the machine's clock in the agent and turned two existing
+tests into functions of the wall clock, one of them the SHARED contract
+scenario "a plan card is cancelled", whose fixture pins the runner to
+2026-09-08 and writes one class page dated 2026-09-09.
+
+**What this deliberately does NOT do.**
+
+- **Over MCP the twin and the act can still disagree across midnight.** A
+  client calls `plan_publish_class_on` and then `publish_class_on` as two
+  separate requests, each resolving its own words against a now-fresh clock.
+  There is no single moment "the call is created" to settle at, and inventing
+  one would mean the server remembering plans between requests. Windows made
+  the identical trade — `PlantoirTools.Today` is a `Func<DateOnly>` read per
+  call — and the exposure is one minute of one night against a bug that was
+  costing whole days.
+- **`remember_timetable`'s twin pair is left to resolve twice, and that is
+  safe.** `timetablePlan` is shared by the plan and the act, so a fresh clock
+  is read once by each. `today` reaches only `RememberTimetablePlan.recorded`,
+  which no sentence of the plan's description reads back and no
+  `changesNothing` comparison consults — and a stamp recording the day the
+  dates were written is arguably more correct for having moved.
+- **Nothing new goes on the activity trail.** No line has ever recorded which
+  day "tomorrow" became: "assistant matched a fixed phrase" carries the tool
+  name, and "assistant chose a tool" carries argument NAMES and never values,
+  deliberately. Adding the settled date would mean a value on the trail and a
+  `carries` change in `contracts/shared-rules.json` for both platforms. The
+  day is diagnosable without it — after this change it is a function of the
+  "assistant asked" line's own timestamp and the sentence it carries, where
+  before it was a function of when the window opened, which the trail does not
+  record. The published date remains in what the teacher was told
+  ("Published the class on 2026-09-09."), which is why that sentence names the
+  day it settled on rather than the word it was sent.
 
 ### Two things this deliberately did not fix
 
