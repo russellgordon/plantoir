@@ -48,7 +48,9 @@ enum CourseArchiver {
     }
 
     /// Deletes the oldest backups of one course until only
-    /// `mostBackupsKept` are left.
+    /// `mostBackupsKept` of them are left — counting only those whose stamp
+    /// could be true, since the sort that decides which are "oldest" is a
+    /// sort on the date in the file's NAME.
     ///
     /// Only backups: archives (`<CODE>_<timestamp>.zip`) and the setup
     /// wizard's automatic zips (`<timestamp>.zip`) share this folder, and

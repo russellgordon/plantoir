@@ -499,6 +499,15 @@ wrong-clock one. Accepted deliberately: the alternative is deleting a zip
 whose date is the one thing known to be wrong about it, and the only copy of a
 course is not a good thing to be wrong about.
 
+**What a teacher is told about such a copy was left alone**, deliberately.
+`BackupItem.keptDescription` says "The assistant made this one; its five most
+recent are kept" — which is now not quite true of a zip the pruner is skipping.
+Wording it separately would mean a new sentence a teacher reads, with a home
+in the contract and a test, to describe a case that only arises for a folder
+carried from a Mac whose calendar is not Gregorian; the common sentence would
+get worse for everybody so that a rare one could be exact. Written down rather
+than silently decided, so the next person to notice knows it was noticed.
+
 **A carried-over zip sits at one END of the list or the other**, since both
 lists sort newest first (`WorkspaceModel.findArchivedItems`,
 `findBackupItems`), and which end depends on which way that calendar's year
