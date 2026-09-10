@@ -293,7 +293,11 @@ public class AssistScenarioTests : IDisposable
             // The window puts the teacher's own words in the transcript before
             // the agent answers; the agent's lines carry only its half.
             transcript.Add("teacher: " + phrasing);
-            Render(tools, transcript, await agent.Say(phrasing, CancellationToken.None));
+            // Which tool a turn's answer came from, for the transcript's
+            // speaker: a fixed phrasing IS its tool, and no model runs here to
+            // choose a different one.
+            string answering = AssistCardCommand.Matching(phrasing)?.ToolName ?? "";
+            Render(transcript, answering, await agent.Say(phrasing, CancellationToken.None));
 
             if (!agent.IsAwaitingApproval)
             {
@@ -308,18 +312,21 @@ public class AssistScenarioTests : IDisposable
             Assert.False(isLastTurn && when == "say",
                 $"“{phrasing}” put up a card, and this case says it is answered");
 
+            // Read BEFORE the decision: approving and declining both clear it.
+            string waiting = agent.PendingTool ?? "";
+
             if (isLastTurn && when == "decline")
             {
                 transcript.Add("teacher: " + AssistWording.Cancelled);
-                Render(tools, transcript, await agent.Decline(CancellationToken.None));
+                Render(transcript, waiting, await agent.Decline(CancellationToken.None));
             }
             else
             {
                 // The word on the button, chosen by the product's own rule
                 // rather than by a copy of that rule kept here.
-                transcript.Add("teacher: " + (AssistAgent.NeedsApproval(agent.PendingTool ?? "")
+                transcript.Add("teacher: " + (AssistAgent.NeedsApproval(waiting)
                     ? AssistWording.DeployAccepted : AssistWording.PlanAccepted));
-                Render(tools, transcript, await agent.Approve(CancellationToken.None));
+                Render(transcript, waiting, await agent.Approve(CancellationToken.None));
             }
         }
     }
@@ -342,9 +349,9 @@ public class AssistScenarioTests : IDisposable
 
         var lines = new List<AssistAgent.Line>();
         var answer = await agent.RunTool(call, lines, CancellationToken.None);
-        Render(tools, transcript, lines);
+        Render(transcript, when, lines);
         // The teacher's half: what the transcript actually shows.
-        Render(tools, transcript, new List<AssistAgent.Line> { new("tools", answer.Summary) });
+        Render(transcript, when, new List<AssistAgent.Line> { new("tools", answer.Summary) });
         return answer;
     }
 
@@ -352,17 +359,26 @@ public class AssistScenarioTests : IDisposable
 
     /// <summary>Agent lines, rendered the way the contract writes a transcript line.</summary>
     /// <remarks>
-    /// The contract's <c>tool(name)</c> speaker carries the tool that answered,
-    /// and this app's <see cref="AssistAgent.Line"/> does not — the window
-    /// renders every tool result the same way. <see cref="RealTools"/> is asked
-    /// instead, being the one place that knows.
+    /// <para>The contract's <c>tool(name)</c> speaker carries the tool that
+    /// answered, and this app's <see cref="AssistAgent.Line"/> does not — the
+    /// window renders every tool result the same way. So the caller names it,
+    /// being the one that asked for it.</para>
+    ///
+    /// <para><b>Named rather than looked up.</b> The first version of this asked
+    /// the tool server which tool had produced a given sentence, which is wrong
+    /// for every answer the tool server never saw: <c>AssistAgent.RunTool</c>
+    /// answers <c>deploy_section</c> and <c>rebuild_preview</c> from the window
+    /// itself, so the lookup would miss and fall back to whichever tool ran
+    /// LAST — a plausible name on the wrong line, which is worse than no name.
+    /// Nothing asserted it yet; it would have been waiting for the first case
+    /// that did.</para>
     /// </remarks>
-    private static void Render(RealTools tools, List<string> transcript, List<AssistAgent.Line> lines)
+    private static void Render(List<string> transcript, string answering, List<AssistAgent.Line> lines)
     {
         foreach (var line in lines)
         {
             transcript.Add(line.Speaker == "tools"
-                ? $"tool({tools.NameFor(line.Text)}): {line.Text}"
+                ? $"tool({answering}): {line.Text}"
                 : $"{line.Speaker}: {line.Text}");
         }
     }
@@ -598,8 +614,6 @@ public class AssistScenarioTests : IDisposable
     {
         private readonly PlantoirTools _tools;
         private readonly Dictionary<string, MethodInfo> _served = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, string> _nameBySummary = new(StringComparer.Ordinal);
-        private string _lastCalled = "";
 
         public RealTools(AssistWorkspace workspace)
         {
@@ -614,10 +628,6 @@ public class AssistScenarioTests : IDisposable
                 _served[attribute.Name ?? method.Name] = method;
             }
         }
-
-        /// <summary>Which tool produced a given answer, for the transcript's speaker.</summary>
-        public string NameFor(string summary) =>
-            _nameBySummary.TryGetValue(summary, out string? name) ? name : _lastCalled;
 
         public async Task<AssistToolAnswer> CallTool(string name, JsonObject arguments,
                                                      Action<string>? progress = null,
@@ -640,7 +650,7 @@ public class AssistScenarioTests : IDisposable
                 returned = running.GetType().GetProperty("Result")?.GetValue(running);
             }
 
-            var answer = returned switch
+            return returned switch
             {
                 CallToolResult result => Answer(result),
                 string said => AssistToolAnswer.Same(said),
@@ -649,16 +659,6 @@ public class AssistScenarioTests : IDisposable
                 _ => throw new InvalidOperationException(
                     $"{name} answers with {returned.GetType().Name}, which this runner cannot read."),
             };
-
-            // A plan twin's answer is spoken by the ASSISTANT and never shown as
-            // a tool result, so it is not recorded here — a plain in-order queue
-            // of calls would put the plan's name on the write's line.
-            if (!name.StartsWith("plan_", StringComparison.Ordinal))
-            {
-                _lastCalled = name;
-                _nameBySummary[answer.Summary] = name;
-            }
-            return answer;
         }
 
         /// <summary>The two halves, read apart exactly as <c>McpClient</c> reads them.</summary>
@@ -697,15 +697,26 @@ public class AssistScenarioTests : IDisposable
                     continue;
                 }
 
+                // Matched EXACTLY, because the arguments the server receives are
+                // a case-sensitive JSON object. Matching loosely here would let
+                // a case send "Course" and pass, while the same call over
+                // JSON-RPC dropped it.
                 JsonNode? given = null;
                 foreach (var (key, value) in arguments)
-                    if (string.Equals(key, parameter.Name, StringComparison.OrdinalIgnoreCase)) given = value;
+                    if (string.Equals(key, parameter.Name, StringComparison.Ordinal)) given = value;
 
                 if (given is null)
                 {
-                    bound[i] = parameter.HasDefaultValue ? parameter.DefaultValue
-                        : parameter.ParameterType.IsValueType ? Activator.CreateInstance(parameter.ParameterType)
-                        : null;
+                    // A parameter with no default is REQUIRED, and a required
+                    // argument that never arrived is a fault in the case rather
+                    // than an empty string to carry on with: over the wire the
+                    // SDK refuses the call, and a runner that quietly passed
+                    // null would answer some refusal about a course called ""
+                    // and let the case assert against it.
+                    if (!parameter.HasDefaultValue)
+                        throw new InvalidOperationException(
+                            $"{method.Name} requires {parameter.Name}, and the call did not send it.");
+                    bound[i] = parameter.DefaultValue;
                     continue;
                 }
 
