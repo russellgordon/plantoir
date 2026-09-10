@@ -200,6 +200,163 @@ is kept OUT of the built site, so a rename that missed it silently un-hid the
 folder and the next publish put pages the teacher had hidden in front of
 students.
 
+## Renaming a course's word for a unit
+
+Beside the word under Settings — Overall ("What do you call a unit?  Unit
+Rename…") a sheet renames a course's word for a unit AFTER the course is in
+use — "Unit" to "Module", say. Added 2026-09-10 for
+[issue #100](https://github.com/russellgordon/plantoir/issues/100), the half
+of `unit_word` that was deliberately not built on 2026-09-01. The wizard
+still asks the question at creation and pours the ready-made pages in the
+answer; this is what happens when the answer changes later. Code:
+`UnitWordRenamer` (the plan and the work), `UnitWordRenameWording` (the
+sentences), `UnitWordRenameSheet` (the sheet). The rules and the cases both
+suites run are [`contracts/class-planning.json`](../contracts/class-planning.json)
+→ `renamingTheUnitWord`; the sentences are
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`specialNames.renameUnitWord`; the trail line is `word for a unit renamed`.
+
+What it does, in the order it does it — and the order is part of the
+contract, because "disk first, configuration last" is the kind of reasoning a
+refactor simplifies away:
+
+1. **Reads every page it is about to rename**, and refuses the whole rename
+   if one cannot be read. Also refuses if the record in step 3 cannot be
+   written: a rename with no record is one that cannot be recognised if it
+   stops. The insertion planner's habit is to skip a page it
+   cannot read; here that would write `unit_word: Module` while the skipped
+   page still said `Unit`, recognised by nothing — the exact silent failure
+   `unit_word` exists to prevent. Reading first also pays an iCloud-backed
+   vault's download cost before anything has moved.
+2. **Backs up the whole course** (`CourseArchiver.backUpCourse`, made "by
+   you", never pruned).
+3. **Writes a record** under `courses/.internal/renames/<CODE>.unit-word.json`
+   — beside the folder renames' records, with its own suffix.
+4. **Retitles each page in place, then MOVES it.** Never copy-then-delete: a
+   move is atomic on one volume, so there is never a moment with two copies
+   or none. An interruption leaves a page under its old name whose title says
+   the new one, which is harmless (every reader goes by the file name) and
+   which the next run finishes.
+5. **Rewrites the links** across every Markdown page of the course, shared
+   folders included — a section's index or a shared overview may link at a
+   class page. The link map carries the old name of every page being renamed
+   AND of every page a stopped rename already moved, so finishing an
+   interrupted rename also repoints links to pages moved before the stop.
+6. **Writes `unit_word`** through `CourseConfiguration.recordOnDisk`, which
+   compares-and-swaps against the build's own writer and updates the
+   in-memory copy, so the form's other unsaved edits survive and Revert leaves
+   the rename alone.
+7. **Clears the record.**
+
+Things that were decided, with what was rejected:
+
+- **The undo is renaming it back.** The operation is its own inverse, and the
+  test `testRenamingBackPutsEverythingAsItWas` pins it byte for byte. The
+  backup is the LAST resort and the sheet says so: restoring it replaces every
+  page of the course, edits since included. Restoring a backup now also
+  discards the built site (`WorkspaceModel.restoreBackup`), which it never
+  did — restored files carry the timestamps they were backed up with, older
+  than the site built since, so the freshness check read "up to date" and a
+  deploy would have published the pages the teacher had just undone. Found
+  by the plan review; the same reasoning was already written at
+  `CourseArchiver.archiveAndRemoveCourse`.
+- **A page already sitting where a renamed page would go refuses
+  EVERYTHING**, naming the page and section. Skipping the one page — the
+  obvious alternative — leaves "Unit 2, Day 3" beside "Module 2, Day 3", two
+  numbering schemes that every feature counting class pages would read as two
+  classes.
+- **It is refused while the course is previewing or deploying**, with the
+  sentence restoring a backup uses. A build copies `content/` afresh; copying
+  half a rename builds a site with two numbering schemes, and a scheduled
+  deploy fires on its own clock.
+- **A change of capitalisation alone is a rename** ("Unit" to "unit"): the
+  configured spelling is what every new class page is written in, so a course
+  whose word is "module" would otherwise get a "module 3, Day 1" next-class
+  page beside "Module 2, Day 9". Only the identical word is "unchanged". It is
+  safe on the default case-insensitive volume because a page is moved, not
+  copied and deleted; the plan's collision check treats a destination that
+  differs from its source only in case as the same file rather than a clash.
+- **Prose is left alone**, and the sheet says so. The 2026-09-01 decision
+  stands: the payload rewrite that pours "by the end of Unit 3" as "Module 3"
+  runs only over content Plantoir ships. A course poured as Unit and renamed
+  to Module keeps around 574 such sentences and a shared task called "Unit 2
+  Test" (`class_pages.renamed` renames ANY payload file starting "Unit N" at
+  pour time, so a fresh Module course would have called it "Module 2 Test").
+  Recorded so the first teacher who compares does not file it as a defect.
+- **The site does not change until every section is published**, and the
+  done sentence ends by saying so. Every section reads as Edited at once
+  (`SectionPublishState` fingerprints path, size and date) and the built site
+  keeps the old names until each is rebuilt. That is correct — the build
+  wipes `content/` per run and mirrors `public/` with `--delete`, and
+  `BuildFreshness` sees the new timestamps — so no `--full-rebuild` and no
+  stale page leak; it needs saying, not fixing.
+- **A stale record is cleared, not believed.** A record whose `from` is no
+  longer the course's word means the configuration landed and only the
+  clearing failed, or the word was edited by hand; left alone it would prefill
+  a word from another day forever. `SpecialFolderRenamer.interruptedRenameTarget`
+  checks the disk as well as its record for the same reason.
+- **The walks run off the main actor**, like the folder rename beside it.
+  The first implementation ran on the main actor because every helper it
+  reuses was main-actor under the project's default isolation, and the
+  implementation review counted the cost honestly: the survey, the pre-read
+  and the link pass are three full walks of the course, plus a zip of the
+  whole course, on exactly the iCloud-evicted vault the folder rename went
+  off-main for — and a spinner cannot animate while the main actor is
+  blocked. Making it right cost less than feared: `UnitDay`,
+  `ClassPageTerm`, `WikiLinkRewriter`, three `PageFrontmatter` functions
+  and `ClassPages.markdownPages` are pure and needed only the keyword, and
+  the walk works from `UnitWordRenameCourseFacts` — the five things it needs
+  to know about a course, copied out on the main actor — rather than from
+  the course itself. Only the backup (a subprocess) and the configuration
+  write (the observable model) stay on the main actor, and the sheet cannot
+  be dismissed while the work is under way, so a failure always has a view
+  to land on.
+- **A stopped rename is finished with its own word or not at all.** While a
+  record is on disk only its target is accepted; any other word would plan
+  from the old word alone, leave the pages already moved matching neither,
+  and end with three words in one course. That holds inside the open sheet
+  too: after a failure part way, the sheet looks over the course again and
+  holds the field to that rename's word — the third review found that the
+  first fix covered only a sheet opened afterwards. The record is believed
+  only when the disk agrees — at least one class page SPELLED the new way,
+  meaning it parses under the new word and begins with it, case-sensitively.
+  Parsing alone is not enough (the parser ignores case, so "Unit 1, Day 1"
+  parses under "unit"), and "does not begin with the old word" is wrong the
+  other way ("Units 1, Day 1" begins with "Unit"); the spelling rule is right
+  for a different word, a change of capitalisation, and either word being a
+  prefix of the other, and a test covers all four. A restored backup clears
+  the records itself (`CourseRestorer.restoreBackup`), so "did not finish —
+  press Rename" can never describe a rename the restore undid. A record that
+  cannot be WRITTEN refuses the rename with its own sentence, since "renamed
+  0 of 3 and could not rename Unit 1, Day 1" would blame a page nothing had
+  touched.
+- **Nothing is moved onto itself.** The parser is case-insensitive, so on a
+  re-run of a capitalisation change the pages already spelled the new way
+  match the old word too; a page whose new title equals its title is left
+  where it is (and kept in the link map). Whether a destination that
+  "exists" is the source is asked of the filesystem's file identity, never
+  of the spelling, so a case-sensitive volume still sees a genuine clash.
+- **The trail line is owed whenever the course changed**, which is not the
+  same as whether a page was counted: the first page can be retitled and
+  then fail to move. `UnitWordRenameProblem` carries `changedTheCourse`,
+  decided by what actually happened (a retitle written, a page moved) rather
+  than by where the loop stopped — the third review caught a version that
+  set it to true for any failure, which a test then passed against as if it
+  were a constant. A page whose links could not be written back is counted
+  and said rather than silently shrinking the number the teacher was shown,
+  and the links sentence is shown whenever any link was touched, because
+  finishing a rename that stopped during its link pass moves nothing and
+  rewrites plenty.
+- **A display-only rename** (titles say Thread while files stay Unit) was
+  rejected on 2026-09-01 and stays rejected: Obsidian is the teacher's editor
+  and they would see the old word every time they opened the vault, which is
+  the place the rename was supposed to help.
+
+The command-line launcher does not rename: `setup_course.py`'s
+`prompt_unit_word` still leaves a saved word alone on a re-run and now says
+where to go. Nothing in the build changes — it reads the word from the
+configuration on every run.
+
 ## Reporting a problem
 
 Plantoir keeps a note of every task it runs — in

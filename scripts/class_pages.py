@@ -22,7 +22,10 @@ wrong map that reports success.
 A course records its word in `course_config.json` as `unit_word`. **ABSENT
 means "Unit"**, which is what every course made before this key existed says,
 and what a course made from scratch still says unless the teacher chooses
-otherwise.
+otherwise. Since 2026-09-10 the word can also be changed on a course already
+in use, from the app's Course Settings: the app renames every class page and
+follows the links, then writes the new word here. Nothing in the build changes
+for that — it reads the word from the configuration on every run.
 
 **"Day" is deliberately fixed.** A teacher who says "Thread" almost certainly
 still says "Day 3", and a second configurable word would double the migration
