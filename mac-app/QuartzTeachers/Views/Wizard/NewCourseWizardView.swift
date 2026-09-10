@@ -929,12 +929,12 @@ struct NewCourseWizardView: View {
 
                     VStack(alignment: .leading, spacing: 6) {
                         MembershipToggleListView(
-                            title: "Folders whose work counts for marks",
+                            title: GradedFolderWording.listTitle,
                             allItems: gradedFolderChoices,
                             members: gradedFoldersBinding,
                             protection: wizardGradedFolderProtection
                         )
-                        Text("The curriculum map uses this to show which expectations you have actually evaluated. Most courses keep “Tasks”; add “Tests” or anything else you mark, and remove what you don’t.")
+                        Text(GradedFolderWording.caption)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }

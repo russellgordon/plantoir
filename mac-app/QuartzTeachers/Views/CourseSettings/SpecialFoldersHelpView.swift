@@ -135,6 +135,11 @@ struct SpecialFoldersHelpView: View {
                 + "lessons against, and the map is left out."
         ))
 
+        // "The curriculum map" here, "the curriculum coverage map" in
+        // GradedFolderWording.caption — a DELIBERATE mixed state, not drift to
+        // be tidied up. The caption follows the control it captions, this
+        // sheet keeps the name it has always had, and
+        // contracts/shared-rules.json -> gradedFolders.wording.why says so.
         rows.append(SpecialFolderEntry(
             name: SpecialFoldersHelpView.listed(gradedFolderNames),
             what: "Work that counts for marks",
