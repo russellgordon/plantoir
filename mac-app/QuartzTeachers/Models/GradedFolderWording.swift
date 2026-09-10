@@ -7,9 +7,9 @@ import Foundation
 ///
 /// **One home rather than four literals.** The same two strings serve Course
 /// Settings AND the New Course wizard, on both platforms; before this they
-/// were four strings on the mac and two more on Windows, pinned by nothing.
-/// Windows' half is `Plantoir.Core/Models/GradedFolderRule.cs`
-/// (`ListTitle`, `Caption`).
+/// were four strings on the mac and two more on Windows, and before the
+/// contract case nothing pinned any of them. Windows' half is
+/// `Plantoir.Core/Models/GradedFolderRule.cs` (`ListTitle`, `Caption`).
 ///
 /// Three decisions inside the caption, each argued the other way first and
 /// each recorded in full in the contract's own `why` rather than here:
@@ -33,8 +33,8 @@ import Foundation
 ///
 /// One imprecision is inherited and flagged rather than fixed: the coverage
 /// map's own word is "assessed", and this caption says "evaluated". It says
-/// it because the `specialFoldersHelp` row has since that sheet was written,
-/// so changing it is a separate piece on both platforms.
+/// it because the `specialFoldersHelp` row has said it since that sheet was
+/// written, so changing it is a separate piece on both platforms.
 enum GradedFolderWording {
 
     // MARK: - Stored properties
