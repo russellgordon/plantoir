@@ -721,7 +721,12 @@ final class SharedRulesContractTests: XCTestCase {
         )
 
         var verbsFound: [String] = []
-        for verb in ["add", "adds", "adding", "remove", "removes", "removing"] {
+        // Eight forms where Windows' half of this test bans six: "anything
+        // you added" is the same wrong promise in the past tense, and nothing
+        // in this caption legitimately says either word. Windows could match
+        // it and nothing breaks if it does not — this is code on each side
+        // rather than contract data, so the two lists may differ.
+        for verb in ["add", "adds", "adding", "added", "remove", "removes", "removing", "removed"] {
             if SharedRulesContractTests.caption(caption, containsWord: verb) {
                 verbsFound.append(verb)
             }
@@ -752,12 +757,14 @@ final class SharedRulesContractTests: XCTestCase {
                 "\(fileName) was not found where this test expects it, so the checks below would pass vacuously."
             )
             let contents: String = try String(contentsOf: fileURL, encoding: .utf8)
+            // Outside comments, so a doc note NAMING the constant cannot stand
+            // in for a view that actually draws from it.
             XCTAssertTrue(
-                contents.contains("GradedFolderWording.listTitle"),
+                SharedRulesContractTests.source(contents, uses: "GradedFolderWording.listTitle"),
                 "\(fileName) no longer takes the Marks list's title from GradedFolderWording, so it can drift from the contract without a test noticing."
             )
             XCTAssertTrue(
-                contents.contains("GradedFolderWording.caption"),
+                SharedRulesContractTests.source(contents, uses: "GradedFolderWording.caption"),
                 "\(fileName) no longer takes the Marks caption from GradedFolderWording, so it can drift from the contract without a test noticing."
             )
         }
@@ -767,6 +774,12 @@ final class SharedRulesContractTests: XCTestCase {
         // at SpecialFoldersHelpView is written — would slip past a
         // whole-sentence search. Taken from the constant, never retyped, so the
         // needle cannot drift from what the app shows.
+        //
+        // Honest about its reach: this is a PASTE-BACK guard, not an
+        // adversarial one. The needle is the caption's first 24 characters, so
+        // a copy split before that point, and any paraphrase, evades it — the
+        // reference checks above are what catch a view that stops using the
+        // constant at all.
         let captionOpening: String = String(GradedFolderWording.caption.prefix(24))
         var filesWithACopy: [String] = []
         for fileURL in ActivityTrailWiringTests.swiftFiles(under: productFolderURL) {
@@ -802,8 +815,9 @@ final class SharedRulesContractTests: XCTestCase {
     /// two live in, so this reads it there. **A hosted-view geometry check was
     /// rejected**: `Form` and `Section` render lazily on macOS, so a walk of
     /// the view tree would have to fight the layout for an answer source order
-    /// already gives — Windows can assert real tree order because its list is
-    /// built into a panel eagerly.
+    /// already gives — Windows asserts real UI-Automation tree order in
+    /// `CourseSettingsCaptionUiTests.TheMarksCaptionIsOnScreenBelowItsList`,
+    /// which it can because its list is built into a panel eagerly.
     func testTheMarksCaptionIsDrawnBelowItsList() throws {
         let productFolderURL: URL = ActivityTrailWiringTests.productSourceFolderURL()
 
@@ -819,6 +833,13 @@ final class SharedRulesContractTests: XCTestCase {
             var captionLine: Int = -1
             var lineNumber: Int = 0
             for line in lines {
+                // Comments skipped, as ActivityTrailWiringTests does: a note
+                // ABOVE the list that happens to name the caption constant
+                // would otherwise read as the caption itself being drawn there.
+                if line.trimmingCharacters(in: .whitespaces).hasPrefix("//") {
+                    lineNumber += 1
+                    continue
+                }
                 if titleLine < 0 && line.contains("GradedFolderWording.listTitle") {
                     titleLine = lineNumber
                 }
@@ -1214,6 +1235,21 @@ final class SharedRulesContractTests: XCTestCase {
             .components(separatedBy: CharacterSet.letters.inverted)
         for wordInCaption in wordsInCaption {
             if wordInCaption == word.lowercased() {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether source code USES a token — on a line that is not a comment, so
+    /// a doc comment mentioning it does not count as a use.
+    private static func source(_ contents: String, uses token: String) -> Bool {
+        for line in contents.components(separatedBy: "\n") {
+            let trimmedLine: String = line.trimmingCharacters(in: .whitespaces)
+            if trimmedLine.hasPrefix("//") {
+                continue
+            }
+            if trimmedLine.contains(token) {
                 return true
             }
         }
