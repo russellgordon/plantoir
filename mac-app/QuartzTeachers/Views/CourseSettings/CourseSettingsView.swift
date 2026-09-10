@@ -173,7 +173,7 @@ struct CourseSettingsView: View {
                         },
                         protection: perSectionFileProtection
                     )
-                    Text("Tip: you can also simply create new folders in Obsidian — they’re added to your site automatically the next time you preview (unless you have removed them here).")
+                    Text(SpecialNames.contentStructureTip)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } header: {

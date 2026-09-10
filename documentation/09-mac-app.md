@@ -99,6 +99,57 @@ curriculum folder is what let the retired sentence sit unguarded, and the
 banned-word sweep could not stand in for it — a banned word catches only that
 word.
 
+## The caption under the four Content Structure lists
+
+The tip below the Shared folders / Shared files / Per-section folders /
+Per-section files editors is `SpecialNames.contentStructureTip`, asserted
+against `contracts/shared-rules.json` → `specialNames.contentStructureTip`.
+The sentence itself, the alternatives rejected and the one edge it does not
+cover are in that contract entry's `why`; the rule it glosses — an exclusion
+is by NAME, is authoritative at build time and never expires — is in
+[`05-build-pipeline.md`](05-build-pipeline.md). None of that is repeated here.
+
+**What is worth knowing on this side is how it is guarded, because the obvious
+guard does not reach.** A contract test proves the constant matches the
+contract and stays green if the line that RENDERS it is deleted — measured, not
+assumed: with `Text(SpecialNames.contentStructureTip)` removed from
+`CourseSettingsView`, the three contract facts all still passed. Windows
+answered that with an opt-in UI-Automation test that reads the real form
+(`CourseSettingsCaptionUiTests`). So the GATED guard here is a source scan,
+`testCourseSettingsDrawsTheContentStructureTipFromOneHome`, reusing the shape
+issue #71 established for the Marks wording: it reads `CourseSettingsView.swift`
+for a reference to the constant on a non-comment line, and every other product
+file for a pasted copy of the sentence. That failed with the line removed and
+passes with it back.
+
+**The mac's XCUITest target was tried for the on-screen half first, and did not
+earn its place — worth knowing before anyone tries again.** `QuartzTeachersUITests`
+exists and drives Course Settings already, so a test asserting the caption is
+visible looked like fifteen lines. Three things were met, in this order, and the
+first two are cheap to fix: the sidebar row must be matched on LABEL (`["EXC2O"]`
+resolves by identifier or label and found several elements in one run; asking for
+the identifier alone found none), and a 260-character sentence cannot go through
+the `staticTexts[…]` subscript at all — XCUITest refuses a string identifier over
+128 characters and wants an `NSPredicate` on `label`. The third is why it was
+dropped: **the caption sits below four list editors, and the window-level
+`swipeUp()` loop reached it in one run out of four** — twenty-five swipes, ~160
+seconds, then nothing found. `MarketingScreenshotTests.scrollSettings` dispatches
+at the window because a queried scroll view swallowed scrolls silently; whatever
+the fix is, it is that loop and not the assertion, and a flaky test in an opt-in
+suite is worse than none. The identifier that attempt added to the `Text` was
+taken out again with it, so nothing in the product is left pointing at a test
+that does not exist.
+
+**Its limits, so nobody trusts it further than it goes.** It sees a reference,
+not a rendering: it cannot tell that the `Text` is inside the Content Structure
+section, that the section can be reached, or that anything is on screen. A
+paraphrase evades the paste-back half, as does a copy split before the needle's
+24th character. It is a paste-back and deletion guard standing in for a UI
+test, and choosing it over a hosted-view geometry check was the same call
+[`04-course-setup.md`](04-course-setup.md) records for the Marks caption:
+`Form` renders lazily on macOS, so walking the view tree means fighting the
+layout for an answer the source already gives.
+
 ## Renaming a course folder
 
 Folder rows in Course Settings carry a pencil. It renames the folder **on

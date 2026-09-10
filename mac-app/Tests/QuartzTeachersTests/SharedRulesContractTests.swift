@@ -1140,6 +1140,137 @@ final class SharedRulesContractTests: XCTestCase {
             SpecialNames.removeLeavesTheFolderOnDiskMessage(name: "Tests"),
             (removed["message"] as? String)?.replacingOccurrences(of: "{name}", with: "Tests")
         )
+
+        let tip: [String: Any] = try XCTUnwrap(section["contentStructureTip"] as? [String: Any])
+        XCTAssertEqual(
+            SpecialNames.contentStructureTip,
+            tip["message"] as? String,
+            "The Content Structure caption and contracts/shared-rules.json → "
+            + "specialNames.contentStructureTip disagree. The two apps worded this same rule "
+            + "differently for two weeks with nothing pinning either, which is the failure a "
+            + "contract case exists to make impossible rather than to discover later."
+        )
+    }
+
+    /// The tip promises its behaviour for BOTH kinds of thing the four lists
+    /// above it hold. Both apps said "folders" alone until 2026-09-07, while
+    /// the build discovers and excludes files identically — `discover_shared_items`
+    /// and `discover_section_items` append top-level FILES, and `build_site.py`
+    /// skips and drops excluded ones from `shared_files` and `per_section_files`
+    /// exactly as it does folders. So a teacher who removed a file met a
+    /// permanent, silent rule that no sentence anywhere warned them about.
+    ///
+    /// **Honest about its reach**: this guards the PROMISE clause only. An edit
+    /// dropping "and files" from the first sentence fails here; one that
+    /// narrowed the second sentence back to folders would not, and no test
+    /// would catch it. Windows' half of this
+    /// (`TheContentStructureTipCoversFilesAsWellAsFolders`) has the same limit
+    /// and says so.
+    func testTheContentStructureTipCoversFilesAsWellAsFolders() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let tip: [String: Any] = try XCTUnwrap(section["contentStructureTip"] as? [String: Any])
+        let message: String = try XCTUnwrap(tip["message"] as? String)
+
+        XCTAssertTrue(
+            message.contains("folders and files"),
+            "The Content Structure caption promises its behaviour for folders alone. Two of "
+            + "the four lists it sits under are FILE lists, and discovery and exclusion treat "
+            + "files identically, so the narrower promise leaves a teacher who removed a file "
+            + "with no warning anywhere about a permanent, silent rule."
+        )
+    }
+
+    /// It is a caption, not a removal-blocked sentence, so it deliberately
+    /// carries no `reason` key.
+    ///
+    /// Asserted HERE, on the side that can act on it, because the cost lands
+    /// on the OTHER side: Windows'
+    /// `NoBlockedSentenceInTheContractIsUnusedHere` sweeps every top-level
+    /// entry's `reason` under `specialNames` and demands each be one of the seven sentences
+    /// that app shows in a flyout. A `reason` added to this entry would fail
+    /// the Windows suite for something that has nothing to do with what the
+    /// sentence says — and `shared-rules.json` is an AUTHORED contract file
+    /// that a mac session edits freely, so the mac is where that mistake gets
+    /// made and where it should be caught.
+    func testTheContentStructureTipIsNotABlockedSentence() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let tip: [String: Any] = try XCTUnwrap(section["contentStructureTip"] as? [String: Any])
+
+        XCTAssertNil(
+            tip["reason"],
+            "specialNames.contentStructureTip gained a `reason` key. It is a caption rather "
+            + "than a removal-blocked sentence, and Windows sweeps every top-level `reason` here "
+            + "expecting to find it in a flyout — so this breaks that suite for a reason "
+            + "unrelated to the wording."
+        )
+    }
+
+    /// Course Settings actually DRAWS the caption, from the one constant.
+    ///
+    /// The gap this closes is the one Windows named when it proposed the case:
+    /// a contract test alone proves the constant matches the contract, and
+    /// stays perfectly green if the line that renders it is deleted. Windows
+    /// answered that with an opt-in UI-Automation test
+    /// (`CourseSettingsCaptionUiTests`), MEASURED to fail with the caption
+    /// commented out. The mac HAS an XCUITest target that could do the same,
+    /// but it is outside the gate (`-only-testing:QuartzTeachersTests` runs
+    /// this target only), and an attempt at it reached this caption — four
+    /// list editors down the form — in one run out of four. So this is the
+    /// gated guard: the source scan issue #71 established for the Marks
+    /// wording (`testBothSurfacesDrawTheMarksWordingFromOneHome`), which
+    /// reads the view rather than the screen. What went wrong with the UI
+    /// attempt, and which part of it is worth fixing, is in
+    /// `documentation/09-mac-app.md`.
+    ///
+    /// **What it reaches, plainly**: that the view references the constant on
+    /// a non-comment line, and that no other product file carries a pasted
+    /// copy of the sentence. It cannot see that the `Text` is inside the
+    /// Content Structure section, that the section is reachable, or that
+    /// anything is on screen. A paraphrase, or a copy split before the
+    /// needle's 24th character, evades the paste-back half.
+    func testCourseSettingsDrawsTheContentStructureTipFromOneHome() throws {
+        let productFolderURL: URL = ActivityTrailWiringTests.productSourceFolderURL()
+        let fileURL: URL = try XCTUnwrap(
+            SharedRulesContractTests.fileNamed("CourseSettingsView.swift", under: productFolderURL),
+            "CourseSettingsView.swift was not found where this test expects it, so the checks below would pass vacuously."
+        )
+        let contents: String = try String(contentsOf: fileURL, encoding: .utf8)
+
+        XCTAssertTrue(
+            SharedRulesContractTests.source(contents, uses: "SpecialNames.contentStructureTip"),
+            "CourseSettingsView.swift no longer draws the Content Structure caption from "
+            + "SpecialNames.contentStructureTip. Either it was deleted — and the one rule a "
+            + "teacher cannot infer went with it — or it went back to being a literal that "
+            + "can drift from the contract without a test noticing."
+        )
+
+        // Taken from the constant, never retyped, so the needle cannot drift
+        // from what the app shows.
+        let tipOpening: String = String(SpecialNames.contentStructureTip.prefix(24))
+        var filesWithACopy: [String] = []
+        for candidateURL in ActivityTrailWiringTests.swiftFiles(under: productFolderURL) {
+            if candidateURL.lastPathComponent == "SpecialNames.swift" {
+                continue
+            }
+            let candidateContents: String = try String(contentsOf: candidateURL, encoding: .utf8)
+            for line in candidateContents.components(separatedBy: "\n") {
+                let trimmedLine: String = line.trimmingCharacters(in: .whitespaces)
+                if trimmedLine.hasPrefix("//") {
+                    continue
+                }
+                if trimmedLine.contains(tipOpening) {
+                    filesWithACopy.append(candidateURL.lastPathComponent)
+                    break
+                }
+            }
+        }
+        XCTAssertEqual(
+            filesWithACopy, [],
+            "These files carry their own copy of the Content Structure caption: "
+            + "\(filesWithACopy). There is one home for it, SpecialNames.contentStructureTip, "
+            + "because a second copy is how the two apps came to word this same rule "
+            + "differently in the first place."
+        )
     }
 
     /// Every key the contract says a rename carries across is one the renamer
