@@ -6,9 +6,10 @@ import Foundation
 /// ([issue #71](https://github.com/russellgordon/plantoir/issues/71)).
 ///
 /// **One home rather than four literals.** The same two strings serve Course
-/// Settings AND the New Course wizard, on both platforms; before this they
-/// were four strings on the mac and two more on Windows, and before the
-/// contract case nothing pinned any of them. Windows' half is
+/// Settings AND the New Course wizard, on both platforms. Before the contract
+/// case there were four distinct strings written out as eight literals — a
+/// title and a caption in each app, duplicated across that app's two surfaces
+/// — and nothing pinned any of them. Windows' half is
 /// `Plantoir.Core/Models/GradedFolderRule.cs` (`ListTitle`, `Caption`).
 ///
 /// Three decisions inside the caption, each argued the other way first and

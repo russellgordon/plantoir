@@ -439,8 +439,10 @@ the answer is explicit and the historical rule stops applying to that course.
 
 Both are one contract case — `contracts/shared-rules.json` → `gradedFolders`
 .`wording` — because the same two sentences serve four surfaces: Course
-Settings and the New Course wizard, on both platforms. They were six different
-strings pinned by nothing until 2026-09-08, when Windows proposed the case; the
+Settings and the New Course wizard, on both platforms. Until 2026-09-08, when
+Windows proposed the case, they were four distinct strings written out as eight
+literals — a title and a caption in each app, duplicated across that app's two
+surfaces — and nothing pinned any of them; the
 mac adopted it on 2026-09-09 ([#71](https://github.com/russellgordon/plantoir/issues/71)),
 where they live in `GradedFolderWording` and the two views draw from it.
 
@@ -468,8 +470,8 @@ argument:
 
 One imprecision is inherited and flagged rather than fixed: the coverage map's
 own word is "assessed" and the caption says "evaluated". It says it because the
-folders-help row has since that sheet was written, so changing it is a separate
-piece on both platforms.
+folders-help row has said it since that sheet was written, so changing it is a
+separate piece on both platforms.
 
 ### What the checklist OFFERS, and the two traps in walking a folder to find out
 

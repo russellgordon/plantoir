@@ -818,6 +818,12 @@ final class SharedRulesContractTests: XCTestCase {
     /// already gives — Windows asserts real UI-Automation tree order in
     /// `CourseSettingsCaptionUiTests.TheMarksCaptionIsOnScreenBelowItsList`,
     /// which it can because its list is built into a panel eagerly.
+    ///
+    /// **What this reaches**: the FIRST non-comment mention of each constant in
+    /// the file, not the pair inside that one `Section`. Exact while each view
+    /// references each constant once, which both do today — but a view that
+    /// gained an earlier mention of `listTitle` that draws nothing (a stored
+    /// property, a `.help(…)`) could pass this with the caption above its list.
     func testTheMarksCaptionIsDrawnBelowItsList() throws {
         let productFolderURL: URL = ActivityTrailWiringTests.productSourceFolderURL()
 
@@ -1243,6 +1249,11 @@ final class SharedRulesContractTests: XCTestCase {
 
     /// Whether source code USES a token — on a line that is not a comment, so
     /// a doc comment mentioning it does not count as a use.
+    ///
+    /// `//` only: a use inside a `/* … */` block would still count, and a
+    /// reference split across two lines would not be found. Both are shapes
+    /// this repository's Swift does not use, and the cost of being wrong is a
+    /// test that has to be read rather than a bug that ships.
     private static func source(_ contents: String, uses token: String) -> Bool {
         for line in contents.components(separatedBy: "\n") {
             let trimmedLine: String = line.trimmingCharacters(in: .whitespaces)
