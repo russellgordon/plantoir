@@ -161,10 +161,12 @@ reasons rather than tasks:
   that is exactly how the path-bar menu went unnoticed for months.
 - **Get each logical chunk looked at by something that is not the thing that
   wrote it** — the plan (after Russell has agreed it, per §0), then the
-  implementation, then the fixes. `CLAUDE.md`
-  rule 11 names Claude Code's models (Opus, Fable) because that is what the
-  mac side runs; on your harness it means the most capable model you have,
-  plus a genuinely independent review. A
+  implementation, then the fixes, and one sweep of the whole finished piece
+  at the very end. `CLAUDE.md` rule 11 names Claude Code's models (Opus for
+  the chunk reviews, Fable only for that final sweep — since 2026-09-10)
+  because that is what the mac side runs; on your harness it means a
+  genuinely independent review of each chunk, with the most capable model
+  you have kept for the last look. A
   review of the finished thing arrives too late to change its shape, and the
   shape is usually what is wrong. Verify what a review claims rather than
   acting on it; reviewers are wrong often enough to matter.

@@ -411,31 +411,48 @@ Neither app contains toolchain logic of its own: they write the same
       that is exactly where a weaker model produces something that passes its
       tests and is wrong.
     - **Have each logical chunk checked by a genuinely independent reviewer
-      before moving on. In Claude Code, use Fable** — a DIFFERENT model where
-      one is available, and a fresh context at the very least, because a
-      reviewer that is the same mind with the same assumptions agrees with
-      itself. **At least three reviews per coherent piece** (rule 6's sense of
-      "piece"), and more if it has separable parts: the PLAN, then the
-      implementation, then the fixes. A review of the finished thing arrives
-      too late to change its shape, and the shape is usually what is wrong.
-      Brief the reviewer adversarially — tell it to find where the work is
-      wrong, incomplete, or has created a new problem, and tell it that
-      "nothing to act on" is an acceptable answer, or it will invent findings
-      to justify its existence.
+      before moving on. In Claude Code, use OPUS for those reviews** — a fresh
+      context at the very least, because a reviewer that is the same mind
+      with the same assumptions agrees with itself. **At least three reviews
+      per coherent piece** (rule 6's sense of "piece"), and more if it has
+      separable parts: the PLAN, then the implementation, then the fixes. A
+      review of the finished thing arrives too late to change its shape, and
+      the shape is usually what is wrong. Brief the reviewer adversarially —
+      tell it to find where the work is wrong, incomplete, or has created a
+      new problem, and tell it that "nothing to act on" is an acceptable
+      answer, or it will invent findings to justify its existence.
 
-      **Standing order from Russell, 2026-09-09: use FABLE for subagent
-      reviews.** This supersedes the one-day order below it and restores the
-      rule above: a review wants a genuinely different model, and Fable is it.
+      **Then ONE final sweep on FABLE, and only that one, right before "this
+      is ready".** Standing order from Russell, 2026-09-10: **Opus for all
+      subagent reviews; Fable only for the VERY FINAL pre-merge sweep.** The
+      sweep is a fourth review, of the whole finished piece as it will be
+      merged — after the fixes from the earlier reviews, after the
+      documentation pass (below) and after the rebuild rule 10 asks for — so
+      that the most capable model reads exactly what Russell will be asked to
+      merge and nothing that will still change. It is a sweep, not a fourth
+      round: brief it to look across the whole diff for what the chunk
+      reviews could not see (a fix in one place that made a sentence
+      elsewhere wrong, a contract case and a doc that disagree, a rule
+      followed in three files and not the fourth). Findings it raises are
+      fixed and re-run through the ordinary tests; they do not earn another
+      Fable pass unless Russell asks for one.
+
       **Pass the model EXPLICITLY when spawning an agent** rather than relying
       on the default — the default subagent model is configured outside this
-      repository, so a session that omits it cannot tell what it got.
+      repository, so a session that omits it cannot tell what it got. Say
+      which model did which review in the write-up, the way row 480 of
+      `GUI-IMPROVEMENTS.md` does.
 
-      *(Superseded, kept because a session may meet its consequences: on
-      Tuesday 2026-09-08 the order was to run subagent work on OPUS, after a
-      review agent died mid-run with "You're out of usage credits … to keep
-      using Fable 5.1". That was a fact about the account on one day rather
-      than a revision of the rule, and it said Fable goes back to being the
-      first choice the moment it can run. It can, so it has.)*
+      *(Superseded, kept because a session may meet its consequences. On
+      2026-09-09 the order was FABLE for every subagent review, restoring the
+      original "a DIFFERENT model where one is available" rule after a
+      one-day order on 2026-09-08 to run subagent work on OPUS — that day a
+      review agent had died mid-run with "You're out of usage credits … to
+      keep using Fable 5.1", and the order said Fable would come back the
+      moment it could run. It did, for a day: the piece for issue #100 on
+      2026-09-10 ran all three of its reviews on Fable, and the rule above
+      replaced that arrangement the same day. Reviews recorded as Fable
+      before 2026-09-10 are not a breach of the rule above; they predate it.)*
 
       **Verify what a review claims rather than acting on it.** A reviewer is
       wrong often enough to matter, and a finding accepted without checking is
