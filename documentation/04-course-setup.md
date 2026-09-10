@@ -435,6 +435,44 @@ already ticked, so a teacher sees what is actually happening rather than a blank
 list. Nothing is written until they change something — and the moment they do,
 the answer is explicit and the historical rule stops applying to that course.
 
+### What the control is CALLED, and the caption below it
+
+Both are one contract case — `contracts/shared-rules.json` → `gradedFolders`
+.`wording` — because the same two sentences serve four surfaces: Course
+Settings and the New Course wizard, on both platforms. Until 2026-09-08, when
+Windows proposed the case, they were four distinct strings written out as eight
+literals — a title and a caption in each app, duplicated across that app's two
+surfaces — and nothing pinned any of them; the
+mac adopted it on 2026-09-09 ([#71](https://github.com/russellgordon/plantoir/issues/71)),
+where they live in `GradedFolderWording` and the two views draw from it.
+
+Three things in that caption are worth knowing before editing it, because each
+was argued the other way first and the contract's `why` carries the full
+argument:
+
+- **It says "tick", never "add" or "remove"** — a correction rather than a
+  preference. The control is a tick list with no Add button, so the mac's
+  previous caption named two actions it does not offer, and "remove what you
+  don't" invited the one thing the product refuses outright: unticking the last
+  graded folder while the coverage map is on.
+- **The map is "the curriculum coverage map"** here, matching the flyout raised
+  from this list and the switch beside it, so one screen says one name three
+  times. The folders-help sheet still says "the curriculum map", **deliberately**
+  — a recorded mixed state, not drift to be tidied up, and `SpecialFoldersHelpView`
+  says so where the tidying would happen.
+- **The caption belongs BELOW its list**, which `wording.rule` requires by name:
+  it says "a page in one of these", and above the list "these" follows the
+  section header "Marks" and refers to nothing. Windows drew it above until
+  2026-09-08. A mac test reads source order for this, since inside the `Section`
+  and `VStack` these live in, source order is stacking order; hosting the view
+  and walking it was rejected because `Form` renders lazily on macOS and would
+  buy nothing over reading the order directly.
+
+One imprecision is inherited and flagged rather than fixed: the coverage map's
+own word is "assessed" and the caption says "evaluated". It says it because the
+folders-help row has said it since that sheet was written, so changing it is a
+separate piece on both platforms.
+
 ### What the checklist OFFERS, and the two traps in walking a folder to find out
 
 The list is the course's `shared_folders`, then its `per_section_folders`, then
