@@ -110,7 +110,8 @@ file — or any file in the working folder.
 | `<CODE>/.cloudflare_sites/section<N>.json` | Cloudflare Pages marker (project name/id, subdomain, account) so re-publishing reuses the same project instead of creating a second one. |
 | `<CODE>/Media/` | Shared binary assets; symlinked into every build, always hidden from the sidebar. |
 | `<CODE>/.obsidian/` | Obsidian vault settings (seeded from `support/obsidian_defaults`). |
-| `_backups/<CODE>/<timestamp>.zip` | Full course backups made by the setup wizard before re-runs. |
+| `_backups/<CODE>/<timestamp>.zip` | Full course backups made by the setup wizard before re-runs. It shares this folder with the app's own archives (`<CODE>_<timestamp>.zip`) and backups (`<CODE>_backup_<timestamp>.zip`), which are told apart from it and from each other by NAME alone — `contracts/course-management.json` → `zipNames`. |
+| The `<timestamp>` in all three | `yyyy-MM-dd_HHmmss`, in the **Gregorian** calendar and local time, on every machine whatever calendar it is set to. Python's `strftime` is Gregorian always and Windows pins `CultureInfo.InvariantCulture`; the mac pins `en_US_POSIX` (`ArchiveStamp`) and, since 2026-09-10, also reads the spellings an earlier build wrote on a machine whose calendar was not Gregorian — see [09-mac-app.md](09-mac-app.md#what-an-archive-or-a-backup-is-called-and-the-calendar-it-is-stamped-in). |
 | `.internal/profile.json` | Teacher profile (last name for Netlify site naming). |
 | `.gitignore` | Auto-maintained to exclude `.internal/` and `_backups/`. |
 

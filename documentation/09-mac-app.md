@@ -357,6 +357,113 @@ The command-line launcher does not rename: `setup_course.py`'s
 where to go. Nothing in the build changes — it reads the word from the
 configuration on every run.
 
+## What an archive or a backup is CALLED, and the calendar it is stamped in
+
+Three kinds of zip share `courses/_backups/<CODE>/` and are told apart only by
+their names: an archive (`ICS3U_2026-08-09_141530.zip`, or
+`ICS3U-section2_…` for one section), a backup
+(`ICS3U_backup_2026-08-09_141530.zip`, with `_assistant-section<N>` on the
+end when the assistant made it), and the setup wizard's automatic copy
+(`2026-08-09_141530.zip`, written by `scripts/setup_course.py` in Python).
+The grammar is contract data — [`contracts/course-management.json`](../contracts/course-management.json)
+→ `zipNames` — because the two apps list each other's files. `ArchiveStamp`
+owns the timestamp half: `text(for:)` writes it, `moment(from:)` reads it, and
+`CourseArchiver`, `ArchivedItem` and `BackupItem` all go through it.
+
+**The stamp is Gregorian on every Mac, whatever calendar the Mac is set to.**
+This is the fix for [issue #160](https://github.com/russellgordon/plantoir/issues/160),
+made 2026-09-10. `DateFormatter` renders `yyyy` in the CURRENT LOCALE'S
+calendar unless a locale is pinned, and until that day neither the writer nor
+the reader pinned one. Measured here on macOS 26 for 2026-08-09 14:15:30:
+
+| The Mac's calendar | What it wrote |
+|---|---|
+| Gregorian | `2026-08-09_141530` |
+| Buddhist (Thai) | `2569-08-09_141530` |
+| Japanese | `0008-08-09_141530` (Reiwa 8) |
+| Islamic (Umm al-Qura) | `1448-02-26_141530` |
+| Hebrew | `5786-11-26_141530` |
+| Ethiopic | `2018-12-03_141530` |
+
+Nothing looked wrong on such a machine, which is why nobody met it: the same
+unpinned formatter wrote and read, so it was symmetric. What was NOT symmetric
+was everything else — the name disagreed with what `contracts/` says Plantoir
+writes, a folder carried to another machine stopped sorting, and the wizard's
+own zip sat in the same folder stamped `2026` in Python's always-Gregorian
+`strftime` while the app's archive beside it said `2569`.
+
+### Reading the old spelling is the part that needed thought
+
+Pinning the writer alone would have been worse than the bug. A teacher on an
+affected Mac has zips already named the old way; a reader that accepted only
+the new spelling would empty their Archives and Backups lists on the day they
+updated, with the files still sitting on disk. Worse than *looking* empty:
+`CourseArchiver.pruneBackups` sorts the assistant's backups by date and
+deletes everything past the fifth, so the first backup made after such an
+update would have read as the year 1483 on a Buddhist Mac, sorted last, and
+been deleted immediately — the newest safety copy, gone.
+
+So `ArchiveStamp.moment(from:)` accepts both spellings, and **chooses between
+them on whether a reading could be TRUE, not on whether it parsed.** That is
+the trap: `2569-08-09_141530` parses perfectly well as the Gregorian year
+2569, so "try the pinned reading, fall back if it fails" never falls back at
+all. `couldHaveBeenStamped(_:)` is the discriminator — at or after 2025-01-01,
+and not more than a day in the future.
+
+**Why that floor, and why it is not arbitrary.** The archive feature was
+written on 2026-08-09 (`git log --reverse -- CourseArchiver.swift`), so no zip
+of this kind can be older than that. The floor is set a year and a half
+BEFORE it, which refuses no real name, and it still leaves six years of
+daylight above the nearest wrong reading. That daylight is what the floor is
+for: read as Gregorian, Buddhist 2569, Hebrew 5786 and Ethiopic-Amete-Alem
+7518 land in the future, while Japanese 0008, Islamic 1448, Persian 1405,
+Indian 1948, Coptic 1742 and Ethiopic 2018 land before Plantoir existed.
+
+**Ethiopic is the case that decided the shape of the code**, and it is worth
+knowing because it is the only one in macOS's calendar list that a
+"sensible-looking date" test cannot catch: seven years and eight months behind
+the Gregorian calendar, so its old spelling of this moment is `2018-12-03` —
+an ordinary date, in the past, that a person would not blink at. Only "could
+Plantoir have written it" separates it, because Plantoir did not exist in
+2018.
+
+The same case is why the PINNED reading is tried first rather than the
+machine's. Both orders are right today; they part company in about 2034, when
+an Ethiopic Mac's reading of a name written now (2026 → 2034) stops being in
+the future and becomes plausible in its own right. Pinned-first settles that
+name before the question is ever asked, and it is measurably correct in both
+eras — a simulated read in 2035 gives the same answer for every calendar in
+the list. Machine-first was tried and rejected for exactly that reason.
+
+### What was rejected
+
+- **Guessing which calendar wrote a stamp this Mac cannot explain.** A zip
+  carried here from a Buddhist Mac reads as the year 2569, and 2569 − 543
+  would "recover" it. Rejected: it means deciding another machine's calendar
+  on its behalf, and a wrong guess dates a teacher's archive silently. It
+  keeps the answer this Mac has always given, and stays in the list.
+- **Refusing a stamp no reading can explain.** The last line of
+  `moment(from:)` answers with the machine's reading anyway, so nothing that
+  is listed today stops being listed. A wrong date a teacher can SEE beats an
+  archive that vanishes from the list while the file sits on disk.
+- **Renaming the zips already on disk.** A migration that renames a teacher's
+  own backups is a far bigger and riskier act than reading both spellings,
+  and reading both costs nothing.
+- **Asking the zip's own modification date** to break a tie. It would settle
+  the Ethiopic case even in 2035 — but a copied file's modification date is
+  the moment it was copied, so it answers confidently and wrongly exactly
+  when a folder has been moved between machines, which is the case this is
+  all about.
+
+### One `if` in the pruner, because a date here is a DELETION key
+
+`pruneBackups` now skips any backup whose stamp `couldHaveBeenStamped` says
+cannot be true: not counted toward the five kept, and never deleted. A copy
+carried from a Buddhist Mac reads as 2569, which sorts as the newest thing in
+the folder, and counted it would take one of the five places and push a real
+backup off the disk. Left out, it stays listed, and the teacher can restore
+or delete it themselves — the same standing every backup of their own has.
+
 ## Reporting a problem
 
 Plantoir keeps a note of every task it runs — in

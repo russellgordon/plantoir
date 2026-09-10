@@ -32,6 +32,7 @@ final class CourseManagementContractTests: XCTestCase {
             case "backup":
                 XCTAssertNotNil(backup, "\(name) should be read as a backup")
                 XCTAssertNil(archive, "\(name) must NOT also read as an archive")
+                CourseManagementContractTests.assertMoment(backup?.backedUpAt, is: testCase["moment"] as? String, in: name)
                 if let expectedSection = testCase["section"] as? Int {
                     XCTAssertEqual(
                         backup?.maker, .assistant(sectionNumber: expectedSection),
@@ -44,11 +45,42 @@ final class CourseManagementContractTests: XCTestCase {
                 XCTAssertNotNil(archive, "\(name) should be read as an archive")
                 XCTAssertNil(backup, "\(name) must NOT also read as a backup")
                 XCTAssertEqual(archive?.sectionNumber, testCase["section"] as? Int, name)
+                CourseManagementContractTests.assertMoment(archive?.archivedAt, is: testCase["moment"] as? String, in: name)
             default:
                 XCTAssertNil(backup, "\(name) must not be read as a backup")
                 XCTAssertNil(archive, "\(name) must not be read as an archive")
             }
         }
+    }
+
+    /// The moment a name is read as, checked against the contract.
+    ///
+    /// **Taken apart with a GREGORIAN calendar, and never re-spelled with the
+    /// app's own writer.** Asking `ArchiveStamp.text(for:)` to spell the date
+    /// back out and comparing THAT would be a round trip: it stays green
+    /// while the reader and the writer are wrong together, which is exactly
+    /// the state issue #160 found them in. Asking `Calendar.current` would be
+    /// worse again — on a Buddhist-calendar Mac it renders 2026 CE as 2569
+    /// and the test agrees with the bug.
+    private static func assertMoment(_ read: Date?, is expected: String?, in name: String) {
+        guard let expected else {
+            return
+        }
+        guard let read else {
+            XCTFail("\(name) was not read at all, so it has no moment")
+            return
+        }
+        var gregorian: Calendar = Calendar(identifier: .gregorian)
+        gregorian.timeZone = TimeZone.current
+        let pieces: DateComponents = gregorian.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second], from: read
+        )
+        let spelled: String = String(
+            format: "%04d-%02d-%02d %02d:%02d:%02d",
+            pieces.year ?? 0, pieces.month ?? 0, pieces.day ?? 0,
+            pieces.hour ?? 0, pieces.minute ?? 0, pieces.second ?? 0
+        )
+        XCTAssertEqual(spelled, expected, "\(name) is stamped with a moment the contract does not agree with")
     }
 
     // MARK: - The name a new course starts with

@@ -911,7 +911,13 @@ as history, not as what Windows does today.
   `<CODE>_backup_<timestamp>.zip` (teacher-made backups),
   `<CODE>_<timestamp>.zip` / `<CODE>-sectionN_<timestamp>.zip`
   (archives from removals), `<timestamp>.zip` (the wizard's automatic
-  zips, never listed). Backups get their own sidebar group above
+  zips, never listed). The `<timestamp>` is `yyyy-MM-dd_HHmmss` in the
+  **Gregorian** calendar on every machine, which on this side is already
+  true by construction — `CourseArchiver.cs` writes and `ArchivedItem.cs`
+  parses with `CultureInfo.InvariantCulture`. The mac reached the same
+  place on 2026-09-10 ([issue #160](https://github.com/russellgordon/plantoir/issues/160));
+  the moment each name is read as is now contract data
+  (`contracts/course-management.json` → `zipNames`, the `moment` per case). Backups get their own sidebar group above
   Archived. Restoring a backup archives the current course FIRST, then
   replaces the course folder's CONTENTS in place — never the folder
   itself (see the Obsidian note below) — and keeps the zip. Deleting a

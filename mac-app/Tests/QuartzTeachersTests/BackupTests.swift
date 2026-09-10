@@ -172,6 +172,62 @@ final class BackupTests: XCTestCase {
         )
     }
 
+    /// A backup whose stamp cannot be true is never counted and never
+    /// deleted — because this list is sorted by date before its tail is
+    /// thrown away.
+    ///
+    /// The name here is what a Buddhist-calendar Mac wrote before 2026-09-10,
+    /// carried to this one in a working folder. Nothing can tell that 2569
+    /// was ever meant to be 2026 — reading it as Buddhist would mean deciding
+    /// another machine's calendar on its behalf — so it keeps the date it
+    /// has, and sorts as the newest thing in the folder. Counted, it would
+    /// take one of the five kept places and push a real backup out of the
+    /// list and off the disk.
+    @MainActor
+    func testABackupWhoseStampCannotBeTrueIsNeitherCountedNorDeleted() throws {
+        let fixture: BackupFixture = try BackupFixture()
+        defer { fixture.tearDown() }
+        let fileManager: FileManager = FileManager.default
+
+        let folderURL: URL = fixture.coursesDirectoryURL
+            .appendingPathComponent("_backups")
+            .appendingPathComponent("ICS3U")
+        try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
+
+        let carriedOver: String = "ICS3U_backup_2569-08-09_141530_assistant-section1.zip"
+        var assistantNames: [String] = []
+        for daysAgo in 1...5 {
+            assistantNames.append(
+                "ICS3U_backup_\(BackupTests.stamp(daysAgo: daysAgo))_assistant-section1.zip"
+            )
+        }
+
+        var namesToPlant: [String] = assistantNames
+        namesToPlant.append(carriedOver)
+        for name in namesToPlant {
+            try Data("planted".utf8).write(to: folderURL.appendingPathComponent(name))
+        }
+
+        CourseArchiver.pruneBackups(
+            forCourseCode: "ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+
+        for name in assistantNames {
+            XCTAssertTrue(
+                fileManager.fileExists(atPath: folderURL.appendingPathComponent(name).path),
+                "\(name) is one of the five real backups and must survive"
+            )
+        }
+        XCTAssertTrue(
+            fileManager.fileExists(atPath: folderURL.appendingPathComponent(carriedOver).path),
+            "A backup with an unreadable date is still the teacher's, and is not ours to delete"
+        )
+        XCTAssertNotNil(
+            BackupItem.from(fileURL: folderURL.appendingPathComponent(carriedOver), courseCode: "ICS3U"),
+            "…and it goes on being listed, so they can restore or delete it themselves"
+        )
+    }
+
     /// A course with nothing but the teacher's own backups loses none of
     /// them, however many there are.
     @MainActor
@@ -207,14 +263,16 @@ final class BackupTests: XCTestCase {
 
     /// "2026-08-09_141530", that many days back from now — so the test means
     /// the same thing whenever it is run.
+    ///
+    /// Spelled by the app's own writer rather than by a formatter of its
+    /// own: a fixture that spells a name a different way is a fixture that
+    /// stops describing the product the moment the product changes.
     private static func stamp(daysAgo: Int, extraSeconds: TimeInterval = 0) -> String {
-        let formatter: DateFormatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HHmmss"
         let secondsPerDay: TimeInterval = 24 * 60 * 60
         let moment: Date = Date()
             .addingTimeInterval(-secondsPerDay * TimeInterval(daysAgo))
             .addingTimeInterval(extraSeconds)
-        return formatter.string(from: moment)
+        return ArchiveStamp.text(for: moment)
     }
 
     @MainActor
@@ -235,7 +293,21 @@ final class BackupTests: XCTestCase {
         )
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
-        XCTAssertTrue(backupURL.lastPathComponent.hasPrefix("ICS3U_backup_"))
+        // The whole name, not just its beginning — this is the one test that
+        // watches the REAL writer, and the fault it guards against is in the
+        // half a prefix check never looks at. A Buddhist-calendar Mac with an
+        // unpinned formatter writes "ICS3U_backup_2569-…", which has the same
+        // prefix and is not a name Plantoir writes.
+        let name: String = backupURL.lastPathComponent
+        let thisYear: Int = Calendar(identifier: .gregorian).component(.year, from: Date())
+        XCTAssertNotNil(
+            name.range(of: "^ICS3U_backup_\\d{4}-\\d{2}-\\d{2}_\\d{6}\\.zip$", options: .regularExpression),
+            "“\(name)” is not the name the contract describes"
+        )
+        XCTAssertTrue(
+            name.contains("ICS3U_backup_\(thisYear)-"),
+            "“\(name)” is not stamped in the Gregorian year it was made in"
+        )
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.pageURL.path),
                       "Backing up must not move or remove the course")
 

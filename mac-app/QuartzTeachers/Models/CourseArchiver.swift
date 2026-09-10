@@ -86,6 +86,18 @@ enum CourseArchiver {
             guard case .assistant = backup.maker else {
                 continue
             }
+            // A stamp that cannot be true is not allowed to decide what gets
+            // DELETED. `ArchiveStamp` still reads such a name — a zip carried
+            // from a Mac whose calendar this one does not use, say — so the
+            // teacher can see it and restore it; but its date is the one
+            // thing about it that is known to be wrong, and this list is
+            // sorted by date before the tail of it is thrown away. A copy
+            // stamped 2569 would sort as the NEWEST thing in the folder and
+            // quietly take a real backup's place among the five that are
+            // kept. Left out, it is never counted and never deleted.
+            guard ArchiveStamp.couldHaveBeenStamped(backup.backedUpAt) else {
+                continue
+            }
             backups.append(backup)
         }
         if backups.count <= mostBackupsKept {
@@ -248,9 +260,11 @@ enum CourseArchiver {
 
     /// "ICS3U_2026-08-09_141530.zip", or with a suffix,
     /// "ICS3U_backup_2026-08-09_141530_assistant-section1.zip".
+    ///
+    /// The moment is spelled by `ArchiveStamp`, which is also what reads it
+    /// back — a writer with a formatter of its own is how the two came to
+    /// disagree in the first place.
     private static func timestampedName(prefix: String, suffix: String = "") -> String {
-        let formatter: DateFormatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        return "\(prefix)_\(formatter.string(from: Date()))\(suffix).zip"
+        return "\(prefix)_\(ArchiveStamp.text(for: Date()))\(suffix).zip"
     }
 }
