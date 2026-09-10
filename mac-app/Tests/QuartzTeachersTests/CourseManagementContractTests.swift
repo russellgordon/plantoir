@@ -83,6 +83,56 @@ final class CourseManagementContractTests: XCTestCase {
         XCTAssertEqual(spelled, expected, "\(name) is stamped with a moment the contract does not agree with")
     }
 
+    // MARK: - Whether a stamp could be true
+
+    /// The rule that decides what gets DELETED, so both apps run it.
+    ///
+    /// Every case is ASCII digits read as Gregorian, which is what makes the
+    /// list portable: it means the same thing under `en_US_POSIX` and under
+    /// `CultureInfo.InvariantCulture`. The mac's own migration — reading the
+    /// spellings an older build wrote in the machine's calendar — is
+    /// deliberately not here, and `ArchiveStampTests` covers it.
+    func testWhetherAStampCouldBeTrueIsWhatTheContractSays() throws {
+        let section: [String: Any] = try CourseManagementContractTests.section("zipNames")
+        let rule: [String: Any] = try XCTUnwrap(section["couldHaveBeenStamped"] as? [String: Any])
+
+        // The bounds themselves, so a change to either goes red HERE and on
+        // Windows rather than only in the Swift that happens to hold them.
+        XCTAssertEqual(rule["earliest"] as? String, "2025-01-01 00:00:00")
+        XCTAssertEqual(rule["futureAllowanceDays"] as? Int, 2)
+
+        let secondsPerDay: TimeInterval = 24 * 60 * 60
+        for testCase in try XCTUnwrap(rule["cases"] as? [[String: Any]]) {
+            let expected: Bool = try XCTUnwrap(testCase["expect"] as? Bool)
+
+            if let daysFromNow = testCase["daysFromNow"] as? Int {
+                let moment: Date = Date().addingTimeInterval(secondsPerDay * TimeInterval(daysFromNow))
+                XCTAssertEqual(
+                    ArchiveStamp.couldHaveBeenStamped(moment), expected,
+                    "\(daysFromNow) days from now"
+                )
+                continue
+            }
+
+            let stamp: String = try XCTUnwrap(testCase["stamp"] as? String)
+            let read: Date = try XCTUnwrap(
+                CourseManagementContractTests.readAsGregorian(stamp),
+                "\(stamp) should parse as an ordinary Gregorian stamp, whatever it means"
+            )
+            XCTAssertEqual(ArchiveStamp.couldHaveBeenStamped(read), expected, stamp)
+        }
+    }
+
+    /// The stamp read the one way both platforms read it — no machine
+    /// calendar, no fallback. What the contract's cases are ABOUT.
+    private static func readAsGregorian(_ stamp: String) -> Date? {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = ArchiveStamp.format
+        return formatter.date(from: stamp)
+    }
+
     // MARK: - The name a new course starts with
 
     func testANewCourseStartsWithTheShortName() throws {
