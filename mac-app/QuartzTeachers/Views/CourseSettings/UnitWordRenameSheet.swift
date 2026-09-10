@@ -7,9 +7,16 @@ import SwiftUI
 /// way: it commits to disk straight away and says so. What it adds is the
 /// plan — how many pages, in which sections, how many links — shown BEFORE
 /// the teacher agrees, because this renames pages their links point at.
-/// The plan is worked out once, when the sheet opens; the counts do not
-/// depend on the word typed. What does depend on it — a page already sitting
-/// where a renamed page would go — is checked when Rename is pressed.
+/// The survey is made once, when the sheet opens; the counts do not depend
+/// on the word typed. What does depend on it — a page already sitting where
+/// a renamed page would go — is checked when Rename is pressed.
+///
+/// The walks leave the main actor (`Task.detached`), for the reason the
+/// folder rename gives: reading every page in an iCloud-backed vault
+/// downloads the evicted ones, one network round trip per page. The backup
+/// and the configuration write stay on the main actor, and the sheet cannot
+/// be dismissed while the work is under way, so a failure always has a view
+/// to land on.
 struct UnitWordRenameSheet: View {
 
     // MARK: - Stored properties
@@ -22,7 +29,7 @@ struct UnitWordRenameSheet: View {
     @Environment(\.dismiss) var dismiss
 
     @State var proposedWord: String = ""
-    @State var plan: UnitWordRenamePlan? = nil
+    @State var survey: UnitWordSurvey? = nil
     @State var interruptedTarget: String? = nil
     @State var failure: String? = nil
     @State var isRenaming: Bool = false
@@ -35,13 +42,9 @@ struct UnitWordRenameSheet: View {
 
     /// The live objection under the field, or nil when the word is usable.
     var problem: String? {
-        // Finishing an interrupted rename types the same word the record
-        // holds; that is not "unchanged", because the settings still say the
-        // old one.
-        if let interruptedTarget, proposedWord.trimmingCharacters(in: .whitespaces) == interruptedTarget {
-            return nil
-        }
-        return UnitWordRenamer.problem(renaming: currentWord, to: proposedWord)
+        return UnitWordRenamer.problem(
+            renaming: currentWord, to: proposedWord, interruptedTarget: interruptedTarget
+        )
     }
 
     var coursesDirectoryURL: URL {
@@ -52,6 +55,25 @@ struct UnitWordRenameSheet: View {
     /// the folder they are busy in.
     var workingFolderPath: String {
         return coursesDirectoryURL.deletingLastPathComponent().path
+    }
+
+    /// The proposal in the word typed so far, so "Unit 1, Day 1 becomes
+    /// Module 1, Day 1" follows the field.
+    var previewLines: [String] {
+        guard let survey else {
+            return []
+        }
+        let typed: String = ClassPageTerm.cleaned(proposedWord)
+        var lines: [String] = [
+            UnitWordRenameWording.previewPages(
+                courseCode: course.code, pages: survey.pages,
+                sections: survey.sections, old: currentWord, new: typed
+            ),
+        ]
+        if survey.pages > 0 {
+            lines.append(UnitWordRenameWording.previewLinks(count: survey.links))
+        }
+        return lines
     }
 
     // MARK: - Body
@@ -73,14 +95,15 @@ struct UnitWordRenameSheet: View {
                 TextField(ClassPageTerm.standard, text: $proposedWord, prompt: Text(ClassPageTerm.standard))
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("unitWordRenameField")
+                    .disabled(isRenaming)
                     .onSubmit {
                         Task { await performRename() }
                     }
             }
 
-            if let plan {
+            if survey != nil {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(previewLines(for: plan), id: \.self) { line in
+                    ForEach(previewLines, id: \.self) { line in
                         Text(line)
                             .font(.callout)
                             .fixedSize(horizontal: false, vertical: true)
@@ -91,7 +114,7 @@ struct UnitWordRenameSheet: View {
                 HStack(spacing: 6) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("Looking over the course’s pages…")
+                    Text(UnitWordRenameWording.lookingOver)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -120,6 +143,7 @@ struct UnitWordRenameSheet: View {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
+                .disabled(isRenaming)
                 if isRenaming {
                     ProgressView()
                         .controlSize(.small)
@@ -129,12 +153,13 @@ struct UnitWordRenameSheet: View {
                     Task { await performRename() }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(problem != nil || plan == nil || isRenaming)
+                .disabled(problem != nil || survey == nil || isRenaming)
                 .accessibilityIdentifier("unitWordRenameButton")
             }
         }
         .padding(20)
         .frame(width: 460)
+        .interactiveDismissDisabled(isRenaming)
         .task {
             await lookOverTheCourse()
         }
@@ -142,37 +167,22 @@ struct UnitWordRenameSheet: View {
 
     // MARK: - Functions
 
-    /// The preview in the word typed so far, so "Unit 1, Day 1 becomes
-    /// Module 1, Day 1" follows the field.
-    func previewLines(for plan: UnitWordRenamePlan) -> [String] {
-        let typed: String = ClassPageTerm.cleaned(proposedWord)
-        var lines: [String] = [
-            UnitWordRenameWording.previewPages(
-                courseCode: plan.courseCode, pages: plan.renames.count,
-                sections: plan.sectionsTouched, old: plan.from, new: typed
-            ),
-        ]
-        if !plan.renames.isEmpty {
-            lines.append(UnitWordRenameWording.previewLinks(count: plan.linksToRewrite))
-        }
-        return lines
-    }
-
-    /// Fills the field and works out the plan. Yields to the run loop first
-    /// so the sheet is on screen before the course's pages are read.
+    /// Fills the field and makes the survey — off the main actor, because it
+    /// reads every page in the course.
     func lookOverTheCourse() async {
-        let interrupted: String? = UnitWordRenamer.interruptedRenameTarget(in: course)
+        let facts: UnitWordRenameCourseFacts = UnitWordRenamer.facts(for: course)
+        let interrupted: String? = await Task.detached(priority: .userInitiated) {
+            return UnitWordRenamer.interruptedRenameTarget(facts: facts)
+        }.value
         interruptedTarget = interrupted
         proposedWord = interrupted ?? currentWord
-        await Task.yield()
-        // Planned against the CURRENT word on both sides: the counts are the
-        // same whatever is typed, and the destination check is redone on
-        // Rename with the real word.
-        plan = UnitWordRenamer.plan(from: currentWord, to: currentWord + " ", in: course)
+        survey = await Task.detached(priority: .userInitiated) {
+            return UnitWordRenamer.survey(facts: facts)
+        }.value
     }
 
     func performRename() async {
-        if problem != nil || isRenaming {
+        if problem != nil || survey == nil || isRenaming {
             return
         }
         failure = nil
@@ -185,37 +195,84 @@ struct UnitWordRenameSheet: View {
 
         let oldWord: String = currentWord
         let newWord: String = ClassPageTerm.cleaned(proposedWord)
-        // Let the spinner draw before the pages are read.
-        await Task.yield()
+        let facts: UnitWordRenameCourseFacts = UnitWordRenamer.facts(for: course)
 
-        // Planned again with the real word — the plan on screen was made when
-        // the sheet opened, and Obsidian may be open — then carried out.
-        let freshPlan: UnitWordRenamePlan = UnitWordRenamer.plan(from: oldWord, to: newWord, in: course)
-        let outcome: UnitWordRenameOutcome
+        // 1. Planned again with the real word — the survey on screen was made
+        //    when the sheet opened, and Obsidian may be open — and every page
+        //    read, both off the main actor. Nothing has changed yet.
+        let planned: Result<(UnitWordRenamePlan, [String]), Error> = await Task.detached(priority: .userInitiated) {
+            let freshPlan: UnitWordRenamePlan = UnitWordRenamer.plan(from: oldWord, to: newWord, facts: facts)
+            if let refusal = freshPlan.problems.first {
+                return .failure(UnitWordRenameProblem(
+                    sentence: refusal, pagesRenamed: 0, linksRewritten: 0, changedTheCourse: false
+                ))
+            }
+            do {
+                return .success((freshPlan, try UnitWordRenamer.readEveryPage(of: freshPlan)))
+            } catch {
+                return .failure(error)
+            }
+        }.value
+        let freshPlan: UnitWordRenamePlan
+        let texts: [String]
+        switch planned {
+        case .success(let pair):
+            freshPlan = pair.0
+            texts = pair.1
+        case .failure(let error):
+            failure = error.localizedDescription
+            return
+        }
+
+        // 2. The way back, on the main actor: the archiver is.
+        let backupURL: URL
         do {
-            outcome = try UnitWordRenamer.rename(
-                freshPlan, in: course, coursesDirectoryURL: coursesDirectoryURL
-            )
+            backupURL = try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         } catch {
+            failure = error.localizedDescription
+            return
+        }
+
+        // 3. The work, off the main actor.
+        let carried: Result<UnitWordRenameOutcome, Error> = await Task.detached(priority: .userInitiated) {
+            do {
+                return .success(try UnitWordRenamer.carryOut(
+                    freshPlan, texts: texts, facts: facts, backupURL: backupURL
+                ))
+            } catch {
+                return .failure(error)
+            }
+        }.value
+        let outcome: UnitWordRenameOutcome
+        switch carried {
+        case .success(let done):
+            outcome = done
+        case .failure(let error):
             let sentence: String = error.localizedDescription
+            // A rename that touched the course and stopped is the one outcome
+            // the trail exists for: from here the course has two words in it.
+            // Owed whenever anything on disk changed, which is not the same as
+            // whether a page was counted — the first page can be retitled and
+            // then fail to move.
+            var changedTheCourse: Bool = false
             var renamedSoFar: Int = 0
             if let problem = error as? UnitWordRenameProblem {
+                changedTheCourse = problem.changedTheCourse
                 renamedSoFar = problem.pagesRenamed
             }
-            // A rename that moved pages and stopped is the one outcome the
-            // trail exists for: from here the course has two words in it.
-            if renamedSoFar > 0 {
+            if changedTheCourse {
                 ActivityTrail.note(
                     .unitWordRenamed,
                     "started renaming the word for a unit in " + course.code + " from " + oldWord
                     + " to " + newWord + " and stopped after " + String(renamedSoFar)
-                    + " class pages — " + sentence
+                    + " class pages (backup " + backupURL.lastPathComponent + ") — " + sentence
                 )
             }
             failure = sentence
             return
         }
 
+        // 4. The settings, on the main actor: the model is observable.
         do {
             try UnitWordRenamer.record(freshPlan, in: course)
         } catch {
@@ -230,15 +287,17 @@ struct UnitWordRenameSheet: View {
             return
         }
 
-        ActivityTrail.note(
-            .unitWordRenamed,
-            "renamed the word for a unit in " + course.code + " from " + oldWord + " to " + newWord
+        var line: String = "renamed the word for a unit in " + course.code + " from " + oldWord + " to " + newWord
             + " (" + String(outcome.pagesRenamed) + " class pages renamed, "
             + String(outcome.linksRewritten) + " links updated, backup "
             + outcome.backupURL.lastPathComponent + ")"
-        )
+        if outcome.pagesNotWritten > 0 {
+            line += " — " + String(outcome.pagesNotWritten) + " pages could not be written, so their links still use the old names"
+        }
+        ActivityTrail.note(.unitWordRenamed, line)
         let sentence: String = UnitWordRenameWording.doneSentence(
-            from: oldWord, to: newWord, pages: outcome.pagesRenamed, links: outcome.linksRewritten
+            from: oldWord, to: newWord, pages: outcome.pagesRenamed,
+            links: outcome.linksRewritten, pagesNotWritten: outcome.pagesNotWritten
         )
         dismiss()
         onRenamed(sentence)

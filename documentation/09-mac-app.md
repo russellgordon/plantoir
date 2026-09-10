@@ -221,7 +221,9 @@ contract, because "disk first, configuration last" is the kind of reasoning a
 refactor simplifies away:
 
 1. **Reads every page it is about to rename**, and refuses the whole rename
-   if one cannot be read. The insertion planner's habit is to skip a page it
+   if one cannot be read. Also refuses if the record in step 3 cannot be
+   written: a rename with no record is one that cannot be recognised if it
+   stops. The insertion planner's habit is to skip a page it
    cannot read; here that would write `unit_word: Module` while the skipped
    page still said `Unit`, recognised by nothing — the exact silent failure
    `unit_word` exists to prevent. Reading first also pays an iCloud-backed
@@ -293,14 +295,40 @@ Things that were decided, with what was rejected:
   clearing failed, or the word was edited by hand; left alone it would prefill
   a word from another day forever. `SpecialFolderRenamer.interruptedRenameTarget`
   checks the disk as well as its record for the same reason.
-- **It runs on the main actor**, unlike the folder rename beside it. Every
-  helper it reuses — `UnitDay`, `PageFrontmatter`, `WikiLinkRewriter`,
-  `CourseArchiver` — is main-actor under the project's default isolation, as
-  is `ClassInsertionPlanner`, whose rename this widens. A course holds under
-  a hundred class pages; the sheet yields to the run loop before the walk so
-  the spinner draws. Taking it off the main actor would mean making six
-  helpers `nonisolated` and passing the course's facts across as values,
-  which is a piece of its own if a teacher ever reports the freeze.
+- **The walks run off the main actor**, like the folder rename beside it.
+  The first implementation ran on the main actor because every helper it
+  reuses was main-actor under the project's default isolation, and the
+  implementation review counted the cost honestly: the survey, the pre-read
+  and the link pass are three full walks of the course, plus a zip of the
+  whole course, on exactly the iCloud-evicted vault the folder rename went
+  off-main for — and a spinner cannot animate while the main actor is
+  blocked. Making it right cost less than feared: `UnitDay`,
+  `ClassPageTerm`, `WikiLinkRewriter`, three `PageFrontmatter` functions
+  and `ClassPages.markdownPages` are pure and needed only the keyword, and
+  the walk works from `UnitWordRenameCourseFacts` — the five things it needs
+  to know about a course, copied out on the main actor — rather than from
+  the course itself. Only the backup (a subprocess) and the configuration
+  write (the observable model) stay on the main actor, and the sheet cannot
+  be dismissed while the work is under way, so a failure always has a view
+  to land on.
+- **A stopped rename is finished with its own word or not at all.** While a
+  record is on disk only its target is accepted; any other word would plan
+  from the old word alone, leave the pages already moved matching neither,
+  and end with three words in one course. The record is believed only when
+  the disk agrees — at least one class page under the new word — and a
+  restored backup clears the records itself, so "did not finish — press
+  Rename" can never describe a rename the restore undid.
+- **Nothing is moved onto itself.** The parser is case-insensitive, so on a
+  re-run of a capitalisation change the pages already spelled the new way
+  match the old word too; a page whose new title equals its title is left
+  where it is (and kept in the link map). Whether a destination that
+  "exists" is the source is asked of the filesystem's file identity, never
+  of the spelling, so a case-sensitive volume still sees a genuine clash.
+- **The trail line is owed whenever the course changed**, which is not the
+  same as whether a page was counted: the first page can be retitled and
+  then fail to move. `UnitWordRenameProblem` carries `changedTheCourse` for
+  exactly that, and a page whose links could not be written back is counted
+  and said rather than silently shrinking the number the teacher was shown.
 - **A display-only rename** (titles say Thread while files stay Unit) was
   rejected on 2026-09-01 and stays rejected: Obsidian is the teacher's editor
   and they would see the old word every time they opened the vault, which is

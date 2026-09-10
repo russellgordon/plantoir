@@ -1368,6 +1368,27 @@ final class SharedRulesContractTests: XCTestCase {
         let problems: [String: Any] = try XCTUnwrap(rename["problems"] as? [String: Any])
         XCTAssertEqual(UnitWordRenameWording.problemEmpty, problems["empty"] as? String)
         XCTAssertEqual(UnitWordRenameWording.problemUnchanged, problems["unchanged"] as? String)
+        XCTAssertEqual(UnitWordRenameWording.lookingOver, rename["lookingOver"] as? String)
+        XCTAssertEqual(
+            UnitWordRenameWording.problemMustFinishFirst(target: "Module"),
+            (problems["mustFinishFirst"] as? String)?.replacingOccurrences(of: "{target}", with: "Module")
+        )
+        XCTAssertEqual(UnitWordRenameWording.doneLinksNotWritten(pages: 1), rename["doneLinksNotWrittenOne"] as? String)
+        XCTAssertEqual(
+            UnitWordRenameWording.doneLinksNotWritten(pages: 3),
+            (rename["doneLinksNotWrittenMany"] as? String)?.replacingOccurrences(of: "{pages}", with: "3")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.doneSentence(from: "Unit", to: "Module", pages: 86, links: 12, pagesNotWritten: 2),
+            [
+                UnitWordRenameWording.done(from: "Unit", to: "Module"),
+                UnitWordRenameWording.donePages(count: 86),
+                UnitWordRenameWording.doneLinks(count: 12),
+                UnitWordRenameWording.doneLinksNotWritten(pages: 2),
+                UnitWordRenameWording.donePublish,
+                UnitWordRenameWording.doneBackup,
+            ].joined(separator: " ")
+        )
         XCTAssertEqual(
             UnitWordRenameWording.problemPageInTheWay(courseCode: "ICS3U", sectionNumber: 2, name: "Module 1, Day 2"),
             (problems["pageInTheWay"] as? String)?

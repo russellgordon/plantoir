@@ -126,7 +126,7 @@ enum PageFrontmatter {
     /// returned unchanged: Quartz falls back to the file name, which is
     /// already right after a rename, and inserting a key the teacher never had
     /// is not this function's business.
-    static func settingTitle(in pageText: String, to title: String) -> String {
+    nonisolated static func settingTitle(in pageText: String, to title: String) -> String {
         guard let block = block(in: pageText) else {
             return pageText
         }
@@ -142,7 +142,7 @@ enum PageFrontmatter {
 
     /// Where the frontmatter block starts and ends, and the lines inside it.
     /// A page whose first line is not `---` has no frontmatter to speak of.
-    static func block(in pageText: String) -> (openIndex: Int, closeIndex: Int, lines: [String])? {
+    nonisolated static func block(in pageText: String) -> (openIndex: Int, closeIndex: Int, lines: [String])? {
         let lines: [String] = pageText.components(separatedBy: "\n")
         guard let first = lines.first, trimmingCarriageReturn(first) == "---" else {
             return nil
@@ -162,7 +162,7 @@ enum PageFrontmatter {
     }
 
     /// A line without the carriage return a Windows-written file leaves on it.
-    static func trimmingCarriageReturn(_ line: String) -> String {
+    nonisolated static func trimmingCarriageReturn(_ line: String) -> String {
         if line.hasSuffix("\r") {
             return String(line.dropLast())
         }

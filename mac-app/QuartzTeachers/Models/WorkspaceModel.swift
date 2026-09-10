@@ -1299,6 +1299,13 @@ class WorkspaceModel {
                 forWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
                 courseCode: item.courseCode
             )
+            // So do the records of renames under way: the pages they describe
+            // have just been replaced, and a record left standing would open
+            // the next Course Settings with "did not finish — press Rename to
+            // finish" about a rename the restore has undone.
+            let courseDirectory: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
+            UnitWordRenamer.clearRenameRecord(courseDirectory: courseDirectory)
+            SpecialFolderRenamer.clearRenameRecord(courseDirectory: courseDirectory)
         } catch {
             backupProblem = error.localizedDescription
             reloadCourses()
