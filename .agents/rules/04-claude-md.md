@@ -9,6 +9,48 @@ description: "Plantoir project rules, part 4 of 9 - Rules that override default 
 
 ## Rules that override default behaviour (continued)
 
+   **A Windows session is therefore not missing a rule set** — decided
+   2026-08-17, when it turned out that machine has no global instructions
+   configured and the agent there could see only a rule about a language it
+   never touches. `windows-app/` is ordinary idiomatic C#, LINQ included
+   (`Where`, `Select` and friends appear about 105 times in product code
+   today), and that is the intended state, not drift to be tidied up. Do not
+   "bring the C# into line" with the Swift rules, and do not propose it: the
+   two apps are written by different hands in different languages, and one
+   house style stretched across both would buy nothing a teacher can see.
+9. **Driving the interface leaves the machine as you found it — and gives the
+   terminal back.** Written for **macOS sessions**, where the setup is known:
+   Russell works at this Mac with the session running in iTerm. (A Windows
+   session owes the same courtesy to whatever terminal it was launched from,
+   by whatever means that platform offers.)
+
+   Verifying a change by driving the real app — activating it, sending
+   keystrokes through System Events, taking screenshots — is encouraged: it
+   has already caught bugs that every unit test passed. But when that stretch
+   of work is done, not merely at the end of the whole task, **bring the
+   terminal back to the front**:
+
+   ```bash
+   osascript -e 'tell application "iTerm" to activate'
+   ```
+
+   Russell watches progress at a glance from across the room, and an app left
+   frontmost hides the transcript, so he has to walk over to find out what is
+   happening. The same rule covers everything else a test borrowed: put the
+   system appearance back if you toggled Dark Mode, restore another
+   application's state if you changed it (Obsidian's vault registry, say —
+   back it up first, and check afterwards that it matches), and leave no
+   half-finished edit open in the app. Say what you touched and that you put
+   it back.
+
+10. **When you think the work is done, rebuild the app before you say so.**
+    Not after every edit — at the point you believe the change addresses what
+    was asked and you are about to report back. That is the moment Russell goes
+    to test it, and his Dock icon points at the Debug build in DerivedData
+    (`~/Library/Developer/Xcode/DerivedData/Plantoir-*/Build/Products/Debug/Plantoir.app`,
+    the same bundle `xcodebuild` writes), so "rebuild it" and "make it ready to
+    test" are the same act:
+
     ```bash
     cd mac-app
     xcodegen generate     # if files were added or removed, or project.yml changed

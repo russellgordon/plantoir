@@ -209,8 +209,39 @@ Neither app contains toolchain logic of its own: they write the same
      not. "A coherent piece" keeps its old meaning — one thing a teacher
      could notice, with its tests and its write-up; not one file, and not a
      whole afternoon. When Russell approves the merge, merge with `--no-ff`
-     so the piece stays one readable unit in history, and delete the branch
-     after it merges.
+     so the piece stays one readable unit in history.
+   - **Then DELETE the branch — local and remote — in the same session, as
+     the last step of the merge.** Standing order from Russell, 2026-09-09,
+     replacing the trailing clause "and delete the branch after it merges"
+     that used to end the point above. Same instruction; it is its own step
+     now because a clause at the end of a sentence about merge strategy was
+     read as advice and skipped, and by the day this was written the remote
+     carried **26 branches of which 25 were fully merged** — 0 commits
+     ahead, nothing unique in any of them.
+
+     ```bash
+     git branch -d issue/<number>-<slug>                      # local
+     git push origin --delete issue/<number>-<slug>           # remote
+     ```
+
+     Use `-d`, never `-D`: the lowercase form refuses a branch that is not
+     fully merged, which is the check, not an inconvenience to work around.
+     A branch it refuses is telling you something — go and look before you
+     force it.
+
+     **The cost is not tidiness.** A list where 25 of 26 entries are dead is
+     a list nobody reads, so the one LIVE branch — somebody else's work in
+     flight, on a repository where two agents and a session can be running
+     at once — is invisible in it. That happened here the same day: this
+     session read the eight most recently committed branches, called them
+     live without checking, and warned Russell about a duplicate that did
+     not exist. Every branch that survives its merge makes the next reader's
+     answer worse.
+
+     **Deleting the branch is not what finishes the WORK** — the issue's
+     closing comment is (rules 3 and 4), and the branch goes after it, so a
+     merged piece leaves exactly two traces: the `--no-ff` merge commit and
+     the closed issue.
    - **Autonomy moves with the model, and it stops at the issue branch.**
      Committing as you go on the issue branch, and pushing that branch to
      `origin`, are the standing order — no per-session permission.
