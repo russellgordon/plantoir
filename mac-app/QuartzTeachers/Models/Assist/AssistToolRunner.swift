@@ -113,10 +113,11 @@ final class AssistToolRunner {
     /// The day a relative word is counted from, read afresh every time it is
     /// asked for.
     ///
-    /// Not observable, and deliberately: `@Observable` sees stored properties,
-    /// and this is a hand-written computed one over a closure. A view that
-    /// displayed it would not redraw when the day turned. Nothing displays it
-    /// today — `AssistAgent` is the only reader.
+    /// Not observable, and deliberately: `@Observable` tracks a computed
+    /// property through the stored ones it READS, and this one reads a `let`
+    /// closure, so there is nothing to track. A view that displayed it would
+    /// not redraw when the day turned. Nothing displays it today —
+    /// `AssistAgent` is the only reader.
     ///
     /// Readable from outside because `AssistAgent` settles the day of a call
     /// BEFORE the plan twin and the act both run against it, and the two must
