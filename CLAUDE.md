@@ -274,9 +274,13 @@ Neither app contains toolchain logic of its own: they write the same
    The Swift in `mac-app/` avoids `map`/`filter`/`reduce`, uses `@Observable`
    (never `ObservableObject`) and `// MARK: -` sections, and prefers clarity
    over concision. Those rules live in Russell's MACHINE-WIDE instructions
-   (`~/.claude/CLAUDE.md`, mirrored to `~/.gemini/GEMINI.md`), not in this
-   repository, because they govern his Swift everywhere rather than this
-   project in particular.
+   (`~/.claude/CLAUDE.md`), not in this repository, because they govern his
+   Swift everywhere rather than this project in particular. There is ONE
+   copy, and that is the point: the `~/.gemini/GEMINI.md` mirror this line
+   used to name was removed on 2026-09-09 along with the agent that read it,
+   and it had already drifted — 203 lines against 263, missing the rule
+   against `DispatchQueue` entirely. A mirror nobody re-syncs is a second
+   answer to the same question.
 
    **A Windows session is therefore not missing a rule set** — decided
    2026-08-17, when it turned out that machine has no global instructions
