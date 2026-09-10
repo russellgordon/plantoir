@@ -829,7 +829,11 @@ the order you are likely to meet the same things:
   through `~/Library/Mobile Documents/com~apple~CloudDocs/…`, so the last
   crumb — the only one that differs between a teacher's folders — was the
   one lost. Now a contract rule, `workingFolderPathBar.tooLongForTheSpace`:
-  a path too long for the space shows its END. Your bar needs the same.
+  a path too long for the space shows its END. Your bar needs the same. (That
+  fix then broke the opposite case — a path SHORT enough to fit ended up at the
+  far end of the bar, away from its label — which is the sibling rule
+  `fitsInTheSpace`, added 2026-09-09. Both, or neither: see
+  [`10-local-ai-assistant.md`](10-local-ai-assistant.md#the-working-folder-path-bar--reported-missing-in-use-2026-08-16).)
 - **The folder must be NAMED before it is explained.** The picker showed the
   five sentences and then the path bar; a teacher reads "this folder" and
   looks for which folder. Path bar first, in both the empty-folder and the

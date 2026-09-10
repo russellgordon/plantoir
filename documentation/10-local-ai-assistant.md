@@ -896,6 +896,43 @@ at the drive rather than at `/`), the two actions with each platform's label,
 and the gestures. The labels differ on purpose: "Show in Finder" against
 "Show in File Explorer".
 
+**Where the crumbs SIT, which took two goes to get right.** The bar has two
+rules and they are one rule seen from each end: a path too long for the space
+shows its END (`tooLongForTheSpace`, 2026-09-05 — an iCloud path runs through
+`~/Library/Mobile Documents/com~apple~CloudDocs/…`, so the last crumb is the
+only one that differs between a teacher's folders and it was the one lost), and
+a path that FITS starts beside the label (`fitsInTheSpace`, 2026-09-09, issue
+#145). The second was written four days after the first, because the first
+BROKE it. The mac's bar is a horizontal `ScrollView`; a scroll view fills
+whatever width it is given, so once the content was anchored at the trailing
+edge, a short path was pinned to the far end of the window with the label
+stranded at the other — reported from a screenshot, on every window, for four
+days.
+
+**The shape of that mistake is worth more than the fix**, because it is not
+about SwiftUI: a greedy container handed an alignment meant for the OVERFLOW
+case applies it just as happily to the case that fits, and the case that fits is
+the ordinary one. The fix is to prefer the natural-size form —
+`ViewThatFits(in: .horizontal)` on the mac, choosing the plain row and falling
+back to the scrolling one. It lives inside `FinderPathBarView` rather than at a
+call site, which matters: the folder picker had already met this and wrapped its
+own copy in a `ViewThatFits`, so the knowledge existed in the repository while
+the window's bar went on being wrong, and a third caller would have inherited
+the bug again. Windows is not affected — `BreadcrumbBar` in a `*` column lays
+out leading-first and collapses the START of the path — but that is the
+platform's control being right, not a decision anyone made, so a hand-rolled
+`ScrollViewer` of crumbs there would need `HorizontalAlignment="Left"` on its
+content and would meet exactly this.
+
+**Pinned by measurement, not by eye.** A layout rule asserted in words is a rule
+nothing runs. `PathBarWidthTests` proposes 1,400 points to the bar and reads
+back the width it CLAIMS — the defect being precisely "claims all the width
+offered" — the way `CloudSyncNoticeLayoutTests` reads height for the notice
+above it. 175 points with the fix; 1,400 with it taken out, for a row that draws
+in 175. A third case squeezes a long path to 320 and requires it to take all
+320, so "ask for less" cannot be satisfied by a bar that clips instead of
+scrolling.
+
 **The general lesson, which is why this went unnoticed for months.** An
 affordance that lives ONLY in a context menu is invisible to everything: no
 screenshot shows it, no test on the other side asks for it, and the person
