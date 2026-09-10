@@ -162,23 +162,31 @@ final class ClassPlanningContractTests: XCTestCase {
 
     private func makeWorkspace(
         meetingDates: [String] = ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16",
-                                  "2026-09-18", "2026-09-22"]
+                                  "2026-09-18", "2026-09-22"],
+        word: String? = nil,
+        sectionNumbers: [Int] = [1]
     ) throws -> (root: URL, coursesURL: URL, course: Course) {
         let root: URL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("class-planning-contract-\(UUID().uuidString)")
         let coursesURL: URL = root.appendingPathComponent("courses")
         let courseURL: URL = coursesURL.appendingPathComponent("ICS3U")
-        try FileManager.default.createDirectory(
-            at: courseURL.appendingPathComponent("section1/All Classes"), withIntermediateDirectories: true
-        )
-        let configuration: [String: Any] = [
+        for sectionNumber in sectionNumbers {
+            try FileManager.default.createDirectory(
+                at: courseURL.appendingPathComponent("section\(sectionNumber)/All Classes"),
+                withIntermediateDirectories: true
+            )
+        }
+        var configuration: [String: Any] = [
             "course_code": "ICS3U",
             "course_name": "Introduction to Computer Science",
-            "section_numbers": [1],
-            "num_sections": 1,
+            "section_numbers": sectionNumbers,
+            "num_sections": sectionNumbers.count,
             "per_section_folders": ["All Classes"],
             "per_section_files": [],
         ]
+        if let word {
+            configuration["unit_word"] = word
+        }
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
             .write(to: courseURL.appendingPathComponent("course_config.json"))
         let loaded: CourseConfiguration = try CourseConfiguration(
@@ -194,7 +202,7 @@ final class ClassPlanningContractTests: XCTestCase {
         return (root, coursesURL, course)
     }
 
-    private func writeClass(_ title: String, on date: String, in course: Course) throws {
+    private func writeClass(_ title: String, on date: String, in course: Course, section: Int = 1) throws {
         let page: String = """
         ---
         title: \(title)
@@ -205,7 +213,7 @@ final class ClassPlanningContractTests: XCTestCase {
         \(title)
         """
         try page.write(
-            to: ClassPages.folderURL(forSection: 1, in: course).appendingPathComponent(title + ".md"),
+            to: ClassPages.folderURL(forSection: section, in: course).appendingPathComponent(title + ".md"),
             atomically: true, encoding: .utf8
         )
     }
@@ -312,6 +320,95 @@ final class ClassPlanningContractTests: XCTestCase {
         XCTAssertFalse(appliesTo.isEmpty)
         XCTAssertNotNil(section["dateInherited"])
         XCTAssertNotNil(section["why"])
+    }
+
+    // MARK: - Renaming the word for a unit
+
+    /// Which pages a rename of the course's word moves, and what refuses it.
+    /// Each case builds its own course, so the rule is run against real files
+    /// rather than against a list of titles.
+    func testRenamingTheUnitWordCases() throws {
+        for testCase in try ClassPlanningContractTests.cases(in: "renamingTheUnitWord") {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let from: String = try XCTUnwrap(testCase["from"] as? String)
+            let to: String = try XCTUnwrap(testCase["to"] as? String)
+            let pages: [[String: Any]] = try XCTUnwrap(testCase["pages"] as? [[String: Any]])
+
+            var sectionNumbers: [Int] = []
+            for page in pages {
+                let section: Int = try XCTUnwrap(page["section"] as? Int)
+                if !sectionNumbers.contains(section) {
+                    sectionNumbers.append(section)
+                }
+            }
+            let (root, _, course) = try makeWorkspace(word: from, sectionNumbers: sectionNumbers)
+            defer { try? FileManager.default.removeItem(at: root) }
+            for page in pages {
+                let section: Int = try XCTUnwrap(page["section"] as? Int)
+                let title: String = try XCTUnwrap(page["title"] as? String)
+                try writeClass(title, on: "2026-09-08", in: course, section: section)
+            }
+
+            let plan: UnitWordRenamePlan = UnitWordRenamer.plan(from: from, to: to, in: course)
+            if testCase["expectRefused"] as? Bool == true {
+                XCTAssertFalse(plan.canProceed, name)
+                XCTAssertTrue(plan.renames.isEmpty, "\(name): a refused plan must list no renames")
+                continue
+            }
+            XCTAssertTrue(plan.canProceed, "\(name): \(plan.problems)")
+            var actual: [String] = []
+            for rename in plan.renames {
+                actual.append("\(rename.sectionNumber): \(rename.from) → \(rename.to)")
+            }
+            actual.sort()
+            var expected: [String] = []
+            for rename in try XCTUnwrap(testCase["expectRenames"] as? [[String: Any]]) {
+                expected.append("\(try XCTUnwrap(rename["section"] as? Int)): \(try XCTUnwrap(rename["from"] as? String)) → \(try XCTUnwrap(rename["to"] as? String))")
+            }
+            expected.sort()
+            XCTAssertEqual(actual, expected, name)
+            XCTAssertEqual(plan.sectionsTouched, try XCTUnwrap(testCase["expectSections"] as? [Int]), name)
+            if let linkMap = testCase["expectLinkMap"] as? [String: String] {
+                XCTAssertEqual(plan.linkMap, linkMap, name)
+            }
+        }
+    }
+
+    /// How links follow the renamed pages — and, as much to the point, what
+    /// does not: prose, and pages that merely start with the word.
+    func testRenamingTheUnitWordLinkCases() throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("renamingTheUnitWord")
+        let linkCases: [String: Any] = try XCTUnwrap(section["linkCases"] as? [String: Any])
+        for testCase in try XCTUnwrap(linkCases["cases"] as? [[String: Any]]) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let from: String = try XCTUnwrap(testCase["from"] as? String)
+            let to: String = try XCTUnwrap(testCase["to"] as? String)
+            var renamedPages: [String: String] = [:]
+            for title in try XCTUnwrap(testCase["pageTitles"] as? [String]) {
+                let numbers: UnitDay = try XCTUnwrap(UnitDay(pageTitle: title, term: from), name)
+                renamedPages[title] = UnitDay(unit: numbers.unit, day: numbers.day, term: to).title
+            }
+            let text: String = try XCTUnwrap(testCase["text"] as? String)
+            XCTAssertEqual(
+                WikiLinkRewriter.rewriting(text, renamedPages: renamedPages),
+                try XCTUnwrap(testCase["expect"] as? String),
+                name
+            )
+        }
+    }
+
+    /// The order the contract fixes is the order the code runs — pinned by
+    /// name, because the reasoning for it ("disk first, configuration last")
+    /// is the kind of thing a refactor simplifies away.
+    func testRenamingTheUnitWordOrderIsDocumented() throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("renamingTheUnitWord")
+        let order: [String] = try XCTUnwrap(section["order"] as? [String])
+        XCTAssertEqual(order.count, 7)
+        XCTAssertTrue(order[0].contains("read every planned page"))
+        XCTAssertTrue(order[1].contains("back up"))
+        XCTAssertTrue(order[5].contains("unit_word"))
+        XCTAssertNotNil(section["why"])
+        XCTAssertNotNil(section["howAPageIsRenamed"])
     }
 
     private static func section(_ name: String) throws -> [String: Any] {

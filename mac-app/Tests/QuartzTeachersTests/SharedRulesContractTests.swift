@@ -1346,6 +1346,133 @@ final class SharedRulesContractTests: XCTestCase {
         }
     }
 
+    /// Every sentence the unit-word rename sheet shows is the contract's.
+    /// Named rather than quoted, so rewording is a one-place change.
+    func testRenameUnitWordSentencesMatchContract() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let rename: [String: Any] = try XCTUnwrap(section["renameUnitWord"] as? [String: Any])
+        XCTAssertEqual(UnitWordRenameWording.fieldLabel, rename["fieldLabel"] as? String)
+        XCTAssertEqual(UnitWordRenameWording.renameButton, rename["renameButton"] as? String)
+        XCTAssertEqual(UnitWordRenameWording.sheetTitle(for: "Unit"), "Rename “Unit”")
+        XCTAssertEqual(
+            UnitWordRenameWording.sheetTitle(for: "Unit"),
+            (rename["sheetTitle"] as? String)?.replacingOccurrences(of: "{word}", with: "Unit")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.rowCaption(word: "Module"),
+            (rename["rowCaption"] as? String)?.replacingOccurrences(of: "{word}", with: "Module")
+        )
+        XCTAssertEqual(UnitWordRenameWording.explanation, rename["explanation"] as? String)
+        XCTAssertEqual(UnitWordRenameWording.proseIsLeftAlone, rename["proseIsLeftAlone"] as? String)
+
+        let problems: [String: Any] = try XCTUnwrap(rename["problems"] as? [String: Any])
+        XCTAssertEqual(UnitWordRenameWording.problemEmpty, problems["empty"] as? String)
+        XCTAssertEqual(UnitWordRenameWording.problemUnchanged, problems["unchanged"] as? String)
+        XCTAssertEqual(
+            UnitWordRenameWording.problemPageInTheWay(courseCode: "ICS3U", sectionNumber: 2, name: "Module 1, Day 2"),
+            (problems["pageInTheWay"] as? String)?
+                .replacingOccurrences(of: "{code}", with: "ICS3U")
+                .replacingOccurrences(of: "{n}", with: "2")
+                .replacingOccurrences(of: "{name}", with: "Module 1, Day 2")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.problemPageUnreadable(courseCode: "ICS3U", sectionNumber: 2, name: "Unit 1, Day 2"),
+            (problems["pageUnreadable"] as? String)?
+                .replacingOccurrences(of: "{code}", with: "ICS3U")
+                .replacingOccurrences(of: "{n}", with: "2")
+                .replacingOccurrences(of: "{name}", with: "Unit 1, Day 2")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.problemBusy(courseCode: "ICS3U"),
+            (problems["busy"] as? String)?.replacingOccurrences(of: "{code}", with: "ICS3U")
+        )
+
+        let preview: [String: Any] = try XCTUnwrap(rename["preview"] as? [String: Any])
+        XCTAssertEqual(
+            UnitWordRenameWording.previewPages(courseCode: "ICS3U", pages: 0, sections: [], old: "Unit", new: "Module"),
+            (preview["pagesNone"] as? String)?
+                .replacingOccurrences(of: "{code}", with: "ICS3U")
+                .replacingOccurrences(of: "{old}", with: "Unit")
+                .replacingOccurrences(of: "{new}", with: "Module")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.previewPages(courseCode: "ICS3U", pages: 1, sections: [3], old: "Unit", new: "Module"),
+            (preview["pagesOne"] as? String)?
+                .replacingOccurrences(of: "{sections}", with: "Section 3")
+                .replacingOccurrences(of: "{old}", with: "Unit")
+                .replacingOccurrences(of: "{new}", with: "Module")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.previewPages(courseCode: "ICS3U", pages: 86, sections: [1, 2, 4], old: "Unit", new: "Module"),
+            (preview["pagesMany"] as? String)?
+                .replacingOccurrences(of: "{pages}", with: "86")
+                .replacingOccurrences(of: "{sections}", with: "Sections 1, 2 and 4")
+                .replacingOccurrences(of: "{old}", with: "Unit")
+                .replacingOccurrences(of: "{new}", with: "Module")
+        )
+        XCTAssertEqual(UnitWordRenameWording.sectionsPhrase([1, 3]), "Sections 1 and 3")
+        XCTAssertEqual(UnitWordRenameWording.previewLinks(count: 0), preview["linksNone"] as? String)
+        XCTAssertEqual(UnitWordRenameWording.previewLinks(count: 1), preview["linksOne"] as? String)
+        XCTAssertEqual(
+            UnitWordRenameWording.previewLinks(count: 12),
+            (preview["linksMany"] as? String)?.replacingOccurrences(of: "{count}", with: "12")
+        )
+
+        XCTAssertEqual(
+            UnitWordRenameWording.done(from: "Unit", to: "Module"),
+            (rename["done"] as? String)?
+                .replacingOccurrences(of: "{old}", with: "Unit")
+                .replacingOccurrences(of: "{new}", with: "Module")
+        )
+        XCTAssertEqual(UnitWordRenameWording.donePages(count: 0), rename["donePagesNone"] as? String)
+        XCTAssertEqual(UnitWordRenameWording.donePages(count: 1), rename["donePagesOne"] as? String)
+        XCTAssertEqual(
+            UnitWordRenameWording.donePages(count: 86),
+            (rename["donePagesMany"] as? String)?.replacingOccurrences(of: "{pages}", with: "86")
+        )
+        XCTAssertEqual(UnitWordRenameWording.doneLinks(count: 0), rename["doneLinksNone"] as? String)
+        XCTAssertEqual(UnitWordRenameWording.doneLinks(count: 1), rename["doneLinksOne"] as? String)
+        XCTAssertEqual(
+            UnitWordRenameWording.doneLinks(count: 12),
+            (rename["doneLinksMany"] as? String)?.replacingOccurrences(of: "{links}", with: "12")
+        )
+        XCTAssertEqual(UnitWordRenameWording.donePublish, rename["donePublish"] as? String)
+        XCTAssertEqual(UnitWordRenameWording.doneBackup, rename["doneBackup"] as? String)
+        // The order of the whole sentence, as `doneOrder` describes it.
+        XCTAssertEqual(
+            UnitWordRenameWording.doneSentence(from: "Unit", to: "Module", pages: 86, links: 12),
+            [
+                UnitWordRenameWording.done(from: "Unit", to: "Module"),
+                UnitWordRenameWording.donePages(count: 86),
+                UnitWordRenameWording.doneLinks(count: 12),
+                UnitWordRenameWording.donePublish,
+                UnitWordRenameWording.doneBackup,
+            ].joined(separator: " ")
+        )
+
+        let interrupted: [String: Any] = try XCTUnwrap(rename["interruptedRename"] as? [String: Any])
+        XCTAssertEqual(
+            UnitWordRenameWording.interruptedRename(from: "Unit", to: "Module"),
+            (interrupted["message"] as? String)?
+                .replacingOccurrences(of: "{old}", with: "Unit")
+                .replacingOccurrences(of: "{new}", with: "Module")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.halfDone(renamed: 40, of: 86, stoppedAt: "Unit 3, Day 2", reason: "disk full"),
+            (rename["halfDone"] as? String)?
+                .replacingOccurrences(of: "{renamed}", with: "40")
+                .replacingOccurrences(of: "{total}", with: "86")
+                .replacingOccurrences(of: "{name}", with: "Unit 3, Day 2")
+                .replacingOccurrences(of: "{reason}", with: "disk full")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.settingsNotWritten(new: "Module", reason: "disk full"),
+            (rename["settingsNotWritten"] as? String)?
+                .replacingOccurrences(of: "{new}", with: "Module")
+                .replacingOccurrences(of: "{reason}", with: "disk full")
+        )
+    }
+
     func testCurriculumFolderResolutionCases() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
         let resolutionSection: [String: Any] = try XCTUnwrap(section["curriculumFolderResolution"] as? [String: Any])
