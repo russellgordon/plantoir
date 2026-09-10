@@ -38,7 +38,7 @@ the boundary is a TOP-LEVEL key — the file names them under `generated.keys`:
 |---|---|
 | `cardPhrasings` | `AssistCardCommand.fixedShapes` |
 | `tools` | `AssistToolRunner.tools` / `.localTools` / `.mcpOnlyTools`, and each definition's `needsApproval` and `planTwinName` |
-| `nearMisses`, `scenarios` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and decisions are why this repository has handoff documents. |
+| `nearMisses`, `scenarios` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and a decision lives in the `documentation/` page that owns its subject, with a GitHub issue pointing at it when the other platform owes work — the handoff documents that used to hold them were retired on 2026-09-08. |
 
 In `app-rules.json` the same split applies: `milestones` is a readout of
 `TaskMilestones` and `credentialRequests` a readout of `CredentialRequest` —
@@ -238,7 +238,8 @@ recounted 2026-09-07.
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
-| Which folders the marks checklist OFFERS | `shared-rules.json` → `gradedFolders.choices` | Proposed from Windows 2026-09-06 and run there by `GradedFolderChoicesTests` (10 cases). **The mac has the behaviour and runs no case list**, so its suite does not go red for this one — [issue #112](https://github.com/russellgordon/plantoir/issues/112). |
+| What a removal does to the marks pool | `shared-rules.json` → `gradedFolders.removingAFolder` | `GradedFolderChoices` (6 cases), played through Course Settings in the order it really happens. Proposed FROM the mac 2026-09-09 and **run nowhere else yet**: Windows deserialises only `gradedFolders.choices`, so its suite stays GREEN rather than going red, and wiring this list is part of what [#142](https://github.com/russellgordon/plantoir/issues/142) asks for. Four of the six fail there as the code stands. |
+| Which folders the marks checklist OFFERS | `shared-rules.json` → `gradedFolders.choices` | `GradedFolderChoices` (14 cases, the depth cap and the skip list), against real directory trees — a walk over a fixture is not a walk. Proposed from Windows 2026-09-06 and run on the mac since 2026-09-09 (issues [#79](https://github.com/russellgordon/plantoir/issues/79) and [#112](https://github.com/russellgordon/plantoir/issues/112)); both platforms now go red for it. |
 | What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (25), and `scripts/test_site_health.py` |
 
 ### Which of these the WINDOWS suite runs
@@ -265,7 +266,7 @@ through these classes in
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
 | `gradedFolders.cases`, and `gradedFolders.wording` — the Marks list's title and caption (proposed from Windows 2026-09-08; the mac runs nothing for it yet and is not red) | `GradedFolderContractTests`. Whether a teacher can SEE the caption is `CourseSettingsCaptionUiTests` in `Plantoir.UiTests/`, opt-in and part of no gate |
-| `gradedFolders.choices` (cases, the depth cap and the skip list) | `GradedFolderChoicesTests` |
+| `gradedFolders.choices` (cases, the depth cap and the skip list) | `GradedFolderChoicesTests`. The mac runs the same list in its own `GradedFolderChoicesTests` since 2026-09-09; the three cases added there that day — the symbol sort, a section folder found deeper down, and the level a removed name reaches — pass here unchanged, and only the `Count >= 11` guard needs raising, to 14 |
 | `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
 | `specialNames.contentStructureTip` (proposed from Windows 2026-09-07; the mac runs nothing for it yet, and is not red — no mac test names the key) | `SpecialNamesContractTests`. Whether a teacher can actually SEE it is `CourseSettingsCaptionUiTests`, which is in `Plantoir.UiTests/` rather than this project, carries `[UiFact]`, and runs only under `PLANTOIR_UI_TESTS=1` — so it is part of no gate |
 | `specialNames.renameFolder.materialisesOnRename`, `addCreatesTheFolder`, `removeLeavesTheFolderOnDisk`, `renameFolder.interruptedRename` (proposed from Windows 2026-09-07) | `FolderRenameApplyTests` |

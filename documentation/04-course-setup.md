@@ -435,6 +435,106 @@ already ticked, so a teacher sees what is actually happening rather than a blank
 list. Nothing is written until they change something — and the moment they do,
 the answer is explicit and the historical rule stops applying to that course.
 
+### What the checklist OFFERS, and the two traps in walking a folder to find out
+
+The list is the course's `shared_folders`, then its `per_section_folders`, then
+every folder found inside the course itself, four levels down — because the
+build counts a graded folder at ANY depth, and a checklist built from the two
+top-level lists alone would let the first tick freeze a pool without
+`Portfolios/Tasks` in it. The rule, its skip list, its depth cap and its 14
+cases are `contracts/shared-rules.json` → `gradedFolders.choices`, run by
+`GradedFolderChoicesTests` on both platforms against REAL directory trees: a
+walk over a fixture is not a walk.
+
+Two things about it cost real time, and both were found by one platform and
+paid for by the other.
+
+**A folder the teacher REMOVED is still on disk, so the walk hands it back.**
+`excluded_items` is what a removal writes, and the walk must consult it or the
+confirmation's own promise — "Removing it will take it out of your course's
+marks pool" — is broken on the very next redraw. Filtered at the two levels the
+build's preflight scan discovers: the course's own children against
+`excluded_items.shared`, a section folder's children against
+`excluded_items.per_section`, matched exactly, case included. (A `sectionN`
+folder hands that per-section scope to its children wherever it is found, not
+only directly inside the course — both apps have always done it, it falls out
+of passing the scope down a recursive walk, and a case now says so rather than
+leaving the two to drift apart the first time anyone tidies one of them.) The cost is
+recorded rather than hidden: a pooled name found ONLY inside the removed folder
+then has no row to untick until the folder is put back. Nothing is lost — a
+pooled name with no row is preserved rather than dropped — and it is not
+silent, because `_has_graded_folders` walks the MERGED tree, so a pool matching
+nothing published reports that no folder counts for marks exactly as an empty
+pool would.
+
+**And a consequence of that filter, which is a rule in its own right** —
+`gradedFolders.removingAFolder`, six cases. Removing a folder takes its name out
+of the marks pool, with two exceptions, and both exist to stop a removal quietly
+taking marks OFF the map:
+
+- **A course that has NEVER been asked is left unasked.** Freezing wrote the
+  historical rule's answer minus the removed folder, and on the ordinary course
+  whose only marked folder is `Tasks` that is an EMPTY pool: nothing counting
+  for marks, permanently, from a removal the teacher was told only would take
+  one folder out of it. An absent key keeps the historical rule running, so a
+  `Thinking Tasks` still counts and putting the folder back restores it.
+- **A name that still counts somewhere else keeps its place.** The pool is a
+  list of NAMES, so when `Portfolios/Tasks` survives a top-level `Tasks`, the
+  checklist still offers `Tasks` and it still names published work. This is in
+  slight tension with the confirmation's literal words — the FOLDER left the
+  course, a folder of that name did not — and the trade is deliberate: a pool
+  entry naming published work is worth more than a sentence read to the letter.
+
+Both fall out of one instruction: recompute what the checklist offers AFTER the
+removal is recorded, and drop the name only if it is no longer among them AND
+the course had already been asked.
+
+Two edges of that, recorded rather than left to be met. The second exception
+says "still OFFERED", not "still counts": the checklist sees four levels and the
+build counts at any depth, so a `Tasks` five levels down is dropped from the
+pool and goes on counting. And the "at least one folder must count for marks"
+floor — the one that refuses to unpick the last pooled folder while the coverage
+map is on — asks whether this is the last NAME in the pool, not whether the pool
+would survive the removal. So it still blocks removing a top-level `Tasks` on a
+course where `Portfolios/Tasks` would have kept the name. Conservative, rare,
+and the same on both platforms; sharpening it would be a shared change. **Order is the whole subject.** Ask before
+the exclusion is written and the removed folder is still on the list, so the
+pool freezes — which is what the mac did until 2026-09-09 and what Windows still
+does, from a walk cached one `BuildForm` pass earlier ([issue
+#142](https://github.com/russellgordon/plantoir/issues/142)).
+
+Nothing new is written to the activity trail for any of this. The removal
+already leaves its own line (`item excluded`), and what changed is only which
+folders are OFFERED — which is not something a teacher DOES, and a trail line
+for it would record a redraw.
+
+**The ORDER is ordinal, case-insensitive, and every shorter way of asking for
+that is a different question.** Directory enumeration order is the filesystem's
+business, so the children of each folder are sorted — otherwise the same course
+lists differently on two machines, and no case could pin an order at all. Which
+comparison, measured on a Mac 2026-09-09 while adopting the rule:
+
+| Asked this way | `Unit 10` vs `Unit 2` | `_Archive` vs `Alpha` |
+|---|---|---|
+| `localizedStandardCompare` (Finder order) | `Unit 2` first | `_Archive` first |
+| `compare(options: [.caseInsensitive])` | `Unit 10` first ✅ | `_Archive` first |
+| C# `OrdinalIgnoreCase` — what shipped | `Unit 10` first ✅ | `Alpha` first ✅ |
+
+The trap is the middle row: it looks right, and it is right about digits, and
+it is wrong about the six ASCII characters between `Z` and `a` (`[ \ ] ^ _ `)
+because Foundation folds to LOWER case where C# folds to UPPER. `_Archive` and
+`~Old` are ordinary names for a folder a teacher wants at one end of a list. The
+mac therefore precomposes, upper-cases, and compares UTF-16 code units by hand
+(`GradedFolderChoices.sortsBefore`), and a contract case pins each row of that
+table, so the two suites disagree rather than the teachers. Accented names are
+deliberately NOT pinned: macOS hands back decomposed spellings and Windows
+precomposed ones, and a case would promise what neither platform can keep on the
+other's files.
+
+Finder order is arguably nicer for a person reading a list. If anyone wants it,
+it is a shared change to the contract and both apps — not something to reach for
+on one side because it looked more natural there.
+
 ### Content declares its own pool
 
 All 38 payload manifests and all 50 skeleton families now carry
@@ -448,9 +548,11 @@ disagree for the one that would have been broken by it.
 
 ### Where the rules live
 
-`contracts/shared-rules.json` → `gradedFolders` (9 cases, run by
-`scripts/test_graded_folders.py` in the image) and `contracts/file-formats.json`
-for the key itself.
+`contracts/shared-rules.json` → `gradedFolders` (10 cases for which folders
+COUNT, run by `scripts/test_graded_folders.py` in the image — neither app
+implements that rule, so neither suite runs them) and `gradedFolders.choices`
+(14 cases for what the checklist OFFERS, run by both apps). The key itself is in
+`contracts/file-formats.json`.
 
 ## “Where do the class pages live?” had four answers
 
