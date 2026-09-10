@@ -3360,7 +3360,12 @@ final class AssistToolRunner {
             return arguments
         }
         var settled: [String: Any] = arguments
-        // The precedence `classPlan` itself reads them in.
+        // BOTH keys, and the order of this list means nothing: each is read
+        // from what arrived and written to the copy, so no key can settle
+        // against another's answer. Which of the two a tool then USES is
+        // `classPlan`'s decision, and it takes `date` first; settling both
+        // means that decision is made the same way whether the words were
+        // settled or not.
         for key in ["date", "when"] {
             let raw: String = AssistToolRunner.text(key, in: arguments)
             if raw.isEmpty {
