@@ -1652,7 +1652,14 @@ Two details that make the backups usable rather than merely present:
   about a particular section, or themselves on purpose. A list of five
   identical-looking timestamps is not a choice anybody can make.
 - **Prune only the ASSISTANT's own backups**, keeping its five most recent
-  per course. A teacher's backup is a decision — they pressed Back Up because
+  per course — and, since 2026-09-10, only those whose stamp could be true.
+  The date lives in the file NAME, this list is sorted by it and its tail is
+  thrown away, so a name stamped in another machine's calendar (2569, on a
+  zip carried from a pre-fix Thai Mac) would sort as the newest thing in the
+  folder and take a real backup's place. Left out of the count, it is never
+  deleted either: [09-mac-app.md](09-mac-app.md) → "What an archive or a
+  backup is CALLED" says what that costs, since a Mac with a badly wrong
+  clock stops being pruned too. A teacher's backup is a decision — they pressed Back Up because
   they were about to do something they were unsure of — and deleting it on a
   schedule they never agreed to is the app overruling them about their own
   work. The assistant's are different in kind: it saves one per conversation

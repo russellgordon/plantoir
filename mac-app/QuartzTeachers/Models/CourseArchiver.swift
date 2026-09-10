@@ -28,7 +28,9 @@ enum CourseArchiver {
     /// it rides in the same name — see `BackupMaker`.
     ///
     /// The oldest backups of this course are pruned afterwards, so the
-    /// folder settles at `mostBackupsKept` instead of growing forever.
+    /// folder settles at `mostBackupsKept` instead of growing forever — with
+    /// one exception, added with the calendar fix: a backup whose stamp
+    /// cannot be true is neither counted nor deleted. See `pruneBackups`.
     @discardableResult
     static func backUpCourse(
         _ course: Course,
