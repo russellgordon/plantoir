@@ -327,6 +327,18 @@
         "tool" : "make_room_for_classes"
       },
       {
+        "becauseNotThis" : "An article with a plural noun disagrees exactly as a count and a noun do, and this tool renames pages the teacher's links point at. Both apps already refuse it; the case is written down so a looser matcher has to change this list on purpose.",
+        "example" : "make room for a class at Unit 3, Day 4",
+        "fills" : {
+          "atDay" : "<day>",
+          "howMany" : "1",
+          "unit" : "<unit>"
+        },
+        "notThis" : "make room for a classes at Unit 3, Day 4",
+        "shape" : "make room for a class at unit <unit>, day <day>",
+        "tool" : "make_room_for_classes"
+      },
+      {
         "becauseNotThis" : "A comma means one PAGE was named, which has a title in it for the model to read out. Only a bare unit number is a whole unit.",
         "example" : "publish unit 5",
         "fills" : {

@@ -583,12 +583,11 @@ public class AssistSurfaceContractTests
         var missing = new List<string>();
         var stillDropped = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var phrasing in doc["cardPhrasings"]!["matches"]!.AsArray())
+        void Check(string typed)
         {
-            string typed = phrasing!["phrasing"]!.ToString();
             var matched = AssistCardCommand.Matching(typed);
-            if (matched is null) continue;   // the phrasing itself is another test's business
-            if (!served.TryGetValue(matched.ToolName, out var method)) continue;
+            if (matched is null) return;   // the phrasing itself is another test's business
+            if (!served.TryGetValue(matched.ToolName, out var method)) return;
 
             var takes = method.GetParameters()
                 .Select(p => p.Name!)
@@ -602,6 +601,19 @@ public class AssistSurfaceContractTests
                 missing.Add($"“{typed}” sets \"{key}\" and {matched.ToolName} does not take it");
             }
         }
+
+        foreach (var phrasing in doc["cardPhrasings"]!["matches"]!.AsArray())
+            Check(phrasing!["phrasing"]!.ToString());
+
+        // The PARSED families too, which this walked past until 2026-09-09.
+        // They are the half where an argument is most easily misnamed, because
+        // it is built in code from a number rather than written out beside the
+        // sentence — and `make_room_for_classes`, whose three are `unit`,
+        // `atDay` and `howMany`, is the most dangerous tool on the surface.
+        // A dropped `atDay` there would make room at the wrong day and rename
+        // a run of the teacher's pages to prove it.
+        foreach (var family in doc["cardPhrasings"]!["parsed"]!.AsArray())
+            Check(family!["example"]!.ToString());
 
         Assert.True(missing.Count == 0,
             "These card arguments are dropped on the way to the tool, silently: " +
@@ -634,6 +646,24 @@ public class AssistSurfaceContractTests
         // section to every tool it can reach, and these two are simply surplus.
         ["undo_last_change.course"] = "the undo history is per conversation, so the argument is surplus",
         ["undo_last_change.section"] = "the undo history is per conversation, so the argument is surplus",
+
+        // HARMLESS for the same reason, and MEASURED rather than assumed.
+        // Driving the real plantoir-mcp.exe over stdio (ModelContextProtocol
+        // 2.2.0) with both keys present, `list_courses` answered with the
+        // folder's three courses and `IsError` was false. `list_courses` is
+        // about the FOLDER, so a course and a section are nothing it could
+        // use; `back_up_course` copies a whole course, sections and all.
+        ["list_courses.course"] = "list_courses is about the folder, so both are surplus",
+        ["list_courses.section"] = "list_courses is about the folder, so both are surplus",
+
+        // NOT harmless, and listed for exactly that reason — the way #116 was
+        // carried here until it was fixed. "Duplicate Unit 3, Day 2 as my next
+        // class" is offered by the prompt shelf and pinned by the contract,
+        // and add_next_class has no `duplicate` parameter at all: the binder
+        // drops it and the teacher gets a BLANK next class where they asked
+        // for a copy of a lesson. Issue #149 builds it; delete this entry then,
+        // which the check below insists on.
+        ["add_next_class.duplicate"] = "issue #149 — the tool cannot duplicate a page yet",
 
         // Issue #116 was here — the eight publish_class_on phrasings sending
         // `when` at a tool that takes `date`. Fixed 2026-09-09:
