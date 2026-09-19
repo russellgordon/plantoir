@@ -724,8 +724,11 @@ and every folder built before the fix stays broken until someone passes
 ## The local assistant
 
 Plantoir has an on-device assistant: the teacher types "publish tomorrow's
-class" and the pages are published. It is on `main` in both apps and in no
-released version, because no release has been tagged yet.
+class" and the pages are published. It is on `main` in both apps and it has
+SHIPPED: it is in v1.1.0 (2026-08-20), so a change to it is a change to
+something teachers already use — not to a feature still waiting for its first
+release. (This paragraph said "in no released version, because no release has
+been tagged yet" until 2026-09-19, a month after that stopped being true.)
 
 One sentence explains the architecture — **the model never does anything.** It
 reads a sentence and answers with the name of a function and its arguments;
