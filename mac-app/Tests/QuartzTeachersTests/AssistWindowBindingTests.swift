@@ -253,15 +253,18 @@ final class AssistWindowBindingTests: XCTestCase {
 
         let engine: StubEngine = try StubEngine()
         defer { engine.stop() }
+        // The model's own spelling is `mcv4u`, deliberately: the two halves of
+        // this answer disagree about it ON PURPOSE, and asserting both here is
+        // what stops the trail being "tidied up" into the sentence's spelling.
         engine.serve(Canned.finished(
             tool: "publish_pages",
-            arguments: #"{"course": "MCV4U", "section": 1, "pages": "Unit 1, Day 1"}"#
+            arguments: #"{"course": "mcv4u", "section": 1, "pages": "Unit 1, Day 1"}"#
         ))
 
         let agent: AssistAgent = AssistFixture.makeAgent(
             tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
         )
-        let sentence: String = "Put MCV4U's lesson in front of the students for me"
+        let sentence: String = "Put my calculus lesson in front of the students for me"
         XCTAssertNil(AssistCardCommand.matching(sentence), "The sentence is answered in code, so nothing was tested.")
         await agent.say(sentence)
 
@@ -295,9 +298,18 @@ final class AssistWindowBindingTests: XCTestCase {
         XCTAssertTrue(transcript(of: agent).contains(sentence))
 
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        // The TRAIL keeps what the MODEL wrote; the SENTENCE above names the
+        // course the way the working folder spells it. Both are asserted,
+        // because the divergence is a rule — `contracts/shared-rules.json` →
+        // `activityTrail.mustRecord` says so — and a normalised line would
+        // throw away the only record that the model spelt it oddly.
         XCTAssertTrue(
-            trail.contains("the assistant was asked about MCV4U in this window, which is for ICS3U"),
-            "Nothing on the trail says the request named another course:\n\(trail)"
+            trail.contains("the assistant was asked about mcv4u in this window, which is for ICS3U"),
+            "Nothing on the trail says the request named another course, in the model's own spelling:\n\(trail)"
+        )
+        XCTAssertFalse(
+            trail.contains("MCV4U"),
+            "The trail was normalised to the folder's spelling, losing what the model actually wrote:\n\(trail)"
         )
         XCTAssertTrue(trail.contains("nothing was run from it"), trail)
         XCTAssertTrue(trail.contains("publish pages"), trail)
