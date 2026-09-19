@@ -635,6 +635,64 @@ reached, so the wording change cannot cost a misroute. A card offering
 something the model is unreliable at would be worse than no card at all, so
 one was removed for exactly that reason.
 
+### Re-measured on Metal after the system prompt changed
+
+The system prompt gained two sentences on 2026-08-24 (`b77b91bd`) on the
+strength of numbers taken on **Windows, in a container, under Vulkan**. Issue
+#117 re-measured it here. Full conditions, thresholds and per-probe tables in
+`research/ai-assist/metal-routing-results.txt`; the summary, 29 probes on the
+shipping 13-tool surface, M4 Pro, llama.cpp b10435 native with Metal, each
+tier at its own context size:
+
+| | Qwen3 4B (`.large`) | Qwen2.5 1.5B (`.small`) |
+|---|---|---|
+| All 29 probes, shipped prompt | **271 / 290 (93%)** | 208 / 290 (72%) |
+| The same, with the pre-2026-08-24 prompt | 270 / 290 (93%) | 199 / 290 (69%) |
+| The eleven the window offers | **110 / 110** | 90 / 110 |
+| Polarity inversions | **0** | **0** |
+| Tool calls whose arguments were truncated | **0** | 12-19 per 290 |
+
+Two things to take from it, and nothing more. **The 2026-08-24 change is
+neutral on the tier this Mac runs** — 27 of the 29 probes give the identical
+tool with the old wording and the new one — and the cluster it was written
+for was never present here: "I posted Unit 2, Day 3 by mistake. Make it a
+draft again." is `unpublish_pages` 10/10 in every arm of both models, before
+the tweak and after it. And **the two tiers are not two grades of the same
+thing**: the small one is solidly right on 19 of 29 probes and solidly wrong
+on 7, including "Deploy tomorrow's class at 6:30 AM", which it answers by
+deploying now. That is why the small tier shows what it is about to do before
+doing it, and the large one does not.
+
+**Something both platforms must know before quoting a zero.** Every suite in
+`research/ai-assist/` parses a tool call's arguments as
+`try: json.loads(...) except: args = {}`, so a call whose argument JSON was cut
+off short has always been recorded as a call with no arguments, and never as a
+malformed one. `trimmed-surface-suite.py` counts it now; `teachers-say-suite.py`
+and `adversarial-suite.py` — the Windows-side ones — still do not, so a "0
+malformed" from either means "no HTTP errors". It is not a Windows bug to fix
+on a deadline: the mac is the platform EXPOSED to it, because
+`AssistModelClient` sends no `max_tokens` at all where Windows'
+`LocalModel` sends 512.
+
+The figures above are not a failure rate. The suite runs at temperature 0.1
+(0 in the arms that copy the app's own request), which is near-greedy: ten
+trials tell you whether a model systematically mishandles a sentence, not how
+often a teacher would be misrouted. Re-running an identical arm an hour later
+moved the total by 3-5 responses in 290.
+
+**A harness divergence worth knowing, for whoever measures next.** The suite's
+system-prompt constant writes ASCII hyphens where `AssistAgent.swift` — and
+`AssistAgent.cs` — write em-dashes. Six characters, the only difference, and
+every routing number in `research/` before 2026-09-18 was taken against the
+hyphen form rather than the shipped string. Measured both ways on the same
+server the same evening: 204/290 against 208/290, no stable probe moving by
+more than 3/10, which is inside this suite's own run-to-run wobble. **So the
+older numbers stand**, and neither app owes the other a change. The suite now
+keeps `--prompt hyphen` as its default for comparability, offers
+`--prompt shipped` which READS the literal out of the Swift, and asserts on
+every run that the two differ by exactly those six characters — because the
+comment that used to hold them together said "keep this in sync by hand".
+
 ---
 
 ## Part 6 — The design in full, and the reasoning behind it
@@ -2354,12 +2412,38 @@ rather than by writing the code.
    without it would have handed the phrasings credit for work the app was
    already doing. `trimmed-surface-results.txt` had already recorded the same
    line being worth fifteen points when prepended instead.
-3. **There are THREE interception layers before the model, not one:**
-   `PreviewAskedForPlainly` (thirteen exact sentences),
-   `AssistCardCommand.Matching` (`FixedShapes` plus its three parsers), and
-   four inline regexes in `AssistAgent.CardCommand` itself. Three controls
-   were sentences the app answers WITHOUT the model, so they measured
-   nothing. The mac's `AssistCardCommand.swift` has the same shape.
+3. **There are THREE interception layers before the model on WINDOWS, and
+   ONE on the mac** — the trap is the same, the count is not, and the
+   sentence here used to say "the mac's `AssistCardCommand.swift` has the
+   same shape", which is false. On Windows: `PreviewAskedForPlainly`
+   (thirteen exact sentences), `AssistCardCommand.Matching` (`FixedShapes`
+   plus its parsers), and four inline regexes in `AssistAgent.CardCommand`
+   itself. Three controls were sentences the app answers WITHOUT the model,
+   so they measured nothing.
+
+   **On the mac there is one layer and it is reached once**, at
+   `AssistAgent.swift:172` — `AssistCardCommand.matching(trimmed)`, on the
+   text BEFORE the dateline is appended, tidied by trimming whitespace,
+   stripping leading and trailing `.` and `!`, and lower-casing, then
+   compared by EQUALITY (never substring), followed by four parsed families.
+   The plain-preview sentences are not a second layer here: "preview" and
+   "rebuild the preview" are entries in `fixedShapes` like everything else.
+   Corrected 2026-09-18 while measuring #117, which counted them rather than
+   assuming: of the 29 probes in `trimmed-surface-suite.py`, exactly **five**
+   are answered in code and never routed —
+
+       card: publish tomorrow   -> publish_class_on
+       card: check the section  -> check_section
+       card: rebuild preview    -> rebuild_preview
+       card: undo               -> undo_last_change
+       card: deploy now         -> deploy_section
+
+   all five of them promise-card phrasings. The suite now reports both totals
+   (all 29 and the 24 a model actually sees) and finds that list from
+   `contracts/assist-cases.json` rather than from a hand copy, so a phrasing
+   added to the card table shows up in the next measurement by itself. They
+   are still measured, because Claude Code over MCP has no interception layer
+   in front of it and does route them.
 4. **Making a research script stricter can delete a control.** Requiring the
    course code in `narrow-tools.py` read as a tightening and would have
    silently turned `trimmed-surface-suite.py --real-course` into a no-op,

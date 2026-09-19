@@ -438,6 +438,15 @@ same two. Neither inverted polarity once in 840 replies. The model-selection
 table below is from the earlier 29-probe suite, which is what the choice of
 model was actually made on.
 
+Re-measured on 2026-09-18 (issue #117) after the system prompt changed on
+Windows' numbers, this time with each tier at ITS OWN context size and the
+request body the app really sends: the 4B holds 110/110 on the window's
+suggestions and 93% overall, the 1.5B 72%, and neither inverted polarity in
+2,494 replies. The older wording of the prompt scores the same on the 4B, so
+the change is neutral here. Conditions, thresholds and per-probe tables are in
+`research/ai-assist/metal-routing-results.txt`, which is also the file to read
+before quoting any "0 malformed calls" from this folder.
+
 Replies take about 0.5 s once the conversation is warm. The first reply is
 the one-off read of the tool definitions, which the window warms in the
 background as it opens, so a teacher does not normally wait for it. Closing
