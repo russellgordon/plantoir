@@ -790,6 +790,10 @@ final class ScheduledDeployTests: XCTestCase {
     /// The orange triangle has to say what it means, both on hover and to
     /// anyone listening to the row rather than looking at it.
     ///
+    /// What this pins is the SENTENCE. That the sentence is attached to the
+    /// triangle is not something a unit test can see; taking the hover text
+    /// off the image would leave this green.
+    ///
     /// Asked for by Russell on 2026-09-19: the clock beside it has had hover
     /// text since it shipped, and a warning mark that says nothing leaves a
     /// teacher to guess which of the two badges is the bad one.
