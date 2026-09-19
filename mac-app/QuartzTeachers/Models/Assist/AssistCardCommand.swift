@@ -59,7 +59,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 return command
             }
         }
-        if let unit = AssistCardCommand.wholeUnit(tidied) {
+        if let unit = AssistCardCommand.wholeUnitOrClassPage(tidied) {
             return unit
         }
         if let more = AssistCardCommand.moreDays(tidied) {
@@ -422,29 +422,118 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         )
     }
 
-    /// "Publish Unit 5" and "Unpublish Unit 4", for any unit number.
+    /// "Publish Unit 5", "Unpublish Unit 4", and — since #215 — "Hide Unit 4,
+    /// Day 21".
     ///
     /// Parsed rather than listed, because unlike the seven weekdays there is
     /// no fixed set of units to write down. It is still a FIXED SHAPE in every
-    /// way that matters: the whole sentence is the request, the unit number is
-    /// the only thing in it, and reading an integer off the end is not a
-    /// judgement anybody needs a language model for.
+    /// way that matters: the whole sentence is the request, the numbers in it
+    /// are the only things in it, and reading an integer out of a frame is not
+    /// a judgement anybody needs a language model for.
     ///
-    /// Deliberately strict. "Publish Unit 4, Day 3" has a comma and is one
-    /// page, so it is not matched here and goes to the model, which is exactly
-    /// right — that request has a page title in it to read out.
-    private static func wholeUnit(_ tidied: String) -> AssistCardCommand? {
-        for (prefix, tool) in [("unpublish unit ", "unpublish_pages"),
-                               ("publish unit ", "publish_pages")]
-        where tidied.hasPrefix(prefix) {
-            let rest: String = String(tidied.dropFirst(prefix.count))
-                .trimmingCharacters(in: .whitespaces)
-            guard !rest.isEmpty, !rest.contains(","), Int(rest) != nil else {
-                return nil
-            }
-            return AssistCardCommand(toolName: tool, arguments: ["pages": "Unit \(rest)"])
+    /// **"Hide" is here because the model could not do it, and that was
+    /// measured** (issue #215, 2026-09-19, Qwen2.5-1.5B Q4_K_M with the app's
+    /// own flags, request body and system prompt, temperature 0). "Unpublish
+    /// unit 4, day 21" reached `unpublish_pages` every time; "hide unit 4, day
+    /// 21" reached NO tool at all in five phrasings out of five — the model
+    /// handed the teacher their own sentence back as text, date line and all.
+    /// It errs in the safe direction, and it reads as broken. The repository's
+    /// own rule says to steer with code rather than with a tool description
+    /// (one clarifying sentence added to `publish_pages`' description once took
+    /// the promise-card score from 110/110 to 90/110), so the word is answered
+    /// here and the router never sees it.
+    ///
+    /// **The day arm is gated on the VERB, and the asymmetry is deliberate.**
+    /// `hide` and `unpublish` take a whole unit or one class page; `publish`
+    /// takes a whole unit only, exactly as it did before, so "publish unit 4,
+    /// day 3" still goes to the model. Unpublishing errs safe — a page nobody
+    /// can see — while publishing puts a page in front of students, and
+    /// "Publish Unit 2, Day 3" is 10/10 on the smaller assistant today, so
+    /// there is nothing to buy by widening the dangerous direction on the same
+    /// day. `show` and `unhide` are out for a nearer reason: "show unit 4" is
+    /// at least as likely to mean "display it to me", and getting that wrong
+    /// publishes.
+    ///
+    /// **Any extra word must fall through, and that is a safety rule rather
+    /// than tidiness.** `AssistAgent.encode` writes this window's course and
+    /// section into every card call, and the guard that refuses a request
+    /// naming another course lives in `think()`, which a matched card never
+    /// reaches. So "hide unit 4, day 21 in ICS3U", typed in an ICS4U window,
+    /// would act on ICS4U and report success — the exact failure #202 exists
+    /// to remove. The frame therefore reads a fixed number of words and
+    /// refuses anything else.
+    ///
+    /// **Term-blind on purpose, for now.** Only the literal word "unit" is
+    /// matched, because this is a pure function of the sentence and a course's
+    /// own word for a unit is not in it. A Module course loses nothing: "hide
+    /// module 4, day 21" falls through to the model exactly as it does today,
+    /// and "hide unit 4" still works there because `AssistPublishPlanner`
+    /// accepts "unit" alongside the course's own word.
+    private static func wholeUnitOrClassPage(_ tidied: String) -> AssistCardCommand? {
+        // A question mark comes off HERE rather than in the shared tidier, for
+        // the reason `deployAtATime` gives above: the fixed shapes are matched
+        // by equality and two of them carry one.
+        var frame: String = tidied
+        while frame.hasSuffix("?") {
+            frame = String(frame.dropLast())
         }
-        return nil
+
+        // The comma in "Unit 4, Day 21" is punctuation in the frame rather
+        // than part of any value — the same reading `makeRoom` already uses —
+        // so it is dropped before the words are counted. That makes "unit 4 ,
+        // day 21" and "unit 4 day 21" the same sentence, and leaves "day21"
+        // refused, because that is not a word this frame has.
+        var words: [String] = []
+        for piece in frame.replacingOccurrences(of: ",", with: " ").split(separator: " ") {
+            words.append(String(piece))
+        }
+        // "Please" is courtesy rather than content, at either end — the same
+        // tolerance `deployAtATime` already has.
+        if words.first == "please" {
+            words.removeFirst()
+        }
+        if words.last == "please" {
+            words.removeLast()
+        }
+
+        guard words.count >= 3, words[1] == "unit" else {
+            return nil
+        }
+        let toolName: String
+        let mayNameADay: Bool
+        switch words[0] {
+        case "hide", "unpublish":
+            toolName = "unpublish_pages"
+            mayNameADay = true
+        case "publish":
+            toolName = "publish_pages"
+            mayNameADay = false
+        default:
+            return nil
+        }
+
+        // Read exactly as it was before this family grew a second arm:
+        // `Int(...) != nil` is the acceptance test, and the teacher's own
+        // digits are what travels into the title. Tightening this to plain
+        // digits would change a shipped behaviour for no reported fault, so
+        // "unit 04" still becomes "Unit 04".
+        let unit: String = words[2]
+        guard Int(unit) != nil else {
+            return nil
+        }
+        if words.count == 3 {
+            return AssistCardCommand(toolName: toolName, arguments: ["pages": "Unit \(unit)"])
+        }
+        guard mayNameADay, words.count == 5, words[3] == "day" else {
+            return nil
+        }
+        let day: String = words[4]
+        guard Int(day) != nil else {
+            return nil
+        }
+        return AssistCardCommand(
+            toolName: toolName, arguments: ["pages": "Unit \(unit), Day \(day)"]
+        )
     }
 
     /// A phrasing the matcher PARSES rather than compares, described so the
@@ -508,16 +597,26 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 fills: ["pages": "Unit <number>"],
                 example: "publish unit 5",
                 notThis: "publish unit 4, day 3",
-                becauseNotThis: "A comma means one PAGE was named, which has a title in it for the "
-                              + "model to read out. Only a bare unit number is a whole unit."
+                becauseNotThis: "Publishing is the direction that reaches students, so this verb takes "
+                              + "a whole unit and nothing else: a comma means one PAGE was named, and "
+                              + "that request goes to the model. The hide and unpublish family below "
+                              + "does take a page, and the asymmetry is the decision — unpublishing "
+                              + "errs safe, and this phrasing is answered correctly by the model "
+                              + "anyway, so there is nothing to buy by widening it."
             ),
             ParsedShape(
-                shape: "unpublish unit <number>",
+                shape: "[please] hide|unpublish unit <number>[, day <number>] [please]",
                 tool: "unpublish_pages",
-                fills: ["pages": "Unit <number>"],
-                example: "unpublish unit 4",
-                notThis: "unpublish unit 4, day 3",
-                becauseNotThis: "As above: a comma names a page, not a unit."
+                fills: ["pages": "Unit <number>, or Unit <number>, Day <number> when a day was named — "
+                              + "always in these capitals, since the frame only fires on the literal "
+                              + "word 'unit'. Every accepted and refused spelling is in hideIsUnpublish."],
+                example: "hide unit 4, day 21",
+                notThis: "hide unit 4, day 21 in ICS3U",
+                becauseNotThis: "A matched card binds THIS window's course and section into the call "
+                              + "unconditionally, and the guard that refuses a request naming another "
+                              + "course only runs on the model's answers. So a frame that swallowed a "
+                              + "sentence naming another course would act on this one and report "
+                              + "success. Any extra word falls through."
             ),
             ParsedShape(
                 shape: "add <count> more days to unit <number>",

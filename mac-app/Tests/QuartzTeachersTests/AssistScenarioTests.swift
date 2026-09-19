@@ -249,6 +249,14 @@ final class AssistScenarioTests: XCTestCase {
                 page: "Unit 1, Day 1", publish: "false", date: "2026-09-09", body: "one", in: made.course
             )
         }
+        // A page to hide needs to be published first, or the plan has nothing
+        // to propose and the card never appears — which reads as the phrasing
+        // not matching, when it is the fixture that is empty.
+        if pending == "unpublish_pages" {
+            try AssistFixture.write(
+                page: "Unit 1, Day 1", publish: "true", date: "2026-09-09", body: "one", in: made.course
+            )
+        }
         // A rollover needs THREE things or it refuses before reaching anything
         // worth asserting, and each refusal looks like a different bug: with no
         // class dates on file it offers the schedule sheet instead ("I don't

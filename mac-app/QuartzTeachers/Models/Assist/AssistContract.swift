@@ -152,6 +152,7 @@ enum AssistContract {
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
             "answerWasCutOff": AssistWording.answerWasCutOff,
+            "didNotFollowThat": AssistWording.didNotFollowThat,
             // A call naming a course that is not this window's. Two keys for
             // two different facts, not two phrasings of one: the first can
             // tell a teacher to go and open that course, the second cannot,
@@ -509,8 +510,8 @@ enum AssistContract {
             "note": "These top-level keys are written by `Plantoir --write-contracts` from the app's own "
                   + "types and will be overwritten: " + generatedCaseKeys.joined(separator: ", ")
                   + ". Every other top-level key — nearMisses, scenarios, promptHistory, "
-                  + "deployAtATime, windowBinding — is hand-written intent and is PRESERVED by a "
-                  + "regeneration, so "
+                  + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest — is hand-written "
+                  + "intent and is PRESERVED by a regeneration, so "
                   + "a case may be proposed from either platform. Listing them rather than naming "
                   + "two: the list was already two short when this was noticed, and a key nobody "
                   + "mentions is a key somebody deletes believing it was generated.",
