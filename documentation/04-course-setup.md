@@ -727,17 +727,25 @@ what counts the folder:
 | `Tasks` / `tasks` | true | true | true |
 | `Straße` / `STRASSE` | false | **true** | false |
 | `Σ` / `ς` | false | **true** | false |
-| `I` / `i`, Turkish locale | true | — | true |
 
 - **`localizedCaseInsensitiveCompare` is rejected**: it reads the CURRENT
-  locale, and `compare("I", "i", options: [.caseInsensitive], locale: tr_TR)`
-  answers NOT EQUAL. A Turkish-locale Mac would then disagree with the build
-  about the plainest ASCII names.
+  locale, and it is the one comparison with no column in that table because the
+  table's answers do not depend on the machine and its do. Measured:
+  `compare("I", "i", options: [.caseInsensitive], locale: tr_TR)` answers NOT
+  EQUAL where the same call with `locale: nil` answers EQUAL, so a
+  Turkish-locale Mac would disagree with the build about the plainest ASCII
+  names.
 - **`caseInsensitiveCompare` is rejected**: locale-independent, but it folds
   FURTHER than Python and C# — the two rows above.
 - **`lowercased()` equality is chosen**: locale-independent (it folds `I` to
-  `i` where `lowercased(with: tr_TR)` gives `ı`), and the same fold
-  `str.lower()` and `OrdinalIgnoreCase` perform. Note that this is deliberately
+  `i` where `lowercased(with: tr_TR)` gives `ı`), the same fold `str.lower()`
+  performs, and the same answer `OrdinalIgnoreCase` gives on ASCII. They are
+  not one fold beyond it: `U+212A KELVIN SIGN` against `k` is true for
+  `lowercased()` and for `str.lower()` (both measured here) where
+  `OrdinalIgnoreCase` should answer false, since it upper-cases and
+  `ToUpperInvariant('k')` is `K` — read off the spec rather than measured,
+  there being no `dotnet` on this Mac. Nothing is pinned there. Note also that
+  this is deliberately
   NOT the house idiom: `caseInsensitiveCompare` is what mac model code asks
   folder-name questions with elsewhere, because those are questions only the app
   answers.
@@ -753,8 +761,10 @@ name out of the pool exactly; Windows uses `OrdinalIgnoreCase`. It shows only on
 a course whose pool and whose folder spell one name two ways, where the mac
 keeps a pool entry whose folder has gone and Windows removes it. Both err
 safely — nothing counted is lost either way, and `site_health.py` raises
-`noGradedFolders` for a pool matching nothing published, where the coverage map
-is on — so it is left unpinned. The two halves are not free of each other,
+`noGradedFolders` for a pool matching nothing published, on a course whose
+coverage map is on AND whose site has curriculum expectations (`site_health.py`
+:144: `coverage_wanted and curriculum_found and not graded_folders_found`) — so
+it is left unpinned. The two halves are not free of each other,
 though: **the still-offered test must be at least as PERMISSIVE as the drop.**
 That is the mac's shape now (case-insensitive test, exact drop) and Windows'
 (one comparer for both). Reverse it and a name can be judged absent and then
