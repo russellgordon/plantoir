@@ -594,10 +594,28 @@ of about fifty-five or more class pages — and `publish_pages` already takes
 tokens. Nothing on the local surface takes free text or a page BODY:
 `remember_timetable`, the one tool that would carry ninety dates, is in
 `AssistToolSurface.hiddenFromTheLocalModel` and never reaches a capped
-request. **One shape has not been measured**: the two-lap one, where
-`list_pages` hands back up to `AssistToolRunner.mostPagesListed` entries as
-relative PATHS and the next turn is asked to publish all of them. It is the
-gap in this argument, and it is written down here rather than assumed away.
+request.
+
+**One shape does NOT fit, and it was measured rather than argued about.** The
+two-lap one: `list_pages` hands back up to `AssistToolRunner.mostPagesListed`
+(60) entries as relative PATHS (`AssistSectionGraph.relativePath`), far longer
+per item than a class title, and the next turn may be asked to publish all of
+them. Tokenised against the model's own tokenizer, using the sixty paths a real
+257-page course really hands back: **60 paths are 975 tokens, and such a call
+crosses 512 at about the thirty-first path** — the twenty-sixth if the section's
+longest paths are taken. So the risk is real and it is now bounded and named,
+rather than unknown.
+
+What stops it being a fault in practice is that the model does not write that
+call. Asked exactly that way — primed with the `list_pages` result carrying all
+sixty paths, then "Publish all of those." — the smaller assistant answered with
+`{"course": …, "section": 1, "pages": "all"}` in **35 completion tokens, three
+trials of three, finishing naturally**. The cap never fired. That is one model,
+one phrasing, three trials, and it is worth exactly that much: the honest
+summary is that a teacher who does hit this meets
+`AssistWording.answerWasCutOff`, whose advice — fewer pages at a time — is
+followable in precisely this case. Raising the cap to cover the worst
+imaginable call is the state #166 was about.
 
 **Rejected: a larger cap, or none on the larger tier.** A cap sized to the
 worst imaginable call is a cap that never fires, which is the state this
@@ -620,7 +638,17 @@ where it is stopped, so the only outcomes available to such a run are
 "neutral" and "it cost something"; no reading of it can say the cap improved
 routing.
 
-<!-- #166 RESULTS POINTER -->
+**It was run, and the answer is nothing.** `research/ai-assist/token-cap-results.txt`
+holds it: on an M4 Pro (Mac16,8, 48 GiB) with llama.cpp b10435 on Metal, both
+tiers at their shipped contexts, **0 of 29 probes and 0 of 19 shelf phrasings
+chose a different tool under the cap** — against a morning uncapped arm and
+against a same-afternoon uncapped control, identical trial for trial across all
+960 rows of each comparison, with no polarity inversion and no probe gaining a
+`finish_reason: length` turn it did not already have. The threshold was
+pre-registered at 08:46, before the first capped request was sent. What changed
+is the clock: the runaway this issue opened with went from **5,435 completion
+tokens and 41–95 seconds to 512 tokens and 6.0–6.3 seconds**, ten trials of ten,
+with the engine's own log showing the stop moving from the context to the cap.
 
 ### Step 2 — What comes back
 
@@ -653,7 +681,12 @@ again with "a shorter sentence, or fewer pages at a time", and if the request
 that ran away were still sitting in the conversation the shorter retry would
 be sent with it still in front. What the teacher SEES is untouched — the
 transcript keeps their sentence; it is only what goes back to the model that
-is wound back. (The `catch` path — an engine that could not be reached, or the
+is wound back. **One thing is given up for that, knowingly**: teacher and
+model now remember different things, so a back-reference — "do that again" —
+reaches a model with nothing to refer to, and will decline or misroute. That
+is accepted, because the alternative is the model re-reading the sentence that
+ran away and running away again, and because the wording asks for a
+restatement rather than a reference. (The `catch` path — an engine that could not be reached, or the
 180-second timeout — is deliberately not wound back, and never has been: it
 tells the teacher the engine failed rather than asking them to rephrase, the
 sentence is usually not the problem there, and `RelativeDayFreshnessTests`

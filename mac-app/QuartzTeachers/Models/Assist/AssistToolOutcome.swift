@@ -134,6 +134,18 @@ struct AssistToolOutcome: Sendable, Equatable {
 
     /// A read that could not be answered. Reads hand back either way, so the
     /// model can say plainly what was missing rather than inventing it.
+    ///
+    /// **Never return this from a tool that has already written anything.**
+    /// `shouldContinue: true` is what lets a turn take another lap, and a lap
+    /// that comes back cut off winds the whole turn out of the conversation
+    /// (`AssistAgent.sayTheAnswerDidNotFinish`) — including this outcome's own
+    /// tool result. That is safe today only because a lap can never follow a
+    /// write: every write answers `wrote` or `refused`, and the two
+    /// `couldNotRead` returns that live inside write-shaped functions
+    /// (`backUpCourse`, `makeRoomForClasses`) are pre-write guards. Return it
+    /// after a write and the model would lose the record of a change that
+    /// really happened, which is exactly what the design promises cannot
+    /// occur.
     static func couldNotRead(_ reason: String) -> AssistToolOutcome {
         return AssistToolOutcome(summary: reason, detail: reason, shouldContinue: true)
     }

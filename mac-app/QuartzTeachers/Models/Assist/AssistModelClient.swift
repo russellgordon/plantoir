@@ -135,10 +135,19 @@ struct AssistModelClient: Sendable {
     /// only legitimate shape it cuts is an explicit list of about fifty-five
     /// or more class pages — and `publish_pages` already takes `onOrAfter` and
     /// `before`, which asks for any number of classes in about sixty tokens.
-    /// (The two-lap shape — `list_pages` handing back up to
-    /// `AssistToolRunner.mostPagesListed` relative paths, then "publish all of
-    /// those" — has NOT been measured against the tokenizer yet; it is the one
-    /// shape this headroom argument does not cover.)
+    ///
+    /// **The one shape that does NOT fit**, measured rather than assumed: the
+    /// two-lap one, where `list_pages` hands back up to
+    /// `AssistToolRunner.mostPagesListed` entries as relative PATHS and the
+    /// next turn is asked to publish all of them. Sixty real paths are **975
+    /// tokens**, so such a call crosses this cap at about the thirty-first
+    /// (the twenty-sixth for a section's longest paths). Asked exactly that
+    /// way, though, the smaller assistant answered `"pages": "all"` in 35
+    /// tokens, three trials of three, and the cap never fired — one model, one
+    /// phrasing, worth that much and no more. A teacher who does meet it is
+    /// told `AssistWording.answerWasCutOff`, whose advice is followable in
+    /// precisely this case. Sizing the cap to the worst imaginable call is a
+    /// cap that never fires, which is what this issue was about.
     ///
     /// The rule is in `contracts/app-rules.json` → `modelTiers.requirements`
     /// so that neither app can move it alone.
