@@ -100,10 +100,28 @@ public sealed partial class AssistWindow : Window
     /// it will end up showing, which is the trap row 300 records. Must be
     /// called on the UI thread, which every caller here is.
     /// </summary>
+    /// <summary>
+    /// A window already showing THIS section's folder, or null.
+    ///
+    /// <para><c>_main</c> only counts while it still shows <c>_folder</c>.
+    /// Nothing closes an assistant window when the main window is pointed at
+    /// another working folder, so it can outlive the folder it was opened
+    /// beside — and a hand-back into a window showing something else presses
+    /// buttons about a course that folder has never had (#162).</para>
+    /// </summary>
+    private MainWindow? MainWindowShowingThisSection()
+    {
+        if (_main is { IsClosed: false } main && App.WindowFor(_folder) == main) return main;
+        return App.WindowFor(_folder);
+    }
+
+    /// <summary>
+    /// Where a build or a deploy this conversation asked for is carried out —
+    /// a window on this section's own folder, opened if there is none.
+    /// </summary>
     private MainWindow? MainWindowForBuilds()
     {
-        if (_main is { IsClosed: false }) return _main;
-        if (App.WindowFor(_folder) is { } other) return other;
+        if (MainWindowShowingThisSection() is { } showing) return showing;
         try { return App.OpenWindow(_folder, null); }
         catch (Exception ex) { App.LogDiagnostic($"AssistWindow could not open a main window: {ex}"); return null; }
     }
@@ -481,12 +499,19 @@ public sealed partial class AssistWindow : Window
                 if (MainWindowForBuilds() is not { } main) return null;
                 return await main.DeployForAsync(_course.Code, _section);
             },
-            StopPreviewInApp = () => _main?.StopPreviewFor(_course.Code, _section),
+            // Every hand-back names THIS section's folder, never the main
+            // window's: nothing closes an assistant window when the main
+            // window is pointed somewhere else, so `_main` may by now be
+            // showing a different folder entirely (#162).
+            StopPreviewInApp = () => _main?.StopPreviewFor(_folder, _course.Code, _section),
             StopPreviewInAppAsync = async () =>
             {
-                if (_main is not null) await _main.StopPreviewForAsync(_course.Code, _section);
+                if (_main is not null) await _main.StopPreviewForAsync(_folder, _course.Code, _section);
             },
-            SectionIsBusy = () => _main?.IsSectionBusy(_course.Code, _section) == true,
+            // Asked of a window showing this section's folder — the busy
+            // answer is read off a detail pane, and another folder's pane
+            // answers about another folder's section.
+            SectionIsBusy = () => MainWindowShowingThisSection()?.IsSectionBusy(_course.Code, _section) == true,
             // Same process as the previews, so the in-memory leases are the
             // truth about whether one is on screen.
             PreviewIsShowing = () => PreviewLeases.Active.Any(lease =>

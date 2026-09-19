@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
@@ -657,5 +658,260 @@ public sealed class SharedRuleContractTests : IDisposable
             UnpublishedClasses = Array.Empty<string>(),
         };
         Assert.DoesNotContain("not published yet", clean.Describe(), StringComparison.Ordinal);
+    }
+
+    // ---- What a window lets go of when it changes working folder ----------
+
+    /// <summary>
+    /// <c>workingFolderSelection</c>, run as data through the one funnel both
+    /// ways of adopting a folder go through (<see cref="WindowFolderState.PointAt"/>).
+    ///
+    /// <para>This file reads <c>shared-rules.json</c> by NAMED KEY, so a key
+    /// nobody asks for is silently ignored and the suite stays green while the
+    /// bug is still there. It will not go red on its own — which is exactly
+    /// how this rule arrived from the mac (issue #162) with the defect present
+    /// and every gate passing.</para>
+    ///
+    /// <para>Each case gets its OWN folders. One of them DELETES a course, and
+    /// a shared fixture would hand the damaged folder to whatever ran next,
+    /// making the list silently order-dependent.</para>
+    ///
+    /// <para>The selection is built STRUCTURALLY, from the case's kind, folder
+    /// and section number, and compared the same way. The mac's
+    /// <c>course|CODE</c> storage string is pinned in no contract and must not
+    /// become pinned here by accident — Windows' own stored form is
+    /// <see cref="WindowMemoryCodec"/>'s and is nobody else's business.</para>
+    /// </summary>
+    [Fact]
+    public void AWindowLetsGoOfTheOldFoldersSelectionAsTheContractSays()
+    {
+        var rule = ContractLoader.LoadJson("shared-rules.json")["workingFolderSelection"]!;
+        var cases = rule["cases"]!.AsArray();
+        Assert.True(cases.Count >= 4,
+            $"The contract lost working-folder cases: {cases.Count} present, 4 expected at least.");
+
+        // Played all the way through and reported TOGETHER: a loop that stops
+        // at the first failure says "case 3 is wrong" where what a mutation
+        // has to prove is WHICH cases it turns red.
+        var failures = new List<string>();
+        int index = 0;
+
+        foreach (var testCase in cases)
+        {
+            int caseNumber = ++index;
+            string name = testCase!["name"]!.ToString();
+            string why = testCase["why"]!.ToString();
+            string caseRoot = Path.Combine(_folder, $"case{caseNumber}");
+
+            var window = new FolderWindow();
+            window.PointAt(FolderFor(caseRoot, testCase["startIn"]!.ToString()));
+
+            var chosen = SelectionFromCase(testCase["select"]!);
+            window.State.Selection = chosen;
+
+            var then = testCase["then"]!;
+            if (then["pointAt"] is { } destination)
+            {
+                window.PointAt(FolderFor(caseRoot, destination.ToString()));
+            }
+            else if (then["removeTheSelectedCourseAndReload"]?.GetValue<bool>() == true)
+            {
+                // A teacher deleting a course in File Explorer with its window
+                // open. The folder has NOT changed, so nothing is let go of —
+                // and the "Course Not Found" that follows is the right answer.
+                Directory.Delete(window.CourseDirectoryFor(chosen)!, recursive: true);
+                window.Reload();
+            }
+            else
+            {
+                failures.Add($"case {caseNumber} ({name}) names no action this suite can play.");
+                continue;
+            }
+
+            string expect = testCase["expect"]!.ToString();
+            var actual = window.State.Selection;
+            bool asExpected = expect switch
+            {
+                "cleared" => actual is null,
+                "unchanged" => actual is not null && actual.Equals(chosen),
+                _ => false,
+            };
+            if (!asExpected)
+                failures.Add($"case {caseNumber} ({name}): expected '{expect}', the window held " +
+                             $"'{actual?.ToString() ?? "nothing"}'. {why}");
+
+            if (testCase["expectNamesALoadedCourse"]?.GetValue<bool>() is { } shouldName)
+            {
+                bool names = window.SelectionNamesALoadedCourse;
+                if (names != shouldName)
+                    failures.Add($"case {caseNumber} ({name}): the selection should " +
+                                 $"{(shouldName ? "" : "NOT ")}name a course that loaded, and it " +
+                                 $"{(names ? "does" : "does not")}. {why}");
+            }
+        }
+
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
+
+        // The rejected alternatives carry their reasons: the first is the one
+        // this rule exists to avoid being "simplified" back into.
+        var rejected = rule["rejected"]!.AsArray();
+        Assert.True(rejected.Count >= 2, "The contract lost a rejected alternative.");
+        foreach (var entry in rejected)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(entry!["instead"]?.ToString()));
+            Assert.False(string.IsNullOrWhiteSpace(entry["why"]?.ToString()));
+        }
+    }
+
+    /// <summary>
+    /// The case list above proves the RULE. This proves the product still
+    /// asks it — and only through one door.
+    ///
+    /// <para>Read as source because <c>WorkspaceViewModel</c> is in the WinUI
+    /// project, which this suite cannot reference. Without it the contract
+    /// cases could pass forever while a second adoption route quietly kept
+    /// the old folder's selection, which is the precise shape of the defect.</para>
+    /// </summary>
+    [Fact]
+    public void BothWaysOfAdoptingAFolderGoThroughTheOneFunnel()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            RepoRoot, "windows-app", "Plantoir", "ViewModels", "WorkspaceViewModel.cs"));
+        string code = Regex.Replace(source, @"//[^\n]*", "");
+
+        // THIS is the assertion that holds the rule: one door into the funnel,
+        // so no second adoption route can gain or skip the clear. The
+        // PointAtFolder count below pins a SPELLING and is only a readability
+        // guard — somebody could rename the parameter and redden it without
+        // changing a thing a teacher sees.
+        Assert.Equal(1, Regex.Matches(code, @"_state\.PointAt\(").Count);
+        Assert.Equal(2, Regex.Matches(code, @"PointAtFolder\(path\)").Count);
+
+        // The clear itself lives in Core, in one function, and nowhere else:
+        // the contract rejects clearing from a property observer on the folder
+        // precisely because it hides a rule a reader has to find.
+        Assert.DoesNotContain("_state.Selection = null", code, StringComparison.Ordinal);
+
+        // And the OTHER rejected alternative, which the case list cannot catch
+        // on its own: contract case 4 is replayed against this suite's own
+        // FolderWindow.Reload, so a `Selection = null` written through the
+        // PROPERTY inside WorkspaceViewModel.Reload() would leave case 4 green
+        // and still erase the legitimately right "Course Not Found". Reload
+        // must not touch the selection at all.
+        //
+        // The honest limit: this reads Reload's OWN body. A write inside
+        // something Reload calls — NotifyLoaded today — is invisible to it,
+        // and so is a write in another class reached through the model.
+        string reload = BodyOfReload(code);
+        Assert.DoesNotContain("Selection", reload, StringComparison.Ordinal);
+
+        // Load-bearing twice: it re-renders the pane with the selection gone,
+        // and it is what drives App.RememberOpenWindows(), without which the
+        // remembered frame still names the old folder's course and the defect
+        // returns on the next launch.
+        Assert.Equal(1, Regex.Matches(code, @"Notify\(nameof\(Selection\)\)").Count);
+    }
+
+    /// <summary><c>WorkspaceViewModel.Reload()</c>'s body, by brace counting.</summary>
+    private static string BodyOfReload(string commentStrippedSource)
+    {
+        var header = Regex.Match(commentStrippedSource, @"public void Reload\(\)\s*\r?\n\s*\{");
+        Assert.True(header.Success, "WorkspaceViewModel.Reload() is no longer shaped as this scan expects.");
+        int open = commentStrippedSource.IndexOf('{', header.Index);
+        int depth = 0;
+        for (int i = open; i < commentStrippedSource.Length; i++)
+        {
+            if (commentStrippedSource[i] == '{') depth++;
+            else if (commentStrippedSource[i] == '}' && --depth == 0)
+                return commentStrippedSource[(open + 1)..i];
+        }
+        throw new InvalidOperationException("Reload()'s body never closed.");
+    }
+
+    /// <summary>
+    /// The two things a folder change decides, composed the way
+    /// <c>WorkspaceViewModel</c> composes them: point at the folder through
+    /// the funnel, then load what is there.
+    /// </summary>
+    private sealed class FolderWindow
+    {
+        public readonly WindowFolderState State = new();
+        public List<Course> Courses = new();
+
+        public void PointAt(string folder)
+        {
+            State.PointAt(folder);
+            Reload();
+        }
+
+        public void Reload() =>
+            Courses = State.FolderPath is null ? new() : Workspace.DiscoverCourses(State.FolderPath);
+
+        public string? CourseDirectoryFor(SidebarSelection? selection) => selection switch
+        {
+            SidebarSelection.CourseItem(var code) => Courses.FirstOrDefault(c => c.Code == code)?.DirectoryPath,
+            SidebarSelection.SectionItem(var code, _) => Courses.FirstOrDefault(c => c.Code == code)?.DirectoryPath,
+            _ => null,
+        };
+
+        public bool SelectionNamesALoadedCourse => CourseDirectoryFor(State.Selection) is not null;
+    }
+
+    /// <summary>
+    /// The code each labelled folder's course wears. <c>folderBSameCode</c>
+    /// deliberately wears folderA's: a course with the same code is a
+    /// DIFFERENT course, and that is the case a selection validated against
+    /// the loaded courses would get wrong by silently landing on it.
+    /// </summary>
+    private const string CodeInFolderA = "ICS3U";
+
+    private static SidebarSelection SelectionFromCase(JsonNode select)
+    {
+        string kind = select["kind"]!.ToString();
+        // Built from kind/courseIn/section, never from a stored string: the
+        // spelling of a stored selection is one platform's business.
+        string code = select["courseIn"]!.ToString() switch
+        {
+            "folderA" or "folderBSameCode" => CodeInFolderA,
+            var other => throw new InvalidOperationException($"No course lives in '{other}'."),
+        };
+        return kind switch
+        {
+            "course" => new SidebarSelection.CourseItem(code),
+            "section" => new SidebarSelection.SectionItem(code, select["section"]!.GetValue<int>()),
+            _ => throw new InvalidOperationException($"Unknown selection kind '{kind}'."),
+        };
+    }
+
+    /// <summary>A real working folder for one of the contract's labels.</summary>
+    private static string FolderFor(string caseRoot, string label)
+    {
+        string folder = Path.Combine(caseRoot, label);
+        string courses = Path.Combine(folder, "courses");
+        Directory.CreateDirectory(courses);
+        switch (label)
+        {
+            case "folderA":
+                WriteCourse(courses, CodeInFolderA, new[] { 1, 2 });
+                break;
+            case "folderBSameCode":
+                WriteCourse(courses, CodeInFolderA, new[] { 1 });
+                break;
+            case "folderBEmpty":
+                break;                       // a working folder with no courses in it
+            default:
+                throw new InvalidOperationException($"The contract names a folder label this suite cannot make: '{label}'.");
+        }
+        return folder;
+    }
+
+    private static void WriteCourse(string coursesDirectory, string code, int[] sections)
+    {
+        string courseDirectory = Path.Combine(coursesDirectory, code);
+        Directory.CreateDirectory(courseDirectory);
+        File.WriteAllText(Path.Combine(courseDirectory, "course_config.json"),
+            $$"""{"course_code":"{{code}}","section_numbers":[{{string.Join(',', sections)}}]}""");
+        foreach (int section in sections)
+            Directory.CreateDirectory(Path.Combine(courseDirectory, $"section{section}"));
     }
 }
