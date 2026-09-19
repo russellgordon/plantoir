@@ -233,8 +233,9 @@ public partial class App : Application
             if (window.IsClosed || window.Workspace.WorkspacePath is not { } open) continue;
             try
             {
-                if (string.Equals(Path.GetFullPath(open), Path.GetFullPath(folderPath), StringComparison.OrdinalIgnoreCase))
-                    return window;
+                // The app's single comparison (#162), so this answers the same
+                // way as every other "is that the same folder?" in the app.
+                if (WorkingFolder.IsTheSame(open, folderPath)) return window;
             }
             catch (Exception) { /* a malformed stored path is "no window", not a crash in the tool loop */ }
         }
