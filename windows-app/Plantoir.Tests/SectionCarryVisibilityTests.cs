@@ -60,6 +60,55 @@ public class SectionCarryVisibilityTests
         Assert.Equal("false", Carry("publishForSection1: |-", "  false"));
     }
 
+    /// <summary>
+    /// The LEGACY key, whose value runs onto the next line, is held back too —
+    /// including when the key's own line looks like a complete value.
+    /// </summary>
+    /// <remarks>
+    /// <para>Pinned because it CHANGED and nothing else covers it. Until the
+    /// reader was corrected (2026-09-19, issue #176) <c>draftSection1: false</c>
+    /// with an indented line under it was read as a plain <c>false</c> and
+    /// carried across as PUBLISHED.</para>
+    ///
+    /// <para><b>The mac still does that, so this is a real divergence and a new
+    /// one.</b> The Swift's <c>reading(ofValue:followedBy:)</c> consults the
+    /// line below only when the key's line is EMPTY, and
+    /// <c>SectionAdder.publishValue</c> asks it — so the mac carries these as
+    /// "true". Measured what the SITE does with the source page
+    /// (python-frontmatter 1.3.0 / PyYAML 6.0.3, then
+    /// <c>build_site._as_bool</c>): <c>'false x'</c>, <c>'no x'</c>,
+    /// <c>'true x'</c> and <c>'yes x'</c> all fold into strings that are not
+    /// "true", so the source page is PUBLISHED in every one of those rows, and
+    /// only <c>draftSection1:</c> over <c>  true</c> is HIDDEN.</para>
+    ///
+    /// <para>Neither app reproduces that. Both err HELD BACK — the mac in two
+    /// of those rows, this in four — and uniformly held back is the documented
+    /// preference and the Python's answer. The mac's #176 fix closes it,
+    /// because its carry asks the same reader.</para>
+    /// </remarks>
+    [Theory]
+    [InlineData("draftSection1: false")]   // the row that changed, and that the mac still carries as "true"
+    [InlineData("draftSection1: no")]      // and this one
+    [InlineData("draftSection1: true")]
+    [InlineData("draftSection1: yes")]
+    [InlineData("draftSection1:")]
+    [InlineData("draftSection1: >-")]
+    public void ALegacyValueThatRunsOntoTheNextLineIsHeldBack(string keyLine) =>
+        Assert.Equal("false", Carry(keyLine, "  x"));
+
+    /// <summary>
+    /// And the same key with nothing below it is read, not refused — the
+    /// guard that keeps the theory above from passing for the wrong reason.
+    /// </summary>
+    [Fact]
+    public void ALegacyValueOnItsOwnIsStillReadNormally()
+    {
+        Assert.Equal("true", Carry("draftSection1: false"));
+        Assert.Equal("true", Carry("draftSection1: no"));
+        Assert.Equal("false", Carry("draftSection1: true"));
+        Assert.Equal("false", Carry("draftSection1: yes"));
+    }
+
     [Fact]
     public void TheLastOfTwoKeysWinsAndAQuotedKeyIsStillTheKey()
     {
