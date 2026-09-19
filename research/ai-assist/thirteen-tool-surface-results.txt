@@ -1,6 +1,17 @@
 THE SHIPPING 13-TOOL SURFACE, MEASURED
 ======================================
 
+[NOTE ADDED 2026-09-18, #117 — the numbers below are untouched.]
+"malformed tool calls: 0" here means "no HTTP errors". The harness caught a
+tool call whose argument JSON was TRUNCATED and recorded it as a call with no
+arguments, so truncation could not appear in that line. Counted properly on
+the same hardware and weights, the 1.5B truncates 12-19 arguments per 290
+responses and the 4B none — see metal-routing-results.txt. Also: the 42-probe
+harness that produced this file was never committed, and an attempt to
+reproduce it probe-for-probe at this file's own context size and thread count
+did not succeed. Treat the per-probe column as a record of that day rather
+than as a baseline to diff against.
+
 Date: 2026-08-15
 Engine: llama.cpp b10435, Metal, 48 GB M4 Pro
 Flags: --reasoning off --reasoning-budget 0 --ctx-size 16384 --threads 6
