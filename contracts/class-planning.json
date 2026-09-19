@@ -137,6 +137,65 @@
     ],
     "note": "Making room for a class in the middle of a unit. The RENAME ORDER is the part to get right and the part that looks like an implementation detail: it is the difference between a course that survives and one that loses a lesson."
   },
+  "duplication": {
+    "cases": [
+      {
+        "name": "the copy is the source's own next day, not a page after the last class",
+        "duplicate": "Unit 1, Day 1",
+        "existingClasses": [
+          { "title": "Unit 1, Day 1", "date": "2026-09-08" },
+          { "title": "Unit 1, Day 2", "date": "2026-09-10" },
+          { "title": "Unit 2, Day 1", "date": "2026-09-12" }
+        ],
+        "timetable": ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16"],
+        "expectNewTitle": "Unit 1, Day 2",
+        "expectDate": "2026-09-10",
+        "expectRenamesInOrder": ["Unit 1, Day 2 → Unit 1, Day 3"],
+        "expectUndoOffered": false,
+        "why": "\"Duplicate Unit 1, Day 1 as my next class\" means tomorrow's lesson is a copy of that one. Landing the copy after the last class of the course would put it weeks away from the lesson it repeats, and leave the day the teacher meant holding the old page."
+      },
+      {
+        "name": "a later unit re-dated is enough to withhold the undo, even with nothing renamed",
+        "duplicate": "Unit 1, Day 2",
+        "existingClasses": [
+          { "title": "Unit 1, Day 1", "date": "2026-09-08" },
+          { "title": "Unit 1, Day 2", "date": "2026-09-10" },
+          { "title": "Unit 2, Day 1", "date": "2026-09-12" },
+          { "title": "Unit 2, Day 2", "date": "2026-09-14" }
+        ],
+        "timetable": ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16", "2026-09-18"],
+        "expectNewTitle": "Unit 1, Day 3",
+        "expectDate": "2026-09-12",
+        "expectRenamesInOrder": [],
+        "expectUndoOffered": false,
+        "why": "The case a renames-only test cannot see. Renames happen only WITHIN the unit being changed, so duplicating the last day of a unit renames nothing while re-dating every class of every later unit. An undo keyed on renames alone is offered here and takes back only the new page, leaving the rest of the year moved — a partial undo, which is worse than none. The way back is the backup, and the reply says so."
+      },
+      {
+        "name": "duplicating the last class of the course moves nothing, so it can be taken back",
+        "duplicate": "Unit 2, Day 2",
+        "existingClasses": [
+          { "title": "Unit 1, Day 1", "date": "2026-09-08" },
+          { "title": "Unit 2, Day 1", "date": "2026-09-10" },
+          { "title": "Unit 2, Day 2", "date": "2026-09-12" }
+        ],
+        "timetable": ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14"],
+        "expectNewTitle": "Unit 2, Day 3",
+        "expectDate": "2026-09-14",
+        "expectRenamesInOrder": [],
+        "expectUndoOffered": true,
+        "why": "Nothing else moves, so taking the copy back is whole rather than partial — and this is the common case, since a teacher duplicating a lesson is usually working at the end of what they have written."
+      }
+    ],
+    "forcedUnpublished": {
+      "value": true,
+      "why": "The copy starts hidden however the source was. A page made by duplicating a published lesson is a draft of next week's, and putting it in front of students the moment it is made is the one thing duplicating must not do. The per-section publish key has to be checked as well as the plain one: a copied page carrying publishForSection<N>: true beats the publish: false written over it, and the copy would be visible."
+    },
+    "undoRule": {
+      "rule": "record undo ONLY when nothing else moved - no renames AND no date moves",
+      "why": "A partial undo that deleted the copy and left every later class renamed and re-dated is worse than no undo at all. When classes shuffled, the way back is the backup taken before any of it, and the reply names it."
+    },
+    "note": "Duplicating a lesson as the next class. Windows runs these in ClassPlanningContractTests.Duplication_MatchesContract; the mac owes a runner, and the second case is expected to FAIL there until its undo is keyed on date moves as well as renames (issue for the mac, 2026-09-18)."
+  },
   "nextClass": {
     "cases": [
       {
