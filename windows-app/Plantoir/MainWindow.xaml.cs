@@ -405,6 +405,16 @@ public sealed partial class MainWindow : Window
     /// Stop a section's preview, for the assistant — the first half of
     /// stop, edit, start again. No Activate: a stop is not the moment to
     /// pull the teacher away from the conversation.
+    ///
+    /// <para>The fallback half of a pair: <c>AssistAgent</c> calls this only
+    /// where no async wiring is set (<c>StopPreviewInApp</c> rather than
+    /// <c>StopPreviewInAppAsync</c>), before a deploy hand-back and before a
+    /// page edit. Both callers rely on the same thing — that the preview is no
+    /// longer serving or building out of this section's output folder, because
+    /// the very next thing they do is rewrite the pages it is serving or start
+    /// a build into the same place. So this must do what
+    /// <see cref="StopPreviewForAsync"/> does, and for the same folder;
+    /// the two differ only in whether they WAIT for the processes to go.</para>
     /// </summary>
     /// <param name="sectionFolder">
     /// The working folder the SECTION lives in — the assistant window's own,
@@ -419,23 +429,33 @@ public sealed partial class MainWindow : Window
         {
             try
             {
-                if (!ThisWindowIsShowing(sectionFolder))
+                // Only when this window is still the section's own. Otherwise
+                // its detail pane holds a DIFFERENT folder's section, and
+                // stopping that one would take down a preview the teacher is
+                // watching, while selecting into it would name a course this
+                // folder has never had.
+                if (ThisWindowIsShowing(sectionFolder))
                 {
-                    // Nothing here belongs to that section: the detail pane is
-                    // showing another folder's, and selecting into this window
-                    // would put a course code from a folder it has left into a
-                    // sidebar that never had it. The section's own preview is
-                    // reclaimed below by the async path; the synchronous stop
-                    // has nothing safe to do.
-                    return;
+                    if (DetailHost.Content is not SectionDetailView existing ||
+                        !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                        existing.SectionNumber != section)
+                    {
+                        Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                    }
+                    if (DetailHost.Content is SectionDetailView detail) detail.StopPreviewIfRunning();
                 }
-                if (DetailHost.Content is not SectionDetailView existing ||
-                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
-                    existing.SectionNumber != section)
-                {
-                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
-                }
-                if (DetailHost.Content is SectionDetailView detail) detail.StopPreviewIfRunning();
+
+                // OUTSIDE the branch, exactly as the async twin does it, and
+                // this is the half that was missing. Two ways the view's own
+                // stop above reclaims nothing: this window may not be the
+                // section's at all, and even when it is, selecting the section
+                // REPLACES DetailHost.Content synchronously — so the view asked
+                // to stop is a freshly built one with no preview in it, while
+                // the instance that owns the running preview is only unloaded a
+                // dispatcher tick later. Either way the sweep and the release
+                // here name the SECTION's folder and are safe to run twice.
+                PreviewStopper.StopSectionProcesses(sectionFolder, courseCode, section);
+                PreviewLeases.Release(sectionFolder, courseCode, section);
             }
             catch (Exception ex)
             {

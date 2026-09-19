@@ -2118,11 +2118,25 @@ where a teacher is *least* watching the main window.
 
 So every hand-back now names `_folder`, the section's own:
 
-- `StopPreviewFor` / `StopPreviewForAsync` take it as an argument. The sweep
-  and the lease release always run against it, so the section's preview is
-  reclaimed either way; the parts that touch the WINDOW — selecting the
-  section, and stopping the detail pane's preview — run only while that window
-  is still showing that folder.
+- `StopPreviewFor` / `StopPreviewForAsync` take it as an argument. **Both**
+  paths run `PreviewStopper.StopSectionProcesses…` and
+  `PreviewLeases.Release(sectionFolder, …)` OUTSIDE the window check, so the
+  section's preview is reclaimed either way; the parts that touch the WINDOW —
+  selecting the section, and stopping the detail pane's preview — run only
+  while that window is still showing that folder. The synchronous one is the
+  fallback `AssistAgent` uses where no async wiring is set, before a deploy
+  hand-back and before a page edit, and both callers rely on the same thing:
+  that nothing is still serving or building out of the section's output folder
+  by the time they rewrite the pages or start a build into it. The two differ
+  only in whether they WAIT for the processes to go.
+
+  **The unconditional sweep is load-bearing in the showing branch too**, which
+  is easy to miss. Selecting the section REPLACES `DetailHost.Content`
+  synchronously, so the view that `StopPreviewIfRunning()` is then asked to
+  stop is a freshly built one with no preview in it, while the instance that
+  owns the running preview is only unloaded a dispatcher tick later. Relying on
+  that unload would make the stop's completion a matter of timing. Both calls
+  are safe to run twice.
 - `MainWindowForBuilds` now prefers `_main` only while it still shows
   `_folder`, falling back to `App.WindowFor(_folder)` and then to opening one.
   A build or a deploy therefore always happens in a window showing the
