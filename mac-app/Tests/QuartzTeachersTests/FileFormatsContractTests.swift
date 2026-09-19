@@ -104,12 +104,24 @@ final class FileFormatsContractTests: XCTestCase {
 
             The lesson.
             """
+            // Every case carries `sectionLocal`, and the READ deliberately
+            // does not use it: the build consults all four keys on every page
+            // it copies, wherever that page lives. It is unwrapped anyway so
+            // that a case written without it fails here rather than on
+            // Windows, whose writing side still needs it.
+            _ = try XCTUnwrap(
+                testCase["sectionLocal"] as? Bool,
+                "A reading case must still say whether the page is section-local: \(frontmatter)"
+            )
             let visible: Bool = AssistPageVisibility.publishes(
                 in: page,
-                forSection: testCase["section"] as? Int ?? 1,
-                isSectionLocal: try XCTUnwrap(testCase["sectionLocal"] as? Bool)
+                forSection: testCase["section"] as? Int ?? 1
             )
-            XCTAssertEqual(visible, testCase["expectVisible"] as? Bool, frontmatter)
+            var message: String = frontmatter
+            if let reason = testCase["why"] as? String {
+                message = frontmatter + " — " + reason
+            }
+            XCTAssertEqual(visible, testCase["expectVisible"] as? Bool, message)
         }
     }
 
@@ -120,12 +132,29 @@ final class FileFormatsContractTests: XCTestCase {
     /// contract said migrate, from 2026-09-07; the app kept inverting; and the
     /// suite stayed green for two days because the test agreed with the code
     /// instead of with the contract. Reading `writingCases` is what stops that
-    /// happening again: Windows runs the same list.
+    /// happening again.
+    ///
+    /// Windows runs the same list as of 2026-09-19 —
+    /// `FileFormatContractTests.TheWritingCasesInTheContractAreFollowed`,
+    /// issue #138, which replaced five of these cases retyped into that file.
+    /// Until then this comment said Windows did NOT run it, which was true when
+    /// written and is the second time in two days this paragraph has been
+    /// wrong: a claim about what the other side runs is how a divergence
+    /// survives review, so it is worth re-checking rather than repeating.
+    /// (Corrected from the Windows side, 2026-09-19, comment only.)
     func testTheLegacySpellingIsMigratedToTheCurrentOne() throws {
         let section: [String: Any] = try FileFormatsContractTests.section("pageVisibility")
         let group: [String: Any] = try XCTUnwrap(section["writingCases"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
-        XCTAssertFalse(cases.isEmpty, "contracts/file-formats.json carries no writing cases to run")
+        // A FLOOR, not a census — Windows' own runner carries one for the same
+        // reason (`>= 10`, raised here to what the list holds today). A loop
+        // over a list an edit has emptied passes having run nothing, which is
+        // exactly the failure this whole file exists to prevent. Raise it when
+        // cases are added; never lower it to make an edit go through.
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 13,
+            "contracts/file-formats.json → pageVisibility.writingCases has shrunk"
+        )
 
         for testCase in cases {
             let before: String = try XCTUnwrap(testCase["before"] as? String)

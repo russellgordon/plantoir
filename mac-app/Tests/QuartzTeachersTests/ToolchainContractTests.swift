@@ -23,6 +23,22 @@ final class ToolchainContractTests: XCTestCase {
             let value: String = try XCTUnwrap(pin["value"] as? String)
             let why: String = (pin["why"] as? String) ?? ""
 
+            // A pin that says where to look for itself needs no case here, so
+            // the next one costs a contract entry rather than a code change
+            // on two platforms.
+            if let expected = pin["dockerfileContains"] as? String {
+                // The two fields must say the same thing, or a pin could be
+                // raised in `value` and still pass because the line it
+                // watches for never mentioned the version.
+                XCTAssertTrue(
+                    expected.contains(value),
+                    "\(name): the contract watches the Dockerfile for \"\(expected)\", which does "
+                    + "not carry the pinned version \(value). \(why)"
+                )
+                XCTAssertTrue(recipe.contains(expected), "\(name): \(why)")
+                continue
+            }
+
             switch name {
             case "baseImage":
                 XCTAssertTrue(recipe.contains("FROM \(value)"), "\(name): \(why)")

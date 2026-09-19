@@ -111,16 +111,23 @@ public sealed class ScheduledDeploy
     /// <c>unpublishedClasses(course:sectionNumber:)</c> has always done: a
     /// class dated after the deploy is still a page students cannot see.
     ///
-    /// <para>Walks the same folders <c>AssistWorkspace.ClassPages</c> walks
-    /// and leaves out the same <c>index.md</c>, for the same reason: a
-    /// section's front page is not a class. Named by FILE name, as this
+    /// <para>Walks the same folders <c>AssistWorkspace.ClassPages</c> walks —
+    /// the ones the SHARED membership rule counts
+    /// (<c>contracts/class-planning.json</c> → <c>classFolder.membership</c>),
+    /// not every <c>per_section_folder</c> — and leaves out the same
+    /// <c>index.md</c>, for the same reason: a section's front page is not a
+    /// class. That sentence was false between the two of them until
+    /// 2026-09-19, when both stopped walking the whole list; a test now pins
+    /// the two together on one fixture, because a comment claiming agreement
+    /// is exactly what stops anybody checking. Named by FILE name, as this
     /// app's own tool names them (<c>AssistWorkspace.PlanScheduledDeploy</c>);
     /// the mac uses the page's title, a recorded difference.</para>
     /// </summary>
     public static List<string> UnpublishedClassesIn(Course course, int sectionNumber)
     {
         var names = new List<string>();
-        foreach (string folder in course.Configuration.PerSectionFolders)
+        foreach (string folder in ClassFolderRule.Names(course.Configuration.ClassFolder,
+                                                        course.Configuration.PerSectionFolders))
         {
             string root = Path.Combine(course.SectionDirectory(sectionNumber), folder);
             if (!Directory.Exists(root)) continue;

@@ -26,11 +26,31 @@ The image is layered as follows (in order):
 1. **Base: `python:3.11-slim`** — Debian slim with Python 3.11. Python is
    needed for the four orchestration scripts; 3.11 also provides `zoneinfo`
    for timezone-correct timestamps.
-2. **`pip install python-frontmatter Pillow`** — the two Python
-   dependencies. `python-frontmatter` parses and rewrites the YAML
+2. **`pip install python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0`** —
+   the Python dependencies, all three PINNED since 2026-09-18 (issue #140) at
+   the versions the image already carried, so the pin changed nothing about
+   what is installed. `python-frontmatter` parses and rewrites the YAML
    frontmatter block at the top of each Markdown file (used heavily for the
    per-section `publish`/`created` machinery); Pillow draws each section's
    social sharing card.
+
+   **PyYAML is named explicitly even though python-frontmatter pulls it in,
+   and that is the point of the pin.** python-frontmatter parses with PyYAML,
+   which implements YAML **1.1** — and that is the only reason `publish: no`
+   and `publish: off` hide a page rather than being the strings "no" and
+   "off". PyYAML 7 is expected to move to YAML 1.2, where those pages would be
+   PUBLISHED, silently, in courses already in front of students.
+   `contracts/file-formats.json` → `pageVisibility` states the 1.1 table as
+   fact and both apps are written against it, so an unpinned upgrade would
+   fail nothing anywhere. The reasoning is in
+   [08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page),
+   and the pins are in `contracts/toolchain.json` → `pins`. **The same three
+   are pinned in `windows-app/Vendor/fetch-runtime.ps1`** (since 2026-09-19),
+   which builds the runtime that really produces a Windows teacher's site —
+   nothing on that machine builds this image. Each pin names both files it
+   must appear in (`dockerfileContains`, `windowsRuntimeContains`) and a test
+   on each platform holds its own file against them, so a pin raised in one
+   place cannot quietly stay put in the other.
 3. **Node.js 20 + tools** — installed from NodeSource. Quartz is a Node
    program (`npx quartz build`). Also installed: `curl`, `git` (needed to
    clone Quartz), `lsof` (used to kill a previous preview server holding
@@ -78,10 +98,13 @@ The image is layered as follows (in order):
 7. **`cp -r /opt/quartz /opt/quartz-site`** — a spare copy of the scaffold
    (not used by the current build path, which copies from `/opt/quartz`
    directly).
-8. **Copy the Python scripts** into `/opt/scripts/` — nine of them as of
-   2026-09-05: `toolchain_paths.py`, `contracts.py`, `site_health.py`,
-   `class_pages.py`, `setup_course.py`, `build_site.py`, `deploy.py`,
-   `social_card.py` and `netlify_badge.py`.
+8. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
+   2026-09-18: `toolchain_paths.py`, `contracts.py`, `site_health.py`,
+   `class_pages.py`, `page_visibility.py`, `stop_preview.py`,
+   `setup_course.py`, `build_site.py`, `deploy.py`, `social_card.py` and
+   `netlify_badge.py`. **Count them off the Dockerfile rather than trusting
+   this sentence** — it said "nine … as of 2026-09-05" while the recipe copied
+   ten, `stop_preview.py` having been added without the list following it.
 
    **They are copied ONE BY ONE, by name, and that is a trap worth knowing.**
    Splitting a rule out into a new sibling module is therefore a change to the

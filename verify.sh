@@ -198,6 +198,13 @@ else
   cat /tmp/verify_class_pages_test.log
 fi
 
+if (cd scripts && python3 test_page_visibility.py) >/tmp/verify_page_visibility_test.log 2>&1; then
+  pass "page_visibility.py: whether the built site shows a page, against contracts/file-formats.json (scripts/test_page_visibility.py)"
+else
+  fail "page_visibility.py: whether the built site shows a page, against contracts/file-formats.json (scripts/test_page_visibility.py)"
+  cat /tmp/verify_page_visibility_test.log
+fi
+
 # Runs BEFORE the image build below, on purpose: it answers in a tenth of a
 # second the question the image build answers in three minutes.
 if (cd scripts && python3 test_baked_modules.py) >/tmp/verify_baked_modules_test.log 2>&1; then
@@ -343,6 +350,28 @@ if docker run --rm \
 else
   fail "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
   cat /tmp/verify_class_folder_test.log
+fi
+
+# ---- Whether the site shows a page: the contract, run down the REAL chain ----
+# The one check here that is not about a rule being implemented right — it is
+# about the rule being TRUE. Both apps are tested against
+# contracts/file-formats.json -> pageVisibility.readingCases, so if that list
+# is wrong they are confidently wrong together and every suite stays green.
+# This runs each case through process_frontmatter (python-frontmatter, PyYAML)
+# and then through the image's OWN gray-matter/js-yaml on JSON_SCHEMA plus
+# patches/publish.ts's expression — which is exactly what Quartz v4.5.0 does.
+# So a PyYAML bump, a Quartz bump or a rewritten patch cannot move the table
+# without this failing.
+echo ""
+echo "🔎 Checking the visibility contract against what the real build does…"
+if docker run --rm \
+  -v "$(pwd)/scripts/check_visibility_against_the_site.py:/opt/scripts/check_visibility_against_the_site.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_visibility_against_the_site.py \
+  >/tmp/verify_visibility_site.log 2>&1; then
+  pass "every pageVisibility reading case agrees with the built site (scripts/check_visibility_against_the_site.py)"
+else
+  fail "every pageVisibility reading case agrees with the built site (scripts/check_visibility_against_the_site.py)"
+  cat /tmp/verify_visibility_site.log
 fi
 
 # ---- build_site.py: custom-domain resolution follows the primary destination ----
@@ -576,6 +605,7 @@ check_baked scripts/site_health.py        /opt/scripts/site_health.py
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.
 check_baked contracts/class-planning.json /opt/contracts/class-planning.json
+check_baked scripts/page_visibility.py    /opt/scripts/page_visibility.py
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py

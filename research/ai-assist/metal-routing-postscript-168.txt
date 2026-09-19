@@ -1,0 +1,64 @@
+POSTSCRIPT TO metal-routing-results.txt — what was DONE about #168
+==================================================================
+Written 2026-09-19. A separate file rather than a line inside the results,
+because a results file records what a run printed on the day it ran and is
+never edited afterwards; this is a fact about the CODE, not a re-measurement.
+
+WHAT THE MEASUREMENT SAID, AND STILL SAYS
+-----------------------------------------
+metal-routing-results.txt, the post-hoc mac-shelf arm (see its lines about
+"THE MAC'S OWN SHELF, 19 phrasings"):
+
+  "Deploy at 6:30 AM"   Qwen2.5-1.5B, ctx 8192, shipped prompt, Metal
+                        temp 0.1, 10 trials   0/10 correct — 10x deploy_section
+                        app request body, 3x  0/3  correct — 3x  deploy_section
+                        Qwen3-4B              10/10 correct (schedule_deploy)
+
+Nothing about that has been re-run and nothing about it has changed. The
+smaller assistant still answers that sentence with an immediate deploy when it
+is asked. Anyone putting that sentence to the MODEL should expect the same numbers — but the suite itself no longer does: since this change its interception guard answers the sentence in code, as the app does, so a re-run of the mac-shelf arm probes three cards rather than four and never sends this one.
+
+WHAT CHANGED, 2026-09-19 (issue #168)
+-------------------------------------
+The sentence no longer reaches the model, so the misroute is unreachable from
+the shelf:
+
+1. "deploy at <time>" became a PARSED FAMILY in
+   mac-app/QuartzTeachers/Models/Assist/AssistCardCommand.swift — matched in
+   code, never sent to the model, and answered with schedule_deploy. Every
+   accepted and refused spelling is data in
+   contracts/assist-cases.json -> deployAtATime.
+
+2. AssistWording.deployApproval — the card shown before an IMMEDIATE deploy —
+   now says that it happens now, so a misroute of this shape is visible at the
+   moment of approving even when the phrasing is one the family does not read.
+
+CONSEQUENCE FOR THE NUMBERS IN THE RESULTS FILE
+-----------------------------------------------
+Two counts in metal-routing-results.txt describe the CODE rather than the
+model, and they were true on 2026-09-18 and are not true now. They are left
+exactly as they were:
+
+  "15 of the 19 are answered in code; the four that reach the model…"
+                                              -> 16 answered in code, 3 routed
+  the same split in the post-hoc shelf section -> the same correction
+  the "Deploy at 6:30 AM" row of the shelf table
+                                              -> still the model's behaviour,
+                                                 but no longer reachable from
+                                                 the card
+
+The list of four model-routed cards is pinned by
+AssistPromptShelfTests.testEveryCardIsEitherMatchedInCodeOrKnownToGoToTheModel,
+which now names three. If a future run wants the shelf's split, count it there
+rather than here.
+
+WHY NO ROUTING RE-MEASUREMENT IS OWED
+-------------------------------------
+No tool was added or removed; no description, parameter, `required`,
+`needsApproval` or plan twin changed; the system prompt is untouched and
+contains no reference to AssistWording. Checked rather than asserted: after the
+change, `Plantoir --write-contracts` regenerated contracts/assist-cases.json
+and its `tools` and `toolSchemas` keys compare EQUAL, key for key, against
+origin/dev. The model is shown exactly what it was shown before. The matcher is
+strictly upstream of the model and the approval sentence strictly downstream of
+it.

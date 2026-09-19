@@ -498,6 +498,76 @@ than implying every line came off a run. **Nothing here has ever been seen to
 crash its host**; this exists so that if one ever does, it is read correctly
 the first time.
 
+### And when the failure IS real: a red contract test is a handover
+
+Everything above is about telling a genuine failure from a crash or an empty
+run. This is the case where the totals line is honest, the named test really
+did fail, and it is still not what it looks like.
+
+`AssistCardCommandTests`, `AssistSurfaceContractTests` and `ContractTests`
+deserialise `contracts/*.json` and run what they find. Those files are written
+on the mac, so **a failure in one of them usually means the mac moved and this
+side has not followed yet** — not that somebody broke something here this
+afternoon. The mac opens a GitHub issue labelled `windows` in the session it
+changes a contract (`CLAUDE.md` rule 3), so there is already a page naming what
+moved and what this app owes.
+
+**Read the open `windows` issues before filing a new one — and then check,
+because "usually" is not "always".** On 2026-09-09 a session mid-way through
+unrelated work met four of these and filed
+[#146](https://github.com/russellgordon/plantoir/issues/146) reporting them as
+one thing: a contract had moved with nobody told. They were four different
+things, and the run is worth knowing as a set.
+
+- **Two had an issue and an unreadable failure.**
+  [#70](https://github.com/russellgordon/plantoir/issues/70) had been open since
+  19:52 the previous evening, naming the phrasings and the failure itself —
+  *"Three more card phrasings will make your suite red"*, and separately the
+  parsed make-room family the second test actually failed on. The assertions
+  said `Assert.NotNull() Failure: Value is null` and gave the reader nothing to
+  search for. They name the phrasing, the tool and the handover now, which is
+  the durable half of the fix: a session that meets one is told where to look
+  without having to remember this page.
+- **One had a perfect failure and no issue at all.**
+  `AssistSurfaceContractTests` reported exactly that `back_up_course`'s
+  arguments had moved — *"must require exactly the arguments the contract says
+  it does"* — and nothing on either platform explained it. Not carelessness: the
+  tool was built matching this app's, a review fix twenty minutes later gave it
+  a `section`, and the issue written after that described the feature rather
+  than the fix. **So when you look and genuinely find nothing, you have found a
+  real gap**: say so, and open an issue labelled `mac`.
+- **One was this app's own** — a test that had retyped a contract value into a
+  literal, so it failed when the contract GREW. No issue elsewhere could have
+  named it.
+
+The fourth thing a red contract test can be is a case proposed FROM here, which
+turns the MAC's suite red on purpose and is a request rather than damage;
+[`contracts/README.md`](../contracts/README.md) covers both directions.
+
+**And a fifth: a handover that has arrived and whose fix is NOT in the release
+being cut.** Met 2026-09-18. The mac's unit-word rename moved
+`shared-rules.json` — one `activityTrail.mustRecord` event, one
+`specialNames.platformWording` key — and the Windows half is
+[#158](https://github.com/russellgordon/plantoir/issues/158), milestoned
+v1.3.0. `ContractTests.SharedRules_ActivityTrailEvents_Exist` and
+`SpecialFolderRenamerTests.EverySentenceTheContractCallsPlatformWordedSaysThisPc`
+were red with nothing anybody was meant to do about them yet, which makes
+"did anything break?" unanswerable for every other run in the meantime.
+
+Those two are now NAMED GAPS: `windows-app/Plantoir.Tests/NamedGapLedger.cs`
+holds one entry per key, carrying the key, the issue, the milestone and the
+reason. Everything else is asserted exactly as before, and the ledger fails
+both ways — if a ledgered thing starts existing here (saying to delete the
+entry) and if it stops being in the contract. **So a green totals line on this
+suite can mean "green, with two written debts"**, and the ledger file is the
+one place that says which. `contracts/README.md` → "Named gaps" carries the
+boundary: a named gap is allowed only while an open issue milestoned LATER
+than the release being cut owns the work, and never for a difference a teacher
+can see at the current milestone. Softening the contract instead — an
+`appliesOn: ["mac"]` that would be untrue and, having no mend-check, permanent
+— was rejected there and the reasoning is worth reading before proposing it
+again.
+
 ## Driving the real interface
 
 `run-ui-tests.ps1` launches the x64 Debug build and drives it with UI
@@ -522,6 +592,25 @@ and not reopening it — that part is the teacher's).
 
 It does **not** judge anything visual: colour, contrast, dark-mode legibility,
 how a long name wraps. That is a screenshot pass, not this.
+
+**One of them now reads a FILE rather than the screen**, and it is worth
+knowing why that belongs here. `MarksPoolRemovalUiTests` removes a folder in
+Course Settings — the row's own button, the confirmation, Save — and then
+asserts that the written `course_config.json` still has no `graded_folders`
+key. The RULE is pinned by the unit suite against the contract's seven cases
+([#142](https://github.com/russellgordon/plantoir/issues/142), plus the
+case-insensitive seventh that Windows proposed and the mac adopted on
+2026-09-19, [#172](https://github.com/russellgordon/plantoir/issues/172));
+what no unit
+test here can reach is that the gesture a teacher makes arrives at that rule
+at all, with the confirmation agreeing and Save writing what the rule decided.
+Mutation-measured: restoring the pre-fix body fails it with
+`graded_folders: ["Thinking Tasks"]` in the file, which is the damage itself,
+while the old pool arithmetic over a CORRECT walk leaves it green — so what
+it guards is the ORDER reaching the file. It drives no launcher, so the
+`--state-dir` caveat above does not bite, and it writes its own one-course
+fixture rather than joining `CourseFixtures.WriteBoth`, which every other
+suite here reads.
 
 **It cannot crash its host, and that was measured rather than assumed**
 (2026-09-08). The question came from the mac, where the unit suite segfaulted
@@ -774,7 +863,14 @@ as work happens:
 WSL2 and the whole image/container model on 2026-08-19 (`GUI-IMPROVEMENTS.md`
 entry 290) in favour of a **native runtime**: `windows-app/Vendor/fetch-runtime.ps1`
 fetches pinned, portable pieces — Node 20 (zip, no installer), Python 3.11
-(the embeddable distribution plus `python-frontmatter` and `Pillow`), a clone
+(the embeddable distribution plus `python-frontmatter==1.3.0`,
+`PyYAML==6.0.3` and `Pillow==12.3.0`, pinned there since 2026-09-19 and held
+against `contracts/toolchain.json` → `pins` by
+`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins`; PyYAML is
+named explicitly because it is what decides whether a teacher's `publish: no`
+hides a page — see
+[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page)),
+a clone
 of Quartz v4.5.0 with this repo's `patches/` applied, wrangler, and the Noto
 emoji font — into `windows-app/Vendor/runtime/`, which the app then ships
 inside its own bundle the same way it ships the assistant's `llama/` engine.
@@ -963,7 +1059,17 @@ as history, not as what Windows does today.
   way: resolve claims on the platform's restoration-complete signal
   rather than polling, and while a claim may still arrive show a quiet
   loading state, never the folder picker the claim is about to replace.
-  The scenario test suite in the macOS app is the porting spec.
+  The scenario test suite in the macOS app is the porting spec. **The
+  other half of that — what a window lets GO of when it is pointed at a
+  different folder** — is `contracts/shared-rules.json` →
+  `workingFolderSelection`, and since 2026-09-19 all four of its cases run
+  here too: both adoption routes go through one funnel,
+  `WorkspaceViewModel.PointAtFolder` → `WindowFolderState.PointAt`. The
+  reasoning is in [`09-mac-app.md`](09-mac-app.md) → "What a window lets go
+  of when it changes working folder"; what is Windows' about it — the state
+  having to move into Core before any test could reach it, which folder a
+  teardown names, and the one notion of "the same folder" — is at the foot of
+  this page.
 - **New windows** (entry 84): inherit the folder of the window that was
   key when the command ran; with no windows open, show the folder picker.
   Decide the folder BEFORE first paint or the picker flashes.
@@ -1153,6 +1259,106 @@ imitation ever starts costing more than it saves.
 — keep the real control.** The mac ended up here because it had already been
 forced off the native control for the flyout's sake; do not inherit that
 position by accident.
+
+## Reading a page's visibility: four .NET defaults that get it wrong
+
+The rule itself — what the BUILT SITE does with a `publish:` line, and why
+that is not what reading the line suggests — belongs to
+[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page),
+and `Plantoir.Core/Models/PageVisibilityReader.cs` is the same rule as
+`scripts/page_visibility.py` and the mac's Swift file of the same name. What
+is worth writing down HERE is the part that is about C#, because a
+transliteration of either reference is wrong in four places and every one of
+them is silent (issue #140, 2026-09-19):
+
+- **`Trim()`, `TrimEnd()` and `char.IsWhiteSpace` strip the non-breaking
+  space.** YAML's whitespace is a space and a tab and nothing else, so
+  `publish: false<NBSP>` is the string "false " and the page is
+  PUBLISHED. Trimming it calls a live page hidden — the one direction that
+  must never be wrong. `Block.IndexOf` used both of these. Trim space and tab
+  by hand. (The single exception is the DRAFT family's final compare, which
+  mirrors Python's `str(value).strip()` inside `build_site._as_bool` and so
+  *should* strip it.)
+- **`StartsWith`, `EndsWith`, `IndexOf(string)` and `Contains(string)` are
+  CULTURE-SENSITIVE by default**, and a culture-sensitive compare matches
+  across characters it considers ignorable. Every one of them in this reader
+  passes `StringComparison.Ordinal` explicitly. `string ==` is already
+  ordinal, but it is written as `string.Equals(..., Ordinal)` where the answer
+  turns on it, so nobody has to remember which operators are which.
+- **`ToLower()` is not `ToLowerInvariant()`.** In Turkish, `I` lowercases to a
+  dotless `ı`, so `TRUE` would stop being `true`.
+- **`string.Split('\n')` is right and `splitlines()`-style splitting is not.**
+  Both references split on `"\n"` alone and strip a trailing `\r` per line;
+  splitting on every Unicode line break would find boundaries inside a
+  teacher's value.
+
+Two faults found here were in the WRITER rather than the reader, and both are
+worth knowing because they are the shape a writer goes wrong in: `ReplaceValue`
+looked for an inline comment with `IndexOf('#')`, so hiding a
+`publish: "false # why"` page left an unbalanced quote in the teacher's file;
+and `Block.Parse` demanded exactly `---` on line 0 while accepting `...` as a
+close, where python-frontmatter's boundary is `^-{3,}\s*$` for both — so a page
+fenced with `----` got a second block PREPENDED and the teacher's real
+frontmatter became body text on the student's site.
+
+One fence finder and one key matcher now serve the reader and every
+VISIBILITY writer — and that qualifier is load-bearing, because two other
+finders are still hand-rolled and were deliberately left alone:
+`CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
+#140, so a restore reaches different pages on the two platforms — that is
+[issue #177](https://github.com/russellgordon/plantoir/issues/177), a
+`decision`) and `SectionAdder.FrontmatterLines` (strict on BOTH platforms, so
+the section carry agrees with itself — parity, not a divergence, and
+documented rather than filed). Four finders, two unified. Check which one you
+are looking at before "tidying" any of them.
+
+A third fault was shared with the mac and **was fixed here first, on
+2026-09-19; the mac followed the same day.**
+Both writers replaced a key's line and orphaned the indented CONTINUATION
+line below it onto the new value, so **hiding** a page whose value is a block
+scalar left it PUBLISHED — the failure that reports success, and reached by
+the very rule #140 introduced ("on `cannot tell`, write the flag out in
+full"), so it could not ship as a known issue. `PageFrontmatter
+.ContinuationLines` takes those lines with the key in both of `SetDraft`'s
+branches, following `setup_course.per_section_frontmatter`'s loop —
+stepping over blank lines and `# note`s **at any indent**, so a complete
+value's note stays where the teacher wrote it and a column-0 note between a
+key and its value does not end the walk. That second half was got wrong here
+first (the sweeper stepped over indented comments only, orphaned the value and
+stopped the build) and it was still wrong in the shared Python until the mac's
+half landed; `setup_course.per_section_frontmatter` now steps the same way.
+
+**And the half of it a sweep cannot reach, which is the part worth carrying
+away.** `publish: false` with an indented `false` under it is the string
+`"false false"` on the site and the page is PUBLISHED — but the reader called
+it hidden, and called it CONFIDENTLY, so `SetDraft`'s "already right, change
+nothing" gate returned before the writer ran at all. Hiding the page was a
+no-op the teacher was told had worked. A sweep in the writer is no use
+against a request the writer never receives: `PageVisibilityReader.ReadScalar`
+had to stop trusting the key's own line, and it now answers `cannot tell`
+whenever the first line that could be a value is indented. **The lesson
+generalises past this bug** — when a reader and a writer are fixed in the same
+piece, check which of them the guard clause runs in.
+
+[Issue #176](https://github.com/russellgordon/plantoir/issues/176) carries the
+measured table and both halves. It was taken on Windows first even though a
+one-sided fix in this field is normally a silent divergence, because the
+divergence was Windows being right; the mac took it the same day and
+implemented this design unchanged, so the two apps agree at the THREE-WAY
+level again. What landed with the mac's half and reaches this side:
+`contracts/file-formats.json` gained two `readingCases` (the two continuation
+forms the SITE publishes, where each app's reporting answer agrees with it —
+`PageFrontmatter.IsDraft` is `Answer(...) == Hidden` and `ReadScalar` already
+answers `CannotTell`, so both pass here unchanged) and three `writingCases`
+for the sweep, which `FileFormatContractTests
+.TheWritingCasesInTheContractAreFollowed` now runs. Those three were derived
+from `ReplaceValue` and `ContinuationLines` by reading rather than by running
+— macOS cannot build `net9.0-windows` — and checked against a transliteration
+calibrated on the ten cases already in the list; if one is red on this side it
+is a real difference and worth an issue back, saying which case and what
+Windows produced. The reasoning lives in
+`documentation/08-course-config-reference.md` → "A writer must take a value's
+CONTINUATION lines with the key".
 
 ## Two macOS mechanics NOT to port
 
@@ -1358,7 +1564,7 @@ through the production seam. The mac's own fake window has always returned
 a result from its `deploy` closure (`FakePreview.swift`), so it never had
 the sync-only gap. See "The scenario runner runs the REAL tools" below.
 
-## Two testing lessons that recur, and both cost a red branch
+## Three testing lessons that recur, and each cost a red branch
 
 **A test proving a date was FRESHENED must compare against a date in the PAST.**
 `windows-app/Plantoir.Tests/ModelTests.cs` asserts
@@ -1382,6 +1588,42 @@ assertion had passed; the test failed on housekeeping. Deleting a temp folder is
 housekeeping: when it does not work, the operating system will get to it. **The
 same shape is available on the mac** with Spotlight indexing, and whether the
 mac's suites have it has never been checked.
+
+**The shared state a class must be serialised against is not always a static —
+it can be a folder on the machine.** `SharedActivityState` was created for
+process-wide statics (preview leases, the publish registry) and its name still
+says so, but the question it answers is *what does this class touch that
+outlives it*. Two things beyond statics now qualify, both learned from a real
+red run:
+
+- **The activity trail's log path.** Five classes redirect it to a scratch file
+  and then assert on what is in that file, so a class merely WRITING trail lines
+  — `ScheduledHealthFindings.Take` leaves a `folder problem found` line — can
+  drop them into somebody else's fixture mid-assertion. Writing them is enough
+  to belong in the collection; redirecting is not the only way in.
+- **`%LOCALAPPDATA%\Plantoir\scheduled`.** The generated wrapper resolves
+  `$healthDir` and `$pendingDir` from `$env:LOCALAPPDATA` at RUN time, which is
+  why `ScheduledWrapperRunTests` and `ScheduledPublishOutcomeTests` can
+  substitute the baked OUTCOME folder and cannot substitute that one. Both run
+  wrappers for ICS3U section 1; a stub build that finds nothing takes the
+  wrapper's nothing-found branch and DELETES the folder-problems record for that
+  section — the record the other class has just written and is about to read. It
+  showed as one red `AWorkingFolderWithSpacesInItsNameStillBuilds` on
+  2026-09-18 (`Assert.Single` on an empty list), green alone and on re-run.
+  Both classes are in the collection since 2026-09-19. **That fixes the two
+  classes against each other and nothing against the MACHINE**: xUnit cannot
+  serialise the suite against a real scheduled publish for a course called
+  ICS3U running at half six, which would write and consume the same file — and
+  `Take` consumes the record, so a genuine overnight finding cleared by a
+  test's stub build is never noticed. Making those directories injectable is
+  [issue #179](https://github.com/russellgordon/plantoir/issues/179).
+
+The general rule, and the cheap check when a test fails once and cannot be
+reproduced: **ask what the class writes that another class can see** — a static,
+a process-wide setting, a real per-user folder, a scheduled task — and look for a
+second class writing the same thing with the same key. `--state-dir` and a
+substituted literal move SOME of it; neither moves what a child process resolves
+from the environment.
 
 ## The scenario runner runs the REAL tools
 
@@ -1528,17 +1770,171 @@ over it would collide with a real file. The logic already existed inside
 divergence issue #70 described, in the direction it suggested: an argument
 nobody can get wrong beats one with a sensible default.
 
-### The check that found the one still open
+### A stamp that cannot be true never decides what gets deleted
+
+Added 2026-09-19 for [issue #161](https://github.com/russellgordon/plantoir/issues/161),
+which arrived from the mac. It belongs beside the two above because it is the
+same kind of fault — a rule that is right about the common case and silently
+destructive about one it never considered — and because `PruneBackups` is the
+code the `back_up_course` fix above was about.
+
+`CourseArchiver.PruneBackups` sorts the assistant's backups by the date parsed
+out of their file names and deletes everything past the fifth. **This app has
+always written that stamp correctly**: `CourseArchiver.TimestampedName` and
+both readers (`ArchivedItem.From`, `BackupItem.From`) are pinned to
+`InvariantCulture`, so no Windows machine has ever written its own calendar
+into a name. The mac did, until 2026-09-10 — a `DateFormatter` with a format
+and no locale renders `yyyy` in whatever calendar the Mac is set to — and a
+working folder moves between machines. So a folder carried from a pre-fix Thai
+Mac holds `ICS3U_backup_2569-08-09_141530_assistant-section1.zip`, invariant
+parsing reads that cleanly as the year **2569**, it sorts as the newest thing
+in the folder, it takes one of the five kept places, and a real backup is
+deleted. Nothing reports a fault.
+
+`Plantoir.Core/Models/ArchiveStamp.cs` is the answer, matching the mac's type
+of the same name:
+
+- **`EarliestPossible` = 2025-01-01.** The floor is "before Plantoir could have
+  written one", not a round number — the archive feature was written
+  2026-08-09, so no zip of this kind is older than that. It is set a year and a
+  half earlier so no real name is ever refused (a machine whose clock is a few
+  months out still writes a name this accepts), and it still clears the nearest
+  wrong reading — Ethiopic `2018-12-03` — by six years. Any floor between the
+  two works; one in the middle is wrong in neither direction.
+- **`FutureAllowance` = 2 days.** Not one. The stamp is local wall time on BOTH
+  ends, so a zip written this morning in Kiritimati (UTC+14) and read the same
+  morning on Baker Island (UTC−12) is 26 hours ahead of `DateTime.Now` — absurd
+  as travel, ordinary as a folder in OneDrive — and two days also absorbs a
+  daylight-saving step. The extra day costs nothing: no wrong reading of any
+  calendar lands within a year of the ceiling.
+- **Both bounds inclusive, local time, never `UtcNow`.** A parsed stamp comes
+  back through `TryParseExact` as `DateTimeKind.Unspecified` and means what the
+  clock said where it was written; measuring it against a UTC now would refuse
+  real names for up to half a day at either end of the world. `now` is
+  injectable so a test's answer cannot change between one assertion and the
+  next; nothing in the app passes it.
+
+The guard itself is one `continue` in the COLLECTION loop, which is the part
+that matters: a refused backup is **neither counted toward the five nor
+deleted**, and it stays LISTED. Its date is the only thing about it known to be
+wrong, and a teacher may still want to restore it or delete it themselves.
+
+**No sentence and no trail line**, both deliberately, both matching the mac.
+Nothing a teacher can see changes — the zip they had is the zip they still have
+— so there is no wording to add; and a new `activityTrail.mustRecord` key would
+turn the mac's suite red for a line the mac chose not to write. A prune line
+answers a question about a COUNT, not about a moment.
+
+**The accepted cost, written down here so it is not rediscovered as a bug.** A
+PC whose clock is badly wrong — a dead CMOS battery reading 2009 or 1601, or a
+machine days fast — stamps *every* assistant backup implausibly. None is ever
+counted, so none is ever pruned: one zip per conversation, for ever, on a course
+that may be hundreds of megabytes. That is the right trade, because the two
+failures are not symmetrical. A disk filling slowly is visible, complained
+about, and recoverable by deleting backups from the list; a deleted backup is
+none of those things. It is worth naming on this side in particular: a dead RTC
+on a desktop PC is commoner than the mac's write-up weighed, and this is the
+platform where the folder is most likely to have travelled.
+
+**One sentence it makes approximately false, and why it was left alone.**
+`BackupItem.KeptDescription` tells the teacher "The assistant made this one; its
+five most recent are kept" about a zip that will now never be pruned. The mac's
+`BackupItem` says exactly the same thing, it is not contract data, and neither
+side changed it — so the two still match, and this is a shared decision rather
+than something each platform finds separately. Changing it would mean saying
+"unless its date is implausible" to a teacher who has no idea their folder came
+from a Thai Mac, which is rule 1's problem rather than a fix.
+**The same is true of one sentence in `documentation/10-local-ai-assistant.md`,
+and it is NOT left alone — it is fixed on the mac's branch.** "Prune only the
+ASSISTANT's own backups, keeping its five most recent per course" is now
+approximately false in exactly the way `KeptDescription` is: the five kept are
+the five most recent PLAUSIBLE ones, and an implausible zip is kept beside them
+for ever. (It would be fair to say the guard makes the sentence's INTENT truer
+— a 2569 zip was stealing one of the five — but the sentence as written still
+describes something the code no longer does, and that is the kind of
+almost-right line that gets believed.) It is not corrected here, because 10 is a
+shared page and `origin/issue/160-archive-stamp-calendar` already rewrites that
+bullet with the caveat and a pointer to `09-mac-app.md` for what it costs;
+editing it from this side would conflict with that branch for no gain. **When
+#160 merges, check that bullet reads correctly for both platforms** — the mac's
+wording says "since 2026-09-10", which is its date, not this one's.
+
+**Tests** are in `CourseBackupTests` (`ModelTests.cs`) — a plain temp-folder
+class, nothing process-wide, so it stays out of `SharedActivityState`. The one
+worth copying is `PruneBackups_ABackupWhoseStampCannotBeTrue_IsNeitherCountedNorDeleted`:
+it asserts the number of surviving REAL backups, not merely that the 2569 zip is
+still there, because a guard that worked by refusing to PARSE the name would
+pass the weaker assertion while still deleting two real copies instead of one.
+`PruneBackups_AStampPastTheCeiling_CountsOnceTheClockCatchesUp` is the reason
+`PruneBackups` takes a `now`: the ceiling is half the rule and nothing on disk
+exercises it, since whether a stamp is past it depends on when the suite runs.
+It asks about ONE file twice with the clock in two places — three days ahead of
+`now` it is uncounted and undeleted; with `now` moved forward two days it is
+counted, and being the newest it keeps its place while the oldest real backup
+goes. Without that test the parameter was dead plumbing described by a comment
+that was not true, which a review caught.
+Three mutations were run: removing the `continue` reddens the 2569 and
+below-floor tests; making either bound exclusive reddens
+`CouldHaveBeenStamped_IsInclusiveAtBothBounds`; dropping `, now` where
+`PruneBackups` calls the guard reddens the ceiling test.
+
+**Part 2 of #161 is deliberately not done, and the issue stays open.** The mac
+turned these bounds into contract data — `contracts/course-management.json` →
+`zipNames` → `couldHaveBeenStamped`, ten cases plus the two bounds, and a
+`moment` on each recognised `zipNames` case. That block was on the unmerged
+`issue/160-archive-stamp-calendar` branch when this was written and **reached
+`dev` on 2026-09-19 with #160** (mac GUI row 498), so nothing blocks part 2 any
+more; nothing here touched that file either way. Windows now runs the ten cases
+and pins both bounds
+against `ArchiveStamp`, and `CouldHaveBeenStamped_BoundsAreTheOnesTheMacUses` —
+the one test here holding the literals, marked as such in its own comment —
+goes away. Take the `moment` apart with a Gregorian calendar and compare the
+pieces; do not re-spell it with `CourseArchiver.TimestampedName`, because a
+round trip stays green while the writer and the reader are wrong together, which
+is exactly the state the mac was found in.
+
+**Found while in this code, filed rather than fixed:**
+[issue #187](https://github.com/russellgordon/plantoir/issues/187) — the
+same-second collision name `CourseArchiver.Archive` writes
+(`ICS3U_2026-09-19_120000-2.zip`, or `…_assistant-section1-2.zip` for a backup)
+is readable by neither parser, so such a zip is invisible to both sidebar lists
+and to pruning; for a whole-course archive, `ArchiveAndRemoveCourse` then
+deletes the course folder and the only copy never appears in Archives. The mac
+has no collision retry at all, so it is Windows-only and no `zipNames` case
+covers the form.
+
+### The check that found the one still open — and how it was closed
 
 `TheCardsArgumentsReachTheToolThatReadsThem` walked only `cardPhrasings.matches`
 — the LITERAL phrasings. It now walks `cardPhrasings.parsed` as well, which is
 the half where an argument is most easily misnamed, because it is built in code
 from a number rather than written out beside the sentence. It found a live
-defect on its first run: `add_next_class` declares no `duplicate` parameter, so
+defect on its first run: `add_next_class` declared no `duplicate` parameter, so
 "duplicate Unit 3, Day 2 as my next class" — a sentence `AssistPromptShelf`
-OFFERS — has the argument dropped by the binder and quietly makes a **blank**
-page. Recorded in `KnownToBeDropped` naming issue #149, the way #116 was
-carried there until it was fixed.
+OFFERS — had the argument dropped by the binder and quietly made a **blank**
+page. It was recorded in `KnownToBeDropped` naming issue #149, the way #116
+was carried there until it was fixed.
+
+**Fixed 2026-09-18, and the entry is gone** — the mend-check at the bottom of
+that test fails on a pair that is listed and has started arriving, so deleting
+it is not optional. Both halves of `add_next_class` now declare `duplicate`;
+the pair moved to `agreedExtras` with the binder reason, since the mac needs
+no such argument (its card and tool runner share a process). What the feature
+does, and the two places it is deliberately stricter than the mac, is in
+[`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "Which tools record an
+undo entry, and which deliberately do not".
+
+**One thing to know before adding another card-only argument.**
+`add_next_class` IS one of the thirteen tools the local model routes to, so an
+argument on its schema is an argument the router can invent — here, a page
+title for a request that named none. `AssistAgent.CardOnlyArguments` strips it
+from `properties` and `required` in the narrowed schema, and
+`NarrowToolsMirrorTests` pins that `research/ai-assist/narrow-tools.py` strips
+it too, because a routing score measured through a surface the app does not
+ship is worse than no score. The alternative — leaving it visible and writing
+a sentence in the description telling the model not to use it — is the thing
+CLAUDE.md warns about: one clarifying sentence in `publish_pages`' description
+once took a probe suite from 110/110 to 90/110.
 
 **The general lesson**: a silent drop is invisible to any test that does not go
 looking, and "the tool ran and returned something sensible" is exactly what it
@@ -1563,6 +1959,305 @@ stayed green because its example says "two classes". A form one side supports
 and does not DECLARE is invisible to the other. If a family here accepts
 something the contract's `shape` does not spell out, that is a case to propose,
 not a detail to leave in the code.
+
+## What a window lets go of when its working folder changes
+
+Issue [#162](https://github.com/russellgordon/plantoir/issues/162), the
+Windows half of the mac's [#93](https://github.com/russellgordon/plantoir/issues/93).
+The reported defect: with a course selected, choosing another working folder
+left the selection naming a course that folder had never had, so the detail
+pane greeted the teacher with "Course Not Found" about a folder they had only
+just arrived in. The rule itself is in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`workingFolderSelection`, and `documentation/09-mac-app.md` explains it; what
+follows is only what is Windows'.
+
+### The state had to move into Core before anything could be tested
+
+`SidebarSelection` and the folder lived in `Plantoir/ViewModels/WorkspaceViewModel.cs`.
+`Plantoir.Tests` targets plain `net9.0` and references Core and Mcp only, so
+**no test in this repository could reach the rule at all** — which is the real
+reason the defect arrived here with every Windows gate green rather than red.
+Both now live in `Plantoir.Core/Models/WorkingFolderSelection.cs`:
+`SidebarSelection` unchanged (no XAML names it, and `Serialized`/`Parse`
+already delegated to Core's `WindowMemoryCodec`, so the strings
+`App.RememberOpenWindows` persists are byte-for-byte what they were), plus a
+new `WindowFolderState` holding the folder, the selection and the sidebar
+memory that survives a change. The precedent is `FolderRemoval`, moved the same
+way for [#142](https://github.com/russellgordon/plantoir/issues/142).
+
+`WorkspaceViewModel` keeps every public member it had and delegates; both
+`ChooseWorkspace` and `AdoptRestoredPath` go through one private
+`PointAtFolder` → `WindowFolderState.PointAt`. What is route-specific stays
+with its caller — the trail line, `Settings.Save`, `ReleaseFolderIfUnused`,
+`NoteBecameKey` — because a restored window must not record "working folder
+opened" twice.
+
+Two things are easy to drop and neither fails loudly:
+
+- **`Notify(nameof(Selection))` after the reload.** `MainWindow` subscribes to
+  it twice over: once to re-render the pane, and once to call
+  `App.RememberOpenWindows()`. Without the second, the remembered frame still
+  names the old folder's course and the whole defect returns on the next
+  launch — invisible until then. It fires only when a folder was actually left
+  behind, because the first adoption runs mid-construction, before the window
+  has finished building itself.
+- **The kept half.** `ExpandedCourseCodes`, `IsShowingArchived` and
+  `IsShowingBackups` are seeded by `MainWindow`'s constructor BEFORE the folder
+  is adopted, so clearing them in the funnel would silently break window
+  restoration rather than anything to do with this rule.
+
+### `alsoCleared` reduces to the selection here — a finding, not an omission
+
+The mac also lets go of five pending confirmations and four alerts, which it
+holds as FIELDS. On Windows every one of those is an awaited modal
+`ContentDialog` (`SidebarPane.xaml.cs`'s archive, restore, delete and rename
+confirmations): the state is a continuation on the stack, with no field to
+clear, and the folder it acts on is read INSIDE that continuation rather than
+pinned when the dialog went up. Inventing fields to clear would mean inventing
+the state to go with them.
+
+**What the modality does not close, and this is the part worth knowing.** The
+MENU route to the folder picker is genuinely shut while a dialog is up:
+`MainWindow.OpenWorkingFolder_Click` is a `MenuFlyoutItem`, and the dialog's
+overlay covers the menu bar. **Ctrl+O is not obviously shut.** It is a
+`KeyboardAccelerator` declared on `MainWindow.xaml`'s `Root` grid; WinUI
+searches for accelerators window-wide unless a `ScopeOwner` narrows them, none
+is set, and `OpenWorkingFolderAccelerator` has no guard of its own. Whether the
+key actually reaches it under a modal dialog cannot be settled by reading —
+that needs a run, and it is
+[issue #191](https://github.com/russellgordon/plantoir/issues/191), along with
+the other three that are unguarded the same way: Ctrl+N
+(`NewWindowAccelerator`), Ctrl+Shift+R (`ReloadCoursesAccelerator`) and **F2**
+(`RenameCourseAccelerator`, `MainWindow.xaml:14`). F2 is the sharpest of the
+four — it is the only one that would raise a SECOND `ContentDialog` on top of
+the modal one, which WinUI refuses and swallows, so the key would appear to do
+nothing at all.
+
+**So the confirmations were made safe whether it fires or not**, which is the
+honest delivery of `alsoCleared` here. Every confirmation in `SidebarPane`
+captures the working folder BEFORE its dialog goes up and, after the await,
+does nothing at all if `WorkingFolder.IsTheSame(captured, live)` is false —
+`TheFolderMovedUnderThisConfirmation`, one helper so the **twelve** check sites
+read identically. Silently void, like the mac's cleared confirmation: no
+sentence, because a teacher who has just moved to another folder is not waiting
+to hear about the one they left.
+
+Eleven of the twelve follow a dialog. **The twelfth follows a wait that is not
+a dialog at all**, and it is the widest window in the file: inside the rename,
+`FolderActions.QuitObsidianAndWait` polls for up to five seconds (50 × 100 ms)
+with nothing on screen, so the File menu and Ctrl+O are both fully live — and
+everything after it reads the LIVE workspace, down to setting the selection to
+the renamed code. A check before a wait says nothing about what is true after
+it.
+
+**What the void path leaves behind, decided rather than overlooked:** Obsidian
+has been quit by then and is not reopened, and nothing tells the teacher so.
+Nothing on disk is half-done — the rename does not run at all — so the cost is
+an editor to open again. Reopening it was rejected because the vault to reopen
+is in the folder they have just LEFT: Plantoir would pull them back to a folder
+they deliberately moved away from, and the folder they are now in may have no
+vault of that name. Saying it was rejected for the same reason the whole rule
+exists — a sentence about the old folder is what `alsoCleared` forbids.
+
+What that prevents is specific rather than theoretical. Each confirmation names
+its course, archive or backup by a path taken before the dialog, and finishes
+by asking the window where it is NOW. Answer a backup restore after a folder
+switch and `Workspace.CoursesDirectory()` is the NEW folder's while
+`item.FilePath` is still the OLD folder's zip: the new folder's course of that
+code is archived and overwritten from a backup belonging to a folder nobody is
+looking at, and it reports success and shows the result. The two deletes remove
+the old folder's file while the window shows the new one.
+
+`Plantoir.Tests/ConfirmationFolderGuardTests` gates this with **two** scans of
+`SidebarPane.xaml.cs`. The first: every awaited dialog must be followed by the
+check before the next await or the end of the method, or carry a
+`// folder-check: not needed — …` comment saying why (three do: the helper
+itself, the error reporter, and the "is backed up" notice). The second covers
+waits that are not dialogs — in a method that captured a folder, a
+`Workspace.Reload()` or a `Workspace.Selection =` after any `await` must have
+the check between them. A new confirmation written with neither fails.
+
+**What the scans cannot see** is written in their own comments and repeated
+here, because a guard believed to cover more than it does is worse than none.
+
+- **They read ONE file.** `CourseSettingsView`'s folder-rename sheet finishes
+  inside a `Closing` deferral against a course captured at construction, so it
+  acts on the right folder's files — a milder case, left alone;
+  `TaskProgressView`'s runner questions belong to a task rather than a folder;
+  `MainWindow`'s own dialogs act on no course.
+- **Nothing scans `MainWindow`'s hand-backs at all.** `StopPreviewFor`,
+  `StopPreviewForAsync` and `MainWindowForBuilds` take the SECTION's folder
+  from the assistant window that asked, rather than reading the main window's —
+  see "The assistant's hand-backs name a section, not a window" below. That is
+  held by reading, not by a test.
+- **The dialog scan is LINEAR, not brace-aware.** A confirmation in an `if`
+  branch is satisfied by a check sitting in the `else` branch below it, and the
+  forward search stops at the first closing brace at method indentation, so an
+  unusually shaped method ends it early. An opt-out is read on the site line or
+  the two above it, so write one ON the site line — a comment two lines up is
+  one reflow away from being out of reach.
+- **The non-dialog scan watches two writes only**, sees only methods spelling
+  `string? askedIn =`, matches the word `await` lexically (so one in a comment
+  arms it), and reads a write inside a lambda declared after an await as a
+  write in the continuation. Those failures all point toward crying wolf rather
+  than toward silence, which is the right way round.
+
+A C# parser inside a test was rejected for both: what actually happens is a new
+confirmation written with no check at all, and both scans catch that.
+
+### The assistant's hand-backs name a section, not a window
+
+`AssistWindow` hands building, deploying and stopping back to the main window's
+own controls rather than running them again behind the chat — the design
+Windows led on. Each hand-back knew a course code and a section number, and
+found the window to use as `_main`, the window the conversation was opened
+beside.
+
+**That window can move.** Nothing closes an assistant window when the main
+window is pointed at a different working folder, so `_main` outlives the folder
+it was opened for, and every hand-back then acts in a window showing something
+else: the stop swept the container and released the lease of the folder the
+teacher had just arrived IN — another window's running preview of that course
+and section — while the section's own preview leaked; and it selected a course
+code into a sidebar that had never had one, which is this issue's own defect
+arriving by a side door. Worse than the dialog case, because the assistant is
+where a teacher is *least* watching the main window.
+
+So every hand-back now names `_folder`, the section's own:
+
+- `StopPreviewFor` / `StopPreviewForAsync` take it as an argument. **Both**
+  paths run `PreviewStopper.StopSectionProcesses…` and
+  `PreviewLeases.Release(sectionFolder, …)` OUTSIDE the window check, so the
+  section's preview is reclaimed either way; the parts that touch the WINDOW —
+  selecting the section, and stopping the detail pane's preview — run only
+  while that window is still showing that folder. The synchronous one is the
+  fallback `AssistAgent` uses where no async wiring is set, before a deploy
+  hand-back and before a page edit, and both callers rely on the same thing:
+  that nothing is still serving or building out of the section's output folder
+  by the time they rewrite the pages or start a build into it. The two differ
+  only in whether they WAIT for the processes to go.
+
+  **The unconditional sweep is load-bearing in the showing branch too**, which
+  is easy to miss. Selecting the section REPLACES `DetailHost.Content`
+  synchronously, so the view that `StopPreviewIfRunning()` is then asked to
+  stop is a freshly built one with no preview in it, while the instance that
+  owns the running preview is only unloaded a dispatcher tick later. Relying on
+  that unload would make the stop's completion a matter of timing. Both calls
+  are safe to run twice.
+- `MainWindowForBuilds` now prefers `_main` only while it still shows
+  `_folder`, falling back to `App.WindowFor(_folder)` and then to opening one.
+  A build or a deploy therefore always happens in a window showing the
+  section's folder, so no sentence had to be invented for a hand-back that
+  could not find its window — it can.
+- `SectionIsBusy` asks a window showing that folder, because "busy" is read off
+  a detail pane and another folder's pane answers about another folder's
+  section.
+- `App.WindowFor` compares with `WorkingFolder.IsTheSame` like everything else,
+  rather than its own `Path.GetFullPath` spelling.
+
+The capture cannot be taken at the top of the dispatcher lambda either: the
+lambda runs when the dispatcher reaches it, not when the assistant asked.
+
+### Which folder a teardown names
+
+The second defect, and the one that had to land FIRST. `SectionDetailView`
+used to read `_window.Workspace.WorkspacePath` inside `StopPreview`,
+`StopPreviewAsync`, `CancelPreview`, `CancelDeploy` and `ReleaseLease`, and
+`Unloaded` calls `StopPreview()`.
+
+Clearing the selection replaces `DetailHost.Content`, and WinUI DISPATCHES
+`Unloaded` — it runs a layout pass later, with the window already pointing at
+the new folder. The stop would then run `preview.ps1 --stop` against folder B
+and remove B's lease row: inert if nothing is previewing there, and **harmful
+if something is**, because it stops another window's preview of that course and
+section while the folder being left carries on serving with nothing left to
+stop it. Today `Unloaded` never fires on a folder change, so the bug is inert;
+**clearing the selection without the captures is what would make it live**, and
+that is why the two are separate commits in that order.
+
+The fix is structural, and two notes rather than one:
+
+- `_folderThisSectionWorksIn` — written where a folder is DECIDED: the two
+  preview starts, and the deploy only AFTER its own preview stop, so that stop
+  still names the preview's folder. Read by every stop.
+- `_folderThisSectionRegisteredIn` — written once, `readonly`, at
+  construction, and read only by `ReleaseLease`'s folder-keyed sweep. Kept
+  apart from the work folder because a deploy starting in the one render pass
+  between the folder change and the teardown moves the work folder, and a
+  registration riding along with it would strand the old folder's lease row.
+  That was the mac's own finding on review of #93.
+
+`PreviewLeases.Lease` already carries its `FolderPath`, so `Release(lease)` was
+right all along; only the folder-keyed sweep beside it had to change.
+
+**It is gated by a source scan, and the shape of the scan matters.** No
+`SectionDetailView` mounts in a unit test, and CLAUDE.md forbids a `[UiFact]`
+that drives Preview, so `SectionDetailTeardownSourceTests` reads the file and
+asserts **zero** reads of the window's live folder between two marker comments
+— not a list of the five known sites. `ReleaseLease` alone has six callers
+(`AbandonWait` among them, which no earlier inventory named), and a test naming
+today's sites stays green the moment somebody adds a sixth, which is the whole
+failure it exists to prevent. It also pins the four write sites and the single
+registration write, since deleting a capture would otherwise leave every stop a
+silent no-op wearing the shape of the fix working. (Four, not three: the
+marketing-shot harness `StagePreviewForCapture` sets `_previewUrl`, which makes
+`hadPreview` true, and a staged view must not answer the teardown's question
+differently from a real one.)
+
+**That scan is LEXICAL, and one exception is named rather than tidied away.**
+Every teardown path ends in `RefreshChrome()`, which is defined outside the
+region and does read the live folder — correctly, because what a teacher may
+click next is a question about the folder now on screen, and it stops and
+releases nothing. A second test asserts that `RefreshChrome` is the **only**
+method called from the region whose own body reads the live folder, so another
+cannot arrive under cover of the first. Neither test can see past this file.
+
+### One notion of "the same folder"
+
+Found while wiring the above, pre-existing and teacher-visible on its own.
+`MainWindow.IsTheOpenFolder` resolved and compared case-insensitively;
+`ChooseWorkspace` asked `previous != path` and `ReleaseFolderIfUnused` asked
+`m.WorkspacePath == path`, both **ordinal**. The OS folder picker hands back
+the true on-disk casing, and a stored path carries whatever casing it was saved
+with — so re-choosing the folder already open was "the same" to one and "a
+change" to the other. The change path then found no window holding the old
+spelling and stopped that folder's container: the container of the folder still
+on screen, with the teacher's preview inside it. The contract says re-choosing
+the open folder "costs the teacher nothing".
+
+`Plantoir.Core/Models/WorkingFolder.cs` is the one rule now, and every
+folder-equality test in those classes asks it, including
+`Workspace.FolderForNewWindow` — which also hands back the OPEN window's
+spelling rather than the remembered one, since inheriting a second spelling is
+how one folder comes to look like two.
+
+**What it deliberately does not resolve.** `Path.GetFullPath`, trailing
+separators trimmed, `OrdinalIgnoreCase` — and nothing more. No junctions, no
+symlinks, no deciding that `Z:\Courses` and `\\server\share\Courses` are one
+folder. Those answers need a handle open: `FolderContainers.PhysicalPath` does
+exactly that with `GetFinalPathNameByHandle`, which is right for NAMING a
+container (it must agree byte for byte with what `preview.ps1` derives) and
+wrong here. This question is asked on the UI thread, on every folder change and
+every window close, often about a folder that has just been unplugged, renamed
+or deleted, where a handle open blocks or fails. **Rejected for that reason:**
+an extra container stop costs a second and starts again by itself; losing the
+window costs the teacher their work.
+
+**And one case where it is wrong the other way, accepted knowingly.** Windows
+can mark a directory case-SENSITIVE per folder (`fsutil file
+setCaseSensitiveInfo`, which is what WSL does to the folders it creates), and
+inside one of those `Work` and `work` are two real sibling folders that this
+compares as equal — so a container could be stopped for a sibling, or a folder
+change read as no change. Recoverable (the next preview starts the container
+again), and closing it would mean asking the filesystem per comparison, which
+is the handle open rejected just above. A teacher's working folder living
+inside a WSL-created case-sensitive directory is a shape nobody has met:
+Plantoir's folders are chosen from the ordinary Windows picker.
+
+**No new trail event is owed.** `working folder opened` already records the
+act, its line is still true, and a selection being let go is not something a
+teacher DID — it is the consequence of what they did, recorded one line up.
 
 ---
 

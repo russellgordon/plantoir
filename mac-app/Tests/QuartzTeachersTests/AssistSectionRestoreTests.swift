@@ -111,12 +111,12 @@ final class AssistSectionRestoreTests: XCTestCase {
 
         let after: String = try String(contentsOf: fixture.sharedPageURL, encoding: .utf8)
         XCTAssertEqual(
-            AssistPageVisibility.statedPublishing(in: after, forSection: 1, isSectionLocal: false),
+            AssistPageVisibility.statedPublishing(in: after, forSection: 1),
             false,
             "This section's publishing must go back to what the copy had"
         )
         XCTAssertEqual(
-            AssistPageVisibility.statedPublishing(in: after, forSection: 2, isSectionLocal: false),
+            AssistPageVisibility.statedPublishing(in: after, forSection: 2),
             true,
             "Another section's key in the SAME file must be left exactly as it is"
         )

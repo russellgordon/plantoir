@@ -58,26 +58,31 @@ public static class PageFrontmatter
 
     /// <summary>
     /// Whether this page is hidden in the given section, resolved the way the
-    /// build resolves it: the per-section key wins, a plain <c>publish:</c> is
-    /// the fallback, the legacy draft keys are read after that, and a page with
-    /// none of them is published — the kinder default, since a forgotten flag
-    /// leaves a page visible rather than silently removing it.
+    /// BUILD resolves it — which is not the same as reading the line.
+    ///
+    /// <para>The four keys are consulted in one order on every page the build
+    /// copies — <c>publishForSection&lt;N&gt;</c>, <c>publish</c>,
+    /// <c>draftSection&lt;N&gt;</c>, <c>draft</c> — and what each value MEANS is
+    /// decided by the round trip through python-frontmatter that every page
+    /// makes before Quartz sees it. <see cref="PageVisibilityReader"/> is the
+    /// one place that knows the table.</para>
+    ///
+    /// <para>A page whose flag this app will not read collapses to NOT hidden
+    /// here, because this answer is used for REPORTING: calling a page hidden
+    /// while students are reading it is the failure that reports success.
+    /// Anything that WRITES must ask <see cref="Visibility"/> and refuse to
+    /// trust <see cref="PageVisibility.CannotTell"/> — see
+    /// <see cref="SetDraft"/>.</para>
     /// </summary>
-    public static bool IsDraft(string pageText, int sectionNumber)
-    {
-        var block = Block.Parse(pageText);
-        if (block is null) return false;
+    public static bool IsDraft(string pageText, int sectionNumber) =>
+        PageVisibilityReader.Answer(pageText, sectionNumber) == PageVisibility.Hidden;
 
-        // The new keys win outright. A page carrying both has already been
-        // migrated, and the leftover draft key must not contradict it.
-        if (block.BoolValue("publishForSection" + sectionNumber) is { } perSection) return !perSection;
-        if (block.BoolValue("publish") is { } plain) return !plain;
-
-        // Not yet migrated: read the old keys, inverted.
-        return block.BoolValue("draftSection" + sectionNumber)
-            ?? block.BoolValue("draft")
-            ?? false;   // no flag at all means visible, then as now
-    }
+    /// <summary>
+    /// The three-way reading: what the build does with this page, including the
+    /// case where this app will not say.
+    /// </summary>
+    internal static PageVisibility Visibility(string pageText, int sectionNumber) =>
+        PageVisibilityReader.Answer(pageText, sectionNumber);
 
     /// <summary>
     /// The value literally stored under one key, or null when the key is
@@ -93,23 +98,30 @@ public static class PageFrontmatter
 
     /// <summary>
     /// Whether this page is currently hidden, in DRAFT terms, or null when it
-    /// says nothing either way.
+    /// says nothing either way — or when the flag is a form this app will not
+    /// read, which collapses to "not hidden" in every caller's <c>?? false</c>.
     ///
-    /// Callers reason in "is it hidden" because that is the question a plan
-    /// answers, while the file now stores the opposite. Reading the raw
+    /// <para>Callers reason in "is it hidden" because that is the question a
+    /// plan answers, while the file now stores the opposite. Reading the raw
     /// <c>publish</c> value into a field that means "draft" inverts every
     /// comparison that depends on it — which is exactly what happened, and
     /// what made a plan think an already-published page still needed
-    /// publishing.
+    /// publishing.</para>
+    ///
+    /// <para>Takes a SECTION rather than a key, since 2026-09-19: the build
+    /// consults all four keys on every page it copies, so where a page lives
+    /// decides which key is WRITTEN and nothing about what it says. Asking only
+    /// about one key reported a course-level page carrying a plain
+    /// <c>publish: false</c> as visible while the build hid it — the mac's own
+    /// blind spot until the same day (issue #140).</para>
     /// </summary>
-    public static bool? StoredDraft(string pageText, string publishKey)
-    {
-        var block = Block.Parse(pageText);
-        if (block is null) return null;
-        if (block.BoolValue(publishKey) is { } published) return !published;
-        if (block.BoolValue(LegacyKeyOf(publishKey)) is { } draft) return draft;
-        return null;
-    }
+    public static bool? StoredDraft(string pageText, int sectionNumber) =>
+        PageVisibilityReader.Answer(pageText, sectionNumber) switch
+        {
+            PageVisibility.Hidden => true,
+            PageVisibility.Visible => false,
+            _ => null,
+        };
 
     /// <summary>
     /// The key carrying this page's date, following the same rule as the draft
@@ -244,55 +256,195 @@ public static class PageFrontmatter
     /// </summary>
     /// <param name="key">The publish key, from <see cref="PublishKeyFor"/>.</param>
     /// <param name="draft">True to hide the page from students.</param>
-    public static (string Text, DraftEdit Edit) SetDraft(string pageText, string key, bool draft)
+    /// <param name="sectionNumber">
+    /// The section this edit is for. REQUIRED, and it is not the same question
+    /// as <paramref name="key"/>: the gate below has to ask what the BUILD
+    /// makes of the whole page, which is all four keys in build order, while
+    /// the write puts the answer in the one key a page's folder decides on.
+    /// That asymmetry is the mac's too. Making it optional would make a second
+    /// rule — a page carrying a stray <c>publishForSection&lt;N&gt;</c> beside
+    /// a plain <c>publish:</c> would then be judged on the key alone, and the
+    /// build reads the per-section one FIRST, so the write could be skipped in
+    /// the dangerous direction.
+    /// </param>
+    public static (string Text, DraftEdit Edit) SetDraft(
+        string pageText, string key, bool draft, int sectionNumber)
     {
         bool publish = !draft;
-        var block = Block.Parse(pageText);
-        // Reads the old key too, so a page that predates the change reports
+        // Reads the old keys too, so a page that predates the change reports
         // the state it actually has rather than "not set".
-        bool? before = StoredDraft(pageText, key);
+        bool? before = StoredDraft(pageText, sectionNumber);
 
         string legacy = LegacyKeyOf(key);
-        bool hasLegacy = block?.IndexOf(legacy) is not null;
+        // Found with the READER's own key matcher, so the writer rewrites the
+        // line the reader read. A `"publish": false` was invisible to a plain
+        // prefix test, which meant this inserted a second `publish: true` above
+        // it — and PyYAML keeps the LAST of two, so the page stayed hidden
+        // while the teacher was told it had been published.
+        var currentKeyLines = PageVisibilityReader.TopLevelLineIndices(pageText, key);
+        var legacyKeyLines = PageVisibilityReader.TopLevelLineIndices(pageText, legacy);
+        bool hasLegacy = legacyKeyLines.Count > 0;
 
         // Already right AND already migrated: nothing to do.
-        if (before == draft && !hasLegacy)
+        //
+        // The shortcut needs a CONFIDENT answer. A value this app cannot read
+        // is REPORTED as visible, and a writer that believed that would decline
+        // to publish a page on the strength of a guess — so a page whose flag
+        // cannot be read gets the flag written out in full, in whichever
+        // direction was asked for. Never launder `cannot tell` into a literal
+        // "already true".
+        var stated = PageVisibilityReader.Answer(pageText, sectionNumber);
+        bool alreadySaysIt = (stated == PageVisibility.Visible && publish)
+            || (stated == PageVisibility.Hidden && !publish);
+        if (alreadySaysIt && !hasLegacy)
             return (pageText, new DraftEdit(key, before, draft, Changed: false));
 
         string newline = DominantNewline(pageText);
         string line = key + ": " + (publish ? "true" : "false");
 
-        if (block is null)
+        if (PageVisibilityReader.FenceIndices(pageText) is not { } fences)
         {
             string text = "---" + newline + line + newline + "---" + newline + pageText;
             return (text, new DraftEdit(key, null, draft, Changed: true));
         }
 
-        var lines = new List<string>(block.Lines);
-        int? publishAt = block.IndexOf(key);
-        int? legacyAt = block.IndexOf(legacy);
+        var lines = new List<string>(pageText.Split('\n'));
+        // A key's value can live on the lines BELOW it, and those lines go
+        // wherever the key goes — see ContinuationLines for what that costs
+        // when they are left behind. Gathered before anything is removed, so
+        // every index still means what it said.
+        var remove = new SortedSet<int>();
 
-        if (publishAt is { } at)
+        if (currentKeyLines.Count > 0)
         {
-            lines[at] = ReplaceValue(lines[at], publish);
-            // Already migrated; the leftover is just noise now.
-            if (legacyAt is { } duplicate) lines.RemoveAt(duplicate);
+            // The LAST line naming a key is the one the build reads, so it is
+            // the one to rewrite: setting the first of two would leave the page
+            // saying the opposite of what was asked for.
+            int at = currentKeyLines[^1];
+            // Asked BEFORE the line is rewritten, because the rewrite always
+            // puts a value there.
+            bool wasEmpty = ValueIsEmpty(lines[at], key);
+            lines[at] = ReplaceValue(lines[at], key, publish);
+            remove.UnionWith(ContinuationLines(lines, at, fences.Close, wasEmpty));
+            // Already migrated; every leftover legacy line is noise that now
+            // says the opposite of the line above it.
+            foreach (int stale in legacyKeyLines)
+            {
+                remove.Add(stale);
+                remove.UnionWith(ContinuationLines(
+                    lines, stale, fences.Close, ValueIsEmpty(lines[stale], legacy)));
+            }
         }
-        else if (legacyAt is { } old)
+        else if (hasLegacy)
         {
             // Migrating: put the new key exactly where the old one sat, so the
             // teacher's frontmatter keeps its order. Moving it to the top would
             // show up as a reordered diff in a file Obsidian has open.
-            string carriageReturn = lines[old].EndsWith('\r') ? "\r" : "";
-            lines[old] = line + carriageReturn;
+            int old = legacyKeyLines[^1];
+            bool wasEmpty = ValueIsEmpty(lines[old], legacy);
+            lines[old] = line + (lines[old].EndsWith('\r') ? "\r" : "");
+            remove.UnionWith(ContinuationLines(lines, old, fences.Close, wasEmpty));
+            for (int i = 0; i < legacyKeyLines.Count - 1; i++)
+            {
+                remove.Add(legacyKeyLines[i]);
+                remove.UnionWith(ContinuationLines(
+                    lines, legacyKeyLines[i], fences.Close, ValueIsEmpty(lines[legacyKeyLines[i]], legacy)));
+            }
         }
         else
         {
-            lines.Insert(block.FirstBodyLine, line);
+            lines.Insert(fences.Open + 1, line);
         }
 
-        return (block.Rebuild(lines, newline), new DraftEdit(key, before, draft, Changed: true));
+        // Last first, so the earlier indices stay put.
+        foreach (int index in remove.Reverse()) lines.RemoveAt(index);
+
+        return (Rebuild(lines, newline), new DraftEdit(key, before, draft, Changed: true));
     }
+
+    /// <summary>
+    /// The lines BELOW a key that are part of its value, and so have to go
+    /// wherever the key's line goes.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Leaving them behind is the failure that reports success.</b>
+    /// A page reading <c>publish: &gt;-</c> with <c>  false</c> under it is
+    /// HIDDEN on the site; rewriting only the key's line leaves that
+    /// <c>  false</c> orphaned onto the new value, and PyYAML folds the two
+    /// into the multi-line plain scalar <c>"false false"</c> — a string that is
+    /// not <c>"false"</c>, so the page is PUBLISHED while the teacher is told
+    /// it was hidden. Measured, python-frontmatter 1.3.0 / PyYAML 6.0.3 /
+    /// CPython 3.11.9. When the orphan is a MAPPING it is a <c>ScannerError</c>
+    /// and the whole build stops instead.</para>
+    ///
+    /// <para>The rule is <c>setup_course.per_section_frontmatter</c>'s, which
+    /// has taken these lines with the key since 2026-09-18, and it is the
+    /// same stepping <see cref="PageVisibilityReader.FirstNonBlankLine"/> does:
+    /// walk forward, STEP OVER blank lines and indented <c># note</c>s rather
+    /// than stopping at them, stop at the first line that is not indented, and
+    /// take everything up to the last indented line that was not a comment. So
+    /// a complete value followed by an indented note keeps the note — nothing
+    /// is taken, because no value line was found below it — while a note with
+    /// a real value under it goes with the value, which is also what the
+    /// reader sees through it.</para>
+    ///
+    /// <para>A comment is stepped over at ANY indent, not only an indented
+    /// one, because that is what the reader does. Measured: <c>publish:</c>
+    /// with a column-0 <c># note</c> and then an indented <c>false</c> is
+    /// HIDDEN on the site; a sweeper that stopped at the comment left the
+    /// <c>false</c> orphaned and the build stopped with a <c>ParserError</c>.
+    /// A top-level comment with no value under it is still left alone — the
+    /// walk takes nothing, because it found no value line below it.</para>
+    ///
+    /// <para><paramref name="sweepLeadingSequence"/> covers the one
+    /// continuation that is NOT indented: a block sequence written at column 0
+    /// directly under a key with an empty value. Measured, <c>publish:</c>
+    /// with <c>- a</c> under it is the list <c>['a']</c> and the page is
+    /// published; leaving the <c>- a</c> behind after a hide is a
+    /// <c>ParserError</c> and the build stops. It is passed only when the
+    /// key's own value was empty, because that is the only shape where such a
+    /// line can belong to this key.</para>
+    ///
+    /// <para>This does NOT parse block scalars and must not start: it only
+    /// finds where a key's value ends. It sweeps whether or not the key's own
+    /// line LOOKED complete — <c>publish: false</c> with an indented
+    /// <c>false</c> under it is the string "false false" and the page is
+    /// PUBLISHED — but the sweep is not what saves that page. The READER has
+    /// to refuse it first, or <see cref="SetDraft"/>'s "already right" gate
+    /// returns before any of this runs; see
+    /// <see cref="PageVisibilityReader.ReadScalar"/>.</para>
+    /// </remarks>
+    private static List<int> ContinuationLines(
+        List<string> lines, int keyIndex, int closeIndex, bool sweepLeadingSequence)
+    {
+        int lastValueLine = keyIndex;
+        for (int follow = keyIndex + 1; follow < closeIndex && follow < lines.Count; follow++)
+        {
+            string bare = PageVisibilityReader.TrimCarriageReturn(lines[follow]);
+            string content = PageVisibilityReader.TrimYamlSpaces(bare);
+            bool indented = bare.StartsWith(' ') || bare.StartsWith('\t');
+            if (content.Length == 0) continue;       // a blank line does not end a value
+            if (content.StartsWith('#')) continue;   // and a comment is not one, at any indent
+            if (!indented)
+            {
+                if (!sweepLeadingSequence) break;                   // a top-level key ends it
+                if (content != "-" && !content.StartsWith("- ", StringComparison.Ordinal)) break;
+            }
+            lastValueLine = follow;
+        }
+
+        var taken = new List<int>();
+        for (int index = keyIndex + 1; index <= lastValueLine; index++) taken.Add(index);
+        return taken;
+    }
+
+    /// <summary>
+    /// Whether this line names <paramref name="key"/> with nothing after its
+    /// colon — the one shape whose value can continue at column 0.
+    /// </summary>
+    private static bool ValueIsEmpty(string line, string key) =>
+        PageVisibilityReader.ValuePart(key, PageVisibilityReader.TrimCarriageReturn(line)) is { } value
+        && PageVisibilityReader.TrimYamlSpaces(value).Length == 0;
 
     /// <summary>The pre-change key that answers the same question as <paramref name="key"/>.</summary>
     private static string LegacyKeyOf(string key) =>
@@ -305,24 +457,78 @@ public static class PageFrontmatter
     /// before it — indentation, the key's own spelling, and any spacing the
     /// teacher used. An inline <c># comment</c> after the value survives.
     /// </summary>
-    private static string ReplaceValue(string line, bool draft)
+    /// <remarks>
+    /// The comment is found with the READER's quote-aware scan, not with the
+    /// first <c>#</c> on the line. A hash inside quotes is not a comment, and
+    /// splitting <c>publish: "false # why"</c> at it left an unbalanced quote
+    /// in the teacher's file — frontmatter the build cannot parse at all.
+    /// </remarks>
+    private static string ReplaceValue(string line, string key, bool publish)
     {
         // A CRLF file's lines still carry their '\r' here; rebuilding the line
         // without putting it back would quietly convert that one line to LF.
         string carriageReturn = line.EndsWith('\r') ? "\r" : "";
         string body = line.TrimEnd('\r');
 
-        int colon = body.IndexOf(':');
-        if (colon < 0) return line;   // not a mapping line; leave it alone
-        string head = body[..(colon + 1)];
-        string tail = body[(colon + 1)..];
+        // Split at the colon the READER's matcher found, not at the first
+        // colon on the line. The two happen to agree for every key this app
+        // writes — a top-level line beginning with the key, quoted or not —
+        // but "happens to agree" is how a reader and a writer drift apart, and
+        // that drift is this file's oldest bug class.
+        string tail;
+        if (PageVisibilityReader.ValuePart(key, body) is { } afterColon)
+        {
+            tail = afterColon;
+        }
+        else
+        {
+            int colon = body.IndexOf(':');
+            if (colon < 0) return line;   // not a mapping line; leave it alone
+            tail = body[(colon + 1)..];
+        }
+        string head = body[..(body.Length - tail.Length)];
 
-        int hash = tail.IndexOf('#');
-        string comment = hash >= 0 ? tail[hash..].TrimEnd() : "";
-        string spacing = tail.Length > 0 && tail[0] == ' ' ? " " : "";
+        string beforeComment = PageVisibilityReader.StripComment(tail);
+        string comment = tail.Length > beforeComment.Length
+            ? tail[beforeComment.Length..].TrimEnd(' ', '\t')
+            : "";
+        // ALWAYS separate the value from the colon. YAML needs a space, a tab
+        // or the end of the line after a key's colon to make a mapping at all,
+        // so `publish:false` is one plain scalar — and beside any other key it
+        // is a ScannerError that STOPS THE BUILD while this app reports the
+        // page hidden. Measured, python-frontmatter 1.3.0 / PyYAML 6.0.3.
+        //
+        // Two lines reached it. `publish:<TAB>false` reads as hidden today
+        // (a tab after the colon is perfectly good YAML), and publishing it
+        // emitted `publish:true`. And a key with an EMPTY value emitted
+        // `publish:false` — which is not a corner: `SectionAdder.PublishValue`
+        // deliberately copies the emptiness of a null `publishForSection<N>`,
+        // and writes `createdSection<N>:` on the line beside it, so Plantoir
+        // was corrupting a page Plantoir had just generated.
+        //
+        // The teacher's own tab is kept; anything else becomes one space.
+        string spacing = tail.StartsWith('\t') ? "\t" : " ";
         string gap = comment.Length > 0 ? " " : "";
 
-        return head + spacing + (draft ? "true" : "false") + gap + comment + carriageReturn;
+        return head + spacing + (publish ? "true" : "false") + gap + comment + carriageReturn;
+    }
+
+    /// <summary>
+    /// The lines joined back together, keeping each one's own ending and giving
+    /// an INSERTED line the file's dominant one.
+    /// </summary>
+    private static string Rebuild(List<string> lines, string newline)
+    {
+        // Split/join on '\n' alone would strip the '\r' from CRLF files, so
+        // the lines still carry theirs; only an INSERTED line needs one.
+        var builder = new StringBuilder();
+        for (int i = 0; i < lines.Count; i++)
+        {
+            builder.Append(lines[i]);
+            if (i < lines.Count - 1)
+                builder.Append(lines[i].EndsWith('\r') || newline == "\n" ? "\n" : newline);
+        }
+        return builder.ToString();
     }
 
     private static string DominantNewline(string text) =>
@@ -344,27 +550,26 @@ public static class PageFrontmatter
         /// <summary>Where a newly inserted key goes: straight after the opening fence.</summary>
         public int FirstBodyLine => Open + 1;
 
+        /// <remarks>
+        /// ONE fence finder, shared with the reader. python-frontmatter's
+        /// boundary is <c>^-{3,}\s*$</c> — three dashes or more, at either end
+        /// — and it tolerates blank lines before the opening one. Insisting on
+        /// exactly <c>---</c> at line 0 made the writers prepend a block of
+        /// their own on a page fenced with <c>----</c>, leaving the teacher's
+        /// real frontmatter behind it as BODY TEXT, printed to their students.
+        /// <c>...</c> is not accepted as a closing fence, because
+        /// python-frontmatter does not accept one either.
+        /// </remarks>
         public static Block? Parse(string text)
         {
-            string[] lines = text.Split('\n');
-            int open = -1;
-            for (int i = 0; i < lines.Length; i++)
+            if (PageVisibilityReader.FenceIndices(text) is not { } fences) return null;
+            return new Block
             {
-                string trimmed = Strip(lines[i]);
-                if (trimmed.Length == 0) continue;          // leading blank lines are tolerated
-                if (trimmed != "---") return null;          // content before a fence: no frontmatter
-                open = i;
-                break;
-            }
-            if (open < 0) return null;
-
-            for (int i = open + 1; i < lines.Length; i++)
-            {
-                string trimmed = Strip(lines[i]);
-                if (trimmed == "---" || trimmed == "...")
-                    return new Block { Lines = lines, Open = open, Close = i, Original = text };
-            }
-            return null;   // unterminated block — refuse to edit rather than guess
+                Lines = text.Split('\n'),
+                Open = fences.Open,
+                Close = fences.Close,
+                Original = text,
+            };
         }
 
         /// <summary>
@@ -372,26 +577,28 @@ public static class PageFrontmatter
         /// an indented <c>draft:</c> is a field of some other mapping, not the
         /// page's own flag, and editing it would change something else.
         /// </summary>
+        /// <remarks>
+        /// The reader's own matcher, so the three legal spellings of a key
+        /// (<c>created:</c>, <c>created :</c>, <c>"created":</c>) are all
+        /// found and a colon with no space after it is not a mapping at all.
+        /// The indentation test is by hand, because <c>char.IsWhiteSpace</c>
+        /// counts a non-breaking space and YAML does not.
+        /// </remarks>
         public int? IndexOf(string key)
         {
             for (int i = Open + 1; i < Close; i++)
             {
-                string raw = Lines[i].TrimEnd('\r');
-                if (raw.Length == 0 || char.IsWhiteSpace(raw[0])) continue;   // blank or nested
-                string line = raw.TrimEnd();
-                if (line.Length == 0 || line[0] == '#') continue;
-                if (line.StartsWith(key, StringComparison.Ordinal) &&
-                    line.Length > key.Length && line[key.Length] == ':')
-                    return i;
+                string raw = PageVisibilityReader.TrimCarriageReturn(Lines[i]);
+                if (raw.Length == 0 || raw[0] == ' ' || raw[0] == '\t') continue;   // blank or nested
+                if (raw[0] == '#') continue;
+                if (PageVisibilityReader.ValuePart(key, raw) is not null) return i;
             }
             return null;
         }
 
         public bool? BoolValue(string key)
         {
-            if (IndexOf(key) is not { } at) return null;
-            string line = Strip(Lines[at]);
-            string value = line[(line.IndexOf(':') + 1)..];
+            if (RawValue(key) is not { } value) return null;
             int hash = value.IndexOf('#');
             if (hash >= 0) value = value[..hash];
             value = value.Trim();
@@ -400,12 +607,12 @@ public static class PageFrontmatter
             return null;   // a non-boolean draft value is not ours to interpret
         }
 
-        /// <summary>The text after the first colon, exactly as written.</summary>
+        /// <summary>The text after the key's colon, exactly as written.</summary>
         public string? RawValue(string key)
         {
             if (IndexOf(key) is not { } at) return null;
-            string line = Strip(Lines[at]);
-            return line[(line.IndexOf(':') + 1)..].Trim();
+            string raw = PageVisibilityReader.TrimCarriageReturn(Lines[at]);
+            return PageVisibilityReader.ValuePart(key, raw)?.Trim();
         }
 
         /// <summary>
@@ -415,9 +622,8 @@ public static class PageFrontmatter
         /// </summary>
         public DateOnly? DateValue(string key)
         {
-            if (IndexOf(key) is not { } at) return null;
-            string line = Strip(Lines[at]);
-            string value = line[(line.IndexOf(':') + 1)..].Trim().Trim('"', '\'');
+            if (RawValue(key) is not { } raw) return null;
+            string value = raw.Trim('"', '\'');
             if (value.Length == 0) return null;
             if (DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None, out var stamp))
@@ -428,21 +634,8 @@ public static class PageFrontmatter
             return null;
         }
 
-        public string Rebuild(List<string> lines, string newline)
-        {
-            // Split/join on '\n' alone would strip the '\r' from CRLF files, so
-            // the lines still carry theirs; only an INSERTED line needs one.
-            var builder = new StringBuilder();
-            for (int i = 0; i < lines.Count; i++)
-            {
-                builder.Append(lines[i]);
-                if (i < lines.Count - 1)
-                    builder.Append(lines[i].EndsWith('\r') || newline == "\n" ? "\n" : newline);
-            }
-            return builder.ToString();
-        }
-
-        private static string Strip(string line) => line.TrimEnd('\r').Trim();
+        public string Rebuild(List<string> lines, string newline) =>
+            PageFrontmatter.Rebuild(lines, newline);
     }
 }
 

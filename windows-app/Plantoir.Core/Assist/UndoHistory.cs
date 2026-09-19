@@ -41,12 +41,79 @@ public sealed class UndoHistory
 
     public IReadOnlyList<Entry> Entries => _entries;
 
-    /// <summary>Start recording an operation. Nested calls are ignored — the outermost wins.</summary>
-    public void Begin(string description)
+    /// <summary>
+    /// Start recording an operation. Nested calls are ignored — the outermost
+    /// wins — and the return says which this call was.
+    /// </summary>
+    /// <returns>
+    /// True when this call actually opened the entry, false when one was
+    /// already open. <see cref="Recording"/> uses it so that an inner scope
+    /// cannot end or abandon an outer operation's entry.
+    /// </returns>
+    public bool Begin(string description)
     {
-        if (_open is not null) return;
+        if (_open is not null) return false;
         _open = new Dictionary<string, FileState>(StringComparer.OrdinalIgnoreCase);
         _description = description;
+        return true;
+    }
+
+    /// <summary>
+    /// Begin an operation whose entry cannot be left open, whatever happens.
+    ///
+    /// <para><b>Why a scope rather than a Begin/End pair.</b> Three tools
+    /// called <see cref="Begin"/> and never <see cref="End"/>, and five more
+    /// closed theirs only on the path where nothing threw — and the failure is
+    /// silent in both directions. Nothing is recorded, so "undo that" tells a
+    /// teacher nothing has been changed; and the entry stays OPEN, so the NEXT
+    /// operation's files are swallowed into it and committed under the earlier
+    /// description. A teacher who made room, published a class and asked to
+    /// undo was told they had made room, and had the publish taken back with
+    /// it.</para>
+    ///
+    /// <para>So the pairing is no longer something to remember:
+    /// <c>using var recording = UndoHistory.Record(_undo, "…");</c> at the top,
+    /// <c>recording.Done();</c> where the operation has finished. Anything that
+    /// leaves without reaching <c>Done</c> — a throw, or a return added years
+    /// later by somebody who never read this — abandons instead, which is the
+    /// safe default rather than the lossy one. See
+    /// <c>documentation/10-local-ai-assistant.md</c> for WHY abandoning is
+    /// right when an operation threw partway, and what was rejected.</para>
+    /// </summary>
+    /// <param name="history">May be null: an MCP server with no history simply records nothing.</param>
+    public static Recording Record(UndoHistory? history, string description) => new(history, description);
+
+    /// <summary>One operation's recording, ended or abandoned by leaving its scope.</summary>
+    public sealed class Recording : IDisposable
+    {
+        private readonly UndoHistory? _history;
+        private readonly bool _owns;
+        private bool _settled;
+
+        internal Recording(UndoHistory? history, string description)
+        {
+            _history = history;
+            _owns = history is not null && history.Begin(description);
+        }
+
+        /// <summary>The operation finished. Commit what it touched.</summary>
+        public void Done()
+        {
+            if (_settled || !_owns) return;
+            _settled = true;
+            _history!.End();
+        }
+
+        /// <summary>
+        /// Left without finishing, so nothing is remembered. A nested scope
+        /// does nothing at all here: the outermost call owns the entry.
+        /// </summary>
+        public void Dispose()
+        {
+            if (_settled || !_owns) return;
+            _settled = true;
+            _history!.Abandon();
+        }
     }
 
     /// <summary>

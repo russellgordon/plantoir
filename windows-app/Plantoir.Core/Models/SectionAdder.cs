@@ -211,7 +211,14 @@ public static class SectionAdder
         var addition = new List<string> { $"createdSection{sectionNumber}: {created}" };
         string? publish = PublishValue(lowestSection.Value, lines);
         if (publish != null)
-            addition.Add($"publishForSection{sectionNumber}: {publish}");
+        {
+            // An empty value is a null, and `key:` is how YAML spells one —
+            // `key: ` with a trailing space says the same thing and looks like
+            // a typo in the teacher's file.
+            addition.Add(publish.Length == 0
+                ? $"publishForSection{sectionNumber}:"
+                : $"publishForSection{sectionNumber}: {publish}");
+        }
 
         int lastKeyIndex = -1;
         for (int i = 0; i < lines.Count; i++)
@@ -241,22 +248,93 @@ public static class SectionAdder
         return lines.Any(l => prefixes.Any(p => l.StartsWith(p, StringComparison.Ordinal)));
     }
 
-    private static string? PublishValue(int sectionNumber, List<string> lines)
+    /// <summary>
+    /// The value a new section's <c>publishForSection&lt;N&gt;</c> should carry,
+    /// taken from the section this page already has — or null when the page
+    /// carries neither spelling.
+    /// </summary>
+    /// <remarks>
+    /// <para>The per-section value is copied VERBATIM. Whatever the build makes
+    /// of `publishForSection1: oN` it makes of `publishForSection2: oN`, so no
+    /// reader standing between the two can invert it by misreading it. The one
+    /// value that cannot be copied is one that runs onto the NEXT line — a
+    /// block scalar, or a key with the value indented beneath it — because the
+    /// copy would be a key with nothing after it. Those are written as held
+    /// back.</para>
+    ///
+    /// <para>The continuation test comes BEFORE the empty one, deliberately: a
+    /// `publishForSection1:` whose value sits indented below it LOOKS empty,
+    /// and copying that emptiness would publish a page the build holds back.
+    /// Both references — the mac's <c>SectionAdder.publishValue</c> and
+    /// <c>setup_course.per_section_frontmatter</c> — write `false` for it.</para>
+    ///
+    /// <para><c>draftSection&lt;N&gt;</c> is the older spelling with the
+    /// OPPOSITE polarity, so it is read and inverted — carrying it across
+    /// unchanged would publish a page the teacher had held back. Until
+    /// 2026-09-19 this compared the value with the literal "true", which
+    /// quietly PUBLISHED a `draftSection1: yes` or `draftSection1: On` page
+    /// into the new section while the build went on hiding the original. A
+    /// draft value this app cannot read is written as held back: a page wrongly
+    /// held back is one a teacher notices and fixes; a page wrongly published
+    /// is one nobody notices at all.</para>
+    /// </remarks>
+    internal static string? PublishValue(int sectionNumber, List<string> lines)
     {
-        string pubPrefix = $"publishForSection{sectionNumber}:";
-        foreach (string line in lines)
+        // The reader's own matcher and the reader's own LAST-wins rule, so the
+        // value carried across is the value the build reads. A prefix test
+        // missed `"publishForSection1": false` entirely, and stopping at the
+        // first of two copies carried the one PyYAML throws away.
+        if (PageVisibilityReader.LastTopLevelEntry($"publishForSection{sectionNumber}", lines) is { } entry)
         {
-            if (line.StartsWith(pubPrefix, StringComparison.Ordinal))
-                return line[pubPrefix.Length..].Trim();
-        }
-        string draftPrefix = $"draftSection{sectionNumber}:";
-        foreach (string line in lines)
-        {
-            if (line.StartsWith(draftPrefix, StringComparison.Ordinal))
+            bool continues = entry.NextLine is { } below
+                && (below.StartsWith(' ') || below.StartsWith('\t'));
+            if (continues) return "false";
+
+            string value = PageVisibilityReader.TrimYamlSpaces(entry.Value);
+            if (value.Length == 0)
             {
-                string val = line[draftPrefix.Length..].Trim().ToLowerInvariant();
-                return val == "true" ? "false" : "true";
+                // A key with nothing after it is a NULL, which PUBLISHES the
+                // page. Copying the emptiness keeps the new section saying what
+                // the old one says; writing "false" would hide it.
+                return "";
             }
+            if (!PageVisibilityReader.IsCompleteOnItsOwnLine(entry.Value)) return "false";
+            return value;
+        }
+
+        if (PageVisibilityReader.LastTopLevelEntry($"draftSection{sectionNumber}", lines) is { } legacy)
+        {
+            // No `continues` check of its own on this branch, because the
+            // READER now has one: a value with an indented line below it is
+            // `cannot tell` whatever is on the key's line, so it lands "false"
+            // — held back — which is what `setup_course.per_section_frontmatter`
+            // writes for the same input.
+            //
+            // **This differs from the mac, and the difference is new.** Until
+            // the reader was corrected (2026-09-19, issue #176) this branch
+            // matched the SWIFT, which still consults the line below only when
+            // the key's line is EMPTY: the mac carries `draftSection1: false`
+            // with an indented line under it across as PUBLISHED, and this
+            // carries it as held back. Measured what the SITE does with the
+            // source page — python-frontmatter 1.3.0 / PyYAML 6.0.3, then
+            // `build_site._as_bool`:
+            //
+            //     draftSection1: false / "  x"   'false x'  -> PUBLISHED
+            //     draftSection1: no    / "  x"   'no x'     -> PUBLISHED
+            //     draftSection1: true  / "  x"   'true x'   -> PUBLISHED
+            //     draftSection1: yes   / "  x"   'yes x'    -> PUBLISHED
+            //     draftSection1:       / "  true"  True     -> HIDDEN
+            //
+            // Neither app reproduces that: both err HELD BACK, the mac in two
+            // of those rows and this in four. Uniformly held back is the
+            // documented preference here — a page wrongly held back is one a
+            // teacher notices and fixes — and it is the Python's answer too.
+            // The mac's own #176 fix closes it, since its `publishValue` asks
+            // the same reader.
+            var scalar = PageVisibilityReader.ReadScalar(legacy.Value, legacy.NextLine);
+            return PageVisibilityReader.DraftFamilyAnswer(scalar) == PageVisibility.Visible
+                ? "true"
+                : "false";
         }
         return null;
     }
