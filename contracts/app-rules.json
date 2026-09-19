@@ -1153,7 +1153,7 @@
       "--mcp-stdio",
       "{folder}"
     ],
-    "serverIsThePlantoirBinary" : "The MCP server is the Plantoir binary itself answering --mcp-stdio, so there is no second executable to find, sign or forget. On Windows it is plantoir-mcp.exe, which is the one part of this block that differs by platform.",
+    "serverIsThePlantoirBinary" : "The MCP server is the Plantoir binary itself answering --mcp-stdio, so there is no second executable to find, sign or forget. On Windows it is plantoir-mcp.exe, which is one of the parts of this block that differ by platform — how the session is handed to a terminal is another, and macHandsOverWith is the mac's alone.",
     "serverName" : "plantoir",
     "whatADoorIs" : "Plantoir finds the assistant's command-line tool and starts it in a terminal, in the teacher's working folder, with Plantoir's MCP server already connected and an opening message already sent. The teacher types no command and watches a real session in a real terminal window. Nothing is left in the folder Obsidian is watching, and nothing global is touched."
   },
