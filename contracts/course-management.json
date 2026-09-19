@@ -244,22 +244,26 @@
       {
         "kind": "backup",
         "maker": "teacher",
-        "name": "ICS3U_backup_2026-08-11_221530.zip"
+        "name": "ICS3U_backup_2026-08-11_221530.zip",
+        "moment": "2026-08-11 22:15:30"
       },
       {
         "kind": "backup",
         "maker": "assistant",
         "name": "ICS3U_backup_2026-08-11_221530_assistant-section3.zip",
+        "moment": "2026-08-11 22:15:30",
         "section": 3,
         "why": "The assistant's own backups say so in the name, so a teacher can see which copies Plantoir made and what each was for. A name WITHOUT that ending is one of the teacher's own — which is exactly what every backup made before this existed is, and why the suffix is added rather than the teacher's being marked."
       },
       {
         "kind": "archive",
-        "name": "ICS3U_2026-08-10_143005.zip"
+        "name": "ICS3U_2026-08-10_143005.zip",
+        "moment": "2026-08-10 14:30:05"
       },
       {
         "kind": "archive",
         "name": "ICS3U-section2_2026-08-10_143005.zip",
+        "moment": "2026-08-10 14:30:05",
         "section": 2
       },
       {
@@ -287,7 +291,28 @@
         "why": "Not a zip."
       }
     ],
+    "couldHaveBeenStamped": {
+      "earliest": "2025-01-01 00:00:00",
+      "futureAllowanceDays": 2,
+      "cases": [
+        { "stamp": "2026-08-10_143005", "expect": true },
+        { "stamp": "2569-08-09_141530", "expect": false, "why": "What a Buddhist-calendar machine wrote before the mac pinned its formatter. Read as Gregorian it is the year 2569, five centuries from now." },
+        { "stamp": "5786-11-26_141530", "expect": false, "why": "The same, from a Hebrew-calendar machine." },
+        { "stamp": "0008-08-09_141530", "expect": false, "why": "A Japanese-calendar machine: Reiwa 8, read as the year 8." },
+        { "stamp": "1448-02-26_141530", "expect": false, "why": "An Islamic-calendar machine." },
+        { "stamp": "2018-12-03_141530", "expect": false, "why": "An ETHIOPIC machine, and the case the bounds exist for: read as Gregorian it is an ordinary date in the past that a person would not blink at. Only 'before Plantoir could have written one' separates it, which is why the floor is a date in this product's own history rather than a round number." },
+        { "stamp": "9999-12-31_235959", "expect": false, "why": "No calendar can explain it." },
+        { "daysFromNow": -1, "expect": true, "why": "Yesterday, computed rather than written, so the list does not go stale." },
+        { "daysFromNow": 1, "expect": true, "why": "Inside the future allowance: the stamp is LOCAL time on both ends, so a zip written at UTC+14 and read at UTC-12 is 26 hours ahead of this machine's now." },
+        { "daysFromNow": 5, "expect": false }
+      ],
+      "note": "Whether a moment is one Plantoir could have stamped into a zip's name. Shared because it is the rule that decides what gets DELETED: PruneBackups (CourseArchiver on both sides) sorts the assistant's backups by the date in their NAME and throws the tail away, so a name written in another machine's calendar — 2569, on a folder carried from a pre-fix Mac — parses cleanly, sorts as the newest thing in the folder, takes one of the five kept places and pushes a real backup off the disk. A stamp this refuses must be neither counted nor deleted; it is still LISTED, so the teacher can restore or delete it themselves. The floor is 2025-01-01 because the archive feature was written on 2026-08-09 and nothing of this kind can be older: set a year and a half earlier it refuses no real name, and it still clears the nearest wrong reading (Ethiopic, 7 years 8 months behind) by six years. ASCII digits and a Gregorian reading throughout, so this list runs identically under en_US_POSIX and CultureInfo.InvariantCulture — unlike the mac's own migration for the old spellings, which is deliberately NOT shared. Proposed from the mac 2026-09-10 (issue #160); Windows deserialises zipNames by key name, so an unknown block leaves its suite GREEN until it is wired up, and issue #161 asks for that. The guard itself is already there: #161's first half landed on 2026-09-19, with these same two bounds held by a test of its own until this list replaces it."
+    },
     "courseCode": "ICS3U",
+    "moment": {
+      "format": "yyyy-MM-dd HH:mm:ss, in the LOCAL time zone",
+      "note": "The moment a recognised name is read as. Pinned because the stamp is written and read in the GREGORIAN calendar on every machine, whatever calendar the machine itself is set to. A date formatter given no locale renders `yyyy` in the CURRENT LOCALE'S calendar, so the same instant is spelled `2569-08-09_141530` on a Buddhist-calendar machine, `0008-08-09_141530` on a Japanese one and `1448-02-26_141530` on an Islamic one (measured on macOS 26 for 2026-08-09 14:15:30) — none of them a name this file says Plantoir writes, and none of them sortable once the folder is opened anywhere else. Windows has always pinned `CultureInfo.InvariantCulture`; the mac pinned `en_US_POSIX` on 2026-09-10 for issue #160, and also goes on READING the old spellings, because a teacher on such a machine has zips already named that way and refusing them would empty their Archives and Backups lists on the day they updated. That reading half is the mac's own migration and is deliberately not a case here: the mac cannot check it on the other side, because .NET's TryParseExact does not treat native digits the way Foundation does. Issue #161 carries what Windows was asked to do about it. The live defect it named — a backup named in another machine's calendar sorts as the newest thing in the folder, and their PruneBackups had no guard against a date that cannot be true — was fixed there on 2026-09-19; what is still owed is asserting these values."
+    },
     "note": "Three kinds of zip live side by side in `courses/_backups/<CODE>/`, told apart by NAME. Each parser accepts only its own form, so the three can never appear in each other's lists — an archive showing up under Backups is a teacher restoring the wrong thing. The timestamp is `yyyy-MM-dd_HHmmss` and contains an underscore of its own, which is why the pieces are counted rather than split on the last underscore."
   }
 }

@@ -1007,7 +1007,13 @@ as history, not as what Windows does today.
   `<CODE>_backup_<timestamp>.zip` (teacher-made backups),
   `<CODE>_<timestamp>.zip` / `<CODE>-sectionN_<timestamp>.zip`
   (archives from removals), `<timestamp>.zip` (the wizard's automatic
-  zips, never listed). Backups get their own sidebar group above
+  zips, never listed). The `<timestamp>` is `yyyy-MM-dd_HHmmss` in the
+  **Gregorian** calendar on every machine, which on this side is already
+  true by construction — `CourseArchiver.cs` writes and `ArchivedItem.cs`
+  parses with `CultureInfo.InvariantCulture`. The mac reached the same
+  place on 2026-09-10 ([issue #160](https://github.com/russellgordon/plantoir/issues/160));
+  the moment each name is read as is now contract data
+  (`contracts/course-management.json` → `zipNames`, the `moment` per case). Backups get their own sidebar group above
   Archived. Restoring a backup archives the current course FIRST, then
   replaces the course folder's CONTENTS in place — never the folder
   itself (see the Obsidian note below) — and keeps the zip. Deleting a
@@ -1875,9 +1881,11 @@ below-floor tests; making either bound exclusive reddens
 **Part 2 of #161 is deliberately not done, and the issue stays open.** The mac
 turned these bounds into contract data — `contracts/course-management.json` →
 `zipNames` → `couldHaveBeenStamped`, ten cases plus the two bounds, and a
-`moment` on each recognised `zipNames` case — but that block lives only on the
-unmerged `issue/160-archive-stamp-calendar` branch. Nothing here touches that
-file. When it reaches `dev`, Windows runs the ten cases and pins both bounds
+`moment` on each recognised `zipNames` case. That block was on the unmerged
+`issue/160-archive-stamp-calendar` branch when this was written and **reached
+`dev` on 2026-09-19 with #160** (mac GUI row 498), so nothing blocks part 2 any
+more; nothing here touched that file either way. Windows now runs the ten cases
+and pins both bounds
 against `ArchiveStamp`, and `CouldHaveBeenStamped_BoundsAreTheOnesTheMacUses` —
 the one test here holding the literals, marked as such in its own comment —
 goes away. Take the `moment` apart with a Gregorian calendar and compare the
