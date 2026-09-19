@@ -2,10 +2,12 @@
 """Convert plantoir-mcp tools/list output to the OpenAI-shaped, narrowed
 surface the local model actually sees.
 
-This MIRRORS three things in `AssistAgent` (windows-app/Plantoir.Core/Assist/
+This MIRRORS four things in `AssistAgent` (windows-app/Plantoir.Core/Assist/
 AssistAgent.cs), and is only worth running while it still does:
 
   * `ForTheLocalModel` - which tools survive the narrowing,
+  * `CardOnlyArguments`- arguments the server declares and this model is NOT
+                         shown, stripped from properties and required,
   * `Briefly()`        - the trigger phrasings plus one sentence of what it does,
   * `MakeExamplesReal()` + the description's own `.Replace(ExampleCourse, ...)`
                        - the schemas' example course becomes THIS window's
@@ -67,6 +69,19 @@ FOR_THE_LOCAL_MODEL = {
     "read_remembered_timetable", "add_next_class",
 }
 
+# MIRROR of AssistAgent.CardOnlyArguments. Pinned by NarrowToolsMirrorTests.
+#
+# Arguments the SERVER declares and the local model is not shown, as
+# "tool.argument". `duplicate` is filled by AssistCardCommand from a sentence
+# matched in code and by nothing else; it exists on the schema only because the
+# MCP binder drops an argument the method does not declare (issue #149), and
+# showing it to the router would add a page title it could invent to a tool it
+# already picks. A surface measured WITH it is not the surface that ships.
+CARD_ONLY_ARGUMENTS = {
+    "add_next_class.duplicate",
+    "plan_add_next_class.duplicate",
+}
+
 # MIRROR of AssistAgent.ExampleCourse.
 EXAMPLE_COURSE = "ICS3U"
 
@@ -80,6 +95,22 @@ def briefly(description):
     stop = description.find(". ")
     kept.append(description[:stop + 1] if stop > 0 else description)
     return " ".join(kept).strip()
+
+
+def hide_card_only_arguments(parameters, tool_name):
+    """MIRROR of AssistAgent.HideCardOnlyArguments - properties AND required."""
+    if not isinstance(parameters, dict):
+        return
+    for pair in CARD_ONLY_ARGUMENTS:
+        name, _, argument = pair.partition(".")
+        if name != tool_name:
+            continue
+        properties = parameters.get("properties")
+        if isinstance(properties, dict):
+            properties.pop(argument, None)
+        required = parameters.get("required")
+        if isinstance(required, list) and argument in required:
+            required.remove(argument)
 
 
 def make_examples_real(node, course_code):
@@ -109,6 +140,7 @@ for tool in tools:
         continue
     parameters = tool.get("inputSchema", {"type": "object"})
     described = briefly(tool.get("description", ""))
+    hide_card_only_arguments(parameters, tool["name"])
     if course_code is not None:
         make_examples_real(parameters, course_code)
         described = described.replace(EXAMPLE_COURSE, course_code)

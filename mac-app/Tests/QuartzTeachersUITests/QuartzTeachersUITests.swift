@@ -927,4 +927,78 @@ final class QuartzTeachersUITests: XCTestCase {
         let restoredValue: String = "\(readingTimeToggle.value ?? "")"
         XCTAssertEqual(initialValue, restoredValue, "Cancel should revert the toggle")
     }
+
+    /// The skeleton toggle, driven for real: typing a code with no
+    /// ready-made pages fills the structure editor with that subject's
+    /// folders, turning the toggle off puts the generic defaults back, and
+    /// turning it on again brings the subject's folders back.
+    ///
+    /// The unit suite can only call the functions this uses, and the bug
+    /// behind issue #77 was a control with no handler at all — which every
+    /// unit test passed. So this one presses the toggle.
+    ///
+    /// Read through the Marks checklist rather than the folder lists: it
+    /// offers every folder the course currently has and sits OUTSIDE the
+    /// "Folders and files" disclosure, so the state of the editor can be
+    /// read without opening anything. `Investigations` belongs to the
+    /// science skeleton and to no factory list; `Examples` is the other way
+    /// round.
+    func testDecliningTheSkeletonPutsTheDefaultFoldersBack() throws {
+        let application: XCUIApplication = try launchApp()
+
+        // `.firstMatch`: the sidebar's own button and the menu item that
+        // does the same thing both answer to this identifier, and either
+        // opens the wizard.
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"].firstMatch
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+        codeField.click()
+        codeField.typeText("SNC4M")
+
+        let subjectFolder: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "toggle-Investigations").firstMatch
+        let factoryFolder: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "toggle-Examples").firstMatch
+        XCTAssertTrue(
+            subjectFolder.waitForExistence(timeout: 10),
+            "Typing a code with a skeleton should put that subject's folders in the editor"
+        )
+        XCTAssertFalse(factoryFolder.exists, "…and take the factory-only ones out")
+
+        let skeletonToggle: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "skeletonToggle").firstMatch
+        XCTAssertTrue(skeletonToggle.waitForExistence(timeout: 5))
+        skeletonToggle.click()
+
+        XCTAssertTrue(
+            factoryFolder.waitForExistence(timeout: 5),
+            "Turning the skeleton off should put the generic defaults back — the editor has to "
+            + "show what will actually be created (contracts/shared-rules.json → "
+            + "wizard.skeletonToggle)."
+        )
+        XCTAssertFalse(subjectFolder.exists, "…and take the skeleton's folders out")
+
+        let emptyCourseNote: XCUIElement = application.staticTexts["noExampleContentNote"]
+        XCTAssertTrue(
+            emptyCourseNote.waitForExistence(timeout: 5),
+            "A teacher who declines the skeleton is told the course will start with empty "
+            + "folders — the same sentence a code with no skeleton at all gets."
+        )
+
+        skeletonToggle.click()
+
+        XCTAssertTrue(
+            subjectFolder.waitForExistence(timeout: 5),
+            "Turning it back on should adopt the subject's folders again"
+        )
+        XCTAssertFalse(factoryFolder.exists)
+        XCTAssertFalse(emptyCourseNote.exists, "…and take the empty-course note away again")
+
+        saveScreenshot(named: "07-skeleton-toggle-restores-defaults", of: application)
+
+        application.buttons["wizardCloseButton"].click()
+    }
 }

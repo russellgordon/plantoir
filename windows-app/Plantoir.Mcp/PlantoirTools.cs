@@ -477,6 +477,27 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     private const string UnitHelp = "The unit number these classes belong to, for example 2.";
 
+    /// <summary>
+    /// The argument behind "duplicate Unit 3, Day 2 as my next class".
+    ///
+    /// <para>Declared on both halves of <c>add_next_class</c> and DECLARED is
+    /// the operative word: the MCP binder drops an argument the method does
+    /// not take rather than refusing it, so before this existed the sentence
+    /// the prompt shelf offers ran as a plain "add the next class" and made a
+    /// BLANK page where a teacher had asked for a copy of a lesson, with
+    /// nothing anywhere reporting a fault (issue #149).</para>
+    ///
+    /// <para>The local model never sees it — <c>AssistAgent.CardOnlyArguments</c>
+    /// strips it from the narrowed schema — because <c>add_next_class</c> IS in
+    /// that model's thirteen tools and an argument it can invent is a routing
+    /// change nobody measured. The fixed phrasing fills it in code, which is
+    /// the only way it is ever set.</para>
+    /// </summary>
+    private const string DuplicateHelp =
+        "The title of a numbered class page to copy, for example \"Unit 3, Day 2\". The copy becomes that " +
+        "page's next day, dated to the day the section next meets, and starts hidden. Leave empty for an " +
+        "ordinary blank next class page.";
+
     [McpServerTool(Name = "plan_make_room_for_classes", Title = "Plan making room for classes",
                    ReadOnly = true, Destructive = false)]
     [Description("Work out what would happen if a class were inserted part-way through a unit, changing nothing. " +
@@ -515,7 +536,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "update every link that pointed at them, move the classes that follow onto later class days, " +
                  "and create the new pages unpublished. " +
                  "\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is " +
-                 "backed up first and undo_last_change reverses the whole thing. Afterwards, tell them to look " +
+                 "backed up first, and the backup is the way back: because this moves and renames many pages " +
+                 "at once, undo_last_change does NOT reverse it. Afterwards, tell them to look " +
                  "the section over in Plantoir before deploying — many pages moved at once.")]
     public CallToolResult MakeRoomForClasses(
         [Description("The course code, for example ICS3U.")] string course,
@@ -590,9 +612,18 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("Pass \"next\" to start a new unit. Leave empty to continue the current unit.")]
         string unit = "",
         [Description("Pass a number to add that many days to the specified unit number. Leave 0 for a single class.")]
-        int days = 0)
+        int days = 0,
+        [Description(DuplicateHelp)] string duplicate = "")
         => Guarded(() =>
         {
+            // FIRST, and the reason is that plan mode is ON unless a teacher
+            // has turned it off: the card's arguments reach the TWIN before
+            // they reach the write, so a twin that cannot see `duplicate`
+            // proposes an ordinary next class and the teacher approves
+            // something other than what runs.
+            if (!string.IsNullOrWhiteSpace(duplicate))
+                return Proposing(workspace.PlanDuplicateClass(course, section, duplicate).Describe());
+
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
             return plan.ChangesNothing
                 ? Answering("The next class page already exists.", plan.Describe())
@@ -613,9 +644,21 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("Pass \"next\" to start a new unit. Leave empty to continue the current unit.")]
         string unit = "",
         [Description("Pass a number to add that many days to the specified unit number. Leave 0 for a single class.")]
-        int days = 0)
+        int days = 0,
+        [Description(DuplicateHelp)] string duplicate = "")
         => Guarded(() =>
         {
+            // Branches FIRST, like the twin; `unit` and `days` mean nothing to
+            // a duplicate, which takes its unit and its day from the page
+            // being copied.
+            if (!string.IsNullOrWhiteSpace(duplicate))
+            {
+                var copying = workspace.PlanDuplicateClass(course, section, duplicate);
+                var duplicated = workspace.ApplyDuplicateClass(copying);
+                return Answering(ClassChangeWording.Duplicated(copying.SourceTitle, copying.NewTitle),
+                                 duplicated.Message);
+            }
+
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
             if (plan.ChangesNothing)
                 return Answering("Nothing needed adding — that page already exists.",

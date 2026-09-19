@@ -2,6 +2,15 @@
 """
 The shipped tool surface, tested against the model it was designed for.
 
+**HISTORICAL — the title is no longer true, noted 2026-09-18.** The probes
+below accept `publish_class` and `hide_class`; the app split those into
+`publish_pages` / `publish_class_on` and `unpublish_pages` long ago, so every
+probe here misses whatever the model does, and a run reads as a routing
+collapse that is really a stale accept-list. Two other files pointed here as
+the way to measure the shipping surface and have been corrected to name
+`trimmed-surface-suite.py` instead. Kept unchanged because its results are
+dated records and rewriting it would make them unreproducible.
+
 The earlier suites used hand-written tool definitions. These are the schemas
 plantoir-mcp actually publishes over tools/list, so this measures the thing
 that will really be in front of a model — including the two design changes the
