@@ -191,14 +191,17 @@ final class GradedFolderChoicesTests: XCTestCase {
     ///
     /// The order is the whole subject. Ask what the checklist offers BEFORE
     /// the exclusion is written and the removed folder is still there, so the
-    /// pool gets frozen — which is what the mac did until 2026-09-09 and what
-    /// Windows still does, from a walk cached one pass earlier.
+    /// pool gets frozen — which is what the mac did until 2026-09-09 and
+    /// Windows until 2026-09-18, from a walk cached one `BuildForm` pass
+    /// earlier (issue #142). Both platforms follow the rule now; on Windows
+    /// the whole gesture is one Core method,
+    /// `FolderRemoval.RemoveFolderFromCourse`.
     func testWhatARemovalDoesToTheMarksPoolMatchesTheContract() throws {
         let rule: [String: Any] = try GradedFolderChoicesTests.gradedFoldersSection()["removingAFolder"] as? [String: Any] ?? [:]
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
         XCTAssertGreaterThanOrEqual(
-            cases.count, 6,
-            "The contract lost removal cases: \(cases.count) present, 6 expected at least."
+            cases.count, 7,
+            "The contract lost removal cases: \(cases.count) present, 7 expected at least."
         )
 
         var index: Int = 0
@@ -239,6 +242,22 @@ final class GradedFolderChoicesTests: XCTestCase {
                 )
             }
         }
+    }
+
+    /// The still-offered question itself, asked the way the BUILD asks it.
+    ///
+    /// The contract's seventh case proves the rule end to end; this proves the
+    /// comparison, so that a later tidy cannot swap `lowercased()` equality for
+    /// a substring test or a locale-aware compare and stay green.
+    func testStillOfferedIgnoresCaseAndMatchesWholeNames() {
+        XCTAssertTrue(
+            GradedFolderChoices.stillOffers(["Concepts", "Portfolios", "tasks"], aFolderNamed: "Tasks")
+        )
+        XCTAssertTrue(GradedFolderChoices.stillOffers(["TASKS"], aFolderNamed: "tasks"))
+        // A whole name, never a substring: `Homework Tasks` is a different
+        // folder, and `_is_graded_path` compares whole segments too.
+        XCTAssertFalse(GradedFolderChoices.stillOffers(["Homework Tasks"], aFolderNamed: "Tasks"))
+        XCTAssertFalse(GradedFolderChoices.stillOffers([], aFolderNamed: "Tasks"))
     }
 
     private static func list(_ names: [String], without removed: String) -> [String] {
