@@ -208,6 +208,28 @@ RESULTS
 -------
 Nothing above this line was written after the first model call.
 
+POST-HOC footnote on the citations ABOVE, which are left exactly as they were
+pre-registered: the dated NOTEs added to the older results files on
+2026-09-18 pushed their line numbers down. `macos-native-10-trial-comparison.txt`
+moved by 10 lines, so the "(:193-250)" above is :203-260 today (its
+"generation rate median" line, cited later in this file, is :220 AFTER the
+shift); the seven files that took a six-line note moved by 7, so
+`conversational-residue-results.txt`'s rejected wording is at ~:66-78 and
+`macos-native-results.txt`'s `read` sentence at :65-66. Everything written
+after this line cites a SECTION or a quoted phrase instead, which does not
+rot.
+
+POST-HOC correction to the CONDITIONS note above, added rather than edited
+into it for the same reason: **the 1.5B is not only "what a Mac under 16 GB
+runs".** contracts/shared-rules.json → assistantModelChoice offers "The
+smaller assistant" as a hand-picked option on EVERY machine, and the caution
+that accompanies a hand-picked choice appears only when that choice is
+UNCOMFORTABLE — resident size above a third of physical memory. At 1.75 GB the
+1.5B is comfortable on anything from about 5.25 GB upwards, so a teacher on a
+48 GB Mac can select it and be warned about nothing at all. Every 1.5B figure
+in this file is therefore about a configuration that ships to anyone who picks
+it, not only about small hardware.
+
 THE ANSWER, IN ONE PARAGRAPH
 ----------------------------
 **On the tier this Mac actually ships, the 2026-08-24 change is neutral: it
@@ -227,9 +249,11 @@ small tier reads 208/290 shipped against 199/290 pre-tweak.
 regression is not the prompt's doing.** The most comparable prior run —
 `macos-native-10-trial-comparison.txt` → `qwen3-4b-nothink`, the same 29
 probes, 10 trials, this Mac — scored 280/290 (97%) with the Windows-comparable
-18 at 180/180. Today it is 271/290 with W-18 at 161/180, and **the whole
-19-response gap is two probes**, `read` (10/10 → 0-1/10) and `typos` (10/10 →
-0/10), both identical in the shipped and the pre-tweak wording. That is on the
+18 at 180/180. Today it is 271/290 with W-18 at 161/180, and **two probes are
+the whole difference**: `read` (10/10 → 0-1/10) and `typos` (10/10 → 0/10),
+both identical in the shipped and the pre-tweak wording. On the 290-probe
+scale that is a 9-response drop; the 19 is on the Windows-comparable-18 scale,
+where both probes sit. That is on the
 tier every Mac with 16 GB or more runs, and it is the finding in this file
 most worth acting on.
 
@@ -253,38 +277,42 @@ ones to read for what a teacher meets. The percentage column is omitted on the
 3-trial and 1-trial rows on purpose: at temperature 0 they are a check that
 the answer is stable, not a rate.
 
-  arm                                  all       %    W-18     card 11  inv  writes  trunc
-  ---------------------------------------------------------------------------------------
+  arm                                  all       %      sees     W-18     card 11  inv  writes  trunc
+  ---------------------------------------------------------------------------------------------------
   Qwen2.5-1.5B, ctx 8192, threads 4      (suite body, max_tokens 256)
-  A1 hyphen        temp 0.1, 10x     204/290   70%   116/180   88/110    0     55     19
-  A2 shipped       temp 0.1, 10x     208/290   72%   118/180   90/110    0     51     12
-  A3 pre-tweak     temp 0.1, 10x     199/290   69%   110/180   89/110    0     56     13
+  A1 hyphen        temp 0.1, 10x     204/290   70%   166/240   116/180   88/110    0     55     19
+  A2 shipped       temp 0.1, 10x     208/290   72%   168/240   118/180   90/110    0     51     12
+  A3 pre-tweak     temp 0.1, 10x     199/290   69%   159/240   110/180   89/110    0     56     13
                                          (APP body — no max_tokens at all)
-  H  shipped       temp 0,    3x      63/87     -     36/54    27/33     0     15      3
-  Hpre pre-tweak   temp 0,    3x      61/87     -     34/54    27/33     0     15      3
-  H  shipped       temp 0, cold 1x    21/29     -     12/18     9/11     0      5      1
-  Hpre pre-tweak   temp 0, cold 1x    21/29     -     12/18     9/11     0      5      1
+  H  shipped       temp 0,    3x      63/87     -     51/72     36/54    27/33     0     15      3
+  Hpre pre-tweak   temp 0,    3x      61/87     -     49/72     34/54    27/33     0     15      3
+  H  shipped       temp 0, cold 1x    21/29     -     17/24     12/18     9/11     0      5      1
+  Hpre pre-tweak   temp 0, cold 1x    21/29     -     17/24     12/18     9/11     0      5      1
 
   Qwen2.5-1.5B, ctx 16384, threads 6 — the ANCHORS' conditions. POST-HOC:
   added after the ctx-8192 arms were seen, to test whether the context size
   explained the disagreement with the anchors. It does not.
-  shipped          temp 0.1, 10x     207/290   71%   120/180   87/110    0     50     14
-  pre-tweak        temp 0.1, 10x     198/290   68%   115/180   83/110    0     60     16
+  shipped          temp 0.1, 10x     207/290   71%   170/240   120/180   87/110    0     50     14
+  pre-tweak        temp 0.1, 10x     198/290   68%   158/240   115/180   83/110    0     60     16
 
   Qwen3-4B, ctx 16384, threads 4 — THIS MAC'S OWN TIER
-  A2 shipped       temp 0.1, 10x     271/290   93%   161/180  110/110    0     10      0
-  A3 pre-tweak     temp 0.1, 10x     270/290   93%   160/180  110/110    0     10      0
-  H  shipped       temp 0,    3x      81/87     -     48/54    33/33     0      3      0
-  Hpre pre-tweak   temp 0,    3x      81/87     -     48/54    33/33     0      3      0
-  H  shipped       temp 0, cold 1x    27/29     -     16/18    11/11     0      1      0
-  Hpre pre-tweak   temp 0, cold 1x    27/29     -     16/18    11/11     0      1      0
+  A2 shipped       temp 0.1, 10x     271/290   93%   221/240   161/180  110/110    0     10      0
+  A3 pre-tweak     temp 0.1, 10x     270/290   93%   220/240   160/180  110/110    0     10      0
+  H  shipped       temp 0,    3x      81/87     -     66/72     48/54    33/33     0      3      0
+  Hpre pre-tweak   temp 0,    3x      81/87     -     66/72     48/54    33/33     0      3      0
+  H  shipped       temp 0, cold 1x    27/29     -     22/24     16/18    11/11     0      1      0
+  Hpre pre-tweak   temp 0, cold 1x    27/29     -     22/24     16/18    11/11     0      1      0
 
   THE MAC'S OWN SHELF, 19 phrasings, 1.5B, ctx 8192, shipped prompt. POST-HOC:
   added after the review pointed out that "card 11" above is Windows' list.
   15 of the 19 are answered in code; the four that reach the model are what
-  this arm is evidence about.
-  temp 0.1, 10x                      139/190   73%   — 4 model-routed: 30/40
-  APP body, temp 0, 3x                42/57     -    — 4 model-routed:  9/12
+  this arm is evidence about, and they are the "sees" column here.
+  temp 0.1, 10x                      139/190   73%    30/40     — the Windows subtotals
+  APP body, temp 0, 3x                42/57     -      9/12       do not apply
+
+The "sees" column is the nearest figure in this table to what a teacher meets,
+and on the 4B it is 92% in every arm. Every figure in it is the suite's own
+printed subtotal, not a recomputation.
 
 Thinking is OFF and the token counts prove it, which is the only proof there
 is: 4B median 41 completion tokens, max 73 — tens, not the hundreds a <think>
@@ -390,8 +418,14 @@ and it is a different list with different wording:
 
 A "110/110 promise card" is therefore a statement about Windows' promises, and
 it has been quoted as a mac figure. The mac's shelf was measured at
-temperature 0 on the 4B on 2026-08-16 (`shelf-phrasings-results.txt`, 140/140)
-and had never been measured on the 1.5B at all. It is now, with the
+temperature 0 on the 4B on 2026-08-16 (`shelf-phrasings-results.txt`,
+140/140) — but that file measured the shelf as it stood THEN, 14 phrasings,
+and the shelf is 19 today: **10 of today's 19 strings appear in it**, and four
+of its fourteen ("Publish the class on Monday", "Show me Unit 2, Day 3",
+"What dates am I teaching?", "What pages are in this section?") are no longer
+on the shelf. All FOUR of today's model-routed strings are among the ten,
+verbatim, so "10/10 on the 4B" for "Deploy at 6:30 AM" stands. The shelf had
+never been measured on the 1.5B at all. It is now, with the
 interception guard deciding which phrasings reach the model rather than a
 hand-made list: **15 of the 19 are answered in code, and four reach the
 model.** Those four, 1.5B, ctx 8192, shipped prompt:
@@ -407,7 +441,8 @@ model.** Those four, 1.5B, ctx 8192, shipped prompt:
 **The mac's shelf keeps three of its four model-routed promises on the small
 tier and breaks one — and the one it breaks deploys to students immediately
 when the teacher asked for 6:30 tomorrow morning.** The same string is 10/10
-CORRECT on the 4B (`shelf-phrasings-results.txt` ~:66, temperature 0), so this
+CORRECT on the 4B (`shelf-phrasings-results.txt`, its `schedule_deploy` row,
+temperature 0), so this
 is a small-tier failure, not a wording failure. It is the sharpest result in
 this file: it is the mac's own words, on the mac's own shelf, on the tier an
 8 GB Mac runs.
@@ -452,8 +487,8 @@ prompt was pre-tweak there, and today's pre-tweak arm reproduces today's
 answer rather than the anchor's.
 
 **Anchor 1c — macos-native-results.txt** (2026-08-15, the 3-trial run, 1.5B,
-15 tools) says at ~:58-59, in the mac's own words: *"'read' answered with
-check_section 3/3"*, and its overall figure is 63/87 (72%) — the same fraction
+15 tools) says, in the mac's own words, *"'read' answered with check_section
+3/3"*, and its overall figure is 63/87 (72%) — the same fraction
 today's small-tier headline arm gives. So on `read` the mac's own August files
 DISAGREE WITH EACH OTHER: the 3-trial file says check_section, the 13-tool
 file says `read_page` 9/10, today says check_section. That disagreement is
@@ -521,12 +556,14 @@ folder" does not fix this on the small model — it moves the wrong answer
 around (check_section without it, rebuild_preview with it) without ever
 producing a decline. On the tier this Mac ships it was already right and
 still is. The wording fix that was tried and rejected is in
-conversational-residue-results.txt ~:59-71 and was not retried here.
+conversational-residue-results.txt, under "A THIRD wording was tried and
+rejected", and was not retried here.
 
 THRESHOLD VERDICTS
 ------------------
 1. ANY polarity inversion — **NOT TRIPPED.** Zero, in every arm, on both
-   models: 2,494 responses in total, no hide request answered with a publish
+   models: 2,494 responses in the 29-probe arms plus 247 in the mac-shelf
+   arm (which had 0 inversions and 0 truncations of its own), no hide request answered with a publish
    tool. Worth more than it looks, because the counter was WIDENED for this
    run: the old one matched probe labels and could not see "card: unpublish
    by name" or "no course named: hide" invert. It now covers all six polarity
@@ -538,7 +575,7 @@ THRESHOLD VERDICTS
      1.5B  publish tomorrow, with links   anchor 1  10/10 → 0/10
      1.5B  deploy now                     anchor 1  10/10 → 0/10
      1.5B  no course named: publish       anchor 1  10/10 → 0/10
-     1.5B  typos                          anchor 1  10/10 → 5-7/10 (see below)
+     1.5B  typos                          anchor 1  10/10 → 5/10 in A3 (see below)
      4B    read                           anchor 1b 10/10 → 0-1/10
      4B    typos                          anchor 1b 10/10 → 0/10
 
@@ -551,18 +588,26 @@ THRESHOLD VERDICTS
    prompt forms.
 
    **A degree of freedom the pre-registration left open, named rather than
-   used.** It said "the comparable arm" and never said WHICH, and on the 1.5B
-   `typos` the verdict turns on that choice: 5/10 in A3 (trips), 6/10 in A1
-   (trips), 7/10 in the ctx-16384 control (does not), 9/10 in A2, 10/10 in the
-   16k shipped arm (does not). POST-HOC, and stated so the reader can discount
-   it: this file treats **A1 (hyphen, ctx 8192) as comparable to anchor 1**,
-   because anchor 1's own numbers were taken against the hyphen constant, and
-   **A3 (pre-tweak) as comparable to anchor 2 and 1b**, because those predate
-   the tweak. On that reading `typos` trips on the 1.5B. It would not have
-   tripped had "comparable" been read as A2. The probe is unstable in every
-   arm, so nothing is built on it; the point of writing this down is that a
-   threshold with an unpinned term is a threshold that can be satisfied after
-   the fact, and the next pre-registration should name the arm.
+   used.** The threshold is "≤5/10 in the comparable arm" and it never said
+   WHICH arm is comparable. On the 1.5B's `typos` that choice decides the
+   verdict outright: **5/10 in A3 (trips, at exactly the boundary), 6/10 in A1
+   (does NOT trip — 6 > 5), 7/10 in the ctx-16384 pre-tweak control (does
+   not), 9/10 in A2, 10/10 in the 16k shipped arm (does not).**
+
+   POST-HOC, and stated so a reader can discount it: this file pairs **A3
+   (pre-tweak) with all three anchors**, because all three predate 2026-08-24
+   and were therefore taken with the pre-tweak wording. That is the only
+   dimension on which they can be matched — the earlier draft here paired A1
+   with anchor 1 "because anchor 1 used the hyphen constant", which is hollow:
+   ALL THREE anchors used the hyphen constant, so it separates nothing. On the
+   A3 reading, 1.5B `typos` trips at 5/10. On an A1 reading it does not.
+   Anchor 2 cannot supply the trip either way: its 1.5B `typos` is 8/10, not
+   10/10, so that anchor never qualifies the probe for this threshold at all.
+
+   The probe is unstable in every arm, so nothing in this file is built on it.
+   The point of writing it down is that a threshold with an unpinned term can
+   be satisfied after the fact, and **the next pre-registration must name the
+   arm.**
 
 3. "hide, phrased as a mistake" — **NOT TRIPPED, and this is the answer #117
    asked for.** 10/10 unpublish_pages in every 1.5B arm, 10/10 in every 4B
@@ -623,8 +668,8 @@ truncated calls per 290 responses — `publish tomorrow, with links` every
 trial, plus `typos`, `no course named: publish` and `deploy now` — and the 4B
 produces none. **Read every "malformed tool calls: 0" in the older files as
 "no HTTP errors".** (One suite is different and is worth naming so the claim
-is exact: `routing-suite.py` ~:161 keeps the raw string as
-`{"__unparseable__": …}` and never counts it, and its report line says
+is exact: `routing-suite.py` keeps the raw string as
+`{"__unparseable__": …}` (search it for `__unparseable__`) and never counts it, and its report line says
 "malformed tool calls (runtime rejected)", which is honest about what it
 means. It simply has no count of the other kind either.)
 
@@ -641,8 +686,8 @@ the rails on this surface", 3/87 is "how often does a teacher meet it".
 **A scoring limit, stated because it flatters the totals.** PASS/MISS is
 decided by the tool NAME alone; the arguments are checked by separate counters
 that do not feed the score. So a call that chose the right tool and arrived
-with unusable arguments is scored correct. It happened twice in 2,494
-responses (both `publish by name, informal` → `publish_pages`, truncated), so
+with unusable arguments is scored correct. It happened twice in the 2,494 responses of the 29-probe arms, and never in
+the mac-shelf arm's 247 (both `publish by name, informal` → `publish_pages`, truncated), so
 it moves nothing here — but a future run where truncation is common would be
 over-scored, and the fix is to fail a probe whose arguments did not parse.
 
@@ -718,8 +763,9 @@ them is the wording:
 
   - **`read` on the 4B.** 10/10 `read_page` in August on both the 15-tool and
     the 13-tool surfaces; 0-1/10 today, choosing `check_section`, identically
-    in both prompt forms. With `typos` it accounts for the whole 19-response
-    drop from 280/290 to 271/290 on the tier most teachers run. Nothing here
+    in both prompt forms. With `typos` it accounts for the whole drop from
+    280/290 to 271/290 — 9 responses there, 19 on the Windows-comparable-18
+    scale — on the tier most teachers run. Nothing here
     explains it, and the tool-surface change that would explain `typos` does
     not cover it.
   - **"Deploy at 6:30 AM", the mac's own shelf card, on the small tier.**
@@ -737,20 +783,7 @@ three mac anchors taken on 2026-08-15 disagree with each other about `read`,
 and the newest of them cannot be re-run because its harness was never
 committed. Commit the harness beside the results.
 
-HOW THIS FILE WAS CHECKED
--------------------------
-Three reviews, each by Claude Opus in a fresh context: the PLAN before any
-arm was run, the RESULTS once they existed, and the corrections made in
-answer to the second. The results review re-parsed all 2,494 raw rows
-independently and every total in this file reproduced; what it changed was
-the INTERPRETATION, and each of its corrections is either applied above or
-argued against above — the sections marked POST-HOC are the ones it caused,
-including the mac-shelf arm, which exists because the review noticed that the
-"promise card" everything here quotes is Windows' list. A final pre-merge
-sweep by Claude Fable 5.1 covers the whole change as it will be merged.
-
 No row was added to `GUI-IMPROVEMENTS.md`, and that is a decision rather than
-an omission: nothing a teacher can see changed. The things a teacher WOULD
-notice are named in the conclusion above and are tracked as their own issues,
-which is where a row will belong when one of them is fixed.
-
+an omission: nothing a teacher can see changed. The three things a teacher
+WOULD notice are named above and are tracked as their own issues, which is
+where a row will belong when one of them is fixed.

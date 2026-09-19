@@ -422,6 +422,62 @@ MAC_SHELF = [
      "shelf: cancel the deploy", False),
 ]
 
+SHELF_SWIFT = "mac-app/QuartzTeachers/Views/Assist/AssistSupportingViews.swift"
+
+
+def shelf_phrasings() -> list:
+    """Every phrasing on the mac's shelf, READ out of the Swift.
+
+    `narrow-tools.py` is the cautionary tale this exists to avoid: a hand copy
+    of a shipping list that was right when committed and silently wrong three
+    days later. So MAC_SHELF above is checked against the source on every run
+    rather than trusted — parsed from `AssistPromptShelfView.groups`, whose
+    shape is `("Group title", ["a phrasing", "another"])`, with the group
+    titles (the literal straight after an opening bracket) dropped because
+    they are UI and never reach the model.
+    """
+    source = (ROOT / SHELF_SWIFT).read_text(encoding="utf-8")
+    opening = source.index("static let groups: [(String, [String])] = [")
+    closing = source.index("\n    ]", opening)
+    # Comment lines are dropped FIRST: this table is more comment than code,
+    # and the comments quote phrasings — including ones deliberately NOT on
+    # the shelf, like "Publish the class on Monday" — which a naive reader of
+    # the string literals picks up as if they were cards.
+    kept = []
+    for line in source[opening:closing].split("\n"):
+        if line.lstrip().startswith("//"):
+            continue
+        kept.append(line)
+    region = "\n".join(kept)
+    titles = set(re.findall(r'\(\s*"([^"]*)"\s*,\s*\[', region))
+    phrasings = []
+    for literal in re.findall(r'"([^"]*)"', region):
+        if literal in titles or not literal:
+            continue
+        phrasings.append(literal)
+    return phrasings
+
+
+def assert_shelf_is_current() -> int:
+    """Fail the run if MAC_SHELF has drifted from the shelf it copies."""
+    onScreen = shelf_phrasings()
+    copied = [prompt for _, prompt, _, _ in MAC_SHELF]
+    missing = [p for p in onScreen if p not in copied]
+    extra = [p for p in copied if p not in onScreen]
+    if missing or extra:
+        sys.exit(
+            "MAC_SHELF no longer matches %s:\n"
+            "  on the shelf and NOT measured: %s\n"
+            "  measured and NOT on the shelf: %s\n"
+            "Fix the list above before quoting a number from this arm."
+            % (SHELF_SWIFT, missing or "none", extra or "none")
+        )
+    if len(onScreen) != len(copied):
+        sys.exit("MAC_SHELF has %d entries, the shelf has %d"
+                 % (len(copied), len(onScreen)))
+    return len(copied)
+
+
 if MAC_SHELF_ONLY:
     CASES = MAC_SHELF
     PROMISED = []
@@ -522,6 +578,9 @@ print("### prompt=%s temperature=%s app-body=%s trials=%s course=%s" % (
     PROMPT_FORM, TEMPERATURE, APP_BODY, TRIALS, COURSE))
 print("### em-dashes in the shipped literal, folded for the hyphen form: %d"
       % assert_forms_agree())
+if MAC_SHELF_ONLY:
+    print("### mac shelf: %d phrasings, checked against %s"
+          % (assert_shelf_is_current(), SHELF_SWIFT))
 print("### intercepted in code before the model (%d of %d probes): %s" % (
     len(INTERCEPTED), len(CASES),
     ", ".join("%s -> %s" % (p, t) for p, t in INTERCEPTED.items())))
