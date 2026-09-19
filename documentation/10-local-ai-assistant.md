@@ -499,6 +499,18 @@ The clearest example is what happens to linked pages:
 - **Publishing** a page always publishes what it links to. There is no
   `includeLinked` flag for the model to decide about, because a class page
   whose linked notes are invisible is broken, always.
+
+  **That sentence describes the MAC, and the two platforms differ — undecided,
+  [issue #173](https://github.com/russellgordon/plantoir/issues/173).** Windows
+  stops at class pages: a link that lands on another class publishes nothing
+  and is not followed through (`AssistWorkspace.cs:724`), where the mac's
+  `linkedPages(from:)` has no such test. The same split is in the date rule
+  beside it — a class page never INHERITS a date on either platform, but
+  Windows also stops the walk there (`:916` before `:917`) while the mac
+  traverses through. Found on Windows during
+  [#115](https://github.com/russellgordon/plantoir/issues/115) and left alone
+  deliberately; #173 asks which answer is right and says to write the winner
+  into `contracts/` and correct this page.
 - **Unpublishing** is deliberately *not* the mirror image. A linked page comes
   down only when the pages being taken down are the **only** ones that link to
   it — otherwise hiding this week's lesson would strip a page last week's
