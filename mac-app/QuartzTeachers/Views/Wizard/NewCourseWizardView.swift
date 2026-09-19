@@ -468,10 +468,12 @@ struct NewCourseWizardView: View {
             //
             // Attached HERE, to the whole sheet, rather than to the
             // Toggle itself: the Toggle lives inside an `else if let
-            // skeleton` branch of the Starting Content section, which
-            // SwiftUI rebuilds on every keystroke in the course-code
-            // field, and a handler on a view that is being rebuilt is a
-            // handler nothing has to keep.
+            // skeleton` branch of the Starting Content section, and that
+            // branch LEAVES the hierarchy the moment the typed code stops
+            // having a skeleton — a handler that is not there cannot fire.
+            // (Re-evaluating a body does not cost a handler: the LCS
+            // switch's own `.onChange` sits inside a branch and works.
+            // Disappearing is the case this avoids.)
             .onChange(of: startsFromSkeleton) { _, startsFromASkeletonNow in
                 if startsFromASkeletonNow {
                     adoptSkeletonStructure()
@@ -1114,7 +1116,7 @@ struct NewCourseWizardView: View {
             return
         }
         let adopted: WizardStructure.Lists = WizardStructure.adopting(skeleton)
-        show(adopted)
+        putIntoEditor(adopted)
         // Recorded so that turning the toggle off can tell a list the teacher
         // has edited since from one they never touched.
         adoptedStructure = adopted
@@ -1130,12 +1132,12 @@ struct NewCourseWizardView: View {
             adopted: adoptedStructure,
             usesLCSTerminology: usesLCSTerminology
         )
-        show(restored)
+        putIntoEditor(restored)
         adoptedStructure = nil
     }
 
-    /// Puts a set of lists into the editor.
-    func show(_ lists: WizardStructure.Lists) {
+    /// Puts a set of lists into the structure editor.
+    func putIntoEditor(_ lists: WizardStructure.Lists) {
         sharedFolders = lists.sharedFolders
         sharedFiles = lists.sharedFiles
         perSectionFolders = lists.perSectionFolders
@@ -1143,14 +1145,12 @@ struct NewCourseWizardView: View {
         gradedFolders = lists.gradedFolders
     }
 
+    /// The marks pool narrowed to the folders this course will actually have.
+    /// The rule itself is `GradedFolderRule.reconciled(_:toFolders:)`, which
+    /// says how it differs from Windows' and why; this stays as the name the
+    /// call sites and their tests already use.
     static func reconciledGradedFolders(from gradedFolders: [String], validChoices: [String]) -> [String] {
-        var result: [String] = []
-        for folder in gradedFolders {
-            if validChoices.contains(folder) {
-                result.append(folder)
-            }
-        }
-        return result
+        return GradedFolderRule.reconciled(gradedFolders, toFolders: validChoices)
     }
 
     func reconcileGradedFolders() {
@@ -1355,16 +1355,24 @@ struct NewCourseWizardView: View {
         var chosenSharedFiles: [String] = sharedFiles
         var chosenPerSectionFolders: [String] = perSectionFolders
         var chosenPerSectionFiles: [String] = perSectionFiles
+        var chosenGradedFolders: [String] = gradedFolders
         var skeleton: SkeletonCatalog.Family? = nil
         if startsFromSkeleton && SkeletonCatalog.hasSkeleton(forCode: code) {
             skeleton = SkeletonCatalog.family(forCode: code)
             if let adopted = SkeletonCatalog.structureToAdopt(
                 forCode: code, currentSharedFolders: sharedFolders
             ) {
-                chosenSharedFolders = adopted.sharedFolders
-                chosenSharedFiles = adopted.sharedFiles
-                chosenPerSectionFolders = adopted.perSectionFolders
-                chosenPerSectionFiles = adopted.perSectionFiles
+                let lateAdoption: WizardStructure.Lists = WizardStructure.adopting(adopted)
+                chosenSharedFolders = lateAdoption.sharedFolders
+                chosenSharedFiles = lateAdoption.sharedFiles
+                chosenPerSectionFolders = lateAdoption.perSectionFolders
+                chosenPerSectionFiles = lateAdoption.perSectionFiles
+                // The marks pool comes with them. Leaving it behind wrote the
+                // wizard's default ["Tasks"] beside the mathematics
+                // skeleton's folders, whose assessed work is in Thinking
+                // Tasks — the same silent loss row 359 exists about. Windows
+                // sets all five here too (NewCourseDialog.BuildConfiguration).
+                chosenGradedFolders = lateAdoption.gradedFolders
             }
         }
 
@@ -1497,7 +1505,7 @@ struct NewCourseWizardView: View {
         let structureFromExample: Bool = prepopulatesExampleContent
             && ExampleContentCatalog.hasContent(forCode: code)
         if !structureFromExample {
-            config["graded_folders"] = gradedFolders
+            config["graded_folders"] = chosenGradedFolders
         }
 
         return config

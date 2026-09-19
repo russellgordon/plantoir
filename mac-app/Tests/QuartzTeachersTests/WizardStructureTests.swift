@@ -30,29 +30,56 @@ final class WizardStructureTests: XCTestCase {
                        "A family that declares its own graded folders keeps them")
     }
 
-    /// A family that declares no marks pool of its own falls back to the
-    /// rule the build applied before the key existed — and the fallback is
-    /// the same function every other part of the app now asks.
-    func testAFamilyWithNoDeclaredPoolFallsBackToTheHistoricalRule() throws {
-        var familiesWithADeclaredPool: Int = 0
+    /// Every bundled family declares its own marks pool, and the adoption
+    /// takes it as declared.
+    ///
+    /// Written as its own check rather than as the `else` of the one below,
+    /// because that is what it really is: the generator writes
+    /// `graded_folders` for all fifty, so nothing in the bundle can exercise
+    /// the fallback and a test that walked them believing it did would be
+    /// reporting on a branch it never ran.
+    func testEveryBundledFamilyDeclaresItsOwnPoolAndKeepsIt() throws {
+        var familiesSeen: Int = 0
         for name in SkeletonCatalog.everyFamilyName() {
             let family: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.family(named: name))
-            let pool: [String] = SkeletonCatalog.adoptedGradedFolders(for: family)
-            if family.gradedFolders.isEmpty {
-                XCTAssertEqual(
-                    pool,
-                    GradedFolderRule.inferredPool(
-                        from: family.sharedFolders + family.perSectionFolders
-                    ),
-                    "\(name) declares no graded folders, so the historical rule decides its pool"
-                )
-            } else {
-                familiesWithADeclaredPool += 1
-                XCTAssertEqual(pool, family.gradedFolders, "\(name) declares its own pool")
-            }
+            familiesSeen += 1
+            XCTAssertFalse(
+                family.gradedFolders.isEmpty,
+                "\(name) declares no graded_folders. The fallback below would decide its marks "
+                + "pool instead — check that it says what the subject means."
+            )
+            XCTAssertEqual(SkeletonCatalog.adoptedGradedFolders(for: family), family.gradedFolders,
+                           "\(name)'s declared pool is what an adoption takes")
         }
-        XCTAssertGreaterThan(familiesWithADeclaredPool, 0,
-                             "No family declared a pool at all — the manifests were not found")
+        XCTAssertGreaterThan(familiesSeen, 40, "The bundled manifests were not found")
+    }
+
+    /// A family that declares no pool falls back to the rule the build
+    /// applied before the key existed.
+    ///
+    /// Run against a family built here, because no bundled one can reach it —
+    /// and the branch is still worth holding: a hand-written manifest, or a
+    /// generator change, brings it back, and the fallback is what stops such
+    /// a course opening with no marks at all.
+    func testAFamilyWithNoDeclaredPoolFallsBackToTheHistoricalRule() {
+        let family: SkeletonCatalog.Family = SkeletonCatalog.Family(
+            name: "improvised",
+            label: "Improvised",
+            sharedFolders: ["Concepts", "Thinking Tasks", "Curriculum"],
+            sharedFiles: ["Learning Goals.md"],
+            perSectionFolders: ["All Classes", "Group Tasks"],
+            perSectionFiles: ["Key Links.md"],
+            hidden: ["Curriculum"],
+            expandable: ["Concepts"],
+            curriculumFolder: "Curriculum",
+            gradedFolders: []
+        )
+
+        XCTAssertEqual(
+            SkeletonCatalog.adoptedGradedFolders(for: family),
+            ["Thinking Tasks", "Group Tasks"],
+            "Every folder whose name mentions tasks, shared and per-section alike"
+        )
     }
 
     /// The one rule the three surfaces that ask "what is this course
@@ -106,9 +133,14 @@ final class WizardStructureTests: XCTestCase {
         )
     }
 
-    /// The marks pool the teacher has ticked themselves is theirs, exactly
-    /// like a folder list they have edited.
-    func testAMarksPoolTheTeacherChangedIsLeftAlone() throws {
+    /// The marks pool the teacher ticked themselves is theirs — but only as
+    /// far as the folders the course will actually have.
+    ///
+    /// Both halves matter, and the second was missed on the first attempt:
+    /// keeping `Investigations` here would write a `graded_folders` naming a
+    /// folder that has just left the editor, which the build counts and
+    /// never finds. `Tasks` survives because the factory list has one.
+    func testAMarksPoolTheTeacherChangedIsKeptButNarrowed() throws {
         let science: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.family(forCode: "SNC4M"))
         let adopted: WizardStructure.Lists = WizardStructure.adopting(science)
         let withTheirOwnPool: WizardStructure.Lists = WizardStructure.Lists(
@@ -116,7 +148,7 @@ final class WizardStructureTests: XCTestCase {
             sharedFiles: adopted.sharedFiles,
             perSectionFolders: adopted.perSectionFolders,
             perSectionFiles: adopted.perSectionFiles,
-            gradedFolders: ["Investigations"]
+            gradedFolders: ["Tasks", "Investigations"]
         )
 
         let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
@@ -125,8 +157,34 @@ final class WizardStructureTests: XCTestCase {
 
         XCTAssertEqual(restored.sharedFolders, WizardDefaults.sharedFolders,
                        "The untouched folder lists still go back")
-        XCTAssertEqual(restored.gradedFolders, ["Investigations"],
-                       "A pool the teacher ticked is not re-inferred over folders they never chose")
+        XCTAssertEqual(restored.gradedFolders, ["Tasks"],
+                       "Their own choice is kept where the folder survives the restore, and "
+                       + "dropped where it does not")
+    }
+
+    /// A pool narrowed to nothing is written as nothing — "asked, and nothing
+    /// counts" — rather than quietly naming folders that are gone.
+    func testAMarksPoolCanNarrowToNothing() throws {
+        let mathematics: SkeletonCatalog.Family = try XCTUnwrap(
+            SkeletonCatalog.family(forCode: "MPM1D")
+        )
+        let adopted: WizardStructure.Lists = WizardStructure.adopting(mathematics)
+        XCTAssertEqual(adopted.gradedFolders, ["Thinking Tasks", "Tasks"],
+                       "The one family that declares a pool other than [\"Tasks\"]")
+
+        let afterUntickingTasks: WizardStructure.Lists = WizardStructure.Lists(
+            sharedFolders: adopted.sharedFolders,
+            sharedFiles: adopted.sharedFiles,
+            perSectionFolders: adopted.perSectionFolders,
+            perSectionFiles: adopted.perSectionFiles,
+            gradedFolders: ["Thinking Tasks"]
+        )
+
+        let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
+            in: afterUntickingTasks, adopted: adopted, usesLCSTerminology: false
+        )
+        XCTAssertEqual(restored.gradedFolders, [],
+                       "Thinking Tasks left the editor with the rest of the skeleton")
     }
 
     // MARK: - The wizard's own two call sites
@@ -257,6 +315,27 @@ final class WizardStructureTests: XCTestCase {
 
         XCTAssertEqual(configuration["use_skeleton"] as? Bool, true)
         XCTAssertEqual(configuration["shared_folders"] as? [String], science.sharedFolders)
+    }
+
+    /// The configuration adopts once more as it is built, whether or not the
+    /// code field's handler ever ran — and the marks pool goes with the four
+    /// lists. Windows sets all five in the same place.
+    ///
+    /// The pool is the half that was missed: the wizard's default is
+    /// `["Tasks"]`, and a mathematics course keeping it would count nothing
+    /// in `Thinking Tasks`, which is where its assessed work goes.
+    func testTheLateAdoptionCarriesTheSubjectsMarksPoolToo() {
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: "MPM1D", startsFromSkeleton: true
+        )
+        let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+            code: "MPM1D", name: "Mathematics"
+        )
+
+        XCTAssertEqual(configuration["graded_folders"] as? [String], ["Thinking Tasks", "Tasks"])
+        XCTAssertEqual(
+            (configuration["shared_folders"] as? [String])?.contains("Thinking Tasks"), true
+        )
     }
 
     /// A code with ready-made pages is offered no skeleton, so neither

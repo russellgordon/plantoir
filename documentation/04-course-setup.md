@@ -91,10 +91,12 @@ folders with none of its pages, while `course_config.json` said
 `use_skeleton: false`. A wizard that lies about what it is about to make is
 a worse product than one that never asked.
 
-The rule and its ten cases are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
-`wizard.skeletonToggle`, run on the mac by `SharedRulesContractTests` and
-`WizardStructureTests`. Four things about it are decisions rather than
-mechanics:
+The rule and its thirteen cases are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`wizard.skeletonToggle`, run on the mac by `SharedRulesContractTests`;
+`WizardStructureTests` covers what cases cannot reach — the pieces the rule
+is assembled from, and a scan proving the toggle is WIRED, a control with no
+handler being the original bug. Four things about it are decisions rather than
+mechanics, and two more are worth knowing before reading a green run as coverage:
 
 - **A list is recognised as untouched by VALUE, not by a dirty flag.** A
   list edited and then edited BACK to exactly what the adoption set is
@@ -109,11 +111,26 @@ mechanics:
   switch left them, while the per-section lists still go back. Re-taking the
   snapshot on a terminology flip would make the restore delete the College
   Board folder the teacher had just asked for.
-- **The marks pool is re-inferred over the RESTORED folders** rather than
-  copied from anywhere, so it can never name a folder that has just left the
-  editor. The mac does it eagerly inside the restore and Windows clears the
-  pool and lets `CurrentGradedFolders()` infer it on the next read — the
-  same answer over the same lists.
+- **The marks pool can never name a folder that has just left the editor**,
+  and it takes TWO rules to keep that true: a pool still equal to the
+  adoption's is re-inferred over the restored folders, and a pool the teacher
+  has ticked themselves is kept but NARROWED to the folders the course will
+  actually have. Miss the second and a teacher who adopted the mathematics
+  skeleton, unticked `Tasks` and then declined the skeleton is left with
+  `graded_folders: ["Thinking Tasks"]` against a course with no such folder —
+  the build counts nothing, the checklist shows nothing ticked, and neither
+  says so. (The first version of the mac's restore did exactly that, and the
+  adversarial review of it found it.) The two apps reach the same answer from
+  opposite ends: the mac narrows inside the restore, Windows leaves the pool
+  and narrows it on every read (`CurrentGradedFolders`) and again when the
+  file is written.
+- **Two of the five lists cannot tell one answer from another for most
+  codes**, which matters when reading a green run as coverage: every bundled
+  family ships `per_section_folders` of exactly `["All Classes"]`, the
+  factory default, so only the per-section FILES prove that half of a
+  restore; and every family declares `graded_folders` of `["Tasks"]` except
+  mathematics, so a marks-pool expectation means nothing unless its case uses
+  a mathematics code. The contract carries cases on `MPM1D` for that reason.
 - **A narrow extra rule for the hole value equality leaves was rejected.**
   It would have made the two apps differ over a case no teacher can tell
   apart, which is how the contract stops being worth having.
