@@ -552,6 +552,17 @@
           ]
         },
         {
+          "name": "a class folder beside one that mentions no classes",
+          "perSectionFolders": [
+            "All Classes",
+            "Handouts"
+          ],
+          "expect": [
+            "All Classes"
+          ],
+          "why": "Only the folder that mentions classes counts. Handouts are course material, not days of teaching, and counting them puts them in the dated class lists, in 'publish every class from the 15th', and in the list of classes a scheduled deploy says students cannot see yet. Windows walked every per_section_folder in two places and did exactly that until 2026-09-19 (issue #115); the mac and build_site.py never did."
+        },
+        {
           "name": "two folders that both mention classes",
           "perSectionFolders": [
             "Class Resources",
