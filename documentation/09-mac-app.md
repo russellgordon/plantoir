@@ -622,13 +622,23 @@ one real thing: the older wording let the model DECLINE a plain hide request
 6 times in 10 where the current one declines once.
 
 **This window's own shelf was measured for the first time** in the same run,
-on the smaller assistant. Of its 19 cards, 15 are answered in code by
-`AssistCardCommand` and 4 reach the model; of those four, three are routed
-correctly every trial and **"Deploy at 6:30 AM" is not — it is answered by
+on the smaller assistant. Of its 19 cards, 15 were answered in code by
+`AssistCardCommand` and 4 reached the model; of those four, three were routed
+correctly every trial and **"Deploy at 6:30 AM" was not — it was answered by
 `deploy_section`, an immediate deploy, 10 trials out of 10** (issue #168).
 The same card is correct 10/10 on the larger assistant. Conditions, thresholds and per-probe
 tables are in `research/ai-assist/metal-routing-results.txt`, which is also
 the file to read before quoting any "0 malformed calls" from that folder.
+
+**The split is 16 and 3 since 2026-09-19**, and that is a fact about the CODE
+rather than a second measurement: "deploy at &lt;time&gt;" became a parsed
+family in `AssistCardCommand`, so the card no longer reaches the model at all
+and the measured misroute is unreachable from the shelf. The model itself is
+unchanged and still gets that sentence wrong when it is phrased in a way the
+family does not read — which is the point of the second half of the same
+piece, the immediate deploy card now saying that it happens now. Both halves
+are in `documentation/10-local-ai-assistant.md` under "A time is a number, not
+a judgement".
 
 Replies take about 0.5 s once the conversation is warm. The first reply is
 the one-off read of the tool definitions, which the window warms in the

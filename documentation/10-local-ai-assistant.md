@@ -342,6 +342,142 @@ This is the same principle as the coarse tools: reasoning moved out of the
 model is reliability bought back. It is also the honest caveat on the 110/110
 in Part 5 — some of those are perfect because they are not questions.
 
+### A time is a number, not a judgement
+
+Written 2026-09-19, closing [issue
+#168](https://github.com/russellgordon/plantoir/issues/168). The shelf offers
+**"Deploy at 6:30 AM"** word for word, and the smaller assistant answered it
+with `deploy_section` — an immediate deploy, to students — **10 trials out of
+10 at temperature 0.1 and 3 out of 3 through the app's own request body**
+(Qwen2.5-1.5B, ctx 8192, shipped prompt, Metal, 2026-09-18;
+`research/ai-assist/metal-routing-results.txt`). The 4B is correct 10/10 on
+the same sentence, so there is nothing wrong with the card.
+
+**Two things were done, and they are independent.** Either would have helped;
+together they cover both the sentence that was measured and the ones that were
+not.
+
+**1. The immediate approval card now says it is immediate.** The two approval
+cards were asymmetric exactly where a misroute lands: `schedule_deploy`'s names
+the whole moment, and `deploy_section`'s named no time at all — so a teacher
+who asked for half six tomorrow read a card that was perfectly true and said
+nothing to contradict them. `AssistWording.deployApproval` now leads with the
+fact that it happens now; the two sentences after it, which have been argued
+over twice, are untouched. **`deployQuestion` was deliberately NOT changed**:
+"Shall I deploy?" is said under EVERY approval card including the scheduled
+one (`AssistAgent.run(settledCall:)` is unconditional, and Windows' `AskFirst`
+likewise), so "Shall I deploy now?" would make the scheduled card read worse
+than the thing being fixed. Splitting the question per tool is its own piece —
+[issue #184](https://github.com/russellgordon/plantoir/issues/184). The rule is
+pinned as a PROPERTY rather than a sentence:
+`contracts/shared-rules.json` → `assistantConfirmation.`
+`theImmediateDeployCardSaysItIsImmediate` carries the word the sentence must
+contain, and both suites can run it, so it survives the next rewording.
+
+**2. "deploy at &lt;time&gt;" is a sixth parsed family and never reaches the
+model.** A time in a fixed frame is a NUMBER, not a judgement — the same
+argument `makeRoom` already won for "make room for two classes at Unit 3, Day
+4" — and this is CLAUDE.md's standing rule applied exactly: steer the model
+with code, not with tool descriptions. The frame, after trimming, case-folding
+and removing a trailing `.`, `!` or `?`:
+
+```
+[please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow] [please]
+```
+
+**The rule that carries the most weight: a time with no am or pm must be
+written with two digits for the hour.** That is what 24-hour time looks like
+and it is the form `schedule_deploy`'s own schema asks for, so `06:30` and
+`18:30` are read and **`6:30` is not** — morning or evening, and nobody can
+tell which. A deploy set twelve hours wrong is a site that updates after the
+class it was meant for, so the doubt goes to the model, which has the dateline
+and is measured reading arguments out reliably. `noon` and `midnight` are both
+accepted, alike, and so are `12 pm` and `12 am`: one rule rather than two, and
+the card names the day it landed on. A section number, a course code, a
+weekday, a condition or a second request all fall through — the window is
+scoped to ONE section and binds it whatever the sentence said, so a card
+appearing to honour another section would answer a different question with
+total confidence.
+
+Every accepted and refused spelling is DATA, in `contracts/assist-cases.json`
+→ `deployAtATime` (23 accepted, 23 refused, 11 resolving rows), authored rather
+than generated and preserved across `--write-contracts`. One example and one
+near-miss — all `cardPhrasings.parsed` can carry — would have described a
+grammar of times as a single spelling, and the other platform would have built
+one spelling.
+
+**Which day a bare time means: the next such time, forwards, counting today
+while it is still to come.** Word for word the rule `dayNamedByWeekday` already
+applies to a bare day word, one unit up. An explicit "today" or "tomorrow"
+overrides it, and "today 06:30" said at nine o'clock stays on today and meets
+the existing "…has already passed" refusal — they named the day, so the app
+does not move it for them. **Rejected: "today at that time, always"**, which
+invents no temporal rule at all but answers the shelf's own card with a refusal
+for most of the day. The guess is allowed because it is never silent:
+`schedule_deploy` waits for a button and its card names the whole moment,
+weekday and date included, before anything is written.
+
+**Where the settling happens, and why it is one clock read.**
+`AssistAgent.settled(_:)` binds the section, settles a relative DAY
+(`withTheDaySettled`, below) and then settles a bare clock time
+(`withTheMomentSettled`) — once, where the call is created, reading `Date()` in
+exactly one place. `AssistAgent.say` then builds the call, settles it, writes
+its trail line FROM THE SETTLED ARGUMENTS, and hands the same call to
+`run(settledCall:)` without settling it again. That order is the fix to a real
+problem rather than tidiness: the matcher is clock-free, so the day a bare time
+means does not exist when the sentence is matched, and a line written before
+the settling would record a time with no day on it. The settler is idempotent
+— a whole moment is handed straight back — and a test says so, which is what
+makes the arrangement safe.
+
+**Which settler owns which argument is asked of the TOOL.**
+`settlingTheClassDay` takes the tools that declare `date`;
+`settlingTheDeployMoment` takes the tools that declare `when` and NOT `date`.
+A tool cannot be in both, so the division is by construction rather than by
+memory — `schedule_deploy` and `plan_scheduled_deploy` are the two today, and
+`publish_class_on`'s day-shaped `when` is untouched without anybody having to
+remember that it is different.
+
+**Three consequences written down rather than discovered.**
+
+- **The settler quietly changes the MODEL's path too.** It runs in
+  `run(call:)` for every call, so a model that answers `when: "06:30"` now gets
+  a day guessed onto it instead of meeting `unreadableTime`. Measured limit:
+  the settler reads an exact `HH:mm` and nothing looser, so a model's `"6:30"`
+  still refuses. This is consistent with `withTheDaySettled`, which already
+  covers the model's path for the same reason — but it IS a behaviour change on
+  a path the fix is otherwise not about.
+- **A card can be approved into a refusal.** At 06:29:50, "deploy at 6:30 am"
+  settles onto 06:30 today, ten seconds away; `ScheduledDeploy.problem` refuses
+  anything at or before `now` and is re-evaluated when the teacher presses the
+  button, so a card naming a minute can be declined by the app a moment later.
+  "Settled once" is a property of the MOMENT, not of the refusal. **No minimum
+  lead time was invented** — there is none anywhere in the product, and adding
+  one here would be a rule nobody could find later.
+- **Scheduling silently replaces an existing schedule** for that section
+  (`ScheduledDeploy` removes any previous job), and neither the card nor the
+  summary says so. Pre-existing, and untouched here; this family turns that
+  path from rare into the easy one, so it is worth knowing.
+
+**`AssistMCPServer` deliberately settles nothing**, so `Plantoir --mcp-stdio`
+still refuses a bare `when: "06:30"` with the runner's own "I could not read
+that time". That is a deliberate divergence from the `publish_class_on`
+decision below, where the tool WAS made forgiving: an MCP caller genuinely
+reaches that tool with a relative day, whereas `schedule_deploy`'s schema tells
+Claude Code to send `YYYY-MM-DD HH:MM` and no MCP client sends a bare clock
+time.
+
+**No routing re-measurement is owed, and here is the check rather than the
+claim.** `AssistToolSurface.swift` is not touched — no tool added or removed,
+no description, no parameter, no `required`, no `needsApproval`, no plan twin —
+and `AssistAgent.systemPrompt` references no `AssistWording`. Confirmed by
+regenerating: `contracts/assist-cases.json` → `tools` and `toolSchemas` come
+back **byte-identical** (compared key by key against `origin/dev`), so the
+model is shown exactly what it was shown before. The matcher is strictly
+upstream of the model and the approval sentence strictly downstream of it. What
+DOES change is a count of the CODE: the shelf's split moves from
+15-answered-in-code/4-model-routed to 16/3.
+
 ### The dateline, and why its position is a finding
 
 A model has no clock. Every message the teacher sends therefore carries
@@ -711,7 +847,12 @@ of physical memory — picking it raises no caution at all. The small one is
 solidly right on 19 of 29 probes and solidly wrong on 7, including every way
 of asking for a deploy at a time — the mac's own shelf card "Deploy at 6:30
 AM" routes to `deploy_section`, deploying immediately, 10/10 on the small tier
-while the 4B gets it right 10/10 (issue #168). Confirmation before acting does
+while the 4B gets it right 10/10 (issue #168). **That is still true of the
+MODEL**, and since 2026-09-19 that exact sentence no longer reaches it: it is
+a parsed family in `AssistCardCommand`, so the shelf's card is answered in
+code. A teacher who phrases it some other way still meets the misroute, which
+is why the same piece also made the immediate deploy card say that it happens
+now — see "A time is a number, not a judgement" below. Confirmation before acting does
 not turn that into a safe failure by itself: `assistantAsksBeforeChanging` is ONE
 setting for both tiers and defaults on for both (`AssistantSettingsTests`
 asserts it on a 48 GB machine), approval is per TOOL — `needsApproval: true`
@@ -2339,6 +2480,17 @@ announcement, and this repository has already measured what a clarifying
 sentence costs: one added to `publish_pages` took the promise-card score from
 110/110 to 90/110. Steer with code.
 
+**A second settler joined it on 2026-09-19**, for the tools that take a
+MOMENT rather than a class day — `AssistToolRunner.settlingTheDeployMoment`,
+which turns a bare `06:30` into the whole moment it means. The two divide the
+surface by the SCHEMA and not by a remembered list: this one takes the tools
+that declare `date`, that one the tools that declare `when` and not `date`.
+The reasoning, the day-choosing rule and what was rejected are under "A time
+is a number, not a judgement" above; what matters here is that neither settler
+can reach the other's tools, so the sentence "`schedule_deploy`'s `when` is
+excluded by construction" above is still true of the DAY settler and is no
+longer the whole story about that argument.
+
 ### What "Monday" means, and where that decision lives
 
 `contracts/schedule-rules.json` → `relativeDays`, which both suites run — the
@@ -2459,7 +2611,11 @@ touched, which is `publish_class_on` and its twin today. `schedule_deploy`'s
 `when` is a MOMENT — a day and a time, parsed by `moment(named:)` — and is
 excluded by construction rather than by being remembered, which is the same
 argument `AssistAgent` already makes for asking the surface whether a plan twin
-exists. The card's own spelling `when` is settled for those tools too, but NOT
+exists. (**That argument now has a second half**: since 2026-09-19 a bare clock
+time in a MOMENT is settled by `settlingTheDeployMoment`, which takes exactly
+the tools this one refuses — `when` declared and `date` not. Same question
+asked of the same schema, two answers that cannot overlap. See "A time is a
+number, not a judgement".) The card's own spelling `when` is settled for those tools too, but NOT
 renamed to `date`: `AssistCardCommand` is generated into
 `contracts/assist-cases.json` → `cardPhrasings` and both suites assert that
 key. A word the settler cannot read is left exactly as it arrived, so the
@@ -2512,7 +2668,14 @@ scenario "a plan card is cancelled", whose fixture pins the runner to
   day "tomorrow" became: "assistant matched a fixed phrase" carries the tool
   name, and "assistant chose a tool" carries argument NAMES and never values,
   deliberately. Adding the settled date would mean a value on the trail and a
-  `carries` change in `contracts/shared-rules.json` for both platforms. The
+  `carries` change in `contracts/shared-rules.json` for both platforms.
+  (**Reversed for the deploy MOMENT on 2026-09-19**, #168: the line now also
+  carries the whole moment a bare time settled onto, and `carries` was widened
+  to say so. The argument that won is the one this bullet did not have — a
+  DAY word is recoverable from the "assistant asked" line's own timestamp and
+  the sentence beside it, whereas "the next 6:30 from now" is a choice the
+  code made and nothing else records. The class day is unchanged: this is one
+  value, of one shape, on one family.) The
   day is diagnosable without it — after this change it is a function of the
   "assistant asked" line's own timestamp and the sentence it carries, where
   before it was a function of when the window opened, which the trail does not
@@ -2535,8 +2698,10 @@ scenario "a plan card is cancelled", whose fixture pins the runner to
   the two apps say different things — so it is written down here instead.
 
 **What the trail does and does not carry.** "assistant matched a fixed phrase"
-records the tool, and "assistant chose a tool" records argument NAMES and never
-values, deliberately — the values are the teacher's page titles. So a report of
+records the tool — and, since 2026-09-19, the whole MOMENT when the phrasing
+named a time and the app chose a day for it (#168, mac only so far) — and
+"assistant chose a tool" records argument NAMES and never values, deliberately
+— the values are the teacher's page titles. So a report of
 "it published the wrong day" cannot be diagnosed from the trail on either
 platform, and neither app changed that here: it would mean putting a value on
 the trail, against a rule `contracts/shared-rules.json` states with its
@@ -2637,7 +2802,9 @@ rather than by writing the code.
    `AssistAgent.swift:172` — `AssistCardCommand.matching(trimmed)`, on the
    text BEFORE the dateline is appended, tidied by trimming whitespace,
    stripping leading and trailing `.` and `!`, and lower-casing, then
-   compared by EQUALITY (never substring), followed by four parsed families.
+   compared by EQUALITY (never substring), followed by the parsed families —
+   four when that was written, six today ("deploy at <time>" joined them on
+   2026-09-19, #168).
    The plain-preview sentences are not a second layer here: "preview" and
    "rebuild the preview" are entries in `fixedShapes` like everything else.
    Corrected 2026-09-18 while measuring #117, which counted them rather than
