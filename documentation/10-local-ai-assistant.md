@@ -453,8 +453,6 @@ routing.
 
 ### Step 2 — What comes back
 
-### Step 2 — What comes back
-
 ```json
 { "choices": [ { "message": {
     "role": "assistant",
