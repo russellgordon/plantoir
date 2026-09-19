@@ -428,7 +428,12 @@ def ask(prompt):
     try:
         arguments = json.loads(call["arguments"])
     except Exception:
-        arguments = {}
+        # NOT the same as "no arguments", and this file used to conflate the
+        # two. A generation that runs out of room mid-JSON arrives as a tool
+        # call whose arguments are a truncated string; swallowing that as {}
+        # reported "0 malformed" while an unusable call was reaching the app.
+        # Measured 2026-09-18 on the 1.5B with the app's own body.
+        arguments = {"__unparsed__": call["arguments"][:60]}
     return call["name"], arguments, elapsed, spent, reason
 
 
@@ -461,6 +466,9 @@ inversions, narrow_inversions, fabricated, wrong_courses = [], [], [], []
 # before the call ran — counted apart, because a suite that reports them as
 # faults is stricter than the product a teacher uses.
 app_corrected = []
+# A call whose arguments JSON did not parse, and a turn the server stopped
+# because it ran out of room rather than because the model had finished.
+truncated, ran_long = [], []
 chosen = {}          # probe -> {tool: count}
 scored = {}          # probe -> hits
 spent_tokens, latencies = [], []
@@ -483,6 +491,11 @@ for acceptable, prompt, probe, needs_date in CASES:
         chosen[probe][label] = chosen[probe].get(label, 0) + 1
         if name == "__MALFORMED__":
             malformed += 1
+        if "__unparsed__" in arguments:
+            malformed += 1
+            truncated.append((probe, name, spent, ms))
+        if reason == "length":
+            ran_long.append((probe, name, spent, ms))
         ok = name in acceptable
         if ok:
             right += 1
@@ -544,7 +557,13 @@ for probe, name, arguments in inversions:
 print("   ...of which the OLD label-matching counter would have seen: %d" % len(narrow_inversions))
 print("misses that were a WRITE (the dangerous kind): %d" % wrong_writes)
 print("responses needing type coercion: %d" % type_problems)
-print("malformed tool calls: %d" % malformed)
+print("malformed tool calls: %d   (HTTP errors, plus arguments that did not parse)" % malformed)
+print("tool calls whose arguments were TRUNCATED mid-JSON: %d" % len(truncated))
+for probe, name, spent, ms in sorted(set(truncated)):
+    print("   %s -> %s, %d completion tokens, %d ms" % (probe, name, spent, ms))
+print("turns the server ended on 'length' rather than on the model finishing: %d" % len(ran_long))
+for probe, name, spent, ms in sorted(set(ran_long)):
+    print("   %s -> %s, %d completion tokens, %d ms" % (probe, name, spent, ms))
 print("'tomorrow' dates not equal to %s: %d" % (TOMORROW.isoformat(), len(fabricated)))
 for probe, date in fabricated:
     print("   %s -> date=%r" % (probe, date))
