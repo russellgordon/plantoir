@@ -335,6 +335,26 @@ final class AssistAgent {
                     )
                     return
                 }
+
+                // A COURSE that is not this window's, with the answer
+                // otherwise perfect: refused here, above everything, so that
+                // "no plan twin, no approval card, no tool ran" is true by
+                // construction rather than by inspection. Everything that
+                // acts on a call is downstream of the line below —
+                // `run(call:)` settles it, the approval card holds it, the
+                // plan twin runs on it — and a `return` from here reaches
+                // none of them.
+                //
+                // BELOW the two gates above, deliberately. A reply the engine
+                // stopped part way can carry a half-written course code (#166
+                // measured a `deploy_section` cut off at 28 tokens whose
+                // arguments parsed cleanly), and lecturing a teacher about a
+                // course the model never finished naming would be a sentence
+                // about the wrong thing entirely.
+                if let other = courseTheModelNamedInsteadOfThisOne(in: first) {
+                    sayTheRequestNamedAnotherCourse(other, tool: first.function.name)
+                    return
+                }
                 messages.append(reply)
                 // One tool at a time, on purpose: a model that batches has
                 // decided an order, and the order is exactly the reasoning
@@ -403,9 +423,7 @@ final class AssistAgent {
     /// answer whose arguments will not parse is a question about the model
     /// itself. Same event, different sentence.
     private func sayTheAnswerDidNotFinish(tool: String?, stoppedByTheEngine: Bool) {
-        if messages.count > messageCountAtTheStartOfTheTurn {
-            messages.removeLast(messages.count - messageCountAtTheStartOfTheTurn)
-        }
+        windTheTurnBack()
         entries.append(Entry(speaker: .assistant, text: AssistWording.answerWasCutOff))
         // The tool it had BEGUN to name, in the words a teacher would
         // recognise rather than the function's own: "it ran away trying to
@@ -426,6 +444,128 @@ final class AssistAgent {
         ActivityTrail.note(
             .assistantAnswerWasCutOff,
             said + " — nothing was run from it",
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
+    }
+
+    /// Take the whole turn back out of the conversation, down to where it
+    /// began.
+    ///
+    /// Shared by the two places that abandon a turn — an answer that did not
+    /// finish, and a request that named another course — because they make
+    /// the same claim about the history and the two must not drift. What the
+    /// teacher can SEE is untouched: `entries` keeps their sentence on every
+    /// path.
+    ///
+    /// Two reasons it is the whole turn rather than the reply alone, and both
+    /// were learned rather than assumed. A reply carrying a `tool_call` that
+    /// no `tool` message ever answers is a conversation some chat templates
+    /// reject outright, so the reply cannot stay. And the sentence cannot
+    /// stay either once the reply has gone: the model runs at temperature 0,
+    /// so a next turn sent with the same sentence still in front of it gets
+    /// the same answer, and an assistant that reliably repeats its own
+    /// refusal is worse than the fault it replaced.
+    private func windTheTurnBack() {
+        if messages.count > messageCountAtTheStartOfTheTurn {
+            messages.removeLast(messages.count - messageCountAtTheStartOfTheTurn)
+        }
+    }
+
+    /// The course the model named, when the tool declares one and the code is
+    /// not this window's.
+    ///
+    /// Nil covers four different things, all of which mean "there is nothing
+    /// to refuse here": the tool's own schema does not declare `course` (so
+    /// the course is not the window's to take back — `undo_last_change`
+    /// declares neither argument and is untouched by all of this); the tool
+    /// is not one that exists, so there is no schema to ask, and the call
+    /// falls through to `run(settledCall:)`'s "There is no tool by that
+    /// name."; the model left `course` out; or it wrote something that is not
+    /// a non-empty string — a number, a null, an object. The last is the
+    /// reason this reads the value ONCE, here, for both the guard and the
+    /// fill: `AssistToolRunner.text` reads an `NSNumber` back as a string, so
+    /// a `"course": 1` that one function calls absent and another calls
+    /// present is a value that survives into a call. Absent, of whatever
+    /// kind, means the binder writes this window's code over it.
+    private func courseTheModelNamedInsteadOfThisOne(in call: AssistToolCall) -> String? {
+        if !theToolDeclares("course", in: call) {
+            return nil
+        }
+        guard let written = call.argumentValues["course"] as? String else {
+            return nil
+        }
+        // `whitespacesAndNewlines`, exactly as `AssistToolRunner.text(_:in:)`
+        // trims before `locate` ever sees the value. Trimming less here would
+        // refuse `"ICS3U\n"` in an ICS3U window — a lost turn on the
+        // teacher's own course, and told about in the wrong words.
+        let named: String = written.trimmingCharacters(in: .whitespacesAndNewlines)
+        if named.isEmpty || named.lowercased() == courseCode.lowercased() {
+            return nil
+        }
+        return named
+    }
+
+    /// Whether this tool's OWN schema declares that argument.
+    ///
+    /// The one question both the guard and the binder ask, asked in one
+    /// place. Gating on the schema rather than on a list of tool names is
+    /// what keeps the next tool added from silently getting the wrong rule —
+    /// today the schema and a hand-kept list of twelve would agree, which is
+    /// exactly when a list looks harmless.
+    private func theToolDeclares(_ argument: String, in call: AssistToolCall) -> Bool {
+        guard let definition = tools.definition(named: call.function.name) else {
+            return false
+        }
+        return definition.parameters[argument] != nil
+    }
+
+    /// Refuse a request that named another course, and say so.
+    ///
+    /// Nothing ran and nothing can: this is reached from `think()` above the
+    /// line that hands the call on, so the plan twin, the approval card and
+    /// the tool itself are all downstream of a `return` from here.
+    ///
+    /// Two sentences, chosen on ONE question — is that code a course in this
+    /// working folder? A course that is here can be opened, and the teacher
+    /// is told to; a code naming nothing cannot be, and telling them to open
+    /// it would send them looking in the sidebar for something that is not
+    /// there. Both are refusals either way: binding an invented code to this
+    /// window would publish this window's class and report success, which is
+    /// the fault the guard exists to remove.
+    ///
+    /// **`planMode`'s counters are deliberately not touched.** A refusal is
+    /// neither an accepted plan nor a cancelled one — nothing was proposed —
+    /// so neither `recordAccepted` nor `recordCancelled` belongs here, and
+    /// saying so stops it being added later as an oversight.
+    private func sayTheRequestNamedAnotherCourse(_ otherCourse: String, tool: String) {
+        windTheTurnBack()
+        // Named as the FOLDER spells it when the folder has it — a teacher
+        // sent to open "mcv4u" is being sent to look for something their
+        // sidebar does not show. When the folder does not have it there is
+        // nothing else to show, so the model's own text stands (already
+        // trimmed), and the other sentence is careful not to tell them to go
+        // and open it.
+        var said: String = AssistWording.askedAboutACourseThatIsNotHere(
+            course: courseCode, otherCourse: otherCourse
+        )
+        if let known = tools.knownCourseCode(matching: otherCourse) {
+            said = AssistWording.askedAboutAnotherCourse(course: courseCode, otherCourse: known)
+        }
+        entries.append(Entry(speaker: .assistant, text: said))
+        // Both course codes and the tool, in the words a teacher would
+        // recognise. Never their sentence — `assistantAsked` already has
+        // that, on its own marked line — and never the argument values.
+        //
+        // What the MODEL wrote, deliberately, where the sentence above says
+        // what the FOLDER calls it: the trail is evidence about the model, so
+        // a code it spelt oddly is worth keeping as it spelt it.
+        ActivityTrail.note(
+            .assistantWasAskedAboutAnotherCourse,
+            "the assistant was asked about " + otherCourse + " in this window, which is for "
+                + courseCode + " — nothing was run from it, and it had chosen "
+                + AssistAgent.inWords(tool),
             course: courseCode,
             section: sectionNumber
         )
@@ -468,8 +608,8 @@ final class AssistAgent {
     }
 
     /// Run a tool, stopping at the gate when it needs one.
-    /// The same call, but about THIS window's course and section whatever the
-    /// model said.
+    /// The same call, about THIS window's section — and about this window's
+    /// course, or the turn was refused before it ever reached here.
     ///
     /// The window is opened for one section and its title says so, yet the
     /// tools take `course` and `section` as arguments and the model fills them
@@ -481,20 +621,41 @@ final class AssistAgent {
     /// begins with a number, and no amount of describing the argument will
     /// stop it happening on the next page name that does.
     ///
-    /// So the argument is taken back. This is the same principle as the coarse
-    /// tools and the boolean-free surface: a fact the app already knows is not
-    /// a fact worth asking a model for. It cannot cost routing accuracy either,
-    /// since it changes nothing the model reads — only what is done with what
-    /// it said.
+    /// So the SECTION is taken back, present or absent. This is the same
+    /// principle as the coarse tools and the boolean-free surface: a fact the
+    /// app already knows is not a fact worth asking a model for. It cannot
+    /// cost routing accuracy either, since it changes nothing the model reads
+    /// — only what is done with what it said. Absent counts, and that is a
+    /// change: none of the twelve local tools that take a section reads an
+    /// omission as "every section", so a call that left it out used to be
+    /// refused by the runner with a complaint that read as though the
+    /// teacher's own sentence were the problem.
+    ///
+    /// **The COURSE is not taken back, and the difference is the point.**
+    /// Rewriting it too meant "publish MCV4U's class", typed in an ICS3U
+    /// window, succeeding on ICS3U — a failure that reports success, and the
+    /// one kind a teacher cannot catch. A call naming a different course is
+    /// refused up in `think()` and never arrives here, so by the time this
+    /// runs the only course in play is this window's; writing it in is then a
+    /// fill rather than an overwrite, and it is written in THIS WINDOW'S
+    /// SPELLING so that the approval card a teacher reads before pressing Go
+    /// says ICS3U rather than whatever casing the model chose.
+    ///
+    /// Gated on the TOOL'S OWN SCHEMA, never on a list of tool names: a tool
+    /// declaring neither argument — `undo_last_change` — is left exactly as
+    /// it came, and so is any future tool, without anybody having to remember
+    /// a list.
     ///
     /// Done HERE rather than in the runner, because the runner also answers
     /// Claude Code over MCP, where the course and section are genuinely the
     /// caller's to choose. It is this WINDOW that is about one section.
     private func boundToThisSection(_ call: AssistToolCall) -> AssistToolCall {
         var arguments: [String: Any] = call.argumentValues
-        if arguments["course"] != nil || arguments["section"] != nil {
-            arguments["course"] = courseCode
+        if theToolDeclares("section", in: call) {
             arguments["section"] = sectionNumber
+        }
+        if theToolDeclares("course", in: call) {
+            arguments["course"] = courseCode
         }
         guard let data = try? JSONSerialization.data(withJSONObject: arguments),
               let rewritten = String(data: data, encoding: .utf8) else {
@@ -589,6 +750,11 @@ final class AssistAgent {
     /// One function rather than three calls in a row at each site, because
     /// "settled" is a state the rest of the agent depends on and a caller that
     /// forgot one of the three would look exactly like a caller that had not.
+    ///
+    /// Nothing here decides whether a call may run at all: a model call naming
+    /// a course that is not this window's is refused in `think()`, above the
+    /// line that reaches this, so a settled call is one that was already
+    /// allowed.
     private func settled(_ rawCall: AssistToolCall) -> AssistToolCall {
         return withTheMomentSettled(withTheDaySettled(boundToThisSection(rawCall)))
     }

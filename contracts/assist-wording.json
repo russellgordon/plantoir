@@ -6,6 +6,7 @@
     "course" : "a course code, e.g. ICS3U",
     "leftAlone" : "how many pages an undo could not put back, here 2",
     "moving" : "how many later classes move, counted once each even when a page is both renamed and re-dated — here 2",
+    "otherCourse" : "the course the model named instead of the window's own, e.g. MCV4U — or, in askedAboutACourseThatIsNotHere, a code naming no course in the working folder at all",
     "page" : "the page being copied, e.g. Unit 3, Day 2",
     "renaming" : "how many of those are also renamed, here 1 in the …AndLinksFollow key and 0 in the …KeepingTheirNames one",
     "section" : "a section number, e.g. 1"
@@ -13,6 +14,8 @@
   "wording" : {
     "aCreatedPageCanBeTakenBack" : "“Undo that” takes the page away again, as long as you have not written anything in it yet. Once you have, it is yours and I will leave it alone.",
     "answerWasCutOff" : "I didn't get to the end of that, so I haven't changed anything. Ask me again — a shorter sentence, or fewer pages at a time.",
+    "askedAboutACourseThatIsNotHere" : "There is no course called {otherCourse} in this working folder, so nothing was done. This window is for {course}.",
+    "askedAboutAnotherCourse" : "This window is for {course}, so nothing was done for {otherCourse}. Open {otherCourse}'s section in Plantoir and ask me there.",
     "backedUpCourse" : "Backed up {course} to {course}_backup_2026-09-08_190000.zip. It is in Plantoir's Backups list, and restoring from it puts the whole course back as it is right now.",
     "builtWithNoWindowOpen" : "Rebuilt the site for {course} Section {section}. Open that section in Plantoir and press Preview to look it over — no window is showing it at the moment.",
     "cancelled" : "Cancel",
