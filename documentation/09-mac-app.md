@@ -212,6 +212,19 @@ and neither of these sits under one: both are above a `Spacer(minLength: 0)`
 with the window's height available. That is the general case in this app's
 main window, which is why the modifier buys nothing there and costs this.
 
+**One exception was measured by the fix's reviewer, and it is the right way
+round.** With the scheduled-publish notice showing AND "Show details" expanded
+AND the window at or near its minimum height (620×548, 760×548, 500×600 in a
+replica), the folder render note gives up a line — 14.5 pt, one truncated
+line, where the rigid version got 30. The contest is with the details
+console's `.frame(minHeight: 200, idealHeight: 260, maxHeight: .infinity)`.
+In that same corner the old code blanked the whole window, so the note losing
+a line is strictly better than the window losing its sidebar. `.layoutPriority(1)`
+was MEASURED and does not help (on the Text, or on the whole result stack), and
+the `…StillWrapsInFullAtRealWidths` tests host the view alone, so they prove
+"not line-limited", not "never truncated". Issue #213; never answer it by
+putting the modifier back.
+
 ## What a window lets go of when it changes working folder
 
 The defect, reported as [issue
