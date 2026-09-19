@@ -299,6 +299,7 @@ final class SharedRulesContractTests: XCTestCase {
             relativePath: "courses/ADA1O/Portfolios/index.md",
             isSectionLocal: false,
             isVisibleToStudents: true,
+            visibilityIsCertain: true,
             date: nil,
             linkedTitles: ["journal checklist"],
             classFolderNames: ["All Classes"],

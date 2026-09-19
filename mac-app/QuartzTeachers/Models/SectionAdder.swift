@@ -317,7 +317,13 @@ enum SectionAdder {
 
         var addition: [String] = ["createdSection\(sectionNumber): \(created)"]
         if let publish = publishValue(forSection: source, in: lines) {
-            addition.append("publishForSection\(sectionNumber): \(publish)")
+            // An empty value is a null, and `key:` is how YAML spells one —
+            // `key: ` with a trailing space would say the same thing and look
+            // like a typo in the teacher's file.
+            let pair: String = publish.isEmpty
+                ? "publishForSection\(sectionNumber):"
+                : "publishForSection\(sectionNumber): \(publish)"
+            addition.append(pair)
         }
 
         // The pair goes after the last per-section key, so each section's
@@ -379,20 +385,36 @@ enum SectionAdder {
     /// wrongly held back is one a teacher notices and fixes; a page wrongly
     /// published is one nobody notices at all.
     static func publishValue(forSection sectionNumber: Int, in lines: [String]) -> String? {
-        let publishPrefix: String = "publishForSection\(sectionNumber):"
-        for line in lines where line.hasPrefix(publishPrefix) {
-            let raw: String = String(line.dropFirst(publishPrefix.count))
-            if !PageVisibilityReader.isCompleteOnItsOwnLine(raw) {
+        // The reader's own matcher and the reader's own LAST-wins rule, so the
+        // value carried across is the value the build reads. A prefix test
+        // missed `"publishForSection1": false` entirely, and stopping at the
+        // first of two copies carried the one PyYAML throws away.
+        if let entry = PageVisibilityReader.lastTopLevelEntry(
+            forKey: "publishForSection\(sectionNumber)", in: lines
+        ) {
+            let value: String = PageVisibilityReader.trimmingYAMLSpaces(entry.value)
+            let continues: Bool = entry.nextLine?.hasPrefix(" ") == true
+                || entry.nextLine?.hasPrefix("\t") == true
+            if continues {
                 return "false"
             }
-            return raw.trimmingCharacters(in: .whitespaces)
+            if value.isEmpty {
+                // A key with nothing after it is a null, which PUBLISHES the
+                // page. Copying the emptiness keeps the new section saying
+                // what the old one says; writing "false" would hide it.
+                return ""
+            }
+            if !PageVisibilityReader.isCompleteOnItsOwnLine(entry.value) {
+                return "false"
+            }
+            return value
         }
 
-        let draftPrefix: String = "draftSection\(sectionNumber):"
-        for line in lines where line.hasPrefix(draftPrefix) {
-            let raw: String = String(line.dropFirst(draftPrefix.count))
+        if let entry = PageVisibilityReader.lastTopLevelEntry(
+            forKey: "draftSection\(sectionNumber)", in: lines
+        ) {
             let scalar: PageVisibilityReader.ScalarReading = PageVisibilityReader.reading(
-                ofValue: raw, followedBy: nil
+                ofValue: entry.value, followedBy: entry.nextLine
             )
             switch PageVisibilityReader.answerFromDraftFamily(scalar) {
             case .visible:

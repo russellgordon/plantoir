@@ -581,6 +581,20 @@
       },
       {
         "expectVisible": true,
+        "page": "publish:false",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "No space after the colon, so this is not a mapping at all — it is one plain scalar, and the page reaches Quartz with NO keys and is PUBLISHED. Measured. A reader that takes everything after the first colon calls this page hidden while students are reading it, which is the one mistake that must never be made. (With another key beside it the same line stops the build instead, so there is no case here for that shape.)"
+      },
+      {
+        "expectVisible": true,
+        "page": "publish:true",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The same rule with the value that makes it look harmless: `publish:true` is not this page's flag either. Both spellings are here so neither answer can be right by accident."
+      },
+      {
+        "expectVisible": true,
         "page": "title: Unit 1, Day 1",
         "section": 1,
         "sectionLocal": true,

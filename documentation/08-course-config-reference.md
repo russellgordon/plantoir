@@ -197,19 +197,50 @@ are two predicates and not one.
 Each app's reader — `PageVisibilityReader` on the mac, `page_visibility.py` in
 the shared Python — answers **three ways**: `visible`, `hidden`, and
 `cannotTell` for a handful of forms it will not guess at (a value on the line
-BELOW the key, a tag such as `!!str false`, a block scalar, an anchor or alias,
-a flow collection, an escape inside double quotes, an indented key, and
+BELOW the key — over a blank line as happily as not — a tag such as
+`!!str false`, a block scalar, an anchor or alias, a flow collection, an escape
+inside double quotes, an indented key, a value that starts with a character
+YAML reserves (`%`, `@`, a backtick, `- `) or carries its own `key: value`, and
 frontmatter the build cannot parse at all — tab indentation or an unclosed
 fence, which stop the whole build so there is no site verdict to mirror).
+
+Two shapes are NOT `cannotTell` and are worth naming, because both were read
+the dangerous way round before they were measured:
+
+* **`publish:false`, with no space after the colon, is not a key at all.** YAML
+  needs a space, a tab or the end of the line after the colon to make a mapping
+  — so that line is one plain scalar, the page reaches Quartz with no keys, and
+  it is PUBLISHED. (With another key beside it the same line stops the build.)
+  Reading everything after the first colon called this page hidden.
+* **YAML's whitespace is a space and a tab, and nothing else.** The
+  non-breaking space Option-Space types on a Mac is not whitespace to YAML, so
+  `publish: false<NBSP>` is the STRING "false\u{00A0}" and the page is
+  published. Swift's `trimmingCharacters(in: .whitespaces)` and Python's
+  `str.strip()` both strip it; both readers trim space and tab by hand instead.
+  (One exception, measured and accepted: when such a value is the LAST thing in
+  the frontmatter block, python-frontmatter's own `.strip()` removes it and the
+  build hides the page, where these readers say visible. That is the mild
+  direction, and it is the only place they knowingly differ.)
 
 What happens to `cannotTell` depends on who asked, and this is the part to get
 right:
 
-* **Anything REPORTING to a teacher collapses it to VISIBLE.** The sidebar, the
-  section graph, a publish plan's "already right" list, the scheduled deploy's
-  "classes students cannot see yet". Never to hidden: listing a live page among
-  the ones still to publish costs a second look, while calling a page hidden
-  when students are already reading it is the failure that reports success.
+* **Anything REPORTING to a teacher collapses it to VISIBLE.** The section
+  graph (`AssistSectionGraph`), the scheduled deploy's "classes students cannot
+  see yet" (`ScheduledDeploy.unpublishedClasses`), the index pointer and the
+  re-date planner. (No VIEW reads a page's flag — a sentence here said "the
+  sidebar" until 2026-09-18 and there is no such reader; the sidebar lists
+  courses.) Never to hidden: listing a live page among the ones still to
+  publish costs a second look, while calling a page hidden when students are
+  already reading it is the failure that reports success.
+* **Anything DECIDING WHETHER TO WRITE needs certainty, not a match.** A page
+  whose flag cannot be read is not "already the way you asked" — it is a page
+  to write. `AssistSectionPage.visibilityIsCertain` carries that, and both
+  places that skip a page because it already matches require it: the publish
+  plan's "already right" list and the whole-unit count of what would move.
+  Without it, "publish this page" on such a page answered *It's already been
+  published* and wrote nothing while the build was holding the page back —
+  reporting success about the exact failure this rule exists to remove.
 * **Anything WRITING to a teacher's file never collapses it at all.**
   `AssistPageVisibility.setting`'s "already right, change nothing" shortcut
   fires only on a CONFIDENT reading that already matches; on `cannotTell` it
@@ -225,7 +256,9 @@ than merely allow it.
 
 ### What a WRITER does with an odd value
 
-Two rules, both deliberate:
+Four rules, all deliberate. The first two are about the VALUE; the last two are
+about finding the line, and are the ones a writer gets wrong by being written
+separately from the reader:
 
 * **A page that already SAYS what was asked is left alone**, however oddly it
   says it. `publish: maybe` publishes the page, so "publish this page" is
@@ -241,9 +274,27 @@ Two rules, both deliberate:
   between the two can invert it. The exception is a value that runs onto the
   NEXT line (a block scalar, or a key with the value indented beneath it),
   which cannot be copied to another key's line at all; that, and a DRAFT value
-  the reader cannot read, are written as HELD BACK. A page wrongly held back is
+  the reader cannot read, are written as HELD BACK — and the continuation
+  lines are taken WITH the key, because an indented scalar left behind lands
+  under whatever key follows and stops the build. A key with nothing after it
+  is the one exception: that is a null, which PUBLISHES the page, so the copy
+  keeps it a null rather than deciding for the teacher. A page wrongly held back is
   one a teacher notices and fixes; a page wrongly published is one nobody
   notices at all.
+* **A writer takes the LAST line naming a key, because the reader does and the
+  build does.** PyYAML keeps the last of two identical keys. A writer that set
+  the first left `publish: true` above a `publish: false` the build still
+  obeys, and a carry that read the first took the value PyYAML throws away.
+* **A writer finds the line with the READER's own matcher, never a prefix
+  test.** `publish : false` and `"publish": false` are the same key to YAML and
+  were invisible to `hasPrefix("publish:")` — so publishing such a page
+  INSERTED a second `publish: true` above it, PyYAML kept the last, and the
+  page stayed hidden while the teacher was told it had been published. The
+  line is then rebuilt in the plain spelling, which is the point: one line
+  changes and the page really says what was asked. `PageVisibilityReader
+  .valuePart` is that matcher on the mac, and `page_visibility`'s key pattern
+  in the Python. **Leaving the reader ahead of the writer is its own bug
+  class**, and it is the one to check first in any new writer.
 
 ### What this replaced, and what was rejected
 
@@ -271,12 +322,16 @@ Rejected, with reasons:
   right long-term answer. Deferred past v1.2.0: it is new UI, in every surface
   that lists pages, on both platforms. The three-way answer now exists INSIDE
   the reader, so adopting it later is a presentation change rather than a
-  re-derivation. **The residue this leaves, said out loud:** asked to publish a
-  page whose value reads `cannotTell`, the assistant answers "It's already been
-  published" and writes nothing, because the plan layer is a reporting
-  consumer. That is the one place the collapse is visible to a teacher, it
-  affects only the forms listed above (none of which anything Plantoir writes
-  can produce), and closing it is what option 3 is for.
+  re-derivation. **What it would ADD is a teacher being told**; what it is no
+  longer needed for is correctness. The first version of this work left a
+  residue — asked to publish a page whose value reads `cannotTell`, the
+  assistant answered that it was already published and wrote nothing, because
+  the plan layer took the reporting collapse at face value. That was found in
+  review, and it is CLOSED: `visibilityIsCertain` makes such a page always a
+  change, so the flag is written out in full and the page really is published.
+  What a teacher still does not get is the SENTENCE — nothing says "the value
+  on this page was one Plantoir could not read", it simply writes a plain one.
+  That is what option 3 would add.
 * **Erring VISIBLE everywhere, writers included.** It makes the reader one line
   shorter and silently publishes pages: a writer that trusts the collapse
   declines the edit and reports success.
@@ -300,10 +355,14 @@ own expression. Not reasoned: this issue was once opened on a claim about
 `publish: no` that was read off two plausible-looking files and never run, and
 the claim was backwards.
 
-`contracts/file-formats.json` → `pageVisibility.readingCases` carries 52 of
+`contracts/file-formats.json` → `pageVisibility.readingCases` carries 54 of
 those measurements as the list both app suites run, and
 `scripts/check_visibility_against_the_site.py` re-runs every one of them down
-the real chain on each `verify.sh`. That check also asserts that Quartz still
+the real chain on each `verify.sh` — along with twenty-three more it carries
+itself, the forms each reader REFUSES to answer about. Those cannot be shared
+cases (a shared case states what the SITE does, and both readers report these
+as visible whatever it does) but the refusals are only justified while the
+measurement holds, so the measurement is pinned where it can fail. That check also asserts that Quartz still
 parses with `JSON_SCHEMA` and that `publish.ts` still compares against `false`
 and `"false"` — because if either moves, the whole table moves with it and
 every suite would otherwise stay green.

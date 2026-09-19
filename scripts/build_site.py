@@ -4115,27 +4115,39 @@ def _is_draft(text: str) -> bool:
     end = text.find("\n---", 4)
     if end < 0:
         return False
+    lines = text[4:end].split("\n")
     publish_value = None
     draft_value = None
-    for line in text[4:end].split("\n"):
-        # `publish : x` and `"publish": x` are the same key to YAML. They
-        # cannot survive `process_frontmatter`, which rewrites every key, so
-        # this only matters if raw source text is ever handed here — but a
-        # reader that agrees with the site on every line costs one character
-        # class more than one that agrees on most of them.
-        match = re.match(r"^[\"']?(publish|draft)[\"']?[ \t]*:(.*)$", line)
+    for index, line in enumerate(lines):
+        # `publish : x` and `"publish": x` are the same key to YAML, and
+        # `publish:x` is NOT a key at all — it is one plain scalar, which is
+        # why the colon has to be followed by a space, a tab or the end of the
+        # line. None of those can survive `process_frontmatter`, which
+        # rewrites every key, so this only matters if raw source text is ever
+        # handed here — but a reader that agrees with the site on every line
+        # costs one character class more than one that agrees on most of them.
+        match = re.match(r"^[\"']?(publish|draft)[\"']?[ \t]*:(?=[ \t]|$)(.*)$", line)
         if match:
             # The LAST line wins, because that is the one PyYAML keeps when a
             # page carries the same key twice.
+            pair = (match.group(2), _first_non_blank(lines, index))
             if match.group(1) == "publish":
-                publish_value = match.group(2)
+                publish_value = pair
             else:
-                draft_value = match.group(2)
+                draft_value = pair
     if publish_value is not None:
-        return page_visibility.publish_family_answer(publish_value) == page_visibility.HIDDEN
+        return page_visibility.publish_family_answer(*publish_value) == page_visibility.HIDDEN
     if draft_value is not None:
-        return page_visibility.draft_family_answer(draft_value) == page_visibility.HIDDEN
+        return page_visibility.draft_family_answer(*draft_value) == page_visibility.HIDDEN
     return False
+
+
+def _first_non_blank(lines: list, index: int):
+    """The first line after `index` that is not blank, or None."""
+    for line in lines[index + 1:]:
+        if page_visibility.trim(line) != "":
+            return line
+    return None
 
 
 def class_folder_name(config: dict) -> str:

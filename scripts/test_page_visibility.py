@@ -62,12 +62,42 @@ class FamilySpellingTests(unittest.TestCase):
             )
 
     def test_a_case_that_cannot_be_read_says_so_rather_than_guessing(self):
-        for value in (" !!str false", " >-", " &flag false", " *flag", ' "fal'):
+        for value in (" !!str false", " >-", " &flag false", " *flag", ' "fal',
+                      " %", " @x", " `x", " - false", " false: true"):
             self.assertEqual(
                 page_visibility.publish_family_answer(value),
                 page_visibility.CANNOT_TELL,
                 f"publish:{value} is not something this reader should answer about",
             )
+
+    def test_a_value_on_the_line_below_is_not_followed(self):
+        # Measured: the build reads it and HIDES the page, so a reader that
+        # called the key null would call a held-back page visible.
+        self.assertEqual(
+            page_visibility.publish_family_answer("", "  false"),
+            page_visibility.CANNOT_TELL,
+        )
+        self.assertEqual(
+            page_visibility.draft_family_answer("", "\ttrue"),
+            page_visibility.CANNOT_TELL,
+        )
+        # But a key with nothing below it is a genuine null, which publishes.
+        self.assertEqual(
+            page_visibility.publish_family_answer("", "title: x"),
+            page_visibility.VISIBLE,
+        )
+        self.assertEqual(page_visibility.publish_family_answer(""), page_visibility.VISIBLE)
+
+    def test_only_spaces_and_tabs_are_whitespace(self):
+        # A non-breaking space is what Option-Space types on a Mac. YAML does
+        # not treat it as whitespace, so `false<NBSP>` is a STRING and the page
+        # is PUBLISHED — measured. Trimming it would call that page hidden.
+        self.assertEqual(
+            page_visibility.publish_family_answer(" false\u00a0"), page_visibility.VISIBLE
+        )
+        self.assertEqual(
+            page_visibility.publish_family_answer(" false\t"), page_visibility.HIDDEN
+        )
 
     def test_a_value_that_runs_onto_the_next_line_cannot_be_copied(self):
         self.assertTrue(page_visibility.is_complete_on_its_own_line(" oN # why"))
@@ -152,9 +182,48 @@ class CourseLevelSplitterTests(unittest.TestCase):
     def test_a_value_it_cannot_read_is_written_as_held_back(self):
         # A page wrongly held back is one a teacher notices and fixes; a page
         # wrongly published is one nobody notices at all.
-        for line in ("draft: !!str true", "draft: >-", "publish: >-", "publish:"):
+        for line in ("draft: !!str true", "draft: >-", "publish: >-"):
             out = self.split(line)
             self.assertIn("publishForSection1: false", out, line)
+
+    def test_a_value_on_the_line_below_is_held_back_and_taken_with_it(self):
+        # Measured: the build reads the indented line and HIDES the page. The
+        # continuation has to go with the key — left behind, it becomes an
+        # indented scalar under whatever key follows, which STOPS the build.
+        for line in ("publish:\n  false", "draft:\n  true", "publish: >-\n  false"):
+            out = self.split(line)
+            self.assertIn("publishForSection1: false", out, line)
+            self.assertIn("publishForSection2: false", out, line)
+            self.assertNotIn("  false", out, line)
+            self.assertNotIn("  true", out, line)
+
+    def test_a_key_with_nothing_after_it_stays_a_null(self):
+        # A null PUBLISHES the page. Writing "false" here would hide, at course
+        # setup, a page the teacher's own file publishes.
+        out = self.split("publish:")
+        self.assertIn("publishForSection1:\n", out)
+        self.assertNotIn("publishForSection1: false", out)
+
+    def test_the_last_of_two_identical_keys_wins(self):
+        # PyYAML keeps the last, so the build reads the last. Taking the first
+        # published a page into every new section that the build hides.
+        out = self.split("publish: true\npublish: false")
+        self.assertIn("publishForSection1: false", out)
+        self.assertNotIn("publishForSection1: true", out)
+        out = self.split("draft: false\ndraft: true")
+        self.assertIn("publishForSection1: false", out)
+
+    def test_the_other_legal_spellings_of_the_key_are_split_too(self):
+        for line in ('"publish": false', "publish : false", "'publish': false"):
+            out = self.split(line)
+            self.assertIn("publishForSection1: false", out, line)
+            self.assertNotIn(line, out, f"{line} should have been replaced, not left beside the split")
+
+    def test_a_colon_with_no_space_after_it_is_not_a_key(self):
+        # `publish:false` is one plain scalar, not a mapping. Measured: a page
+        # whose whole frontmatter is that line reaches Quartz with no keys.
+        out = self.split("publish:false")
+        self.assertNotIn("publishForSection", out)
 
     def test_a_page_with_no_flag_is_given_none(self):
         out = self.split("title: Course Outline")

@@ -81,6 +81,63 @@ final class PageVisibilityReadingTests: XCTestCase {
         )
     }
 
+    /// More of the same, each measured after the first round of review.
+    func testTheFormsTheBuildItselfCannotRead() {
+        // Measured: each of these STOPS the build, so there is no site verdict
+        // to mirror and this reader must not offer one. Reading them as
+        // ordinary strings called them all published.
+        XCTAssertEqual(answer("publish: - false"), .cannotTell, "A sequence entry on the key's line")
+        XCTAssertEqual(answer("publish: %"), .cannotTell, "A directive indicator")
+        XCTAssertEqual(answer("publish: @x"), .cannotTell, "A character YAML reserves")
+        XCTAssertEqual(answer("publish: `x"), .cannotTell, "And another")
+        XCTAssertEqual(answer("publish: false: true"), .cannotTell, "A mapping where a scalar goes")
+    }
+
+    /// A value below the key, over a blank line. Measured: the build reads it
+    /// and HIDES the page.
+    func testAValueBelowTheKeyIsNotFollowedEvenOverABlankLine() {
+        XCTAssertEqual(answer("publish:\n\n  false"), .cannotTell)
+        XCTAssertEqual(answer("draft:\n\n  true"), .cannotTell)
+        XCTAssertEqual(answer("publishForSection1:\n  false"), .cannotTell)
+    }
+
+    /// A colon has to be followed by a space, a tab or the end of the line, or
+    /// the line is not a mapping at all.
+    func testAColonWithNoSpaceAfterItIsNotAKey() {
+        // Measured: a page whose whole frontmatter is `publish:false` reaches
+        // Quartz with NO keys and is published; one with another key beside it
+        // stops the build. Either way this is not the page's flag, and reading
+        // it as one called a live page hidden.
+        XCTAssertEqual(answer("publish:false"), .saysNothing)
+        XCTAssertEqual(answer("publish:true"), .saysNothing)
+        XCTAssertEqual(answer("draft:true"), .saysNothing)
+    }
+
+    /// YAML's whitespace is a space and a tab, and the Mac's Option-Space is
+    /// neither.
+    func testOnlySpacesAndTabsAreWhitespace() {
+        // Measured: `publish: false<NBSP>` beside another key is the STRING
+        // "false\u{00A0}" and the page is PUBLISHED.
+        XCTAssertEqual(answer("publish: false\u{00A0}\ntitle: x"), .visible)
+        XCTAssertEqual(answer("publish:\u{00A0}false"), .saysNothing,
+                       "A non-breaking space after the colon does not make this a mapping")
+        XCTAssertEqual(answer("publish: false\t"), .hidden, "A tab is whitespace, and this is hidden")
+    }
+
+    /// python-frontmatter's fence is three dashes OR MORE.
+    func testALongerFenceIsStillFrontmatter() {
+        // Measured: both of these hide the page. Requiring exactly `---` read
+        // them as pages with no frontmatter at all, which is "visible".
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: "----\npublish: false\n----\nBody.\n", forSection: 1),
+            .hidden
+        )
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: "---\npublish: false\n----\nBody.\n", forSection: 1),
+            .hidden
+        )
+    }
+
     /// A key of one of the four names, indented under something else. It may
     /// be nothing to do with the page, and it may be everything.
     func testAnIndentedKeyIsNotThisPagesFlag() {
@@ -251,6 +308,49 @@ final class PageVisibilityReadingTests: XCTestCase {
                        "`published` is a different key and says nothing about this page")
         XCTAssertEqual(answer("publishForSection11: false", section: 1), .saysNothing,
                        "Nor is section 11 section 1")
+    }
+
+    /// The writer must rewrite the line the READER read, or the two disagree
+    /// about which line the build is looking at.
+    func testTheWriterRewritesTheLineTheReaderRead() {
+        // A quoted key was invisible to the writer's plain prefix test, so it
+        // inserted a SECOND `publish: true` above it — and PyYAML keeps the
+        // LAST of two, so the page stayed hidden while the teacher was told it
+        // had been published. Measured through the real build.
+        // The line is rebuilt in the plain spelling, which is the point: one
+        // line changes, and the page really says what the teacher asked for.
+        for frontmatter in ["\"publish\": false", "publish : false", "'publish': false"] {
+            let before: String = "---\n\(frontmatter)\n---\nBody.\n"
+            let published = AssistPageVisibility.setting(
+                published: true, in: before, forSection: 1, isSectionLocal: true
+            )
+            XCTAssertEqual(published.text, "---\npublish: true\n---\nBody.\n", frontmatter)
+            XCTAssertEqual(
+                PageVisibilityReader.answer(in: published.text, forSection: 1), .visible,
+                "\(frontmatter) — inserting a second key above this one left the page hidden"
+            )
+        }
+    }
+
+    /// And it must rewrite the LAST of two, because that is the one the build
+    /// reads.
+    func testTheWriterSetsTheLastOfTwoIdenticalKeys() {
+        let twice: String = "---\npublish: true\npublish: false\ntitle: x\n---\nBody.\n"
+        let published = AssistPageVisibility.setting(
+            published: true, in: twice, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertEqual(published.text, "---\npublish: true\npublish: true\ntitle: x\n---\nBody.\n")
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: published.text, forSection: 1), .visible,
+            "Setting the FIRST of two would have left this page hidden"
+        )
+
+        let legacyTwice: String = "---\ndraft: false\ndraft: true\n---\nBody.\n"
+        let hidden = AssistPageVisibility.setting(
+            published: false, in: legacyTwice, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertEqual(hidden.text, "---\npublish: false\n---\nBody.\n",
+                       "Migrating takes the last legacy line and removes the earlier ones")
     }
 
     /// Reading does not depend on where the page lives — the build consults

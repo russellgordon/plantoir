@@ -2663,6 +2663,85 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertFalse(after.contains("# covered Tuesday"))
     }
 
+    /// A flag this app will NOT read is not "already done".
+    ///
+    /// Each of these hides the page on the built site, and the reader calls
+    /// every one of them `cannot tell` rather than guessing. Reporting treats
+    /// that as visible, which is the mild mistake — but a PLAN that believed
+    /// it answered "It's already been published." and wrote nothing, while
+    /// students could not see the page. That is the failure that reports
+    /// success, and it is the one this whole issue exists to remove.
+    @MainActor
+    func testAFlagThisAppCannotReadIsAlwaysWritten() async throws {
+        for value in ["!!str false", "&flag false", "!!bool false"] {
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            try write(page: "Unit 4, Day 23", publish: value, date: "2026-09-08",
+                      body: "Nothing linked.", in: made.course)
+            let url: URL = pageURL(of: "Unit 4, Day 23", in: made.course)
+
+            let outcome: AssistToolOutcome = await made.runner.run(call: call(
+                "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+            ))
+            let after: String = try String(contentsOf: url, encoding: .utf8)
+            XCTAssertTrue(
+                after.contains("publish: true"),
+                "publish: \(value) — the flag must be written out in full: \(outcome.summary)"
+            )
+            XCTAssertEqual(
+                PageVisibilityReader.answer(in: after, forSection: 1), .visible,
+                "publish: \(value) — and the page must now really be published"
+            )
+        }
+    }
+
+    /// The same, asked to hide.
+    @MainActor
+    func testAFlagThisAppCannotReadIsWrittenWhenHidingToo() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 23", publish: "!!str false", date: "2026-09-08",
+                  body: "Nothing linked.", in: made.course)
+
+        _ = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+        ))
+        let after: String = try String(
+            contentsOf: pageURL(of: "Unit 4, Day 23", in: made.course), encoding: .utf8
+        )
+        XCTAssertEqual(PageVisibilityReader.answer(in: after, forSection: 1), .hidden)
+    }
+
+    /// And the same page inside a whole-unit publish, which counts what would
+    /// MOVE and had the identical blind spot.
+    @MainActor
+    func testAWholeUnitPublishCountsAPageItCannotRead() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 1", publish: "true", date: "2026-09-08",
+                  body: "Done.", in: made.course)
+        try write(page: "Unit 4, Day 2", publish: "!!str false", date: "2026-09-09",
+                  body: "Not read.", in: made.course)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
+        ))
+        XCTAssertFalse(
+            outcome.detail.contains("already been published"),
+            "A page whose flag cannot be read is not one that needs no change: \(outcome.detail)"
+        )
+        let after: String = try String(
+            contentsOf: pageURL(of: "Unit 4, Day 2", in: made.course), encoding: .utf8
+        )
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: after, forSection: 1), .visible,
+            "and the page whose flag could not be read is now really published"
+        )
+    }
+
     /// And the mirror, for hiding.
     @MainActor
     func testUnpublishingAPageThatIsAlreadyHiddenSaysSo() async throws {

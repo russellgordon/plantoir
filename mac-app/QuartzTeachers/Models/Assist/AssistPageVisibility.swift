@@ -112,7 +112,14 @@ enum AssistPageVisibility {
     ) -> (text: String, changed: Bool) {
         let key: String = publishKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
         let legacy: String = draftKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
-        let carriesLegacyKey: Bool = PageFrontmatter.rawValue(forKey: legacy, in: pageText) != nil
+        // Found with the READER's own key matcher, so the writer rewrites the
+        // line the reader read. A `"publish": false` was invisible to a plain
+        // prefix test, which meant this inserted a second `publish: true`
+        // above it — and PyYAML keeps the LAST of two, so the page stayed
+        // hidden while the teacher was told it had been published.
+        let currentKeyLines: [Int] = topLevelLineIndices(ofKey: key, in: pageText)
+        let legacyKeyLines: [Int] = topLevelLineIndices(ofKey: legacy, in: pageText)
+        let carriesLegacyKey: Bool = !legacyKeyLines.isEmpty
 
         // Already saying the right thing in the current spelling: leave the
         // file alone, so its modification time does not move and the next
@@ -138,35 +145,55 @@ enum AssistPageVisibility {
         }
 
         var lines: [String] = pageText.components(separatedBy: "\n")
-        var currentKeyIndex: Int? = nil
-        var legacyKeyIndex: Int? = nil
-        for index in (block.openIndex + 1)..<block.closeIndex {
-            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
-            if currentKeyIndex == nil && bare.hasPrefix(key + ":") {
-                currentKeyIndex = index
-            }
-            if legacyKeyIndex == nil && bare.hasPrefix(legacy + ":") {
-                legacyKeyIndex = index
-            }
-        }
 
-        if let index = currentKeyIndex {
+        // The LAST line naming a key is the one the build reads, so it is the
+        // one to rewrite: setting the first of two would leave the page saying
+        // the opposite of what was asked for.
+        if let index = currentKeyLines.last {
             lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
             // This page was migrated already, and a leftover legacy key now
-            // says the opposite of the line above it. It goes.
-            if let stale = legacyKeyIndex {
+            // says the opposite of the line above it. Every one of them goes,
+            // last first so the earlier indices stay put.
+            for stale in legacyKeyLines.reversed() {
                 lines.remove(at: stale)
             }
-        } else if let index = legacyKeyIndex {
+        } else if let index = legacyKeyLines.last {
             // Migrating. The new key takes the old key's own line, so the
             // teacher's frontmatter keeps its order — moving it to the top of
             // the block would show up as a reordered diff in a file they very
-            // likely have open.
+            // likely have open. Any earlier copies of the legacy key go with
+            // it, for the same reason a leftover does above.
             lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
+            for stale in legacyKeyLines.dropLast().reversed() {
+                lines.remove(at: stale)
+            }
         } else {
             lines.insert(line, at: block.openIndex + 1)
         }
         return (lines.joined(separator: "\n"), true)
+    }
+
+    /// Every line of this page's frontmatter that names this key at the top
+    /// level, in the order they appear.
+    ///
+    /// The same matcher `PageVisibilityReader` uses, so a key the reader can
+    /// see is a key this can rewrite. A page with no frontmatter has none.
+    static func topLevelLineIndices(ofKey key: String, in pageText: String) -> [Int] {
+        guard let block = PageFrontmatter.block(in: pageText) else {
+            return []
+        }
+        let lines: [String] = pageText.components(separatedBy: "\n")
+        var found: [Int] = []
+        for index in (block.openIndex + 1)..<block.closeIndex {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
+                continue
+            }
+            if PageVisibilityReader.valuePart(ofKey: key, inLine: bare) != nil {
+                found.append(index)
+            }
+        }
+        return found
     }
 
     /// True when this page lives in one section's own folder, and so carries
