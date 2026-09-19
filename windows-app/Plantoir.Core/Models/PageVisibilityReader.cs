@@ -263,10 +263,13 @@ internal static class PageVisibilityReader
     /// guess.
     /// </summary>
     /// <param name="nextLine">
-    /// The first NON-BLANK line below the key inside the same block, or null
-    /// when there is none. A key with nothing after the colon takes its value
-    /// from there — over a blank line as happily as not — and this reader does
-    /// not follow it.
+    /// The first line below the key that could be a VALUE — blank lines and
+    /// comments already stepped over, at any indent — or null when there is
+    /// none before the end of the block.
+    /// <para>If it is INDENTED, the key's value continues onto it, and this
+    /// reader does not follow it: the answer is <c>null</c>. That holds
+    /// however complete the key's own line looks, which is the whole point —
+    /// see the body.</para>
     /// </param>
     internal static ScalarReading? ReadScalar(string rawValue, string? nextLine)
     {

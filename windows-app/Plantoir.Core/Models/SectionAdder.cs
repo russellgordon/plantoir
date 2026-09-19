@@ -304,10 +304,33 @@ public static class SectionAdder
 
         if (PageVisibilityReader.LastTopLevelEntry($"draftSection{sectionNumber}", lines) is { } legacy)
         {
-            // No `continues` check on this branch, matching the SWIFT rather
-            // than the Python: a value on the next line reads as `cannot tell`,
-            // which is written as held back anyway, so the two agree on the
-            // answer by different routes.
+            // No `continues` check of its own on this branch, because the
+            // READER now has one: a value with an indented line below it is
+            // `cannot tell` whatever is on the key's line, so it lands "false"
+            // — held back — which is what `setup_course.per_section_frontmatter`
+            // writes for the same input.
+            //
+            // **This differs from the mac, and the difference is new.** Until
+            // the reader was corrected (2026-09-19, issue #176) this branch
+            // matched the SWIFT, which still consults the line below only when
+            // the key's line is EMPTY: the mac carries `draftSection1: false`
+            // with an indented line under it across as PUBLISHED, and this
+            // carries it as held back. Measured what the SITE does with the
+            // source page — python-frontmatter 1.3.0 / PyYAML 6.0.3, then
+            // `build_site._as_bool`:
+            //
+            //     draftSection1: false / "  x"   'false x'  -> PUBLISHED
+            //     draftSection1: no    / "  x"   'no x'     -> PUBLISHED
+            //     draftSection1: true  / "  x"   'true x'   -> PUBLISHED
+            //     draftSection1: yes   / "  x"   'yes x'    -> PUBLISHED
+            //     draftSection1:       / "  true"  True     -> HIDDEN
+            //
+            // Neither app reproduces that: both err HELD BACK, the mac in two
+            // of those rows and this in four. Uniformly held back is the
+            // documented preference here — a page wrongly held back is one a
+            // teacher notices and fixes — and it is the Python's answer too.
+            // The mac's own #176 fix closes it, since its `publishValue` asks
+            // the same reader.
             var scalar = PageVisibilityReader.ReadScalar(legacy.Value, legacy.NextLine);
             return PageVisibilityReader.DraftFamilyAnswer(scalar) == PageVisibility.Visible
                 ? "true"
