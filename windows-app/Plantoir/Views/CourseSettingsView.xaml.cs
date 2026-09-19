@@ -55,11 +55,17 @@ public sealed partial class CourseSettingsView : UserControl
     /// build does reconcile the two, but only at the next build — a teacher
     /// reading this list before then would see a folder they had just
     /// removed.</para>
+    ///
+    /// <para>A FOLDER's removal is the whole gesture and lives in
+    /// <see cref="FolderRemoval.RemoveFolderFromCourse"/>, because the marks
+    /// decision depends on the ORDER the three writes happen in and an order
+    /// that lives in a view can be pinned by no test. A FILE has no marks pool
+    /// to consider, so it needs only the exclusion.</para>
     /// </summary>
     private void RecordExclusion(string scope, string kind, string name)
     {
-        Config.Exclude(scope, name);
-        if (kind == "folder") DropFromMarksPool(name);
+        if (kind == "folder") FolderRemoval.RemoveFolderFromCourse(Config, _course.DirectoryPath, scope, name);
+        else Config.Exclude(scope, name);
         // No section on the line: these lists are COURSE-wide, and the
         // two-argument overload exists for exactly that. Naming the course's
         // first section would assert a section that had nothing to do with the
@@ -67,38 +73,6 @@ public sealed partial class CourseSettingsView : UserControl
         // person reading the trail would believe.
         ActivityTrail.Note(ActivityTrail.Event.ItemExcluded,
             $"{_course.Code}: removed the {CourseConfiguration.ScopeInWords(scope)} {kind} “{name}” from this course's site");
-    }
-
-    /// <summary>
-    /// A folder that has left the lists must leave the marks pool with it.
-    ///
-    /// <para>Without this the consequential dialog's own sentence is FALSE --
-    /// it promises "Removing it will take it out of your course's marks pool"
-    /// -- and `graded_folders` ends up naming a folder `excluded_items` tells
-    /// the build to skip. If it was the only entry, the course is left with a
-    /// non-empty pool matching nothing the site publishes, so nothing counts
-    /// for marks while the settings claim something does. This is the mac's
-    /// row 380 correction (3), ported rather than rediscovered.</para>
-    ///
-    /// <para><b>One thing this comment used to say is not true and was
-    /// corrected 2026-09-06</b>, because a wrong reason gets acted on: such a
-    /// pool does NOT read as "asked and answered" to the build and does not
-    /// suppress the `noGradedFolders` warning. `_has_graded_folders` in
-    /// <c>build_site.py</c> walks the MERGED tree and answers false when no
-    /// directory there matches a pooled name, so <c>site_health.py</c> raises
-    /// the finding exactly as it would for an empty pool. The reason to do
-    /// this is the promise in the dialog, which is reason enough.</para>
-    ///
-    /// <para>Materialised first, so a legacy course whose pool has never been
-    /// set does not get one CREATED as an empty list by a removal -- that
-    /// would silently switch it from the historical substring rule to "nothing
-    /// counts".</para>
-    /// </summary>
-    private void DropFromMarksPool(string name)
-    {
-        var pool = MarksPool();
-        if (pool.RemoveAll(f => string.Equals(f, name, StringComparison.OrdinalIgnoreCase)) == 0) return;
-        Config.GradedFolders = pool;
     }
 
     /// <summary>

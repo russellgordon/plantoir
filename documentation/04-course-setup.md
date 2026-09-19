@@ -629,11 +629,67 @@ floor — the one that refuses to unpick the last pooled folder while the covera
 map is on — asks whether this is the last NAME in the pool, not whether the pool
 would survive the removal. So it still blocks removing a top-level `Tasks` on a
 course where `Portfolios/Tasks` would have kept the name. Conservative, rare,
-and the same on both platforms; sharpening it would be a shared change. **Order is the whole subject.** Ask before
+and the same on both platforms; sharpening it would be a shared change.
+
+**Order is the whole subject.** Ask before
 the exclusion is written and the removed folder is still on the list, so the
-pool freezes — which is what the mac did until 2026-09-09 and what Windows still
-does, from a walk cached one `BuildForm` pass earlier ([issue
-#142](https://github.com/russellgordon/plantoir/issues/142)).
+pool freezes — which is what the mac did until 2026-09-09 and Windows until
+2026-09-18, from a walk cached one `BuildForm` pass earlier ([issue
+#142](https://github.com/russellgordon/plantoir/issues/142)). **Both platforms
+now follow the rule.** On Windows the whole gesture is one Core method,
+`FolderRemoval.RemoveFolderFromCourse` — the copy list, then `excluded_items`,
+then the walk, then the pool decision — and it is in Core rather than in the
+view precisely because the order is the rule: `Plantoir.Tests` references
+`Plantoir.Core` alone, so a test calling a pure pool function while the order
+lived in `CourseSettingsView` would have stayed green through the very
+reordering that causes the bug. Mutation-measured there on 2026-09-18: putting
+the pre-fix body back turns cases 1, 2, 5 and 6 red, the old pool semantics over
+a CORRECT walk turn 5 and 6 red, and reordering the walk before the exclusion —
+or leaving the exclusion out — turns 3 and 4 red.
+
+**A course damaged by the old behaviour is NOT repaired, decided 2026-09-18.**
+It keeps its frozen pool until the teacher ticks or unticks something, and
+neither app goes looking. The reason is that nobody can have been damaged by a
+version they were given: the freezing code (`a3c581fb`, 2026-08-25) is in no
+release tag and not on `main`, and `git grep -l graded_folders v1.1.0` comes
+back empty — the whole key is unreleased, so only a development build could have
+written one. And a repair could not identify what it was repairing even if it
+went looking: a pool written as `[]` by a removal is byte-identical to the
+deliberate empty pool the rule's own fourth case calls a legitimate answer, and
+correlating it with `excluded_items` collides with exactly that case — a teacher
+who unticked everything and then removed a folder looks the same from the file.
+REJECTED, so neither is proposed again: **detect-and-offer**, which would have to
+ask a teacher about a state it cannot identify and would put that question in
+front of courses that had simply answered "nothing counts"; and **silent
+auto-repair**, which would rewrite a deliberate answer without asking — the same
+failure this rule exists to prevent, arriving from the other direction. A
+genuinely damaged course is not left with nothing: `site_health.py` raises
+`noGradedFolders` for an empty pool exactly as it does for a pool matching
+nothing published.
+
+**One thing the contract's six cases cannot see**, and Windows differs there on
+purpose: matching CASE. The walk returns names as they are spelled on disk, so
+removing a top-level `Tasks` while `Portfolios/tasks` survives offers `tasks` —
+and an exact "still offered" test reads that as "no longer offered", drops
+`Tasks` from the pool, and leaves `build_site.py`, which lowercases both sides,
+still counting that folder. Marks off the coverage map because of a capital
+letter. Windows asks the question case-insensitively and pins it with a
+Windows-only test; the case is PROPOSED to the mac as [issue
+#172](https://github.com/russellgordon/plantoir/issues/172) rather than added
+here, because a contract case landing unannounced turns the other suite red and
+reads as damage.
+
+**Whichever way #172 settles, keep the never-asked guard.** It looks dead: with
+the walk taken after the exclusion, replacing it with the materialised pool
+leaves all six cases green, because the historical rule only ever names folders
+drawn FROM the choices — the copy lists plus the walk — so a name no longer
+among them cannot be in the materialised pool either. That redundancy depends
+on the still-offered test and the drop asking with the SAME comparer, which is
+exactly what #172 is about. Measured 2026-09-18: with an exact still-offered
+test, and the guard replaced the same way, a never-asked course removing a
+top-level `Tasks` while `Portfolios/tasks` survives writes `graded_folders: []`
+— nothing counting for marks, permanently. The #142 damage itself, brought back
+by tidying away a check that looked redundant.
 
 Nothing new is written to the activity trail for any of this. The removal
 already leaves its own line (`item excluded`), and what changed is only which
