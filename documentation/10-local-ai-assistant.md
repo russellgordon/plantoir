@@ -1359,9 +1359,10 @@ tool, never the argument values.
 **Do this in the agent, not in the tool.** The same tools answer Claude Code
 over MCP, where the course and section genuinely ARE the caller's to choose.
 It is the window that is about one section, so the window is what binds them.
-The runner gained one READING for this — `knowsACourse(called:)`, which answers
-the one question the two sentences turn on — and it is not the guard: it
-refuses nothing and is asked by nobody but the agent.
+The runner gained one READING for this — `knownCourseCode(matching:)`, which
+answers the one question the two sentences turn on and hands back the code that
+goes into the first of them — and it is not the guard: it refuses nothing and
+is asked by nobody but the agent.
 
 **What was REJECTED.**
 
