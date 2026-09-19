@@ -342,6 +342,13 @@ This is the same principle as the coarse tools: reasoning moved out of the
 model is reliability bought back. It is also the honest caveat on the 110/110
 in Part 5 — some of those are perfect because they are not questions.
 
+Two families joined the table on 2026-09-19, both for measured misroutes and
+both described below: "deploy at &lt;time&gt;" in "A time is a number, not a
+judgement", and the widened hide/unpublish frame in "'Hide' is 'unpublish', and
+a reply that is the question again". The second one is also the answer to "what
+should the app SAY when the model hands the teacher their own sentence back?",
+which is a different question with a different fix.
+
 ### A time is a number, not a judgement
 
 Written 2026-09-19, closing [issue
@@ -516,7 +523,209 @@ back **byte-identical** (compared key by key against `origin/dev`), so the
 model is shown exactly what it was shown before. The matcher is strictly
 upstream of the model and the approval sentence strictly downstream of it. What
 DOES change is a count of the CODE: the shelf's split moves from
-15-answered-in-code/4-model-routed to 16/3.
+15-answered-in-code/4-model-routed to 16/3. *(It moved again the same day, to
+17/2, with #215 below — this paragraph is #168's record and is left as it was
+written.)*
+
+### "Hide" is "unpublish", and a reply that is the question again
+
+Written 2026-09-19, closing [issue
+#215](https://github.com/russellgordon/plantoir/issues/215). Two faults, found
+in the v1.2.0 hand smoke and then measured. Neither is new: the tool surface
+and the system prompt were byte-identical across every merge that day, and the
+second fault is how a plain reply has been kept in the history since v1.1.0.
+
+**Conditions for every number below** (they belong to these numbers and to
+nothing else): Qwen2.5-1.5B-Instruct Q4_K_M — the file the app downloads for
+the smaller assistant — llama.cpp b10435 on Metal, M4 Pro 48 GiB, the app's own
+server flags, the app's own request body, temperature 0, the shipped system
+prompt, the 13-tool local surface, the date line on the END of every user
+message. Raw output and the replay scripts:
+`research/ai-assist/echo-postscript-215.txt`. **The larger assistant was not
+measured** — it is not downloaded on this Mac — so nothing here says anything
+about the 4B.
+
+#### The word
+
+`unpublish unit 4, day 21` reached `unpublish_pages` every time. `hide unit 4,
+day 21` reached **no tool at all**, in five phrasings out of five, and what
+came back was the teacher's own sentence as text. It errs in the safe direction
+— nothing is hidden and nothing else happens — and it reads as broken. The word
+was already on record as this tier's weak spot: `conversational-residue-
+results.txt` has "HIDE — the inversion case" at 3/3 declined, and
+[#167](https://github.com/russellgordon/plantoir/issues/167) showed a single
+token flipping its answer.
+
+**So "hide" is answered in code**, which is CLAUDE.md's standing rule applied
+exactly: steer the model with code, not with tool descriptions. `wholeUnit`
+became `wholeUnitOrClassPage` — one frame, one verb table, so the two verbs can
+never drift apart:
+
+```
+[please] hide|unpublish unit <n>[[,] day <m>] [please]
+[please] publish unit <n> [please]
+```
+
+**The day arm is gated on the VERB, and that asymmetry is the decision.**
+`hide` and `unpublish` take a whole unit or one class page; `publish` takes a
+whole unit only, so `publish unit 4, day 3` still goes to the model, exactly as
+it did before. Unpublishing errs safe — a page nobody can see — while
+publishing puts a page in front of students, and "Publish Unit 2, Day 3" is
+10/10 on this tier today, so there was nothing to buy by widening the dangerous
+direction on the same day. It is a `refused` row in the contract rather than a
+comment somebody deletes.
+
+**What the frame tolerates was decided rather than left to taste**, because
+spellings are the whole question for a family like this — the same argument
+`deployAtATime` won. The comma is frame punctuation and is dropped before the
+words are counted (`makeRoom`'s reading), so `unit 4 , day 21` and `unit 4 day
+21` are the same request and odd spacing is read the same way; a trailing `?`
+comes off; `please` is courtesy at either end; and `day21` is refused, because
+that is not a word this frame has. 13 accepted and 15 refused rows are DATA, in
+`contracts/assist-cases.json` → `hideIsUnpublish`.
+
+**The refusals are the safety half, and one of them is load-bearing.**
+`AssistAgent.encode` writes THIS window's course and section into every card
+call, and the guard that refuses a request naming another course lives in
+`think()` — which a matched card never reaches (see "Never ask the model for
+something the window already knows"). So `hide unit 4, day 21 in ICS3U`, typed
+in an ICS4U window, would act on ICS4U and report success: the one kind of
+failure a teacher cannot catch, and the exact fault
+[#202](https://github.com/russellgordon/plantoir/issues/202) exists to remove.
+The frame therefore reads a fixed number of words and refuses everything else —
+a negation (`don't hide unit 2, day 3`), a second page, a part of a page, a
+section named.
+
+**Term-blind for now, and the limit is stated rather than discovered.** Only
+the literal word "unit" is matched, because `AssistCardCommand` is a pure
+function of the sentence — that is what lets the contract describe it as input
+and output — and a course's own word for a unit is not in the sentence.
+Threading `unit_word` through the matcher would change the contract's
+representation of every parsed family and the research harness's interception
+guard with it. A Module course loses nothing: `hide module 4, day 21` falls
+through to the model exactly as it did before, and `hide unit 4` still works
+there because `AssistPublishPlanner.unitNamed` accepts "unit" alongside the
+course's own word.
+
+**Rejected, and each for a reason worth keeping.** A clarifying sentence in
+`publish_pages`' description — the measured precedent is 110/110 → 90/110, with
+three previously-perfect probes broken, because a small model reads a
+description naming another tool as a recommendation rather than a boundary.
+Mirroring the frame on the publish side, for the reason above. `show` and
+`unhide` as publish-side synonyms, which are worse again: "show unit 4" is at
+least as likely to mean "display it to me", and resolving that guess by
+publishing is the wrong way to be wrong.
+
+**The cost, said plainly.** Every phrasing answered in code leaves the routing
+denominator. The shelf's split moves 16/3 → **17/2** — "Unpublish Unit 2, Day
+3" is answered in code now, and only "Publish Unit 2, Day 3" and "Cancel
+scheduled deploy" still go to the model — and the research suites' intercepted
+count moves from five of 29 probes to six, with the promise-card line they
+print dropping from 6 of 11 to 5 of 11. A score taken after this is not
+comparable to one taken before it without saying so.
+
+#### The reply that was the question again
+
+The worse half, and it is not about the word "hide" at all. After `hide unit 4,
+day 20` echoed, **`Unpublish Unit 4, Day 20` echoed too** — a sentence the same
+model answers correctly every time in a fresh conversation. Replayed on ICD2O
+and ICS4U, pages "Unit 4, Day 20" and "Unit 4, Day 21": identical in all four.
+
+| conversation | result |
+|---|---|
+| FRESH: "Unpublish Unit 4, Day 20" | `unpublish_pages` ✔ |
+| turn 1: "hide unit 4, day 20" | no tool — echoes the sentence, date line and all |
+| turn 2, after that echo: "Unpublish Unit 4, Day 20" | no tool — **echoes again** |
+
+So it is not the course token and not the page: **it is the HISTORY.** The
+echoed reply was kept in `messages`, and the model then copied the pattern it
+could see — user says X, assistant says X — for every later request. One
+unrecognised phrase made the window useless until it was closed and reopened.
+The FRESH row is what says the fix works: a clean conversation is enough.
+
+**An echo is recognisable in code**, so `think()` refuses it, below the
+tool-call branch (an echo is a reply with no tool call in it) and above the
+append (the whole point is that the reply must not reach the history). The rule
+is a pure function and lives in `AssistAgent.isTheRequestBackAgain` so the
+contract's cases can run straight against it: no tool call, and the reply's
+text equals this turn's user message — case-folded, with `.`, `!` and `?`
+trimmed from both ends.
+
+**Both spellings of the question are compared**: the message AS SENT, with the
+date line on the end, which is what the measured echo carried; and the sentence
+the teacher typed, because a model that trims the parenthetical is not a
+different fault. The typed sentence is kept in a property of its own rather
+than recomputed — taking the date line back off would mean reading the clock a
+second time, which is what `withTheDaySettled` exists to prevent.
+
+**It compares the message at the START of the turn, never the last user message
+anywhere**, and that is what makes a card-matched second lap safe by
+construction rather than by inspection: such a turn begins with a TOOL RESULT,
+so the guard sees no user message and cannot fire. Two tests exist only to kill
+the two wrong implementations — one that drops the role check (killed with a
+reply equal to the tool result's own text) and one that searches backwards for
+the most recent user message, which is what a reader of `windTheTurnBack` would
+reach for (killed with a two-turn case).
+
+**What happens on an echo:** the turn is wound back with the rewind
+`sayTheAnswerDidNotFinish` and the wrong-course refusal already share —
+`windTheTurnBack()` now has three callers — the teacher reads
+`AssistWording.didNotFollowThat`, and a new trail event is recorded. **Never
+the echoed text**: handing a teacher their own sentence back is the fault, and
+repeating it inside an apology would be the same fault, politely.
+
+**The sentence is deliberately GENERAL, and an earlier draft was wrong here.**
+It offered three verbs to start with — publish, unpublish or hide — and told
+the teacher to name the page. The guard fires on ANY request the model answers
+with plain words: a deploy, a request to make room for a class, a question
+about dates. Telling a teacher whose "deploy at half six" was echoed to start
+with a publishing verb and name a page is not a hedge, it is wrong advice, and
+a sentence that will be believed and is false in a whole class of cases is
+worse than a vaguer true one. The working phrasings belong here, in the
+documentation, not in a sentence said to everybody.
+
+**"I haven't changed anything" is true on every path that can reach it**, by
+the same walk `answerWasCutOff` records: a turn only comes back to the model
+for another lap when a tool said to (`AssistToolOutcome.shouldContinue`), which
+is true for `read`, `couldNotRead` and `planned` alone, and `planned` is held
+behind the approval card and never reaches a second lap.
+
+**Strict on purpose, and here is what that misses.** An echo with a preamble
+("Sure: hide unit 4, day 21"), a partial echo, and any other kind of residue in
+the history all get through. Each would need a similarity measure, and a fuzzy
+rule that fires on a legitimate answer is worse than the fault: it would throw
+a real reply away and tell the teacher it did not follow. **The one corner it
+leaves**, stated the way #211's row states its own: a teacher typing a
+content-free token — "ok", "thanks" — to which the model replies with the same
+token. They then read one honest sentence instead of "ok", and a turn carrying
+nothing is wound out of a history it was adding nothing to. Nothing can be lost
+that way: everything with state in it — a plan, a deploy, the dates sheet — is
+a button or a sheet rather than free text, and `entries` keeps the teacher's
+own words on every path.
+
+**The trail line is a NEW event**, `assistant repeated the request back`
+(`activityTrail.mustRecord` 48 → 49). It carries the course, the section, that
+nothing ran and that the turn was taken back out of the conversation — never
+the sentence, which `assistant asked` already carries on its own marked line.
+**Rejected: folding it into `assistant answer was cut off`.** Those two share a
+genuine kind — an answer the app refused — but that event's NAME says "cut
+off", which would be false here: this answer finished. A line describing
+something other than what happened is worse than no line, because it will be
+believed. `assistant could not answer` is worse again; that is for an engine
+that FAILED.
+
+**A SCENARIO is not expressible for this half**, and the reason is the same
+limit `windowBinding` records in `contracts/README.md`: the scenario runner
+builds its agent with no engine behind it, so a model's reply cannot be
+scripted. The cases are the predicate instead, and the mac drives the whole
+path through the `StubEngine` seam.
+
+**No routing re-measurement is owed**, and here is the check rather than the
+claim: `AssistToolSurface.swift` and `AssistToolDefinition.swift` are untouched,
+`AssistAgent.systemPrompt` is untouched, `tools` and `toolSchemas` regenerate
+byte-identical against `origin/dev`, and the 13-tool local WIRE surface hashes
+the same as a copy taken from the live server before this change. The matcher
+is strictly upstream of the model; the echo guard is strictly downstream of it.
 
 ### The dateline, and why its position is a finding
 
@@ -3712,23 +3921,29 @@ rather than by writing the code.
    stripping leading and trailing `.` and `!`, and lower-casing, then
    compared by EQUALITY (never substring), followed by the parsed families —
    four when that was written, six today ("deploy at <time>" joined them on
-   2026-09-19, #168).
+   2026-09-19, #168; "hide" joined the existing unpublish family the same day
+   rather than adding a seventh, #215).
    The plain-preview sentences are not a second layer here: "preview" and
    "rebuild the preview" are entries in `fixedShapes` like everything else.
    Corrected 2026-09-18 while measuring #117, which counted them rather than
-   assuming: of the 29 probes in `trimmed-surface-suite.py`, exactly **five**
-   are answered in code and never routed —
+   assuming, and re-counted 2026-09-19 after #215: of the 29 probes in
+   `trimmed-surface-suite.py`, **six** are answered in code and never routed —
 
        card: publish tomorrow   -> publish_class_on
+       card: unpublish by name  -> unpublish_pages
        card: check the section  -> check_section
        card: rebuild preview    -> rebuild_preview
        card: undo               -> undo_last_change
        card: deploy now         -> deploy_section
 
-   all five of them promise-card phrasings. The suite now reports both totals
-   (all 29 and the 24 a model actually sees) and finds that list from
+   all six of them promise-card phrasings. (It was five until #215 widened the
+   unpublish family to take a class page, which took `card: unpublish by name`
+   out of the routing measurement — and the run's own "promise-card, the N the
+   model sees" line from 6 of 11 to 5 of 11.) The suite reports both totals
+   (all 29 and the **23** a model actually sees) and finds that list from
    `contracts/assist-cases.json` rather than from a hand copy, so a phrasing
-   added to the card table shows up in the next measurement by itself. They
+   added to the card table shows up in the next measurement by itself — which
+   is how this one was re-counted rather than reasoned about. They
    are still measured, because Claude Code over MCP has no interception layer
    in front of it and does route them.
 4. **Making a research script stricter can delete a control.** Requiring the
