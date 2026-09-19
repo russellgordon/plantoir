@@ -384,6 +384,18 @@ enum SectionAdder {
     /// A draft value this app cannot read is written as held back. A page
     /// wrongly held back is one a teacher notices and fixes; a page wrongly
     /// published is one nobody notices at all.
+    ///
+    /// **Two legacy values started being carried the other way on 2026-09-19**
+    /// (issue #176), because this asks the one reader and the reader was
+    /// corrected: a `draftSectionN` line that LOOKS complete with a value
+    /// indented under it now reads `cannotTell` rather than being read off the
+    /// key's own line. So `draftSection1: false` / `  x` and
+    /// `draftSection1: no` / `  x` are carried as HELD BACK where they used to
+    /// be carried as published. Measured: the site PUBLISHES both of those
+    /// source pages — YAML folds the two lines into the plain scalar
+    /// `"false x"`, which `_as_bool` cannot make a boolean of — so neither
+    /// answer matches the site, and this one errs the safe way, which is also
+    /// the way Windows and `setup_course.per_section_frontmatter` err.
     static func publishValue(forSection sectionNumber: Int, in lines: [String]) -> String? {
         // The reader's own matcher and the reader's own LAST-wins rule, so the
         // value carried across is the value the build reads. A prefix test
