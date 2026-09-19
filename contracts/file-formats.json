@@ -164,7 +164,7 @@
           "key": "use_skeleton",
           "requirement": "BOTH apps ask the teacher and write the answer. Decided 2026-08-16: Windows matches macOS.",
           "type": "boolean",
-          "why": "Whether a course with no ready-made payload starts from its subject's SKELETON — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing. Around 1,900 course codes have a skeleton and no payload, so this is the question most teachers actually meet. Both apps write `hasSkeleton(code) && teacherSaidYes`. (Windows did not write it at all until 2026-09-07, so for three weeks the Python took its own default of TRUE and a Windows teacher could not decline.)"
+          "why": "Whether a course with no ready-made payload starts from its subject's SKELETON — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing. Around 1,900 course codes have a skeleton and no payload, so this is the question most teachers actually meet. Both apps write `hasSkeleton(code) && teacherSaidYes`. (Windows did not write it at all until 2026-09-07, so for three weeks the Python took its own default of TRUE and a Windows teacher could not decline.) The wizard's structure EDITOR must agree with this key in both directions — turning the toggle off puts the generic defaults back rather than leaving the skeleton's folders on screen for a course that will not have them — and that rule, with its cases, is in shared-rules.json → wizard.skeletonToggle."
         },
         {
           "key": "prepopulate_example_content",
