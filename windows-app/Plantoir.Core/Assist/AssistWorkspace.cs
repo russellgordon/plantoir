@@ -228,9 +228,18 @@ public sealed class AssistWorkspace
     /// order.
     ///
     /// "Class page" is read from the course's own configuration rather than
-    /// guessed: it is a page inside one of the course's
-    /// <c>per_section_folders</c> (typically "All Classes"), and never an
-    /// <c>index.md</c>.
+    /// guessed: it is a page inside one of the folders the SHARED membership
+    /// rule counts (<c>contracts/class-planning.json</c> →
+    /// <c>classFolder.membership</c>), and never an <c>index.md</c>.
+    ///
+    /// <para>Membership, not the whole <c>per_section_folders</c> list. This
+    /// walked every per-section folder until 2026-09-19, so a course
+    /// configured <c>["All Classes","Handouts"]</c> counted its handouts as
+    /// days of teaching here while the mac and <c>build_site.py</c> did not —
+    /// a difference nobody chose. The rule can also count FEWER folders than
+    /// the list: a course whose folders are <c>["Lessons","Labs"]</c> mentions
+    /// classes nowhere, so membership falls back to the single name the naming
+    /// half chose and the Labs pages stop being classes.</para>
     ///
     /// Both exclusions matter, and the second is the dangerous one. A section's
     /// <c>index.md</c>, its folder indexes and its Key Links page all carry the
@@ -239,7 +248,8 @@ public sealed class AssistWorkspace
     /// </summary>
     public List<string> ClassPages(Course course, int sectionNumber)
     {
-        var folders = course.Configuration.PerSectionFolders;
+        var folders = ClassFolderRule.Names(course.Configuration.ClassFolder,
+                                            course.Configuration.PerSectionFolders);
         var pages = new List<(DateOnly? Date, string Path)>();
 
         foreach (string folder in folders)
@@ -1086,11 +1096,13 @@ public sealed class AssistWorkspace
         string text = File.ReadAllText(pagePath);
         bool isFolderIndex = Path.GetFileName(pagePath).Equals("index.md", StringComparison.OrdinalIgnoreCase);
         // The shared rule (contracts/class-planning.json -> classFolder), against
-        // the path RELATIVE to the working folder. This used to test the whole
+        // the path relative to the SECTION. This used to test the whole absolute
         // directory string, so a teacher whose working folder was
-        // C:\Users\x\Classroom\ made every page in every course a class page.
+        // C:\Users\x\Classroom\ made every page in every course a class page;
+        // Relative(pagePath) closed that, and PathWithinSection closes the rest
+        // of it — see the helper, and the mac's pathWithinSection it mirrors.
         bool isClassPage = ClassFolderRule.IsClassPage(
-            Relative(pagePath),
+            PathWithinSection(course, section, pagePath),
             ClassFolderRule.Names(course.Configuration.ClassFolder, course.Configuration.PerSectionFolders));
         return new PlannedPage(
             Title: Path.GetFileNameWithoutExtension(pagePath),
@@ -3279,6 +3291,52 @@ public sealed class AssistWorkspace
     {
         try { return Course(courseCode).Configuration.UnitWord; }
         catch (AssistRefusal) { return ClassPageTerm.DefaultWord; }
+    }
+
+    /// <summary>
+    /// A page's path relative to its SECTION folder, which is the form the
+    /// class-page rule needs.
+    ///
+    /// <para>Nothing above the section can reach the rule this way, so what a
+    /// teacher called their working folder cannot change what counts as a
+    /// lesson — and neither can what they called their COURSE folder, nor the
+    /// <c>courses</c> folder itself. <see cref="Relative"/> is relative to the
+    /// working folder, so its segments still include <c>courses</c>, the course
+    /// code and <c>sectionN</c>; that was enough for the
+    /// <c>C:\Users\x\Classroom</c> bug and not enough for the rest.</para>
+    ///
+    /// <para>A page OUTSIDE the section folder — every course-level SHARED
+    /// page, which <c>PagePaths.MarkdownPages</c> deliberately includes —
+    /// falls back to its own file NAME, so it is never a class page. Returning
+    /// the last two components instead, which is what the mac tried first,
+    /// puts the immediate parent's name back in front of the rule: that is the
+    /// discredited "does the parent mention classes" sniff, and a false
+    /// POSITIVE waiting to happen, because a course-level shared folder called
+    /// "All Classes" would then make every shared page under it a lesson of
+    /// every section. A shared page is not a class page; say so plainly rather
+    /// than guess from a fragment of path.</para>
+    ///
+    /// <para>Mirrors <c>AssistSectionGraph.pathWithinSection</c> on the mac —
+    /// its CODE, which returns <c>url.lastPathComponent</c>; that method's own
+    /// header comment still says "last two components" and is stale.</para>
+    /// </summary>
+    private static string PathWithinSection(Course course, int sectionNumber, string fullPath)
+    {
+        string root;
+        string full;
+        try
+        {
+            root = Path.GetFullPath(course.SectionDirectory(sectionNumber));
+            full = Path.GetFullPath(fullPath);
+        }
+        catch { return Path.GetFileName(fullPath); }
+
+        if (!root.EndsWith(Path.DirectorySeparatorChar)) root += Path.DirectorySeparatorChar;
+        // Case-insensitively, because Windows paths are: a page reached as
+        // SECTION1\... must not read as a page outside section1.
+        if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            return full[root.Length..];
+        return Path.GetFileName(full);
     }
 
     private static string ClassFolder(Course course, int sectionNumber)
