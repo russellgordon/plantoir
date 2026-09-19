@@ -383,13 +383,10 @@ struct CourseSettingsView: View {
                 if let chosen = course.configuration.gradedFolders {
                     return chosen
                 }
-                var counted: [String] = []
-                for folder in gradedFolderChoices {
-                    if folder.lowercased().contains("task") {
-                        counted.append(folder)
-                    }
-                }
-                return counted
+                // The offered list is already de-duplicated by exact name, so
+                // asking the shared rule — which de-duplicates too — gives the
+                // answer the hand-written loop here gave.
+                return GradedFolderRule.inferredPool(from: gradedFolderChoices)
             },
             set: { newValue in
                 course.configuration.gradedFolders = newValue

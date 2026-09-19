@@ -166,6 +166,25 @@ enum SkeletonCatalog {
         return candidate
     }
 
+    /// Which of a skeleton's folders count for marks when the wizard adopts
+    /// it: the manifest's own `graded_folders` where it names any, and
+    /// otherwise the historical rule read off the family's own folders.
+    ///
+    /// The manifest wins for a reason a teacher would notice — the
+    /// mathematics family ships `Thinking Tasks` rather than `Tasks`, and the
+    /// generic rule finds it only because it says "task" at all. Windows'
+    /// `SkeletonCatalog.AdoptedGradedFolders` is the same function under the
+    /// same name, so the same code opens with the same marks pool on both
+    /// platforms.
+    static func adoptedGradedFolders(for family: Family) -> [String] {
+        if !family.gradedFolders.isEmpty {
+            return family.gradedFolders
+        }
+        return GradedFolderRule.inferredPool(
+            from: family.sharedFolders + family.perSectionFolders
+        )
+    }
+
     /// True when a folder list is still one the app offered, rather than
     /// one the teacher has changed.
     static func isOffered(_ folders: [String]) -> Bool {

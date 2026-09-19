@@ -185,14 +185,10 @@ struct SpecialFoldersHelpView: View {
         if let chosen = course.configuration.gradedFolders {
             return chosen
         }
-        var counted: [String] = []
-        for folder in course.configuration.sharedFolders
-            + course.configuration.perSectionFolders {
-            if folder.lowercased().contains("task") && !counted.contains(folder) {
-                counted.append(folder)
-            }
-        }
-        return counted
+        return GradedFolderRule.inferredPool(
+            from: course.configuration.sharedFolders
+                + course.configuration.perSectionFolders
+        )
     }
 
     // MARK: - Body

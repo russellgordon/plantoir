@@ -669,6 +669,117 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
+    /// What a teacher is told when the course will start with nothing in it.
+    ///
+    /// One sentence for two situations — no content and no skeleton for the
+    /// code, or a skeleton the teacher has turned down — because they are one
+    /// situation for a teacher. Windows has said it in both places since
+    /// 2026-09-07; the mac since 2026-09-18 (issue #77).
+    func testTheEmptyCourseNoteIsTheOneInTheContract() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("wizard")
+
+        XCTAssertEqual(
+            WizardWording.noExampleContentNote,
+            section["noExampleContentNote"] as? String,
+            "The wizard's empty-course note and contracts/shared-rules.json → wizard "
+            + "disagree. Both apps show this sentence, in both of the situations "
+            + "wizard.whenTheNoteIsShown names; change it in the contract and in both "
+            + "apps, or not at all."
+        )
+    }
+
+    // MARK: - The skeleton toggle, in both directions
+
+    /// The structure editor shows what will actually be created: the toggle
+    /// adopts a subject's folders and gives them up again, list by list
+    /// against what the adoption put there.
+    ///
+    /// Every case in `wizard.skeletonToggle`, played the way the contract's
+    /// own `howToRunACase` says — each with its own fixture, so one case's
+    /// adoption cannot answer another's.
+    func testTheSkeletonToggleRestoresWhatTheContractSays() throws {
+        let toggle: [String: Any] = try SharedRulesContractTests.skeletonToggleRules()
+        let defaultCode: String = try XCTUnwrap(toggle["courseCode"] as? String)
+        let vocabulary: [String: Any] = try XCTUnwrap(toggle["lists"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(toggle["cases"] as? [[String: Any]])
+
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 8,
+            "wizard.skeletonToggle has lost cases. The list is the acceptance list for both "
+            + "apps; a case removed here is a behaviour neither suite checks any more."
+        )
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let given: [String: Any] = try XCTUnwrap(testCase["given"] as? [String: Any])
+            let code: String = (given["courseCode"] as? String) ?? defaultCode
+            let usesLCSTerminology: Bool = given["usesLCSTerminology"] as? Bool ?? false
+            let family: SkeletonCatalog.Family = try XCTUnwrap(
+                SkeletonCatalog.family(forCode: code), "No skeleton family for \(code)"
+            )
+
+            var lists: WizardStructure.Lists = try SharedRulesContractTests.lists(
+                from: try XCTUnwrap(given["lists"] as? [String: Any]),
+                family: family, vocabulary: vocabulary, caseName: name
+            )
+            var snapshot: WizardStructure.Lists? = (given["hasSnapshot"] as? Bool == true)
+                ? WizardStructure.adopting(family)
+                : nil
+
+            for step in try XCTUnwrap(testCase["steps"] as? [String]) {
+                switch step {
+                case "turnOn":
+                    // The adoption rule that predates this one: a folder list
+                    // the teacher has changed is never overwritten.
+                    if let adoptable = SkeletonCatalog.structureToAdopt(
+                        forCode: code, currentSharedFolders: lists.sharedFolders
+                    ) {
+                        lists = WizardStructure.adopting(adoptable)
+                        snapshot = lists
+                    }
+                case "turnOff":
+                    lists = WizardStructure.restoringDefaults(
+                        in: lists, adopted: snapshot, usesLCSTerminology: usesLCSTerminology
+                    )
+                    snapshot = nil
+                default:
+                    XCTFail("\(name): unknown step \"\(step)\"")
+                }
+            }
+
+            let expected: WizardStructure.Lists = try SharedRulesContractTests.lists(
+                from: try XCTUnwrap(testCase["expect"] as? [String: Any]),
+                family: family, vocabulary: vocabulary, caseName: name
+            )
+            XCTAssertEqual(lists, expected, "wizard.skeletonToggle → \(name)")
+        }
+    }
+
+    /// The contract's own copy of the factory lists is the app's copy.
+    ///
+    /// Without this the vocabulary the cases are written in could drift away
+    /// from the thing it names, and every case would keep passing against a
+    /// contract that no longer describes the product. Windows owes the same
+    /// assertion against its own `WizardDefaults`.
+    func testTheSkeletonTogglesVocabularyIsTheAppsOwnDefaults() throws {
+        let toggle: [String: Any] = try SharedRulesContractTests.skeletonToggleRules()
+        let vocabulary: [String: Any] = try XCTUnwrap(toggle["lists"] as? [String: Any])
+        let factory: [String: Any] = try XCTUnwrap(vocabulary["factory"] as? [String: Any])
+        let lcs: [String: Any] = try XCTUnwrap(vocabulary["lcs"] as? [String: Any])
+
+        XCTAssertEqual(factory["sharedFolders"] as? [String], WizardDefaults.sharedFolders)
+        XCTAssertEqual(factory["sharedFiles"] as? [String], WizardDefaults.sharedFiles)
+        XCTAssertEqual(factory["perSectionFolders"] as? [String], WizardDefaults.perSectionFolders)
+        XCTAssertEqual(factory["perSectionFiles"] as? [String], WizardDefaults.perSectionFiles)
+        XCTAssertEqual(lcs["sharedFolders"] as? [String], WizardDefaults.lcsSharedFolders)
+        XCTAssertEqual(lcs["sharedFiles"] as? [String], WizardDefaults.lcsSharedFiles)
+        XCTAssertNil(
+            lcs["perSectionFolders"],
+            "Neither per-section list has an LCS variant — the terminology switch rewrites only "
+            + "the two shared ones, and a variant written here would be a rule the apps do not have."
+        )
+    }
+
     // MARK: - What a teacher reads on the Marks control
 
     /// The Marks tick list's title and its caption are the contract's, word
@@ -1903,5 +2014,92 @@ final class SharedRulesContractTests: XCTestCase {
             try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
         )
         return try XCTUnwrap(all[name] as? [String: Any], "No \(name) in shared-rules.json")
+    }
+
+    /// `wizard.skeletonToggle` — the rule, its vocabulary and its cases.
+    private static func skeletonToggleRules() throws -> [String: Any] {
+        let wizard: [String: Any] = try SharedRulesContractTests.section("wizard")
+        return try XCTUnwrap(wizard["skeletonToggle"] as? [String: Any],
+                             "No skeletonToggle in shared-rules.json → wizard")
+    }
+
+    /// One case's five lists, with each symbol resolved as
+    /// `wizard.skeletonToggle.symbols` says. A literal array means itself.
+    private static func lists(
+        from described: [String: Any],
+        family: SkeletonCatalog.Family,
+        vocabulary: [String: Any],
+        caseName: String
+    ) throws -> WizardStructure.Lists {
+        return WizardStructure.Lists(
+            sharedFolders: try list(
+                described["sharedFolders"], slot: "sharedFolders",
+                familyList: family.sharedFolders, family: family,
+                vocabulary: vocabulary, caseName: caseName
+            ),
+            sharedFiles: try list(
+                described["sharedFiles"], slot: "sharedFiles",
+                familyList: family.sharedFiles, family: family,
+                vocabulary: vocabulary, caseName: caseName
+            ),
+            perSectionFolders: try list(
+                described["perSectionFolders"], slot: "perSectionFolders",
+                familyList: family.perSectionFolders, family: family,
+                vocabulary: vocabulary, caseName: caseName
+            ),
+            perSectionFiles: try list(
+                described["perSectionFiles"], slot: "perSectionFiles",
+                familyList: family.perSectionFiles, family: family,
+                vocabulary: vocabulary, caseName: caseName
+            ),
+            gradedFolders: try list(
+                described["gradedFolders"], slot: "gradedFolders",
+                familyList: SkeletonCatalog.adoptedGradedFolders(for: family), family: family,
+                vocabulary: vocabulary, caseName: caseName
+            )
+        )
+    }
+
+    /// One slot's value: an array is itself, a string is one of the
+    /// contract's symbols.
+    private static func list(
+        _ described: Any?,
+        slot: String,
+        familyList: [String],
+        family: SkeletonCatalog.Family,
+        vocabulary: [String: Any],
+        caseName: String
+    ) throws -> [String] {
+        if let literal = described as? [String] {
+            return literal
+        }
+        let symbol: String = try XCTUnwrap(
+            described as? String, "\(caseName): nothing said about \(slot)"
+        )
+        switch symbol {
+        case "skeleton":
+            return familyList
+        case "skeletonReversed":
+            return familyList.reversed()
+        case "factory", "lcs":
+            let set: [String: Any] = try XCTUnwrap(
+                vocabulary[symbol] as? [String: Any], "\(caseName): no \(symbol) lists in the contract"
+            )
+            return try XCTUnwrap(
+                set[slot] as? [String],
+                "\(caseName): the contract has no \(symbol) list for \(slot), so the symbol means nothing here"
+            )
+        case "lcsFlippedFromSkeleton":
+            let factory: [String: Any] = try XCTUnwrap(vocabulary["factory"] as? [String: Any])
+            let lcs: [String: Any] = try XCTUnwrap(vocabulary["lcs"] as? [String: Any])
+            return WizardDefaults.switchingFactoryItems(
+                in: familyList,
+                toFactory: try XCTUnwrap(lcs[slot] as? [String]),
+                fromFactory: try XCTUnwrap(factory[slot] as? [String])
+            )
+        default:
+            XCTFail("\(caseName): unknown list symbol \"\(symbol)\" for \(slot)")
+            return []
+        }
     }
 }
