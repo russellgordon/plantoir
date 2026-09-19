@@ -820,6 +820,32 @@ final class ClassPlanningContractTests: XCTestCase {
         XCTAssertNil(moved["unit 4, day 2"], "A class was moved off its own day")
     }
 
+    /// The date half of the stop decided in issue #173.
+    ///
+    /// The CASES are run against a real course, through `publish_pages`, in
+    /// `AssistToolRunnerTests.testTheDatesAClassBringsStopAtAClassAsTheContractSays`
+    /// — the same split this file's sibling in `shared-rules.json` makes, and
+    /// for the same reason: a synthetic page graph can be built to agree with
+    /// whatever it is asked. What is pinned here is that the file says it, says
+    /// why, and lists the stop among the reasons a page does not move.
+    func testTheReachStopsAtAClassPageAndTheRuleSaysSo() throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("datingPagesAClassBrings")
+        let stop: [String: Any] = try XCTUnwrap(section["reachStopsAtAClassPage"] as? [String: Any])
+        XCTAssertEqual(stop["value"] as? Bool, true)
+        XCTAssertNotNil(stop["why"] as? String)
+
+        var saysTheWalkStops: Bool = false
+        for reason in try XCTUnwrap(section["doesNotMoveWhen"] as? [String]) {
+            if reason.contains("only THROUGH another class page") {
+                saysTheWalkStops = true
+            }
+        }
+        XCTAssertTrue(
+            saysTheWalkStops,
+            "doesNotMoveWhen does not name the page a different class brings"
+        )
+    }
+
     // MARK: - Dating non-class pages
 
     func testNonClassPagesContractExistsAndIsDocumented() throws {
