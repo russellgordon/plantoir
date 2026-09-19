@@ -527,6 +527,15 @@ enum ScheduledDeploy {
             course: courseCode,
             section: sectionNumber
         ).path
+        // Every record is assembled here and MOVED into place, so the app's
+        // watch on the record folder sees one event carrying a whole file. See
+        // `recordCompletionLines` and `ScheduledPublishOutcome.partialRecordURL`
+        // — including why this sits beside the record folder rather than in it.
+        let stoppedPartialRecord: String = ScheduledPublishOutcome.partialRecordURL(
+            inHomeFolder: homeFolder,
+            course: courseCode,
+            section: sectionNumber
+        ).path
 
         // Clear LAST time's record before this run does anything.
         //
@@ -561,17 +570,23 @@ enum ScheduledDeploy {
         lines.append("    /bin/mkdir -p \(shellQuoted(stoppedDirectory))")
         lines.append("    if [ $BUILD_RC -eq 3 ]; then")
         lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.buildNeededAnAnswer.rawValue))"
-            + " > \(shellQuoted(stoppedRecord))")
+            + " > \(shellQuoted(stoppedPartialRecord))")
         lines.append("    else")
         lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.didNotFinish.rawValue))"
-            + " > \(shellQuoted(stoppedRecord))")
+            + " > \(shellQuoted(stoppedPartialRecord))")
         lines.append("    fi")
         // Written for BOTH build branches. The outright failure puts it in
         // the teacher's sentence; buildNeededAnAnswer never shows it, and it
         // is written anyway so every record has one shape for the reader — see
         // ScheduledPublishOutcome.buildDestinationName.
-        lines.append("    /bin/echo \(shellQuoted(ScheduledPublishOutcome.buildDestinationName))"
-            + " >> \(shellQuoted(stoppedRecord))")
+        for completion in recordCompletionLines(
+            indentedBy: "    ",
+            destination: ScheduledPublishOutcome.buildDestinationName,
+            temporaryPath: stoppedPartialRecord,
+            recordPath: stoppedRecord
+        ) {
+            lines.append(completion)
+        }
         lines.append("  fi")
         lines.append("fi")
         // Deploy only if there is something good to deploy — the button
@@ -587,8 +602,10 @@ enum ScheduledDeploy {
         ).path
         lines.append("/bin/rm -f \(shellQuoted(sentinelPath))")
         lines.append("ALL_OK=\"$READY\"")
-        // A stopped run leaves a note the app reads the next time the teacher
-        // opens Plantoir. Until this existed, an overnight publish that did not
+        // A stopped run leaves a note the app reads: at once, if the teacher is
+        // looking at that section (`ScheduledPublishWatcher` watches the folder
+        // these are moved into), and otherwise the next time they open it.
+        // Until this existed, an overnight publish that did not
         // get through said so in the section's own log and NOWHERE else — so
         // "my site did not update on Tuesday and I do not know why" had no
         // answer, and a run that stopped looked exactly like one that was never
@@ -644,12 +661,19 @@ enum ScheduledDeploy {
             lines.append("      /bin/mkdir -p \(shellQuoted(stoppedDirectory))")
             lines.append("      if [ $RC -eq 3 ]; then")
             lines.append("        /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.neededAnAnswer.rawValue))"
-                + " > \(shellQuoted(stoppedRecord))")
+                + " > \(shellQuoted(stoppedPartialRecord))")
             lines.append("      else")
             lines.append("        /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.didNotFinish.rawValue))"
-                + " > \(shellQuoted(stoppedRecord))")
+                + " > \(shellQuoted(stoppedPartialRecord))")
             lines.append("      fi")
-            lines.append("      /bin/echo \(shellQuoted(name)) >> \(shellQuoted(stoppedRecord))")
+            for completion in recordCompletionLines(
+                indentedBy: "      ",
+                destination: name,
+                temporaryPath: stoppedPartialRecord,
+                recordPath: stoppedRecord
+            ) {
+                lines.append(completion)
+            }
             lines.append("    fi")
             lines.append("  fi")
             legIndex += 1
@@ -669,11 +693,19 @@ enum ScheduledDeploy {
         lines.append("if [ \"$ALL_OK\" = \"1\" ]; then")
         lines.append("  /bin/mkdir -p \(shellQuoted(stoppedDirectory))")
         lines.append("  /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.succeeded.rawValue))"
-            + " > \(shellQuoted(stoppedRecord))")
-        lines.append("  /bin/echo " + shellQuoted(destinationDescriptions.isEmpty
-            ? destinationTypes.joined(separator: ", ")
-            : destinationDescriptions.joined(separator: ", "))
-            + " >> \(shellQuoted(stoppedRecord))")
+            + " > \(shellQuoted(stoppedPartialRecord))")
+        var whereItWent: String = destinationDescriptions.joined(separator: ", ")
+        if destinationDescriptions.isEmpty {
+            whereItWent = destinationTypes.joined(separator: ", ")
+        }
+        for completion in recordCompletionLines(
+            indentedBy: "  ",
+            destination: whereItWent,
+            temporaryPath: stoppedPartialRecord,
+            recordPath: stoppedRecord
+        ) {
+            lines.append(completion)
+        }
         lines.append("fi")
         // The sentinel carries WHERE it went, so the record a scheduled
         // publish leaves is the same shape as the button's.
@@ -701,6 +733,46 @@ enum ScheduledDeploy {
         // removed first, so a Mac that restarts mid-deploy comes back with
         // nothing pending, whatever happens to the job afterwards.
         return lines.joined(separator: "\n")
+    }
+
+    /// The two shell lines that finish a record and put it in the folder the
+    /// app watches, in ONE move.
+    ///
+    /// Only the TAIL of the write, deliberately: two of the three places that
+    /// record an outcome choose the kind in shell rather than in Swift
+    /// (`if [ $BUILD_RC -eq 3 ]`, `if [ $RC -eq 3 ]`), so a helper that took the
+    /// kind as an argument could serve only the third — or would need a `$KIND`
+    /// expression, which must not go through `shellQuoted` since that would
+    /// quote the dollar sign. Each branch writes its own kind into the temporary
+    /// file with `>`; this adds the destination line and moves the finished file
+    /// into place.
+    ///
+    /// **Why a temporary file and a move rather than two `echo`s** — and why the
+    /// temporary file sits in the PARENT of the record folder — is measured, with
+    /// the numbers, in `ScheduledPublishOutcome.partialRecordURL`. The short
+    /// version: the app watches that folder so the notice can appear while the
+    /// teacher is looking at the section, and a record written in two steps was
+    /// delivered as one event carrying half a file, 0 times out of 40.
+    ///
+    /// Nothing about FAILURE changes. The generated wrapper has no `set -e`, so a
+    /// write that fails leaves an empty temporary file, which `mv` then installs,
+    /// and an empty record reads as no record at all — exactly what a failed
+    /// `echo` straight into the record produced before. A failed `mv` leaves no
+    /// record, likewise.
+    static func recordCompletionLines(
+        indentedBy indent: String,
+        destination: String,
+        temporaryPath: String,
+        recordPath: String
+    ) -> [String] {
+        var result: [String] = []
+        result.append(
+            "\(indent)/bin/echo \(shellQuoted(destination)) >> \(shellQuoted(temporaryPath))"
+        )
+        result.append(
+            "\(indent)/bin/mv \(shellQuoted(temporaryPath)) \(shellQuoted(recordPath))"
+        )
+        return result
     }
 
     /// One argument, safe to paste into a shell command.

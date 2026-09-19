@@ -16,6 +16,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task.detached(priority: .utility) {
                 BuildOutputLocation.discardBuildsForMissingWorkingFolders()
             }
+            // Watch for what a scheduled run leaves behind, so its notice
+            // reaches a teacher who is already looking at that section. One
+            // watcher for the app: the folder hangs off the home folder, not
+            // off a working folder. Behind the same guard as the line above —
+            // the suite must never watch the teacher's real Application
+            // Support.
+            ScheduledPublishWatcher.shared.start()
         }
     }
 
