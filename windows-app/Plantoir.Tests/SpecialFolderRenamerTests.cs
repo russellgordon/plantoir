@@ -259,7 +259,15 @@ public class SpecialFolderRenamerTests : IDisposable
     /// </summary>
     /// <remarks>
     /// <para><b>Nothing may be added to this map without a matching key in the
-    /// contract, and nothing may be in the contract without an entry here.</b>
+    /// contract, and nothing may be in the contract without an entry here —
+    /// with ONE exception, which is itself checked.</b> A key whose sentence
+    /// belongs to a feature this app has not built yet may be held open as a
+    /// NAMED GAP in <see cref="NamedGapLedger"/>, and
+    /// <c>renameUnitWord.explanation</c> is (GitHub issue #158, v1.3.0). That
+    /// is not a hole in the pairing: the ledger fails the moment the key
+    /// appears in this map, and fails if the contract stops naming it, so the
+    /// exception cannot outlive either half. See the ledger for when one is
+    /// allowed.
     /// That pairing is the whole point of driving the test off
     /// <c>platformWording.keys</c>: the mac already fails if a fourth
     /// <c>specialNames</c> sentence contains its platform word and is not

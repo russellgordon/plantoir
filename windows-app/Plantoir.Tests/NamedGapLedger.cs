@@ -41,6 +41,23 @@ namespace Plantoir.Tests;
 /// green, and nothing anywhere would notice. Softening the contract to quiet a
 /// suite removes the very signal the contract exists to give.</para>
 ///
+/// <para><b>A second option, rejected — declare the event with no call site.</b>
+/// It has a precedent here: <c>ActivityTrail.Event</c> carries
+/// <c>ItemExcluded</c>, <c>ItemReIncluded</c> and <c>RemovalBlocked</c>,
+/// declared with the site-health work purely so this same trail test was green,
+/// and the comment beside them disclaims itself as precedent in as many words
+/// ("a note that they are owed a caller, not a precedent"). It was rejected for
+/// #158 for a stronger reason than tidiness. Those three were a FEW DAYS ahead
+/// of their call sites in the same release; the unit-word rename is a whole
+/// feature a release away, so the declaration would sit there for a milestone
+/// with nothing to write it. And an event that is named but never recorded
+/// tells the contract that a line exists which no teacher's trail will ever
+/// carry — a green test asserting a trail that cannot happen, which is worse
+/// than a red one, because the next person to ask "does Windows record this?"
+/// gets yes. <c>FolderProblemFound</c> sat dead for months exactly that way. A
+/// ledger entry says the opposite and says it out loud: this is NOT recorded
+/// here yet, and here is who owes it.</para>
+///
 /// <para><b>The boundary — when an entry is allowed.</b> Only when an OPEN
 /// issue, milestoned LATER than the release being cut, owns the work. Never for
 /// a difference a teacher can see at the current milestone: that is a defect to
@@ -117,11 +134,26 @@ internal static class NamedGapLedger
 
         foreach (var entry in mine)
         {
+            // TWO different things bring you here, and the second is the one
+            // this ledger exists to catch. Either the contract genuinely
+            // dropped the key — fine, delete the entry — or somebody SCOPED it
+            // away from this platform, which reaches this check the same way:
+            // ContractTests filters `activityTrail.mustRecord` by `appliesOn`
+            // BEFORE calling in, so an `appliesOn: ["mac"]` added to quiet a
+            // suite arrives here as "the contract no longer names it". Both
+            // possibilities are named, because deleting the entry is the right
+            // answer to the first and the wrong one to the second.
             Assert.True(contract.Contains(entry.Key),
                 $"NamedGapLedger holds \"{entry.Key}\" open under {entry.Area}, and the contract no " +
-                "longer names it. A gap can only be held open against something the contract still " +
-                "asks for. Delete this entry from windows-app/Plantoir.Tests/NamedGapLedger.cs and " +
-                $"say on issue #{entry.Issue} that the requirement went away.");
+                "longer names it HERE. Two different things cause that. (1) The contract dropped the " +
+                "key outright — the requirement went away, so delete this entry from " +
+                $"windows-app/Plantoir.Tests/NamedGapLedger.cs and say so on issue #{entry.Issue}. " +
+                "(2) Somebody scoped it away from this platform instead — an `appliesOn` that no " +
+                "longer lists \"windows\". Check `git log -p contracts/shared-rules.json` before " +
+                "believing (1): scoping is the softening this ledger exists to prevent, it has no " +
+                $"mend-check of its own, and issue #{entry.Issue} ({entry.Milestone}) says this " +
+                "platform owes the work. If that is what happened, put the contract back and leave " +
+                "this entry alone.");
 
             Assert.False(here.Contains(entry.Key),
                 $"\"{entry.Key}\" is ledgered as not built here yet (issue #{entry.Issue}, " +
