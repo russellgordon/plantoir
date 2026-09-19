@@ -317,7 +317,13 @@ enum SectionAdder {
 
         var addition: [String] = ["createdSection\(sectionNumber): \(created)"]
         if let publish = publishValue(forSection: source, in: lines) {
-            addition.append("publishForSection\(sectionNumber): \(publish)")
+            // An empty value is a null, and `key:` is how YAML spells one —
+            // `key: ` with a trailing space would say the same thing and look
+            // like a typo in the teacher's file.
+            let pair: String = publish.isEmpty
+                ? "publishForSection\(sectionNumber):"
+                : "publishForSection\(sectionNumber): \(publish)"
+            addition.append(pair)
         }
 
         // The pair goes after the last per-section key, so each section's
@@ -358,20 +364,64 @@ enum SectionAdder {
 
     /// Whether a section publishes this page, as the string to write back.
     ///
-    /// Visibility is `publishForSectionN`. `draftSectionN` is the older
-    /// spelling with the OPPOSITE polarity, so a course written before the
-    /// rename is read and inverted — carrying it across unchanged would
-    /// publish a page the teacher had held back.
+    /// The current key's value is COPIED, character for character, comment and
+    /// quotes and all. That is what makes the copy safe: whatever the build
+    /// makes of `publishForSection1: oN`, it makes the same thing of
+    /// `publishForSection2: oN`, so no reader standing between the two can
+    /// invert it by misreading it. The one value that cannot be copied is one
+    /// that runs onto the NEXT line — a block scalar, or a key with the value
+    /// indented beneath it — because the copy would be a key with nothing
+    /// after it. Those are written as held back, for the reason below.
+    ///
+    /// `draftSectionN` is the older spelling with the OPPOSITE polarity, so a
+    /// course written before the rename is read and inverted — carrying it
+    /// across unchanged would publish a page the teacher had held back. That
+    /// inversion is the build's own rule, read by `PageVisibilityReader`:
+    /// until 2026-09-18 it was `value == "true"`, which quietly PUBLISHED a
+    /// `draftSection1: yes` or `draftSection1: On` page into the new section
+    /// while the build went on hiding the original.
+    ///
+    /// A draft value this app cannot read is written as held back. A page
+    /// wrongly held back is one a teacher notices and fixes; a page wrongly
+    /// published is one nobody notices at all.
     static func publishValue(forSection sectionNumber: Int, in lines: [String]) -> String? {
-        let publishPrefix: String = "publishForSection\(sectionNumber):"
-        for line in lines where line.hasPrefix(publishPrefix) {
-            return String(line.dropFirst(publishPrefix.count)).trimmingCharacters(in: .whitespaces)
+        // The reader's own matcher and the reader's own LAST-wins rule, so the
+        // value carried across is the value the build reads. A prefix test
+        // missed `"publishForSection1": false` entirely, and stopping at the
+        // first of two copies carried the one PyYAML throws away.
+        if let entry = PageVisibilityReader.lastTopLevelEntry(
+            forKey: "publishForSection\(sectionNumber)", in: lines
+        ) {
+            let value: String = PageVisibilityReader.trimmingYAMLSpaces(entry.value)
+            let continues: Bool = entry.nextLine?.hasPrefix(" ") == true
+                || entry.nextLine?.hasPrefix("\t") == true
+            if continues {
+                return "false"
+            }
+            if value.isEmpty {
+                // A key with nothing after it is a null, which PUBLISHES the
+                // page. Copying the emptiness keeps the new section saying
+                // what the old one says; writing "false" would hide it.
+                return ""
+            }
+            if !PageVisibilityReader.isCompleteOnItsOwnLine(entry.value) {
+                return "false"
+            }
+            return value
         }
 
-        let draftPrefix: String = "draftSection\(sectionNumber):"
-        for line in lines where line.hasPrefix(draftPrefix) {
-            let value: String = String(line.dropFirst(draftPrefix.count)).trimmingCharacters(in: .whitespaces)
-            return value.lowercased() == "true" ? "false" : "true"
+        if let entry = PageVisibilityReader.lastTopLevelEntry(
+            forKey: "draftSection\(sectionNumber)", in: lines
+        ) {
+            let scalar: PageVisibilityReader.ScalarReading = PageVisibilityReader.reading(
+                ofValue: entry.value, followedBy: entry.nextLine
+            )
+            switch PageVisibilityReader.answerFromDraftFamily(scalar) {
+            case .visible:
+                return "true"
+            case .hidden, .cannotTell, .saysNothing:
+                return "false"
+            }
         }
         return nil
     }

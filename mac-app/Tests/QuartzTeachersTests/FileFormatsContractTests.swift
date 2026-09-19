@@ -104,12 +104,24 @@ final class FileFormatsContractTests: XCTestCase {
 
             The lesson.
             """
+            // Every case carries `sectionLocal`, and the READ deliberately
+            // does not use it: the build consults all four keys on every page
+            // it copies, wherever that page lives. It is unwrapped anyway so
+            // that a case written without it fails here rather than on
+            // Windows, whose writing side still needs it.
+            _ = try XCTUnwrap(
+                testCase["sectionLocal"] as? Bool,
+                "A reading case must still say whether the page is section-local: \(frontmatter)"
+            )
             let visible: Bool = AssistPageVisibility.publishes(
                 in: page,
-                forSection: testCase["section"] as? Int ?? 1,
-                isSectionLocal: try XCTUnwrap(testCase["sectionLocal"] as? Bool)
+                forSection: testCase["section"] as? Int ?? 1
             )
-            XCTAssertEqual(visible, testCase["expectVisible"] as? Bool, frontmatter)
+            var message: String = frontmatter
+            if let reason = testCase["why"] as? String {
+                message = frontmatter + " — " + reason
+            }
+            XCTAssertEqual(visible, testCase["expectVisible"] as? Bool, message)
         }
     }
 
@@ -120,7 +132,13 @@ final class FileFormatsContractTests: XCTestCase {
     /// contract said migrate, from 2026-09-07; the app kept inverting; and the
     /// suite stayed green for two days because the test agreed with the code
     /// instead of with the contract. Reading `writingCases` is what stops that
-    /// happening again: Windows runs the same list.
+    /// happening again.
+    ///
+    /// Windows does NOT yet run this list — `Plantoir.Tests` answers
+    /// `writingRules` with hand-written assertions instead, which is the same
+    /// shape of gap this test was written to close. Said plainly because this
+    /// comment claimed the opposite until 2026-09-18, and a false claim about
+    /// what the other side runs is how a divergence survives review.
     func testTheLegacySpellingIsMigratedToTheCurrentOne() throws {
         let section: [String: Any] = try FileFormatsContractTests.section("pageVisibility")
         let group: [String: Any] = try XCTUnwrap(section["writingCases"] as? [String: Any])
