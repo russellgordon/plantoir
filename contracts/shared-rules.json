@@ -76,9 +76,9 @@
         "why": "Recorded the moment the teacher's words are ACCEPTED, above every branch below it - not when the message goes to the model, and not when an answer comes back. Two different bugs came from placing it lower: a sentence matching a fixed shape returns early and never reaches the model, so a whole class of input left no trace at all; and an engine that failed, or one still thinking when the teacher gave up, lost the sentence that caused the trouble. It is also what the report's checkbox keys off, so recording it late made the checkbox vanish for somebody who had plainly just used the assistant. The general rule: record what the teacher did where they did it, above every branch, never at a later point that can be skipped."
       },
       {
-        "carries": "course, section, and the tool it ran",
+        "carries": "course, section, the tool it ran, and - when the phrasing named a time and the app settled it onto a day - the whole moment it settled on",
         "event": "assistant matched a fixed phrase",
-        "why": "Some phrasings are matched in code and never reach the model at all. Without this line, 'why did it not think about what I said?' is unanswerable - the trail would show a tool running with nothing between it and the teacher's sentence."
+        "why": "Some phrasings are matched in code and never reach the model at all. Without this line, 'why did it not think about what I said?' is unanswerable - the trail would show a tool running with nothing between it and the teacher's sentence. The moment joined it with the deploy-at-a-time family (issue #168): 'deploy at 6:30 am' names no day, so the app chooses one - the next such time, counting today while it is still to come - and a teacher writing in to say 'it went out on Saturday, I meant Friday' would otherwise leave a trail carrying their sentence and the tool but not the day that was chosen. The conversation is not on the trail, so this is the only place that choice is recoverable. A WHOLE moment only, never a half-settled word and never anything a teacher wrote."
       },
       {
         "carries": "course, section, the tool name, the ARGUMENT NAMES, the seconds, the completion-token count, and whether it waited for the approval button",
@@ -89,6 +89,11 @@
         "carries": "course, section, and the reason",
         "event": "assistant could not answer",
         "why": "The failure that leaves nothing else behind: no tool, no turn, no output. Without this line 'I asked it something and nothing happened' is unfalsifiable."
+      },
+      {
+        "carries": "course, section, which tool the model had BEGUN to name when there was one, and WHICH of the two things happened - an answer the engine stopped part way, or a finished answer whose arguments could not be read. Never what it had begun to write.",
+        "event": "assistant answer was cut off",
+        "why": "A model can write until it is stopped, and what it has half-written is not an instruction: the app throws it away, runs nothing and says so. Without this line the teacher's side of that - a long wait and then the assistant declining - is indistinguishable from a misroute, so a report of 'it thought for ages and then said no' has nothing to look at. Separate from 'assistant could not answer', which is for an engine that FAILED; here the engine answered perfectly and the app refused the answer. The tool it had begun to name is carried because 'it ran away trying to publish' and 'it ran away trying to deploy' are different reports; what it had begun to WRITE is not carried, because that is the teacher's page titles. The two causes share one event and one sentence to the teacher - from their side both are mended by asking again - but the LINE distinguishes them, because whoever reads the report cannot: an answer stopped at the cap is a question about how much the model was asked to write, and a finished answer whose arguments will not parse is a question about the model itself."
       },
       {
         "carries": "which assistant the teacher is set to use",
@@ -263,6 +268,12 @@
     "deployingAlwaysAsks": {
       "value": true,
       "why": "Deploying puts work in front of students and cannot be taken back by us, so it is gated separately and the setting does not reach it."
+    },
+    "theImmediateDeployCardSaysItIsImmediate": {
+      "value": true,
+      "mustContain": "now",
+      "mustContainIsAWholeWord": true,
+      "why": "Matched as a WHOLE WORD, case-folded, which is what mustContainIsAWholeWord says and why it is not left to each platform's `contains`: 'knows', 'known' and 'nowhere' would all satisfy a substring test, so a sentence that says nothing about time could keep this rule green. `value` being true is asserted rather than read as a switch - a rule turned off from the data is a rule that goes quiet without anybody deciding to turn it off. The two approval cards were asymmetric exactly where a misroute lands. The scheduled one names the whole moment; the immediate one named no time at all, so a teacher who asked for 6:30 tomorrow and was routed to an immediate deploy read a card that was perfectly true and said nothing to contradict them. Measured on 2026-09-18: the smaller assistant sent 'Deploy at 6:30 AM' to deploy_section 10 trials out of 10 and 3 of 3 in the app itself (research/ai-assist/metal-routing-results.txt, issue #168). The WORD is asserted, case-folded, and not the sentence: the sentence lives in wording.deployApproval, has been rewritten three times already and will be again, while the rule that an immediate deploy must say it is immediate should outlive every rewording. It helps every misroute of this shape, not only the one that was measured."
     },
     "mentionedAfter": {
       "plansAccepted": 15,

@@ -41,9 +41,18 @@ AssistAgent does (Say appends the date; NarrowToLocal rewrites examples).
                      em-dashes on every run; see `assert_forms_agree`.
   --temperature X    Default 0.1, which is what the older runs used.
   --app-body         Send the request AssistModelClient sends: temperature 0,
-                     tool_choice "auto", no max_tokens. Greedy decoding makes
+                     tool_choice "auto", and `max_tokens` READ OUT OF THE
+                     SWIFT (`AssistModelClient.mostTokensPerReply`, 512 since
+                     #166) rather than copied here. Greedy decoding makes
                      repeated trials near-deterministic, so a trial count is
                      not a failure rate — see the note in the report.
+  --uncapped         Only with --app-body: send no `max_tokens` at all, which
+                     is the body the mac sent BEFORE #166. Kept for the same
+                     reason `--date-prepended` and `--prompt pre-tweak` are:
+                     the version that failed, kept so the failure can be
+                     reproduced rather than re-discovered. Every `--app-body`
+                     number taken before 2026-09-19 — including
+                     `metal-routing-results.txt`'s H arm — is this arm.
   --intercept-only   Run the interception guard and stop. No server needed.
   --mac-shelf        Measure the MAC's shelf (AssistSupportingViews.swift)
                      instead of the 29 probes. The eleven "promise card"
@@ -55,6 +64,7 @@ Usage:
   python trimmed-surface-suite.py TOOLS.json [trials] [--date-appended]
          [--date-prepended] [--real-course] [--port 8099] [--course VVH2O]
          [--prompt hyphen|shipped|pre-tweak] [--temperature 0.1] [--app-body]
+         [--uncapped]
          [--intercept-only]
 
 TOOLS.json is the narrowed OpenAI-shaped surface. Produce it from the contract
@@ -89,16 +99,23 @@ COURSE = args[args.index("--course") + 1] if "--course" in args else "EXC2O"
 SECTION = 1
 PROMPT_FORM = args[args.index("--prompt") + 1] if "--prompt" in args else "hyphen"
 APP_BODY = "--app-body" in args
+UNCAPPED = "--uncapped" in args
 TEMPERATURE = float(args[args.index("--temperature") + 1]) if "--temperature" in args else 0.1
 if APP_BODY:
-    # AssistModelClient.reply: temperature 0, tool_choice auto, no max_tokens.
+    # AssistModelClient.reply: temperature 0, tool_choice auto, and a cap read
+    # out of the Swift below (or none at all with --uncapped, which is the
+    # body the mac sent before #166).
     TEMPERATURE = 0.0
+if UNCAPPED and not APP_BODY:
+    sys.exit("--uncapped only means anything with --app-body: every other arm "
+             "sends the suite's historic max_tokens 256.")
 INTERCEPT_ONLY = "--intercept-only" in args
 # The MAC's shelf instead of Windows' ExampleRequests — see MAC_SHELF below.
 MAC_SHELF_ONLY = "--mac-shelf" in args
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 AGENT_SWIFT = "mac-app/QuartzTeachers/Models/Assist/AssistAgent.swift"
+CLIENT_SWIFT = "mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift"
 PRE_TWEAK_COMMIT = "b77b91bd^"
 
 ENDPOINT = "http://127.0.0.1:%s/v1/chat/completions" % PORT
@@ -189,6 +206,28 @@ def swift_system_prompt(source: str, course: str, section: int) -> str:
             text += body + "\n"
     text = text.rstrip("\n")
     return text.replace("\\(course)", course).replace("\\(section)", str(section))
+
+
+def swift_most_tokens_per_reply() -> int:
+    """`AssistModelClient.mostTokensPerReply`, read out of the Swift.
+
+    Read rather than copied, for the reason the system prompt is: a hand copy
+    of a shipping value is exactly what `narrow-tools.py` taught this folder
+    not to keep. It EXITS when the constant cannot be found — a renamed
+    constant that quietly fell back to a default would make the `--app-body`
+    arm measure the uncapped body while its header line claimed otherwise,
+    which is a measurement that looks like evidence and is not.
+    """
+    source = (ROOT / CLIENT_SWIFT).read_text(encoding="utf-8")
+    found = re.search(r"static let mostTokensPerReply:\s*Int\s*=\s*(\d+)", source)
+    if not found:
+        sys.exit(
+            "Could not find `static let mostTokensPerReply: Int = N` in %s.\n"
+            "The --app-body arm sends what the app sends, so it cannot run "
+            "until this reads the real value. Fix the regex above (or pass "
+            "--uncapped, which deliberately sends no cap)." % CLIENT_SWIFT
+        )
+    return int(found.group(1))
 
 
 def system_prompt(form: str, course: str, section: int) -> str:
@@ -491,8 +530,13 @@ def intercepted(message):
     CONTRACT rather than from a hand-copied list, which is how
     `narrow-tools.py` went stale for three days without anyone noticing.
     Same tidying as the Swift: trim, strip leading and trailing `.` and `!`,
-    lower-case, then EQUALITY — never a substring. Then the four parsed
-    families, which cannot be listed because the number in them is unbounded.
+    lower-case, then EQUALITY — never a substring. Then the six parsed
+    families, which cannot be listed because the number, title or TIME in them
+    is unbounded. The sixth — "deploy at <time>" — is checked against the
+    contract's own accepted and refused rows before any probe is sent, by
+    `assert_deploy_at_a_time_matches_contract()` below: this guard went one
+    family stale once already, and a stale guard scores a routing result for a
+    sentence the app never routes.
     """
     with open(ROOT / "contracts" / "assist-cases.json", encoding="utf-8") as handle:
         phrasings = json.load(handle)["cardPhrasings"]["matches"]
@@ -512,9 +556,121 @@ def intercepted(message):
         one = room.group(1) in ("a", "one", "1")
         if one == (room.group(2) == "class"):
             return "make_room_for_classes"
+    if deploy_at_a_time(tidied):
+        return "schedule_deploy"
     if re.fullmatch(r"duplicate .+ as (my next class|the next class|my next lesson)", tidied):
         return "add_next_class"
     return None
+
+
+def deploy_at_a_time(tidied):
+    """Whether "deploy at 6:30 am" and its spellings are answered in code.
+
+    Mirrors `AssistCardCommand.deployAtATime`. It answers only WHETHER, not
+    which minute: the suite measures what reaches the model, and the settling
+    into a whole moment happens later, in the app, against a clock.
+    """
+    frame = tidied.rstrip("?").strip()
+    words = frame.split()
+    if words[:1] == ["please"]:
+        words = words[1:]
+    if words[-1:] == ["please"]:
+        words = words[:-1]
+    if words[:1] != ["deploy"]:
+        return False
+    words = words[1:]
+    if words[:1] == ["it"]:
+        words = words[1:]
+    elif words[:2] == ["this", "section"]:
+        words = words[2:]
+    day = None
+    if words[:1] and words[0] in ("today", "tomorrow"):
+        day = words[0]
+        words = words[1:]
+    if words[:1] != ["at"]:
+        return False
+    words = words[1:]
+    if words[-1:] and words[-1] in ("today", "tomorrow"):
+        if day is not None:
+            return False
+        words = words[:-1]
+    return time_of_day(words) is not None
+
+
+def time_of_day(words):
+    """"6:30 am", "7pm", "18:30", "noon", "midnight" -> "HH:MM", else None."""
+    if len(words) not in (1, 2):
+        return None
+    if len(words) == 1:
+        if words[0] == "noon":
+            return "12:00"
+        if words[0] == "midnight":
+            return "00:00"
+    clock, meridiem = words[0], None
+    if len(words) == 2:
+        meridiem = words[1].replace(".", "")
+        if meridiem not in ("am", "pm"):
+            return None
+    else:
+        for ending in ("a.m.", "p.m.", "a.m", "p.m", "am", "pm"):
+            if meridiem is None and clock.endswith(ending):
+                meridiem = ending.replace(".", "")
+                clock = clock[: -len(ending)]
+    hour_text, minute_text = clock, "00"
+    if ":" in clock:
+        hour_text, _, minute_text = clock.partition(":")
+    elif meridiem is None:
+        return None
+    for text in (hour_text, minute_text):
+        if not text or any(character not in "0123456789" for character in text):
+            return None
+    if len(hour_text) > 2 or len(minute_text) != 2:
+        return None
+    hour, minute = int(hour_text), int(minute_text)
+    if minute > 59:
+        return None
+    if meridiem is None:
+        if len(hour_text) != 2 or hour > 23:
+            return None
+        return "%02d:%s" % (hour, minute_text)
+    if not 1 <= hour <= 12:
+        return None
+    if meridiem == "pm" and hour != 12:
+        hour += 12
+    if meridiem == "am" and hour == 12:
+        hour = 0
+    return "%02d:%s" % (hour, minute_text)
+
+
+def assert_deploy_at_a_time_matches_contract():
+    """Fail the run if the guard above has drifted from the contract's rows.
+
+    The shelf list is checked against the Swift for exactly this reason, and
+    this guard needs it more: `AssistCardCommand` is the truth and nothing here
+    can import it, so the contract's own accepted and refused rows are what
+    stand in for it. A miss in either direction is a number nobody should quote
+    — an accepted row that is not intercepted here gets SENT to the model and
+    scored as routing for a sentence the app answers itself, and a refused row
+    that is intercepted hides a probe that genuinely does route.
+    """
+    with open(ROOT / "contracts" / "assist-cases.json", encoding="utf-8") as handle:
+        family = json.load(handle).get("deployAtATime")
+    if not family:
+        sys.exit("contracts/assist-cases.json carries no deployAtATime rows to check against.")
+    wrong = []
+    for row in family["accepted"]:
+        if intercepted(row["input"]) != "schedule_deploy":
+            wrong.append("accepted and NOT intercepted: %r" % row["input"])
+    for row in family["refused"]:
+        if intercepted(row["input"]) == "schedule_deploy":
+            wrong.append("refused and intercepted anyway: %r" % row["input"])
+    if wrong:
+        sys.exit(
+            "deploy_at_a_time() no longer agrees with contracts/assist-cases.json "
+            "-> deployAtATime:\n  %s\nFix it before quoting a number from this suite."
+            % "\n  ".join(wrong)
+        )
+    return len(family["accepted"]) + len(family["refused"])
 
 
 def ask(prompt):
@@ -525,10 +681,14 @@ def ask(prompt):
         "tools": TOOLS,
     }
     if APP_BODY:
-        # What AssistModelClient sends, and nothing else: no max_tokens, and
-        # tool_choice named rather than left to the server's default.
+        # What AssistModelClient sends, and nothing else: tool_choice named
+        # rather than left to the server's default, and the cap read out of
+        # the Swift — or none at all under --uncapped, which is the body the
+        # mac sent before #166.
         payload["tool_choice"] = "auto"
         payload["stream"] = False
+        if not UNCAPPED:
+            payload["max_tokens"] = APP_CAP
     else:
         payload["max_tokens"] = 256
     request = urllib.request.Request(ENDPOINT, data=json.dumps(payload).encode(),
@@ -566,21 +726,34 @@ def ask(prompt):
 # Which probes the app never sends. Computed rather than listed, so a
 # phrasing added to the card table shows up here on the next run.
 CARD_LABELS = [probe for _, _, probe, _ in PROMISED]
+# The one parsed family this guard cannot describe with a one-line regex is
+# pinned against the contract before anything is measured.
+DEPLOY_ROWS_CHECKED = assert_deploy_at_a_time_matches_contract()
 INTERCEPTED = {}
 for acceptable, prompt, probe, needs_date in CASES:
     tool = intercepted(prompt.replace("EXC2O", COURSE).replace("exc2o", COURSE.lower()))
     if tool is not None:
         INTERCEPTED[probe] = tool
 
+# Read once, and only when it is going to be sent: an --uncapped arm is
+# reproducible from a checkout where the constant does not exist yet.
+APP_CAP = swift_most_tokens_per_reply() if (APP_BODY and not UNCAPPED) else None
+
 print("### date-appended=%s date-prepended=%s real-course=%s" % (
     DATE_APPENDED, DATE_PREPENDED, REAL_COURSE))
 print("### prompt=%s temperature=%s app-body=%s trials=%s course=%s" % (
     PROMPT_FORM, TEMPERATURE, APP_BODY, TRIALS, COURSE))
+print("### max_tokens=%s (%s)" % (
+    "none" if (APP_BODY and UNCAPPED) else (APP_CAP if APP_BODY else 256),
+    "--uncapped: the body the mac sent before #166" if (APP_BODY and UNCAPPED)
+    else ("read from %s" % CLIENT_SWIFT if APP_BODY else "this suite's historic cap")))
 print("### em-dashes in the shipped literal, folded for the hyphen form: %d"
       % assert_forms_agree())
 if MAC_SHELF_ONLY:
     print("### mac shelf: %d phrasings, checked against %s"
           % (assert_shelf_is_current(), SHELF_SWIFT))
+print("### deploy-at-a-time guard agrees with %d contract rows"
+      % DEPLOY_ROWS_CHECKED)
 print("### intercepted in code before the model (%d of %d probes): %s" % (
     len(INTERCEPTED), len(CASES),
     ", ".join("%s -> %s" % (p, t) for p, t in INTERCEPTED.items())))

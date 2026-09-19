@@ -1,0 +1,458 @@
+WHAT THE max_tokens CAP DID TO ROUTING (ISSUE #166)
+===================================================
+
+THE FIRST THING TO KNOW: THIS SUITE CANNOT SEE THE FIX
+------------------------------------------------------
+Issue #166 is two changes, and only one of them is measurable here.
+
+  1. The app now sends `"max_tokens": 512` (`AssistModelClient.mostTokensPerReply`)
+     where it sent nothing before.
+  2. The app now REFUSES to run a call parsed out of an answer the server
+     ended on `length` rather than on the model finishing.
+
+`trimmed-surface-suite.py` scores the tool NAME the model chose. It does not
+run the app, so it cannot see (2) at all — nothing here is evidence that the
+refusal works, and `AssistCutOffAnswerTests` in the mac suite is where that
+lives. What this file answers is the ONE question a cap raises and a unit test
+cannot: **does bounding the reply change which tool the model picks?**
+
+The visible effect of (1) in these runs is confined to the length/TRUNCATED
+lines. Everything else is expected to be — and is — identical.
+
+**And it cannot show a "win" either.** A cap can only be neutral or harmful to
+routing. The gain it buys is a teacher not waiting 41 to 95 seconds for an
+answer that was never going to be usable, and that gain is a clock, which this
+file reports and deliberately does not score.
+
+AN EQUIVALENCE TO CARRY FORWARD
+-------------------------------
+**`metal-routing-results.txt`'s `H` arm — and every `--app-body` number in this
+folder taken before 2026-09-19 — is `--app-body --uncapped` today.** The flag
+was added by #166 so the old body stays reproducible. A run made with plain
+`--app-body` after 2026-09-19 is measuring a DIFFERENT request, and comparing
+it with an older `--app-body` figure is not like-for-like.
+
+WHAT THIS NUMBER IS NOT
+-----------------------
+  - **Not a pass rate.** Temperature 0, near-greedy: ten trials of a probe are
+    usually ten copies of one answer. Ten trials distinguishes "this model
+    systematically does this" from "it wobbled once".
+  - **Not what a teacher experiences.** Five of the 29 probes never reach the
+    model in the app (`AssistCardCommand` answers them in code), and the app
+    settles the course, the section and relative dates before any call runs.
+  - **Not a gate.** Nothing in either test suite checks routing, deliberately.
+  - **Not a comparison across days.** `--date-appended` puts the date in every
+    probe, so BEFORE and AFTER were run on the SAME day on purpose.
+
+CONDITIONS
+----------
+Date:        2026-09-19. BEFORE arms (B1, B1') 08:11-08:41 local; AFTER arms
+             (CAPPED and CONTROL) 10:20-10:54 local; the extra measurement
+             below 10:54-10:57.
+Dateline:    `--date-appended` appends "(Today is 2026-09-19, a Saturday.)" to
+             every probe. Every arm in this file carries the same one.
+Machine:     Apple M4 Pro (hw.model = Mac16,8), 48 GiB (51,539,607,552 bytes),
+             hw.perflevel0.logicalcpu = 8 performance cores,
+             hw.perflevel1.logicalcpu = 4 efficiency
+macOS:       26.6 (build 25G72)
+Engine:      llama.cpp b10435 - `version: 0.1.0-dev (build 10435, commit
+             9e40df63b)`, AppleClang 21.0.0.21000101 for Darwin arm64 - a COPY
+             of the binary the app bundles (mac-app/Vendor/llama/llama-server),
+             sha256 e7d9f892260d2e48b63bf7cbe9e263c8fc07fd5851fadd970aa741242efa7f29.
+             NATIVE, with Metal. Nothing in a container; Colima was not touched.
+Models:      .small  qwen2.5-1.5b-instruct-q4_k_m.gguf, Q4_K_M,
+                     1,117,320,736 bytes
+                     sha256 6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e
+                     (the file the app itself downloaded, read-only here)
+             .large  Qwen3-4B-Q4_K_M.gguf, Q4_K_M, 2,497,280,256 bytes
+                     sha256 7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5
+                     the byte count AssistModelTier.downloadBytes checks
+Context:     8192 (.small), 16384 (.large) - AssistModelTier.contextTokens
+Threads:     4 - AssistHardwareBudget.threadCount on this Mac (half the eight
+             performance cores, clamped to [2,6])
+Flags:       exactly AssistServerHost.serverArguments and nothing else:
+               --model <M> --port <P> --host 127.0.0.1 --ctx-size <C>
+               --reasoning off --reasoning-budget 0 --threads 4
+               --n-gpu-layers 999 --jinja --parallel 1
+Port:        8098 for every AFTER arm (8099 for the BEFORE arms). A separate
+             measurement was running on this Mac at the same time and owned
+             8099; its server was NOT touched, and its presence during each arm
+             is recorded below.
+Surface:     13 tools, the local surface, from
+             `python3 research/ai-assist/tools-from-contract.py local`,
+             sha256 36c5642b68127cde2aa7a05afd099ab8639575ec5651e94929bf74a9c9cacf74
+             - regenerated from the implementation branch and BYTE-IDENTICAL
+             to the file the BEFORE arms ran against.
+Contract:    contracts/assist-cases.json unchanged between the BEFORE tree and
+             the implementation branch (sha256
+             047e49e954ccd4b72574c05da0f7d893227f3b991738757c366b7bda02462cb2
+             in both). Contract 68de49ad (2026-09-09 23:33) is newer than
+             AssistToolSurface.swift 3c080a54 (2026-09-09 23:20).
+Prompt:      the shipped literal, READ out of AssistAgent.swift. That file
+             changed on the branch (96 lines), so the literal was extracted
+             from both trees and compared rather than assumed: identical,
+             sha256 406c7f0c85e43d2b9690187ead0d06bbe63d57e0e5efa83bf8670cbe06f61813,
+             1,278 chars, six em-dashes. Every arm printed
+             "em-dashes in the shipped literal ...: 6".
+Shelf:       AssistSupportingViews.swift byte-identical between the two trees
+             (sha256 ab52d711ecab6be5c9ef57e3e1f3d3fe221e11eb6def548a9c65d66021f63390).
+             Every --mac-shelf arm printed "mac shelf: 19 phrasings".
+Interception: 5 of 29 in the default set, 15 of 19 in the shelf set - the same
+             counts the BEFORE arms printed. **Re-running this today prints 16
+             of 19 for the shelf**, and that is not drift in this measurement:
+             #168 landed on 2026-09-19 AFTER these arms ran and moved "Deploy
+             at 6:30 AM" into AssistCardCommand, so one more shelf phrasing is
+             now answered in code and never reaches the model. Every arm here
+             ran against the 15/19 surface; the probe it moved
+             ("shelf: deploy at 6:30") chose the same tool in every arm of
+             this run, capped and not.
+Sources:     BEFORE arms: a worktree of origin/dev at 0a6c2247.
+             AFTER arms:  a worktree of origin/issue/166-token-cap at 0f5f48f8,
+                          the pushed implementation.
+Suite:       research/ai-assist/trimmed-surface-suite.py on the branch,
+             sha256 c95232e29ba1f411750db8ddd6347644bafe62309facf64201c6fe4f27e37365.
+             Its only change against the BEFORE tree's copy is the cap
+             plumbing - `--uncapped`, the constant-reading function, and one
+             extra header line - so under `--uncapped` the request body is
+             byte-for-byte the body the BEFORE arms sent.
+Body:        confirmed by READING `ask()`, not assumed, and by the header line
+             each arm printed:
+               CAPPED   --app-body            -> "### max_tokens=512 (read from
+                                                  mac-app/QuartzTeachers/Models/
+                                                  Assist/AssistModelClient.swift)"
+               CONTROL  --app-body --uncapped -> "### max_tokens=none (--uncapped:
+                                                  the body the mac sent before #166)"
+             The suite EXITS if `static let mostTokensPerReply: Int = N` cannot
+             be found, so a capped arm cannot silently measure an uncapped body.
+Command:     python3 research/ai-assist/trimmed-surface-suite.py tools.json 10 \
+               --date-appended --real-course --course VVH2O --prompt shipped \
+               --app-body [--uncapped] --port 8098 [--mac-shelf]
+Hygiene:     `lsof` checked the port empty before every server; ONE server of
+             this run at a time; each killed by the PID the arm recorded, with
+             `kill -0` confirming it gone before the next arm began. An arm
+             WAITS for Plantoir rather than killing it. Nothing this run did
+             not start was killed.
+Folders:     no teacher folder was written. `--real-course` needs nothing on
+             disk - it rewrites ICS3U to VVH2O inside the tool schemas'
+             examples. The extra measurement at the end READ one real course
+             folder, and names it.
+
+PRE-REGISTERED, BEFORE ANY AFTER ARM EXISTED
+--------------------------------------------
+Written 2026-09-19 08:46 EDT, after the noise floor was measured and before the
+first capped request was sent. Quoted here in full so the threshold cannot be
+read as having been fitted to the result:
+
+    # #166 - pre-registered threshold, written 2026-09-19 08:46 EDT BEFORE any
+    # AFTER arm exists
+    #
+    # Noise floor (noise-floor.md): B1 vs B1' on fresh servers, both tiers,
+    # both probe sets: 0 of 960 trials differ in tool chosen or arguments. So
+    # the threshold is strict: for every probe, the bag of tool names in AFTER
+    # (max_tokens as the app will send it) equals BEFORE, per tier and per
+    # probe set.
+    #
+    # Trips: any polarity inversion; a stable-pass probe losing it; a
+    # legitimate call cut by the cap (read as a per-probe diff of the
+    # length/TRUNCATED lines - the ONLY expected difference is the small
+    # tier's "publish tomorrow, with links" runaway stopping at the cap
+    # instead of at the context); a probe switching between declining and
+    # choosing.
+    # Not grounds either way: token counts falling, latency, the count of
+    # length turns.
+    # Same-day comparison only: the appended date moves two probes across days.
+
+THE NOISE FLOOR THE THRESHOLD RESTS ON
+--------------------------------------
+The same BEFORE arm was run twice in the morning (B1 and B1'), on fresh servers,
+killed by PID in between, with nothing changed at all. In all four tier x
+probe-set combinations the two agree on every probe - not only in the bag of
+tool names but trial for trial, in order, including the printed arguments: 0 of
+960 trials differ. The floor is EMPTY, which is why the threshold above is
+strict equality rather than a tolerance. Full record: the measurement's own
+noise-floor file, kept with the run.
+
+THE ARMS
+--------
+Each arm: 10 trials of every probe, a fresh server, the port confirmed free
+first, the server killed by PID after.
+
+  CAPPED   --app-body            (the branch's body: max_tokens 512)   x4
+  CONTROL  --app-body --uncapped (the body the mac sent before #166)   x4
+
+CONTROL exists because the AFTER arms ran in the afternoon of the same day and
+the BEFORE arms in the morning. It is the same body as B1, re-run on this
+afternoon's machine, and it BOUNDS what any capped-vs-BEFORE difference could
+mean. It is reported first for that reason.
+
+THE CONTROL: THIS MORNING'S ARM REPRODUCES
+------------------------------------------
+Per probe, the bag of tool names, CONTROL against B1, all four cells:
+
+  small / 29 probes   IDENTICAL for all 29   (and per-trial identical, 290 rows)
+  small / shelf 19    IDENTICAL for all 19   (and per-trial identical, 190 rows)
+  large / 29 probes   IDENTICAL for all 29   (and per-trial identical, 290 rows)
+  large / shelf 19    IDENTICAL for all 19   (and per-trial identical, 190 rows)
+
+Nothing to report first, in the sense the plan meant: the control differs from
+B1 nowhere, so the AFTER comparison below is not standing on a shifted floor.
+The blunt version - cut away the millisecond column and everything right of it,
+and diff - is two lines per pair, and both are expected: the suite's new
+`### max_tokens=` header line, and the `turn latency` summary.
+
+RESULT: THE CAPPED ARMS
+-----------------------
+Per probe, the bag of tool names, CAPPED against BOTH baselines, all four cells:
+
+  | Tier / probe set | vs B1 (this morning) | vs CONTROL (this afternoon) |
+  |---|---|---|
+  | Qwen2.5-1.5B, 29 probes | 0 of 29 probes differ | 0 of 29 probes differ |
+  | Qwen2.5-1.5B, shelf 19  | 0 of 19 probes differ | 0 of 19 probes differ |
+  | Qwen3-4B, 29 probes     | 0 of 29 probes differ | 0 of 29 probes differ |
+  | Qwen3-4B, shelf 19      | 0 of 19 probes differ | 0 of 19 probes differ |
+
+**No probe differs anywhere, so there is no probe to list with both bags.**
+
+The stricter check underneath the threshold - `(probe, tool chosen, OK/MISS,
+arguments as printed)` for each trial in order, with the millisecond column
+dropped - is also identical, 960 of 960 rows, against both baselines. (The
+arguments column is the suite's printed PREFIX, not the whole string. For the
+one probe whose call is cut, the prefix is identical while the full strings
+differ in length; the token counts below are where that difference is visible.)
+
+TOTALS, SIDE BY SIDE
+--------------------
+Every figure is the suite's own printed subtotal.
+
+| Arm | all probes | inversions | write-misses | malformed | TRUNCATED mid-JSON | finish_reason length | completion tokens (median/max) | turn latency (median/max) | wall clock |
+|---|---|---|---|---|---|---|---|---|---|
+| small / 29 / B1 (am)         | 200/290 (69%) | 0 | 50 | 10 | 10 | 10 | 39 / 5435 | 338 ms / 41,008 ms | 500 s |
+| small / 29 / CONTROL (pm)    | 200/290 (69%) | 0 | 50 | 10 | 10 | 10 | 39 / 5435 | 632 ms / 94,574 ms | 901 s |
+| small / 29 / CAPPED 512 (pm) | 200/290 (69%) | 0 | 50 | 10 | 10 | 10 | 39 /  512 | 570 ms /  6,256 ms | 210 s |
+| small / shelf / B1 (am)         | 130/190 (68%) | 0 | 20 | 0 | 0 | 0 | 33 / 45 | 303 ms / 2,016 ms | 59 s |
+| small / shelf / CONTROL (pm)    | 130/190 (68%) | 0 | 20 | 0 | 0 | 0 | 33 / 45 | 581 ms / 2,580 ms | 111 s |
+| small / shelf / CAPPED 512 (pm) | 130/190 (68%) | 0 | 20 | 0 | 0 | 0 | 33 / 45 | 554 ms / 2,640 ms | 107 s |
+| large / 29 / B1 (am)         | 280/290 (97%) | 0 | 10 | 0 | 0 | 0 | 41 / 73 | 649 ms / 5,239 ms | 186 s |
+| large / 29 / CONTROL (pm)    | 280/290 (97%) | 0 | 10 | 0 | 0 | 0 | 41 / 73 | 646 ms / 5,209 ms | 185 s |
+| large / 29 / CAPPED 512 (pm) | 280/290 (97%) | 0 | 10 | 0 | 0 | 0 | 41 / 73 | 650 ms / 6,621 ms | 200 s |
+| large / shelf / B1 (am)         | 170/190 (89%) | 0 | 0 | 0 | 0 | 0 | 33 / 50 | 573 ms / 5,233 ms | 116 s |
+| large / shelf / CONTROL (pm)    | 170/190 (89%) | 0 | 0 | 0 | 0 | 0 | 33 / 50 | 580 ms / 5,220 ms | 115 s |
+| large / shelf / CAPPED 512 (pm) | 170/190 (89%) | 0 | 0 | 0 | 0 | 0 | 33 / 50 | 558 ms / 5,214 ms | 114 s |
+
+Every column but the clocks and the one max-token figure is identical across
+the three arms of a cell.
+
+THE RUNAWAY, PER TRIAL - THE ONE THING THAT CHANGED
+---------------------------------------------------
+`.small`, 29-probe set, the probe **"publish tomorrow, with links"**, all ten
+trials of ten in every arm. This is the sentence #166 opened with.
+
+  BEFORE (B1, this morning, uncapped)
+     5,435 completion tokens x 10, 40,658 / 40,661 / 40,728 / 40,737 / 40,770 /
+     40,814 / 40,887 / 40,916 / 40,926 / 41,008 ms
+  CONTROL (this afternoon, uncapped)
+     5,435 completion tokens x 10, 48,654 / 60,254 / 63,916 / 69,785 / 75,882 /
+     77,355 / 77,634 / 78,081 / 79,856 / 94,574 ms
+  CAPPED (this afternoon, 512)
+       512 completion tokens x 10,  6,008 /  6,112 /  6,130 /  6,157 /  6,164 /
+      6,182 /  6,188 /  6,205 /  6,237 /  6,256 ms
+
+Three things are worth saying about those numbers rather than leaving them to
+be inferred.
+
+  * **The token count is exact and repeatable in both directions.** 5,435 in
+    all twenty uncapped trials across two runs eight hours apart; 512 in all
+    ten capped trials. The cap is spent to the token.
+  * **The engine's own accounting agrees about WHAT stopped it.** In the
+    uncapped server logs the slot reports `stop processing: n_tokens = 8191,
+    truncated = 1` ten times - 2,756 prompt + 5,435 written = 8,191, the
+    context. In the capped log `truncated = 1` appears **zero** times and the
+    largest `n_tokens` is 3,268. The stop moved from the context to the cap.
+  * **The clock is not a clean 41 -> 4 s, and it would have been dishonest to
+    round it there.** The afternoon machine was busier than the morning one
+    (another measurement's llama-server was resident for most of the run), so
+    the uncapped runaway got WORSE - up to 94.6 s - while the capped one cost
+    6.0 to 6.3 s. The like-for-like pair is CONTROL against CAPPED on the same
+    afternoon: **48.7-94.6 s becomes 6.0-6.3 s**. The engine's own rate for
+    those generations says why the afternoon is slower rather than different:
+    132.9-133.8 tok/s in the morning, 57.5-111.8 tok/s (median ~70) in the
+    afternoon's uncapped arm, 82.0-85.4 tok/s in the capped one. A teacher on
+    an idle machine would see roughly 4 s; nobody measured an idle machine
+    today, and this file does not claim one.
+
+WAS A LEGITIMATE CALL CUT?
+--------------------------
+No. Read as the pre-registration asks - a per-probe diff of the length and
+TRUNCATED lines - the sets are:
+
+  small / 29 :  BEFORE {publish tomorrow, with links x10}
+                CAPPED {publish tomorrow, with links x10}
+  small / shelf, large / 29, large / shelf :
+                BEFORE {} and CAPPED {} - none, in any arm
+
+**No probe gained a `finish_reason: length` turn.** The only probe that has one
+under the cap is the probe that already had one without it, and its call was
+never complete: in BOTH arms it is counted as `malformed` and printed with
+`{"__unparsed__": ...}`, because the arguments do not parse either way. There
+is no probe anywhere whose BEFORE call was complete and whose AFTER call ends
+on `length`.
+
+The 4B produced no runaway in 960 responses across its four arms in the
+morning and none in its four arms this afternoon, capped or not.
+
+THE FOUR TRIP CONDITIONS, ONE BY ONE
+------------------------------------
+  1. **Any polarity inversion.** NOT TRIPPED. `polarity inversions ...: 0` in
+     all twelve arms, including the old label-matching counter's own 0.
+  2. **A stable-pass probe losing it.** NOT TRIPPED. No probe's bag changed at
+     all, in any cell, against either baseline - so no probe moved from 10/10.
+  3. **A legitimate call cut by the cap.** NOT TRIPPED. See above: the
+     length/TRUNCATED sets are identical per probe, and the one probe in them
+     was already there uncapped with an unparseable call.
+  4. **A probe switching between declining and choosing.** NOT TRIPPED. The
+     declining probes (`card: undo`, `card: deploy now`, `out of scope`) are
+     10x (declined) in every arm, and no probe that chose a tool declined.
+
+VERDICT
+-------
+**The pre-registered threshold is MET and no trip condition fired.** For every
+probe, in both tiers and both probe sets, the bag of tool names under the cap
+equals the bag without it - against this morning's BEFORE arm and against this
+afternoon's control, and, more strictly than the threshold asked, trial for
+trial in order for all 960 trials of each comparison.
+
+Nothing beyond that is claimed here.
+
+OTHER LOAD ON THE MACHINE, HONESTLY
+-----------------------------------
+This Mac was not idle. A load sample was taken every 15 seconds inside each arm,
+recording the 1-minute load, any other `llama-server`, and any running Plantoir.
+
+| Arm | window (local) | 1-min load min / median / max | another llama-server | Plantoir seen |
+|---|---|---|---|---|
+| small / 29 / CAPPED     | 10:21:08-10:24:24 |  5.44 /  7.08 /  8.21 | all 14 samples | no |
+| small / 29 / CONTROL    | 10:24:40-10:39:32 |  4.97 /  8.29 / 13.61 | 58 of 60 | yes, 15 samples |
+| small / shelf / CAPPED  | 10:39:44-10:41:29 |  9.10 / 10.32 / 11.73 | all 8 | yes, 6 samples |
+| small / shelf / CONTROL | 10:41:53-10:43:39 |  7.02 /  7.41 /  8.38 | all 8 | no |
+| large / 29 / CAPPED     | 10:43:48-10:47:03 |  5.01 /  7.22 / 12.72 | 3 of 14 | no |
+| large / 29 / CONTROL    | 10:47:10-10:50:11 |  4.28 /  4.50 /  5.37 | none | no |
+| large / shelf / CAPPED  | 10:50:17-10:52:03 |  5.38 /  5.79 /  5.98 | none | no |
+| large / shelf / CONTROL | 10:52:14-10:53:59 |  4.07 /  5.06 /  5.32 | 7 of 8 | no |
+
+The uneven pairs are the useful accident, for the second time in one day. The
+`.small` 29-probe pair ran at medians of 7.08 (capped) and 8.29 (control, peak
+13.61) with another model server resident for most of it; the `.large` shelf
+pair ran nearly idle. Both give identical choices. A busy machine moves the
+clock and not one tool choice - the same finding the morning's 4B pair made,
+and the reason latency here is INDICATIVE ONLY while token counts and tool
+choices are not.
+
+Plantoir itself was launched by another agent during two arms and was NOT
+killed; each sighting is in that arm's interference file. Neither arm's choices
+differ from any other arm's.
+
+THE SHAPE THE HEADROOM ARGUMENT DID NOT COVER: list_pages PATHS
+---------------------------------------------------------------
+The 512 was justified against the shape a TEACHER names - page titles typed
+into the sentence. One shape was left unmeasured and said so in three places:
+the two-lap one, where the model calls `list_pages`, the runner hands back up
+to `AssistToolRunner.mostPagesListed` (**60**) entries as relative PATHS
+(`AssistSectionGraph.relativePath`), and the next turn may echo them into a
+`publish_pages` call. Measured now, at the request of the #166 plan review.
+
+**Source of the paths.** A REAL course on this Mac, read-only: `ICS3U` section
+1 in the working folder `~/Desktop/Class Websites`, 257 markdown pages.
+`ClassPages.pagesOfSection` was reproduced exactly - the same skips
+(`.merged_output`, `node_modules`, `.internal`, other sections), the same
+lowercased-path sort - so the sixty are the sixty `list_pages` would really
+hand back. The course code was rewritten to VVH2O so the arms and this
+measurement name the same course; the codes are the same length. An example:
+
+    courses/VVH2O/College Board Curriculum/1. Computational Solution Design.md
+
+**A. Tokenized against the model's own tokenizer** (llama-server `/tokenize`,
+the tool-call text a Qwen chat template emits). The `.small` and `.large`
+weights gave the SAME counts on every row - Qwen2.5 and Qwen3 share a
+tokenizer - so one column serves both:
+
+    paths    tokens    (the first 60, as list_pages hands them back)
+      1         50
+      5        110
+     10        194
+     20        349
+     30        497
+     31        516   <-- the crossing: 30 still fit, 31 do not
+     40        654
+     50        805
+     60        975
+
+    paths    tokens    (the 60 LONGEST paths in the same section: the worst
+      20       412      case inside one section)
+      25       498
+      26       516   <-- the crossing: 25 still fit, 26 do not
+      40       800
+      60      1231
+
+**So 60 paths do NOT fit inside 512: they are 975 tokens, and the call crosses
+the cap at 31 of them (26 for the longest-path worst case).** The caveat stays,
+and it is now a risk with a number rather than an unknown.
+
+**B. One generation of the shape, to see whether the model actually does it.**
+A conversation primed the way `AssistAgent` primes one - the shipped system
+prompt, "Publish everything in Unit 3 for VVH2O section 1", the assistant's
+`list_pages` call, and a `role: "tool"` message carrying exactly what
+`AssistToolRunner.listPages` puts in `outcome.detail` (the 60 paths, one per
+line, plus its "...and 197 more" tail) - then "Publish all of those." with the
+app's own body, cap included. `.small`, three trials:
+
+    prompt_tokens       3766
+    completion_tokens     35        (three trials of three, identical)
+    finish_reason       'tool_calls'
+    tool chosen          publish_pages
+    arguments            {"course": "VVH2O", "section": 1, "pages": "all"}
+
+**The model did not echo the list.** It answered in 35 tokens, finished
+naturally, and the cap never fired. So the shape that could cost 975 tokens was
+not the shape this model produced when actually asked - on three trials, on one
+model, with one phrasing, which is what that is worth and no more.
+
+It also produced something else worth writing down and NOT fixing here: it
+passed `"pages": "all"`, which is not a page list. What the app does with that
+is outside #166; it is recorded as a finding rather than repaired in passing.
+
+**What this changes.** The caveat in `AssistModelClient.mostTokensPerReply`'s
+doc comment and in `documentation/10-local-ai-assistant.md` -> Step 1 no longer
+says "has not been measured". It says: sixty relative paths are 975 tokens, the
+cut would land at about the thirty-first path, and the one generation measured
+answered with a range instead. It does not change the cap. Raising a cap to
+cover the worst imaginable call is the state #166 was about, and the advice in
+`AssistWording.answerWasCutOff` is followable in exactly this case.
+
+WHAT THIS FILE DOES NOT SHOW
+----------------------------
+  - **The fix itself.** The suite scores the tool NAME. It never runs the app,
+    so nothing here says whether a call parsed out of a cut-off answer is
+    refused. That is `AssistCutOffAnswerTests`' job.
+  - **That the cap is the right SIZE.** It shows 512 changed no choice on these
+    48 probes. The headroom argument for the number is in doc 10, and the
+    measurement above is the one hole in it being filled, not the argument
+    being re-run.
+  - **Anything about Windows.** `plantoir-mcp.exe` and `LocalModel` were not
+    measured; Windows has sent 512 all along, which is where the number came
+    from.
+  - **A probability.** Temperature 0 and ten trials; see "What this number is
+    not" at the top.
+  - **Anything about an idle machine.** Every clock here was taken on a Mac
+    with other work on it, and the two uncapped arms of the same body, eight
+    hours apart, differ by more than a factor of two on the runaway.
+
+FILES
+-----
+Kept with the measurement, not in the repository: the eight AFTER arm stdouts
+(`after-<tier>-<set>-<capped|control>.txt`) with their `.server.log`,
+`.meta.txt` and `.interference.txt`; `run-arm-after.sh` and `run-all-after.sh`
+(the harness); `compare-after.py` (the per-probe and per-trial comparison);
+`totals.py` (the totals table); `blunt-diffs.txt` (the cut-and-diff);
+`pathtokens.py`, `crossing.py`, `twolap.py` and `after-extra*.txt` (the extra
+measurement); and the morning's `before-*` files, `compare.py`, `trials.py` and
+`noise-floor.md`.

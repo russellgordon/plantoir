@@ -68,7 +68,233 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         if let room = AssistCardCommand.makeRoom(tidied) {
             return room
         }
+        if let scheduled = AssistCardCommand.deployAtATime(tidied) {
+            return scheduled
+        }
         return AssistCardCommand.duplicateClass(tidied, original: message)
+    }
+
+    /// "Deploy at 6:30 AM", and the same with a day word.
+    ///
+    /// **Measured, and it is the reason this family exists.** The shelf offers
+    /// this sentence word for word, and the smaller assistant sent it to
+    /// `deploy_section` ten trials out of ten — a deploy to students on the
+    /// spot, in answer to a teacher who asked for half six tomorrow
+    /// (`research/ai-assist/metal-routing-results.txt`, issue #168). The
+    /// approval card it landed on named no time at all, so nothing in front of
+    /// the teacher contradicted them.
+    ///
+    /// A time in a fixed frame is a NUMBER, not a judgement — the same
+    /// argument `makeRoom` already won for "make room for two classes at Unit
+    /// 3, Day 4". So it is read here and never reaches the model, which costs
+    /// the router nothing because it never sees it.
+    ///
+    /// **Clock-free on purpose.** This hands back `"06:30"`, or
+    /// `"tomorrow 06:30"` when a day word was said, and never a date. Which
+    /// DAY a bare time means is settled once, where the call is made, against
+    /// the runner's own clock — `AssistToolRunner.momentText(forTimeOfDay:…)`
+    /// — so this stays a pure function of the sentence, which is what lets the
+    /// contract describe it as input and output.
+    ///
+    /// Course and section words are refused deliberately. "Deploy section 2 at
+    /// 6:30 am" falls through, because this window is about ONE section and
+    /// `AssistAgent` binds that section whatever the sentence said: a card that
+    /// appeared to honour another section would answer a different question
+    /// with total confidence.
+    private static func deployAtATime(_ tidied: String) -> AssistCardCommand? {
+        // A question mark is dropped HERE rather than by the shared tidier at
+        // the top of this file. Widening that would break the fixed shapes
+        // whose literal carries one — "what courses do i have?" and "when are
+        // my next classes?" are matched by EQUALITY, so a shared strip would
+        // stop them matching at all.
+        var frame: String = tidied
+        while frame.hasSuffix("?") {
+            frame = String(frame.dropLast())
+        }
+
+        var words: [String] = []
+        for piece in frame.split(separator: " ") {
+            words.append(String(piece))
+        }
+        // "Please" is courtesy rather than content, at either end. "Can you
+        // deploy at 7 pm" is deliberately NOT accepted: it asks about ability
+        // as much as it instructs, and everything this frame cannot read
+        // without guessing goes to the model.
+        if words.first == "please" {
+            words.removeFirst()
+        }
+        if words.last == "please" {
+            words.removeLast()
+        }
+        guard words.first == "deploy" else {
+            return nil
+        }
+        words.removeFirst()
+        // "deploy it at…" and "deploy this section at…" — both name the one
+        // section this window is about, which is the only section a card can
+        // reach. ("deploy this section now" is already a fixed shape above.)
+        if words.first == "it" {
+            words.removeFirst()
+        } else if words.count >= 2, words[0] == "this", words[1] == "section" {
+            words.removeFirst(2)
+        }
+
+        var dayWord: String? = nil
+        if let opening = words.first, opening == "today" || opening == "tomorrow" {
+            dayWord = opening
+            words.removeFirst()
+        }
+        guard words.first == "at" else {
+            return nil
+        }
+        words.removeFirst()
+        if let closing = words.last, closing == "today" || closing == "tomorrow" {
+            // A day word on BOTH sides is a sentence disagreeing with itself,
+            // and choosing a half is exactly what this table exists to avoid.
+            if dayWord != nil {
+                return nil
+            }
+            dayWord = closing
+            words.removeLast()
+        }
+        guard let time = AssistCardCommand.timeOfDay(words) else {
+            return nil
+        }
+        guard let dayWord else {
+            return AssistCardCommand(toolName: "schedule_deploy", arguments: ["when": time])
+        }
+        return AssistCardCommand(
+            toolName: "schedule_deploy", arguments: ["when": "\(dayWord) \(time)"]
+        )
+    }
+
+    /// "6:30 am", "6:30am", "7 pm", "18:30", "noon", "midnight" — as `HH:mm`,
+    /// or nil when the spelling leaves any doubt about which minute was meant.
+    ///
+    /// **The rule that carries the most weight, stated once so it can be
+    /// argued with: a time with no am or pm must be written with two digits
+    /// for the hour.** That is what 24-hour time looks like, and it is the
+    /// form `schedule_deploy`'s own schema asks for. `06:30` and `18:30` are
+    /// unambiguous; `6:30` is morning or evening and nobody can tell which, so
+    /// it goes to the model — which has the dateline and is measured reading
+    /// arguments out reliably. A deploy set twelve hours wrong is a site that
+    /// updates after the class it was meant for.
+    private static func timeOfDay(_ words: [String]) -> String? {
+        guard words.count == 1 || words.count == 2 else {
+            return nil
+        }
+        if words.count == 1 {
+            // The two times a teacher writes with no digits in them. Both are
+            // exact readings — 12:00 and 00:00 — and both are handled the same
+            // way as "12 pm" and "12 am", which a teacher may equally type.
+            // Neither is a silent guess about the DAY: the approval card names
+            // the whole moment, weekday and date included, before anything is
+            // set.
+            if words[0] == "noon" {
+                return "12:00"
+            }
+            if words[0] == "midnight" {
+                return "00:00"
+            }
+        }
+
+        var clock: String = words[0]
+        var meridiem: String? = nil
+        if words.count == 2 {
+            guard let named = AssistCardCommand.meridiem(named: words[1]) else {
+                return nil
+            }
+            meridiem = named
+        } else {
+            // Written up against the digits: "6:30am". The longest spellings
+            // are tried first so "6:30a.m" does not lose only its last two
+            // characters.
+            for ending in ["a.m.", "p.m.", "a.m", "p.m", "am", "pm"]
+            where meridiem == nil && clock.hasSuffix(ending) {
+                meridiem = AssistCardCommand.meridiem(named: ending)
+                clock = String(clock.dropLast(ending.count))
+            }
+        }
+
+        var hourText: String = clock
+        var minuteText: String = "00"
+        if let colon = clock.firstIndex(of: ":") {
+            hourText = String(clock[clock.startIndex..<colon])
+            minuteText = String(clock[clock.index(after: colon)...])
+        } else if meridiem == nil {
+            // "deploy at 7" — a bare number is not a time anybody has spelled
+            // out, and reading it as an hour would schedule a deploy off a
+            // number that might have been a section or a unit.
+            return nil
+        }
+        // One or two digits of hour, always. Without the upper bound "007:30
+        // am" and "0007 pm" are read as 07:30 and 19:00, because `Int` does
+        // not care how a number was padded — harmless in itself, since nobody
+        // types that, but it is a boundary the other platform would implement
+        // as one-or-two from reading the accepted rows, and a difference no
+        // suite could see. So it is stated here and pinned by a refused row.
+        guard AssistCardCommand.isPlainDigits(hourText),
+              AssistCardCommand.isPlainDigits(minuteText),
+              hourText.count <= 2,
+              minuteText.count == 2,
+              let hour = Int(hourText),
+              let minute = Int(minuteText), minute <= 59 else {
+            return nil
+        }
+
+        guard let meridiem else {
+            guard hourText.count == 2, hour <= 23 else {
+                return nil
+            }
+            return AssistCardCommand.twoDigits(hour) + ":" + minuteText
+        }
+        guard hour >= 1, hour <= 12 else {
+            return nil
+        }
+        var onTheTwentyFourHourClock: Int = hour
+        if meridiem == "pm", hour != 12 {
+            onTheTwentyFourHourClock = hour + 12
+        }
+        if meridiem == "am", hour == 12 {
+            onTheTwentyFourHourClock = 0
+        }
+        return AssistCardCommand.twoDigits(onTheTwentyFourHourClock) + ":" + minuteText
+    }
+
+    /// "am" or "pm", from "am", "a.m", "a.m." and their afternoon twins — nil
+    /// for anything else. The message has already been case-folded.
+    private static func meridiem(named raw: String) -> String? {
+        let folded: String = raw.replacingOccurrences(of: ".", with: "")
+        if folded == "am" || folded == "pm" {
+            return folded
+        }
+        return nil
+    }
+
+    /// Whether every character is an ASCII digit.
+    ///
+    /// ASCII deliberately. `Character.isNumber` is true of Arabic-Indic digits
+    /// and of several other scripts, so a laxer check would accept a "clock
+    /// reading" that `Int` then cannot read, and the refusal would come from
+    /// somewhere further down that was not thinking about spelling at all.
+    private static func isPlainDigits(_ text: String) -> Bool {
+        if text.isEmpty {
+            return false
+        }
+        for character in text {
+            if !character.isASCII || !character.isNumber {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// 6 → "06", 18 → "18".
+    private static func twoDigits(_ number: Int) -> String {
+        if number < 10 {
+            return "0\(number)"
+        }
+        return "\(number)"
     }
 
     /// "Make room for a class at Unit 3, Day 4", and the same with a count.
@@ -225,10 +451,17 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// other app can implement the same thing.
     ///
     /// The literal shapes can be listed; these cannot, because the number in
-    /// them is unbounded — any unit, any count of days, any page title. A
-    /// contract that carried only the literals would say the assistant
-    /// understands eleven sentences when it understands those plus five
-    /// families, and Windows would build eleven.
+    /// them is unbounded — any unit, any count of days, any page title, any
+    /// time of day. A contract that carried only the literals would say the
+    /// assistant understands eleven sentences when it understands those plus
+    /// six families, and Windows would build eleven.
+    ///
+    /// One example and one near-miss is not enough to describe a family whose
+    /// variable part is a TIME, because the spellings a teacher uses are the
+    /// whole question. The deploy-at-a-time family therefore has its own
+    /// authored table of accepted and refused spellings in
+    /// `contracts/assist-cases.json` → `deployAtATime`; this entry is its
+    /// summary, not its specification.
     struct ParsedShape: Sendable, Equatable {
 
         // MARK: - Stored properties
@@ -304,6 +537,21 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 notThis: "duplicate Unit 3, Day 2",
                 becauseNotThis: "The closing half is what makes the sentence unambiguous. Without "
                               + "it, 'duplicate' could mean several things and belongs with the model."
+            ),
+            ParsedShape(
+                shape: "[please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow]",
+                tool: "schedule_deploy",
+                fills: [
+                    "when": "<time> as HH:mm, with the day word in front of it when one was said — "
+                          + "settled into a whole moment where the call is made, not here. Every "
+                          + "accepted and refused spelling is in deployAtATime.",
+                ],
+                example: "deploy at 6:30 am",
+                notThis: "deploy at 6:30",
+                becauseNotThis: "A one-digit hour with no am or pm is morning or evening and nobody "
+                              + "can tell which. A deploy set twelve hours wrong is a site that "
+                              + "updates after the class it was meant for, so the doubt goes to the "
+                              + "model rather than being resolved by a coin toss."
             ),
         ]
     }

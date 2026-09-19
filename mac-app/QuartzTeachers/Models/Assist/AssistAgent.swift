@@ -83,6 +83,15 @@ final class AssistAgent {
     /// and neither could be asserted while this was private.
     private(set) var messages: [AssistMessage] = []
 
+    /// How long `messages` was when the teacher's current turn began.
+    ///
+    /// The mark an abandoned turn is wound back to. Taken at the top of
+    /// `say()` rather than beside the user message, so it is right for the
+    /// fixed-phrase branch too — that one runs a tool without ever appending
+    /// a user message, and the tool result it leaves behind belongs to the
+    /// same turn.
+    private var messageCountAtTheStartOfTheTurn: Int = 0
+
     /// Where the record of each turn is written. Replaceable so a test can
     /// point it somewhere of its own.
     var reportStore: ProblemReportStore = ProblemReportStore.standard
@@ -129,6 +138,9 @@ final class AssistAgent {
         self.tools = tools
         self.planMode = planMode
         messages = [AssistMessage.system(AssistAgent.systemPrompt(course: courseCode, section: sectionNumber))]
+        // So that winding a turn back can never reach past the system prompt,
+        // even if something were ever to reach `think()` without `say()`.
+        messageCountAtTheStartOfTheTurn = messages.count
     }
 
     // MARK: - Functions
@@ -144,6 +156,9 @@ final class AssistAgent {
         if trimmed.isEmpty {
             return
         }
+        // Where this turn starts, so a turn that has to be abandoned can be
+        // wound back to exactly here. See `sayTheAnswerDidNotFinish`.
+        messageCountAtTheStartOfTheTurn = messages.count
         entries.append(Entry(speaker: .teacher, text: trimmed))
 
         // Recorded HERE — the moment the teacher's words are accepted, before
@@ -170,15 +185,14 @@ final class AssistAgent {
         // The fixed shapes never reach the model — see AssistCardCommand for
         // the measurement that decided this.
         if let command = AssistCardCommand.matching(trimmed) {
-            // Worth its own line: "why did it not think about what I said?"
-            // is answered by this and by nothing else in the trail.
-            ActivityTrail.note(
-                .assistantMatchedAFixedPhrase,
-                "matched in code, not sent to the model — ran " + command.toolName,
-                course: courseCode,
-                section: sectionNumber
-            )
-            await run(call: AssistToolCall(
+            // Built and SETTLED before the line is written, and then run
+            // without being settled again. The order is the whole point: the
+            // matcher is clock-free, so "deploy at 6:30 am" arrives here as
+            // "06:30" and the day it means does not exist until the settler
+            // has run. Writing the line first would record a time with no day
+            // on it; settling twice would read the clock twice, which is the
+            // bug `withTheDaySettled` exists to prevent.
+            let call: AssistToolCall = settled(AssistToolCall(
                 id: UUID().uuidString,
                 type: "function",
                 function: AssistToolCall.Function(
@@ -186,6 +200,15 @@ final class AssistAgent {
                     arguments: encode(command.arguments)
                 )
             ))
+            // Worth its own line: "why did it not think about what I said?"
+            // is answered by this and by nothing else in the trail.
+            ActivityTrail.note(
+                .assistantMatchedAFixedPhrase,
+                AssistAgent.matchedInCodeLine(for: call),
+                course: courseCode,
+                section: sectionNumber
+            )
+            await run(settledCall: call)
             return
         }
 
@@ -263,10 +286,56 @@ final class AssistAgent {
                 messages: messages, tools: toolDefinitions
             )
             let reply: AssistMessage = answer.message
-            messages.append(reply)
+
+            // Recorded whatever happens to the turn below: the count of what
+            // the model wrote is the evidence that it ran away, and a turn
+            // thrown away is exactly the turn somebody reading a problem
+            // report needs to see.
             recordTurn(reply: answer, askedAt: askedAt)
 
+            // ABOVE the tool-call branch, because a reply the engine stopped
+            // part way is not an instruction and is not something to read out
+            // either.
+            //
+            // What the model was about to write next is unknowable, and for a
+            // tool that changes pages the difference between "the four pages
+            // you named" and the first four of forty is the whole of what was
+            // asked. **Parsing is not the check.** Measured on this Mac
+            // (llama.cpp b10435, the smaller assistant): the arguments object
+            // is closed before the `</tool_call>` wrapper, so there is a
+            // window one or two tokens wide where a generation was stopped
+            // short and its arguments nevertheless parse perfectly — a
+            // `deploy_section` call cut off at 28 tokens parsed as
+            // `{"course": "VVH2O", "section": 1}`. And `undo_last_change`
+            // takes no arguments at all, so a call to it cut off before it
+            // wrote anything is readable by any check and would simply RUN.
+            // The reason the turn ended is the only thing that catches those.
+            //
+            // The other branch matters just as much: cut off before the tool
+            // name was parseable, the same measurement put a raw
+            // `<tool_call>\n{\n"name": "publi` fragment in `content`, which
+            // the plain-text branch below would print into the transcript.
+            if answer.wasCutOff {
+                sayTheAnswerDidNotFinish(
+                    tool: reply.toolCalls?.first?.function.name, stoppedByTheEngine: true
+                )
+                return
+            }
+
             if let calls = reply.toolCalls, let first = calls.first {
+                // Arguments that cannot be read, with the turn finishing
+                // normally: a small model writing bad JSON of its own accord.
+                // Same answer — running a call whose arguments were lost means
+                // running it against no course, which used to produce a
+                // refusal reading as though the teacher's sentence was the
+                // problem.
+                if !first.argumentsAreReadable {
+                    sayTheAnswerDidNotFinish(
+                        tool: first.function.name, stoppedByTheEngine: false
+                    )
+                    return
+                }
+                messages.append(reply)
                 // One tool at a time, on purpose: a model that batches has
                 // decided an order, and the order is exactly the reasoning
                 // we are trying not to leave with it.
@@ -274,6 +343,7 @@ final class AssistAgent {
                 return
             }
 
+            messages.append(reply)
             let text: String = (reply.content ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             entries.append(Entry(
                 speaker: .assistant, text: text.isEmpty ? AssistWording.nothingToDo : text
@@ -289,6 +359,82 @@ final class AssistAgent {
             )
             activity = .idle
         }
+    }
+
+    /// Throw an unfinished answer away, and say so.
+    ///
+    /// **The whole TURN is wound back, not just the reply.** The reply is not
+    /// added to `messages` — a cut-off reply carrying a `tool_call` that no
+    /// `tool` message ever answers is a conversation some chat templates
+    /// reject outright — and the teacher's sentence goes with it, back to
+    /// `messageCountAtTheStartOfTheTurn`.
+    ///
+    /// Dropping only the reply was the first version, and it made the
+    /// assistant's own advice unfollowable. The sentence a teacher reads here
+    /// asks them to try again with "a shorter sentence, or fewer pages at a
+    /// time" — and the request that ran away was still sitting in the
+    /// conversation, so the retry would have been sent with the runaway
+    /// sentence still in front of it. The stated reason for dropping the
+    /// reply is that it "leaves the history exactly as if the model had not
+    /// answered, which is the truth"; that is not what the history says while
+    /// the question is still in it. A second lap's read exchange goes too,
+    /// which is the same answer: the turn was abandoned, and nothing it did
+    /// changed a page (see `AssistWording.answerWasCutOff` for why that is
+    /// true on every path that reaches here).
+    ///
+    /// **The `catch` path below is deliberately NOT wound back**, and has
+    /// never been: an engine that could not be reached, or one that timed
+    /// out, leaves the teacher's sentence in the conversation. Three reasons
+    /// to leave it that way rather than "tidy it up" here. Nothing is being
+    /// retried on our advice — that path says the engine failed rather than
+    /// asking the teacher to rephrase. The failure is usually the engine
+    /// rather than the sentence, so dropping the sentence would lose context
+    /// the next turn wants. And `RelativeDayFreshnessTests` reads
+    /// `messages` after exactly that path to pin the dateline's POSITION,
+    /// which is a measured finding worth 15 points of routing accuracy; the
+    /// place that finding is asserted should not be quietly removed by a
+    /// change about something else.
+    ///
+    /// The TEACHER is told the same thing either way — from their side an
+    /// answer that ran out of room and one that came out garbled are the same
+    /// event, and both are mended by asking again. The TRAIL tells them apart,
+    /// because whoever reads a report cannot: an answer stopped at the cap is
+    /// a question about how much the model was asked to write, and a finished
+    /// answer whose arguments will not parse is a question about the model
+    /// itself. Same event, different sentence.
+    private func sayTheAnswerDidNotFinish(tool: String?, stoppedByTheEngine: Bool) {
+        if messages.count > messageCountAtTheStartOfTheTurn {
+            messages.removeLast(messages.count - messageCountAtTheStartOfTheTurn)
+        }
+        entries.append(Entry(speaker: .assistant, text: AssistWording.answerWasCutOff))
+        // The tool it had BEGUN to name, in the words a teacher would
+        // recognise rather than the function's own: "it ran away trying to
+        // publish" and "it ran away trying to deploy" are different reports.
+        // Never what it had begun to WRITE — that is the teacher's page
+        // titles.
+        var said: String = "the assistant's answer was cut off"
+        if stoppedByTheEngine {
+            if let name = tool {
+                said += " part way through " + AssistAgent.inWords(name)
+            } else {
+                said += " before it named a tool"
+            }
+        } else {
+            said = "the assistant finished answering but what it wrote for "
+                + AssistAgent.inWords(tool ?? "that") + " could not be read"
+        }
+        ActivityTrail.note(
+            .assistantAnswerWasCutOff,
+            said + " — nothing was run from it",
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
+    }
+
+    /// A tool's name as somebody reading the trail would say it.
+    private static func inWords(_ toolName: String) -> String {
+        return toolName.replacingOccurrences(of: "_", with: " ")
     }
 
     /// Keeps a note of what the model was asked and what it chose.
@@ -404,8 +550,76 @@ final class AssistAgent {
         )
     }
 
+    /// The same call, with a bare clock time turned into the whole moment it
+    /// means.
+    ///
+    /// The sibling of `withTheDaySettled`, and here for the same reason:
+    /// the card holds these arguments while the teacher decides, and
+    /// `approvePending` hands the very same object to `execute`. The runner's
+    /// own clock supplies the DAY, and `Date()` is read in exactly one place —
+    /// here — so a card shown at 06:29 and agreed to at 06:31 still names the
+    /// minute it named.
+    ///
+    /// **This covers the model's path too, quietly**, the way the day settler
+    /// already does: a model that answers `when: "06:30"` used to meet the
+    /// runner's "I could not read that time" and now gets the same reading a
+    /// card gets. A model that answers `"6:30"` still meets the refusal — the
+    /// settler reads an exact `HH:mm` and nothing looser.
+    private func withTheMomentSettled(_ call: AssistToolCall) -> AssistToolCall {
+        guard let definition = tools.definition(named: call.function.name) else {
+            return call
+        }
+        let settled: [String: Any] = AssistToolRunner.settlingTheDeployMoment(
+            in: call.argumentValues, forTool: definition, today: tools.today, now: Date()
+        )
+        guard let data = try? JSONSerialization.data(withJSONObject: settled),
+              let rewritten = String(data: data, encoding: .utf8) else {
+            return call
+        }
+        return AssistToolCall(
+            id: call.id,
+            type: call.type,
+            function: AssistToolCall.Function(name: call.function.name, arguments: rewritten)
+        )
+    }
+
+    /// A call ready to be run: bound to this window's section, with a relative
+    /// day and a bare clock time already resolved.
+    ///
+    /// One function rather than three calls in a row at each site, because
+    /// "settled" is a state the rest of the agent depends on and a caller that
+    /// forgot one of the three would look exactly like a caller that had not.
+    private func settled(_ rawCall: AssistToolCall) -> AssistToolCall {
+        return withTheMomentSettled(withTheDaySettled(boundToThisSection(rawCall)))
+    }
+
+    /// The trail line for a sentence answered in code, naming the tool — and
+    /// the MOMENT, when the sentence carried one.
+    ///
+    /// Named rather than typed where it is asserted, the way every sentence a
+    /// teacher reads is. The moment is on the line because it is a guess made
+    /// in code: "at 6:30" with no day on it becomes tomorrow morning, and a
+    /// teacher who writes in saying "it went out on Saturday, I meant Friday"
+    /// leaves a trail that otherwise records their sentence and the tool but
+    /// not the day the app chose. The conversation is not on the trail, so
+    /// this is the only place the choice is recoverable.
+    ///
+    /// Only a WHOLE moment is ever added — a value `moment(named:)` can read —
+    /// so nothing a teacher wrote, and no half-settled word, can arrive here.
+    static func matchedInCodeLine(for call: AssistToolCall) -> String {
+        let line: String = "matched in code, not sent to the model — ran " + call.function.name
+        guard let when = call.argumentValues["when"] as? String,
+              AssistToolRunner.moment(named: when) != nil else {
+            return line
+        }
+        return line + " for " + when
+    }
+
     private func run(call rawCall: AssistToolCall) async {
-        let call: AssistToolCall = withTheDaySettled(boundToThisSection(rawCall))
+        await run(settledCall: settled(rawCall))
+    }
+
+    private func run(settledCall call: AssistToolCall) async {
         guard let definition = tools.definition(named: call.function.name) else {
             messages.append(AssistMessage.toolResult(
                 callID: call.id, name: call.function.name,
