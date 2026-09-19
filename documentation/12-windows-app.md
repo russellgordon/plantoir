@@ -1535,7 +1535,7 @@ through the production seam. The mac's own fake window has always returned
 a result from its `deploy` closure (`FakePreview.swift`), so it never had
 the sync-only gap. See "The scenario runner runs the REAL tools" below.
 
-## Two testing lessons that recur, and both cost a red branch
+## Three testing lessons that recur, and each cost a red branch
 
 **A test proving a date was FRESHENED must compare against a date in the PAST.**
 `windows-app/Plantoir.Tests/ModelTests.cs` asserts
@@ -1559,6 +1559,36 @@ assertion had passed; the test failed on housekeeping. Deleting a temp folder is
 housekeeping: when it does not work, the operating system will get to it. **The
 same shape is available on the mac** with Spotlight indexing, and whether the
 mac's suites have it has never been checked.
+
+**The shared state a class must be serialised against is not always a static —
+it can be a folder on the machine.** `SharedActivityState` was created for
+process-wide statics (preview leases, the publish registry) and its name still
+says so, but the question it answers is *what does this class touch that
+outlives it*. Two things beyond statics now qualify, both learned from a real
+red run:
+
+- **The activity trail's log path.** Five classes redirect it to a scratch file
+  and then assert on what is in that file, so a class merely WRITING trail lines
+  — `ScheduledHealthFindings.Take` leaves a `folder problem found` line — can
+  drop them into somebody else's fixture mid-assertion. Writing them is enough
+  to belong in the collection; redirecting is not the only way in.
+- **`%LOCALAPPDATA%\Plantoir\scheduled`.** The generated wrapper resolves
+  `$healthDir` and `$pendingDir` from `$env:LOCALAPPDATA` at RUN time, which is
+  why `ScheduledWrapperRunTests` and `ScheduledPublishOutcomeTests` can
+  substitute the baked OUTCOME folder and cannot substitute that one. Both run
+  wrappers for ICS3U section 1; a stub build that finds nothing takes the
+  wrapper's nothing-found branch and DELETES the folder-problems record for that
+  section — the record the other class has just written and is about to read. It
+  showed as one red `AWorkingFolderWithSpacesInItsNameStillBuilds` on
+  2026-09-18 (`Assert.Single` on an empty list), green alone and on re-run.
+  Both classes are in the collection since 2026-09-19.
+
+The general rule, and the cheap check when a test fails once and cannot be
+reproduced: **ask what the class writes that another class can see** — a static,
+a process-wide setting, a real per-user folder, a scheduled task — and look for a
+second class writing the same thing with the same key. `--state-dir` and a
+substituted literal move SOME of it; neither moves what a child process resolves
+from the environment.
 
 ## The scenario runner runs the REAL tools
 
