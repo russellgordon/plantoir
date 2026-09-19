@@ -546,10 +546,16 @@ file exactly as the teacher wrote it: tidying the value would be an edit nobody
 asked for, in a file Obsidian very likely has open. Asked to HIDE the same
 page, it changes and the odd value goes. Settled 2026-09-18 (issue #140); the
 measured table is
-[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page),
-and the residue it knowingly leaves — a value the reader cannot read at all is
-reported as visible, so the plan says "already published" — is written up
-there too.
+[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page).
+
+A value the assistant cannot read at ALL — `publish: !!str false`, a value on
+the line below the key, an anchor — is a different case, and it is not left to
+the reporting collapse: such a page is always treated as needing a change, so
+the flag is written out in full and the page really does end up published.
+What Plantoir still does not do is TELL the teacher that the value it found was
+one it could not read; it simply writes a plain one in its place. That sentence
+is the only part of the "say when we cannot tell" option still outstanding, and
+08 says why it waits.
 
 ### No dangerous tool exists
 

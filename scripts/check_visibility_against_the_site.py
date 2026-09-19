@@ -63,7 +63,6 @@ FORMS_THE_CONTRACT_CANNOT_CARRY = [
     ("publish: [false]", "visible"),
     ("publish: {a: false}", "visible"),
     ("publish: 'fal''se'", "visible"),
-    ("publish: false\u00a0\ntitle: x", "visible"),
     ("title: x\n\tpublish: false", "stops"),
     ("publish: \"false", "stops"),
     ("publish: - false", "stops"),
@@ -72,6 +71,22 @@ FORMS_THE_CONTRACT_CANNOT_CARRY = [
     ("publish: `x", "stops"),
     ("publish: false: true", "stops"),
     ("title: x\npublish:false", "stops"),
+]
+
+# The one answer both readers knowingly get WRONG, pinned so it cannot quietly
+# become a different wrongness.
+#
+# YAML's whitespace is a space and a tab, so `false<NBSP>` is the string
+# "false\xa0" and the page is published — which is what both readers say, and
+# what the build says whenever anything sorts after `publish` in the re-dumped
+# block. ALONE it is different: python-frontmatter's `YAMLHandler.export` ends
+# with `yaml.dump(...).strip()`, and with `publish` sorting last that strip
+# takes the non-breaking space off, so the build HIDES the page. Both readers
+# still say visible, which is the mild direction. Written down here because a
+# knowingly-wrong answer is only safe while the reason for it holds.
+KNOWN_TO_DIFFER = [
+    ("publish: false\u00a0", "hidden", "the readers say VISIBLE"),
+    ("publish: false\u00a0\ntitle: x", "visible", "and here they agree"),
 ]
 
 QUARTZ = Path("/opt/quartz")
@@ -152,6 +167,9 @@ def main():
     processed += judge(
         refused, [(fragment, 1) for fragment, _ in FORMS_THE_CONTRACT_CANNOT_CARRY]
     )
+    differ = work / "differ"
+    differ.mkdir()
+    processed += judge(differ, [(fragment, 1) for fragment, _, _ in KNOWN_TO_DIFFER])
 
     pages_json = work / "pages.json"
     pages_json.write_text(json.dumps(processed), encoding="utf-8")
@@ -177,6 +195,19 @@ def main():
                 f"{actual}. Each app REFUSES to read this form and reports it visible; the "
                 f"refusal was justified by this measurement, so re-read "
                 f"documentation/08-course-config-reference.md before changing either reader."
+            )
+
+    known_start = len(cases) + len(FORMS_THE_CONTRACT_CANNOT_CARRY)
+    for (fragment, expected, note), verdict in zip(KNOWN_TO_DIFFER, verdicts[known_start:]):
+        actual = "stops" if verdict["error"] is not None else (
+            "visible" if verdict["visible"] else "hidden"
+        )
+        if actual != expected:
+            failures.append(
+                f"{fragment!r}: measured as {expected} ({note}) and the build now says "
+                f"{actual}. Both readers knowingly answer this one the mild way round; "
+                f"re-read documentation/08-course-config-reference.md, because the reason "
+                f"they are allowed to has changed."
             )
 
     for case, after, verdict in zip(cases, processed, verdicts):
@@ -205,7 +236,8 @@ def main():
 
     print(
         f"Ran {len(cases)} reading cases and "
-        f"{len(FORMS_THE_CONTRACT_CANNOT_CARRY)} refused forms down the real chain."
+        f"{len(FORMS_THE_CONTRACT_CANNOT_CARRY)} refused forms and "
+        f"{len(KNOWN_TO_DIFFER)} knowingly-different forms down the real chain."
     )
     if failures:
         for line in failures:

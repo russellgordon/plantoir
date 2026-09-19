@@ -872,7 +872,13 @@ enum AssistPublishPlanner {
                     continue
                 }
                 // Already out where students can see it — leave it alone.
-                if page.isVisibleToStudents {
+                //
+                // CERTAINLY out, that is. A page whose flag this app will not
+                // read is reported visible, and it is about to be published
+                // by the change list above; skipping it here would publish it
+                // with whatever date it happened to have rather than the day
+                // of the class that brought it.
+                if page.isVisibleToStudents && page.visibilityIsCertain {
                     continue
                 }
                 // A class's date is its place in the schedule.

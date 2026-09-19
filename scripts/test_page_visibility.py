@@ -99,6 +99,23 @@ class FamilySpellingTests(unittest.TestCase):
             page_visibility.publish_family_answer(" false\t"), page_visibility.HIDDEN
         )
 
+    def test_a_backslash_is_an_escape_only_inside_double_quotes(self):
+        # Single quotes have no escapes at all, so this is the string "fal\\se"
+        # and the page is PUBLISHED — measured. Refusing it made the course
+        # installer write `false` for a page the build shows, and disagreed
+        # with the Swift reader, which had it right.
+        self.assertEqual(
+            page_visibility.publish_family_answer(" 'fal\\se'"), page_visibility.VISIBLE
+        )
+        self.assertEqual(
+            page_visibility.draft_family_answer(" 'tr\\ue'"), page_visibility.VISIBLE
+        )
+        # Inside double quotes it really is an escape, and the characters here
+        # are not the value.
+        self.assertEqual(
+            page_visibility.publish_family_answer(' "fal\\se"'), page_visibility.CANNOT_TELL
+        )
+
     def test_a_value_that_runs_onto_the_next_line_cannot_be_copied(self):
         self.assertTrue(page_visibility.is_complete_on_its_own_line(" oN # why"))
         self.assertTrue(page_visibility.is_complete_on_its_own_line(' "false"'))
@@ -196,6 +213,33 @@ class CourseLevelSplitterTests(unittest.TestCase):
             self.assertIn("publishForSection2: false", out, line)
             self.assertNotIn("  false", out, line)
             self.assertNotIn("  true", out, line)
+
+    def test_a_blank_line_does_not_end_a_value_written_below_the_key(self):
+        # Measured: the build reads past the blank line and HIDES both of
+        # these. A scan that stopped at the blank called the key null and
+        # published a held-back page into every section at course setup.
+        for line in ("draft:\n\n  true", "publish:\n\n  false"):
+            out = self.split(line)
+            self.assertIn("publishForSection1: false", out, line)
+            self.assertIn("publishForSection2: false", out, line)
+            self.assertNotIn("  true", out, line)
+            self.assertNotIn("  false", out, line)
+
+    def test_an_indented_comment_is_not_a_value_and_is_never_deleted(self):
+        # Measured: `publish: true` followed by an indented `# note` is still
+        # true, and `publish:` followed by one is still null. The note is the
+        # teacher's, so it stays exactly where they wrote it.
+        out = self.split("publish: true\n  # mine")
+        self.assertIn("publishForSection1: true", out)
+        self.assertIn("  # mine", out)
+
+        out = self.split("publish:\n  # mine")
+        self.assertIn("publishForSection1:\n", out)
+        self.assertIn("  # mine", out)
+
+        # But a real value UNDER the comment is still a value.
+        out = self.split("publish:\n  # mine\n  false")
+        self.assertIn("publishForSection1: false", out)
 
     def test_a_key_with_nothing_after_it_stays_a_null(self):
         # A null PUBLISHES the page. Writing "false" here would hide, at course

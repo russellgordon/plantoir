@@ -1684,6 +1684,12 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
 
     head_lines = head.split("\n")
 
+    def trim(line):
+        return page_visibility.trim(line)
+
+    def is_comment(line):
+        return page_visibility.is_comment_line(line)
+
     # The reader's own key shapes: `publish :` and `"publish":` are the same
     # key to YAML, and `publish:x` is NOT a key at all — it is one plain
     # scalar. The LAST line naming a key wins, because that is the one PyYAML
@@ -1703,12 +1709,29 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
         # — and cannot be copied onto another key's line. Those lines are
         # taken too: leaving them behind orphans an indented scalar under
         # whatever key happens to follow, which stops the build.
+        #
+        # Blank lines and indented COMMENTS are stepped over rather than
+        # stopping the scan, because YAML steps over them: `draft:` then a
+        # blank line then an indented `true` hides the page, measured, and a
+        # scan that stopped at the blank called the key null and published it
+        # into every section. A comment is not a value, so a complete value
+        # followed by an indented `# note` does NOT continue — and the note
+        # is the teacher's, so it stays where they wrote it.
         continues = False
         follow = index + 1
-        while follow < len(head_lines) and head_lines[follow][:1] in (" ", "\t"):
+        last_value_line = index
+        while follow < len(head_lines):
+            line_below = head_lines[follow]
+            if trim(line_below) == "" or (line_below[:1] in (" ", "\t") and is_comment(line_below)):
+                follow += 1
+                continue
+            if line_below[:1] not in (" ", "\t"):
+                break
             continues = True
-            taken.add(follow)
+            last_value_line = follow
             follow += 1
+        for swallowed in range(index + 1, last_value_line + 1):
+            taken.add(swallowed)
         values[key] = (raw, continues)
     if not values:
         return text

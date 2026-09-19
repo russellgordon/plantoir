@@ -59,6 +59,11 @@ def trim(text):
     return text.replace("\r", "").strip(_YAML_SPACES)
 
 
+def is_comment_line(line):
+    """A line whose content is a `# note`, which YAML skips like a blank one."""
+    return trim(line).startswith("#")
+
+
 def read_scalar(raw_value, next_line=None):
     """
     A value written after a key's colon, read.
@@ -93,9 +98,16 @@ def read_scalar(raw_value, next_line=None):
             if len(value) < 2 or not value.endswith(quote):
                 return None
             inside = value[1:-1]
-            # A backslash is an escape, and a second quote of the same kind is
-            # either a second string or the way YAML spells one quote.
-            if quote in inside or "\\" in inside:
+            # A second quote of the same kind is either a second string or the
+            # way a single-quoted string spells one quote.
+            if quote in inside:
+                return None
+            # A backslash is an escape ONLY inside double quotes. Single
+            # quotes have no escapes at all, so `publish: 'fal\se'` is the
+            # string "fal\se" and the page is published — measured. Refusing
+            # it here made the course installer write `false` for a page the
+            # build shows.
+            if quote == '"' and "\\" in inside:
                 return None
             return (inside, True)
 
