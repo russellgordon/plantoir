@@ -77,12 +77,20 @@ final class HideIsUnpublishCardTests: XCTestCase {
         }
     }
 
-    /// And publishing keeps the narrower frame it has always had.
+    /// And publishing keeps the narrower frame it has always had — the
+    /// REFERENCE and the TOLERANCE both.
     ///
     /// The asymmetry is the decision, not an oversight: unpublishing errs safe
     /// — a page nobody can see — while publishing puts a page in front of
     /// students, and the smaller assistant answers "Publish Unit 2, Day 3"
     /// correctly anyway.
+    ///
+    /// **The tolerance half is asserted because it was got wrong once.** The
+    /// first version of this frame read the verb AFTER stripping the courtesy
+    /// words and the question mark, which widened publish as a side effect: an
+    /// adversarial differential fuzz of 13,464 sentences found 0 matches lost
+    /// and **141 new `publish_pages` matches**, none of them asked for. A test
+    /// naming only the reference would not have caught it, and did not.
     func testPublishStillTakesAWholeUnitAndNoPage() throws {
         let whole: AssistCardCommand = try XCTUnwrap(AssistCardCommand.matching("publish unit 5"))
         XCTAssertEqual(whole.toolName, "publish_pages")
@@ -94,6 +102,20 @@ final class HideIsUnpublishCardTests: XCTestCase {
         )
         XCTAssertNil(AssistCardCommand.matching("publish unit 4 day 3"))
         XCTAssertNil(AssistCardCommand.matching("please publish unit 4, day 3 please"))
+
+        // Not one of the spellings the hide arm beside it now tolerates.
+        for widened in ["publish unit 4?", "please publish unit 4", "publish unit 4 please",
+                        "publish  unit 5", "publish unit, 4"] {
+            XCTAssertNil(
+                AssistCardCommand.matching(widened),
+                "\"\(widened)\" is answered in code, so the publish surface moved."
+            )
+        }
+
+        // …while the two the SHARED tidier has always stripped still work,
+        // because that is shipped behaviour rather than a new tolerance.
+        XCTAssertNotNil(AssistCardCommand.matching("publish unit 5."))
+        XCTAssertNotNil(AssistCardCommand.matching("Publish Unit 5!"))
     }
 
     // MARK: - What the shelf promises
