@@ -1329,9 +1329,10 @@ public sealed class AssistWorkspace
         // you asked me to undo that…" — so a gerund here puts a broken
         // sentence in front of the teacher at the one moment they are
         // checking that the right thing was put back.
-        _undo?.Begin($"{(plan.Hiding ? "unpublished" : "published")} " +
-                     $"{Humanize(plan.Named.Select(p => "“" + p.Title + "”"))} " +
-                     $"in {course.Code} Section {section}");
+        using var recording = UndoHistory.Record(_undo,
+            $"{(plan.Hiding ? "unpublished" : "published")} " +
+            $"{Humanize(plan.Named.Select(p => "“" + p.Title + "”"))} " +
+            $"in {course.Code} Section {section}");
 
         var changed = new List<string>();
         foreach (var page in plan.Changing)
@@ -1367,7 +1368,7 @@ public sealed class AssistWorkspace
         // And the front page catches up with what is now published.
         if (plan.Index is { WillChange: true } index) ApplyIndexChange(index, tail);
 
-        _undo?.End();
+        recording.Done();
 
         if (!plan.Publishes)
             return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding), backup);
@@ -1534,7 +1535,8 @@ public sealed class AssistWorkspace
         }
 
         string verb = publishing ? "published" : "unpublished";
-        _undo?.Begin($"{verb} {course.Configuration.UnitWord} {unit} in {course.Code} Section {section}");
+        using var recording = UndoHistory.Record(_undo,
+            $"{verb} {course.Configuration.UnitWord} {unit} in {course.Code} Section {section}");
 
         bool changedAnything = false;
         var changed = new List<string>();
@@ -1582,7 +1584,7 @@ public sealed class AssistWorkspace
             }
         }
 
-        _undo?.End();
+        recording.Done();
 
         if (!changedAnything)
         {
@@ -1986,7 +1988,8 @@ public sealed class AssistWorkspace
         // rollover is a single act to the teacher, and a partial undo would
         // put a section back on last year's Netlify site while leaving it cut
         // loose from Cloudflare — a state nobody chose and nothing describes.
-        _undo?.Begin($"cut section {sectionNumber} loose from its website");
+        using var recording = UndoHistory.Record(_undo,
+            $"cut section {sectionNumber} loose from its website");
 
         foreach (string folder in new[] { ".netlify_sites", ".cloudflare_sites" })
         {
@@ -2025,7 +2028,7 @@ public sealed class AssistWorkspace
             Release(marker, keptPath, kept, stillPinned);
         }
 
-        _undo?.End();
+        recording.Done();
         return new SiteRelease(kept, stillPinned);
     }
 
@@ -2154,7 +2157,8 @@ public sealed class AssistWorkspace
             TimetableMemory.Write(_folder, course.Code, section, plan.AllMeetings,
                 $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
 
-        _undo?.Begin($"re-dated {course.Code} Section {section} onto block {plan.Block}");
+        using var recording = UndoHistory.Record(_undo,
+            $"re-dated {course.Code} Section {section} onto block {plan.Block}");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         var classPaths = new HashSet<string>(
             plan.Dates.Select(d => d.RelativePath), StringComparer.OrdinalIgnoreCase);
@@ -2199,7 +2203,7 @@ public sealed class AssistWorkspace
             catch { }
         }
 
-        _undo?.End();
+        recording.Done();
 
         // Counted apart, because "moved 91 classes" when 26 classes and 65
         // materials moved is a sentence a teacher would rightly query.
@@ -2316,8 +2320,9 @@ public sealed class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so no dates were changed: {error.Message}");
         }
 
-        _undo?.Begin($"brought {Humanize(plan.Anchors)}’ pages into date in " +
-                     $"{course.Code} Section {section}");
+        using var recording = UndoHistory.Record(_undo,
+            $"brought {Humanize(plan.Anchors)}’ pages into date in " +
+            $"{course.Code} Section {section}");
 
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         int moved = 0;
@@ -2330,7 +2335,7 @@ public sealed class AssistWorkspace
             Save(full, updated);
             moved++;
         }
-        _undo?.End();
+        recording.Done();
 
         return new AssistResult(true,
             $"Brought {moved} page{(moved == 1 ? "" : "s")} into date with the class that uses " +
@@ -2558,44 +2563,35 @@ public sealed class AssistWorkspace
         // expectations, then published a class, then said "undo that" was
         // told they had added expectations and had the publish taken back
         // with them.
-        _undo?.Begin($"added {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
-        try
-        {
-            string path = PagePaths.ResolveInside(_folder, plan.RelativePath);
-            string text = File.ReadAllText(path);
-            string lineEnd = text.Contains("\r\n") ? "\r\n" : "\n";
-            string transclusions = string.Join(lineEnd, plan.Adding.Select(e => $"![[{e.Code}]]"));
+        using var recording = UndoHistory.Record(_undo,
+            $"added {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
 
-            if (plan.HasBlockAlready)
-            {
-                // Append inside the existing block, keeping what is already there.
-                int end = text.IndexOf(CurriculumEnd, StringComparison.OrdinalIgnoreCase);
-                text = text[..end].TrimEnd() + lineEnd + transclusions + lineEnd + text[end..];
-            }
-            else
-            {
-                // A new block, before the "things to do" list if there is one —
-                // that list closes a class page, and the curriculum note belongs
-                // with the lesson rather than after the homework.
-                string block = CurriculumStart + lineEnd + "Today's work points here:" + lineEnd + lineEnd +
-                               transclusions + lineEnd + CurriculumEnd + lineEnd;
-                int before = text.IndexOf("## Things to do", StringComparison.OrdinalIgnoreCase);
-                text = before > 0
-                    ? text[..before] + block + lineEnd + text[before..]
-                    : text.TrimEnd() + lineEnd + lineEnd + block;
-            }
+        string path = PagePaths.ResolveInside(_folder, plan.RelativePath);
+        string text = File.ReadAllText(path);
+        string lineEnd = text.Contains("\r\n") ? "\r\n" : "\n";
+        string transclusions = string.Join(lineEnd, plan.Adding.Select(e => $"![[{e.Code}]]"));
 
-            Save(path, text);
-            _undo?.End();
-        }
-        catch
+        if (plan.HasBlockAlready)
         {
-            // A page that could not be read or written leaves an entry that
-            // describes work nobody did. Abandoning it is what keeps the next
-            // operation's undo its own.
-            _undo?.Abandon();
-            throw;
+            // Append inside the existing block, keeping what is already there.
+            int end = text.IndexOf(CurriculumEnd, StringComparison.OrdinalIgnoreCase);
+            text = text[..end].TrimEnd() + lineEnd + transclusions + lineEnd + text[end..];
         }
+        else
+        {
+            // A new block, before the "things to do" list if there is one —
+            // that list closes a class page, and the curriculum note belongs
+            // with the lesson rather than after the homework.
+            string block = CurriculumStart + lineEnd + "Today's work points here:" + lineEnd + lineEnd +
+                           transclusions + lineEnd + CurriculumEnd + lineEnd;
+            int before = text.IndexOf("## Things to do", StringComparison.OrdinalIgnoreCase);
+            text = before > 0
+                ? text[..before] + block + lineEnd + text[before..]
+                : text.TrimEnd() + lineEnd + lineEnd + block;
+        }
+
+        Save(path, text);
+        recording.Done();
 
         return new AssistResult(true,
             $"Added {plan.Adding.Count} curriculum expectation{(plan.Adding.Count == 1 ? "" : "s")} to " +
@@ -2963,53 +2959,48 @@ public sealed class AssistWorkspace
         // OUTERMOST, and that is the whole of why this reads the way it does.
         // Begin ignores a nested call, so whoever opens the entry first owns
         // the description — and everything ApplyInsertClasses writes lands in
-        // this one.
-        _undo?.Begin($"duplicated “{plan.SourceTitle}” as “{plan.NewTitle}”");
+        // this one. Leaving without reaching Done abandons it, so every
+        // refusal below is safe by construction rather than by remembering.
+        using var recording = UndoHistory.Record(_undo,
+            $"duplicated “{plan.SourceTitle}” as “{plan.NewTitle}”");
 
-        AssistResult inserted;
-        string copied;
-        try
-        {
-            inserted = ApplyInsertClasses(plan.Insertion, progress);
+        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress);
 
-            // The one case that could destroy a lesson. ApplyInsertClasses
-            // SKIPS a rename whose destination already exists rather than
-            // writing over it — right in itself, but it leaves the page the
-            // copy was meant to become holding somebody's real class. Writing
-            // the copy there anyway would lose it.
-            if (occupying is not null && File.Exists(newPath) && File.ReadAllText(newPath) == occupying)
-                throw new AssistRefusal(
-                    ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath));
+        // The one case that could destroy a lesson. ApplyInsertClasses
+        // SKIPS a rename whose destination already exists rather than
+        // writing over it — right in itself, but it leaves the page the
+        // copy was meant to become holding somebody's real class. Writing
+        // the copy there anyway would lose it.
+        if (occupying is not null && File.Exists(newPath) && File.ReadAllText(newPath) == occupying)
+            throw new AssistRefusal(
+                ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath));
 
-            progress?.Report($"Copying “{plan.SourceTitle}”…");
-            bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, newPath);
-            copied = PageFrontmatter.SetTitle(plan.SourceText, plan.NewTitle);
-            copied = PageFrontmatter.SetCreated(
-                copied, PageFrontmatter.CreatedKeyFor(section, sectionLocal), plan.NewDate,
-                SiblingTimeAndOffset(course, section, ClassPages(course, section))).Text;
+        progress?.Report($"Copying “{plan.SourceTitle}”…");
+        bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, newPath);
+        string copied = PageFrontmatter.SetTitle(plan.SourceText, plan.NewTitle);
+        copied = PageFrontmatter.SetCreated(
+            copied, PageFrontmatter.CreatedKeyFor(section, sectionLocal), plan.NewDate,
+            SiblingTimeAndOffset(course, section, ClassPages(course, section))).Text;
+        copied = PageFrontmatter.SetDraft(
+            copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true).Text;
+
+        // A shared source carrying publishForSection<N>: true beats the
+        // plain publish: false just written (PageFrontmatter.IsDraft reads
+        // the per-section key FIRST), so the copy would be VISIBLE to this
+        // section's students the moment it existed. Checked rather than
+        // assumed, because the frontmatter the copy inherits is whatever
+        // the teacher's page happened to carry.
+        if (!PageFrontmatter.IsDraft(copied, section))
             copied = PageFrontmatter.SetDraft(
-                copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true).Text;
+                copied, PageFrontmatter.PublishKeyFor(section, isSectionLocal: false), draft: true).Text;
 
-            // A shared source carrying publishForSection<N>: true beats the
-            // plain publish: false just written (PageFrontmatter.IsDraft reads
-            // the per-section key FIRST), so the copy would be VISIBLE to this
-            // section's students the moment it existed. Checked rather than
-            // assumed, because the frontmatter the copy inherits is whatever
-            // the teacher's page happened to carry.
-            if (!PageFrontmatter.IsDraft(copied, section))
-                copied = PageFrontmatter.SetDraft(
-                    copied, PageFrontmatter.PublishKeyFor(section, isSectionLocal: false), draft: true).Text;
+        Save(newPath, copied);
 
-            Save(newPath, copied);
-        }
-        catch
-        {
-            _undo?.Abandon();
-            throw;
-        }
-
-        if (plan.MovesOtherClasses) _undo?.Abandon();
-        else _undo?.End();
+        // Recorded ONLY when nothing else moved. Left unsettled otherwise, so
+        // the scope abandons it: a partial undo that deleted the copy and left
+        // every later class renamed and re-dated is worse than no undo at all,
+        // and the reply names the backup instead.
+        if (!plan.MovesOtherClasses) recording.Done();
 
         string said = ClassChangeWording.CopiedTo(plan.SourceTitle, plan.NewTitle, plan.NewDate);
         if (plan.MovesOtherClasses)
@@ -3251,29 +3242,23 @@ public sealed class AssistWorkspace
         // entry was opened and never closed. Nothing here renames or re-dates
         // anything else, so there is no partial-undo question to ask: the mac
         // records this one too (AssistToolRunner, the placeholder-class path).
-        _undo?.Begin($"added {plan.Classes.Count} class pages to {UnitWordFor(plan.CourseCode)} {plan.Unit} of " +
-                     $"{course.Code} Section {section}");
-        try
-        {
-            // Match the time of day and UTC offset the section's existing classes
-            // use, so a new page sorts beside them rather than at midnight.
-            string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
-            string folder = ClassFolder(course, section);
-            Directory.CreateDirectory(folder);
+        using var recording = UndoHistory.Record(_undo,
+            $"added {plan.Classes.Count} class pages to {UnitWordFor(plan.CourseCode)} {plan.Unit} of " +
+            $"{course.Code} Section {section}");
 
-            foreach (var created in plan.Classes)
-            {
-                string path = Path.Combine(folder, created.Title + ".md");
-                if (File.Exists(path)) continue;       // checked again: the plan may be minutes old
-                Save(path, ClassSkeleton(created, plan.Unit, plan.Classes.Count, tail));
-            }
-            _undo?.End();
-        }
-        catch
+        // Match the time of day and UTC offset the section's existing classes
+        // use, so a new page sorts beside them rather than at midnight.
+        string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+        string folder = ClassFolder(course, section);
+        Directory.CreateDirectory(folder);
+
+        foreach (var created in plan.Classes)
         {
-            _undo?.Abandon();
-            throw;
+            string path = Path.Combine(folder, created.Title + ".md");
+            if (File.Exists(path)) continue;       // checked again: the plan may be minutes old
+            Save(path, ClassSkeleton(created, plan.Unit, plan.Classes.Count, tail));
         }
+        recording.Done();
 
         return new AssistResult(true,
             $"Created {plan.Classes.Count} class page{(plan.Classes.Count == 1 ? "" : "s")} in Unit " +

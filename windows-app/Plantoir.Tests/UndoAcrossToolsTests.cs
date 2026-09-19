@@ -114,6 +114,46 @@ public sealed class UndoAcrossToolsTests : IDisposable
         Assert.Contains("written straight away", File.ReadAllText(ClassPath("Unit 2, Day 3")));
     }
 
+    // ---- An operation that threw partway -----------------------------------
+
+    [Fact]
+    public async Task AnOperationThatThrewPartWayLeavesNothingOpenToSwallowTheNext()
+    {
+        // The half the first fix missed. Five older tools closed their entry
+        // only on the path where nothing threw — and every one of them is
+        // called through PlantoirTools.Guarded, which turns the exception into
+        // an ANSWER. So the entry stayed open, and the next operation's files
+        // went into it under the earlier description.
+        //
+        // The throw here is a real one: Obsidian is open in the other window,
+        // and a page named by a plan made a minute ago is gone by the time the
+        // teacher presses Go.
+        FourClasses();
+        var workspace = Open();
+        var plan = workspace.PlanPublish("ICS3U", 1,
+            new[] { "Unit 1, Day 1", "Unit 1, Day 2" }, includeLinked: false, publishes: false);
+
+        File.Delete(ClassPath("Unit 1, Day 2"));
+
+        await Assert.ThrowsAnyAsync<IOException>(() => workspace.Apply(plan, preview: false));
+
+        // Nothing is remembered from the half that ran. That is the deliberate
+        // choice, not an oversight: the description was written from the PLAN
+        // before any of it happened, so committing the entry would tell a
+        // teacher they had published two pages when one was written — at the
+        // one moment they are checking. The backup taken before the first
+        // write is the way back.
+        Assert.Empty(_history.Entries);
+
+        // And the next operation's undo is ITS OWN.
+        await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 1" },
+            includeLinked: false, publishes: false), preview: false);
+
+        var entry = Assert.Single(_history.Entries);
+        Assert.Contains("“Unit 2, Day 1”", entry.Description);
+        Assert.Equal(new[] { ClassPath("Unit 2, Day 1") }, entry.Files.Keys.ToArray());
+    }
+
     // ---- Making room -------------------------------------------------------
 
     [Fact]
@@ -132,8 +172,7 @@ public sealed class UndoAcrossToolsTests : IDisposable
             workspace.PlanInsertClasses("ICS3U", 1, unit: 2, atDay: 1, count: 1));
 
         Assert.Empty(_history.Entries);
-        Assert.Contains("will not take this back", result.Message);
-        Assert.Contains(Path.GetFileName(result.BackupPath!), result.Message);
+        Assert.Contains(ClassChangeWording.OtherClassesMoved(result.BackupPath), result.Message);
     }
 
     [Fact]

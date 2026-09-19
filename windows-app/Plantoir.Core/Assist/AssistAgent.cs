@@ -186,7 +186,10 @@ public sealed class AssistAgent
         {
             int dot = pair.IndexOf('.');
             if (dot < 0) continue;
-            if (!string.Equals(pair[..dot], toolName, StringComparison.Ordinal)) continue;
+            // Case-insensitively, because ForTheLocalModel matches tool names
+            // that way and two answers to "is this that tool" is how an
+            // argument stays visible to the router by accident.
+            if (!string.Equals(pair[..dot], toolName, StringComparison.OrdinalIgnoreCase)) continue;
             string argument = pair[(dot + 1)..];
 
             if (schema["properties"] is JsonObject properties) properties.Remove(argument);

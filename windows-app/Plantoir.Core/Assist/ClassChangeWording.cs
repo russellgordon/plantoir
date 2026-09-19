@@ -37,10 +37,6 @@ public static class ClassChangeWording
     public const string TheCopyStartsHidden =
         "The copy starts hidden, so nothing changes on the site until you publish it.";
 
-    /// <summary>The summary line of the plan.</summary>
-    public static string WorkedOutWhatDuplicatingWouldDo(string sourceTitle) =>
-        $"Worked out what duplicating “{sourceTitle}” would do.";
-
     // ---- What else moves ---------------------------------------------------
 
     /// <summary>
