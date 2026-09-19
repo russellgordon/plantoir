@@ -34,7 +34,7 @@ vetoed and for what, and what the flags cost.
 | `reasoning-flag-measurement.txt` | Why thinking must be turned off with **two** flags, and why the fault hid for days: llama.cpp parses the thinking out of the reply, so only the token count and the clock show it. |
 | `tools-from-contract.py` | **Start here for a new measurement.** Writes the tool surface the suites take as input, read from `contracts/assist-cases.json` — which is generated from the app, so a run cannot be against a surface that does not ship. `local` (13 tools) is what the on-device model sees; `mcp` (32) is Claude Code's. |
 | `thirteen-tool-surface-results.txt` | The **current** shipping surface, 42 probes × 10 trials on both tiers. Also records the description-steer regression: fixing one probe in a tool description broke three others. Its 42-probe harness was never committed, so it cannot be re-run — see the row below. |
-| `metal-routing-results.txt` | **Routing on the hardware that ships, after the 2026-08-24 prompt change** (issue #117). Both tiers, three system-prompt forms including the one before the change, the app's own request body, and the mac's OWN shelf — the "promise card" in every other file here is Windows' `ExampleRequests`, not this app's. The answer on the prompt: neutral on the 4B (28 of 29 probes identical either way), and worth 5 trials in 10 on one hide request on the 1.5B. The findings that matter are elsewhere in it, and each is now an issue: `read` on the 4B has gone from 10/10 to 0-1/10 since August (#167), the mac shelf's "Deploy at 6:30 AM" deploys NOW on the small tier (#168), and the app sends no `max_tokens` (#166). Checked by three Claude Opus reviews in fresh contexts — of the plan, the results and the corrections — and a final Claude Fable 5.1 pre-merge sweep. Also the file to read before quoting any "malformed tool calls: 0" in this folder. Pre-registered: its thresholds were committed before the first model call. |
+| `metal-routing-results.txt` | **Routing on the hardware that ships, after the 2026-08-24 prompt change** (issue #117). Both tiers, three system-prompt forms including the one before the change, the app's own request body, and the mac's OWN shelf — the "promise card" in every other file here is Windows' `ExampleRequests`, not this app's. The answer on the prompt: neutral on the 4B (28 of 29 probes identical either way), and worth 5 trials in 10 on one hide request on the 1.5B. The findings that matter are elsewhere in it, and each is now an issue: `read` on the 4B has gone from 10/10 to 0-1/10 since August (#167), the mac shelf's "Deploy at 6:30 AM" deploys NOW on the small tier (#168), and the app sent no `max_tokens` (#166, since fixed — so **this file's `--app-body` arm is `--app-body --uncapped` today**, and a re-run without that flag is measuring a different body). Checked by three Claude Opus reviews in fresh contexts — of the plan, the results and the corrections — and a final Claude Fable 5.1 pre-merge sweep. Also the file to read before quoting any "malformed tool calls: 0" in this folder. Pre-registered: its thresholds were committed before the first model call. |
 | `shelf-phrasings-results.txt` | **The mac shelf as it stood on 2026-08-16**, word for word, 14 × 10 trials on the 4B — the shelf is 19 cards today and ten of them appear here, including all four that reach the model, so it is still the evidence for those four on the larger assistant; `metal-routing-results.txt` measured the current nineteen on the smaller one. Also records a harness fault worth more than the result: measured without `AssistAgent.dateline(on:)`, "Publish the class on Monday" resolved to a date a month away 10/10 and nearly cost a good card. |
 
 **Earlier runs, superseded but kept**
@@ -67,12 +67,17 @@ by construction; two files used to point a new measurement at it and were
 corrected on 2026-09-18), and two
 PowerShell helpers for dumping a live tool list.
 
-`trimmed-surface-suite.py` takes four things that were added for #117 and
-that a later run will want: `--prompt shipped|hyphen|pre-tweak` (the shipped
-form is READ out of `AssistAgent.swift` rather than copied, and an assertion
-fails the run if the copy has drifted), `--app-body` (exactly what
-`AssistModelClient` sends — temperature 0, `tool_choice` auto, no
-`max_tokens`), `--mac-shelf` (the MAC's own nineteen cards instead of the
+`trimmed-surface-suite.py` takes five things that were added for #117 and
+#166 and that a later run will want: `--prompt shipped|hyphen|pre-tweak` (the
+shipped form is READ out of `AssistAgent.swift` rather than copied, and an
+assertion fails the run if the copy has drifted), `--app-body` (exactly what
+`AssistModelClient` sends — temperature 0, `tool_choice` auto, and
+`max_tokens` read out of `AssistModelClient.swift` the same way, with the run
+FAILING if that constant cannot be found rather than quietly falling back to
+no cap), `--uncapped` (with `--app-body`: no `max_tokens` at all, which is
+the body the mac sent **before** #166 — so every `--app-body` number in this
+folder taken before 2026-09-19, `metal-routing-results.txt`'s H arm included,
+is reproduced today by `--app-body --uncapped`), `--mac-shelf` (the MAC's own nineteen cards instead of the
 default probe set, whose eleven "promise card" entries are WINDOWS'
 `ExampleRequests`; the list is checked against
 `AssistSupportingViews.swift` on every run and the run FAILS if the two have

@@ -41,9 +41,18 @@ AssistAgent does (Say appends the date; NarrowToLocal rewrites examples).
                      em-dashes on every run; see `assert_forms_agree`.
   --temperature X    Default 0.1, which is what the older runs used.
   --app-body         Send the request AssistModelClient sends: temperature 0,
-                     tool_choice "auto", no max_tokens. Greedy decoding makes
+                     tool_choice "auto", and `max_tokens` READ OUT OF THE
+                     SWIFT (`AssistModelClient.mostTokensPerReply`, 512 since
+                     #166) rather than copied here. Greedy decoding makes
                      repeated trials near-deterministic, so a trial count is
                      not a failure rate — see the note in the report.
+  --uncapped         Only with --app-body: send no `max_tokens` at all, which
+                     is the body the mac sent BEFORE #166. Kept for the same
+                     reason `--date-prepended` and `--prompt pre-tweak` are:
+                     the version that failed, kept so the failure can be
+                     reproduced rather than re-discovered. Every `--app-body`
+                     number taken before 2026-09-19 — including
+                     `metal-routing-results.txt`'s H arm — is this arm.
   --intercept-only   Run the interception guard and stop. No server needed.
   --mac-shelf        Measure the MAC's shelf (AssistSupportingViews.swift)
                      instead of the 29 probes. The eleven "promise card"
@@ -55,6 +64,7 @@ Usage:
   python trimmed-surface-suite.py TOOLS.json [trials] [--date-appended]
          [--date-prepended] [--real-course] [--port 8099] [--course VVH2O]
          [--prompt hyphen|shipped|pre-tweak] [--temperature 0.1] [--app-body]
+         [--uncapped]
          [--intercept-only]
 
 TOOLS.json is the narrowed OpenAI-shaped surface. Produce it from the contract
@@ -89,16 +99,23 @@ COURSE = args[args.index("--course") + 1] if "--course" in args else "EXC2O"
 SECTION = 1
 PROMPT_FORM = args[args.index("--prompt") + 1] if "--prompt" in args else "hyphen"
 APP_BODY = "--app-body" in args
+UNCAPPED = "--uncapped" in args
 TEMPERATURE = float(args[args.index("--temperature") + 1]) if "--temperature" in args else 0.1
 if APP_BODY:
-    # AssistModelClient.reply: temperature 0, tool_choice auto, no max_tokens.
+    # AssistModelClient.reply: temperature 0, tool_choice auto, and a cap read
+    # out of the Swift below (or none at all with --uncapped, which is the
+    # body the mac sent before #166).
     TEMPERATURE = 0.0
+if UNCAPPED and not APP_BODY:
+    sys.exit("--uncapped only means anything with --app-body: every other arm "
+             "sends the suite's historic max_tokens 256.")
 INTERCEPT_ONLY = "--intercept-only" in args
 # The MAC's shelf instead of Windows' ExampleRequests — see MAC_SHELF below.
 MAC_SHELF_ONLY = "--mac-shelf" in args
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 AGENT_SWIFT = "mac-app/QuartzTeachers/Models/Assist/AssistAgent.swift"
+CLIENT_SWIFT = "mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift"
 PRE_TWEAK_COMMIT = "b77b91bd^"
 
 ENDPOINT = "http://127.0.0.1:%s/v1/chat/completions" % PORT
@@ -189,6 +206,28 @@ def swift_system_prompt(source: str, course: str, section: int) -> str:
             text += body + "\n"
     text = text.rstrip("\n")
     return text.replace("\\(course)", course).replace("\\(section)", str(section))
+
+
+def swift_most_tokens_per_reply() -> int:
+    """`AssistModelClient.mostTokensPerReply`, read out of the Swift.
+
+    Read rather than copied, for the reason the system prompt is: a hand copy
+    of a shipping value is exactly what `narrow-tools.py` taught this folder
+    not to keep. It EXITS when the constant cannot be found — a renamed
+    constant that quietly fell back to a default would make the `--app-body`
+    arm measure the uncapped body while its header line claimed otherwise,
+    which is a measurement that looks like evidence and is not.
+    """
+    source = (ROOT / CLIENT_SWIFT).read_text(encoding="utf-8")
+    found = re.search(r"static let mostTokensPerReply:\s*Int\s*=\s*(\d+)", source)
+    if not found:
+        sys.exit(
+            "Could not find `static let mostTokensPerReply: Int = N` in %s.\n"
+            "The --app-body arm sends what the app sends, so it cannot run "
+            "until this reads the real value. Fix the regex above (or pass "
+            "--uncapped, which deliberately sends no cap)." % CLIENT_SWIFT
+        )
+    return int(found.group(1))
 
 
 def system_prompt(form: str, course: str, section: int) -> str:
@@ -525,10 +564,14 @@ def ask(prompt):
         "tools": TOOLS,
     }
     if APP_BODY:
-        # What AssistModelClient sends, and nothing else: no max_tokens, and
-        # tool_choice named rather than left to the server's default.
+        # What AssistModelClient sends, and nothing else: tool_choice named
+        # rather than left to the server's default, and the cap read out of
+        # the Swift — or none at all under --uncapped, which is the body the
+        # mac sent before #166.
         payload["tool_choice"] = "auto"
         payload["stream"] = False
+        if not UNCAPPED:
+            payload["max_tokens"] = APP_CAP
     else:
         payload["max_tokens"] = 256
     request = urllib.request.Request(ENDPOINT, data=json.dumps(payload).encode(),
@@ -572,10 +615,18 @@ for acceptable, prompt, probe, needs_date in CASES:
     if tool is not None:
         INTERCEPTED[probe] = tool
 
+# Read once, and only when it is going to be sent: an --uncapped arm is
+# reproducible from a checkout where the constant does not exist yet.
+APP_CAP = swift_most_tokens_per_reply() if (APP_BODY and not UNCAPPED) else None
+
 print("### date-appended=%s date-prepended=%s real-course=%s" % (
     DATE_APPENDED, DATE_PREPENDED, REAL_COURSE))
 print("### prompt=%s temperature=%s app-body=%s trials=%s course=%s" % (
     PROMPT_FORM, TEMPERATURE, APP_BODY, TRIALS, COURSE))
+print("### max_tokens=%s (%s)" % (
+    "none" if (APP_BODY and UNCAPPED) else (APP_CAP if APP_BODY else 256),
+    "--uncapped: the body the mac sent before #166" if (APP_BODY and UNCAPPED)
+    else ("read from %s" % CLIENT_SWIFT if APP_BODY else "this suite's historic cap")))
 print("### em-dashes in the shipped literal, folded for the hyphen form: %d"
       % assert_forms_agree())
 if MAC_SHELF_ONLY:
