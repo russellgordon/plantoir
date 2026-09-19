@@ -710,7 +710,8 @@ final class AppRulesContractTests: XCTestCase {
             let couldNotStart: String = try XCTUnwrap(agent["couldNotStart"] as? String)
             let trailLine: String = try XCTUnwrap(agent["trailLine"] as? String)
             let expectedArguments: [String] = try XCTUnwrap(agent["arguments"] as? [String])
-            let writes: [String] = try XCTUnwrap(agent["writes"] as? [String])
+            let writesForTheConnection: [String] = try XCTUnwrap(agent["writesForTheConnection"] as? [String])
+            let macHandsOverWith: String = try XCTUnwrap(agent["macHandsOverWith"] as? String)
 
             let scriptPath: String
             let actualMenuItem: String
@@ -797,24 +798,37 @@ final class AppRulesContractTests: XCTestCase {
             }
             XCTAssertEqual(filledServerArguments, ["--mcp-stdio", folder])
 
-            // What each door writes, and what it therefore does NOT write.
+            // What each door writes for the CONNECTION, and what it therefore
+            // does not write. The Codex list is deliberately empty: its server
+            // is described in its arguments, so there is no file at all.
             let supportDirectory: URL = try ClaudeCodeLauncher.supportDirectory()
-            var expectedFiles: [String] = []
-            for name in writes {
-                expectedFiles.append(AppRulesContractTests.filled(name, with: tokens))
+            var connectionFiles: [String] = []
+            for name in writesForTheConnection {
+                connectionFiles.append(AppRulesContractTests.filled(name, with: tokens))
             }
-            for name in expectedFiles {
+            for name in connectionFiles {
                 XCTAssertTrue(
                     FileManager.default.fileExists(atPath: supportDirectory.appendingPathComponent(name).path),
                     "\(key) was supposed to write \(name)"
                 )
             }
             if key == "codex" {
+                XCTAssertEqual(connectionFiles, [], "The Codex door writes no file for its connection.")
                 XCTAssertFalse(
-                    expectedFiles.contains("mcp-\(courseCode).json"),
-                    "The Codex door writes no configuration file — its server is described in its arguments."
+                    FileManager.default.fileExists(
+                        atPath: supportDirectory.appendingPathComponent("mcp-\(courseCode)-codex.json").path
+                    )
                 )
             }
+
+            // And the file the MAC hands to a terminal, which is this
+            // platform's mechanism rather than a shared requirement: Windows
+            // passes the command line to wt.exe directly and writes no script.
+            XCTAssertEqual(
+                URL(fileURLWithPath: scriptPath).lastPathComponent,
+                AppRulesContractTests.filled(macHandsOverWith, with: tokens),
+                key
+            )
         }
     }
 
