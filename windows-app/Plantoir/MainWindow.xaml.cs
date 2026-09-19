@@ -890,7 +890,7 @@ public sealed partial class MainWindow : Window
     public void HideSyncNoticeFor(string path)
     {
         if (_syncNoticePath is not { } shown) return;
-        if (!string.Equals(ResolvedFolder(shown), ResolvedFolder(path), StringComparison.OrdinalIgnoreCase)) return;
+        if (!WorkingFolder.IsTheSame(shown, path)) return;
         _syncNoticeService = null;
         _syncNoticePath = null;
         SyncNotice.IsOpen = false;

@@ -779,6 +779,11 @@ public sealed class SharedRuleContractTests : IDisposable
             RepoRoot, "windows-app", "Plantoir", "ViewModels", "WorkspaceViewModel.cs"));
         string code = Regex.Replace(source, @"//[^\n]*", "");
 
+        // THIS is the assertion that holds the rule: one door into the funnel,
+        // so no second adoption route can gain or skip the clear. The
+        // PointAtFolder count below pins a SPELLING and is only a readability
+        // guard — somebody could rename the parameter and redden it without
+        // changing a thing a teacher sees.
         Assert.Equal(1, Regex.Matches(code, @"_state\.PointAt\(").Count);
         Assert.Equal(2, Regex.Matches(code, @"PointAtFolder\(path\)").Count);
 
@@ -787,11 +792,40 @@ public sealed class SharedRuleContractTests : IDisposable
         // precisely because it hides a rule a reader has to find.
         Assert.DoesNotContain("_state.Selection = null", code, StringComparison.Ordinal);
 
+        // And the OTHER rejected alternative, which the case list cannot catch
+        // on its own: contract case 4 is replayed against this suite's own
+        // FolderWindow.Reload, so a `Selection = null` written through the
+        // PROPERTY inside WorkspaceViewModel.Reload() would leave case 4 green
+        // and still erase the legitimately right "Course Not Found". Reload
+        // must not touch the selection at all.
+        //
+        // The honest limit: this reads Reload's OWN body. A write inside
+        // something Reload calls — NotifyLoaded today — is invisible to it,
+        // and so is a write in another class reached through the model.
+        string reload = BodyOfReload(code);
+        Assert.DoesNotContain("Selection", reload, StringComparison.Ordinal);
+
         // Load-bearing twice: it re-renders the pane with the selection gone,
         // and it is what drives App.RememberOpenWindows(), without which the
         // remembered frame still names the old folder's course and the defect
         // returns on the next launch.
         Assert.Equal(1, Regex.Matches(code, @"Notify\(nameof\(Selection\)\)").Count);
+    }
+
+    /// <summary><c>WorkspaceViewModel.Reload()</c>'s body, by brace counting.</summary>
+    private static string BodyOfReload(string commentStrippedSource)
+    {
+        var header = Regex.Match(commentStrippedSource, @"public void Reload\(\)\s*\r?\n\s*\{");
+        Assert.True(header.Success, "WorkspaceViewModel.Reload() is no longer shaped as this scan expects.");
+        int open = commentStrippedSource.IndexOf('{', header.Index);
+        int depth = 0;
+        for (int i = open; i < commentStrippedSource.Length; i++)
+        {
+            if (commentStrippedSource[i] == '{') depth++;
+            else if (commentStrippedSource[i] == '}' && --depth == 0)
+                return commentStrippedSource[(open + 1)..i];
+        }
+        throw new InvalidOperationException("Reload()'s body never closed.");
     }
 
     /// <summary>
