@@ -2273,7 +2273,14 @@ Two details that make the backups usable rather than merely present:
   about a particular section, or themselves on purpose. A list of five
   identical-looking timestamps is not a choice anybody can make.
 - **Prune only the ASSISTANT's own backups**, keeping its five most recent
-  per course. A teacher's backup is a decision — they pressed Back Up because
+  per course — and, since 2026-09-10, only those whose stamp could be true.
+  The date lives in the file NAME, this list is sorted by it and its tail is
+  thrown away, so a name stamped in another machine's calendar (2569, on a
+  zip carried from a pre-fix Thai Mac) would sort as the newest thing in the
+  folder and take a real backup's place. Left out of the count, it is never
+  deleted either: [09-mac-app.md](09-mac-app.md) → "What an archive or a
+  backup is CALLED" says what that costs, since a Mac with a badly wrong
+  clock stops being pruned too. A teacher's backup is a decision — they pressed Back Up because
   they were about to do something they were unsure of — and deleting it on a
   schedule they never agreed to is the app overruling them about their own
   work. The assistant's are different in kind: it saves one per conversation
@@ -2751,20 +2758,24 @@ date a teacher remembered lands 543 years in the future and nothing reports a
 fault. That sweep is its own piece of work, with its own review: [issue
 #144](https://github.com/russellgordon/plantoir/issues/144). **`CalendarDay`
 is immune by construction** — `.text` is `String(format: "%04d-%02d-%02d", …)`,
-three integers and no calendar — **but the mac is not, and this line used to
+three integers and no calendar — **but the mac was not, and this line used to
 say it was.** Two `DateFormatter`s in mac product code set a `dateFormat` and
-pin no locale, so they render in the machine's default calendar:
+pinned no locale, so they rendered in the machine's default calendar:
 `CourseArchiver.timestampedName`, which builds archive and backup FILENAMES,
-and `ArchivedItem.date(fromStamp:)`, which reads them back. On the Thai-locale
-machine measured above, a mac writes `ICS3U_2569-08-09_141530.zip` against a
+and `ArchivedItem.date(fromStamp:)`, which read them back. On the Thai-locale
+machine measured above, a mac wrote `ICS3U_2569-08-09_141530.zip` against a
 form `contracts/course-management.json` pins as `yyyy-MM-dd_HHmmss`. Symmetric
-on one machine and broken between two, which is why nobody has met it. Two
-files, not a sweep, and with a migration in it — the reader must go on
-accepting the old spelling or a teacher's own history vanishes from the list
-the day they update: [issue #160](https://github.com/russellgordon/plantoir/issues/160).
-Everywhere else is pinned to `en_US_POSIX`, and the third instance was
-`AssistAgent.dateline()`, fixed below because that line was being rewritten
-anyway.
+on one machine and broken between two, which is why nobody met it. **Fixed on
+2026-09-10** ([issue #160](https://github.com/russellgordon/plantoir/issues/160)):
+`ArchiveStamp` now owns both ends, and it goes on reading the old spellings,
+because a teacher on such a machine has zips already named that way and the
+date in one of those names decides which backup gets DELETED. The whole of it
+— including the Ethiopic case, which is the one an ordinary sanity check
+cannot catch — is in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "What an archive or a backup
+is CALLED, and the calendar it is stamped in". Everywhere else is pinned to
+`en_US_POSIX`, and the third instance was `AssistAgent.dateline()`, fixed
+below because that line was being rewritten anyway.
 
 ### The mac's half: settled where the call is made, and a clock that is read
 
@@ -2842,9 +2853,11 @@ asked `DateFormatter` for `EEEE` with no locale pinned, so a French-locale Mac
 would have told the model "a mardi" and a Thai-locale one would have dated it
 2569 — the same trap the Windows section above measured, live in the sentence
 the model reads most often. Not the last instance on this side: the audit it
-prompted found two more, in the archive filenames, which are
+prompted found two more, in the archive filenames, which were
 [issue #160](https://github.com/russellgordon/plantoir/issues/160) rather than
-this piece, because a durable name cannot be respelled without a migration. `CalendarDay` is three integers and
+this piece, because a durable name cannot be respelled without a migration —
+fixed the same day, in `ArchiveStamp`, with that migration written
+([09-mac-app.md](09-mac-app.md) → "What an archive or a backup is CALLED"). `CalendarDay` is three integers and
 `String(format:)`, and its `weekdayName` pins `en_US_POSIX`. The sentence is
 byte-identical on an English machine, so the routing measurements stand and no
 tool description was touched.

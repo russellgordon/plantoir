@@ -72,7 +72,7 @@ struct ArchivedItem: Identifiable, Hashable {
         let subject: String = String(name[name.startIndex..<underscoreIndex])
         let stamp: String = String(name[name.index(after: underscoreIndex)...])
 
-        guard let archivedAt = ArchivedItem.date(fromStamp: stamp) else {
+        guard let archivedAt = ArchiveStamp.moment(from: stamp) else {
             return nil
         }
 
@@ -87,12 +87,5 @@ struct ArchivedItem: Identifiable, Hashable {
             }
         }
         return nil
-    }
-
-    /// Reads the "2026-08-10_143005" half of an archive's name.
-    static func date(fromStamp stamp: String) -> Date? {
-        let formatter: DateFormatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        return formatter.date(from: stamp)
     }
 }
