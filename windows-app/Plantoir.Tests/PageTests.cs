@@ -54,7 +54,7 @@ public class PageFrontmatterTests
         // Migration happens a page at a time, as things are touched — no
         // sweep, no flag day.
         var (text, edit) = PageFrontmatter.SetDraft(
-            "---\ndraft: true\ntags:\n  - unit-1\n---\nbody\n", "publish", draft: false);
+            "---\ndraft: true\ntags:\n  - unit-1\n---\nbody\n", "publish", draft: false, sectionNumber: 1);
 
         Assert.Equal("---\npublish: true\ntags:\n  - unit-1\n---\nbody\n", text);
         Assert.True(edit.Changed);
@@ -65,7 +65,7 @@ public class PageFrontmatterTests
     {
         var (text, _) = PageFrontmatter.SetDraft(
             "---\ndraftSection1: true\ndraftSection2: false\n---\nbody\n",
-            "publishForSection1", draft: false);
+            "publishForSection1", draft: false, sectionNumber: 1);
 
         Assert.Contains("publishForSection1: true", text);
         Assert.DoesNotContain("draftSection1", text);
@@ -120,7 +120,7 @@ public class PageFrontmatterTests
     {
         string page = "---\ncreatedSection1: 2026-11-20T08:00:00.000-0500\n" +
                       "draftSection1: false\nenableToc: true\ntags:\n  - physics\n---\n## The idea\n";
-        var (text, edit) = PageFrontmatter.SetDraft(page, "publishForSection1", draft: true);
+        var (text, edit) = PageFrontmatter.SetDraft(page, "publishForSection1", draft: true, sectionNumber: 1);
 
         // The new key takes the old one's PLACE, so the teacher's frontmatter
         // keeps its order — a reordered diff in a file Obsidian has open is
@@ -140,7 +140,7 @@ public class PageFrontmatterTests
         // The confirmation panel needs to be able to say "already published"
         // rather than proposing a no-op write.
         string page = "---\npublish: true\n---\nbody\n";
-        var (text, edit) = PageFrontmatter.SetDraft(page, "publish", draft: false);
+        var (text, edit) = PageFrontmatter.SetDraft(page, "publish", draft: false, sectionNumber: 1);
         Assert.Equal(page, text);
         Assert.False(edit.Changed);
         Assert.Equal("“Ohm’s Law” is already published", edit.Describe("Ohm’s Law"));
@@ -151,7 +151,7 @@ public class PageFrontmatterTests
     {
         // The top can never land inside a nested list or block scalar.
         string page = "---\ntags:\n  - unit-1\n---\nbody\n";
-        var (text, edit) = PageFrontmatter.SetDraft(page, "publishForSection1", draft: true);
+        var (text, edit) = PageFrontmatter.SetDraft(page, "publishForSection1", draft: true, sectionNumber: 1);
         Assert.Equal("---\npublishForSection1: false\ntags:\n  - unit-1\n---\nbody\n", text);
         Assert.Null(edit.Before);
     }
@@ -159,7 +159,7 @@ public class PageFrontmatterTests
     [Fact]
     public void APageWithNoFrontmatterGetsABlockAndKeepsItsBody()
     {
-        var (text, _) = PageFrontmatter.SetDraft("## Agenda\n\n1. Something\n", "publish", draft: true);
+        var (text, _) = PageFrontmatter.SetDraft("## Agenda\n\n1. Something\n", "publish", draft: true, sectionNumber: 1);
         Assert.Equal("---\npublish: false\n---\n## Agenda\n\n1. Something\n", text);
     }
 
@@ -167,7 +167,7 @@ public class PageFrontmatterTests
     public void ACommentAfterTheValueSurvives()
     {
         var (text, _) = PageFrontmatter.SetDraft(
-            "---\npublish: true  # not ready yet\n---\nbody\n", "publish", draft: true);
+            "---\npublish: true  # not ready yet\n---\nbody\n", "publish", draft: true, sectionNumber: 1);
         Assert.Equal("---\npublish: false # not ready yet\n---\nbody\n", text);
     }
 
@@ -177,7 +177,7 @@ public class PageFrontmatterTests
         // Obsidian has these files open; converting line endings would show up
         // as an all-lines-changed diff in the teacher's vault.
         string page = "---\r\npublish: true\r\ntags:\r\n  - unit-1\r\n---\r\nbody\r\n";
-        var (text, _) = PageFrontmatter.SetDraft(page, "publish", draft: true);
+        var (text, _) = PageFrontmatter.SetDraft(page, "publish", draft: true, sectionNumber: 1);
         Assert.Equal("---\r\npublish: false\r\ntags:\r\n  - unit-1\r\n---\r\nbody\r\n", text);
         // No line may have been left with a bare LF.
         Assert.Equal(text.Split('\n').Length - 1, text.Split("\r\n").Length - 1);
@@ -187,7 +187,7 @@ public class PageFrontmatterTests
     public void InsertingIntoACrlfFileUsesCrlfForTheNewLineToo()
     {
         string page = "---\r\ntags:\r\n  - unit-1\r\n---\r\nbody\r\n";
-        var (text, _) = PageFrontmatter.SetDraft(page, "publishForSection1", draft: true);
+        var (text, _) = PageFrontmatter.SetDraft(page, "publishForSection1", draft: true, sectionNumber: 1);
         Assert.Equal("---\r\npublishForSection1: false\r\ntags:\r\n  - unit-1\r\n---\r\nbody\r\n", text);
     }
 

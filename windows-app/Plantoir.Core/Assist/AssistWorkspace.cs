@@ -683,6 +683,12 @@ public sealed class AssistWorkspace
 
             foreach (var candidate in sweepCandidates)
             {
+                // REPORTING, deliberately left collapsed: this feeds the
+                // "N linked pages stay visible" sentence, and a page whose
+                // flag cannot be read is counted among them. Erring towards
+                // mentioning a page costs a teacher a second look; the sites
+                // that decide to SKIP A WRITE are the ones that require
+                // VisibilityIsCertain. The mac collapses here too.
                 if (!candidate.IsVisibleToStudents) continue;
                 string? reason = ReasonToKeep(candidate, mustStay, referrers, goingDown, course);
                 if (reason != null && keptSeen.Add(candidate.Title))
@@ -737,9 +743,14 @@ public sealed class AssistWorkspace
         var changes = new List<PlannedChange>();
         var alreadyRight = new List<PlannedPage>();
 
+        // "Already right" has to be a CONFIDENT reading on both lists. A page
+        // whose flag this app will not read REPORTS as visible, and dropping it
+        // into the already-right list would tell the teacher it was published
+        // while the build went on holding it back — the residue this reader
+        // exists to close (issue #140).
         foreach (var page in named)
         {
-            if (page.IsVisibleToStudents == isPublish)
+            if (page.IsVisibleToStudents == isPublish && page.VisibilityIsCertain)
             {
                 alreadyRight.Add(page);
             }
@@ -751,7 +762,7 @@ public sealed class AssistWorkspace
 
         foreach (var page in linked)
         {
-            if (page.IsVisibleToStudents == isPublish)
+            if (page.IsVisibleToStudents == isPublish && page.VisibilityIsCertain)
             {
                 if (!named.Any(n => string.Equals(n.Title, page.Title, StringComparison.OrdinalIgnoreCase)))
                     alreadyRight.Add(page);
@@ -953,13 +964,18 @@ public sealed class AssistWorkspace
 
             if (earliest is not { } owner) continue;
 
-            // If already visible to students, leave it alone
+            // Already out where students can see it — leave it alone.
+            //
+            // CERTAINLY out, that is. A page whose flag this app will not read
+            // is REPORTED visible, and it is about to be published by the
+            // change list; skipping it here would publish it with whatever
+            // date it happened to have rather than the day of the class that
+            // brought it. So only a confident "visible" skips.
             bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, target);
-            string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
             try
             {
-                bool isDraft = PageFrontmatter.StoredDraft(File.ReadAllText(target), key) ?? false;
-                if (!isDraft) continue; // visible to students
+                var visibility = PageFrontmatter.Visibility(File.ReadAllText(target), section);
+                if (visibility is PageVisibility.Visible or PageVisibility.SaysNothing) continue;
             }
             catch { }
 
@@ -1056,13 +1072,12 @@ public sealed class AssistWorkspace
         {
             string full = Path.GetFullPath(path);
             if (planned.TryGetValue(full, out bool willBeDraft)) return willBeDraft;
-            bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
             try
             {
                 // "Hidden" is the question here, and the file answers the
-                // opposite one, so it has to be read in draft terms.
-                string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-                return PageFrontmatter.StoredDraft(File.ReadAllText(full), key) ?? false;
+                // opposite one, so it has to be read in draft terms. REPORTING,
+                // so a flag this app will not read collapses to visible.
+                return PageFrontmatter.StoredDraft(File.ReadAllText(full), section) ?? false;
             }
             catch { return false; }
         });
@@ -1075,13 +1090,12 @@ public sealed class AssistWorkspace
         var graph = LinkGraph.Build(course.DirectoryPath, section);
         return (graph, path =>
         {
-            bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, path);
             try
             {
                 // "Hidden" is the question here, and the file answers the
-                // opposite one, so it has to be read in draft terms.
-                string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-                return PageFrontmatter.StoredDraft(File.ReadAllText(path), key) ?? false;
+                // opposite one, so it has to be read in draft terms. REPORTING,
+                // so a flag this app will not read collapses to visible.
+                return PageFrontmatter.StoredDraft(File.ReadAllText(path), section) ?? false;
             }
             catch { return false; }
         }
@@ -1104,18 +1118,23 @@ public sealed class AssistWorkspace
         bool isClassPage = ClassFolderRule.IsClassPage(
             PathWithinSection(course, section, pagePath),
             ClassFolderRule.Names(course.Configuration.ClassFolder, course.Configuration.PerSectionFolders));
+        // Read the way the BUILT SITE reads it, which is all four keys in build
+        // order — never branching on where the page lives, since a page's
+        // folder decides which key is WRITTEN and nothing about what it says.
+        var visibility = PageFrontmatter.Visibility(text, section);
         return new PlannedPage(
             Title: Path.GetFileNameWithoutExtension(pagePath),
             RelativePath: Relative(pagePath),
             FrontmatterKey: key,
-            CurrentValue: PageFrontmatter.StoredDraft(text, key),
+            CurrentValue: PageFrontmatter.StoredDraft(text, section),
             Draft: draft,
             ViaLink: viaLink,
             Date: PageFrontmatter.CreatedOn(text, section, sectionLocal),
             DisplayTitle: PagePaths.DisplayTitle(pagePath, text),
             IsFolderIndex: isFolderIndex,
             IsClassPage: isClassPage,
-            IsSectionLocal: sectionLocal);
+            IsSectionLocal: sectionLocal,
+            VisibilityIsCertain: visibility != PageVisibility.CannotTell);
     }
 
 
@@ -1355,7 +1374,7 @@ public sealed class AssistWorkspace
             progress?.Report($"Editing “{page.Title}”…");
             string full = PagePaths.ResolveInside(_folder, page.RelativePath);
             string text = File.ReadAllText(full);
-            var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft);
+            var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
             if (!edit.Changed) continue;
             Save(full, updated);
             changed.Add(page.Title);
@@ -1458,7 +1477,11 @@ public sealed class AssistWorkspace
         var moving = new List<string>();
         foreach (var p in unitPages)
         {
-            if (p.IsVisibleToStudents != publishing)
+            // And a page whose flag this app will not read counts as moving,
+            // for the reason above: it reports visible and the build may be
+            // hiding it, so "the unit has already been published" would be a
+            // sentence nobody can stand behind.
+            if (p.IsVisibleToStudents != publishing || !p.VisibilityIsCertain)
             {
                 moving.Add(p.DisplayTitle);
             }
@@ -1565,7 +1588,7 @@ public sealed class AssistWorkspace
                 progress?.Report($"Editing “{change.Title}”…");
                 string full = PagePaths.ResolveInside(_folder, change.RelativePath);
                 string text = File.ReadAllText(full);
-                var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft);
+                var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft, section);
                 if (!edit.Changed) continue;
                 Save(full, updated);
                 if (!changed.Contains(change.Title)) changed.Add(change.Title);
@@ -2187,7 +2210,7 @@ public sealed class AssistWorkspace
                 bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
                 string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
                 var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
-                    updated, pubKey, draft: true);
+                    updated, pubKey, draft: true, section);
                 updated = draftUpdated;
                 if (draftEdit.Changed) changed = true;
             }
@@ -2994,7 +3017,7 @@ public sealed class AssistWorkspace
             copied, PageFrontmatter.CreatedKeyFor(section, sectionLocal), plan.NewDate,
             SiblingTimeAndOffset(course, section, ClassPages(course, section))).Text;
         copied = PageFrontmatter.SetDraft(
-            copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true).Text;
+            copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true, section).Text;
 
         // A shared source carrying publishForSection<N>: true beats the
         // plain publish: false just written (PageFrontmatter.IsDraft reads
@@ -3004,7 +3027,7 @@ public sealed class AssistWorkspace
         // the teacher's page happened to carry.
         if (!PageFrontmatter.IsDraft(copied, section))
             copied = PageFrontmatter.SetDraft(
-                copied, PageFrontmatter.PublishKeyFor(section, isSectionLocal: false), draft: true).Text;
+                copied, PageFrontmatter.PublishKeyFor(section, isSectionLocal: false), draft: true, section).Text;
 
         Save(newPath, copied);
 

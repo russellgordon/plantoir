@@ -296,9 +296,15 @@ public class ClassFolderMembershipTests : IDisposable
     /// The right publish key for where the page sits: a section-local page
     /// uses <c>publish</c>, a course-level SHARED one uses
     /// <c>publishForSection1</c>. Several of these fixtures put a page in a
-    /// course-level folder on purpose, and writing <c>publish: false</c> there
-    /// says nothing at all about section 1 — the page reads as visible, and
-    /// the test passes or fails for the wrong reason.
+    /// course-level folder on purpose, and writing the key a real course would
+    /// carry there is what keeps them honest.
+    ///
+    /// <para>This comment used to say a plain <c>publish: false</c> on a
+    /// course-level page "says nothing at all about section 1". That was true
+    /// of this app's reader and never of the BUILD, which consults all four
+    /// keys on every page it copies — issue #140 made the reader agree, so
+    /// such a page now reads as hidden. The fixtures still write the key a
+    /// teacher's course would carry, which is the point of the helper.</para>
     /// </summary>
     private static string Visibility(string relative, bool unpublished)
     {
