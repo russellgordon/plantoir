@@ -20,7 +20,21 @@ namespace Plantoir.Tests;
 /// anything, ever. Nor did an ordinary failure, and nor did a run that worked:
 /// read the same way round, a scheduled publish that leaves NO trace cannot be
 /// told from one that never happened.</para>
+///
+/// <para><b>Serialised, because the wrappers these tests RUN write into the
+/// machine's own state.</b> <c>Runnable</c> substitutes the baked OUTCOME
+/// folder, but <c>$healthDir</c> resolves <c>$env:LOCALAPPDATA</c> at run time
+/// and cannot be substituted — so a stub build that finds nothing takes the
+/// wrapper's nothing-found branch and DELETES
+/// <c>scheduled\folder-problems\</c>'s record for ICS3U section 1, which is
+/// the very record <see cref="ScheduledWrapperRunTests"/> has just written and
+/// is about to read. Same course, same section, same machine-wide folder. It
+/// cost one red <c>AWorkingFolderWithSpacesInItsNameStillBuilds</c> on
+/// 2026-09-18 — an <c>Assert.Single</c> on an empty list, passing again alone
+/// and on re-run, which is exactly the intermittent that reads as a production
+/// bug and is not one.</para>
 /// </summary>
+[Collection(SharedActivityState.Name)]
 public class ScheduledPublishOutcomeTests : IDisposable
 {
     private readonly string _dir =
