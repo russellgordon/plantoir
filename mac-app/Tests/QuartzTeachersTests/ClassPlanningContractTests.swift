@@ -152,6 +152,15 @@ final class ClassPlanningContractTests: XCTestCase {
     /// then declined to honour. `MakeRoomForClassesTests` makes the same
     /// argument about the tool it covers.
     func testDuplicatingMatchesTheContract() async throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("duplication")
+        // The rule the cases are cases OF, read rather than restated. A rule
+        // nobody explained is a rule the next reader simplifies away.
+        let undoRule: [String: Any] = try XCTUnwrap(section["undoRule"] as? [String: Any])
+        let statedRule: String = try XCTUnwrap(undoRule["rule"] as? String)
+        XCTAssertNotNil(undoRule["why"] as? String, "undoRule has no 'why'")
+        let forcedUnpublished: Bool =
+            (section["forcedUnpublished"] as? [String: Any])?["value"] as? Bool == true
+
         for testCase in try ClassPlanningContractTests.cases(in: "duplication") {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let made = try AssistFixture.makeRunner()
@@ -194,6 +203,14 @@ final class ClassPlanningContractTests: XCTestCase {
                 plan.otherClassesMoving, testCase["expectOtherClassesMoving"] as? Int,
                 "\(name): how many other classes the card says move"
             )
+            // The gate itself, against the rule the contract states in words:
+            // an undo is offered exactly when nothing else moves.
+            let undoOffered: Bool = try XCTUnwrap(testCase["expectUndoOffered"] as? Bool)
+            XCTAssertEqual(
+                plan.movesAnythingElse, !undoOffered,
+                "\(name): the contract's rule is “\(statedRule)” — this plan has "
+                + "\(plan.renames.count) renames and \(plan.moves.count) date moves"
+            )
 
             let said: String = await run(
                 made.runner, "add_next_class",
@@ -213,10 +230,12 @@ final class ClassPlanningContractTests: XCTestCase {
                 copy.contains("created: \(try XCTUnwrap(testCase["expectDate"] as? String))"),
                 "\(name): the copy is dated for the wrong day — \(copy)"
             )
-            XCTAssertFalse(
-                AssistPageVisibility.publishes(in: copy, forSection: 1),
-                "\(name): a copy of a published lesson must start hidden"
-            )
+            if forcedUnpublished {
+                XCTAssertFalse(
+                    AssistPageVisibility.publishes(in: copy, forSection: 1),
+                    "\(name): a copy of a published lesson must start hidden"
+                )
+            }
 
             // A rename really happened when the renamed page holds the words
             // the OLD name's page held.
@@ -235,7 +254,7 @@ final class ClassPlanningContractTests: XCTestCase {
             }
 
             let undone: String = await run(made.runner, "undo_last_change", [:])
-            if try XCTUnwrap(testCase["expectUndoOffered"] as? Bool) {
+            if undoOffered {
                 XCTAssertNotEqual(
                     undone, AssistWording.nothingToUndo,
                     "\(name): nothing else moved, so the copy must be takeable back"
