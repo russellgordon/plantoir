@@ -1991,16 +1991,46 @@ the state to go with them.
 **What the modality does not close, and this is the part worth knowing.** The
 MENU route to the folder picker is genuinely shut while a dialog is up:
 `MainWindow.OpenWorkingFolder_Click` is a `MenuFlyoutItem`, and the dialog's
-overlay covers the menu bar. **Ctrl+O is not shut.** It is a
+overlay covers the menu bar. **Ctrl+O is not obviously shut.** It is a
 `KeyboardAccelerator` declared on `MainWindow.xaml`'s `Root` grid; WinUI
 searches for accelerators window-wide unless a `ScopeOwner` narrows them, none
-is set, and `OpenWorkingFolderAccelerator` has no guard of its own. So a
-teacher who presses Ctrl+O with a restore confirmation on screen can still
-change folder, and answering the dialog afterwards acts on a file in the folder
-they have left — precisely what the contract's `alsoCleared` exists to prevent.
-It is written down rather than fixed with #162 because the fix is a guard
-across every dialog-raising path, not something this rule can reach; the same
-hole exists for `NewWindowAccelerator` and `ReloadCoursesAccelerator`.
+is set, and `OpenWorkingFolderAccelerator` has no guard of its own. Whether the
+key actually reaches it under a modal dialog cannot be settled by reading —
+that needs a run, and it is
+[issue #191](https://github.com/russellgordon/plantoir/issues/191), along with
+`NewWindowAccelerator` and `ReloadCoursesAccelerator`, which are unguarded the
+same way.
+
+**So the confirmations were made safe whether it fires or not**, which is the
+honest delivery of `alsoCleared` here. Every confirmation in `SidebarPane`
+captures the working folder BEFORE its dialog goes up and, after the await,
+does nothing at all if `WorkingFolder.IsTheSame(captured, live)` is false —
+`TheFolderMovedUnderThisConfirmation`, one helper so the eleven sites read
+identically. Silently void, like the mac's cleared confirmation: no sentence,
+because a teacher who has just moved to another folder is not waiting to hear
+about the one they left.
+
+What that prevents is specific rather than theoretical. Each confirmation names
+its course, archive or backup by a path taken before the dialog, and finishes
+by asking the window where it is NOW. Answer a backup restore after a folder
+switch and `Workspace.CoursesDirectory()` is the NEW folder's while
+`item.FilePath` is still the OLD folder's zip: the new folder's course of that
+code is archived and overwritten from a backup belonging to a folder nobody is
+looking at, and it reports success and shows the result. The two deletes remove
+the old folder's file while the window shows the new one.
+
+`Plantoir.Tests/ConfirmationFolderGuardTests` gates it by scanning
+`SidebarPane.xaml.cs`: every awaited dialog must be followed by the check, or
+carry a `// folder-check: not needed — …` comment saying why (three do: the
+helper itself, the error reporter, and the "is backed up" notice). A NEW
+confirmation added with neither fails the suite. **What the scan cannot see**
+is written in its own comment and repeated here, because a guard believed to
+cover more than it does is worse than none: it reads ONE file.
+`CourseSettingsView`'s folder-rename sheet finishes inside a `Closing` deferral
+against a course captured at construction, so it acts on the right folder's
+files — a milder case of the same thing, left alone; `TaskProgressView`'s
+runner questions belong to a task rather than a folder; `MainWindow`'s own
+dialogs act on no course.
 
 ### Which folder a teardown names
 
@@ -2041,9 +2071,20 @@ asserts **zero** reads of the window's live folder between two marker comments
 — not a list of the five known sites. `ReleaseLease` alone has six callers
 (`AbandonWait` among them, which no earlier inventory named), and a test naming
 today's sites stays green the moment somebody adds a sixth, which is the whole
-failure it exists to prevent. It also pins the three write sites and the single
+failure it exists to prevent. It also pins the four write sites and the single
 registration write, since deleting a capture would otherwise leave every stop a
-silent no-op wearing the shape of the fix working.
+silent no-op wearing the shape of the fix working. (Four, not three: the
+marketing-shot harness `StagePreviewForCapture` sets `_previewUrl`, which makes
+`hadPreview` true, and a staged view must not answer the teardown's question
+differently from a real one.)
+
+**That scan is LEXICAL, and one exception is named rather than tidied away.**
+Every teardown path ends in `RefreshChrome()`, which is defined outside the
+region and does read the live folder — correctly, because what a teacher may
+click next is a question about the folder now on screen, and it stops and
+releases nothing. A second test asserts that `RefreshChrome` is the **only**
+method called from the region whose own body reads the live folder, so another
+cannot arrive under cover of the first. Neither test can see past this file.
 
 ### One notion of "the same folder"
 
@@ -2075,6 +2116,17 @@ every window close, often about a folder that has just been unplugged, renamed
 or deleted, where a handle open blocks or fails. **Rejected for that reason:**
 an extra container stop costs a second and starts again by itself; losing the
 window costs the teacher their work.
+
+**And one case where it is wrong the other way, accepted knowingly.** Windows
+can mark a directory case-SENSITIVE per folder (`fsutil file
+setCaseSensitiveInfo`, which is what WSL does to the folders it creates), and
+inside one of those `Work` and `work` are two real sibling folders that this
+compares as equal — so a container could be stopped for a sibling, or a folder
+change read as no change. Recoverable (the next preview starts the container
+again), and closing it would mean asking the filesystem per comparison, which
+is the handle open rejected just above. A teacher's working folder living
+inside a WSL-created case-sensitive directory is a shape nobody has met:
+Plantoir's folders are chosen from the ordinary Windows picker.
 
 **No new trail event is owed.** `working folder opened` already records the
 act, its line is still true, and a selection being let go is not something a
