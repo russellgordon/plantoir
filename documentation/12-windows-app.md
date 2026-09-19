@@ -544,6 +544,30 @@ The fourth thing a red contract test can be is a case proposed FROM here, which
 turns the MAC's suite red on purpose and is a request rather than damage;
 [`contracts/README.md`](../contracts/README.md) covers both directions.
 
+**And a fifth: a handover that has arrived and whose fix is NOT in the release
+being cut.** Met 2026-09-18. The mac's unit-word rename moved
+`shared-rules.json` — one `activityTrail.mustRecord` event, one
+`specialNames.platformWording` key — and the Windows half is
+[#158](https://github.com/russellgordon/plantoir/issues/158), milestoned
+v1.3.0. `ContractTests.SharedRules_ActivityTrailEvents_Exist` and
+`SpecialFolderRenamerTests.EverySentenceTheContractCallsPlatformWordedSaysThisPc`
+were red with nothing anybody was meant to do about them yet, which makes
+"did anything break?" unanswerable for every other run in the meantime.
+
+Those two are now NAMED GAPS: `windows-app/Plantoir.Tests/NamedGapLedger.cs`
+holds one entry per key, carrying the key, the issue, the milestone and the
+reason. Everything else is asserted exactly as before, and the ledger fails
+both ways — if a ledgered thing starts existing here (saying to delete the
+entry) and if it stops being in the contract. **So a green totals line on this
+suite can mean "green, with two written debts"**, and the ledger file is the
+one place that says which. `contracts/README.md` → "A third shape" carries the
+boundary: a named gap is allowed only while an open issue milestoned LATER
+than the release being cut owns the work, and never for a difference a teacher
+can see at the current milestone. Softening the contract instead — an
+`appliesOn: ["mac"]` that would be untrue and, having no mend-check, permanent
+— was rejected there and the reasoning is worth reading before proposing it
+again.
+
 ## Driving the real interface
 
 `run-ui-tests.ps1` launches the x64 Debug build and drives it with UI

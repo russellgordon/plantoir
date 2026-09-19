@@ -189,6 +189,55 @@ you are the side that moved the contract, name every key that moved, because
 the one you did not think worth mentioning is the one that arrives with no
 explanation attached.
 
+#### A third shape: the handover whose fix belongs to a LATER release
+
+The two shapes above both end in work: implement it, or fix the test that
+retyped a value. There is a third, met on 2026-09-18 while getting `dev` green
+for the v1.2.0 cut. The mac's unit-word rename ([#100](https://github.com/russellgordon/plantoir/issues/100))
+had moved `shared-rules.json` — one new `activityTrail.mustRecord` event, one
+new `specialNames.platformWording` key — and the Windows half is
+[#158](https://github.com/russellgordon/plantoir/issues/158), milestoned
+**v1.3.0**. So the handover had arrived, the issue naming it was open and
+correct, and the work was deliberately NOT in the release being cut. Two tests
+were red with nothing anybody was supposed to do about them yet.
+
+Three ways out, and only the third is honest:
+
+- **Soften the contract** — write `appliesOn: ["mac"]` on the event. This is
+  the tempting one, because the machinery is already there and
+  `ContractTests.SharedRules_ActivityTrailEvents_Exist` honours it. It is
+  wrong twice. It is a LIE: `appliesOn` means a difference that is deliberate
+  and permanent ("built site moved out of the working folder" is mac-only
+  because Windows has never built inside the working folder, so there is no
+  moment to record), and Windows owes this one. And it is a PERMANENT lie:
+  `appliesOn` has no mend-check, so the day Windows built the event, the
+  contract would still say it was none of its business, both suites would stay
+  green, and nothing anywhere would notice. A contract softened to quiet a
+  suite has given up the signal it exists to give.
+- **Leave it red.** Then "did anything break?" stops having an answer, which
+  is how four failures sat unnoticed on `dev` long enough to become #146.
+- **Name the gap on the side that owes it.** `windows-app/Plantoir.Tests/NamedGapLedger.cs`
+  holds one entry per key: the key, the issue, the MILESTONE, and the reason.
+  Everything not in the ledger is asserted exactly as before. The ledger fails
+  if a ledgered thing has started existing on Windows — saying to delete the
+  entry — so it cannot outlive the fix; and fails if it names something the
+  contract no longer carries, so it cannot outlive the requirement either.
+  Modelled on `KnownToBeDropped` in `AssistSurfaceContractTests`, mend-check
+  and all. Proved by mutation in the session that wrote it, three ways round.
+
+**The boundary matters more than the mechanism.** An entry is allowed ONLY
+when an open issue, milestoned LATER than the release being cut, owns the work.
+Never for a difference a teacher can see at the current milestone — that is a
+defect to fix or a release to hold, and a ledger entry there is a way of
+shipping it quietly. Never instead of the issue, either: the entry names the
+issue and the issue is where the work lives. If the issue closes, or gets
+pulled into the release being cut, the entry goes and the full assertion comes
+back on its own.
+
+The ledger lives on Windows because that is the side that currently owes
+something; there is no mac equivalent and none is needed until the mac is the
+side behind. The same shape would work there.
+
 ## Proposing a case from the Windows side
 
 So a behaviour invented on Windows can be written here as a case, and **the
@@ -298,7 +347,7 @@ recounted 2026-09-07.
 | Which of a course's OWN folders the build treats specially, and what the sheet says about each | `shared-rules.json` → `specialFoldersHelp` | SpecialFoldersHelpContract (5) on Windows, SpecialFoldersHelpTests (5) on the mac — both sides adopted 2026-09-06 |
 | Which folder holds class pages, and which count | `class-planning.json` → `classFolder` | ClassFolderContractTests (6), and `scripts/test_class_folder.py` |
 | What a course calls a unit | `class-planning.json` → `pageNaming` (the `term` field) and `file-formats.json` → `unit_word` | ClassPageTerm (11), and `scripts/test_class_pages.py` |
-| Renaming that word after the course is in use: which pages move, what refuses it, how links follow, and the order it happens in | `class-planning.json` → `renamingTheUnitWord`; the sentences in `shared-rules.json` → `specialNames.renameUnitWord`; the trail line in `activityTrail.mustRecord` | ClassPlanningContractTests (3), SharedRulesContractTests (1), UnitWordRenamerTests (19) on the mac — added 2026-09-10, [#100](https://github.com/russellgordon/plantoir/issues/100); Windows goes red until it implements them |
+| Renaming that word after the course is in use: which pages move, what refuses it, how links follow, and the order it happens in | `class-planning.json` → `renamingTheUnitWord`; the sentences in `shared-rules.json` → `specialNames.renameUnitWord`; the trail line in `activityTrail.mustRecord` | ClassPlanningContractTests (3), SharedRulesContractTests (1), UnitWordRenamerTests (19) on the mac — added 2026-09-10, [#100](https://github.com/russellgordon/plantoir/issues/100). **Windows runs none of it today**, and the three places differ: the trail event and `renameUnitWord.explanation` were red there and are now NAMED GAPS ledgered to [#158](https://github.com/russellgordon/plantoir/issues/158), v1.3.0 (`windows-app/Plantoir.Tests/NamedGapLedger.cs` — see "A third shape: the handover whose fix belongs to a LATER release" above); `renamingTheUnitWord.cases` (seven) and `linkCases` (three) were never red there because **nothing on that side runs them at all** — there is no Windows counterpart of `ClassPlanningContractTests.testRenamingTheUnitWordCases`, so those ten cases are unrun rather than failing, and they are owed under #158 with the renamer itself. Deliberately not pinned by a test counting them: a count asserted where the cases are not run would guard the number instead of the behaviour |
 | Whether a deploy must build first | `app-rules.json` → `buildFreshness` | BuildFreshness (6) |
 | Preview ports and the websocket offset | `app-rules.json` → `previewPorts` | PreviewLease (7) |
 | The browser-safe address | `app-rules.json` → `linkRules` | BrowserSafeURL (2) |
@@ -385,6 +434,18 @@ home. [`documentation/04-course-setup.md`](../documentation/04-course-setup.md) 
 refuse rather than clear the way" has the detail for the refusal; for the
 repair's own shape, the contract key and
 `windows-app/Plantoir.Tests` are now the record.
+
+**And one list added after that audit is NOT wired here, deliberately.**
+`class-planning.json` → `renamingTheUnitWord` (seven `cases`, three
+`linkCases`, added on the mac 2026-09-10 with [#100](https://github.com/russellgordon/plantoir/issues/100))
+has no Windows runner, because Windows cannot rename a course's word for a
+unit at all yet — [#158](https://github.com/russellgordon/plantoir/issues/158),
+milestoned v1.3.0. Worth saying out loud because it is the quiet kind of gap:
+those ten cases are UNRUN rather than failing, so no Windows gate mentions
+them and nothing goes red. The two places that DID go red — the trail event
+and `renameUnitWord.explanation` — are named in
+`windows-app/Plantoir.Tests/NamedGapLedger.cs` and will fail the moment either
+is built or withdrawn. The ten cases have no such guard; #158 carries them.
 
 **Three habits came out of that work and are worth copying on either side.**
 
