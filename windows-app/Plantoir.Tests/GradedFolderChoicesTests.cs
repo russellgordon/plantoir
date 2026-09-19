@@ -32,6 +32,9 @@ public class GradedFolderChoicesTests : IDisposable
     private static JsonNode Choices =>
         ContractLoader.LoadJson("shared-rules.json")["gradedFolders"]!["choices"]!;
 
+    private static JsonNode RemovingAFolder =>
+        ContractLoader.LoadJson("shared-rules.json")["gradedFolders"]!["removingAFolder"]!;
+
     private string MakeCourse(string name, IEnumerable<string> relativeDirectories)
     {
         string course = Path.Combine(_root, name);
@@ -47,8 +50,8 @@ public class GradedFolderChoicesTests : IDisposable
     public void TheOfferedPoolMatchesTheContract()
     {
         var cases = Choices["cases"]!.AsArray();
-        Assert.True(cases.Count >= 11,
-            $"The contract lost graded-folder-choice cases: {cases.Count} present, 11 expected at least.");
+        Assert.True(cases.Count >= 14,
+            $"The contract lost graded-folder-choice cases: {cases.Count} present, 14 expected at least.");
 
         int index = 0;
         foreach (var testCase in cases)
@@ -80,6 +83,135 @@ public class GradedFolderChoicesTests : IDisposable
 
             Assert.Equal(expected, GradedFolderChoices.For(config, course));
         }
+    }
+
+    /// <summary>
+    /// What a REMOVAL does to the marks pool — run from
+    /// <c>gradedFolders.removingAFolder</c>, six cases, against a real tree.
+    ///
+    /// <para>The whole gesture is played through one Core call
+    /// (<see cref="FolderRemoval.RemoveFolderFromCourse"/>) because the ORDER
+    /// is the rule: the copy list and <c>excluded_items</c> are written, and
+    /// only THEN is the course walked to ask what the checklist still offers. A
+    /// test that called a pure pool function while the order lived in the view
+    /// would pin nothing — the mac fell into exactly that trap, its own removal
+    /// test passing for two days because it left the exclusion out.</para>
+    ///
+    /// <para>Mutation-tested 2026-09-18, since a contract-driven test is worth
+    /// what it FAILS on. The whole pre-fix Windows body — a walk taken before
+    /// the exclusion, materialised over, then <c>RemoveAll</c> — turns cases 1,
+    /// 2, 5 and 6 red, the four the issue says fail there. Each half on its
+    /// own: the old pool semantics over a CORRECT walk turn 5 and 6 red;
+    /// reordering the walk before the exclusion, or leaving the exclusion out
+    /// altogether, turns 3 and 4 red. (Those last two are one finding twice
+    /// over: both leave the removed name among the choices.)</para>
+    /// </summary>
+    [Fact]
+    public void WhatARemovalDoesToTheMarksPoolMatchesTheContract()
+    {
+        var cases = RemovingAFolder["cases"]!.AsArray();
+        Assert.True(cases.Count >= 6,
+            $"The contract lost removal cases: {cases.Count} present, 6 expected at least.");
+
+        // Every case is played, and the ones that fail are reported TOGETHER.
+        // A loop that stops at the first failure says "case 5 is wrong" where
+        // what a mutation has to prove is WHICH cases it turns red — the
+        // evidence that this list pins the rule rather than one accident of it.
+        var failures = new List<string>();
+
+        int index = 0;
+        foreach (var testCase in cases)
+        {
+            int caseNumber = index + 1;
+            string name = testCase!["name"]!.ToString();
+            var shared = testCase["sharedFolders"]!.AsArray().Select(f => f!.ToString()).ToList();
+            var perSection = testCase["perSectionFolders"]!.AsArray().Select(f => f!.ToString()).ToList();
+            var directories = testCase["directories"]!.AsArray().Select(d => d!.ToString()).ToList();
+
+            var values = new JObject
+            {
+                ["course_code"] = "ICS3U",
+                ["shared_folders"] = new JArray(shared),
+                ["per_section_folders"] = new JArray(perSection),
+            };
+            // An ARRAY is a course that HAS been asked. A JSON null is a course
+            // that never was, which is the key ABSENT — writing it as a present
+            // null would say the opposite, because a present null reads as a
+            // CLEARED list.
+            if (testCase["graded"] is JsonArray graded)
+                values["graded_folders"] = new JArray(graded.Select(g => g!.ToString()));
+
+            var config = CourseConfiguration.FromDictionary(values);
+            string course = MakeCourse($"removal{index++}", directories);
+
+            FolderRemoval.RemoveFolderFromCourse(config, course,
+                testCase["remove"]!["scope"]!.ToString(),
+                testCase["remove"]!["name"]!.ToString());
+
+            bool expectAsked = testCase["expectGraded"] is JsonArray;
+            try
+            {
+                // Named, because this is the half that fails silently in the
+                // product: "asked" and "never asked" are both plausible-looking
+                // configurations and only one of them keeps the marks.
+                Assert.True(expectAsked == (config.GradedFolders is not null),
+                    $"expected the course to be {(expectAsked ? "ASKED" : "NEVER ASKED")} after the removal.");
+
+                if (expectAsked)
+                {
+                    Assert.Equal(
+                        testCase["expectGraded"]!.AsArray().Select(e => e!.ToString()).ToList(),
+                        config.GradedFolders);
+                }
+                else
+                {
+                    // Read back from what would be WRITTEN, so "absent" is
+                    // proved rather than inferred from a null the setter could
+                    // have produced either way.
+                    Assert.DoesNotContain("graded_folders",
+                        System.Text.Encoding.UTF8.GetString(config.SerializedBytes()));
+                }
+            }
+            catch (Xunit.Sdk.XunitException problem)
+            {
+                failures.Add($"case {caseNumber} “{name}”: {problem.Message}");
+            }
+        }
+
+        Assert.True(failures.Count == 0, string.Join("\n\n", failures));
+    }
+
+    /// <summary>
+    /// Windows-only, and deliberately not a contract case: the contract leaves
+    /// matching CASE unpinned, because the mac compares pool names exactly
+    /// while this app has always dropped them with
+    /// <c>OrdinalIgnoreCase</c>. What is pinned HERE is that the two halves of
+    /// the rule agree with each other.
+    ///
+    /// <para>The walk returns names as they are spelled on disk. Remove a
+    /// top-level <c>Tasks</c> while <c>Portfolios/tasks</c> survives and the
+    /// checklist offers <c>tasks</c> — so an EXACT "still offered" test would
+    /// answer "no longer offered", the case-insensitive drop would take
+    /// <c>Tasks</c> out of the pool anyway, and <c>build_site.py</c> — which
+    /// lowercases both sides — would go on counting that folder. Marks off the
+    /// coverage map because of a capital letter. Proposed to the mac as a
+    /// contract case by issue #172, which carries the case ready to paste and
+    /// the one line the mac would change.</para>
+    /// </summary>
+    [Fact]
+    public void ANameStillOfferedInANOTHERCasingKeepsItsPlaceInThePool()
+    {
+        var config = CourseConfiguration.FromDictionary(JObject.Parse("""
+            {"course_code": "ICS3U",
+             "shared_folders": ["Concepts", "Tasks", "Portfolios"],
+             "graded_folders": ["Tasks"]}
+            """));
+        string course = MakeCourse("casing",
+            new[] { "Concepts", "Tasks", "Portfolios", "Portfolios/tasks" });
+
+        FolderRemoval.RemoveFolderFromCourse(config, course, CourseConfiguration.SharedScope, "Tasks");
+
+        Assert.Equal(new[] { "Tasks" }, config.GradedFolders);
     }
 
     /// <summary>
