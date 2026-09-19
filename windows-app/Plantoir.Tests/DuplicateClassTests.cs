@@ -245,8 +245,7 @@ public sealed class DuplicateClassTests : IDisposable
         var result = workspace.ApplyDuplicateClass(plan);
 
         Assert.Empty(_history.Entries);
-        Assert.Contains("will not take this back", result.Message);
-        Assert.Contains(Path.GetFileName(result.BackupPath!), result.Message);
+        Assert.Contains(ClassChangeWording.OtherClassesMoved(result.BackupPath), result.Message);
         Assert.DoesNotContain(AssistWording.ACreatedPageCanBeTakenBack, result.Message);
     }
 
@@ -261,7 +260,7 @@ public sealed class DuplicateClassTests : IDisposable
 
         Assert.Empty(_history.Entries);
         Assert.True(File.Exists(ClassPath("Unit 2, Day 3")));     // the old Day 2, renamed
-        Assert.Contains("will not take this back", result.Message);
+        Assert.Contains(ClassChangeWording.OtherClassesMoved(result.BackupPath), result.Message);
     }
 
     // ---- Refusals ----------------------------------------------------------
@@ -337,7 +336,9 @@ public sealed class DuplicateClassTests : IDisposable
 
         var refusal = Assert.Throws<AssistRefusal>(() => workspace.ApplyDuplicateClass(plan));
 
-        Assert.Contains("will not write over a lesson", refusal.Message);
+        Assert.Equal(
+            ClassChangeWording.ThePlaceForTheCopyIsStillTaken("Unit 2, Day 2", workspace.ConversationBackupPath),
+            refusal.Message);
         Assert.Contains("Body of Unit 2, Day 2.", File.ReadAllText(ClassPath("Unit 2, Day 2")));
         Assert.Contains("written in Obsidian just now", File.ReadAllText(ClassPath("Unit 2, Day 3")));
         // And nothing half-recorded is left open to swallow the next change.
@@ -353,8 +354,9 @@ public sealed class DuplicateClassTests : IDisposable
 
         string described = Open().PlanDuplicateClass("ICS3U", 1, "Unit 2, Day 2").Describe();
 
-        Assert.Contains("“Unit 2, Day 2” would be copied to “Unit 2, Day 3”", described);
-        Assert.Contains("2026-09-16", described);
+        Assert.Contains(
+            ClassChangeWording.WouldBeCopiedTo("Unit 2, Day 2", "Unit 2, Day 3", new DateOnly(2026, 9, 16)),
+            described);
         Assert.Contains(ClassChangeWording.TheCopyStartsHidden, described);
     }
 
@@ -372,8 +374,7 @@ public sealed class DuplicateClassTests : IDisposable
 
         Assert.Empty(plan.Insertion.Renames);
         Assert.Equal(2, plan.OtherClassesMoving);
-        Assert.Contains("2 later classes move onto a later class day", described);
-        Assert.Contains("Their names do not change", described);
+        Assert.Contains(ClassChangeWording.OtherClassesWouldMove(2, renaming: 0), described);
     }
 
     [Fact]
@@ -381,10 +382,12 @@ public sealed class DuplicateClassTests : IDisposable
     {
         FourClasses();
 
-        string described = Open().PlanDuplicateClass("ICS3U", 1, "Unit 2, Day 1").Describe();
+        var plan = Open().PlanDuplicateClass("ICS3U", 1, "Unit 2, Day 1");
 
-        Assert.Contains("a day along to make room", described);
-        Assert.Contains("links that point at them are rewritten", described);
+        Assert.NotEmpty(plan.Insertion.Renames);
+        Assert.Contains(
+            ClassChangeWording.OtherClassesWouldMove(plan.OtherClassesMoving, plan.Insertion.Renames.Count),
+            plan.Describe());
     }
 
     [Fact]
@@ -432,7 +435,9 @@ public sealed class DuplicateClassTests : IDisposable
             .PlanAddNextClass("ICS3U", 1, duplicate: "Unit 2, Day 2");
 
         Assert.Equal(true, proposed.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>());
-        Assert.Contains("would be copied to “Unit 2, Day 3”", proposed.Summary());
+        Assert.Contains(
+            ClassChangeWording.WouldBeCopiedTo("Unit 2, Day 2", "Unit 2, Day 3", new DateOnly(2026, 9, 16)),
+            proposed.Summary());
         // Nothing was written.
         Assert.False(File.Exists(ClassPath("Unit 2, Day 3")));
     }

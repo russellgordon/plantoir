@@ -1678,7 +1678,8 @@ in Obsidian, then saying "undo that" must not cost those ten minutes.
 2026-09-18, after Windows found that three tools —
 `add_curriculum_mentions`, `make_room_for_classes` and
 `add_classes`/`add_next_class` — opened an entry and never closed it
-(`UndoHistory.Begin` … no `End`). The consequence was two-sided and entirely
+(`UndoHistory.Begin` … no `End`), and that the other five closed theirs only
+on the path where nothing threw. The consequence was two-sided and entirely
 silent, which is why it lived so long: the tool recorded NO entry at all, so
 "undo that" answered that nothing had been changed — while `add_next_class`'s
 own reply promised the page could be taken back — and the still-open entry
@@ -1686,6 +1687,36 @@ then swallowed the NEXT operation's files and committed them under the
 earlier description. A teacher who made room, published a class and said
 "undo that" was told they had made room, and had the publish taken back with
 it.
+
+**The pairing is no longer something to remember.** Every recording site is
+now `using var recording = UndoHistory.Record(_undo, "…");` with
+`recording.Done()` where the operation finishes. Leaving the scope any other
+way — a throw, or a `return` added years later by somebody who never read
+this — abandons. An inner scope is a no-op, so the outermost call still owns
+the entry and a tool that calls another tool records one operation rather
+than two. The five older sites each wrapped their individual file writes in
+`try`/`catch` and nothing else, so a `ReadAllText` outside those — a page
+Obsidian deleted between the plan and the Go — escaped to
+`PlantoirTools.Guarded`, which turns an exception into an ANSWER, and the
+entry was still open when the teacher asked for the next thing.
+
+**Abandon on a throw, rather than committing what was written — and this was
+a decision, not a default.** The case to think about is a publish of five
+pages that writes three and then throws. Committing the entry (an `End` in a
+`finally`) would make those three undoable, which sounds strictly kinder. It
+was rejected because **the description is written at `Begin`, from the
+PLAN**: the entry would say "published “A”, “B”, “C”, “D” and “E”", and
+`AssistWording.Undid` reads that clause straight back to the teacher — "Earlier,
+you published A, B, C, D and E" — at the one moment they are checking that
+the right thing was put back. A truthful file list under a false sentence is
+the failure rule 5 of `CLAUDE.md` names: a line describing what did not
+happen is worse than no line, because it will be believed. The mac reaches
+the same place from the other end — `AssistToolRunner` records a whole
+`AssistChange` only after the operation returns, so a throw records nothing
+(its whole-unit publish answers "was only partly published: …" and calls
+`history.record` never) — so abandoning is also what matches. The cost is
+real and is covered: the conversation backup is taken before the first write,
+and it is what the reply points at.
 
 The rule both apps now follow, tool by tool:
 
