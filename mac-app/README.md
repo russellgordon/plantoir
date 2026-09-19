@@ -17,7 +17,12 @@ A window without a folder asks for a **working folder** — one containing
 the app offers to initialize. Working folders are **per window**: each
 window restores its own folder across relaunches (frame-keyed), and a new
 window inherits the folder of the window that was key when it was opened —
-or shows the picker when it is the only window.
+or shows the picker when it is the only window. What the sidebar has
+selected belongs to that window's folder: pointing a window at a different
+one lets go of the selection and of everything else naming a course, an
+archive or a backup in the folder being left — see
+[`documentation/09-mac-app.md`](../documentation/09-mac-app.md) → "What a
+window lets go of when it changes working folder".
 
 The app also owns delivery and resources: it mirrors the full toolchain
 recipe into each working folder's `.toolchain/` (refreshing stale
@@ -139,7 +144,11 @@ requirement.
   pure functions carry the rules worth knowing:
   `SkeletonCatalog.structureToAdopt` (never overwrite a list the teacher has
   edited) and `SkeletonCatalog.sidebar` (curriculum hidden, every other
-  shared folder gets a chevron, per-section folders stay plain links).
+  shared folder gets a chevron, per-section folders stay plain links). A
+  third, `WizardStructure`, carries the toggle's OTHER direction — declining
+  the skeleton puts the defaults back into every list the teacher has not
+  edited since, so the editor shows what will actually be created; its thirteen
+  cases are `contracts/shared-rules.json` → `wizard.skeletonToggle`.
 - **Built websites are kept OUTSIDE the working folder**, and
   `courses/<CODE>/.merged_output` is a shortcut to
   `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`

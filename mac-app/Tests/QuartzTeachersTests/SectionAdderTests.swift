@@ -233,6 +233,310 @@ final class SectionAdderTests: XCTestCase {
                       "The existing section's own key is left exactly as it was")
     }
 
+    /// The legacy key with a value that is not literally `true`.
+    ///
+    /// `draftSection1: yes` holds a page back — YAML 1.1's `yes` is the
+    /// boolean true, and the build reads it that way. Comparing the value with
+    /// the literal string "true" said otherwise, and PUBLISHED the page into
+    /// the new section while the build went on hiding the original. Measured
+    /// against the real image on 2026-09-18; the table is in
+    /// contracts/file-formats.json → pageVisibility.readingCases.
+    @MainActor
+    func testALegacyDraftValueIsReadTheWayTheBuildReadsIt() throws {
+        let heldBack: [String] = ["yes", "on", "True", "ON", "\"true\"", "TrUe"]
+        let published: [String] = ["false", "no", "off", "maybe", "\"yes\"", "1"]
+
+        for value in heldBack + published {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            title: Held Back
+            createdSection1: 2026-09-08T07:00:00.000
+            draftSection1: \(value)
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Held Back.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            let expected: String = heldBack.contains(value) ? "false" : "true"
+            XCTAssertTrue(
+                updated.contains("publishForSection2: \(expected)"),
+                "draftSection1: \(value) should carry across as publishForSection2: \(expected)"
+            )
+        }
+    }
+
+    /// A draft value this app cannot read is carried across as HELD BACK.
+    /// A page wrongly held back is one a teacher notices and fixes; a page
+    /// wrongly published is one nobody notices at all.
+    @MainActor
+    func testAnUnreadableLegacyValueCarriesAcrossAsHeldBack() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let shared: String = """
+        ---
+        title: Unreadable
+        createdSection1: 2026-09-08T07:00:00.000
+        draftSection1: !!str true
+        ---
+        Body.
+        """
+        let sharedURL: URL = course.directoryURL.appendingPathComponent("Unreadable.md")
+        try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+        XCTAssertTrue(updated.contains("publishForSection2: false"))
+    }
+
+    /// The CURRENT key's value is copied character for character, whatever it
+    /// says. That is what makes the copy safe: whatever the build makes of the
+    /// original it makes of the copy, so no reader standing between the two
+    /// can invert it by misreading it.
+    @MainActor
+    func testTheCurrentKeysValueIsCopiedExactly() throws {
+        for value in ["true", "false", "oN", "maybe", "\"False\"", "no # for now"] {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            title: Carried Across
+            createdSection1: 2026-09-08T07:00:00.000
+            publishForSection1: \(value)
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Carried Across.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            XCTAssertTrue(
+                updated.contains("publishForSection2: \(value)"),
+                "publishForSection1: \(value) should be copied as it stands"
+            )
+        }
+    }
+
+    /// The build keeps the LAST of two identical keys, so the carry has to
+    /// read the last one too. Taking the first published a page into the new
+    /// section that the build was hiding.
+    @MainActor
+    func testTheLastOfTwoIdenticalKeysIsTheOneCarriedAcross() throws {
+        let pages: [(frontmatter: String, expected: String)] = [
+            ("publishForSection1: true\npublishForSection1: false", "false"),
+            ("publishForSection1: false\npublishForSection1: true", "true"),
+            ("draftSection1: false\ndraftSection1: true", "false"),
+        ]
+        for page in pages {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            createdSection1: 2026-09-08T07:00:00.000
+            \(page.frontmatter)
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Twice.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            XCTAssertTrue(
+                updated.contains("publishForSection2: \(page.expected)"),
+                "\(page.frontmatter) should carry across as \(page.expected)"
+            )
+        }
+    }
+
+    /// A legacy value written on the line BELOW its key. The build reads it
+    /// and holds the page back; a carry that looked only at the key's own line
+    /// saw an empty value, called it "not a draft", and published it.
+    @MainActor
+    func testALegacyValueOnTheNextLineIsCarriedAcrossAsHeldBack() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let shared: String = """
+        ---
+        createdSection1: 2026-09-08T07:00:00.000
+        draftSection1:
+          true
+        ---
+        Body.
+        """
+        let sharedURL: URL = course.directoryURL.appendingPathComponent("Below.md")
+        try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+        XCTAssertTrue(updated.contains("publishForSection2: false"))
+        XCTAssertFalse(updated.contains("publishForSection2: true"))
+    }
+
+    /// A key with nothing after it is a null, which PUBLISHES the page. The
+    /// copy keeps it a null rather than deciding for the teacher.
+    @MainActor
+    func testAKeyWithNothingAfterItIsCarriedAcrossAsItStands() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let shared: String = """
+        ---
+        createdSection1: 2026-09-08T07:00:00.000
+        publishForSection1:
+        title: Learning Goals
+        ---
+        Body.
+        """
+        let sharedURL: URL = course.directoryURL.appendingPathComponent("Null.md")
+        try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+        XCTAssertTrue(updated.contains("publishForSection2:\n"))
+        XCTAssertFalse(updated.contains("publishForSection2: false"))
+    }
+
+    /// The CURRENT key's value can run onto the next line too, and then it
+    /// cannot be copied onto another key's line at all.
+    @MainActor
+    func testACurrentValueOnTheNextLineIsCarriedAcrossAsHeldBack() throws {
+        for frontmatter in ["publishForSection1:\n  false", "publishForSection1: >-\n  false"] {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            createdSection1: 2026-09-08T07:00:00.000
+            \(frontmatter)
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Below.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            XCTAssertTrue(updated.contains("publishForSection2: false"), frontmatter)
+            XCTAssertFalse(updated.contains("publishForSection2: true"), frontmatter)
+        }
+    }
+
+    /// A legacy key with NOTHING after it is not a draft — `_as_bool` of null
+    /// is false — so the new section is published, like the old one.
+    @MainActor
+    func testAnEmptyLegacyValueIsCarriedAcrossAsPublished() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let shared: String = """
+        ---
+        createdSection1: 2026-09-08T07:00:00.000
+        draftSection1:
+        title: Learning Goals
+        ---
+        Body.
+        """
+        let sharedURL: URL = course.directoryURL.appendingPathComponent("EmptyDraft.md")
+        try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+        XCTAssertTrue(updated.contains("publishForSection2: true"))
+    }
+
+    /// A LEGACY value whose key line looks complete, with a value under it.
+    ///
+    /// `publishValue` asks the one reader, so correcting the reader (issue
+    /// #176) moved what a new section inherits here. Measured 2026-09-19:
+    /// `draftSection1: false` with `  x` under it reaches the site as the
+    /// plain scalar `"false x"`, which `_as_bool` cannot make a boolean of, so
+    /// the page is PUBLISHED — and until this landed the mac carried that
+    /// across as `true` on the strength of reading the key's line alone.
+    ///
+    /// **Neither app reproduces the site here and neither is trying to.** Both
+    /// err HELD BACK, which is the documented preference — a page wrongly held
+    /// back is one a teacher notices and fixes — and it is what
+    /// `setup_course.per_section_frontmatter` writes. Windows pins the same
+    /// rows in `SectionCarryVisibilityTests
+    /// .ALegacyValueThatRunsOntoTheNextLineIsHeldBack`.
+    @MainActor
+    func testALegacyValueThatRunsOntoTheNextLineIsCarriedAcrossAsHeldBack() throws {
+        for keyLine in [
+            "draftSection1: false", "draftSection1: no", "draftSection1: true",
+            "draftSection1: yes", "draftSection1:", "draftSection1: >-",
+        ] {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            createdSection1: 2026-09-08T07:00:00.000
+            \(keyLine)
+              x
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Continues.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            XCTAssertTrue(updated.contains("publishForSection2: false"), keyLine)
+            XCTAssertFalse(updated.contains("publishForSection2: true"), keyLine)
+        }
+    }
+
+    /// And the same key lines with NOTHING under them are read normally, so
+    /// the theory above cannot pass for the wrong reason.
+    @MainActor
+    func testALegacyValueOnItsOwnIsStillReadNormally() throws {
+        for row in [
+            (keyLine: "draftSection1: false", carried: "publishForSection2: true"),
+            (keyLine: "draftSection1: no", carried: "publishForSection2: true"),
+            (keyLine: "draftSection1: true", carried: "publishForSection2: false"),
+            (keyLine: "draftSection1: yes", carried: "publishForSection2: false"),
+        ] {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            createdSection1: 2026-09-08T07:00:00.000
+            \(row.keyLine)
+            title: Learning Goals
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Alone.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            XCTAssertTrue(updated.contains(row.carried), row.keyLine)
+        }
+    }
+
     /// A page written with plain `created:` applies to every section
     /// already, including the new one. Splitting it would change what the
     /// existing sections show, so it is left exactly as it is.

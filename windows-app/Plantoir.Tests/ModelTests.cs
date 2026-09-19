@@ -12,6 +12,17 @@ namespace Plantoir.Tests;
 /// list around every one of its methods — which would yank the lease
 /// CourseActivityTests is in the middle of asserting on, roughly one run in
 /// three. Sharing a collection serializes them.
+///
+/// <para>It has since taken in two more kinds of shared thing, because the
+/// question it answers is "what does this class touch that outlives it", not
+/// "is it about previews": the ACTIVITY TRAIL's log path, which is a
+/// process-wide static that several classes redirect to a scratch file and then
+/// assert on — so a class merely WRITING trail lines belongs here too, or its
+/// lines land in somebody else's file; and the SCHEDULED records under
+/// <c>%LOCALAPPDATA%\Plantoir\scheduled</c>, which the generated wrapper
+/// resolves at run time from the environment and no test can substitute away.
+/// Two classes run those wrappers for ICS3U section 1, and one of them deletes
+/// the record the other has just written (2026-09-18).</para>
 /// </summary>
 [CollectionDefinition(SharedActivityState.Name, DisableParallelization = true)]
 public class SharedActivityStateCollection { }
@@ -552,6 +563,242 @@ public class CourseBackupTests
                 Assert.True(File.Exists(assistantFiles[i]), $"New assistant backup {assistantFiles[i]} should have been kept");
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
+    // ---- A stamp that cannot be true never decides what gets deleted (issue #161) ----
+
+    /// <summary>
+    /// Writes <paramref name="count"/> assistant backups whose stamps are
+    /// plausible, anchored to <see cref="ArchiveStamp.EarliestPossible"/>
+    /// rather than to a date typed here, and returns their paths oldest
+    /// first.
+    /// </summary>
+    private static List<string> WritePlausibleAssistantBackups(string backupsDir, int count)
+    {
+        var written = new List<string>();
+        for (int i = 0; i < count; i++)
+        {
+            DateTime stamp = ArchiveStamp.EarliestPossible.AddDays(i);
+            string file = Path.Combine(backupsDir,
+                CourseArchiver.TimestampedName("ICS3U_backup", stamp, "_assistant-section1"));
+            File.WriteAllText(file, "assistant");
+            written.Add(file);
+        }
+        return written;
+    }
+
+    private static int CountExisting(IEnumerable<string> paths)
+    {
+        int found = 0;
+        foreach (string path in paths)
+            if (File.Exists(path)) found++;
+        return found;
+    }
+
+    /// <summary>
+    /// The defect this guard closes. A zip carried from a Mac that wrote its
+    /// own calendar into the name — <c>2569-08-09_141530</c>, a Buddhist Mac's
+    /// spelling of 2026-08-09 — parses cleanly as the year 2569 and sorts as
+    /// the newest thing in the folder. Counted, it takes one of the five kept
+    /// places and pushes a REAL backup off the disk.
+    ///
+    /// <para>The assertion that matters is the count of surviving real
+    /// backups, not merely that the 2569 zip is still there: a guard that
+    /// worked by refusing to PARSE the name would leave the zip alone and
+    /// still delete two real copies instead of one.</para>
+    /// </summary>
+    [Fact]
+    public void PruneBackups_ABackupWhoseStampCannotBeTrue_IsNeitherCountedNorDeleted()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            MakeCourse(coursesDir, "ICS3U");
+            string backupsDir = CourseArchiver.BackupsDirectory(coursesDir, "ICS3U");
+            Directory.CreateDirectory(backupsDir);
+
+            var real = WritePlausibleAssistantBackups(backupsDir, CourseArchiver.MostBackupsKept + 1);
+
+            // The one spelling written out here, because it is the whole point
+            // of the guard. The rest of the old calendars' spellings arrive as
+            // contract data with issue #161 part 2.
+            string fromAThaiMac = Path.Combine(backupsDir,
+                "ICS3U_backup_2569-08-09_141530_assistant-section1.zip");
+            File.WriteAllText(fromAThaiMac, "carried in");
+            Assert.NotNull(BackupItem.From(fromAThaiMac, "ICS3U"));   // it IS listed
+
+            CourseArchiver.PruneBackups("ICS3U", coursesDir);
+
+            Assert.True(File.Exists(fromAThaiMac), "A stamp that cannot be true must never be deleted");
+            Assert.Equal(CourseArchiver.MostBackupsKept, CountExisting(real));
+            Assert.False(File.Exists(real[0]), "The oldest REAL backup is the one that goes");
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
+    /// <summary>
+    /// The other direction: stamps BELOW the floor. Read as Gregorian, the
+    /// Japanese, Islamic and Ethiopic spellings all land before Plantoir could
+    /// have written anything — the nearest of them years below
+    /// <see cref="ArchiveStamp.EarliestPossible"/>. They are kept, and they do
+    /// not count toward the five either.
+    /// </summary>
+    [Fact]
+    public void PruneBackups_StampsBelowTheFloor_AreKeptAndDoNotCount()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            MakeCourse(coursesDir, "ICS3U");
+            string backupsDir = CourseArchiver.BackupsDirectory(coursesDir, "ICS3U");
+            Directory.CreateDirectory(backupsDir);
+
+            var real = WritePlausibleAssistantBackups(backupsDir, CourseArchiver.MostBackupsKept + 1);
+
+            var tooOld = new List<string>();
+            foreach (DateTime stamp in new[]
+                     {
+                         ArchiveStamp.EarliestPossible.AddSeconds(-1),   // a second below
+                         ArchiveStamp.EarliestPossible.AddYears(-7),     // the Ethiopic neighbourhood
+                         ArchiveStamp.EarliestPossible.AddYears(-600),   // and the Islamic one
+                     })
+            {
+                string file = Path.Combine(backupsDir,
+                    CourseArchiver.TimestampedName("ICS3U_backup", stamp, "_assistant-section1"));
+                File.WriteAllText(file, "carried in");
+                Assert.NotNull(BackupItem.From(file, "ICS3U"));
+                tooOld.Add(file);
+            }
+
+            CourseArchiver.PruneBackups("ICS3U", coursesDir);
+
+            Assert.Equal(tooOld.Count, CountExisting(tooOld));
+            Assert.Equal(CourseArchiver.MostBackupsKept, CountExisting(real));
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
+    /// <summary>
+    /// A name no parser recognises was already safe — <see cref="BackupItem.From"/>
+    /// answers null, so it is never listed, never counted and never deleted —
+    /// and this pins it, because the guard added beside it moves the same
+    /// decision and could easily have moved this one with it.
+    /// </summary>
+    [Fact]
+    public void PruneBackups_AnUnreadableName_IsNeverListedCountedOrDeleted()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            MakeCourse(coursesDir, "ICS3U");
+            string backupsDir = CourseArchiver.BackupsDirectory(coursesDir, "ICS3U");
+            Directory.CreateDirectory(backupsDir);
+
+            var real = WritePlausibleAssistantBackups(backupsDir, CourseArchiver.MostBackupsKept + 1);
+
+            string unreadable = Path.Combine(backupsDir, "ICS3U_backup_sometime_assistant-section1.zip");
+            File.WriteAllText(unreadable, "not a stamp");
+            Assert.Null(BackupItem.From(unreadable, "ICS3U"));
+
+            CourseArchiver.PruneBackups("ICS3U", coursesDir);
+
+            Assert.True(File.Exists(unreadable), "A name nothing can read must never be deleted");
+            Assert.Equal(CourseArchiver.MostBackupsKept, CountExisting(real));
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
+    /// <summary>
+    /// The CEILING, exercised through pruning rather than against
+    /// <see cref="ArchiveStamp"/> alone — which is the only thing on disk that
+    /// moves when the clock does, and the reason
+    /// <see cref="CourseArchiver.PruneBackups"/> takes a <c>now</c> at all.
+    ///
+    /// <para>The same file is asked about twice with the clock in two places:
+    /// three days ahead of the first <c>now</c> it cannot be true, so it is
+    /// neither counted nor deleted; with the clock moved forward two days it
+    /// is inside the allowance, is counted like any other backup, and being
+    /// the newest it keeps its place while the oldest REAL backup goes. A
+    /// <c>now</c> that never reached the guard would make the first half of
+    /// that wrong, because against the real clock this stamp is in the
+    /// past.</para>
+    /// </summary>
+    [Fact]
+    public void PruneBackups_AStampPastTheCeiling_CountsOnceTheClockCatchesUp()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            MakeCourse(coursesDir, "ICS3U");
+            string backupsDir = CourseArchiver.BackupsDirectory(coursesDir, "ICS3U");
+            Directory.CreateDirectory(backupsDir);
+
+            DateTime now = ArchiveStamp.EarliestPossible.AddYears(1);
+            var real = WritePlausibleAssistantBackups(backupsDir, CourseArchiver.MostBackupsKept + 1);
+
+            DateTime pastTheCeiling = now + ArchiveStamp.FutureAllowance + TimeSpan.FromDays(1);
+            string ahead = Path.Combine(backupsDir,
+                CourseArchiver.TimestampedName("ICS3U_backup", pastTheCeiling, "_assistant-section1"));
+            File.WriteAllText(ahead, "a clock that was wrong");
+            Assert.NotNull(BackupItem.From(ahead, "ICS3U"));
+
+            CourseArchiver.PruneBackups("ICS3U", coursesDir, now);
+
+            Assert.True(File.Exists(ahead), "A stamp past the ceiling must never be deleted");
+            Assert.Equal(CourseArchiver.MostBackupsKept, CountExisting(real));
+            Assert.False(File.Exists(real[0]), "The OLDEST real backup is the one that goes");
+
+            // Move the clock past it. Nothing on disk changed; the answer does.
+            CourseArchiver.PruneBackups("ICS3U", coursesDir, now + ArchiveStamp.FutureAllowance);
+
+            Assert.True(File.Exists(ahead), "Now plausible, and the newest, so it is kept");
+            Assert.Equal(CourseArchiver.MostBackupsKept - 1, CountExisting(real));
+
+            // WHICH one went, not merely how many are left: counting alone
+            // passes a sort that threw away a backup from the middle, and the
+            // whole point of the guard is which file the sort is allowed to
+            // reach. `real` is written oldest first, so the second prune takes
+            // the next-oldest and everything above it stays.
+            Assert.False(File.Exists(real[1]), "The next-oldest real backup is the one that goes next");
+            for (int i = 2; i < real.Count; i++)
+                Assert.True(File.Exists(real[i]), $"A real backup from the middle was deleted: {real[i]}");
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
+    /// <summary>
+    /// Both bounds are INCLUSIVE, and the clock is injected so the ceiling
+    /// cannot move between one assertion and the next.
+    /// </summary>
+    [Fact]
+    public void CouldHaveBeenStamped_IsInclusiveAtBothBounds()
+    {
+        DateTime now = ArchiveStamp.EarliestPossible.AddYears(2);
+
+        Assert.True(ArchiveStamp.CouldHaveBeenStamped(ArchiveStamp.EarliestPossible, now));
+        Assert.False(ArchiveStamp.CouldHaveBeenStamped(ArchiveStamp.EarliestPossible.AddSeconds(-1), now));
+
+        Assert.True(ArchiveStamp.CouldHaveBeenStamped(now + ArchiveStamp.FutureAllowance, now));
+        Assert.False(ArchiveStamp.CouldHaveBeenStamped(now + ArchiveStamp.FutureAllowance + TimeSpan.FromSeconds(1), now));
+    }
+
+    /// <summary>
+    /// The two bounds themselves, written out. This is the ONE test here that
+    /// holds the literals — everything else asks
+    /// <see cref="ArchiveStamp"/> what they are — and it is replaced by the
+    /// contract loop in issue #161 part 2, once the mac's
+    /// <c>zipNames.couldHaveBeenStamped</c> block reaches dev and both
+    /// platforms can go red together on a change to either bound.
+    /// </summary>
+    [Fact]
+    public void CouldHaveBeenStamped_BoundsAreTheOnesTheMacUses()
+    {
+        Assert.Equal(new DateTime(2025, 1, 1, 0, 0, 0), ArchiveStamp.EarliestPossible);
+        Assert.Equal(TimeSpan.FromDays(2), ArchiveStamp.FutureAllowance);
     }
 }
 

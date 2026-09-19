@@ -164,7 +164,7 @@
           "key": "use_skeleton",
           "requirement": "BOTH apps ask the teacher and write the answer. Decided 2026-08-16: Windows matches macOS.",
           "type": "boolean",
-          "why": "Whether a course with no ready-made payload starts from its subject's SKELETON — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing. Around 1,900 course codes have a skeleton and no payload, so this is the question most teachers actually meet. Both apps write `hasSkeleton(code) && teacherSaidYes`. (Windows did not write it at all until 2026-09-07, so for three weeks the Python took its own default of TRUE and a Windows teacher could not decline.)"
+          "why": "Whether a course with no ready-made payload starts from its subject's SKELETON — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing. Around 1,900 course codes have a skeleton and no payload, so this is the question most teachers actually meet. Both apps write `hasSkeleton(code) && teacherSaidYes`. (Windows did not write it at all until 2026-09-07, so for three weeks the Python took its own default of TRUE and a Windows teacher could not decline.) The wizard's structure EDITOR must agree with this key in both directions — turning the toggle off puts the generic defaults back rather than leaving the skeleton's folders on screen for a course that will not have them — and that rule, with its cases, is in shared-rules.json → wizard.skeletonToggle."
         },
         {
           "key": "prepopulate_example_content",
@@ -220,56 +220,403 @@
         "legacy": "draft"
       }
     },
-    "note": "Frontmatter. Whether students see a page — the single most consequential field in the product, since getting it backwards publishes something a teacher held back. TWO spellings exist and both must be read: `publish:` (current) and `draft:` (legacy, meaning the OPPOSITE). Course-level pages carry a key per section instead.",
+    "note": "Frontmatter. Whether students see a page — the single most consequential field in the product, since getting it backwards publishes something a teacher held back. TWO spellings exist and both must be read: `publish:` (current) and `draft:` (legacy, meaning the OPPOSITE). Course-level pages carry a key per section instead. THE ANSWER IS THE BUILT SITE'S ANSWER, and that is not the same as reading the line: `build_site.process_frontmatter` loads every page with python-frontmatter (PyYAML, YAML 1.1), resolves the per-section keys onto a plain `publish:` and writes it back, and Quartz then parses THAT with js-yaml on its JSON schema before `patches/publish.ts` drops a page whose flag is the boolean false or the exact string \"false\". So `publish: no` hides a page, `publish: true # why` and `publish: maybe` publish one, and `publish: \"False\"` is visible while `publish: FALSE` is not. The four keys are consulted in ONE order on every page the build copies — publishForSection<N>, publish, draftSection<N>, draft — so where a page LIVES decides only which key is WRITTEN: `sectionLocal` is carried on every case below and must not change the answer. Measured 2026-09-18 against python-frontmatter 1.3.0 / PyYAML 6.0.3 / js-yaml on JSON_SCHEMA, and re-measured on every `verify.sh` run by `scripts/check_visibility_against_the_site.py`; the table and what was rejected are in documentation/08-course-config-reference.md. DELIBERATELY NOT HERE: forms neither app should claim to read — a value on the line BELOW the key, a tag (`!!str false`), a block scalar, an anchor or alias, a flow collection, an escape inside double quotes, an indented key, and frontmatter the build cannot parse at all (tab indentation, an unclosed fence), which stops the whole build so there is no site verdict to mirror. Each app answers `cannot tell` internally for those and its REPORTING collapses that to visible — never to hidden, because calling a page hidden while students are reading it is the failure that reports success — while anything that WRITES refuses to trust it and writes the flag out in full. They are pinned in each platform's own tests rather than here, because a shared case saying `expectVisible: true` about a form the site HIDES would oblige the other platform to be wrong in the same direction. WITH ONE DELIBERATE EXCEPTION, added 2026-09-19 with issue #176: the last two cases below are `cannot tell` forms and ARE carried here, because for those two the site PUBLISHES the page and so does each app's reporting. The test is not \"can the reader read it\" but \"does the reporting answer match the site\" — where those two agree, a shared case obliges nobody to be wrong, and these two are worth carrying because the reader that got them wrong got them wrong CONFIDENTLY, which is what let a writer's already-right gate turn \"hide this page\" into a no-op.",
     "readingCases": [
       {
         "expectVisible": true,
         "page": "publish: true",
-        "sectionLocal": true
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The plain case."
       },
       {
         "expectVisible": false,
         "page": "publish: false",
-        "sectionLocal": true
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The other plain case."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: yes",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The build loads every page with PyYAML, which is YAML 1.1: `yes` IS the boolean true, and the page arrives at Quartz as `publish: true`."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish: no",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The one that surprises everybody. `no` is YAML 1.1's boolean false, so the page is HIDDEN — a reader that only knows `true`/`false` calls this page visible while students cannot see it."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: on",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "`on` is the third spelling of true."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish: off",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "And `off` the third spelling of false."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: TRUE",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "All caps is one of the nine spellings PyYAML resolves."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish: FALSE",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "So is this one, and the page is hidden."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish: No",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Capitalised is a spelling too. Exactly three cases of each word are: all lower, Initial, ALL CAPS."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: oN",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "And nothing else is. `oN` is not one of the nine, so it stays the STRING \"oN\", and a string that is not \"false\" publishes the page."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: fAlSe",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Same rule, on the word that matters most: mixed case is an ordinary string, and the page is VISIBLE. A reader that lowercases before comparing hides a page the site publishes."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: maybe",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Anything PyYAML cannot make a boolean of becomes a string, and every string except \"false\" is published. Plantoir must not report this page held back."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: y",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A teacher may well type `y`, and PyYAML deliberately does NOT read a single letter as a boolean — so the page is published, whatever they meant."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: n",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The dangerous half of the same rule: `n` looks like `no` and does the opposite. The page is PUBLISHED."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: 0",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A number is not a boolean here. Zero publishes the page."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: true # why",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Annotating a flag with a reason is an ordinary thing to do in Obsidian. The build strips the comment before Quartz sees the page, so it changes nothing — this is the case issue #140 was opened for, where Plantoir listed a live page as held back."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish: false # why",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The comment changes nothing in this direction either."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: false#x",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A `#` with no space in front of it does not start a comment. The value is the string \"false#x\", which is not \"false\", so the page is PUBLISHED."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish: \"false\"",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Quotes stop PyYAML resolving the word, so Quartz gets the string \"false\" — and `patches/publish.ts` holds a page back for that string as well as for the boolean."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: \"False\"",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "And THIS page is visible, one capital letter away from the one above. The quotes keep it a string, and the string comparison in `patches/publish.ts` is exact: \"False\" is not \"false\". Do not \"simplify\" this into a case-insensitive check — it would hide a page the site publishes."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: 'no'",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Quoting cuts the other way too: quoted, `no` never becomes the boolean, so this page is published where the unquoted spelling hides it."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: \"true\"",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A quoted \"true\" is a string, and every string but \"false\" is published."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish:",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A key with nothing after it is null, and null is not false. The page is published."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: ~",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "YAML's own spelling of null. Same answer."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: null",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "And the word. Same answer again."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish: Off # hide it",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Both rules at once: the comment goes, and `Off` is the boolean false."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish: true\npublish: false",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A page carrying the same key twice: the LAST one wins, because that is what PyYAML keeps. A reader that stops at the first line reports the opposite of what students see."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: false\npublish: true",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The same rule pointing the other way, so neither answer can be right by accident."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish : false",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A space before the colon is still the key `publish`. YAML allows it and the page is hidden."
+      },
+      {
+        "expectVisible": false,
+        "page": "\"publish\": false",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A quoted KEY is the same key. The page is hidden."
       },
       {
         "expectVisible": false,
         "page": "draft: true",
+        "section": 1,
         "sectionLocal": true,
         "why": "The legacy key means the opposite. Reading it as-is publishes a page the teacher hid."
       },
       {
         "expectVisible": true,
         "page": "draft: false",
-        "sectionLocal": true
+        "section": 1,
+        "sectionLocal": true,
+        "why": "And the other way round."
+      },
+      {
+        "expectVisible": false,
+        "page": "draft: yes",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The build asks `build_site._as_bool`, which takes a real boolean as itself — so an unquoted `yes` is true, and the page is held back."
+      },
+      {
+        "expectVisible": false,
+        "page": "draft: on",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "`on` is a boolean true as well, so this page is held back too."
+      },
+      {
+        "expectVisible": false,
+        "page": "draft: TrUe",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Mixed case is a STRING here, and `_as_bool` lowercases a string before comparing it with \"true\". So this page IS held back — the opposite of what mixed case does on the `publish:` side, and the reason the two families need two predicates."
       },
       {
         "expectVisible": true,
-        "page": "title: Unit 1, Day 1",
+        "page": "draft: \"yes\"",
+        "section": 1,
         "sectionLocal": true,
-        "why": "A page that says nothing is VISIBLE — that is Quartz's own default, and changing it here would hide every page written before the field existed."
+        "why": "Quoted, so it never becomes a boolean, and \"yes\" lowercased is not \"true\". This page is PUBLISHED where the unquoted spelling two cases up hides it."
+      },
+      {
+        "expectVisible": false,
+        "page": "draft: \"true\"",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "And a quoted \"true\" still holds the page back, because that is the one string `_as_bool` compares against."
+      },
+      {
+        "expectVisible": true,
+        "page": "draft: maybe",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Anything that is neither a boolean true nor the text \"true\" leaves the page published."
+      },
+      {
+        "expectVisible": true,
+        "page": "draft: 1",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A number is not true here, whatever a teacher meant by it."
+      },
+      {
+        "expectVisible": false,
+        "page": "draft: true # not ready",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The comment is gone before the value is read, on this key as on the other."
       },
       {
         "expectVisible": true,
         "page": "publishForSection2: true",
         "section": 2,
-        "sectionLocal": false
-      },
-      {
-        "expectVisible": false,
-        "page": "draftSection2: true",
-        "section": 2,
-        "sectionLocal": false
+        "sectionLocal": false,
+        "why": "A course-level page carries one flag per section."
       },
       {
         "expectVisible": false,
         "page": "publishForSection2: false",
         "section": 2,
-        "sectionLocal": false
+        "sectionLocal": false,
+        "why": "And the same key can hold it back."
+      },
+      {
+        "expectVisible": false,
+        "page": "draftSection2: true",
+        "section": 2,
+        "sectionLocal": false,
+        "why": "The per-section legacy spelling, inverted like its plain counterpart."
+      },
+      {
+        "expectVisible": false,
+        "page": "draftSection1: yes",
+        "section": 1,
+        "sectionLocal": false,
+        "why": "The legacy key with a YAML 1.1 spelling of true: the build hides this page. Anything that carries this page's visibility to another section must invert THIS, not the literal text \"true\"."
+      },
+      {
+        "expectVisible": true,
+        "page": "publishForSection2: false",
+        "section": 1,
+        "sectionLocal": false,
+        "why": "A key naming ANOTHER section says nothing about this one — the build deletes it unread. Section 1 sees a page with no flag, which is visible."
+      },
+      {
+        "expectVisible": false,
+        "page": "publish: false",
+        "section": 2,
+        "sectionLocal": false,
+        "why": "A plain `publish:` on a COURSE-LEVEL page still counts: the build consults all four keys on every page it copies, wherever the page lives. Until 2026-09-18 the mac read only the per-section keys here and reported this page visible while the build hid it."
+      },
+      {
+        "expectVisible": false,
+        "page": "publishForSection1: false\npublish: true",
+        "section": 1,
+        "sectionLocal": false,
+        "why": "Precedence, first pair: `publishForSection<N>` wins over a plain `publish`."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: true\ndraftSection1: true",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "Precedence, second pair: a `publish` of either spelling wins over the legacy key. A page carrying both has already been migrated, and the leftover must not contradict it."
+      },
+      {
+        "expectVisible": true,
+        "page": "draftSection1: false\ndraft: true",
+        "section": 1,
+        "sectionLocal": false,
+        "why": "Precedence, third pair: between the two legacy spellings the per-section one wins. The whole order is publishForSection<N>, publish, draftSection<N>, draft."
+      },
+      {
+        "expectVisible": true,
+        "page": "publishForSection1: true",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "`sectionLocal` is true here and the per-section key is still the one that answers: where a page LIVES decides which key is WRITTEN, and nothing about how it is read."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: true",
+        "section": 1,
+        "sectionLocal": false,
+        "why": "The same point from the other side: `sectionLocal` is false and a plain `publish` still answers."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish:false",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "No space after the colon, so this is not a mapping at all — it is one plain scalar, and the page reaches Quartz with NO keys and is PUBLISHED. Measured. A reader that takes everything after the first colon calls this page hidden while students are reading it, which is the one mistake that must never be made. (With another key beside it the same line stops the build instead, so there is no case here for that shape.)"
+      },
+      {
+        "expectVisible": true,
+        "page": "publish:true",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The same rule with the value that makes it look harmless: `publish:true` is not this page's flag either. Both spellings are here so neither answer can be right by accident."
+      },
+      {
+        "expectVisible": true,
+        "page": "title: Unit 1, Day 1",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A page that says nothing is VISIBLE — that is Quartz's own default, and changing it here would hide every page written before the field existed."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: false\n  false",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "A value CONTINUES onto the next line whenever the line below is indented, however complete the key's own line looks: YAML folds the two into the one plain scalar \"false false\", a STRING that is not \"false\", and the page is PUBLISHED. Measured 2026-09-19, python-frontmatter 1.3.0 / PyYAML 6.0.3. Both readers answer `cannot tell` here and their reporting collapses that to visible, which is what the site does — so this case is honest as a shared one, unlike the other continuation forms, whose reporting answer is visible where the site HIDES. The reason it matters is the WRITER: reading the key's line alone called this page hidden CONFIDENTLY, so the already-right gate made \"hide this page\" a no-op while students could read it."
+      },
+      {
+        "expectVisible": true,
+        "page": "publish: false\n\n  false",
+        "section": 1,
+        "sectionLocal": true,
+        "why": "The same rule with a BLANK LINE in between, which is the row a reader that looked only at the next physical line would miss. Measured 2026-09-19: the fold is \"false\\nfalse\", still a string that is not \"false\", and the page is PUBLISHED. Honest as a shared case for the same reason as the row above — both readers step over the blank before they test the indent, answer `cannot tell`, and report visible, which is what the site does. The polarity siblings (`no`, `off`, `FALSE`, `true`, `maybe` with a value below) are equally honest and add no coverage these two do not; they stay in each platform's own tests."
       }
     ],
     "writingCases": {
-      "note": "The runnable half of `writingRules` above — give `before` to the writer, ask it for `setVisible`, and expect `after` and `expectChanged` exactly. `before` and `after` are WHOLE files, newline for newline, not the frontmatter fragments `readingCases` uses. Deliberately inside the subset both apps handle identically: LF endings, no inline `# comment` after a value being REWRITTEN (both platforms build a migrated line fresh and so drop one; where they differ is rewriting a key that is already current, which Windows' `ReplaceValue` preserves and the mac's line rewrite does not), no quoted or non-boolean values (`publish: \"true\"`, `draft: yes` — the two apps read those differently, which is a reader question and not one this list is the place to settle), no indented keys, and no blank line before the opening fence.",
+      "note": "The runnable half of `writingRules` above — give `before` to the writer, ask it for `setVisible`, and expect `after` and `expectChanged` exactly. `before` and `after` are WHOLE files, newline for newline, not the frontmatter fragments `readingCases` uses. Deliberately inside the subset both apps handle identically: LF endings, no inline `# comment` after a value being REWRITTEN (both platforms build a migrated line fresh and so drop one; where they differ is rewriting a key that is already current, which Windows' `ReplaceValue` preserves and the mac's line rewrite does not), no indented keys, and no blank line before the opening fence. A value's CONTINUATION lines are inside that subset as of 2026-09-19 (issue #176) and the last three cases cover them: for a key line with no inline comment and no leading indent, the mac's whole-line rebuild and Windows' `ReplaceValue` produce the same bytes, and both sweep with the same walk. Two continuation forms are still kept OUT for the usual reason — a column-0 `# note` between a key and its value, and a column-0 block sequence under an empty key, where the two agree today but the reasoning is odd enough to carry better in each platform's own test. What a NON-BOOLEAN value means is no longer deferred as 'a reader question': `readingCases` settles it, and the last three cases below say what the writer must then do with the answer — leave a page alone when it already SAYS what was asked, however oddly it says it, and write the flag out in full when the reading was `cannot tell`. A writer must never collapse `cannot tell` the way reporting does; erring visible is a mild mistake in a sentence and a page published behind the teacher's back in a file. BOTH suites run this list as of 2026-09-19: the mac since 2026-09-09 (issue #107), and Windows since issue #138, which replaced five of these cases retyped into its own test file. Three of the other five were already asserted there in that suite's own words; what the loop adds is that every case is read from the FILE and so cannot drift from it (ten on the day; thirteen since #176), and that cases 7 and 9 — a block carrying neither spelling, and an oddly-worded `published` asked to be HIDDEN — are covered there for the first time. Said here, and dated, because this note claimed the opposite for a day — a false statement about which side runs a list is how a gap survives review.",
       "cases": [
         {
           "after": "---\ntitle: Day one\npublishForSection1: true\n---\nBody.\n",
@@ -333,6 +680,60 @@
           "sectionLocal": true,
           "setVisible": false,
           "why": "A block with neither spelling in it: the key is inserted straight after the opening fence — ABOVE `title`, which is where the course installer puts it too and which can never land inside a nested list or a block scalar. A migration keeps its line; only a key being added for the first time moves to the top."
+        },
+        {
+          "after": "---\npublish: maybe\n---\nBody.\n",
+          "before": "---\npublish: maybe\n---\nBody.\n",
+          "expectChanged": false,
+          "section": 1,
+          "sectionLocal": true,
+          "setVisible": true,
+          "why": "The build PUBLISHES this page — anything PyYAML cannot make a boolean of is a string, and a string that is not \"false\" is published. So a teacher asking for it to be published is asking for what they already have, and rule 4 holds: the file is not touched and they are told it is already published. Tidying the value to `true` would be an edit nobody asked for, in a file Obsidian very likely has open, and it would throw away whatever the word meant to them."
+        },
+        {
+          "after": "---\npublish: false\n---\nBody.\n",
+          "before": "---\npublish: maybe\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": true,
+          "setVisible": false,
+          "why": "The same page asked to be HIDDEN does change, and the odd value goes: it currently says published, and the only way to say the opposite is to say it plainly."
+        },
+        {
+          "after": "---\npublish: true\n---\nBody.\n",
+          "before": "---\npublish: !!str false\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": true,
+          "setVisible": true,
+          "why": "A value neither app should claim to read — the reading is `cannot tell`. Reporting collapses that to visible, and a writer that did the same would decline this edit and leave the page exactly as it was while telling the teacher it was published. So the writer never collapses it: it writes the flag out in full, on the key's own line, in the direction that was asked for."
+        },
+        {
+          "after": "---\ntitle: Day one\npublish: false\n---\nBody.\n",
+          "before": "---\ntitle: Day one\npublish: >-\n  false\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": true,
+          "setVisible": false,
+          "why": "A value's CONTINUATION lines go wherever its key's line goes. Measured 2026-09-19 (python-frontmatter 1.3.0 / PyYAML 6.0.3, then js-yaml on JSON_SCHEMA): this page is HIDDEN on the site, and a writer that replaced the key's line alone left `  false` orphaned onto the new value — PyYAML folds the two into the plain scalar \"false false\", a STRING that is not \"false\", so the page was PUBLISHED while the teacher was told it was hidden. The failure that reports success, inside the writer."
+        },
+        {
+          "after": "---\npublish: false\n---\nBody.\n",
+          "before": "---\npublish:\n  a: 1\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": true,
+          "setVisible": false,
+          "why": "The same rule where the orphan is a MAPPING. Measured: the page is published before the write (the flag is the map {\"a\": 1}), and leaving the `  a: 1` behind stops the build outright — js-yaml: bad indentation of a mapping entry (3:4) — rather than merely publishing a page the teacher hid."
+        },
+        {
+          "after": "---\npublish: false\n  # the teacher's note\ntitle: x\n---\nBody.\n",
+          "before": "---\npublish: true\n  # the teacher's note\ntitle: x\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": true,
+          "setVisible": false,
+          "why": "And the other side of the same rule: an indented `# note` after a COMPLETE value is not a continuation, so it stays where the teacher wrote it. The walk steps over comments and takes nothing when no value line follows one. Measured: PyYAML ignores the line entirely — the page is published before and HIDDEN after."
         }
       ]
     },

@@ -248,6 +248,49 @@ final class SharedRulesContractTests: XCTestCase {
         }
     }
 
+    /// The card for a deploy that happens NOW has to say so.
+    ///
+    /// **A property, not a sentence.** The wording lives in `AssistWording`
+    /// and has been rewritten three times; what must survive the next rewrite
+    /// is the rule. The contract carries the word the sentence must contain,
+    /// this runs it, and Windows can run the identical check.
+    ///
+    /// The rule is here because the two approval cards were asymmetric exactly
+    /// where a misroute lands: the scheduled one names the whole moment, and
+    /// this one named no time at all — so a teacher who asked for 6:30
+    /// tomorrow, and was sent to an immediate deploy ten trials out of ten on
+    /// the smaller assistant, read a card that was perfectly true and said
+    /// nothing to contradict them (issue #168).
+    @MainActor
+    func testTheImmediateDeployCardSaysItIsImmediate() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("assistantConfirmation")
+        let rule: [String: Any] = try XCTUnwrap(
+            section["theImmediateDeployCardSaysItIsImmediate"] as? [String: Any]
+        )
+        XCTAssertNotNil(rule["why"] as? String, "a rule nobody explained is a rule that gets deleted")
+        // ASSERTED, not read as a switch. Reading it as a guard would mean the
+        // whole check could be turned off by flipping one word in a JSON file,
+        // with a green suite either way — and a rule that can go quiet without
+        // anybody deciding to turn it off is not a rule.
+        XCTAssertEqual(rule["value"] as? Bool, true)
+
+        // A WHOLE WORD, case-folded. `contains` would be satisfied by "knows",
+        // "known" or "nowhere", so a sentence saying nothing about time could
+        // keep this green.
+        XCTAssertEqual(rule["mustContainIsAWholeWord"] as? Bool, true)
+        let wanted: String = try XCTUnwrap(rule["mustContain"] as? String)
+        var spoken: [String] = []
+        for piece in AssistWording.deployApproval.lowercased()
+            .split(whereSeparator: { character in return !character.isLetter }) {
+            spoken.append(String(piece))
+        }
+        XCTAssertTrue(
+            spoken.contains(wanted.lowercased()),
+            "the immediate deploy card says nothing about when it happens: "
+            + AssistWording.deployApproval
+        )
+    }
+
     // MARK: - What a page is called
 
     /// Every case the contract lists, run against the real rule.
@@ -299,6 +342,7 @@ final class SharedRulesContractTests: XCTestCase {
             relativePath: "courses/ADA1O/Portfolios/index.md",
             isSectionLocal: false,
             isVisibleToStudents: true,
+            visibilityIsCertain: true,
             date: nil,
             linkedTitles: ["journal checklist"],
             classFolderNames: ["All Classes"],
@@ -667,6 +711,129 @@ final class SharedRulesContractTests: XCTestCase {
             + "the wizard existed; change it in the contract and in both apps, or not "
             + "at all."
         )
+    }
+
+    /// What a teacher is told when the course will start with nothing in it.
+    ///
+    /// One sentence for two situations — no content and no skeleton for the
+    /// code, or a skeleton the teacher has turned down — because they are one
+    /// situation for a teacher. Windows has said it in both places since
+    /// 2026-09-07; the mac since 2026-09-18 (issue #77).
+    func testTheEmptyCourseNoteIsTheOneInTheContract() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("wizard")
+
+        XCTAssertEqual(
+            WizardWording.noExampleContentNote,
+            section["noExampleContentNote"] as? String,
+            "The wizard's empty-course note and contracts/shared-rules.json → wizard "
+            + "disagree. Both apps show this sentence, in both of the situations "
+            + "wizard.whenTheNoteIsShown names; change it in the contract and in both "
+            + "apps, or not at all."
+        )
+    }
+
+    // MARK: - The skeleton toggle, in both directions
+
+    /// The structure editor shows what will actually be created: the toggle
+    /// adopts a subject's folders and gives them up again, list by list
+    /// against what the adoption put there.
+    ///
+    /// Every case in `wizard.skeletonToggle`, played the way the contract's
+    /// own `howToRunACase` says — each with its own fixture, so one case's
+    /// adoption cannot answer another's.
+    func testTheSkeletonToggleRestoresWhatTheContractSays() throws {
+        let toggle: [String: Any] = try SharedRulesContractTests.skeletonToggleRules()
+        let defaultCode: String = try XCTUnwrap(toggle["courseCode"] as? String)
+        let otherCode: String = try XCTUnwrap(toggle["otherCourseCode"] as? String)
+        let vocabulary: [String: Any] = try XCTUnwrap(toggle["lists"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(toggle["cases"] as? [[String: Any]])
+
+        // The floor is the count as it stands, not a round number below it:
+        // a floor four cases down lets four be deleted without a word, in a
+        // check whose whole purpose is to notice that. Raise it with the list.
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 13,
+            "wizard.skeletonToggle has lost cases. The list is the acceptance list for both "
+            + "apps; a case removed here is a behaviour neither suite checks any more."
+        )
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let given: [String: Any] = try XCTUnwrap(testCase["given"] as? [String: Any])
+            let code: String = (given["courseCode"] as? String) ?? defaultCode
+            let usesLCSTerminology: Bool = given["usesLCSTerminology"] as? Bool ?? false
+            let family: SkeletonCatalog.Family = try XCTUnwrap(
+                SkeletonCatalog.family(forCode: code), "No skeleton family for \(code)"
+            )
+
+            var lists: WizardStructure.Lists = try SharedRulesContractTests.lists(
+                from: try XCTUnwrap(given["lists"] as? [String: Any]),
+                family: family, vocabulary: vocabulary, caseName: name
+            )
+            var snapshot: WizardStructure.Lists? = (given["hasSnapshot"] as? Bool == true)
+                ? WizardStructure.adopting(family)
+                : nil
+            // Where a new wizard opens, and what the guard in
+            // adoptSkeletonStructure() reads when a code is typed.
+            var skeletonIsWanted: Bool = true
+
+            for step in try XCTUnwrap(testCase["steps"] as? [String]) {
+                switch step {
+                case "turnOn":
+                    skeletonIsWanted = true
+                    adopt(forCode: code, into: &lists, snapshot: &snapshot)
+                case "turnOff":
+                    skeletonIsWanted = false
+                    lists = WizardStructure.restoringDefaults(
+                        in: lists, adopted: snapshot, usesLCSTerminology: usesLCSTerminology
+                    )
+                    snapshot = nil
+                case "typeAnotherCode":
+                    // What `adoptSkeletonStructure()` does on a change to the
+                    // course code — nothing at all while the toggle is off.
+                    if skeletonIsWanted {
+                        adopt(forCode: otherCode, into: &lists, snapshot: &snapshot)
+                    }
+                default:
+                    XCTFail("\(name): unknown step \"\(step)\"")
+                }
+            }
+
+            let expected: WizardStructure.Lists = try SharedRulesContractTests.lists(
+                from: try XCTUnwrap(testCase["expect"] as? [String: Any]),
+                family: family, vocabulary: vocabulary, caseName: name
+            )
+            XCTAssertEqual(lists, expected, "wizard.skeletonToggle → \(name)")
+        }
+    }
+
+    /// The contract's own copy of the factory lists is the app's copy.
+    ///
+    /// Without this the vocabulary the cases are written in could drift away
+    /// from the thing it names, and every case would keep passing against a
+    /// contract that no longer describes the product. Windows owes the same
+    /// assertion against its own `WizardDefaults`.
+    func testTheSkeletonTogglesVocabularyIsTheAppsOwnDefaults() throws {
+        let toggle: [String: Any] = try SharedRulesContractTests.skeletonToggleRules()
+        let vocabulary: [String: Any] = try XCTUnwrap(toggle["lists"] as? [String: Any])
+        let factory: [String: Any] = try XCTUnwrap(vocabulary["factory"] as? [String: Any])
+        let lcs: [String: Any] = try XCTUnwrap(vocabulary["lcs"] as? [String: Any])
+
+        XCTAssertEqual(factory["sharedFolders"] as? [String], WizardDefaults.sharedFolders)
+        XCTAssertEqual(factory["sharedFiles"] as? [String], WizardDefaults.sharedFiles)
+        XCTAssertEqual(factory["perSectionFolders"] as? [String], WizardDefaults.perSectionFolders)
+        XCTAssertEqual(factory["perSectionFiles"] as? [String], WizardDefaults.perSectionFiles)
+        XCTAssertEqual(lcs["sharedFolders"] as? [String], WizardDefaults.lcsSharedFolders)
+        XCTAssertEqual(lcs["sharedFiles"] as? [String], WizardDefaults.lcsSharedFiles)
+        // BOTH per-section slots, not just the folders: the note says this set
+        // carries two arrays rather than four, and an authored
+        // `lcs.perSectionFiles` would otherwise sit here unread and unnoticed.
+        XCTAssertNil(
+            lcs["perSectionFolders"],
+            "Neither per-section list has an LCS variant — the terminology switch rewrites only "
+            + "the two shared ones, and a variant written here would be a rule the apps do not have."
+        )
+        XCTAssertNil(lcs["perSectionFiles"], "Same rule, the other per-section list.")
     }
 
     // MARK: - What a teacher reads on the Marks control
@@ -1885,6 +2052,114 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
+    // MARK: - What a window lets go of when it changes working folder
+
+    /// Runs `workingFolderSelection` against the real model — GitHub issue
+    /// #93.
+    ///
+    /// The folders are labels the case list names and this suite
+    /// materialises, and a selection is written by its KIND and the folder
+    /// whose course it means rather than by the string the mac happens to
+    /// store it as. That spelling is pinned in no contract and must not
+    /// become pinned by accident here.
+    func testAWindowLetsGoOfTheOldFolderAsTheContractSays() throws {
+        let rule: [String: Any] = try Self.section("workingFolderSelection")
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty, "shared-rules.json carries no workingFolderSelection cases")
+
+        // Every folder made here, so the clean-up can find them all however
+        // many a case asked for.
+        var everyFolderMade: [URL] = []
+        defer {
+            for folder in everyFolderMade {
+                try? FileManager.default.removeItem(at: folder)
+            }
+        }
+
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            XCTAssertNotNil(oneCase["why"] as? String, "\(name) does not say why it exists")
+
+            // Fresh folders for EVERY case, never shared across the loop.
+            // One of these cases deletes a course from the folder it starts
+            // in, and a cache would hand the damaged folder to whatever ran
+            // next — so the data file would be silently order-dependent, and
+            // would pass only for as long as the destructive case stayed
+            // last. Materialising is a copy of three stub launchers and one
+            // config file; correctness is worth far more than that.
+            var foldersByLabel: [String: URL] = [:]
+            func folder(labelled label: String) throws -> URL {
+                if let existing = foldersByLabel[label] {
+                    return existing
+                }
+                let made: URL = try FixtureWorkspace.materialize()
+                everyFolderMade.append(made)
+                if label == "folderBEmpty" {
+                    try FileManager.default.removeItem(at: try courseDirectory(in: made))
+                }
+                foldersByLabel[label] = made
+                return made
+            }
+
+            let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+            workspace.chooseWorkspace(
+                at: try folder(labelled: try XCTUnwrap(oneCase["startIn"] as? String))
+            )
+
+            let wanted: [String: Any] = try XCTUnwrap(oneCase["select"] as? [String: Any])
+            let code: String = try courseDirectory(
+                in: try folder(labelled: try XCTUnwrap(wanted["courseIn"] as? String))
+            ).lastPathComponent
+            let selection: SidebarSelection
+            switch try XCTUnwrap(wanted["kind"] as? String) {
+            case "course":
+                selection = .course(code)
+            case "section":
+                selection = .section(code, try XCTUnwrap(wanted["section"] as? Int))
+            default:
+                XCTFail("\(name) asks for a kind of selection this suite does not know")
+                continue
+            }
+            workspace.selection = selection
+            XCTAssertNotNil(workspace.selectedCourse, "\(name): the course it selects should be there")
+
+            let then: [String: Any] = try XCTUnwrap(oneCase["then"] as? [String: Any])
+            if let label = then["pointAt"] as? String {
+                workspace.chooseWorkspace(at: try folder(labelled: label))
+            } else if then["removeTheSelectedCourseAndReload"] as? Bool == true {
+                try FileManager.default.removeItem(
+                    at: try courseDirectory(in: try XCTUnwrap(workspace.workspaceURL))
+                )
+                workspace.reloadCourses()
+            } else {
+                XCTFail("\(name) asks for something this suite does not know how to do")
+                continue
+            }
+
+            switch try XCTUnwrap(oneCase["expect"] as? String) {
+            case "cleared":
+                XCTAssertNil(workspace.selection, name)
+            case "unchanged":
+                XCTAssertEqual(workspace.selection, selection, name)
+            default:
+                XCTFail("\(name) expects an outcome this suite does not know")
+                continue
+            }
+            if let namesACourse = oneCase["expectNamesALoadedCourse"] as? Bool {
+                XCTAssertEqual(workspace.selectedCourse != nil, namesACourse, name)
+            }
+        }
+    }
+
+    /// The one course folder inside a fixture working folder.
+    private func courseDirectory(in workingFolder: URL) throws -> URL {
+        let courses: URL = workingFolder.appendingPathComponent("courses")
+        let entries: [URL] = try FileManager.default.contentsOfDirectory(
+            at: courses, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+        )
+        return try XCTUnwrap(entries.first, "the fixture working folder has no course in it")
+    }
+
     // The launcher's own half of this — that `preview.sh` delegates to the
     // shared rule, keeps no sweep of its own, and pipes the code in rather
     // than naming a path baked into the image — is asserted ONCE, in
@@ -1903,5 +2178,109 @@ final class SharedRulesContractTests: XCTestCase {
             try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
         )
         return try XCTUnwrap(all[name] as? [String: Any], "No \(name) in shared-rules.json")
+    }
+
+    /// One adoption, as `adoptSkeletonStructure()` performs it: the rule that
+    /// predates this one still holds, so a folder list the teacher has changed
+    /// is never overwritten and no snapshot is taken.
+    private func adopt(
+        forCode code: String,
+        into lists: inout WizardStructure.Lists,
+        snapshot: inout WizardStructure.Lists?
+    ) {
+        guard let adoptable = SkeletonCatalog.structureToAdopt(
+            forCode: code, currentSharedFolders: lists.sharedFolders
+        ) else {
+            return
+        }
+        lists = WizardStructure.adopting(adoptable)
+        snapshot = lists
+    }
+
+    /// `wizard.skeletonToggle` — the rule, its vocabulary and its cases.
+    private static func skeletonToggleRules() throws -> [String: Any] {
+        let wizard: [String: Any] = try SharedRulesContractTests.section("wizard")
+        return try XCTUnwrap(wizard["skeletonToggle"] as? [String: Any],
+                             "No skeletonToggle in shared-rules.json → wizard")
+    }
+
+    /// One case's five lists, with each symbol resolved as
+    /// `wizard.skeletonToggle.symbols` says. A literal array means itself.
+    private static func lists(
+        from described: [String: Any],
+        family: SkeletonCatalog.Family,
+        vocabulary: [String: Any],
+        caseName: String
+    ) throws -> WizardStructure.Lists {
+        return WizardStructure.Lists(
+            sharedFolders: try list(
+                described["sharedFolders"], slot: "sharedFolders",
+                familyList: family.sharedFolders, family: family,
+                vocabulary: vocabulary, caseName: caseName
+            ),
+            sharedFiles: try list(
+                described["sharedFiles"], slot: "sharedFiles",
+                familyList: family.sharedFiles, family: family,
+                vocabulary: vocabulary, caseName: caseName
+            ),
+            perSectionFolders: try list(
+                described["perSectionFolders"], slot: "perSectionFolders",
+                familyList: family.perSectionFolders, family: family,
+                vocabulary: vocabulary, caseName: caseName
+            ),
+            perSectionFiles: try list(
+                described["perSectionFiles"], slot: "perSectionFiles",
+                familyList: family.perSectionFiles, family: family,
+                vocabulary: vocabulary, caseName: caseName
+            ),
+            gradedFolders: try list(
+                described["gradedFolders"], slot: "gradedFolders",
+                familyList: SkeletonCatalog.adoptedGradedFolders(for: family), family: family,
+                vocabulary: vocabulary, caseName: caseName
+            )
+        )
+    }
+
+    /// One slot's value: an array is itself, a string is one of the
+    /// contract's symbols.
+    private static func list(
+        _ described: Any?,
+        slot: String,
+        familyList: [String],
+        family: SkeletonCatalog.Family,
+        vocabulary: [String: Any],
+        caseName: String
+    ) throws -> [String] {
+        if let literal = described as? [String] {
+            return literal
+        }
+        let symbol: String = try XCTUnwrap(
+            described as? String, "\(caseName): nothing said about \(slot)"
+        )
+        switch symbol {
+        case "skeleton":
+            return familyList
+        case "skeletonReversed":
+            return familyList.reversed()
+        case "factory", "lcs":
+            let set: [String: Any] = try XCTUnwrap(
+                vocabulary[symbol] as? [String: Any], "\(caseName): no \(symbol) lists in the contract"
+            )
+            return try XCTUnwrap(
+                set[slot] as? [String],
+                "\(caseName): the contract has no \(symbol) list for \(slot), so the symbol means nothing here"
+            )
+        case "lcsFlippedFromSkeleton":
+            let factory: [String: Any] = try XCTUnwrap(vocabulary["factory"] as? [String: Any])
+            let lcs: [String: Any] = try XCTUnwrap(vocabulary["lcs"] as? [String: Any])
+            return WizardDefaults.switchingFactoryItems(
+                in: familyList,
+                toFactory: try XCTUnwrap(lcs[slot] as? [String]),
+                fromFactory: try XCTUnwrap(factory[slot] as? [String])
+            )
+        default:
+            XCTFail("\(caseName): unknown list symbol \"\(symbol)\" for \(slot)")
+            return []
+        }
     }
 }

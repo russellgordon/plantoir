@@ -3,7 +3,19 @@ FROM python:3.11-slim
 
 # Python packages: frontmatter parsing, and Pillow to draw each
 # section's social sharing card.
-RUN pip install python-frontmatter Pillow
+#
+# PINNED, and python-frontmatter's own PyYAML is pinned with it, because
+# whether a teacher's page reaches their students is decided by what PyYAML
+# makes of the line they typed. `publish: no` hides a page ONLY because PyYAML
+# reads YAML 1.1's spellings of no as the boolean false; PyYAML 7 is expected
+# to move to YAML 1.2, where `no` is the string "no" and that same page would
+# be published. Both apps and `contracts/file-formats.json` ->
+# `pageVisibility.readingCases` now state the 1.1 table as fact, so an
+# unpinned upgrade would flip real pages in a teacher's course with nothing
+# failing anywhere. These are the versions the image already had on
+# 2026-09-18, read off `pip freeze` rather than chosen — so the pin changes
+# nothing about what is installed today.
+RUN pip install python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0
 
 # Install Node.js (needed for Quartz) and other tools (incl. dos2unix)
 # fonts-noto-color-emoji: the colour emoji drawn onto social cards.
@@ -58,6 +70,9 @@ COPY scripts/site_health.py /opt/scripts/site_health.py
 # toolchain change is gated on it: the unit tests were green and the image
 # could not be built at all.
 COPY scripts/class_pages.py /opt/scripts/class_pages.py
+# One home for "does the built site show this page?" — read by build_site.py
+# and setup_course.py, and pinned by contracts/file-formats.json.
+COPY scripts/page_visibility.py /opt/scripts/page_visibility.py
 # Which processes belong to a section's preview — the one answer, imported by
 # build_site.py before a build for publishing so the preview server cannot
 # overwrite what was just built. `preview.sh --stop` does NOT run this copy:

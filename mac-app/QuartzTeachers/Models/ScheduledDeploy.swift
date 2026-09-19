@@ -312,8 +312,7 @@ enum ScheduledDeploy {
             }
             let isVisible: Bool = AssistPageVisibility.publishes(
                 in: text,
-                forSection: sectionNumber,
-                isSectionLocal: true
+                forSection: sectionNumber
             )
             if !isVisible {
                 held.append(page.title)

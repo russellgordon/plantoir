@@ -41,7 +41,10 @@ places, and which one is a judgement about portability rather than effort:
 - **[`contracts/`](contracts/README.md)** if it is a sentence a teacher reads,
   a rule with inputs and expected outputs, or a sequence that must happen in
   order. Add the case, run it here, commit the diff — the Windows suite then
-  runs the identical case.
+  runs the identical case. **It still owes an issue**, which is not a second
+  home for the behaviour but the notification that it moved: step 3 below says
+  why, and rule 4 already spells out the same thing for a case travelling the
+  other way.
 - **A [GitHub issue](https://github.com/russellgordon/plantoir/issues)
   labelled `windows`** if it cannot be expressed as data: anything visual,
   anything with platform mechanics (Colima, port leases, WebKit), anything
@@ -76,7 +79,38 @@ Plantoir --write-contracts contracts     # or the built binary in DerivedData
 It preserves the hand-written halves (`scenarios`, `nearMisses`,
 `promptHistory`, every case list) and rewrites only the readouts. It is
 idempotent, so a run that changes nothing produces no diff. **Commit the diff —
-that diff is how the Windows side finds out.**
+that diff is how the change travels.**
+
+**It is not how they find out**, and the difference has cost real time. Nobody
+reads a folder of JSON for changes; what the Windows side meets is its own
+suite going red, days later, part-way through something else. So the issue step
+6 asks for is not a courtesy on top of the diff — it is the whole of the
+notification, and the diff is only the payload. **Say in it which key moved and
+which of their tests will go red**, the way
+[#70](https://github.com/russellgordon/plantoir/issues/70) did: *"Three more
+card phrasings will make your suite red"*, with the three quoted. That is what
+turns a failure into a task.
+
+**Name every key the regeneration moved, and remember that the FIX you made
+after the feature moved one too.** This is the half #70 missed, and the shape
+of it is worth knowing because it is not carelessness:
+
+| When | What |
+|---|---|
+| 18:54 | `0f34c54d` builds `back_up_course`, requiring `[course]` — the same shape Windows had had since August. Nothing diverges. |
+| 19:14 | `b0913344` fixes a real defect in it: the copy was filed as the TEACHER's, so `pruneBackups` would have kept every one for ever. The fix takes a `section`. The schema moves. |
+| 19:52 | #70 is opened. It names the tool, its plan twin and its briefing persistence — everything except the argument. |
+
+The issue describes the FEATURE, because that is what you set out to build; the
+review fix twenty minutes later is the part memory drops. And it is the worse
+part to drop — Windows had the identical defect and found it only because the
+contract went red and somebody chased it. Windows'
+`AssistSurfaceContractTests` reported the change exactly — *"must require
+exactly the arguments the contract says it does"* — and its reader had a
+perfectly clear failure and nowhere to look it up, which is half of why
+[#146](https://github.com/russellgordon/plantoir/issues/146) was filed saying
+nobody had been told. **`git diff contracts/` before you write the issue**, and
+let the diff tell you what to list rather than your memory of the afternoon.
 
 ### 4. Run the tests, and read what they say
 

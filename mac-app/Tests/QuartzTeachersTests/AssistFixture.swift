@@ -118,14 +118,24 @@ enum AssistFixture {
 
     /// An agent wired to a runner, with a client that is never reached: every
     /// message these tests send is a card phrasing, matched in code.
+    ///
+    /// `engineAt` points it at a real address instead — `StubEngine.baseURL`
+    /// for a test about what the model answered. `asksBeforeChanging` is the
+    /// plan-mode switch, and it defaults to what a teacher has: **on**. A test
+    /// about what a tool DOES to the disk has to turn it off, or the write is
+    /// held behind a plan and the assertion passes for the wrong reason.
     @MainActor
-    static func makeAgent(tools: AssistToolRunner) -> AssistAgent {
+    static func makeAgent(tools: AssistToolRunner,
+                          engineAt engineURL: URL? = nil,
+                          asksBeforeChanging: Bool = true) -> AssistAgent {
+        let settings: AppSettings = AppSettings(defaults: TestDefaults.make())
+        settings.assistantAsksBeforeChanging = asksBeforeChanging
         return AssistAgent(
             courseCode: "ICS3U",
             sectionNumber: 1,
-            client: AssistModelClient(baseURL: URL(string: "http://127.0.0.1:1")!),
+            client: AssistModelClient(baseURL: engineURL ?? URL(string: "http://127.0.0.1:1")!),
             tools: tools,
-            planMode: AssistPlanMode(tier: .small, settings: AppSettings(defaults: TestDefaults.make()))
+            planMode: AssistPlanMode(tier: .small, settings: settings)
         )
     }
 

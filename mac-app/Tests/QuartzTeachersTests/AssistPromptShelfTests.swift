@@ -99,10 +99,14 @@ final class AssistPromptShelfTests: XCTestCase {
     /// an argument — measured it. See
     /// `research/ai-assist/shelf-phrasings-results.txt`.
     func testEveryCardIsEitherMatchedInCodeOrKnownToGoToTheModel() {
+        // Three, not four. "Deploy at 6:30 AM" left this list on 2026-09-19:
+        // it was measured going to `deploy_section` ten trials out of ten on
+        // the smaller assistant — a deploy to students on the spot in answer
+        // to a teacher who asked for half six tomorrow — and is now a parsed
+        // family in `AssistCardCommand` (issue #168).
         let goesToTheModel: Set<String> = [
             "Publish Unit 2, Day 3",
             "Unpublish Unit 2, Day 3",
-            "Deploy at 6:30 AM",
             "Cancel scheduled deploy",
         ]
 

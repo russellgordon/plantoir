@@ -230,9 +230,14 @@ final class SpecialFoldersProtectionTests: XCTestCase {
     }
 
     func testWizardGradedFoldersIncludedInConfigWhenNotUsingExampleContent() {
+        // The folder lists carry both names, because what is written is now
+        // narrowed to the folders the course will actually have — a pool
+        // naming a folder nobody is creating is not a choice, it is a name
+        // that matches nothing (see GradedFolderRule.reconciled).
         let wizard: NewCourseWizardView = NewCourseWizardView(
             courseCode: "ICS3U",
             prepopulatesExampleContent: false,
+            sharedFolders: ["Concepts", "Tasks", "Projects"],
             gradedFolders: ["Tasks", "Projects"]
         )
 
@@ -360,14 +365,15 @@ final class SpecialFoldersProtectionTests: XCTestCase {
     /// running, so a `Thinking Tasks` still counts and putting the folder back
     /// restores it.
     ///
-    /// **Windows does NOT do this, and an earlier draft of this comment said
-    /// it did.** `DropFromMarksPool` there materialises over a walk cached by
-    /// the previous `BuildForm` pass — taken before the exclusion was written
-    /// — so the removed folder is still among the choices and the pool is
-    /// written. Its own doc comment says the intent is that a legacy course
-    /// "does not get one CREATED as an empty list by a removal", which is what
-    /// this rule delivers and what the cached walk does not. The difference is
-    /// pinned by `gradedFolders.removingAFolder` and handed over as an issue.
+    /// **Windows does this too, since 2026-09-18** — and an earlier draft of
+    /// this comment said it did not, which was true when it was written and
+    /// then was not. `DropFromMarksPool` there used to materialise over a walk
+    /// cached by the previous `BuildForm` pass, taken before the exclusion was
+    /// written, so the removed folder was still among the choices and the pool
+    /// was written anyway. Issue #142 settled that Windows adopts this rule,
+    /// and the whole gesture is now one Core method,
+    /// `FolderRemoval.RemoveFolderFromCourse`. Pinned on both platforms by
+    /// `gradedFolders.removingAFolder`.
     func testRemovingAGradedFolderLeavesANeverAskedCourseUnasked() throws {
         let root: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("test-prot-\(UUID().uuidString)")

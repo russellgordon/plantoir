@@ -342,6 +342,177 @@ This is the same principle as the coarse tools: reasoning moved out of the
 model is reliability bought back. It is also the honest caveat on the 110/110
 in Part 5 — some of those are perfect because they are not questions.
 
+### A time is a number, not a judgement
+
+Written 2026-09-19, closing [issue
+#168](https://github.com/russellgordon/plantoir/issues/168). The shelf offers
+**"Deploy at 6:30 AM"** word for word, and the smaller assistant answered it
+with `deploy_section` — an immediate deploy, to students — **10 trials out of
+10 at temperature 0.1 and 3 out of 3 through the app's own request body**
+(Qwen2.5-1.5B, ctx 8192, shipped prompt, Metal, 2026-09-18;
+`research/ai-assist/metal-routing-results.txt`). The 4B is correct 10/10 on
+the same sentence, so there is nothing wrong with the card.
+
+**Two things were done, and they are independent.** Either would have helped;
+together they cover both the sentence that was measured and the ones that were
+not.
+
+**1. The immediate approval card now says it is immediate.** The two approval
+cards were asymmetric exactly where a misroute lands: `schedule_deploy`'s names
+the whole moment, and `deploy_section`'s named no time at all — so a teacher
+who asked for half six tomorrow read a card that was perfectly true and said
+nothing to contradict them. `AssistWording.deployApproval` now leads with the
+fact that it happens now; the two sentences after it, which have been argued
+over twice, are untouched. **`deployQuestion` was deliberately NOT changed**:
+"Shall I deploy?" is said under EVERY approval card including the scheduled
+one (`AssistAgent.run(settledCall:)` is unconditional, and Windows' `AskFirst`
+likewise), so "Shall I deploy now?" would make the scheduled card read worse
+than the thing being fixed. Splitting the question per tool is its own piece —
+[issue #184](https://github.com/russellgordon/plantoir/issues/184). The rule is
+pinned as a PROPERTY rather than a sentence:
+`contracts/shared-rules.json` → `assistantConfirmation.`
+`theImmediateDeployCardSaysItIsImmediate` carries the word the sentence must
+contain, and both suites can run it, so it survives the next rewording.
+
+**2. "deploy at &lt;time&gt;" is a sixth parsed family and never reaches the
+model.** A time in a fixed frame is a NUMBER, not a judgement — the same
+argument `makeRoom` already won for "make room for two classes at Unit 3, Day
+4" — and this is CLAUDE.md's standing rule applied exactly: steer the model
+with code, not with tool descriptions. The frame, after trimming, case-folding
+and removing a trailing `.`, `!` or `?`:
+
+```
+[please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow] [please]
+```
+
+**The rule that carries the most weight: a time with no am or pm must be
+written with two digits for the hour.** That is what 24-hour time looks like
+and it is the form `schedule_deploy`'s own schema asks for, so `06:30` and
+`18:30` are read and **`6:30` is not** — morning or evening, and nobody can
+tell which. A deploy set twelve hours wrong is a site that updates after the
+class it was meant for, so the doubt goes to the model, which has the dateline
+and is measured reading arguments out reliably. `noon` and `midnight` are both
+accepted, alike, and so are `12 pm` and `12 am`: one rule rather than two, and
+the card names the day it landed on. **The hour is one or two digits either
+way**, which is stated rather than inherited: `Int` does not care how a number
+was padded, so without the bound "007:30 am" would be read as half past seven
+while the other platform, implementing from the accepted rows, would refuse it
+— a difference no suite could see. Two `refused` rows pin it. A section number, a course code, a
+weekday, a condition or a second request all fall through — the window is
+scoped to ONE section and binds it whatever the sentence said, so a card
+appearing to honour another section would answer a different question with
+total confidence.
+
+Every accepted and refused spelling is DATA, in `contracts/assist-cases.json`
+→ `deployAtATime` (23 accepted, 25 refused, 11 resolving rows), authored rather
+than generated and preserved across `--write-contracts`. One example and one
+near-miss — all `cardPhrasings.parsed` can carry — would have described a
+grammar of times as a single spelling, and the other platform would have built
+one spelling.
+
+**Which day a bare time means: the next such time, forwards, counting today
+while it is still to come.** Word for word the rule `dayNamedByWeekday` already
+applies to a bare day word, one unit up. An explicit "today" or "tomorrow"
+overrides it, and "today 06:30" said at nine o'clock stays on today and meets
+the existing "…has already passed" refusal — they named the day, so the app
+does not move it for them. **Rejected: "today at that time, always"**, which
+invents no temporal rule at all but answers the shelf's own card with a refusal
+for most of the day. The guess is allowed because it is never silent:
+`schedule_deploy` waits for a button and its card names the whole moment,
+weekday and date included, before anything is written.
+
+**Where the settling happens, and why it is one clock read.**
+`AssistAgent.settled(_:)` binds the section, settles a relative DAY
+(`withTheDaySettled`, below) and then settles a bare clock time
+(`withTheMomentSettled`) — once, where the call is created, reading `Date()` in
+exactly one place. `AssistAgent.say` then builds the call, settles it, writes
+its trail line FROM THE SETTLED ARGUMENTS, and hands the same call to
+`run(settledCall:)` without settling it again. That order is the fix to a real
+problem rather than tidiness: the matcher is clock-free, so the day a bare time
+means does not exist when the sentence is matched, and a line written before
+the settling would record a time with no day on it. The settler is idempotent
+— a whole moment is handed straight back — and a test says so, which is what
+makes the arrangement safe.
+
+**Which settler owns which argument is asked of the TOOL.**
+`settlingTheClassDay` takes the tools that declare `date`;
+`settlingTheDeployMoment` takes the tools that declare `when` and NOT `date`.
+A tool cannot be in both, so the division is by construction rather than by
+memory — `schedule_deploy` and `plan_scheduled_deploy` are the two today, and
+`publish_class_on`'s day-shaped `when` is untouched without anybody having to
+remember that it is different.
+
+**Five consequences written down rather than discovered.**
+
+- **The settler quietly changes the MODEL's path too.** It runs in
+  `run(call:)` for every call, so a model that answers `when: "06:30"` now gets
+  a day guessed onto it instead of meeting `unreadableTime`. Measured limit:
+  the settler reads an exact `HH:mm` and nothing looser, so a model's `"6:30"`
+  still refuses. This is consistent with `withTheDaySettled`, which already
+  covers the model's path for the same reason — but it IS a behaviour change on
+  a path the fix is otherwise not about.
+- **A card can be approved into a refusal.** At 06:29:50, "deploy at 6:30 am"
+  settles onto 06:30 today, ten seconds away; `ScheduledDeploy.problem` refuses
+  anything at or before `now` and is re-evaluated when the teacher presses the
+  button, so a card naming a minute can be declined by the app a moment later.
+  "Settled once" is a property of the MOMENT, not of the refusal. **No minimum
+  lead time was invented** — there is none anywhere in the product, and adding
+  one here would be a rule nobody could find later.
+- **Scheduling silently replaces an existing schedule** for that section
+  (`ScheduledDeploy` removes any previous job), and neither the card nor the
+  summary says so. Pre-existing, and untouched here; this family turns that
+  path from rare into the easy one, so it is worth knowing.
+- **On the morning the clocks go forward, a wall time may not exist**, and the
+  settled text is therefore built from the INSTANT rather than by joining a day
+  to a time. Measured, America/Toronto, DST starting 02:00 on 8 March 2026:
+  joining the strings gives `"2026-03-08 02:30"`, which `Calendar` has no
+  instant for and `moment(named:)` — three strict `DateFormatter` patterns —
+  reads back as nothing. Everything downstream then failed silently: the trail
+  line dropped its moment, the card printed the raw text instead of "Sunday 8
+  March, 2:30 AM", and approving it failed with the app calling its own output
+  unreadable. `Calendar` moves a nonexistent wall time forward, so 02:30
+  settles onto **03:30** and the card names it. **Rejected: returning nil for
+  that hour**, which is one line and keeps the invariant too, but answers a
+  teacher who asked for an ordinary time with "I could not read that" on the
+  one night when the reason is a fact about their clock. The invariant is now
+  structural — what comes out is the canonical rendering of a real instant, so
+  it always reads back — and `ScheduleDeployCardTests` runs it over every
+  `resolving` row as well as over that morning.
+- **Going BACK, an ambiguous hour resolves to the first occurrence.** Measured,
+  America/Toronto, 1 November 2026: asked at 01:15 in the first 01:00 hour,
+  "1:30 am" settles onto the 01:30 forty-five minutes away; asked at 01:45,
+  it settles onto **tomorrow** rather than the second 01:30 an hour later,
+  because `Calendar.date(from:)` picks the earlier instant and that one has
+  gone. Defensible — it is what "the next such time" means with a
+  first-occurrence convention — and vanishingly rare, but it is a choice
+  rather than an accident.
+
+**Not made a contract row, deliberately: the spring-forward shift.** It is what
+THIS platform's calendar does for free, while .NET throws on an invalid wall
+time (`TimeZoneInfo.ConvertTimeToUtc`), so a row asserting 03:30 would hand
+Windows a DST requirement discovered here and never discussed there. It is a
+mac test and a named trap in the handover instead, to be proposed as a row once
+both sides have met it. The same goes for the fall-back convention.
+
+**`AssistMCPServer` deliberately settles nothing**, so `Plantoir --mcp-stdio`
+still refuses a bare `when: "06:30"` with the runner's own "I could not read
+that time". That is a deliberate divergence from the `publish_class_on`
+decision below, where the tool WAS made forgiving: an MCP caller genuinely
+reaches that tool with a relative day, whereas `schedule_deploy`'s schema tells
+Claude Code to send `YYYY-MM-DD HH:MM` and no MCP client sends a bare clock
+time.
+
+**No routing re-measurement is owed, and here is the check rather than the
+claim.** `AssistToolSurface.swift` is not touched — no tool added or removed,
+no description, no parameter, no `required`, no `needsApproval`, no plan twin —
+and `AssistAgent.systemPrompt` references no `AssistWording`. Confirmed by
+regenerating: `contracts/assist-cases.json` → `tools` and `toolSchemas` come
+back **byte-identical** (compared key by key against `origin/dev`), so the
+model is shown exactly what it was shown before. The matcher is strictly
+upstream of the model and the approval sentence strictly downstream of it. What
+DOES change is a count of the CODE: the shelf's split moves from
+15-answered-in-code/4-model-routed to 16/3.
+
 ### The dateline, and why its position is a finding
 
 A model has no clock. Every message the teacher sends therefore carries
@@ -395,6 +566,90 @@ answer — a router that answers differently to the same request twice is a
 router a teacher cannot learn to trust. (The measurement suites ran at 0.1,
 so the shipped app is if anything more deterministic than the numbers below.)
 
+It also carries **`"max_tokens": 512`** — `AssistModelClient.mostTokensPerReply`,
+added for [#166](https://github.com/russellgordon/plantoir/issues/166), and the
+number Windows had been sending all along. It is not a tuning knob; it is a
+bound on how long a teacher waits. Without one, a reply is bounded only by the
+context, and the context is large: measured on an M4 Pro with the smaller
+assistant (llama.cpp b10435 on Metal, Qwen2.5-1.5B Q4_K_M at a context of
+8,192), the ordinary request *"Publish tomorrow's class for VVH2O section 1,
+and make sure every page it links to is published rather than left as a
+draft"* made the model write `Unit 2, Day 3; Unit 2, Day 4; …` for **5,435
+tokens and 42 seconds**, three trials in three, and the answer was unusable
+when it arrived. 2,757 prompt + 5,435 written = 8,192 exactly: the context was
+the only thing stopping it. The larger assistant is not immune, it fails
+differently and worse — the same shape there is 16,384 − 2,742 = 13,642 tokens
+at that tier's measured 63.2 tok/s, about **216 seconds**, past this client's
+own 180-second timeout, so it would fail rather than answer.
+
+**Why 512 rather than a rounder, larger number.** Measured against the model's
+own tokenizer, the tool calls this surface produces in practice sit well
+inside the cap, and the ones that do not are reachable only by asking for
+something there is a shorter way to ask for: an ordinary call is 16 to 60
+tokens, twenty page titles is 203, twenty-four long real-world titles is 384,
+and fifty-eight short titles is 545 — past the cap, which is the point at
+which it starts to bite. So the only legitimate shape 512 cuts is an explicit list
+of about fifty-five or more class pages — and `publish_pages` already takes
+`onOrAfter` and `before`, which asks for any number of classes in about sixty
+tokens. Nothing on the local surface takes free text or a page BODY:
+`remember_timetable`, the one tool that would carry ninety dates, is in
+`AssistToolSurface.hiddenFromTheLocalModel` and never reaches a capped
+request.
+
+**One shape does NOT fit, and it was measured rather than argued about.** The
+two-lap one: `list_pages` hands back up to `AssistToolRunner.mostPagesListed`
+(60) entries as relative PATHS (`AssistSectionGraph.relativePath`), far longer
+per item than a class title, and the next turn may be asked to publish all of
+them. Tokenised against the model's own tokenizer, using the sixty paths a real
+257-page course really hands back: **60 paths are 975 tokens, and such a call
+crosses 512 at about the thirty-first path** — the twenty-sixth if the section's
+longest paths are taken. So the risk is real and it is now bounded and named,
+rather than unknown.
+
+What stops it being a fault in practice is that the model does not write that
+call. Asked exactly that way — primed with the `list_pages` result carrying all
+sixty paths, then "Publish all of those." — the smaller assistant answered with
+`{"course": …, "section": 1, "pages": "all"}` in **35 completion tokens, three
+trials of three, finishing naturally**. The cap never fired. That is one model,
+one phrasing, three trials, and it is worth exactly that much: the honest
+summary is that a teacher who does hit this meets
+`AssistWording.answerWasCutOff`, whose advice — fewer pages at a time — is
+followable in precisely this case. Raising the cap to cover the worst
+imaginable call is the state #166 was about.
+
+**Rejected: a larger cap, or none on the larger tier.** A cap sized to the
+worst imaginable call is a cap that never fires, which is the state this
+issue was about. The two apps also send the same number deliberately — it is
+in `contracts/app-rules.json` → `modelTiers.requirements` with its `cap`,
+because two apps sending different caps is a difference no test on either
+side could see.
+
+**A cap is a routing change until proved otherwise**, and this is the last
+thing to know about the number. This codebase has already watched one added
+sentence in a tool description move the promise card from 110/110 to 90/110,
+so "it only changes where a generation stops" is a claim to be checked rather
+than assumed. The check is available from one command line:
+`trimmed-surface-suite.py --app-body` sends the cap it reads out of the Swift,
+and `--app-body --uncapped` sends the body as it stood before #166, so the two
+arms differ in `max_tokens` and in nothing else — run per probe at temperature
+0, where the arms reproduce exactly, the comparison is the bag of tool names
+each probe chose. The mechanism cannot change what the model chooses, only
+where it is stopped, so the only outcomes available to such a run are
+"neutral" and "it cost something"; no reading of it can say the cap improved
+routing.
+
+**It was run, and the answer is nothing.** `research/ai-assist/token-cap-results.txt`
+holds it: on an M4 Pro (Mac16,8, 48 GiB) with llama.cpp b10435 on Metal, both
+tiers at their shipped contexts, **0 of 29 probes and 0 of 19 shelf phrasings
+chose a different tool under the cap** — against a morning uncapped arm and
+against a same-afternoon uncapped control, identical trial for trial across all
+960 rows of each comparison, with no polarity inversion and no probe gaining a
+`finish_reason: length` turn it did not already have. The threshold was
+pre-registered at 08:46, before the first capped request was sent. What changed
+is the clock: the runaway this issue opened with went from **5,435 completion
+tokens and 41–95 seconds to 512 tokens and 6.0–6.3 seconds**, ten trials of ten,
+with the engine's own log showing the stop moving from the context to the cap.
+
 ### Step 2 — What comes back
 
 ```json
@@ -408,9 +663,90 @@ so the shipped app is if anything more deterministic than the numbers below.)
 ```
 
 Note `arguments` is a **string** containing JSON, not a JSON object — that is
-the OpenAI convention, and it is parsed in `AssistAgent`. A small model
-occasionally emits arguments that do not parse; that is treated as "no call
-was made" rather than guessed at.
+the OpenAI convention, and it is parsed in `AssistAgent`.
+
+**The reply also carries `finish_reason`, and it is read.** `"length"` means
+the engine stopped the model part way rather than the model finishing, and
+`AssistAgent.think` then runs **nothing at all**: the teacher is answered with
+`AssistWording.answerWasCutOff`, the trail gets an `assistant answer was cut
+off` line naming the tool the model had begun to name, and **the whole turn is
+wound back out of the conversation** — the half-written reply and the
+teacher's sentence with it. A small model that emits arguments which do not
+parse, with the turn finishing normally, is refused the same way and for the
+same reason.
+
+Winding the sentence back matters as much as dropping the reply, and it is
+what makes the assistant's own advice followable: the teacher is asked to try
+again with "a shorter sentence, or fewer pages at a time", and if the request
+that ran away were still sitting in the conversation the shorter retry would
+be sent with it still in front. What the teacher SEES is untouched — the
+transcript keeps their sentence; it is only what goes back to the model that
+is wound back. **One thing is given up for that, knowingly**: teacher and
+model now remember different things, so a back-reference — "do that again" —
+reaches a model with nothing to refer to, and will decline or misroute. That
+is accepted, because the alternative is the model re-reading the sentence that
+ran away and running away again, and because the wording asks for a
+restatement rather than a reference. (The `catch` path — an engine that could not be reached, or the
+180-second timeout — is deliberately not wound back, and never has been: it
+tells the teacher the engine failed rather than asking them to rephrase, the
+sentence is usually not the problem there, and `RelativeDayFreshnessTests`
+reads exactly that state to pin the dateline's measured position.)
+
+The teacher hears the same sentence for both, because from their side the two
+are one event and both are mended by asking again. **The trail tells them
+apart**, because whoever reads a problem report cannot: *"the assistant's
+answer was cut off part way through publish pages"* is a question about how
+much the model was asked to write, and *"the assistant finished answering but
+what it wrote for publish pages could not be read"* is a question about the
+model itself. One event (`assistant answer was cut off`), two sentences.
+(Until #166 neither was true: `finish_reason` was
+never read, the unparseable arguments were silently replaced with `{}`, and
+the tool RAN — against no course, producing "There is no course called "" in
+this working folder", which reads to a teacher as a complaint about what they
+typed.)
+
+**The gate is the finish reason, not a parse check, and that is measured.**
+Sweeping `max_tokens` across every cut point of two ordinary requests on the
+smaller assistant (llama.cpp b10435), llama.cpp closes the arguments object
+*before* the `</tool_call>` wrapper, so there is a window one or two tokens
+wide where a generation was stopped short and its arguments nevertheless parse
+perfectly: at a cap of 28, `deploy_section` came back stopped, with
+`{"course": "VVH2O", "section": 1}` parsing cleanly. What the model was about
+to write next is unknowable, and for a tool that changes pages the difference
+between "the four pages you named" and the first of forty is the whole of what
+was asked. Two more rows from the same sweep say why the gate sits ABOVE the
+tool-call branch and why parsing could never have been enough:
+
+| Cut at | What arrived |
+|---|---|
+| 8 tokens | No tool call at all — a raw `<tool_call>\n{\n"name": "publi` fragment in `content`, which a transcript that prints content verbatim would show a teacher |
+| 10–26 tokens | The tool name parsed; the arguments were a fragment |
+| 28 tokens | Stopped, and the arguments **parsed** |
+| 30+ | Finished normally |
+
+And `undo_last_change` takes no arguments at all, so a call to it cut off
+before it wrote anything is readable by any check that could be written — and
+would simply run.
+
+**The gate is keyed to one spelling, and it fails OPEN.** `wasCutOff` is
+`finish_reason == "length"` and nothing else, so `content_filter`, a null, an
+absent field or a future spelling all read as "the model finished" and the
+reply is acted on. That is deliberate: refusing every reply from a server that
+does not send the field would leave the assistant unable to answer at all, and
+the engine is pinned to b10435 by `mac-app/Vendor/fetch-llama.sh`, so the set
+of spellings is known. **It belongs on the checklist for an engine bump**
+alongside revalidating Quartz for a Node bump — if a later llama.cpp spells a
+truncated turn differently, this gate goes quiet and the fault #166 fixed
+comes back looking like a new one.
+
+**A consequence worth knowing about in advance.** The thinking flags
+(`--reasoning off` and `--reasoning-budget 0`) are what keep a Qwen3 template
+from spending its whole budget inside a `<think>` block. If they ever regress,
+the symptom changes shape: it used to be an answer that was merely slow, and
+with a cap in place it becomes a visible *"I didn't get to the end of that"* —
+because the thinking now runs into the cap. Meeting that sentence after a
+change to the server flags means checking `AssistServerHost.serverArguments`,
+not the cap.
 
 ### Step 3 — Swift decides what actually happens
 
@@ -499,6 +835,18 @@ The clearest example is what happens to linked pages:
 - **Publishing** a page always publishes what it links to. There is no
   `includeLinked` flag for the model to decide about, because a class page
   whose linked notes are invisible is broken, always.
+
+  **That sentence describes the MAC, and the two platforms differ — undecided,
+  [issue #173](https://github.com/russellgordon/plantoir/issues/173).** Windows
+  stops at class pages: a link that lands on another class publishes nothing
+  and is not followed through (`AssistWorkspace.cs:724`), where the mac's
+  `linkedPages(from:)` has no such test. The same split is in the date rule
+  beside it — a class page never INHERITS a date on either platform, but
+  Windows also stops the walk there (`:916` before `:917`) while the mac
+  traverses through. Found on Windows during
+  [#115](https://github.com/russellgordon/plantoir/issues/115) and left alone
+  deliberately; #173 asks which answer is right and says to write the winner
+  into `contracts/` and correct this page.
 - **Unpublishing** is deliberately *not* the mirror image. A linked page comes
   down only when the pages being taken down are the **only** ones that link to
   it — otherwise hiding this week's lesson would strip a page last week's
@@ -536,6 +884,26 @@ There is no single `set_visibility(publish: true/false)` tool. Publishing and
 unpublishing are **separate verbs** with separate names, because a boolean is
 a coin flip under pressure and a verb is not — which is precisely the failure
 that vetoed both 3B models.
+
+**And "publish this page" can correctly do nothing.** Whether a page is already
+published is decided by what the BUILT SITE does with its flag, not by whether
+the line reads `true` — so `publish: maybe`, `publish: on` and `publish: true
+# covered Tuesday` are all pages students can already see. Asked to publish one
+of those, the assistant answers `It's already been published.` and leaves the
+file exactly as the teacher wrote it: tidying the value would be an edit nobody
+asked for, in a file Obsidian very likely has open. Asked to HIDE the same
+page, it changes and the odd value goes. Settled 2026-09-18 (issue #140); the
+measured table is
+[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page).
+
+A value the assistant cannot read at ALL — `publish: !!str false`, a value on
+the line below the key, an anchor — is a different case, and it is not left to
+the reporting collapse: such a page is always treated as needing a change, so
+the flag is written out in full and the page really does end up published.
+What Plantoir still does not do is TELL the teacher that the value it found was
+one it could not read; it simply writes a plain one in its place. That sentence
+is the only part of the "say when we cannot tell" option still outstanding, and
+08 says why it waits.
 
 ### No dangerous tool exists
 
@@ -634,6 +1002,114 @@ that run; both reworded shapes are matched in Swift before the model is
 reached, so the wording change cannot cost a misroute. A card offering
 something the model is unreliable at would be worse than no card at all, so
 one was removed for exactly that reason.
+
+### Re-measured on Metal after the system prompt changed
+
+The system prompt gained two sentences on 2026-08-24 (`b77b91bd`) on the
+strength of numbers taken on **Windows, in a container** — the folder's index
+classifies that run so, and its 1-192 s per-call latencies are a CPU profile,
+so the "Vulkan" in issue #117's title belongs to the tweak's own before/after
+(`conversational-residue-results.txt`, Windows NATIVE) and not to the 72% it
+set out to improve. Issue
+#117 re-measured it here. Full conditions, thresholds and per-probe tables in
+`research/ai-assist/metal-routing-results.txt`; the summary, 29 probes on the
+shipping 13-tool surface, M4 Pro, llama.cpp b10435 native with Metal, each
+tier at its own context size:
+
+| | Qwen3 4B (`.large`) | Qwen2.5 1.5B (`.small`) |
+|---|---|---|
+| All 29 probes, shipped prompt | **271 / 290 (93%)** | 208 / 290 (72%) |
+| The same, with the pre-2026-08-24 prompt | 270 / 290 (93%) | 199 / 290 (69%) |
+| The eleven promise-card probes (**Windows'** `ExampleRequests`, not this app's shelf) | **110 / 110** | 90 / 110 |
+| Polarity inversions | **0** | **0** |
+| Tool calls whose arguments were truncated (suite body, `max_tokens` 256) | **0** | 12-19 per 290 |
+| The same under the app's own body (which sent no cap then — before #166) | **0** | 3 per 87 |
+
+Three things to take from it — and one that is not in the table: on this same
+suite the 4B scored **280/290 with the Windows-comparable 18 at 180/180** in
+August, and the whole difference is two probes, one of which (`read`, answered
+with `check_section` where it used to answer `read_page`) is unexplained by
+anything measured here. That is issue #167.
+
+**The 2026-08-24 change is neutral on the tier this Mac runs** — 28 of the 29
+probes give the identical tool with the old wording and the new one — and the cluster it was written for was never present
+here: "I posted Unit 2, Day 3 by mistake. Make it a draft again." is
+`unpublish_pages` 10/10 in every arm of both models, before the tweak and
+after it. **On the small tier it did buy something**: the older wording let
+the model DECLINE a plain hide request 6 times in 10, where the current one
+declines once.
+
+And **the two tiers are not two grades of the same thing**. This matters more
+widely than "old Macs": the smaller assistant is a CHOICE any teacher can make
+on any machine (`contracts/shared-rules.json` → `assistantModelChoice`), and
+because it is comfortable on essentially every Mac — 1.75 GB against a third
+of physical memory — picking it raises no caution at all. The small one is
+solidly right on 19 of 29 probes and solidly wrong on 7, including every way
+of asking for a deploy at a time — the mac's own shelf card "Deploy at 6:30
+AM" routes to `deploy_section`, deploying immediately, 10/10 on the small tier
+while the 4B gets it right 10/10 (issue #168). **That is still true of the
+MODEL**, and since 2026-09-19 that exact sentence no longer reaches it: it is
+a parsed family in `AssistCardCommand`, so the shelf's card is answered in
+code. A teacher who phrases it some other way still meets the misroute, which
+is why the same piece also made the immediate deploy card say that it happens
+now — see "A time is a number, not a judgement" below. Confirmation before acting does
+not turn that into a safe failure by itself: `assistantAsksBeforeChanging` is ONE
+setting for both tiers and defaults on for both (`AssistantSettingsTests`
+asserts it on a 48 GB machine), approval is per TOOL — `needsApproval: true`
+on `deploy_section` and `schedule_deploy` and nothing else — and the tier only
+changes the CAUTION a teacher is shown when they turn confirmation off
+(`AssistModelLibrary.confirmationCaution`). A sentence here previously claimed
+the small tier confirms and the large one does not; it never has.
+
+**Something both platforms must know before quoting a zero.** Every suite in
+`research/ai-assist/` that printed a `malformed tool calls: N` line USED TO
+parse a tool call's arguments as `try: json.loads(...) except: args = {}`, so
+a call whose argument JSON was cut off short was recorded as a call with no
+arguments and never as a malformed one. Both suites that are run today —
+`trimmed-surface-suite.py` and `teachers-say-suite.py`, the Windows-side one —
+count it properly as of 2026-09-18, in shared Python, so a re-run of either
+counts honestly. **What Windows must know is about results already taken:
+every "malformed tool calls: 0" in the `teachers-say-results.txt` numbers, and
+in the seven other older files, means "no HTTP errors" and nothing more.** All
+nine carry a dated note saying so. `shipped-surface-suite.py` still has the
+old shape and is left alone deliberately — it is marked HISTORICAL and cannot
+be meaningfully re-run, because its probes name tools the app no longer has.
+(`routing-suite.py` is the exception worth naming: it keeps the raw string as
+`{"__unparseable__": …}` and labels its own line "runtime rejected", so it
+never made the false claim — it simply has no count of the other kind.)
+
+The mac WAS the platform exposed to the underlying fault: `AssistModelClient`
+sent no `max_tokens` at all where Windows' `LocalModel` sends 512, so a
+runaway here ran until the context was full. Closed by #166 — the mac now
+sends the same 512, and both halves of what happens to a stopped reply are
+described in "Step 1" and "Step 2" above. The rows in the table are from
+before that change and stay as they were written; a re-run of the `--app-body`
+arm reproduces them only with `--uncapped`.
+
+**Windows is not fixed by that, and this is the part they owe.** Their cap
+bounds the wait, and `LocalModel.Ask` returns `choices[0].message` and drops
+the rest of the response, so the finish reason never leaves `Ask` and a
+cut-off call is acted on. They meet it MORE often than the mac ever did,
+because their cap fires where the mac's context used to.
+
+The figures above are not a failure rate. The suite runs at temperature 0.1
+(0 in the arms that copy the app's own request), which is near-greedy: ten
+trials tell you whether a model systematically mishandles a sentence, not how
+often a teacher would be misrouted. Re-running an identical arm an hour later
+moved the total by 3-5 responses in 290.
+
+**A harness divergence worth knowing, for whoever measures next.** The suite's
+system-prompt constant writes ASCII hyphens where `AssistAgent.swift` — and
+`AssistAgent.cs` — write em-dashes. Six characters, the only difference, and
+every routing number in `research/` before 2026-09-18 was taken against the
+hyphen form rather than the shipped string. Measured both ways on the same
+server the same evening: 204/290 against 208/290, no stable probe moving by
+more than 3/10, which is inside this suite's own run-to-run wobble. **So the
+older numbers stand**, and neither app owes the other a change. The suite now
+keeps `--prompt hyphen` as its default for comparability, offers
+`--prompt shipped` which READS the literal out of the Swift, and asserts on
+every run that the two differ by exactly those six characters — because the
+comment that used to hold them together said "keep this in sync by hand".
 
 ---
 
@@ -1155,11 +1631,44 @@ run that changed it, and reaches you as a **diff in `contracts/`** in the same
 commit as the Swift. Verified by breaking a sentence on purpose: the suite
 failed naming the key and the command to regenerate.
 
-**Four things to know before you use them.**
+**The diff is how it travels; it is not how you FIND OUT.** Nobody reads a
+folder of JSON for changes, so what you actually meet is your own suite going
+red, days later and part-way through something else. The mac therefore opens a
+`windows` issue in the same session (`CLAUDE.md` rule 3), and that issue — not
+the diff — is the handover. Read it that way round: a red contract test means
+go and look for the issue, and issue #146 exists because four of them were met
+mid-task and read as nobody having said anything at all, while #70 sat open
+naming every phrasing.
 
-- **Never hand-edit the GENERATED keys** — `cardPhrasings`, `tools`,
-  `milestones`. Those are readouts of mac code; the next regeneration
-  overwrites your edit and the diff looks like vandalism.
+**What to know before you use them.**
+
+- **Never hand-edit the GENERATED keys.** Those are readouts of mac code; the
+  next regeneration overwrites your edit and the diff looks like vandalism.
+  **`assist-cases.json` and `app-rules.json` each declare their own under
+  `generated.keys`, and that is the list to read** — those two are the MIXED
+  files, and the key marks where the generated half ends.
+  `assist-wording.json` has none because it is generated in FULL and says so in
+  its `note`; the seven authored files have none because there is no generated
+  half to mark. This passage named `cardPhrasings`, `tools` and `milestones`
+  until 2026-09-10, which was two keys of `assist-cases.json` plus one of
+  `app-rules.json`, and left out both `toolSchemas` — the key carrying every
+  tool's arguments, and therefore the one that moved when `back_up_course`'s
+  signature changed — and `credentialRequests`. Two other places said the same
+  three; a list of generated keys typed into prose is exactly the copy this
+  whole folder exists to stop.
+- **Name every key a regeneration moved when you write the `windows` issue —
+  including the ones your REVIEW FIXES moved.** Learned from the same failure,
+  and the timing is the whole lesson. `back_up_course` was built at 18:54 on
+  2026-09-08 requiring `[course]`, exactly matching the tool Windows had had
+  since August. Twenty minutes later a review fix (`b0913344`) gave it a
+  `section`, because it had been filing the copy as the TEACHER's and
+  `pruneBackups` would have kept every one for ever. #70 was opened at 19:52
+  and described the FEATURE — the tool, its plan twin, its briefing
+  persistence — which is what anyone writing up an afternoon remembers. The
+  argument was not mentioned. Windows had the identical defect and found it
+  only because the contract went red and somebody chased it, so what travelled
+  unannounced was a defect FIX, which is the worst kind. Run `git diff
+  contracts/` before writing the issue rather than working from memory.
 - **Write it to the template.** `CLAUDE.md` rule 4 says what a `mac` issue
   carries — title and source, what it fixed and WHY (including what
   was rejected), numbers with the hardware they came from, the file and test
@@ -1330,10 +1839,16 @@ routing, `add_classes` and `make_room_for_classes` as WIDENINGS of something
 that already ships rather than new features (`add_next_class` already calls
 `PlaceholderClassPlanner.apply`, and a `duplicate` key on the same call
 already reaches `ClassInsertionPlanner.plan(count: 1)` — so the ENGINES are
-both wired up already). Note the limit: `duplicate` is not on
-`add_next_class`' published schema at all, only on the hardcoded card phrasing
-`AssistCardCommand.swift:85`, so no model and no MCP client can reach it — the
-mac needs a schema argument, not just a bigger count. And `roll_over_section`
+both wired up already). Note the limit, **which since 2026-09-18 is the
+mac's alone**: `duplicate` is not on the mac's `add_next_class` published
+schema at all, only on the hardcoded card phrasing `AssistCardCommand.swift:85`,
+so no model and no MCP client can reach it there — the mac needs a schema
+argument, not just a bigger count. Windows now declares it on both halves of
+`add_next_class` (issue #149), because it had to: the card reaches the tool
+through an MCP binder that DROPS an undeclared key, so the sentence was
+making a blank page. The mac's card and tool runner share a process, so the
+absence costs it nothing except that Claude Code cannot ask for a duplicate.
+And `roll_over_section`
 because of the defect in item 41's first open part. Two are
 Windows-shaped and stay there: `read_timetable`, because the mac puts
 spreadsheet reading behind its schedule sheet on purpose and has no file-path
@@ -1632,6 +2147,112 @@ It has one property worth copying exactly: before restoring a file it
 compares what is on disk to what it wrote, and **skips anything the teacher
 has edited since**. Publishing a class, then spending ten minutes writing it
 in Obsidian, then saying "undo that" must not cost those ten minutes.
+
+### Which tools record an undo entry, and which deliberately do not
+
+**A tool records an entry only when taking it back is WHOLE.** Written down
+2026-09-18, after Windows found that three tools —
+`add_curriculum_mentions`, `make_room_for_classes` and
+`add_classes`/`add_next_class` — opened an entry and never closed it
+(`UndoHistory.Begin` … no `End`), and that the other five closed theirs only
+on the path where nothing threw. The consequence was two-sided and entirely
+silent, which is why it lived so long: the tool recorded NO entry at all, so
+"undo that" answered that nothing had been changed — while `add_next_class`'s
+own reply promised the page could be taken back — and the still-open entry
+then swallowed the NEXT operation's files and committed them under the
+earlier description. A teacher who made room, published a class and said
+"undo that" was told they had made room, and had the publish taken back with
+it.
+
+**The pairing is no longer something to remember.** Every recording site is
+now `using var recording = UndoHistory.Record(_undo, "…");` with
+`recording.Done()` where the operation finishes. Leaving the scope any other
+way — a throw, or a `return` added years later by somebody who never read
+this — abandons. An inner scope is a no-op, so the outermost call still owns
+the entry and a tool that calls another tool records one operation rather
+than two. The five older sites each wrapped their individual file writes in
+`try`/`catch` and nothing else, so a `ReadAllText` outside those — a page
+Obsidian deleted between the plan and the Go — escaped the method with the
+entry still open, and it was still open when the teacher asked for the next
+thing.
+
+**Where that exception then goes differs by tool, and the difference matters
+more than it looks.** Re-dating, syncing dates, curriculum, making room and
+duplicating are called through `PlantoirTools.Guarded`, which catches
+`IOException` and `UnauthorizedAccessException` and turns them into an ANSWER
+the teacher reads. **Publishing and unpublishing are not**:
+`PlantoirTools.Act` catches only `AssistRefusal` and
+`OperationCanceledException`, so anything else leaves the tool altogether —
+no answer is built, `CarryingTheConversationBackup` never stamps the result,
+and the teacher gets a protocol-level failure naming no backup at all. The
+undo entry is abandoned either way, which is this section's subject; the
+reply is worse on the publish path than on any other, and that gap is
+[issue #165](https://github.com/russellgordon/plantoir/issues/165) rather
+than something fixed in passing.
+
+**Abandon on a throw, rather than committing what was written — and this was
+a decision, not a default.** The case to think about is a publish of five
+pages that writes three and then throws. Committing the entry (an `End` in a
+`finally`) would make those three undoable, which sounds strictly kinder. It
+was rejected because **the description is written at `Begin`, from the
+PLAN**: the entry would say "published “A”, “B”, “C”, “D” and “E”", and
+`AssistWording.Undid` reads that clause straight back to the teacher — "Earlier,
+you published A, B, C, D and E" — at the one moment they are checking that
+the right thing was put back. A truthful file list under a false sentence is
+the failure rule 5 of `CLAUDE.md` names: a line describing what did not
+happen is worse than no line, because it will be believed. The mac reaches
+the same place from the other end — `AssistToolRunner` records a whole
+`AssistChange` only after the operation returns, so a throw records nothing
+(its whole-unit publish answers "was only partly published: …" and calls
+`history.record` never) — so abandoning is also what matches.
+
+**The cost is real, and on one path it is not yet covered.** The conversation
+backup is taken before the first write and is the way back for everything
+here. On the tools that go through `Guarded` the teacher reads a sentence and
+can be pointed at it. On the PUBLISH path they currently cannot: the
+exception leaves the tool, so no reply is built and no backup is named, and
+they are left with a failure and a half-published section. The mac says
+something there — that inline "was only partly published: …" — and Windows
+says nothing; matching it is not a wording decision this side may take alone,
+since the sentence is an inline mac literal rather than an `AssistWording`
+key, so it is written down as [issue
+#165](https://github.com/russellgordon/plantoir/issues/165) instead of
+improvised.
+
+The rule both apps now follow, tool by tool:
+
+| Tool | Records undo? | Why |
+|---|---|---|
+| publish / unpublish, re-date, sync dates, rollover | yes | Files edited in place, nothing renamed. |
+| `add_classes` / `add_next_class` | yes | Created pages are recorded with no "before", so undo deletes them. |
+| `add_curriculum_mentions` | yes | One page, one block, edited in place. |
+| `make_room_for_classes` | **no** | Renames later days, re-dates every class after the insertion point, rewrites the links that pointed at the old names. |
+| duplicate as next class | **only when nothing else moved** | The common case moves nothing; the rest is a make-room. |
+
+**What was rejected, and why it matters more than what was chosen.** The
+obvious fix for make-room was to record the whole thing and let undo put it
+all back. It was rejected because undo is not a transaction: it restores
+files whose contents still match what was written and SKIPS the rest, so a
+teacher who touched one page in Obsidian gets a half-undone shuffle — some
+classes renamed, some not, links pointing at both. A partial undo of a
+rename is worse than no undo, because nothing tells the teacher which half
+happened. So the way back for anything that shuffled is the backup taken
+before it, and the reply NAMES that file
+(`ClassChangeWording.OtherClassesMoved`). The mac reached the same answer
+first and Windows mirrored it rather than improving on it.
+
+**The condition is renames OR date moves, and this is the one place Windows
+is stricter than the mac.** `AssistToolRunner` keys the duplicate's undo on
+`renames.isEmpty` alone. Renames happen only WITHIN the unit being changed,
+so duplicating the LAST day of a unit renames nothing and re-dates every
+class of every later unit — and the mac offers an undo there that takes back
+the copy and leaves the rest of the year moved. Windows counts both lists
+(`DuplicateClassPlan.MovesOtherClasses`), and the same count is what the
+plan tells the teacher before they agree, so an approved plan is never silent
+about a re-dated later unit. Both halves are contract data now:
+`contracts/class-planning.json` → `duplication`, with `undoRule` and three
+cases; the mac owes a runner, and the second case is expected to fail there
+until its gate widens.
 
 ### Back up once per conversation, not once per command
 
@@ -2076,6 +2697,17 @@ announcement, and this repository has already measured what a clarifying
 sentence costs: one added to `publish_pages` took the promise-card score from
 110/110 to 90/110. Steer with code.
 
+**A second settler joined it on 2026-09-19**, for the tools that take a
+MOMENT rather than a class day — `AssistToolRunner.settlingTheDeployMoment`,
+which turns a bare `06:30` into the whole moment it means. The two divide the
+surface by the SCHEMA and not by a remembered list: this one takes the tools
+that declare `date`, that one the tools that declare `when` and not `date`.
+The reasoning, the day-choosing rule and what was rejected are under "A time
+is a number, not a judgement" above; what matters here is that neither settler
+can reach the other's tools, so the sentence "`schedule_deploy`'s `when` is
+excluded by construction" above is still true of the DAY settler and is no
+longer the whole story about that argument.
+
 ### What "Monday" means, and where that decision lives
 
 `contracts/schedule-rules.json` → `relativeDays`, which both suites run — the
@@ -2200,7 +2832,11 @@ touched, which is `publish_class_on` and its twin today. `schedule_deploy`'s
 `when` is a MOMENT — a day and a time, parsed by `moment(named:)` — and is
 excluded by construction rather than by being remembered, which is the same
 argument `AssistAgent` already makes for asking the surface whether a plan twin
-exists. The card's own spelling `when` is settled for those tools too, but NOT
+exists. (**That argument now has a second half**: since 2026-09-19 a bare clock
+time in a MOMENT is settled by `settlingTheDeployMoment`, which takes exactly
+the tools this one refuses — `when` declared and `date` not. Same question
+asked of the same schema, two answers that cannot overlap. See "A time is a
+number, not a judgement".) The card's own spelling `when` is settled for those tools too, but NOT
 renamed to `date`: `AssistCardCommand` is generated into
 `contracts/assist-cases.json` → `cardPhrasings` and both suites assert that
 key. A word the settler cannot read is left exactly as it arrived, so the
@@ -2255,7 +2891,14 @@ scenario "a plan card is cancelled", whose fixture pins the runner to
   day "tomorrow" became: "assistant matched a fixed phrase" carries the tool
   name, and "assistant chose a tool" carries argument NAMES and never values,
   deliberately. Adding the settled date would mean a value on the trail and a
-  `carries` change in `contracts/shared-rules.json` for both platforms. The
+  `carries` change in `contracts/shared-rules.json` for both platforms.
+  (**Reversed for the deploy MOMENT on 2026-09-19**, #168: the line now also
+  carries the whole moment a bare time settled onto, and `carries` was widened
+  to say so. The argument that won is the one this bullet did not have — a
+  DAY word is recoverable from the "assistant asked" line's own timestamp and
+  the sentence beside it, whereas "the next 6:30 from now" is a choice the
+  code made and nothing else records. The class day is unchanged: this is one
+  value, of one shape, on one family.) The
   day is diagnosable without it — after this change it is a function of the
   "assistant asked" line's own timestamp and the sentence it carries, where
   before it was a function of when the window opened, which the trail does not
@@ -2278,8 +2921,10 @@ scenario "a plan card is cancelled", whose fixture pins the runner to
   the two apps say different things — so it is written down here instead.
 
 **What the trail does and does not carry.** "assistant matched a fixed phrase"
-records the tool, and "assistant chose a tool" records argument NAMES and never
-values, deliberately — the values are the teacher's page titles. So a report of
+records the tool — and, since 2026-09-19, the whole MOMENT when the phrasing
+named a time and the app chose a day for it (#168, mac only so far) — and
+"assistant chose a tool" records argument NAMES and never values, deliberately
+— the values are the teacher's page titles. So a report of
 "it published the wrong day" cannot be diagnosed from the trail on either
 platform, and neither app changed that here: it would mean putting a value on
 the trail, against a rule `contracts/shared-rules.json` states with its
@@ -2367,12 +3012,40 @@ rather than by writing the code.
    without it would have handed the phrasings credit for work the app was
    already doing. `trimmed-surface-results.txt` had already recorded the same
    line being worth fifteen points when prepended instead.
-3. **There are THREE interception layers before the model, not one:**
-   `PreviewAskedForPlainly` (thirteen exact sentences),
-   `AssistCardCommand.Matching` (`FixedShapes` plus its three parsers), and
-   four inline regexes in `AssistAgent.CardCommand` itself. Three controls
-   were sentences the app answers WITHOUT the model, so they measured
-   nothing. The mac's `AssistCardCommand.swift` has the same shape.
+3. **There are THREE interception layers before the model on WINDOWS, and
+   ONE on the mac** — the trap is the same, the count is not, and the
+   sentence here used to say "the mac's `AssistCardCommand.swift` has the
+   same shape", which is false. On Windows: `PreviewAskedForPlainly`
+   (thirteen exact sentences), `AssistCardCommand.Matching` (`FixedShapes`
+   plus its parsers), and four inline regexes in `AssistAgent.CardCommand`
+   itself. Three controls were sentences the app answers WITHOUT the model,
+   so they measured nothing.
+
+   **On the mac there is one layer and it is reached once**, at
+   `AssistAgent.swift:172` — `AssistCardCommand.matching(trimmed)`, on the
+   text BEFORE the dateline is appended, tidied by trimming whitespace,
+   stripping leading and trailing `.` and `!`, and lower-casing, then
+   compared by EQUALITY (never substring), followed by the parsed families —
+   four when that was written, six today ("deploy at <time>" joined them on
+   2026-09-19, #168).
+   The plain-preview sentences are not a second layer here: "preview" and
+   "rebuild the preview" are entries in `fixedShapes` like everything else.
+   Corrected 2026-09-18 while measuring #117, which counted them rather than
+   assuming: of the 29 probes in `trimmed-surface-suite.py`, exactly **five**
+   are answered in code and never routed —
+
+       card: publish tomorrow   -> publish_class_on
+       card: check the section  -> check_section
+       card: rebuild preview    -> rebuild_preview
+       card: undo               -> undo_last_change
+       card: deploy now         -> deploy_section
+
+   all five of them promise-card phrasings. The suite now reports both totals
+   (all 29 and the 24 a model actually sees) and finds that list from
+   `contracts/assist-cases.json` rather than from a hand copy, so a phrasing
+   added to the card table shows up in the next measurement by itself. They
+   are still measured, because Claude Code over MCP has no interception layer
+   in front of it and does route them.
 4. **Making a research script stricter can delete a control.** Requiring the
    course code in `narrow-tools.py` read as a tightening and would have
    silently turned `trimmed-surface-suite.py --real-course` into a no-op,

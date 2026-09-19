@@ -39,8 +39,26 @@ nonisolated enum AssistWording {
     /// against the question that follows it: agreeing to do a thing and then
     /// asking permission for it. What is left is the consequence and one piece
     /// of advice a teacher can act on.
+    ///
+    /// **"This happens now." was added in front of those two, and it is the
+    /// only thing this sentence says about TIME.** The two approval cards were
+    /// asymmetric exactly where a misroute lands: `schedule_deploy`'s names the
+    /// whole moment, and this one named no time at all — so a teacher who
+    /// asked for 6:30 tomorrow and was routed to an immediate deploy read a
+    /// card that was perfectly true and said nothing to contradict them
+    /// (measured: ten trials out of ten on the smaller assistant, issue #168).
+    /// It says WHEN rather than WHAT, so it does not reinstate the naming of
+    /// the act that was cut above, and it is first because the word that
+    /// contradicts the teacher has to be the one they read first.
+    ///
+    /// The property is pinned rather than the sentence:
+    /// `contracts/shared-rules.json` → `assistantConfirmation.`
+    /// `theImmediateDeployCardSaysItIsImmediate`, which asks only that the
+    /// sentence carry the word. This will be reworded again; the rule is meant
+    /// to outlive the wording.
     static let deployApproval: String =
-        "Students will see what is deployed. Be certain to review changes you have made."
+        "This happens now. Students will see what is deployed. "
+      + "Be certain to review changes you have made."
 
     /// The question under the deploy card. The act is named HERE, which is why
     /// the sentence above does not name it.
@@ -405,6 +423,42 @@ nonisolated enum AssistWording {
     static let datesNotGivenYet: String =
         "Right you are. I will not be able to date new classes until I have them — "
         + "say “I have a revised list of class dates” whenever you would like to give them."
+
+    // MARK: - When the answer did not finish
+
+    /// The engine stopped the assistant part way through its answer, so
+    /// whatever it had begun to ask for was thrown away unread.
+    ///
+    /// Three things it has to do, in this order. **Say the answer did not
+    /// finish**, because the teacher has just waited for one. **Say that
+    /// nothing changed**, which is the fact genuinely in doubt — the same
+    /// reasoning as `planWasCancelled`, and the opposite of
+    /// `deployWasCancelled`, where the teacher already knew. And **say
+    /// something they can act on**: the shape that causes this is a long
+    /// list, so "fewer pages at a time" addresses the cause rather than
+    /// shrugging politely. The advice is followable because the abandoned
+    /// turn is wound out of the conversation as well — a shorter retry sent
+    /// with the runaway request still in front of it would meet the same
+    /// wall. See `AssistAgent.sayTheAnswerDidNotFinish`.
+    ///
+    /// **"I haven't changed anything" is true on every path that can reach
+    /// this, and it was checked rather than assumed.** A turn only comes back
+    /// to the model for another lap when a tool said to
+    /// (`AssistToolOutcome.shouldContinue`), and that is true for exactly
+    /// three outcomes — `read`, `couldNotRead` and `planned`. Every write
+    /// answers `wrote` or `refused`, `read(` is built only by the tools that
+    /// read (listing pages, reading a page, explaining publishing, listing
+    /// courses, listing curriculum expectations), and a `planned` outcome is
+    /// held behind the approval card and never reaches a second lap. So an
+    /// answer cut off on a second lap follows a READ, and the sentence stays
+    /// true there too.
+    ///
+    /// Says nothing about why. A teacher cannot act on a limit they cannot
+    /// see, and naming it would be exactly the machinery rule 1 keeps out of
+    /// the interface.
+    static let answerWasCutOff: String =
+        "I didn't get to the end of that, so I haven't changed anything. Ask me again — "
+        + "a shorter sentence, or fewer pages at a time."
 
     // MARK: - Shared fragments
 

@@ -69,6 +69,87 @@ of starting content, and never both:
   become the DEFAULT answers to step 5's questions rather than replacing
   them.
 
+**Both apps' wizards let the teacher decline a skeleton, and the structure
+editor must follow them in BOTH directions.** Turning "Start from a
+<subject> skeleton" ON adopts that subject's five lists; turning it OFF puts
+the defaults back — the LCS variants for the two shared lists when the
+terminology switch is on, the plain defaults for the two per-section lists,
+which have no LCS variant — for each list still EQUAL to what the adoption
+put there, and leaves the rest as the teacher left them — except the marks
+pool, which is kept where the teacher ticked it but narrowed to the folders
+the course will actually have (below). With nothing adopted there is nothing
+to compare against and nothing changes. A teacher
+who has declined the skeleton then reads the same sentence as one whose code
+has no skeleton at all ("Example content isn't available for this course
+code yet…"), because the course starts empty either way.
+
+Russell decided this for Windows on 2026-09-06 and Windows shipped it on
+2026-09-07; the mac copied it on 2026-09-18 ([issue
+#77](https://github.com/russellgordon/plantoir/issues/77)), having until
+then adopted one way only. The bug that made it worth fixing is the shape to
+remember: a teacher typed SNC4M, watched Investigations and Concepts appear,
+turned the toggle off — and was shown, and got, the science skeleton's
+folders with none of its pages, while `course_config.json` said
+`use_skeleton: false`. A wizard that lies about what it is about to make is
+a worse product than one that never asked.
+
+The rule and its thirteen cases are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`wizard.skeletonToggle`, run on the mac by `SharedRulesContractTests`;
+`WizardStructureTests` covers what cases cannot reach — the pieces the rule
+is assembled from, and a scan proving the toggle is WIRED, a control with no
+handler being the original bug. Three things about it are decisions rather than
+mechanics; the fourth is what to know before reading a green run as coverage:
+
+- **A list is recognised as untouched by VALUE, not by a dirty flag.** A
+  list edited and then edited BACK to exactly what the adoption set is
+  restored with the untouched ones, and that is intended: a teacher cannot
+  see the difference, so neither can the rule. Order counts as part of the
+  value — the same names in a different order is an edit and is left alone.
+  Per-list dirty flags were rejected: a flag has to be got right in every
+  editing path and gets one wrong the first time a list is changed from
+  somewhere new, which value equality cannot.
+- **The LCS switch rewrites the two SHARED lists**, so flipping it after an
+  adoption leaves them unequal to the snapshot and they stay exactly as the
+  switch left them, while the per-section lists still go back. Re-taking the
+  snapshot on a terminology flip would make the restore delete the College
+  Board folder the teacher had just asked for.
+- **The marks pool can never name a folder that has just left the editor**,
+  and it takes TWO rules to keep that true: a pool still equal to the
+  adoption's is re-inferred over the restored folders, and a pool the teacher
+  has ticked themselves is kept but NARROWED to the folders the course will
+  actually have. Miss the second and a teacher who adopted the mathematics
+  skeleton, unticked `Tasks` and then declined the skeleton is shown a
+  checklist with nothing ticked while the wizard writes
+  `graded_folders: ["Thinking Tasks"]` against a course with no such folder —
+  and the two apps then write DIFFERENT files for the same clicks, which is
+  what the contract exists to stop. (`setup_course.py` reconciles the key
+  again when it reads it, so no teacher ends up with a broken course; that is
+  a second net, not a licence for the wizard to write something untrue. The
+  first version of the mac's restore did exactly that, and the adversarial
+  review of it found it.) The two apps reach the same answer from
+  opposite ends: the mac narrows inside the restore, Windows leaves the pool
+  and narrows it on every read (`CurrentGradedFolders`) and again when the
+  file is written. The mac narrows ONCE MORE as the file is written, for the
+  one path the editor does not cover: the terminology switch takes `College
+  Board Curriculum` out of the folder list without asking the marks pool, so
+  a teacher who had ticked it would otherwise have it written into a course
+  that has no such folder.
+- **Two of the five lists cannot tell one answer from another for most
+  codes**, which matters when reading a green run as coverage: every bundled
+  family ships `per_section_folders` of exactly `["All Classes"]`, the
+  factory default, so only the per-section FILES prove that half of a
+  restore; and every family declares `graded_folders` of `["Tasks"]` except
+  mathematics, so a marks-pool expectation means nothing unless its case uses
+  a mathematics code. The contract carries cases on `MPM1D` for that reason.
+  A third thing not to read as coverage, which the contract's `lists.note`
+  also names: in a runner that resolves the `skeleton` symbol through the same
+  catalog an adoption copies from, a `turnOn` case's four list expectations
+  prove that the adoption FIRED rather than what it copied — which is why the
+  `MPM1D` adoption case spells its marks pool out as a literal.
+- **A narrow extra rule for the hole value equality leaves was rejected.**
+  It would have made the two apps differ over a case no teacher can tell
+  apart, which is how the contract stops being worth having.
+
 Both are poured in by the same `install_example_content()`, which replaces
 the payload's sentinels: `__CREATED__`, `__CREATED_CLASS_K__` (spread
 across the semester), `__SECTION_NUMBER__`, and — for skeletons —
@@ -156,6 +237,13 @@ manifest instead of the factory list, and a folder the teacher adds at the
 prompt is treated like any other section — visible, with a chevron. When
 example content is being installed, this whole step is skipped.
 
+**In both apps' wizards this step and the skeleton question are one
+thing**, and the editor follows the toggle both ways: declining the skeleton
+puts the factory (or LCS) defaults back into every list the teacher has not
+edited since it was adopted, so what the four lists show is what
+`course_config.json` will carry and what will be created on disk. Step 0b
+has the rule, what it deliberately costs, and where its cases live.
+
 - **Shared folders** (factory default: Concepts, Discussions, Examples,
   Exercises, Ontario Curriculum, Recaps, Setup, Style, Tasks, Tutorials, …;
   a music skeleton instead offers Concepts, Repertoire, Warm-Ups, Listening,
@@ -229,7 +317,21 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > kept the old key inverted until 2026-09-09, when it adopted this too —
 > issue #107; `contracts/file-formats.json` → `pageVisibility.writingRules`
 > carries the rule and the reasoning, and `writingCases` beside it is the
-> runnable list both suites now check themselves against.) Two things are
+> same list as data — thirteen whole files, each given to the writer with the
+> visibility it should be asked for and the exact text it must come back as.
+> **Both suites run that list**: the mac since 2026-09-09 with issue #107,
+> and Windows since 2026-09-19 with
+> [issue #138](https://github.com/russellgordon/plantoir/issues/138), which
+> replaced five of the cases retyped into that test file. Three of the other
+> five were already asserted elsewhere in the Windows suite in its own words
+> (one in that file, two in `PageVisibilityReadingTests.cs`); what running the
+> list adds is that every case is read from the FILE and so cannot drift from
+> it, and that two of them are covered on Windows for the first time. The
+> three most recent — a value's CONTINUATION lines going with its key, and an
+> indented `# note` after a complete value staying where the teacher wrote it
+> — arrived on 2026-09-19 with issue #176, which is why the list is thirteen
+> rather than the ten it was when both suites started running it.)
+> Two things are
 > deliberately NOT migrations: restoring a backup puts back the spelling the
 > backup held, because a restore is not an edit; and adding a section writes
 > the new section's `publishForSection<N>` while leaving the other sections'
@@ -237,6 +339,31 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > what any existing section publishes. A page with
 > **no** publication key at all is visible, so forgetting the key leaves work
 > showing rather than making it disappear unnoticed.
+>
+> **And a note on the VALUES, added 2026-09-18.** Neither wizard ever writes
+> anything but `true` or `false`, but a teacher typing in Obsidian can write
+> what they like, and what the built site makes of it is not what reading the
+> line suggests: `publish: no` HIDES a page, `publish: true # covered Tuesday`
+> and `publish: maybe` PUBLISH one, and `publish: "False"` is visible while
+> `publish: FALSE` is not. The reason is the YAML round trip in the build
+> ([05](05-build-pipeline.md#frontmatter-processing)), and the measured table
+> both apps are written against is
+> [08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page).
+> It matters HERE because the course installer splits a course-level page's
+> one flag into one per section (`setup_course.per_section_frontmatter`): a
+> `publish:` value is copied character for character, and a legacy `draft:`
+> value is turned round with the build's own rule rather than by comparing it
+> with the literal text `"true"` — which used to publish a `draft: yes` page
+> into every section while the build went on hiding the unsplit original.
+>
+> **Adding a SECTION carries the same value the same way**, in each app's own
+> `SectionAdder` — the new section's `publishForSection<N>` takes the value
+> the lowest existing section already carries. The mac's fix landed
+> 2026-09-18 and Windows' on 2026-09-19, and both had the identical
+> inversion: a legacy `draftSection1: yes` was carried across as PUBLISHED.
+> A key with nothing after it is a null, which publishes, so the emptiness is
+> copied rather than turned into `false`; a value that runs onto the next line
+> cannot be copied at all and is written as held back.
 
 For each **section**: `section<N>/` with an `index.md` (site home page —
 its stored title is only a starting value: the build recomputes the
@@ -361,7 +488,9 @@ Windows needs exactly three UI behaviours:
   off). When no content exists for the code, this is where the SKELETON
   toggle goes instead (entry 123) — "Start from a <subject> skeleton" —
   and the quiet "empty folders" caption is now the last resort, for a code
-  with neither.
+  with neither. (Both apps also show that caption while the skeleton
+  toggle is OFF, and the toggle puts the defaults back when it goes off:
+  step 0b above has that rule, which postdates this list.)
 - **Structure lock**: when pre-populating, HIDE the folders/files
   editor behind a caption — the payload's manifest is the entire
   structure authority and the Python wizard skips all structure
@@ -510,7 +639,7 @@ nothing published reports that no folder counts for marks exactly as an empty
 pool would.
 
 **And a consequence of that filter, which is a rule in its own right** —
-`gradedFolders.removingAFolder`, six cases. Removing a folder takes its name out
+`gradedFolders.removingAFolder`, seven cases. Removing a folder takes its name out
 of the marks pool, with two exceptions, and both exist to stop a removal quietly
 taking marks OFF the map:
 
@@ -528,8 +657,9 @@ taking marks OFF the map:
   entry naming published work is worth more than a sentence read to the letter.
 
 Both fall out of one instruction: recompute what the checklist offers AFTER the
-removal is recorded, and drop the name only if it is no longer among them AND
-the course had already been asked.
+removal is recorded, and drop the name only if it is no longer among them —
+asked the way the BUILD asks it, case ignored — AND the course had already been
+asked.
 
 Two edges of that, recorded rather than left to be met. The second exception
 says "still OFFERED", not "still counts": the checklist sees four levels and the
@@ -539,11 +669,129 @@ floor — the one that refuses to unpick the last pooled folder while the covera
 map is on — asks whether this is the last NAME in the pool, not whether the pool
 would survive the removal. So it still blocks removing a top-level `Tasks` on a
 course where `Portfolios/Tasks` would have kept the name. Conservative, rare,
-and the same on both platforms; sharpening it would be a shared change. **Order is the whole subject.** Ask before
+and the same on both platforms; sharpening it would be a shared change.
+
+**Order is the whole subject.** Ask before
 the exclusion is written and the removed folder is still on the list, so the
-pool freezes — which is what the mac did until 2026-09-09 and what Windows still
-does, from a walk cached one `BuildForm` pass earlier ([issue
-#142](https://github.com/russellgordon/plantoir/issues/142)).
+pool freezes — which is what the mac did until 2026-09-09 and Windows until
+2026-09-18, from a walk cached one `BuildForm` pass earlier ([issue
+#142](https://github.com/russellgordon/plantoir/issues/142)). **Both platforms
+now follow the rule.** On Windows the whole gesture is one Core method,
+`FolderRemoval.RemoveFolderFromCourse` — the copy list, then `excluded_items`,
+then the walk, then the pool decision — and it is in Core rather than in the
+view precisely because the order is the rule: `Plantoir.Tests` references
+`Plantoir.Core` alone, so a test calling a pure pool function while the order
+lived in `CourseSettingsView` would have stayed green through the very
+reordering that causes the bug. Mutation-measured there on 2026-09-18: putting
+the pre-fix body back turns cases 1, 2, 5 and 6 red, the old pool semantics over
+a CORRECT walk turn 5 and 6 red, and reordering the walk before the exclusion —
+or leaving the exclusion out — turns 3 and 4 red.
+
+**A course damaged by the old behaviour is NOT repaired, decided 2026-09-18.**
+It keeps its frozen pool until the teacher ticks or unticks something, and
+neither app goes looking. The reason is that nobody can have been damaged by a
+version they were given: the freezing code (`a3c581fb`, 2026-08-25) is in no
+release tag and not on `main`, and `git grep -l graded_folders v1.1.0` comes
+back empty — the whole key is unreleased, so only a development build could have
+written one. And a repair could not identify what it was repairing even if it
+went looking: a pool written as `[]` by a removal is byte-identical to the
+deliberate empty pool the rule's own fourth case calls a legitimate answer, and
+correlating it with `excluded_items` collides with exactly that case — a teacher
+who unticked everything and then removed a folder looks the same from the file.
+REJECTED, so neither is proposed again: **detect-and-offer**, which would have to
+ask a teacher about a state it cannot identify and would put that question in
+front of courses that had simply answered "nothing counts"; and **silent
+auto-repair**, which would rewrite a deliberate answer without asking — the same
+failure this rule exists to prevent, arriving from the other direction. A
+genuinely damaged course is not left with nothing: `site_health.py` raises
+`noGradedFolders` for an empty pool exactly as it does for a pool matching
+nothing published.
+
+**The STILL-OFFERED half is asked CASE-INSENSITIVELY, and the seventh case
+pins it** — added 2026-09-19 from [issue
+#172](https://github.com/russellgordon/plantoir/issues/172), which was raised
+from Windows. The walk returns names as they are spelled on disk, so removing a
+top-level `Tasks` while `Portfolios/tasks` survives offers `tasks`; an exact
+"still offered" test reads that as "no longer offered", drops `Tasks` from the
+pool, and leaves `build_site.py` — which lowercases both sides in
+`_is_graded_path` — still counting that folder. Marks off the coverage map
+because of a capital letter. Windows has asked case-insensitively since
+2026-09-18 and proposed the case rather than committing it; on the mac it was
+RED until `CourseSettingsView.dropFromMarksPool` stopped asking with `contains`,
+and cases 1-6 stayed green throughout, which is the measurement Windows
+reported — the six all use one spelling and cannot see the difference.
+
+**Which case-insensitive comparison, measured rather than picked** (2026-09-19,
+this Mac; `GradedFolderChoices.stillOffers` carries the same table in short).
+The question has to be answered the way PYTHON answers it, because Python is
+what counts the folder:
+
+| pair | Swift `lowercased()==` | Swift `caseInsensitiveCompare` | Python `str.lower()==` |
+|---|---|---|---|
+| `Tasks` / `tasks` | true | true | true |
+| `Straße` / `STRASSE` | false | **true** | false |
+| `Σ` / `ς` | false | **true** | false |
+
+- **`localizedCaseInsensitiveCompare` is rejected**: it reads the CURRENT
+  locale, and it is the one comparison with no column in that table because the
+  table's answers do not depend on the machine and its do. Measured:
+  `compare("I", "i", options: [.caseInsensitive], locale: tr_TR)` answers NOT
+  EQUAL where the same call with `locale: nil` answers EQUAL, so a
+  Turkish-locale Mac would disagree with the build about the plainest ASCII
+  names.
+- **`caseInsensitiveCompare` is rejected**: locale-independent, but it folds
+  FURTHER than Python, which is what the build uses — the two rows above.
+  (C#'s answer on those two pairs was not measured on this Mac.)
+- **`lowercased()` equality is chosen**: locale-independent (it folds `I` to
+  `i` where `lowercased(with: tr_TR)` gives `ı`), the same fold `str.lower()`
+  performs, and the same answer `OrdinalIgnoreCase` gives on ASCII. They are
+  not one fold beyond it: `U+212A KELVIN SIGN` against `k` is true for
+  `lowercased()` and for `str.lower()` (both measured here) where
+  `OrdinalIgnoreCase` should answer false, since it upper-cases and
+  `ToUpperInvariant('k')` is `K` — read off the spec rather than measured,
+  there being no `dotnet` on this Mac. Nothing is pinned there. Note also that
+  this is deliberately
+  NOT the house idiom: `caseInsensitiveCompare` is what mac model code asks
+  folder-name questions with elsewhere, because those are questions only the app
+  answers.
+
+Non-ASCII is where all three stop agreeing and nothing pins them: `İ` (U+0130)
+lowercases to `i` plus a combining dot in Swift AND in Python, matching neither
+`i` nor `I`, and Swift's `==` treats a decomposed `Café` as equal to a
+precomposed one where Python's does not — which errs toward KEEPING a pool
+entry, the direction this whole rule errs in.
+
+**What is still NOT pinned is the DROP's own comparison.** The mac takes the
+name out of the pool exactly; Windows uses `OrdinalIgnoreCase`. It shows only on
+a course whose pool and whose folder spell one name two ways, where the mac
+keeps a pool entry whose folder has gone and Windows removes it. Both err
+safely — nothing counted is lost either way, and `site_health.py` raises
+`noGradedFolders` for a pool matching nothing published, on a course whose
+coverage map is on AND whose site has curriculum expectations (`site_health.py`
+:145: `coverage_wanted and curriculum_found and not graded_folders_found`) — so
+it is left unpinned. The two halves are not free of each other,
+though: **the still-offered test must be at least as PERMISSIVE as the drop.**
+That is the mac's shape now (case-insensitive test, exact drop) and Windows'
+(one comparer for both). Reverse it and a name can be judged absent and then
+removed anyway.
+
+**Keep the never-asked guard.** It looks dead: with the walk taken after the
+exclusion, replacing it with the materialised pool leaves every case green,
+because the historical rule only ever names folders drawn FROM the choices — the
+copy lists plus the walk — so a name the still-offered test has just rejected
+cannot be in the materialised pool either. That redundancy holds only while the
+drop is no more permissive than the still-offered test, which is the constraint
+above. **Measured ON WINDOWS, 2026-09-18, on code whose drop is
+`OrdinalIgnoreCase`**: with an exact still-offered test and the guard replaced
+that way, a never-asked course removing a top-level `Tasks` while
+`Portfolios/tasks` survives writes `graded_folders: []` — nothing counting for
+marks, permanently. The #142 damage itself, brought back by tidying away a check
+that looked redundant. **That `[]` is a Windows number and must not be read as a
+mac one**: the same mutation on the mac stops one line lower, at
+`!currentGraded.contains(name)`, because the drop here is exact — the
+materialised pool is `["tasks"]` and the name is `"Tasks"`, so the course stays
+unasked. A mac reader who tries the stated mutation and sees the suite stay
+green must not conclude the guard is dead.
 
 Nothing new is written to the activity trail for any of this. The removal
 already leaves its own line (`item excluded`), and what changed is only which
@@ -597,10 +845,6 @@ implements that rule, so neither suite runs them) and `gradedFolders.choices`
 `contracts/file-formats.json`.
 
 ## “Where do the class pages live?” had four answers
-
-*(The Windows half of this is [issue
-#115](https://github.com/russellgordon/plantoir/issues/115): the C# below was
-written on the mac, which has no `dotnet`, so it has compiled nowhere.)*
 
 A teacher whose class folder is not called "All Classes" — "Class Pages", say —
 used to get a different answer from each of four places:
@@ -667,25 +911,150 @@ folder must not be mistaken for where its lessons live.
   method that returns a PATH, and two things with one name returning different
   kinds of answer is how the next bug gets written;
 - `AssistWorkspace.Plan` now calls
-  `ClassFolderRule.IsClassPage(Relative(pagePath), ClassFolderRule.Names(...))`
-  — note `Relative(...)`, which is the fix for the `Classroom` bug. **The rule
-  is a pure segment matcher and cannot tell an absolute path from a relative
-  one**, so `Relative(...)` is the whole protection: if you ever call
-  `IsClassPage` from somewhere else, pass a relative path or you reintroduce
-  the bug. The mac learned this the same way — its own `AssistSectionPage` had
-  to gain a `pathWithinSection` because `relativePath` is the FULL ABSOLUTE
-  PATH whenever `workspaceURL` is nil;
+  `ClassFolderRule.IsClassPage(PathWithinSection(...), ClassFolderRule.Names(...))`
+  — it passed `Relative(pagePath)` first, which is what fixed the `Classroom`
+  bug, and was narrowed again to the SECTION on 2026-09-19 (the section below).
+  **The rule is a pure segment matcher and cannot tell an absolute path from a
+  relative one**, so what is passed IN is the whole protection: if you ever call
+  `IsClassPage` from somewhere else, pass a section-relative path or you
+  reintroduce the bug. The mac learned this the same way — its own
+  `AssistSectionPage` had to gain a `pathWithinSection` because `relativePath`
+  is the FULL ABSOLUTE PATH whenever `workspaceURL` is nil;
 - `ClassFolderRule.Name`/`Names` skip null and empty entries: these lists come
   from JSON, including the contract's own case data, and unguarded LINQ threw
   where Swift and Python coerce;
 - `AssistWorkspace.ClassFolder(course, section)` delegates its naming half;
-- new `Plantoir.Tests/ClassFolderContractTests.cs`, deserialising the same 5 + 9
-  cases the mac suite and `scripts/test_class_folder.py` run.
+- new `Plantoir.Tests/ClassFolderContractTests.cs`, deserialising the same
+  naming, membership and `isClassPage` cases the mac suite and
+  `scripts/test_class_folder.py` run — 10, 7 and 12 of them as this is written,
+  counted rather than fixed, since each suite guards only a `>=` floor so a
+  case added from either platform cannot break the others by arriving.
 
 **Rejected:** unifying on "contains class" everywhere. It reads well and it
 reclassifies real shipped pages — see the payload examples above. Segment
 EQUALITY for pages, substring only for the configured list, is the distinction
 that makes the rule safe.
+
+### Two things ABOVE or BESIDE the class folder were still deciding class-ness
+
+The C# above was written on the mac and had compiled nowhere, which is what
+[issue #115](https://github.com/russellgordon/plantoir/issues/115) was for. It
+was built and run on Windows on 2026-09-19, and the headline defect — a working
+folder called `C:\Users\x\Classroom` making every page in every course a class
+page — was already closed by `Plan()` passing `Relative(pagePath)`. Two members
+of the same family were not, and both were Windows-only divergences from the
+rule the mac and `build_site.py` apply:
+
+**Membership was the whole folder LIST, in two places.**
+`AssistWorkspace.ClassPages` and `ScheduledDeploy.UnpublishedClassesIn` walked
+every `per_section_folder`, where the membership rule counts the folders that
+mention classes. A course configured `["All Classes","Handouts"]` counted its
+handouts as days of teaching here and nowhere else — in the dated class lists,
+in "publish every class from the 15th", in the next-class numbering, in the
+list of classes a scheduled deploy says students cannot see yet.
+`UnpublishedClassesIn`'s comment claimed it "walks the same folders
+`AssistWorkspace.ClassPages` walks", which was false between the two of them;
+a test now pins them together on one fixture, because a comment claiming
+agreement is exactly what stops anybody checking.
+
+**The path reached above the section.** `Relative()` is relative to the WORKING
+folder, so the segments handed to the rule still included `courses`, the course
+code and `sectionN`. That was enough for the `Classroom` bug and not enough for
+the rest: a course-level SHARED folder a teacher called "All Classes" made every
+page under it a lesson — of every section at once, since shared pages belong to
+all of them. `AssistWorkspace.PathWithinSection` now narrows the path to the
+section folder, mirroring the mac's `AssistSectionGraph.pathWithinSection`.
+Mirror its CODE, not its comment: it returns `url.lastPathComponent` for a page
+outside the section, while its own header comment still says "last two
+components" and is stale — the mac changed the code after review, precisely
+because the last two components put the immediate parent's name back in front
+of the rule, which is the discredited "does the parent mention classes" sniff.
+
+**Three changes a teacher can see**, none of them a new invention — each is
+the shared class-folder rule arriving on a platform that had its own — and
+each pinned by tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
+
+- **Membership can SHRINK.** The rule falls back to ONE folder when no folder
+  name mentions classes, so a course whose folders are `["Lessons","Labs"]` had
+  both walked before and has only "Lessons" after: the Labs pages leave the
+  dated class lists, date-range publishing, the scheduled-deploy list and the
+  class numbering. The mirror of it WIDENS: a course with no per-section
+  folders at all had no class pages here, because there was no folder to walk,
+  and now falls back to "All Classes". Exposure is narrow and was counted
+  rather than guessed — all 38 example payloads and all 50 skeleton manifests
+  configure exactly `["All Classes"]`, so only a teacher who both renamed the
+  class folder away from anything containing "class" AND added a second
+  per-section folder is affected.
+- **Publish plans GROW.** Link-following on Windows stops at class pages
+  (`AssistWorkspace.cs:724`) — a class is published because the teacher asked
+  for it, not because another class linked to it — so a shared page the old
+  wide path called a class was silently skipped. Demoted to what it is, it is
+  followed, and "publish Day 1 and everything it links to" now reaches it.
+  **That guard is WINDOWS-ONLY, and this is where it was found.** The mac's
+  `AssistSectionGraph.linkedPages(from:)` (`:256-281`) has no class-page test
+  at all, and `AssistPublishPlan.swift:434,449` publishes every page it
+  returns, so on the mac a publish follows links INTO class pages too. The
+  outcome of this particular change converges — the demoted shared page was
+  already non-class on the mac, so its links were already followed — but the
+  rule underneath does not, and the difference is nobody's decision:
+  [issue #173](https://github.com/russellgordon/plantoir/issues/173) carries
+  it, with the teacher-visible case (publishing Unit 2, Day 3, which links to
+  Unit 2, Day 4 — Day 4 goes up on the mac and does not on Windows) and the
+  note that `documentation/10-local-ai-assistant.md` states the mac's rule as
+  though it were shared. Deliberately NOT changed here: how far a publish
+  reaches is a different question from which folders hold classes.
+- **The "introducing class" credit changes hands.** An undated page inherits
+  the date of the earliest class linking to it and the teacher is told which
+  class brought it in (`AssistWorkspace.cs:777` finds that class here). A
+  shared page in a folder named like the class folder used to win the credit
+  (a course-level folder sorts before `section1`), so the teacher was told a
+  page they never taught from was what introduced it.
+
+  **The EXCLUSION is shared; the REACH is not** — and this needs saying
+  carefully, because an earlier draft of this page called the whole thing
+  parity. A class page never inherits a date on either platform
+  (`AssistWorkspace.cs:916`, `AssistPublishPlan.swift:871`, and
+  `contracts/class-planning.json` → `datingPagesAClassBrings`: "a class's date
+  is its place in the schedule"). But Windows' `continue` at `:916` sits in
+  front of `queue.Enqueue(target)` at `:917`, so it stops the walk THERE,
+  while the mac's date code reaches its pages through
+  `graph.linkedPages(from:)` (`AssistPublishPlan.swift:862`), which traverses
+  straight through class pages and only filters them out of the move list
+  afterwards. So a page reachable ONLY by way of another class page — Day 3
+  links to Day 4, Day 4 links to a new worksheet nothing else points at — is
+  re-dated on the mac and is not on Windows. That is the same divergence as
+  the publish-following one above, inside the very rule that looked like the
+  settled ground, and [#173](https://github.com/russellgordon/plantoir/issues/173)
+  covers both reaches rather than only the publish one.
+
+**Rejected: keeping Windows' wider membership.** It is the more generous
+reading — everything the teacher put in a per-section folder is a class — and
+it would have avoided both behaviour changes above. It was rejected because a
+Windows-only answer to a shared question is a difference nobody chose, and
+because the wider reading is the one that produces a wrong map that reports
+success: the coverage map, the dated lists and the numbering would count
+handouts as teaching while the BUILD that renders the site would not. Matching
+the shared rule is the point of having one.
+
+**Also rejected: narrowing `Plan()` by resolving a shared page's own folder.**
+Returning the last two path components for a page outside the section keeps the
+immediate parent's name, which is enough for a course-level "All Classes"
+folder to go on making lessons — the very bug being closed, wearing a shorter
+path. A shared page is not a class page; say so plainly rather than guess from
+a fragment of path.
+
+Nothing is written to the activity trail for any of this. All the events in
+`shared-rules.json` → `activityTrail.mustRecord` were checked: none records
+what counts as a class page, and no existing line becomes untrue — the lines
+name what a teacher DID, and this changes which pages a request resolves to,
+not what the request was.
+
+Measured by mutation on 2026-09-19, each revert run against the whole suite:
+`ClassPages` back to `PerSectionFolders` turns 4 tests red;
+`UnpublishedClassesIn` back to it turns 1; `Plan()` back to
+`Relative(pagePath)` turns exactly the 3 narrowing tests red. The
+`Classroom`-working-folder test stays green under all three, which is why it is
+labelled a GUARD in the file rather than evidence of a fix.
 
 ## A cloud-synced working folder: explain it, never refuse it
 

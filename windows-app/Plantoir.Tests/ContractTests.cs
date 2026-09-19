@@ -318,7 +318,17 @@ public class ContractTests
             .Select(ActivityTrail.KeyFor)
             .ToHashSet();
 
-        Assert.Equal(contractKeys, codeKeys);
+        // `appliesOn` above is for a difference that is permanent and
+        // deliberate. This is the other case: an event Windows OWES and has
+        // not built yet, named in the ledger with the issue and the milestone
+        // that own it. Everything not in the ledger is still compared for
+        // equality, and the ledger itself fails if the event starts existing
+        // here or stops being in the contract. See NamedGapLedger for why this
+        // is not written into the contract as `appliesOn`.
+        var deferred = NamedGapLedger.GapsIn(
+            NamedGapLedger.ActivityTrailEvents, contractKeys, codeKeys);
+
+        Assert.Equal(contractKeys.Except(deferred).ToHashSet(), codeKeys);
     }
 
     [Fact]

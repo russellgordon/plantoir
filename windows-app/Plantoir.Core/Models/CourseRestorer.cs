@@ -291,13 +291,27 @@ public static class CourseRestorer
 
     /// <summary>
     /// The line indexes of a page's opening and closing "---", or null when it
-    /// has no frontmatter. As strict as the mac's <c>PageFrontmatter.block</c>
-    /// on purpose — line 1 exactly, "---" terminator — so the two apps restore
-    /// the same pages the same way; stricter than this app's own
-    /// <c>PageFrontmatter.Block.Parse</c>, which tolerates leading blank lines
-    /// and "...". A shared page whose block starts after a blank line is
-    /// therefore left alone by the key restore rather than edited — and that
-    /// is the mac's behaviour too.
+    /// has no frontmatter. Line 1 exactly, "---" terminator — stricter than
+    /// this app's own <c>PageFrontmatter.Block.Parse</c>, so a shared page
+    /// whose block starts after a blank line, or is fenced with "----", is
+    /// left alone by the key restore rather than edited.
+    ///
+    /// <para><b>This was written to MATCH the mac's <c>PageFrontmatter.block</c>
+    /// and no longer does.</b> On 2026-09-18 the mac's fence finder became
+    /// python-frontmatter's own (<c>^-{3,}\s*$</c>, blank lines before the
+    /// opening fence tolerated) because a stricter WRITER prepends a second
+    /// block and turns a teacher's frontmatter into body text — issue #140 —
+    /// and <c>CourseRestorer.swift</c> uses that same finder. So a restore now
+    /// reaches such a page there and not here. Deliberately not changed with
+    /// the reader: nothing in the shared contract covers the restore path, the
+    /// mac's own write-up did not consider it, and which way the two should
+    /// converge is a question for Russell rather than a fault to fix quietly
+    /// from one side. Recorded here so the next reader does not re-derive it,
+    /// and so that nobody "restores parity" by making the wrong one strict.
+    /// (This comment said the two matched, "on purpose", until 2026-09-19.)</para>
+    ///
+    /// <para>This app's <c>Block.Parse</c> also stopped accepting "..." as a
+    /// closing fence on that day, python-frontmatter never having done so.</para>
     /// </summary>
     private static (int Open, int Close)? FrontmatterBounds(string text)
     {

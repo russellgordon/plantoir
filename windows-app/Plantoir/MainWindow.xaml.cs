@@ -378,6 +378,14 @@ public sealed partial class MainWindow : Window
         return await tcs.Task;
     }
 
+    /// <summary>
+    /// Whether this window is the one showing a given working folder, asked
+    /// with the app's single comparison so two spellings of one folder are one
+    /// folder (<c>Plantoir.Core.Models.WorkingFolder</c>, #162).
+    /// </summary>
+    private bool ThisWindowIsShowing(string folderPath) =>
+        WorkingFolder.IsTheSame(Workspace.WorkspacePath, folderPath);
+
     public bool IsSectionBusy(string courseCode, int section)
     {
         // Busy, to the caller asking before a DEPLOY, means "a deploy is
@@ -397,20 +405,57 @@ public sealed partial class MainWindow : Window
     /// Stop a section's preview, for the assistant — the first half of
     /// stop, edit, start again. No Activate: a stop is not the moment to
     /// pull the teacher away from the conversation.
+    ///
+    /// <para>The fallback half of a pair: <c>AssistAgent</c> calls this only
+    /// where no async wiring is set (<c>StopPreviewInApp</c> rather than
+    /// <c>StopPreviewInAppAsync</c>), before a deploy hand-back and before a
+    /// page edit. Both callers rely on the same thing — that the preview is no
+    /// longer serving or building out of this section's output folder, because
+    /// the very next thing they do is rewrite the pages it is serving or start
+    /// a build into the same place. So this must do what
+    /// <see cref="StopPreviewForAsync"/> does, and for the same folder;
+    /// the two differ only in whether they WAIT for the processes to go.</para>
     /// </summary>
-    public void StopPreviewFor(string courseCode, int section)
+    /// <param name="sectionFolder">
+    /// The working folder the SECTION lives in — the assistant window's own,
+    /// passed by the caller. Never this window's, and the difference is not
+    /// hypothetical: nothing closes an assistant window when the main window
+    /// is pointed at another folder, so by the time a stop arrives this window
+    /// may be showing a different folder entirely (#162).
+    /// </param>
+    public void StopPreviewFor(string sectionFolder, string courseCode, int section)
     {
         DispatcherQueue.TryEnqueue(() =>
         {
             try
             {
-                if (DetailHost.Content is not SectionDetailView existing ||
-                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
-                    existing.SectionNumber != section)
+                // Only when this window is still the section's own. Otherwise
+                // its detail pane holds a DIFFERENT folder's section, and
+                // stopping that one would take down a preview the teacher is
+                // watching, while selecting into it would name a course this
+                // folder has never had.
+                if (ThisWindowIsShowing(sectionFolder))
                 {
-                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                    if (DetailHost.Content is not SectionDetailView existing ||
+                        !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                        existing.SectionNumber != section)
+                    {
+                        Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                    }
+                    if (DetailHost.Content is SectionDetailView detail) detail.StopPreviewIfRunning();
                 }
-                if (DetailHost.Content is SectionDetailView detail) detail.StopPreviewIfRunning();
+
+                // OUTSIDE the branch, exactly as the async twin does it, and
+                // this is the half that was missing. Two ways the view's own
+                // stop above reclaims nothing: this window may not be the
+                // section's at all, and even when it is, selecting the section
+                // REPLACES DetailHost.Content synchronously — so the view asked
+                // to stop is a freshly built one with no preview in it, while
+                // the instance that owns the running preview is only unloaded a
+                // dispatcher tick later. Either way the sweep and the release
+                // here name the SECTION's folder and are safe to run twice.
+                PreviewStopper.StopSectionProcesses(sectionFolder, courseCode, section);
+                PreviewLeases.Release(sectionFolder, courseCode, section);
             }
             catch (Exception ex)
             {
@@ -419,30 +464,45 @@ public sealed partial class MainWindow : Window
         });
     }
 
-    public async Task StopPreviewForAsync(string courseCode, int section)
+    /// <param name="sectionFolder">
+    /// The SECTION's working folder, as <see cref="StopPreviewFor"/> — and
+    /// read from the caller rather than from this window, which may since have
+    /// been pointed elsewhere. It is also why the capture cannot simply be
+    /// taken at the top of the lambda: the lambda runs when the dispatcher
+    /// gets to it, not when the assistant asked.
+    /// </param>
+    public async Task StopPreviewForAsync(string sectionFolder, string courseCode, int section)
     {
         var tcs = new TaskCompletionSource();
         DispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
-                if (DetailHost.Content is not SectionDetailView existing ||
-                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
-                    existing.SectionNumber != section)
+                // Only when this window is still the section's own window.
+                // Otherwise its detail pane holds a DIFFERENT folder's section,
+                // and stopping that one would take down a preview the teacher
+                // is watching; selecting into it would name a course this
+                // folder has never had, which is the defect #162 exists to
+                // remove. The container sweep and the lease release below still
+                // run, against the SECTION's folder, so its preview is
+                // reclaimed either way.
+                if (ThisWindowIsShowing(sectionFolder))
                 {
-                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                    if (DetailHost.Content is not SectionDetailView existing ||
+                        !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                        existing.SectionNumber != section)
+                    {
+                        Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                    }
+
+                    if (DetailHost.Content is SectionDetailView detail)
+                    {
+                        await detail.StopPreviewIfRunningAsync();
+                    }
                 }
 
-                if (DetailHost.Content is SectionDetailView detail)
-                {
-                    await detail.StopPreviewIfRunningAsync();
-                }
-
-                if (Workspace.WorkspacePath is { } wp)
-                {
-                    await PreviewStopper.StopSectionProcessesAsync(wp, courseCode, section);
-                    PreviewLeases.Release(wp, courseCode, section);
-                }
+                await PreviewStopper.StopSectionProcessesAsync(sectionFolder, courseCode, section);
+                PreviewLeases.Release(sectionFolder, courseCode, section);
             }
             catch (Exception ex)
             {
@@ -754,15 +814,16 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private static readonly HashSet<string> _syncNoticedThisProcess = new(StringComparer.OrdinalIgnoreCase);
 
-    private static string ResolvedFolder(string path)
-    {
-        try { return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
-        catch { return path; }
-    }
+    // Both of these used to be this window's own private idea of folder
+    // sameness, and the view model had a second, ORDINAL one. Two notions of
+    // "the same folder" is one too many: re-choosing the open folder answered
+    // "yes, the same" here and "no, a change" there, and the change path
+    // stopped the container of the folder still on screen (#162). One rule,
+    // in Plantoir.Core.Models.WorkingFolder, and everything asks it.
+    private static string ResolvedFolder(string path) => WorkingFolder.Resolved(path);
 
     private bool IsTheOpenFolder(string path) =>
-        Workspace.WorkspacePath is { } open &&
-        string.Equals(ResolvedFolder(open), ResolvedFolder(path), StringComparison.OrdinalIgnoreCase);
+        WorkingFolder.IsTheSame(Workspace.WorkspacePath, path);
 
     /// <summary>
     /// The service to name, or null when there is nothing to say: the folder
@@ -889,7 +950,7 @@ public sealed partial class MainWindow : Window
     public void HideSyncNoticeFor(string path)
     {
         if (_syncNoticePath is not { } shown) return;
-        if (!string.Equals(ResolvedFolder(shown), ResolvedFolder(path), StringComparison.OrdinalIgnoreCase)) return;
+        if (!WorkingFolder.IsTheSame(shown, path)) return;
         _syncNoticeService = null;
         _syncNoticePath = null;
         SyncNotice.IsOpen = false;
