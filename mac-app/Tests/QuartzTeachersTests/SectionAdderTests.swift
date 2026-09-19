@@ -463,6 +463,80 @@ final class SectionAdderTests: XCTestCase {
         XCTAssertTrue(updated.contains("publishForSection2: true"))
     }
 
+    /// A LEGACY value whose key line looks complete, with a value under it.
+    ///
+    /// `publishValue` asks the one reader, so correcting the reader (issue
+    /// #176) moved what a new section inherits here. Measured 2026-09-19:
+    /// `draftSection1: false` with `  x` under it reaches the site as the
+    /// plain scalar `"false x"`, which `_as_bool` cannot make a boolean of, so
+    /// the page is PUBLISHED — and until this landed the mac carried that
+    /// across as `true` on the strength of reading the key's line alone.
+    ///
+    /// **Neither app reproduces the site here and neither is trying to.** Both
+    /// err HELD BACK, which is the documented preference — a page wrongly held
+    /// back is one a teacher notices and fixes — and it is what
+    /// `setup_course.per_section_frontmatter` writes. Windows pins the same
+    /// rows in `SectionCarryVisibilityTests
+    /// .ALegacyValueThatRunsOntoTheNextLineIsHeldBack`.
+    @MainActor
+    func testALegacyValueThatRunsOntoTheNextLineIsCarriedAcrossAsHeldBack() throws {
+        for keyLine in [
+            "draftSection1: false", "draftSection1: no", "draftSection1: true",
+            "draftSection1: yes", "draftSection1:", "draftSection1: >-",
+        ] {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            createdSection1: 2026-09-08T07:00:00.000
+            \(keyLine)
+              x
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Continues.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            XCTAssertTrue(updated.contains("publishForSection2: false"), keyLine)
+            XCTAssertFalse(updated.contains("publishForSection2: true"), keyLine)
+        }
+    }
+
+    /// And the same key lines with NOTHING under them are read normally, so
+    /// the theory above cannot pass for the wrong reason.
+    @MainActor
+    func testALegacyValueOnItsOwnIsStillReadNormally() throws {
+        for row in [
+            (keyLine: "draftSection1: false", carried: "publishForSection2: true"),
+            (keyLine: "draftSection1: no", carried: "publishForSection2: true"),
+            (keyLine: "draftSection1: true", carried: "publishForSection2: false"),
+            (keyLine: "draftSection1: yes", carried: "publishForSection2: false"),
+        ] {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            createdSection1: 2026-09-08T07:00:00.000
+            \(row.keyLine)
+            title: Learning Goals
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Alone.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            XCTAssertTrue(updated.contains(row.carried), row.keyLine)
+        }
+    }
+
     /// A page written with plain `created:` applies to every section
     /// already, including the new one. Splitting it would change what the
     /// existing sections show, so it is left exactly as it is.

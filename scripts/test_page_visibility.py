@@ -88,6 +88,33 @@ class FamilySpellingTests(unittest.TestCase):
         )
         self.assertEqual(page_visibility.publish_family_answer(""), page_visibility.VISIBLE)
 
+    def test_a_value_below_a_complete_looking_one_is_still_a_value_below(self):
+        # Measured 2026-09-19: every one of these pages is PUBLISHED by the
+        # site. YAML folds the key's line and the line below into one plain
+        # scalar — "false false", "no false", "maybe false" — and a string
+        # that is not "false" publishes.
+        #
+        # Reading the key's line alone therefore called four of them hidden,
+        # and called it confidently, which is what let a writer's "already
+        # right, change nothing" gate turn "hide this page" into a no-op.
+        for value in ("false", "no", "off", "FALSE", "true", "maybe"):
+            self.assertEqual(
+                page_visibility.publish_family_answer(" " + value, "  false"),
+                page_visibility.CANNOT_TELL,
+                f"publish: {value} with a value under it is not something to answer about",
+            )
+        # The legacy spelling refuses the same way.
+        self.assertEqual(
+            page_visibility.draft_family_answer(" true", "  x"),
+            page_visibility.CANNOT_TELL,
+        )
+        # And a `# note` under a complete value is not a value: the caller has
+        # already stepped over it, so `next_line` is whatever came after.
+        self.assertEqual(
+            page_visibility.publish_family_answer(" false", "title: x"),
+            page_visibility.HIDDEN,
+        )
+
     def test_only_spaces_and_tabs_are_whitespace(self):
         # A non-breaking space is what Option-Space types on a Mac. YAML does
         # not treat it as whitespace, so `false<NBSP>` is a STRING and the page
@@ -240,6 +267,38 @@ class CourseLevelSplitterTests(unittest.TestCase):
         # But a real value UNDER the comment is still a value.
         out = self.split("publish:\n  # mine\n  false")
         self.assertIn("publishForSection1: false", out)
+
+    def test_a_comment_at_column_0_is_stepped_over_like_any_other(self):
+        # The splitter used to step over a comment only when it was INDENTED,
+        # so a note at column 0 between a key and its value ended the scan.
+        # Measured 2026-09-19: `publish:` / `# note` / `  false` is HIDDEN
+        # before the split and the old splitter left section 1 reading
+        # `publish: null` — VISIBLE. The teacher held the page back and one
+        # section published it; with a single section it happened to survive,
+        # which is why nothing noticed.
+        out = self.split("publish:\n# note\n  false")
+        self.assertIn("publishForSection1: false", out)
+        self.assertIn("publishForSection2: false", out)
+        self.assertNotIn("  false", out)
+
+        # The same where the key's own line looks complete. That page does not
+        # build either way — the orphaned value is a mapping error — so this is
+        # a page that stops building being split into pages that still do not,
+        # rather than a published page becoming one that will not build.
+        out = self.split("publish: false\n# note\n  false")
+        self.assertIn("publishForSection1: false", out)
+        self.assertNotIn("  false", out)
+
+        # The consequence worth stating: a column-0 note BETWEEN a key and its
+        # value goes WITH the value, which is what the rule already said. A
+        # note with NOTHING under it is still left exactly where it was.
+        self.assertNotIn("# note", out)
+        kept = self.split("publish: true\n# note")
+        self.assertIn("publishForSection1: true", kept)
+        self.assertIn("# note", kept)
+        kept = self.split("publish:\n# note\ntitle: x")
+        self.assertIn("publishForSection1:\n", kept)
+        self.assertIn("# note", kept)
 
     def test_a_key_with_nothing_after_it_stays_a_null(self):
         # A null PUBLISHES the page. Writing "false" here would hide, at course

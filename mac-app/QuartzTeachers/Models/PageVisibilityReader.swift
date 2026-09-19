@@ -271,21 +271,40 @@ nonisolated enum PageVisibilityReader {
 
     /// Everything after a key's colon, read.
     ///
-    /// `nextLine` is the first NON-BLANK line below the key inside the same
-    /// block, or nil when there is none. A key with nothing after the colon
-    /// takes its value from there — over a blank line as happily as not — and
-    /// this reader does not follow it.
+    /// `nextLine` is the first line below the key that could be a VALUE — blank
+    /// lines and `# note`s at any indent have already been stepped over by
+    /// `firstNonBlankLine` — or nil when there is none before the end of the
+    /// block. A value that CONTINUES onto that line is one this reader will not
+    /// follow, **however complete the key's own line looks**.
     static func reading(ofValue rawValue: String, followedBy nextLine: String?) -> ScalarReading {
         let value: String = trimmingYAMLSpaces(rawValue)
 
+        // A value CONTINUES onto the next line whenever the first line that
+        // could be one is INDENTED — and that is true whatever is on the key's
+        // own line.
+        //
+        // `publish:` alone is null, and null publishes the page, UNLESS the
+        // value is sitting below it. But so is `publish: false` with an
+        // indented `false` under it: YAML folds the two into the one plain
+        // scalar "false false", a STRING that is not "false", and the page is
+        // PUBLISHED. Measured 2026-09-19, python-frontmatter 1.3.0 / PyYAML
+        // 6.0.3 — `no`, `off`, `FALSE` and `maybe` behave the same way, and so
+        // does a blank line between the two.
+        //
+        // Reading the key's line alone called every one of those pages HIDDEN,
+        // and called it CONFIDENTLY — which is the part that bit.
+        // `AssistPageVisibility.setting`'s "already right, change nothing" gate
+        // believed it and returned before the writer ran at all, so "hide this
+        // page" was a no-op the teacher was told had worked while students went
+        // on reading it. A sweep in the writer cannot save a page the writer is
+        // never asked to write.
+        if let below = nextLine, below.hasPrefix(" ") || below.hasPrefix("\t") {
+            return .cannotTell
+        }
+
         if value.isEmpty {
-            // `publish:` on its own is null, and null publishes the page —
-            // UNLESS the value is below it, indented under the key, which this
-            // reader does not follow. Measured: `publish:` then a blank line
-            // then an indented `false` hides the page.
-            if let below = nextLine, below.hasPrefix(" ") || below.hasPrefix("\t") {
-                return .cannotTell
-            }
+            // Nothing after the colon and nothing below it: a genuine null,
+            // and a null publishes the page.
             return .text(value: "", wasQuoted: false)
         }
 
@@ -414,6 +433,23 @@ nonisolated enum PageVisibilityReader {
         return found
     }
 
+    /// A line YAML steps over while it is looking for a key's value: a blank
+    /// one, or a `# note` at ANY indent.
+    ///
+    /// Shared by `firstNonBlankLine` and by `continuationLineIndices`, because
+    /// a reader and a writer that step differently are how this file's oldest
+    /// bug class starts. Measured: `publish:` over a COLUMN-0 `# note` over an
+    /// indented `false` is HIDDEN, and a sweeper that stopped at that comment
+    /// orphaned the value and stopped the build. Windows shipped exactly that
+    /// bug on 2026-09-19 and fixed it the same day.
+    static func isSteppedOverLookingForAValue(_ line: String) -> Bool {
+        let content: String = trimmingYAMLSpaces(PageFrontmatter.trimmingCarriageReturn(line))
+        if content.isEmpty {
+            return true
+        }
+        return content.hasPrefix("#")
+    }
+
     /// The first line below this one that could be a VALUE, or nil when there
     /// is none before the end of the block.
     ///
@@ -422,17 +458,94 @@ nonisolated enum PageVisibilityReader {
     /// line or a `# note` in between. Both measured — `publish:` followed by
     /// an indented comment is a null and PUBLISHES the page, while the same
     /// comment with an indented `false` under it hides it.
+    ///
+    /// The stepping itself is `isSteppedOverLookingForAValue`, which
+    /// `continuationLineIndices` — the WRITER's half of the same question —
+    /// also uses. The name is a small lie inherited from before comments were
+    /// stepped over too; it is kept because four places name it and renaming
+    /// it would buy nothing a teacher can see.
     static func firstNonBlankLine(after index: Int, in lines: [String]) -> String? {
         var position: Int = index + 1
         while position < lines.count {
             let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[position])
-            let content: String = trimmingYAMLSpaces(bare)
-            if !content.isEmpty && !content.hasPrefix("#") {
+            if !isSteppedOverLookingForAValue(bare) {
                 return bare
             }
             position += 1
         }
         return nil
+    }
+
+    /// The lines BELOW a key that are part of its value, and so have to go
+    /// wherever the key's line goes.
+    ///
+    /// **Leaving them behind is the failure that reports success.**
+    /// `publish: >-` with `  false` under it is HIDDEN on the site; rewriting
+    /// the key's line alone orphans that `  false` onto the new value, and
+    /// PyYAML folds the two into the multi-line plain scalar "false false" — a
+    /// string that is not "false", so the page is PUBLISHED while the teacher
+    /// is told it was hidden. When the orphan is a MAPPING, a column-0 comment
+    /// or a column-0 sequence the page stops building instead. All measured
+    /// 2026-09-19, python-frontmatter 1.3.0 / PyYAML 6.0.3 / CPython 3.11.15,
+    /// then js-yaml on `JSON_SCHEMA` and `patches/publish.ts`.
+    ///
+    /// The rule is `setup_course.per_section_frontmatter`'s and Windows'
+    /// `PageFrontmatter.ContinuationLines`': walk forward, STEP OVER blank
+    /// lines and `# note`s at any indent, stop at the first line that is not
+    /// indented, and take everything up to the last indented line that was not
+    /// a comment. So a complete value followed by an indented note keeps the
+    /// note — nothing is taken, because no value line was found below it —
+    /// while a note with a real value under it goes WITH the value, which is
+    /// what the reader sees through it anyway.
+    ///
+    /// `keyValueWasEmpty` covers the one continuation that is NOT indented: a
+    /// block sequence at column 0 under a key with no value of its own.
+    /// Measured, `publish:` over `- a` is the list `['a']` and the page is
+    /// published, and leaving the `- a` after a hide stops the build. A
+    /// sequence under a key that HAS a value is a page that does not build
+    /// either way, so there is nothing to rescue and sweeping a teacher's list
+    /// on that guess would be the larger mistake.
+    ///
+    /// Ask it BEFORE the key's line is rewritten: the rewrite always puts a
+    /// value there, so asking afterwards always answers false.
+    ///
+    /// This does NOT parse block scalars and must not start to: it only finds
+    /// where a value ends.
+    static func continuationLineIndices(
+        belowKeyAt keyIndex: Int,
+        in lines: [String],
+        closeIndex: Int,
+        keyValueWasEmpty: Bool
+    ) -> [Int] {
+        var lastValueLine: Int = keyIndex
+        var position: Int = keyIndex + 1
+        while position < closeIndex && position < lines.count {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[position])
+            if isSteppedOverLookingForAValue(bare) {
+                position += 1
+                continue
+            }
+            let isIndented: Bool = bare.hasPrefix(" ") || bare.hasPrefix("\t")
+            if !isIndented {
+                if !keyValueWasEmpty {
+                    break
+                }
+                let content: String = trimmingYAMLSpaces(bare)
+                if content != "-" && !content.hasPrefix("- ") {
+                    break
+                }
+            }
+            lastValueLine = position
+            position += 1
+        }
+
+        var taken: [Int] = []
+        var index: Int = keyIndex + 1
+        while index <= lastValueLine {
+            taken.append(index)
+            index += 1
+        }
+        return taken
     }
 
     /// Does one of the four names appear INDENTED anywhere in the block?

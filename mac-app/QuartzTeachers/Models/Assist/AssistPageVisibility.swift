@@ -97,6 +97,12 @@ enum AssistPageVisibility {
     /// teacher's frontmatter is theirs, and round-tripping it through a YAML
     /// library would reorder keys and strip their comments.
     ///
+    /// It moves LINES, not just one line. A key's value can live on the lines
+    /// below it, and those lines go wherever the key goes — see
+    /// `PageVisibilityReader.continuationLineIndices` for what it costs when
+    /// they are left behind, which is a page published while the teacher is
+    /// told it was hidden.
+    ///
     /// This is where a legacy page is migrated, and it is the one place that
     /// rewrites a page whose value is already right: a page spelled the old
     /// way is converted once even when nothing about its visibility moves.
@@ -146,16 +152,39 @@ enum AssistPageVisibility {
 
         var lines: [String] = pageText.components(separatedBy: "\n")
 
+        // Every line this write is going to take out, gathered before any of
+        // them is removed so that each index still means what it said. A `Set`
+        // and one descending pass, rather than removing inside each branch:
+        // three separate walks contribute here, and deleting as it goes would
+        // invalidate the indices the next walk returns.
+        var removals: Set<Int> = []
+
         // The LAST line naming a key is the one the build reads, so it is the
         // one to rewrite: setting the first of two would leave the page saying
         // the opposite of what was asked for.
         if let index = currentKeyLines.last {
+            // Asked BEFORE the line is rewritten — the rewrite always puts a
+            // value there, and a column-0 sequence is only this key's value
+            // while the key's own value is empty.
+            let wasEmpty: Bool = valueIsEmpty(ofKey: key, inLine: lines[index])
             lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
+            for taken in PageVisibilityReader.continuationLineIndices(
+                belowKeyAt: index, in: lines, closeIndex: block.closeIndex,
+                keyValueWasEmpty: wasEmpty
+            ) {
+                removals.insert(taken)
+            }
             // This page was migrated already, and a leftover legacy key now
             // says the opposite of the line above it. Every one of them goes,
-            // last first so the earlier indices stay put.
-            for stale in legacyKeyLines.reversed() {
-                lines.remove(at: stale)
+            // and so does every line that was part of its value.
+            for stale in legacyKeyLines {
+                removals.insert(stale)
+                for taken in PageVisibilityReader.continuationLineIndices(
+                    belowKeyAt: stale, in: lines, closeIndex: block.closeIndex,
+                    keyValueWasEmpty: valueIsEmpty(ofKey: legacy, inLine: lines[stale])
+                ) {
+                    removals.insert(taken)
+                }
             }
         } else if let index = legacyKeyLines.last {
             // Migrating. The new key takes the old key's own line, so the
@@ -163,14 +192,51 @@ enum AssistPageVisibility {
             // the block would show up as a reordered diff in a file they very
             // likely have open. Any earlier copies of the legacy key go with
             // it, for the same reason a leftover does above.
+            let wasEmpty: Bool = valueIsEmpty(ofKey: legacy, inLine: lines[index])
             lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
-            for stale in legacyKeyLines.dropLast().reversed() {
-                lines.remove(at: stale)
+            for taken in PageVisibilityReader.continuationLineIndices(
+                belowKeyAt: index, in: lines, closeIndex: block.closeIndex,
+                keyValueWasEmpty: wasEmpty
+            ) {
+                removals.insert(taken)
+            }
+            for stale in legacyKeyLines.dropLast() {
+                removals.insert(stale)
+                for taken in PageVisibilityReader.continuationLineIndices(
+                    belowKeyAt: stale, in: lines, closeIndex: block.closeIndex,
+                    keyValueWasEmpty: valueIsEmpty(ofKey: legacy, inLine: lines[stale])
+                ) {
+                    removals.insert(taken)
+                }
             }
         } else {
             lines.insert(line, at: block.openIndex + 1)
         }
+
+        // Last first, so the earlier indices stay put.
+        var doomed: [Int] = []
+        for index in removals {
+            doomed.append(index)
+        }
+        doomed.sort()
+        for index in doomed.reversed() {
+            lines.remove(at: index)
+        }
         return (lines.joined(separator: "\n"), true)
+    }
+
+    /// True when this line names the key with nothing after its colon — the
+    /// one shape whose value can continue at COLUMN 0, as a block sequence.
+    ///
+    /// Asked with the reader's own matcher rather than a string test, so the
+    /// writer answers about the line the reader read.
+    static func valueIsEmpty(ofKey key: String, inLine line: String) -> Bool {
+        guard let value = PageVisibilityReader.valuePart(
+            ofKey: key, inLine: PageFrontmatter.trimmingCarriageReturn(line)
+        ) else {
+            return false
+        }
+        return PageVisibilityReader.trimmingYAMLSpaces(value).isEmpty
     }
 
     /// Every line of this page's frontmatter that names this key at the top
