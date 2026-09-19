@@ -47,10 +47,13 @@ namespace Plantoir.Tests;
 /// declared with the site-health work purely so this same trail test was green,
 /// and the comment beside them disclaims itself as precedent in as many words
 /// ("a note that they are owed a caller, not a precedent"). It was rejected for
-/// #158 for a stronger reason than tidiness. Those three were a FEW DAYS ahead
-/// of their call sites in the same release; the unit-word rename is a whole
-/// feature a release away, so the declaration would sit there for a milestone
-/// with nothing to write it. And an event that is named but never recorded
+/// #158 for a stronger reason than tidiness, and the difference is MEASURED
+/// rather than remembered: all three were declared in <c>a3144010</c> at 08:17
+/// on 2026-08-25 and all three got their first <c>ActivityTrail.Note</c> call
+/// in <c>a3c581fb</c> at 08:45 the same morning — <b>28 minutes</b>, inside one
+/// piece of work. The unit-word rename is a whole feature a MILESTONE away, so
+/// the declaration would sit there with nothing to write it until v1.3.0. And
+/// an event that is named but never recorded
 /// tells the contract that a line exists which no teacher's trail will ever
 /// carry — a green test asserting a trail that cannot happen, which is worse
 /// than a red one, because the next person to ask "does Windows record this?"
@@ -94,6 +97,7 @@ internal static class NamedGapLedger
     private static readonly Entry[] Entries =
     {
 
+
         // Renaming a course's word for a unit landed on the mac 2026-09-10
         // (issue #100) and arrived here as the contract moving: the event and
         // the sentence are both parts of a feature this app has none of yet.
@@ -134,26 +138,39 @@ internal static class NamedGapLedger
 
         foreach (var entry in mine)
         {
-            // TWO different things bring you here, and the second is the one
-            // this ledger exists to catch. Either the contract genuinely
-            // dropped the key — fine, delete the entry — or somebody SCOPED it
-            // away from this platform, which reaches this check the same way:
-            // ContractTests filters `activityTrail.mustRecord` by `appliesOn`
-            // BEFORE calling in, so an `appliesOn: ["mac"]` added to quiet a
-            // suite arrives here as "the contract no longer names it". Both
-            // possibilities are named, because deleting the entry is the right
-            // answer to the first and the wrong one to the second.
-            Assert.True(contract.Contains(entry.Key),
+            // What brings you here depends on WHICH list, and the message says
+            // only what is possible for that one. `activityTrail.mustRecord`
+            // has per-platform scoping, so there are two causes wanting
+            // opposite responses: the contract dropped the key (delete the
+            // entry) or somebody SCOPED it away with `appliesOn` — which
+            // ContractTests applies BEFORE calling in, so it arrives looking
+            // identical, and is the softening this ledger exists to catch.
+            // `specialNames.platformWording.keys` is a flat array of strings
+            // with no scoping mechanism at all, so naming `appliesOn` there
+            // would send its reader hunting for something that cannot exist.
+            string whyThisHappened =
                 $"NamedGapLedger holds \"{entry.Key}\" open under {entry.Area}, and the contract no " +
-                "longer names it HERE. Two different things cause that. (1) The contract dropped the " +
-                "key outright — the requirement went away, so delete this entry from " +
-                $"windows-app/Plantoir.Tests/NamedGapLedger.cs and say so on issue #{entry.Issue}. " +
-                "(2) Somebody scoped it away from this platform instead — an `appliesOn` that no " +
-                "longer lists \"windows\". Check `git log -p contracts/shared-rules.json` before " +
-                "believing (1): scoping is the softening this ledger exists to prevent, it has no " +
-                $"mend-check of its own, and issue #{entry.Issue} ({entry.Milestone}) says this " +
-                "platform owes the work. If that is what happened, put the contract back and leave " +
-                "this entry alone.");
+                "longer names it. ";
+
+            whyThisHappened += entry.Area == ActivityTrailEvents
+                ? "Two different things cause that, and they want opposite responses. (1) The " +
+                  "contract dropped the key outright — the requirement went away, so delete this " +
+                  "entry from windows-app/Plantoir.Tests/NamedGapLedger.cs and say so on issue " +
+                  $"#{entry.Issue}. (2) Somebody scoped it away from this platform instead, with an " +
+                  "`appliesOn` that no longer lists \"windows\" — ContractTests filters this list by " +
+                  "`appliesOn` BEFORE calling in here, so that arrives looking exactly like (1). " +
+                  "Check `git log -p contracts/shared-rules.json` before believing (1): scoping is " +
+                  "the softening this ledger exists to prevent, it has no mend-check of its own, and " +
+                  $"issue #{entry.Issue} ({entry.Milestone}) says this platform owes the work. If " +
+                  "that is what happened, put the contract back and leave this entry alone."
+                : "A gap can only be held open against something the contract still asks for, so " +
+                  "the requirement went away: delete this entry from " +
+                  "windows-app/Plantoir.Tests/NamedGapLedger.cs and say so on issue " +
+                  $"#{entry.Issue}. (This list is a flat array of keys with no per-platform scoping, " +
+                  "so unlike activityTrail.mustRecord there is no `appliesOn` here for the key to " +
+                  "have been hidden behind — a key missing from it really is a key withdrawn.)";
+
+            Assert.True(contract.Contains(entry.Key), whyThisHappened);
 
             Assert.False(here.Contains(entry.Key),
                 $"\"{entry.Key}\" is ledgered as not built here yet (issue #{entry.Issue}, " +
