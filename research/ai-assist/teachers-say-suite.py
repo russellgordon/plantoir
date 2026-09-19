@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# [NOTE ADDED 2026-09-18, #117] Results taken with this suite BEFORE today
+# under-report malformed calls: a tool call whose argument JSON was truncated
+# was recorded as a call with no arguments, so "malformed tool calls: 0" meant
+# "no HTTP errors". Fixed below, on the mac, in shared Python — the counter
+# now reports truncation separately, and a re-run counts honestly. Nothing
+# else about the run changed: same probes, same defaults, same output shape.
 """
 What the four missing TEACHERS SAY: clauses are worth, measured on Windows.
 
@@ -184,7 +190,12 @@ def ask(prompt):
     try:
         args = json.loads(call["arguments"])
     except Exception:
-        args = {}
+        # NOT the same as "no arguments", and this file used to conflate the
+        # two — see the note at the top. A generation that runs out of room
+        # mid-JSON arrives as a tool call whose arguments are a truncated
+        # string; swallowing it as {} let the line below report zero while an
+        # unusable call went through.
+        args = {"__unparsed__": call["arguments"][:60]}
     return call["name"], args, completion, elapsed
 
 
@@ -205,6 +216,7 @@ def main():
     misroutes = {}
     wrong_values = 0
     malformed = 0
+    truncated = 0
     per_case = []
     print("### tools=%s trials=%d dateline=%r" % (TOOLS_PATH, TRIALS, DATELINE.strip()))
     print("%-26s %-28s %-5s %-6s %s" % ("probe", "chose", "ok", "ms", "arguments"))
@@ -216,6 +228,9 @@ def main():
             if name == "__MALFORMED__":
                 malformed += 1
                 name = None
+            if "__unparsed__" in args:
+                malformed += 1
+                truncated += 1
             ok = name in acceptable
             scores[group][1] += 1
             if ok:
@@ -243,7 +258,9 @@ def main():
     total = scores["test"][1] + scores["control"][1]
     print("OVERALL: %d/%d (%.0f%%)" % (right, total, 100.0 * right / total))
     print("wrong course or section in a routed call: %d" % wrong_values)
-    print("malformed tool calls: %d" % malformed)
+    print("malformed tool calls: %d   (HTTP errors, plus arguments that did not parse)"
+          % malformed)
+    print("tool calls whose arguments were TRUNCATED mid-JSON: %d" % truncated)
     if misroutes:
         print("misroutes, by probe:")
         for label in sorted(misroutes):
