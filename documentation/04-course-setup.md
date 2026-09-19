@@ -883,16 +883,32 @@ tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
   configure exactly `["All Classes"]`, so only a teacher who both renamed the
   class folder away from anything containing "class" AND added a second
   per-section folder is affected.
-- **Publish plans GROW.** Link-following deliberately stops at class pages — a
-  class is published because the teacher asked for it, not because another
-  class linked to it — so a shared page the old wide path called a class was
-  silently skipped. Demoted to what it is, it is followed, and "publish Day 1
-  and everything it links to" now reaches it. The "introducing class" credit
-  changes hands with it: an undated page inherits the date of the earliest
-  class linking to it and the teacher is told which class brought it in, and a
-  shared page in a folder named like the class folder used to win that credit
-  (a course-level folder sorts before `section1`), so the teacher was told a
-  page they never taught from was what introduced it.
+- **Publish plans GROW.** Link-following on Windows stops at class pages
+  (`AssistWorkspace.cs:724`) — a class is published because the teacher asked
+  for it, not because another class linked to it — so a shared page the old
+  wide path called a class was silently skipped. Demoted to what it is, it is
+  followed, and "publish Day 1 and everything it links to" now reaches it.
+  **That guard is WINDOWS-ONLY, and this is where it was found.** The mac's
+  `AssistSectionGraph.linkedPages(from:)` (`:256-281`) has no class-page test
+  at all, and `AssistPublishPlan.swift:433,449` publishes every page it
+  returns, so on the mac a publish follows links INTO class pages too. The
+  outcome of this particular change converges — the demoted shared page was
+  already non-class on the mac, so its links were already followed — but the
+  rule underneath does not, and the difference is nobody's decision:
+  [issue #173](https://github.com/russellgordon/plantoir/issues/173) carries
+  it, with the teacher-visible case (publishing Unit 2, Day 3, which links to
+  Unit 2, Day 4 — Day 4 goes up on the mac and does not on Windows) and the
+  note that `documentation/10-local-ai-assistant.md` states the mac's rule as
+  though it were shared. Deliberately NOT changed here: how far a publish
+  reaches is a different question from which folders hold classes.
+- **The "introducing class" credit changes hands**, and this half IS parity. An
+  undated page inherits the date of the earliest class linking to it and the
+  teacher is told which class brought it in; a class page never inherits, on
+  both platforms (`AssistWorkspace.cs:777`, `AssistPublishPlan.swift:867`, and
+  `contracts/class-planning.json` → `datingPagesAClassBrings`). A shared page
+  in a folder named like the class folder used to win that credit here (a
+  course-level folder sorts before `section1`), so the teacher was told a page
+  they never taught from was what introduced it.
 
 **Rejected: keeping Windows' wider membership.** It is the more generous
 reading — everything the teacher put in a per-section folder is a class — and
