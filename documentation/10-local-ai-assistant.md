@@ -1344,7 +1344,15 @@ section in Plantoir; the second cannot, because there is nothing to open, and
 advice that cannot be followed is worse than none. Both say **nothing was
 DONE** rather than nothing was CHANGED — the refusal fires on the four reading
 tools as well, and "I haven't changed anything" answers a question nobody asked
-of "what pages does MCV4U have?". The trail line is
+of "what pages does MCV4U have?". **The first sentence names that course the
+way the WORKING FOLDER spells it** — a teacher told to open "mcv4u" is being
+sent to look for something their sidebar does not show, and it is the same
+courtesy the window's own code gets on the approval card; the second carries
+the model's own text, trimmed, because there is nothing else to show. Both
+codes are trimmed of whitespace AND newlines, which is what
+`AssistToolRunner.text(_:in:)` does before `locate` ever sees a value: a guard
+that trims less would refuse `"ICS3U\n"` in an ICS3U window, losing a turn on
+the teacher's own course. The trail line is
 `assistant was asked about another course`, carrying both course codes and the
 tool, never the argument values.
 
@@ -1364,8 +1372,12 @@ refuses nothing and is asked by nobody but the agent.
   open on exactly the fault being closed: "publish MCV4's class" mistyped in an
   ICS3U window would publish an ICS3U class and report success. **The measured
   cost of refusing instead is negligible.** `research/ai-assist/`, counted
-  per FILE rather than by arm (one line of Python over `*results*.txt`, so it
-  can be re-run): `trimmed-surface-results.txt` holds the only wrong course
+  per FILE rather than by arm (one line of Python counting `"course": "…"`
+  over `*results*.txt`, so it can be re-run — a naive run returns **827 across
+  seven files**, because two of the seven are single-turn experiments rather
+  than routing runs and are not in the 686: `cache-restore-results.txt` (3, its
+  own arm's ICS3U) and `token-cap-results.txt` (1, its own arm's VVH2O)):
+  `trimmed-surface-results.txt` holds the only wrong course
   values anywhere — 16 `ICS3U` and 3 `ICS2O` against 118 correct — and its arms
   1–2 are the ones run WITHOUT `--real-course`, so the model was shown a
   placeholder code in the schema and echoed it. Everywhere else the value is
