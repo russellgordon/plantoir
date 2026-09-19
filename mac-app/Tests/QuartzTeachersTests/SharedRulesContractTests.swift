@@ -1885,6 +1885,102 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
+    // MARK: - What a window lets go of when it changes working folder
+
+    /// Runs `workingFolderSelection` against the real model — GitHub issue
+    /// #93.
+    ///
+    /// The folders are labels the case list names and this suite
+    /// materialises, and a selection is written by its KIND and the folder
+    /// whose course it means rather than by the string the mac happens to
+    /// store it as. That spelling is pinned in no contract and must not
+    /// become pinned by accident here.
+    func testAWindowLetsGoOfTheOldFolderAsTheContractSays() throws {
+        let rule: [String: Any] = try Self.section("workingFolderSelection")
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty, "shared-rules.json carries no workingFolderSelection cases")
+
+        var foldersByLabel: [String: URL] = [:]
+        defer {
+            for (_, folder) in foldersByLabel {
+                try? FileManager.default.removeItem(at: folder)
+            }
+        }
+        func folder(labelled label: String) throws -> URL {
+            if let existing = foldersByLabel[label] {
+                return existing
+            }
+            let made: URL = try FixtureWorkspace.materialize()
+            if label == "folderBEmpty" {
+                try FileManager.default.removeItem(at: try courseDirectory(in: made))
+            }
+            foldersByLabel[label] = made
+            return made
+        }
+
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            XCTAssertNotNil(oneCase["why"] as? String, "\(name) does not say why it exists")
+
+            let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+            workspace.chooseWorkspace(
+                at: try folder(labelled: try XCTUnwrap(oneCase["startIn"] as? String))
+            )
+
+            let wanted: [String: Any] = try XCTUnwrap(oneCase["select"] as? [String: Any])
+            let code: String = try courseDirectory(
+                in: try folder(labelled: try XCTUnwrap(wanted["courseIn"] as? String))
+            ).lastPathComponent
+            let selection: SidebarSelection
+            switch try XCTUnwrap(wanted["kind"] as? String) {
+            case "course":
+                selection = .course(code)
+            case "section":
+                selection = .section(code, try XCTUnwrap(wanted["section"] as? Int))
+            default:
+                XCTFail("\(name) asks for a kind of selection this suite does not know")
+                continue
+            }
+            workspace.selection = selection
+            XCTAssertNotNil(workspace.selectedCourse, "\(name): the course it selects should be there")
+
+            let then: [String: Any] = try XCTUnwrap(oneCase["then"] as? [String: Any])
+            if let label = then["pointAt"] as? String {
+                workspace.chooseWorkspace(at: try folder(labelled: label))
+            } else if then["removeTheSelectedCourseAndReload"] as? Bool == true {
+                try FileManager.default.removeItem(
+                    at: try courseDirectory(in: try XCTUnwrap(workspace.workspaceURL))
+                )
+                workspace.reloadCourses()
+            } else {
+                XCTFail("\(name) asks for something this suite does not know how to do")
+                continue
+            }
+
+            switch try XCTUnwrap(oneCase["expect"] as? String) {
+            case "cleared":
+                XCTAssertNil(workspace.selection, name)
+            case "unchanged":
+                XCTAssertEqual(workspace.selection, selection, name)
+            default:
+                XCTFail("\(name) expects an outcome this suite does not know")
+                continue
+            }
+            if let namesACourse = oneCase["expectNamesALoadedCourse"] as? Bool {
+                XCTAssertEqual(workspace.selectedCourse != nil, namesACourse, name)
+            }
+        }
+    }
+
+    /// The one course folder inside a fixture working folder.
+    private func courseDirectory(in workingFolder: URL) throws -> URL {
+        let courses: URL = workingFolder.appendingPathComponent("courses")
+        let entries: [URL] = try FileManager.default.contentsOfDirectory(
+            at: courses, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+        )
+        return try XCTUnwrap(entries.first, "the fixture working folder has no course in it")
+    }
+
     // The launcher's own half of this — that `preview.sh` delegates to the
     // shared rule, keeps no sweep of its own, and pipes the code in rather
     // than naming a path baked into the image — is asserted ONCE, in

@@ -146,6 +146,50 @@ final class WindowRestorationScenarioTests: XCTestCase {
         XCTAssertNil(second.giveUp(), "A claimant that has resolved never claims again")
     }
 
+    /// THE RESTORED SELECTION: a window comes back by setting its folder
+    /// FIRST and its remembered selection second, and clearing the selection
+    /// on a folder change must not undo the second half of that.
+    ///
+    /// Named in GitHub issue #93 as the thing to check before fixing it, and
+    /// it is the reason the clearing lives in the folder funnel rather than
+    /// in `reloadCourses()` — a window that restores its folder and then its
+    /// selection reloads courses in between.
+    @MainActor
+    func testARestoredWindowKeepsTheSelectionItComesBackWith() throws {
+        let folders: [String] = try makeFolders(1)
+        defer { removeAll(folders) }
+
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        // The order `WindowRootView.adopt(_:how:)` uses, and the order that
+        // matters: folder, then the sidebar as it was left.
+        workspace.adoptRestoredPath(folders[0])
+        workspace.selection = .section("ICS3U", 2)
+
+        XCTAssertEqual(
+            workspace.selection, .section("ICS3U", 2),
+            "A restored window must come back to what the teacher was looking at"
+        )
+    }
+
+    /// THE DEFENSIVE HALF: no caller in the product reaches
+    /// `adoptRestoredPath` with a folder already set — every one of them is
+    /// a fresh model, and the method's own guard turns away the one route
+    /// that would arrive with the SAME folder. It clears anyway, so that the
+    /// rule belongs to adopting a folder rather than to one way of doing it.
+    @MainActor
+    func testAdoptingADifferentFolderClearsTheSelectionEvenThoughNothingDoesThat() throws {
+        let folders: [String] = try makeFolders(2)
+        defer { removeAll(folders) }
+
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        workspace.adoptRestoredPath(folders[0])
+        workspace.selection = .course("ICS3U")
+
+        workspace.adoptRestoredPath(folders[1])
+
+        XCTAssertNil(workspace.selection)
+    }
+
     /// THE SYSTEM SETTING: "Close windows when quitting" on means nothing
     /// comes back — the list loads empty, though it is still recorded.
     @MainActor
