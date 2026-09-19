@@ -248,6 +248,37 @@ final class SharedRulesContractTests: XCTestCase {
         }
     }
 
+    /// The card for a deploy that happens NOW has to say so.
+    ///
+    /// **A property, not a sentence.** The wording lives in `AssistWording`
+    /// and has been rewritten three times; what must survive the next rewrite
+    /// is the rule. The contract carries the word the sentence must contain,
+    /// this runs it, and Windows can run the identical check.
+    ///
+    /// The rule is here because the two approval cards were asymmetric exactly
+    /// where a misroute lands: the scheduled one names the whole moment, and
+    /// this one named no time at all — so a teacher who asked for 6:30
+    /// tomorrow, and was sent to an immediate deploy ten trials out of ten on
+    /// the smaller assistant, read a card that was perfectly true and said
+    /// nothing to contradict them (issue #168).
+    @MainActor
+    func testTheImmediateDeployCardSaysItIsImmediate() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("assistantConfirmation")
+        let rule: [String: Any] = try XCTUnwrap(
+            section["theImmediateDeployCardSaysItIsImmediate"] as? [String: Any]
+        )
+        XCTAssertNotNil(rule["why"] as? String, "a rule nobody explained is a rule that gets deleted")
+        guard rule["value"] as? Bool == true else {
+            return
+        }
+        let wanted: String = try XCTUnwrap(rule["mustContain"] as? String)
+        XCTAssertTrue(
+            AssistWording.deployApproval.lowercased().contains(wanted.lowercased()),
+            "the immediate deploy card says nothing about when it happens: "
+            + AssistWording.deployApproval
+        )
+    }
+
     // MARK: - What a page is called
 
     /// Every case the contract lists, run against the real rule.
