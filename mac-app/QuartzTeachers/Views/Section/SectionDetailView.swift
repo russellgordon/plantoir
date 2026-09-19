@@ -985,11 +985,12 @@ struct SectionDetailView: View {
         }
         // The folder this preview belongs to, noted at the moment it is
         // decided — which is HERE, not at the appearance. The appearance
-        // notes the same folder when it has one, but it can return without
-        // one while this function goes on working from the model, and then
-        // a preview could start that no stop would ever be aimed at. Every
-        // stop reads this, so writing it beside the lease is what makes
-        // start and stop name one folder.
+        // notes only the key this section registered under, and it can
+        // return without a folder at all while this function goes on
+        // working from the model — so a note made there would have let a
+        // preview start that no stop was ever aimed at. Every stop reads
+        // this, so writing it beside the lease is what makes start and
+        // stop name one folder.
         folderThisSectionWorksIn = workspaceURL
         // Each preview runs on its own port, so several windows can show
         // sections side by side without taking each other down.
