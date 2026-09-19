@@ -1505,7 +1505,19 @@ struct NewCourseWizardView: View {
         let structureFromExample: Bool = prepopulatesExampleContent
             && ExampleContentCatalog.hasContent(forCode: code)
         if !structureFromExample {
-            config["graded_folders"] = chosenGradedFolders
+            // Narrowed once more as the file is written, the way Windows does
+            // it (NewCourseDialog.BuildConfiguration). The editor narrows the
+            // pool wherever it changes the folder lists — a removal, a
+            // skeleton given up — but the terminology switch does not, so a
+            // teacher who ticked College Board Curriculum and then turned LCS
+            // off would otherwise have that folder written into a course that
+            // has no such folder. `setup_course.py` reconciles the key again
+            // when it reads it, so this is the second net rather than the
+            // only one; what it buys is that both apps write the same file.
+            config["graded_folders"] = GradedFolderRule.reconciled(
+                chosenGradedFolders,
+                toFolders: chosenSharedFolders + chosenPerSectionFolders
+            )
         }
 
         return config

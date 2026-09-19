@@ -118,14 +118,22 @@ mechanics, and two more are worth knowing before reading a green run as coverage
   adoption's is re-inferred over the restored folders, and a pool the teacher
   has ticked themselves is kept but NARROWED to the folders the course will
   actually have. Miss the second and a teacher who adopted the mathematics
-  skeleton, unticked `Tasks` and then declined the skeleton is left with
+  skeleton, unticked `Tasks` and then declined the skeleton is shown a
+  checklist with nothing ticked while the wizard writes
   `graded_folders: ["Thinking Tasks"]` against a course with no such folder —
-  the build counts nothing, the checklist shows nothing ticked, and neither
-  says so. (The first version of the mac's restore did exactly that, and the
-  adversarial review of it found it.) The two apps reach the same answer from
+  and the two apps then write DIFFERENT files for the same clicks, which is
+  what the contract exists to stop. (`setup_course.py` reconciles the key
+  again when it reads it, so no teacher ends up with a broken course; that is
+  a second net, not a licence for the wizard to write something untrue. The
+  first version of the mac's restore did exactly that, and the adversarial
+  review of it found it.) The two apps reach the same answer from
   opposite ends: the mac narrows inside the restore, Windows leaves the pool
   and narrows it on every read (`CurrentGradedFolders`) and again when the
-  file is written.
+  file is written. The mac narrows ONCE MORE as the file is written, for the
+  one path the editor does not cover: the terminology switch takes `College
+  Board Curriculum` out of the folder list without asking the marks pool, so
+  a teacher who had ticked it would otherwise have it written into a course
+  that has no such folder.
 - **Two of the five lists cannot tell one answer from another for most
   codes**, which matters when reading a green run as coverage: every bundled
   family ships `per_section_folders` of exactly `["All Classes"]`, the

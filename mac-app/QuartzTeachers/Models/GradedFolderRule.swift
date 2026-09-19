@@ -26,14 +26,6 @@ enum GradedFolderRule {
 
     // MARK: - Functions
 
-    /// The pool a course that has never been asked is already working to,
-    /// read off the folders it actually has — in the order they were given,
-    /// each name once.
-    ///
-    /// De-duplicated by exact name, matching Windows' `InferredPool`: the
-    /// same folder can reach this from two lists at once (a course's shared
-    /// folders and its per-section folders), and offering a teacher the same
-    /// name twice would tick one box and leave the other looking unticked.
     /// A pool the teacher has chosen, narrowed to the folders the course
     /// actually ends up with — in the order they chose them.
     ///
@@ -44,12 +36,16 @@ enum GradedFolderRule {
     /// (`GradedFolderRule.Reconciled`) but at the moment the file is written
     /// rather than the moment the folders change.
     ///
-    /// **Matched EXACTLY, case included, where Windows and `setup_course.py`
-    /// match case-INSENSITIVELY.** That difference predates this function —
-    /// it is the behaviour `NewCourseWizardView.reconciledGradedFolders` has
-    /// always had, moved here rather than changed — and it is
+    /// **This is NOT Windows' `Reconciled` to the letter, and the difference
+    /// is deliberate for now.** Theirs matches case-INSENSITIVELY (as
+    /// `setup_course.py` does) and drops a repeated name; this matches
+    /// EXACTLY and keeps whatever it is given. That is the behaviour
+    /// `NewCourseWizardView.reconciledGradedFolders` has always had, moved
+    /// here rather than changed, so the move could not alter what the wizard
+    /// writes — and it is
     /// [issue #152](https://github.com/russellgordon/plantoir/issues/152)'s
-    /// fourth item, where it can be fixed in one place for everybody.
+    /// fourth item, where it can be fixed in one place for everybody. It
+    /// shows only on a course holding two folders whose names differ by case.
     nonisolated static func reconciled(_ declared: [String], toFolders folders: [String]) -> [String] {
         var kept: [String] = []
         for name in declared {
@@ -60,6 +56,14 @@ enum GradedFolderRule {
         return kept
     }
 
+    /// The pool a course that has never been asked is already working to,
+    /// read off the folders it actually has — in the order they were given,
+    /// each name once.
+    ///
+    /// De-duplicated by exact name, matching Windows' `InferredPool`: the
+    /// same folder can reach this from two lists at once (a course's shared
+    /// folders and its per-section folders), and offering a teacher the same
+    /// name twice would tick one box and leave the other looking unticked.
     nonisolated static func inferredPool(from folderNames: [String]) -> [String] {
         var counted: [String] = []
         for name in folderNames {

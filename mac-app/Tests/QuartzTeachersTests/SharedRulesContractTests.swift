@@ -781,11 +781,15 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertEqual(factory["perSectionFiles"] as? [String], WizardDefaults.perSectionFiles)
         XCTAssertEqual(lcs["sharedFolders"] as? [String], WizardDefaults.lcsSharedFolders)
         XCTAssertEqual(lcs["sharedFiles"] as? [String], WizardDefaults.lcsSharedFiles)
+        // BOTH per-section slots, not just the folders: the note says this set
+        // carries two arrays rather than four, and an authored
+        // `lcs.perSectionFiles` would otherwise sit here unread and unnoticed.
         XCTAssertNil(
             lcs["perSectionFolders"],
             "Neither per-section list has an LCS variant — the terminology switch rewrites only "
             + "the two shared ones, and a variant written here would be a rule the apps do not have."
         )
+        XCTAssertNil(lcs["perSectionFiles"], "Same rule, the other per-section list.")
     }
 
     // MARK: - What a teacher reads on the Marks control

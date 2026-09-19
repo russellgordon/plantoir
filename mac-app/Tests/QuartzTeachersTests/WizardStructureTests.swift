@@ -338,6 +338,33 @@ final class WizardStructureTests: XCTestCase {
         )
     }
 
+    /// What the wizard WRITES never names a folder the course will not have,
+    /// whatever route the pool took to get there.
+    ///
+    /// The route this closes is the terminology switch: turning LCS on,
+    /// ticking `College Board Curriculum` for marks and turning LCS off again
+    /// takes the folder out of the course and leaves the pool naming it —
+    /// that handler is the one place the editor changes a folder list without
+    /// narrowing the pool. Windows narrows as it writes
+    /// (`NewCourseDialog.BuildConfiguration`) and now so does this.
+    func testTheFileNeverNamesAFolderTheCourseWillNotHave() {
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: "SNC4M",
+            startsFromSkeleton: false,
+            gradedFolders: ["Tasks", "College Board Curriculum"]
+        )
+        let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+            code: "SNC4M", name: "Science"
+        )
+
+        XCTAssertEqual(
+            configuration["graded_folders"] as? [String], ["Tasks"],
+            "The LCS folder is not in this course's folder lists, so writing it into the "
+            + "marks pool would be a name that matches nothing on disk — and a different "
+            + "file from the one Windows writes for the same clicks."
+        )
+    }
+
     /// A code with ready-made pages is offered no skeleton, so neither
     /// direction may touch its lists.
     func testACodeWithExampleContentIsNeverAdoptedOrRestored() throws {
