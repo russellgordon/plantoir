@@ -107,6 +107,22 @@ enum AssistContract {
             "publishingAlreadyExplained": AssistWording.publishingAlreadyExplained(
                 course: course, section: section
             ),
+            // The classes a publish followed a link onto and left alone. Two
+            // keys for one function, the way `otherClassesWouldMove…` is: one
+            // rendering cannot show both branches.
+            //
+            // The class names are LITERALS rather than `{page}`, for the same
+            // reason `copiedTo` passes a real date. Half of what the other
+            // platform has to match here is the LISTING — the curly quotes and
+            // the word "and" between two names — and a placeholder pair would
+            // have had to borrow `{copy}`, which means something else
+            // entirely.
+            "linkedClassWasLeftAlone": AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(["Unit 2, Day 4"]), count: 1
+            ),
+            "linkedClassesWereLeftAlone": AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(["Unit 2, Day 4", "Unit 2, Day 5"]), count: 2
+            ),
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),

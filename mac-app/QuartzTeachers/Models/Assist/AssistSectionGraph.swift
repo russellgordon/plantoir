@@ -122,6 +122,29 @@ struct AssistSectionLink {
     let toTitle: String
 }
 
+/// What following one or more pages' links reaches, and the class pages the
+/// walk stopped at on the way.
+///
+/// Two halves rather than one list, because a caller needs both and they mean
+/// opposite things: the first is what a verb acts on, the second is what a
+/// teacher has to be TOLD was left alone. Returning only the first made the
+/// stop invisible — a plan quietly smaller than the one the teacher pictured,
+/// with no way to tell "it decided" from "it missed it".
+struct AssistLinkedReach {
+
+    // MARK: - Stored properties
+
+    /// The material reached: transitive, and never a class page.
+    let pages: [AssistSectionPage]
+
+    /// The class pages a link landed on, which the walk did not enter.
+    ///
+    /// Never one of the pages it started from — those are seeded as seen
+    /// before the walk begins, so a class the teacher NAMED is not reported
+    /// here as one that was left alone.
+    let classPagesStoppedAt: [AssistSectionPage]
+}
+
 /// Every page in one section, what links to what, and who can see it.
 ///
 /// Built by reading the files, once, so that every tool that needs to follow a
@@ -264,19 +287,42 @@ struct AssistSectionGraph {
         return pagesByTitle[tidied]
     }
 
-    /// The pages these ones link to, and the pages THOSE link to, and so on.
+    /// The pages these ones link to, and the pages THOSE link to, and so on —
+    /// stopping at any class page a link lands on.
     ///
     /// Transitive on purpose. "Publish tomorrow's class and everything it links
     /// to" means the concept page the class points at AND the snippet that
     /// concept page points at; stopping at one hop leaves a student one click
     /// from nothing.
-    func linkedPages(from starting: [AssistSectionPage]) -> [AssistSectionPage] {
+    ///
+    /// **A class page is the one stop, and it is a decision rather than an
+    /// oversight.** A class goes up when the teacher names THAT class, so a
+    /// link landing on another class is not collected and is not followed
+    /// through: material reachable only through that class belongs to it and
+    /// goes up with it. Publishing Day 4's worksheet because Day 3 links to
+    /// Day 4 puts it in front of students a day early and dates it to the
+    /// wrong lesson. REJECTED was the middle position — leave the linked class
+    /// alone but walk past it to the material beyond — for those same two
+    /// reasons. Decided 2026-09-19, issue #173, after the two apps were found
+    /// to disagree: Windows stopped, the mac walked through.
+    /// `contracts/shared-rules.json` → `followingLinks.stopsAtAClassPage`.
+    ///
+    /// **The pages STARTED from are never stopped.** They are seeded as seen
+    /// before the walk begins, so naming two classes makes both of them
+    /// starting points, and publishing a whole unit — which names every class
+    /// in it, one plan each — loses nothing.
+    ///
+    /// The name says `reach` rather than `linkedPages` on purpose: the rule
+    /// changed under the old name's promise once already, and renaming it made
+    /// the compiler hand every caller over to be read again.
+    func reachFollowingLinks(from starting: [AssistSectionPage]) -> AssistLinkedReach {
         var seen: Set<String> = []
         for page in starting {
             seen.insert(page.lowercasedTitle)
         }
 
         var found: [AssistSectionPage] = []
+        var classPagesStoppedAt: [AssistSectionPage] = []
         var queue: [AssistSectionPage] = starting
         while !queue.isEmpty {
             let page: AssistSectionPage = queue.removeFirst()
@@ -290,11 +336,18 @@ struct AssistSectionGraph {
                     // that does not exist. Not this tool's business to invent.
                     continue
                 }
+                if linked.isClassPage {
+                    // The walk ends here: the class is neither collected nor
+                    // entered. Only the class itself was marked seen, so a
+                    // page this one ALSO reaches directly is still collected.
+                    classPagesStoppedAt.append(linked)
+                    continue
+                }
                 found.append(linked)
                 queue.append(linked)
             }
         }
-        return found
+        return AssistLinkedReach(pages: found, classPagesStoppedAt: classPagesStoppedAt)
     }
 
     /// Links a student could click on a page they can see, that lead to a page

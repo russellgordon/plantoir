@@ -182,7 +182,12 @@ enum SectionReDatePlanner {
             let day: CalendarDay = SectionReDatePlanner.date(
                 at: index, from: remembered.dates
             )
-            for page in graph.linkedPages(from: [classPage]) {
+            // The reach stops at a class page (issue #173), so material
+            // reachable only THROUGH another class is claimed by the class
+            // that actually brings it rather than by whichever earlier class
+            // could see it through that one. Class pages themselves are
+            // unaffected: step 1 above dates every numbered class by position.
+            for page in graph.reachFollowingLinks(from: [classPage]).pages {
                 if spokenFor.contains(page.lowercasedTitle) || page.isClassPage || page.isFolderIndex {
                     continue
                 }
