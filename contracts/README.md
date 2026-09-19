@@ -524,7 +524,7 @@ subtraction.
 whole answer for a list a named key has been lifted out of:
 `windows-app/Plantoir.Tests/NamedGapLedger.cs` holds exactly two, both
 [#158](https://github.com/russellgordon/plantoir/issues/158) at v1.3.0 — the
-`word for a unit renamed` trail event out of `activityTrail.mustRecord` (45
+`word for a unit renamed` trail event out of `activityTrail.mustRecord` (46
 entries), and `renameUnitWord.explanation` out of
 `specialNames.platformWording.keys` (4). Both fail the moment the gap closes or
 the requirement is withdrawn. The two exemption sets in `FileFormatContractTests`
