@@ -964,8 +964,9 @@ final class AssistToolRunner {
         )
 
         // How far each verb reaches is the planner's rule, not an argument.
-        // Publishing always takes the pages it links to; unpublishing takes
-        // only the pages nothing else needs.
+        // Publishing takes the pages it links to and stops where a link lands
+        // on another class (#173); unpublishing takes only the pages nothing
+        // else needs.
         let plan: AssistPublishPlan
         if publishing {
             plan = AssistPublishPlanner.planPublishing(
