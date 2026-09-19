@@ -176,7 +176,10 @@ WHAT WAS CORRECTED IN THE SUITES
     three shapes, all one-way (Python accepted, Swift did not) — a TAB between
     words, an integer that overflows 64 bits, and non-ASCII digits. The mirror
     now splits on the literal space, and reads a number the way Int(_:) does.
-    Re-checked over 2,410 inputs: 0 disagreements. None was reachable from a
+    Re-checked over 2,410 inputs: 0 disagreements. (A later, wider check of
+    599,228 inputs agreed on every row and probe and still found three
+    Unicode-whitespace classes where the two differ; the mirror is a guard
+    for the rows, not a proof of equivalence.) None was reachable from a
     contract row or a probe, so no number here was ever distorted — but a
     mirror whose comment claims a spelling "cannot go unnoticed" had better not
     have three of them.
