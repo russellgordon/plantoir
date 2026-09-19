@@ -656,6 +656,8 @@ public sealed partial class SidebarPane : UserControl
     /// </summary>
     private async void AskWhenToDeploy(Course course, int number, DateTime? existing)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         var initial = existing ?? DateTime.Today.AddDays(1).AddHours(6).AddMinutes(30);
         bool isChange = existing is not null;
 
@@ -747,6 +749,7 @@ public sealed partial class SidebarPane : UserControl
         Recheck();
 
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         if (Chosen() is not { } when) return;
 
         if (Workspace.WorkspacePath is not { } folder) return;
@@ -771,6 +774,8 @@ public sealed partial class SidebarPane : UserControl
     /// </summary>
     private async void ConfirmCancelScheduledDeploy(Course course, int number, DateTime when)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         var dialog = new ContentDialog
         {
             Title = "Cancel this scheduled deploy?",
@@ -782,6 +787,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Close,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         if (TaskScheduling.Cancel(TaskScheduling.NameFor(course.Code, number)) is { } problem)
         {
@@ -900,6 +906,8 @@ public sealed partial class SidebarPane : UserControl
 
     private async void Remove_Click(object sender, RoutedEventArgs e)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         // An archived item is already put away — nothing for this button to do.
         var course = Workspace.SelectedCourse;
         if (course is null || Workspace.WorkspacePath is null) return;
@@ -933,6 +941,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Close,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         try
         {
@@ -979,12 +988,15 @@ public sealed partial class SidebarPane : UserControl
                       "Anything you add from now on won't be in this backup.",
             CloseButtonText = "OK",
         };
+        // folder-check: not needed — nothing follows this dialog but a discard.
         await ShowDialogSafelyAsync(dialog);
         _ = when;
     }
 
     public async void ConfirmRestoreBackup(BackupItem item)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         // Restoring rewrites the course's folders — never mid-copy (row 104's rule).
         if (Workspace.WorkspacePath is { } folder
             && CourseActivity.BusyReason(folder, item.CourseCode) is not null)
@@ -1007,6 +1019,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Primary,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         try
         {
@@ -1037,6 +1050,8 @@ public sealed partial class SidebarPane : UserControl
 
     public async void ConfirmDeleteBackup(BackupItem item)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         string consequence = IsOnlyRemainingCopy(item.CourseCode, item.FilePath)
             ? $"This backup is the only remaining copy of {item.CourseCode} — the course is no longer " +
               $"in Courses & Clubs. Deleting it removes {item.CourseCode} for good."
@@ -1051,6 +1066,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Close,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         try
         {
             CourseRestorer.DeleteBackup(item);
@@ -1067,6 +1083,8 @@ public sealed partial class SidebarPane : UserControl
 
     public async void ConfirmDeleteArchive(ArchivedItem item)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         // Sections inside a still-present course are never the only copy;
         // the survey matters for whole-course archives.
         bool onlyCopy = item.SectionNumber is null && IsOnlyRemainingCopy(item.CourseCode, item.FilePath);
@@ -1083,6 +1101,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Close,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         try
         {
             CourseRestorer.DeleteArchive(item);
@@ -1099,6 +1118,8 @@ public sealed partial class SidebarPane : UserControl
 
     public async void ConfirmRestore(ArchivedItem item)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         string message = item.SectionNumber is int n
             ? $"Section {n} will be put back into {item.CourseCode}, and will no longer be listed as archived."
             : $"{item.CourseCode} will be put back into Courses & Clubs, and will no longer be listed as archived.";
@@ -1111,6 +1132,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Primary,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         try
         {
@@ -1128,6 +1150,41 @@ public sealed partial class SidebarPane : UserControl
         }
     }
 
+    // ---- A confirmation belongs to the folder it was asked in -------------
+
+    /// <summary>
+    /// True when the window has been pointed at a DIFFERENT working folder
+    /// since this confirmation went up — in which case the answer is void and
+    /// the caller must do nothing at all.
+    ///
+    /// <para>This is the Windows shape of the contract's
+    /// <c>workingFolderSelection.alsoCleared</c>
+    /// (<c>contracts/shared-rules.json</c>): the mac holds its pending
+    /// confirmations as FIELDS and drops them when the folder changes, while
+    /// here each one is a continuation on an <c>await</c>, so there is nothing
+    /// to drop and the check has to happen where the continuation resumes.
+    /// Silently void, exactly like the mac's cleared confirmation — no
+    /// sentence, because a teacher who has just moved to another folder is
+    /// not waiting to be told about the one they left.</para>
+    ///
+    /// <para>What it prevents is not theoretical. Every one of these
+    /// confirmations names a course, an archive or a backup by a path taken
+    /// BEFORE the dialog, and finishes by asking the window where it is NOW.
+    /// Answer a backup restore after the folder has moved and
+    /// <c>Workspace.CoursesDirectory()</c> is the new folder's while
+    /// <c>item.FilePath</c> is still the old folder's zip: the new folder's
+    /// course of that code is archived and overwritten with a backup from a
+    /// folder nobody is looking at, and it reports success. A delete removes
+    /// the old folder's file while the window shows the new one.</para>
+    ///
+    /// <para>Ctrl+O is what makes it reachable — a window-wide accelerator
+    /// with no <c>ScopeOwner</c>, so it is not obviously shut while a modal
+    /// dialog is up (issue #191). The guard is here rather than on the
+    /// accelerator because it is true whatever opens the picker.</para>
+    /// </summary>
+    private bool TheFolderMovedUnderThisConfirmation(string? askedIn) =>
+        !WorkingFolder.IsTheSame(askedIn, Workspace.WorkspacePath);
+
     private XamlRoot? EffectiveXamlRoot => XamlRoot ?? _window.Content?.XamlRoot;
 
     private async Task<ContentDialogResult?> ShowDialogSafelyAsync(ContentDialog dialog)
@@ -1137,6 +1194,8 @@ public sealed partial class SidebarPane : UserControl
             dialog.XamlRoot = root;
             try
             {
+                // folder-check: not needed — this IS the helper every
+                // confirmation is shown through; its callers hold the check.
                 return await dialog.ShowAsync();
             }
             catch (Exception ex)
@@ -1160,6 +1219,7 @@ public sealed partial class SidebarPane : UserControl
             Content = message,
             CloseButtonText = "OK",
         };
+        // folder-check: not needed — an error report acts on nothing.
         await ShowDialogSafelyAsync(dialog);
     }
 
@@ -1173,6 +1233,8 @@ public sealed partial class SidebarPane : UserControl
 
     public async Task OpenNewCourseWizard(string? autoCreateCode = null, string? autoSections = null)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         if (EffectiveXamlRoot is null) return;
         var wizard = new NewCourseDialog(_window) { XamlRoot = EffectiveXamlRoot };
         if (autoCreateCode is not null) wizard.AutoCreate(autoCreateCode, autoSections);
@@ -1185,6 +1247,7 @@ public sealed partial class SidebarPane : UserControl
             App.LogDiagnostic($"OpenNewCourseWizard exception: {ex.Message}");
             return;
         }
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         Workspace.Reload();
         _window.ApplyState();
         if (wizard.CreatedCourseCode is { } code)
@@ -1208,6 +1271,8 @@ public sealed partial class SidebarPane : UserControl
                 "preview or deploy of this course is still using them. Try again when it finishes.");
             return;
         }
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         if (EffectiveXamlRoot is null) return;
         var dialog = new AddSectionDialog(course) { XamlRoot = EffectiveXamlRoot };
         try
@@ -1219,6 +1284,7 @@ public sealed partial class SidebarPane : UserControl
             App.LogDiagnostic($"OpenAddSectionDialog exception: {ex.Message}");
             return;
         }
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         if (dialog.AddedNumber is { } number)
         {
             Workspace.Reload();
@@ -1230,6 +1296,8 @@ public sealed partial class SidebarPane : UserControl
     public async Task OpenRenameCourseDialog(Course course)
     {
         if (Workspace.WorkspacePath is not { } folder) return;
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = folder;
 
         string? busy = CourseActivity.BusyReason(folder, course.Code);
         if (busy is not null)
@@ -1292,6 +1360,7 @@ public sealed partial class SidebarPane : UserControl
         Validate();
 
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         string requestedCode = codeBox.Text.Trim();
         string newNormalized = CourseCodeValidator.Normalize(requestedCode);
@@ -1308,6 +1377,8 @@ public sealed partial class SidebarPane : UserControl
                 DefaultButton = ContentDialogButton.Primary,
             };
             if (await ShowDialogSafelyAsync(obsidianDialog) != ContentDialogResult.Primary) return;
+            if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+
 
             await FolderActions.QuitObsidianAndWait();
         }
