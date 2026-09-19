@@ -851,13 +851,46 @@ public sealed class AssistAgent
 
         var arguments = ArgumentsOf(call);
         string when = arguments["when"]?.GetValue<string>() ?? "";
-        string moment = DateTime.TryParse(when, out var parsed)
+        string moment = ReadTheMoment(when) is { } parsed
             ? parsed.ToString("dddd d MMMM, h:mm tt")
             : when;
         string destination = DestinationProvider?.Invoke() ?? "the web";
         return $"Set this computer to deploy {_courseCode} Section {_section} to {destination} at {moment}. " +
                "It has to be on and awake then — plugged in if it is a laptop, lid open. " +
                "Plantoir cannot wake it up.";
+    }
+
+    /// <summary>
+    /// The moment a scheduled deploy's <c>when</c> names, or null when it
+    /// names none.
+    /// </summary>
+    /// <remarks>
+    /// <para>The form the APP writes — <c>yyyy-MM-dd HH:mm</c>, built
+    /// invariantly a few hundred lines above — is read back invariantly, and
+    /// that is not symmetry for its own sake. A plain
+    /// <c>DateTime.TryParse</c> reads the year in the machine's DEFAULT
+    /// CALENDAR, so on a Thai-locale machine the string this app had just
+    /// written as 2026 came back as Buddhist 2026, which is 1483, and the
+    /// approval card named a weekday five centuries out while the deploy
+    /// itself fired on the right day. A card that misdescribes what the
+    /// button does is worse than one that says nothing. Same family as the
+    /// writer sites in
+    /// <see href="https://github.com/russellgordon/plantoir/issues/144">issue
+    /// #144</see>, met from the READING end.</para>
+    ///
+    /// <para>Anything else — a shape a model invented — keeps the lenient
+    /// parse it has always had, since there is no fixed form to pin it to.
+    /// The DISPLAY stays cultural on purpose: the sentence under it is the
+    /// teacher's, not a wire format.</para>
+    /// </remarks>
+    private static DateTime? ReadTheMoment(string when)
+    {
+        if (DateTime.TryParseExact(when, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture,
+                                   DateTimeStyles.None, out var written))
+        {
+            return written;
+        }
+        return DateTime.TryParse(when, out var parsed) ? parsed : null;
     }
 
     /// <summary>A tool call's arguments, which arrive as a JSON string.</summary>
@@ -892,8 +925,25 @@ public sealed class AssistAgent
     /// safe: the message history holds its own deep clone of the model's
     /// reply, taken before this runs, so nothing rewrites what the model is
     /// shown next turn.</para>
+    ///
+    /// <para><b><paramref name="rewrite"/> returns whether it changed
+    /// anything, and nothing is written back when it did not.</b> So a call
+    /// this leaves alone is byte-for-byte the string the model sent, rather
+    /// than a re-serialisation of it, and "untouched" means untouched in a
+    /// test as well as in meaning. A rewrite that changes something and says
+    /// it did not would have that change dropped — which is the trade for
+    /// that property, and is why the flag is the rewrite's own business
+    /// rather than a comparison made out here.</para>
+    ///
+    /// <para><b>A rewrite that DOES change something re-serialises the
+    /// whole object</b>, and a JSON round trip is not text-preserving:
+    /// whitespace goes, key order follows the object, and non-ASCII escapes
+    /// (a page title's curly quotes become <c>\uXXXX</c>). Harmless, because
+    /// every consumer parses the string rather than reading it — but a test
+    /// that compares arguments TEXTUALLY after a rewrite will differ, and
+    /// should compare the parsed values instead.</para>
     /// </remarks>
-    private static JsonObject WithArgumentsRewritten(JsonObject call, Action<JsonObject> rewrite)
+    private static JsonObject WithArgumentsRewritten(JsonObject call, Func<JsonObject, bool> rewrite)
     {
         if (call["function"] is not JsonObject function) return call;
         if (function["arguments"] is not JsonValue raw || !raw.TryGetValue(out string? json)) return call;
@@ -903,8 +953,7 @@ public sealed class AssistAgent
         catch { return call; }
         if (arguments is null) return call;
 
-        rewrite(arguments);
-        function["arguments"] = arguments.ToJsonString();
+        if (rewrite(arguments)) function["arguments"] = arguments.ToJsonString();
         return call;
     }
 
@@ -958,12 +1007,16 @@ public sealed class AssistAgent
 
         return WithArgumentsRewritten(call, arguments =>
         {
-            if (arguments["date"] is not JsonValue given || !given.TryGetValue(out string? word)) return;
-            if (SectionScheduleSource.ReadRelativeDay(word, Today()) is not { } day) return;
+            if (arguments["date"] is not JsonValue given || !given.TryGetValue(out string? word)) return false;
+            if (SectionScheduleSource.ReadRelativeDay(word, Today()) is not { } day) return false;
 
             // InvariantCulture: the tool must not be sent looking for a class
             // on a day no course has — see the dateline above.
-            arguments["date"] = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            string settled = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            if (settled == word) return false;
+
+            arguments["date"] = settled;
+            return true;
         });
     }
 

@@ -50,6 +50,9 @@ public class RelativeDayFreshnessTests
         private readonly Queue<JsonObject?> _replies = new();
         public readonly List<JsonArray> Asked = new();
 
+        /// <summary>Replies prepared and not yet handed out.</summary>
+        public int Waiting => _replies.Count;
+
         public void Then(JsonObject? reply) => _replies.Enqueue(reply);
 
         public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
@@ -102,6 +105,40 @@ public class RelativeDayFreshnessTests
         public List<AssistAgent.Line> Say(string text) =>
             Agent.Say(text, CancellationToken.None).GetAwaiter().GetResult();
 
+        /// <summary>
+        /// Say something that must reach the MODEL, and prove that it did.
+        /// </summary>
+        /// <remarks>
+        /// <para>Every test of the settler needs this, and an adversarial
+        /// review is what found out why: six of the tests here first said
+        /// "publish tomorrow's class", which is one of the eight FIXED CARD
+        /// PHRASINGS. <c>Say</c> answers those in code and never asks the
+        /// model at all, so the prepared reply was never handed out, the
+        /// settler never ran, and every assertion about the call the model
+        /// had "sent" was made about an object nothing had touched. They
+        /// passed, and they pinned nothing.</para>
+        ///
+        /// <para>So the sentence is checked against the card matcher HERE,
+        /// as an assertion rather than as a comment: if a phrasing used by
+        /// one of these tests is ever adopted as a card, the test says so
+        /// instead of quietly going hollow. And the reply must have been
+        /// taken, which is the other half of the same proof.</para>
+        /// </remarks>
+        public List<AssistAgent.Line> SayThroughTheModel(string text)
+        {
+            Assert.True(AssistCardCommand.Matching(text) is null,
+                $"“{text}” is a fixed card phrasing, so it is answered in code and the model — " +
+                "and the settler with it — never sees this call. Pick a sentence no card matches.");
+
+            int waiting = Model.Waiting;
+            var lines = Say(text);
+
+            Assert.NotEmpty(Model.Asked);
+            Assert.True(Model.Waiting < waiting,
+                "the prepared reply was never handed out, so nothing under test ran.");
+            return lines;
+        }
+
         public List<AssistAgent.Line> Approve() =>
             Agent.Approve(CancellationToken.None).GetAwaiter().GetResult();
     }
@@ -143,7 +180,7 @@ public class RelativeDayFreshnessTests
         rig.Model.Then(Calling("publish_class_on",
             """{"course": "ICS3U", "section": 1, "date": "tomorrow"}"""));
 
-        rig.Say("publish tomorrow's class for me");
+        rig.SayThroughTheModel("publish tomorrow's class for me");
 
         var twin = Assert.Single(rig.Tools.Calls);
         Assert.Equal("plan_publish_class_on", twin.Name);
@@ -179,7 +216,7 @@ public class RelativeDayFreshnessTests
             """{"course": "ICS3U", "section": 1, "date": "next monday"}""");
         rig.Model.Then(reply);
 
-        rig.Say("publish next monday's class");
+        rig.SayThroughTheModel("publish next monday's class");
 
         Assert.Equal("next monday", Assert.Single(rig.Tools.Calls).Arguments["date"]!.ToString());
         Assert.Contains("next monday", ArgumentsOn(reply));
@@ -193,7 +230,7 @@ public class RelativeDayFreshnessTests
         rig.Model.Then(Calling("publish_class_on",
             """{"course": "ICS3U", "section": 1, "date": "2026-10-01"}"""));
 
-        rig.Say("publish the class on the first of October");
+        rig.SayThroughTheModel("publish the class on the first of October");
 
         Assert.Equal("2026-10-01", Assert.Single(rig.Tools.Calls).Arguments["date"]!.ToString());
     }
@@ -204,8 +241,14 @@ public class RelativeDayFreshnessTests
     /// </summary>
     /// <remarks>
     /// It is a day AND a time, and the tool declares no <c>date</c> at all, so
-    /// the gate never opens for it. This is the test that goes red if the gate
-    /// is widened to "any argument that looks like a day".
+    /// the gate never opens for it.
+    ///
+    /// <para>Note what this does NOT catch: widening the gate leaves
+    /// <c>when</c> alone anyway, because the rewrite only ever reads and
+    /// writes <c>date</c>. The sweep below is what goes red if the gate stops
+    /// asking the surface. What this pins is the other half — that <c>when</c>
+    /// is never renamed, never settled and never joined by a <c>date</c> the
+    /// tool would not know what to do with.</para>
     /// </remarks>
     [Fact]
     public void AScheduledDeploysWhenIsNotTouched()
@@ -215,7 +258,7 @@ public class RelativeDayFreshnessTests
             """{"course": "ICS3U", "section": 1, "when": "tomorrow 06:30"}""");
         rig.Model.Then(reply);
 
-        rig.Say("deploy at half six tomorrow");
+        rig.SayThroughTheModel("deploy at half six tomorrow");
         Assert.True(rig.Agent.IsAwaitingApproval);
         rig.Approve();
 
@@ -250,7 +293,7 @@ public class RelativeDayFreshnessTests
         var reply = Calling("publish_class_on", argumentsJson);
         rig.Model.Then(reply);
 
-        rig.Say("publish tomorrow's class");
+        rig.SayThroughTheModel("put tomorrow's class up for me, please");
 
         Assert.Equal(argumentsJson, ArgumentsOn(reply));
         Assert.Single(rig.Tools.Calls);
@@ -265,7 +308,7 @@ public class RelativeDayFreshnessTests
         var reply = Calling("publish_class_on", nonsense);
         rig.Model.Then(reply);
 
-        rig.Say("publish tomorrow's class");
+        rig.SayThroughTheModel("put tomorrow's class up for me, please");
 
         Assert.Equal(nonsense, ArgumentsOn(reply));
     }
@@ -306,10 +349,14 @@ public class RelativeDayFreshnessTests
             var reply = Calling(tool, """{"course": "ICS3U", "section": 1, "date": "tomorrow"}""");
             rig.Model.Then(reply);
 
-            rig.Say("do the thing");
+            rig.SayThroughTheModel("do the thing");
             if (rig.Agent.IsAwaitingApproval) rig.Approve();
 
-            if (ArgumentsOn(reply).Contains("2026-09-09", StringComparison.Ordinal)) settled.Add(tool);
+            // Read as VALUES rather than as text: a rewrite re-serialises the
+            // whole object, so comparing strings here would be comparing
+            // formatting as much as meaning.
+            var after = JsonNode.Parse(ArgumentsOn(reply))!.AsObject();
+            if (after["date"]!.ToString() == "2026-09-09") settled.Add(tool);
         }
 
         Assert.NotEmpty(declaring);
@@ -339,11 +386,21 @@ public class RelativeDayFreshnessTests
     /// as everybody else.
     /// </summary>
     /// <remarks>
-    /// Measured for issue #144: <c>ToString("yyyy-MM-dd")</c> with no culture
-    /// renders <c>2569-09-09</c> on a Thai-locale Windows machine. The dateline
-    /// rides on every model-routed message, so an affected teacher's assistant
-    /// was being told the wrong year on every turn — and the scheduled deploy
-    /// below is a date the app WRITES, which is the half that lasts.
+    /// <para>Measured for issue #144: <c>ToString("yyyy-MM-dd")</c> with no
+    /// culture renders <c>2569-09-09</c> on a Thai-locale Windows machine. The
+    /// dateline rides on every model-routed message, so an affected teacher's
+    /// assistant was being told the wrong year on every turn — and the
+    /// scheduled deploy below is a date the app WRITES, which is the half that
+    /// lasts.</para>
+    ///
+    /// <para>The third assertion is the same trap met from the READING end.
+    /// The card's sentence parses the moment back out of the string the app
+    /// has just written, and a lenient <c>DateTime.TryParse</c> reads 2026 in
+    /// the machine's calendar — Buddhist 2026, which is 1483 — so the card
+    /// named a weekday five centuries out while the deploy itself fired on the
+    /// right day. The DATE is checked through the culture's own rendering of
+    /// the moment that is correct, so what is compared is which moment the
+    /// card describes rather than how Thai writes a Wednesday.</para>
     /// </remarks>
     [Fact]
     public void ANonGregorianMachineIsToldTheSameYearAsEverybodyElse()
@@ -361,7 +418,11 @@ public class RelativeDayFreshnessTests
             Assert.Equal("what day is it? (Today is 2026-09-08, a Tuesday.)", userTurn);
 
             var scheduling = new Rig();
-            scheduling.Say("Deploy tomorrow's class at 6:30 AM");
+            var asked = scheduling.Say("Deploy tomorrow's class at 6:30 AM");
+
+            string card = asked[0].Text;
+            Assert.Contains(new DateTime(2026, 9, 9, 6, 30, 0).ToString("dddd d MMMM, h:mm tt"), card);
+
             scheduling.Approve();
 
             Assert.Equal("2026-09-09 06:30",
