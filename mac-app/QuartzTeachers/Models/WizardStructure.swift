@@ -88,12 +88,16 @@ enum WizardStructure {
     ///   the teacher has ticked themselves is theirs and is kept, but
     ///   NARROWED to the folders the course will actually have. Without the
     ///   second, a teacher who adopted the mathematics skeleton, unticked
-    ///   `Tasks` and then declined the skeleton would be left with
-    ///   `graded_folders: ["Thinking Tasks"]` naming a folder the course does
-    ///   not have — the build counts nothing, the checklist shows nothing
-    ///   ticked, and neither says so. Windows reaches the same place from the
-    ///   other end: it leaves the pool alone here and narrows it on every
-    ///   read (`CurrentGradedFolders`) and again when the file is written.
+    ///   `Tasks` and then declined the skeleton is shown a checklist with
+    ///   nothing ticked while the wizard writes
+    ///   `graded_folders: ["Thinking Tasks"]` — a name no folder of theirs
+    ///   matches, and a DIFFERENT file from the one Windows writes for the
+    ///   same clicks. (`setup_course.py` reconciles the key again when it
+    ///   reads it, so a teacher does not end up with a broken course; that is
+    ///   a second net, not a reason for the wizard to write something untrue.)
+    ///   Windows reaches the same answer from the other end: it leaves the
+    ///   pool alone here and narrows it on every read
+    ///   (`CurrentGradedFolders`) and again when the file is written.
     static func restoringDefaults(
         in current: Lists,
         adopted: Lists?,

@@ -142,7 +142,7 @@ requirement.
   shared folder gets a chevron, per-section folders stay plain links). A
   third, `WizardStructure`, carries the toggle's OTHER direction — declining
   the skeleton puts the defaults back into every list the teacher has not
-  edited since, so the editor shows what will actually be created; its ten
+  edited since, so the editor shows what will actually be created; its thirteen
   cases are `contracts/shared-rules.json` → `wizard.skeletonToggle`.
 - **Built websites are kept OUTSIDE the working folder**, and
   `courses/<CODE>/.merged_output` is a shortcut to
