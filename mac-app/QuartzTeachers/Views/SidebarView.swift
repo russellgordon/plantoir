@@ -99,11 +99,17 @@ struct SidebarView: View {
                                 // teacher who fixes the problem or dismisses
                                 // the notice should see the badge go without
                                 // the sidebar being rebuilt.
+                                //
+                                // The counter is the WATCHER's, which is what
+                                // makes this badge and the section's own band
+                                // move together in both directions: it moves
+                                // when a run finishes (the folder changed) as
+                                // well as when the teacher dismisses a notice.
                                 let stoppedPublish: ScheduledPublishOutcome.Stopped? =
                                     stoppedPublishBadge(
                                         courseCode: course.code,
                                         sectionNumber: sectionNumber,
-                                        generation: workspace.stoppedPublishGeneration
+                                        generation: ScheduledPublishWatcher.shared.generation
                                     )
                                 sectionRowLabel(
                                     sectionNumber: sectionNumber,
