@@ -1,0 +1,210 @@
+ROUTING ON METAL, AFTER THE 2026-08-24 SYSTEM-PROMPT CHANGE
+===========================================================
+
+THE FIRST THING TO KNOW: THIS IS A RE-MEASUREMENT, AND IT CANNOT SHOW A WIN
+--------------------------------------------------------------------------
+The two sentences added to the system prompt on 2026-08-24 (commit b77b91bd,
+"undo_last_change reverses only the assistant's own most recent action…" and
+"There is no tool to delete, remove or rename a page or a folder…") were
+written to fix a cluster measured on WINDOWS, in a container, against
+Qwen2.5-1.5B under Vulkan: promise-card-results.txt, 3 trials, 15 tools, 72%
+overall, with "hide, phrased as a mistake" answered with undo_last_change in
+all three trials.
+
+**That failure has never been observed on Metal.** The same suite had already
+run on this Mac, twice, before the tweak existed:
+
+  - macos-native-10-trial-comparison.txt:193-250 — 2026-08-15, Qwen2.5-1.5B,
+    15 tools, ctx 16384, temp 0.1, 10 trials: "hide, phrased as a mistake"
+    10/10 unpublish_pages.
+  - thirteen-tool-surface-results.txt — 2026-08-15, 13 tools, ctx 16384: the
+    same probe, again 10/10 unpublish_pages, on BOTH tiers.
+
+So on this hardware the tweak was aimed at a fault that was not there. This
+run can therefore show one of two things and no third: that the change is
+NEUTRAL on Metal, or that it is HARMFUL on Metal. It cannot show a gain,
+because there was no loss to recover. That is the honest frame for everything
+below, and it is written at the top so that a number from this file cannot be
+quoted as evidence the tweak worked.
+
+WHAT THIS NUMBER IS NOT
+-----------------------
+  - **Not a pass rate, and not a probability.** The suite runs at temperature
+    0.1 (0 in the headline arms), which is near-greedy: ten trials of one
+    probe are usually ten copies of one answer. Ten trials distinguishes "this
+    model systematically does the wrong thing with this sentence" from "it
+    wobbled once". It does not estimate how often a teacher would be
+    misrouted.
+  - **Not what a teacher experiences.** Five of the 29 probes never reach the
+    model in the app — AssistCardCommand answers them in code — and the app
+    also rewrites the course and section (`boundToThisSection`) and settles
+    relative dates (`withTheDaySettled`) before any call runs. The suite does
+    neither, so its "wrong course" and "fabricated date" counters are
+    STRICTER than the shipped product.
+  - **Not a comparison with the 72%.** That figure is Windows, in a container,
+    3 trials, 15 tools, a different engine build and a different tool-surface
+    text. Nothing here is like-for-like with it. It is quoted only to say what
+    it is.
+  - **Not a gate.** Nothing in either test suite checks routing, deliberately
+    and for reasons recorded in CLAUDE.md. This is a measurement, taken by
+    hand, on one machine, on one day.
+
+CONDITIONS
+----------
+Date:        2026-09-18
+Machine:     Apple M4 Pro, 48 GiB (51,539,607,552 bytes physical),
+             hw.perflevel0.logicalcpu = 8 performance cores
+macOS:       26.6 (build 25G72)
+Engine:      llama.cpp b10435 — `version: 0.1.0-dev (build 10435, commit
+             9e40df63b)`, AppleClang 21.0.0 for Darwin arm64 — the binary the
+             app bundles, mac-app/Vendor/llama/llama-server. NATIVE, with
+             Metal. Nothing in a container; Colima was not touched.
+Models:      .small  qwen2.5-1.5b-instruct-q4_k_m.gguf, Q4_K_M,
+                     1,117,320,736 bytes
+                     sha256 6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e
+                     (the file the app itself downloaded, read-only here)
+             .large  Qwen3-4B-Q4_K_M.gguf, Q4_K_M, 2,497,280,256 bytes
+                     sha256 7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5
+                     fetched from AssistModelTier.downloadURL for .large
+                     (huggingface.co/Qwen/Qwen3-4B-GGUF) into a scratch
+                     folder. The byte count is exactly
+                     AssistModelTier.downloadBytes, which is the app's own
+                     check on a download.
+Tier:        **This Mac ships the LARGE tier.** 48 GiB ≥ 16 GiB, so
+             AssistModelTier.forPhysicalMemory returns .large: Qwen3-4B at
+             ctx 16384. The 1.5B is measured as well because it is what an
+             8 GB Mac runs, and because it is the model every earlier number
+             in this folder was taken against.
+Context:     8192 for the 1.5B (.small), 16384 for the 4B (.large) — exactly
+             AssistModelTier.contextTokens, rather than one figure for both.
+Flags:       everything AssistServerHost.serverArguments passes, and nothing
+             else:
+               --model <M> --port 8099 --host 127.0.0.1 --ctx-size <C>
+               --reasoning off --reasoning-budget 0 --threads 4
+               --n-gpu-layers 999 --jinja --parallel 1
+Threads:     **4, where the 2026-08-15 anchors used 6.** This Mac has 8
+             performance cores and AssistHardwareBudget.threadCount is half of
+             them, clamped to [2,6] — so 4 is what the app would really pass
+             here, and 6 was a hand-typed figure on the day. Generation on
+             Apple silicon is bound by memory bandwidth long before thread
+             count, so this is expected to move the clock a little and the
+             tool choices not at all; it is recorded because an unstated
+             difference is how a comparison quietly stops being one.
+Surface:     13 tools, the local surface, from
+             `python3 research/ai-assist/tools-from-contract.py local`, which
+             reads contracts/assist-cases.json → toolSchemas.local. The
+             contract is GENERATED from the app, so this cannot be a surface
+             that does not ship. `Plantoir --write-contracts` was NOT run (it
+             needs an app build, and another agent held the checkout), so the
+             contract's freshness was checked instead:
+               contract     68de49ad, 2026-09-09 23:33
+               descriptions AssistToolSurface.swift, last changed 3c080a54,
+                            2026-09-09 23:20 — an ANCESTOR of the contract
+                            commit, so the contract is not older than the
+                            surface.
+               AssistToolRunner.swift has changed since (#143, 2026-09-10) but
+               the diff touches no tool description and no tool name.
+Suite:       research/ai-assist/trimmed-surface-suite.py, in the shipped
+             configuration `--date-appended --real-course --course VVH2O`, 29
+             probes. Harness changes for this run are commit 97c18fb6; the
+             defaults are unchanged, so an older command line still
+             reproduces the older files.
+Prompt:      AssistAgent.swift as of 51e74cfe (2026-09-10) for the `shipped`
+             and `hyphen` forms; `git show b77b91bd^` for the `pre-tweak`
+             form. The three differ as follows, verified by the harness on
+             every run:
+               hyphen     1278 chars — the suite's own constant, ASCII
+                          hyphens, what every earlier file in this folder was
+                          measured against
+               shipped    1278 chars — AssistAgent.swift's literal, read out
+                          of the Swift; identical to `hyphen` except for SIX
+                          em-dashes. Windows' AssistAgent.cs also ships
+                          em-dashes.
+               pre-tweak  929 chars — the same literal at b77b91bd^, before
+                          the two sentences
+             The system prompt is NOT in the contract, so nothing pins the
+             Swift, the C# and this suite together but the assertion added in
+             97c18fb6.
+Other load:  another agent was running xcodebuild test suites on this machine
+             throughout. **Latency figures here are indicative only.** Token
+             counts and tool choices are unaffected by a busy machine.
+
+DECIDED IN ADVANCE
+------------------
+Written and committed BEFORE the first model call, so that the thresholds
+cannot be fitted to the numbers. The commit order is the evidence: this
+section is in 97c18fb6's successor, and every results block below arrived
+later.
+
+**The arms.** All of them: 29 probes, `--date-appended --real-course --course
+VVH2O`, the 13-tool local surface, a fresh server per model, port 8099
+confirmed free first.
+
+  Qwen2.5-1.5B, ctx 8192
+    A1  comparability   --prompt hyphen,     temp 0.1, 10 trials
+    A2  em-dash delta   --prompt shipped,    temp 0.1, 10 trials
+    A3  pre-tweak       --prompt pre-tweak,  temp 0.1, 10 trials
+    H   HEADLINE        --prompt shipped,    --app-body (temp 0), 3 trials
+                        warm + 1 pass on a freshly restarted server
+    Hpre                as H, --prompt pre-tweak
+  Qwen3-4B, ctx 16384 (this Mac's own tier)
+    H, Hpre, A2, A3, the same way
+
+A1 is the nearest thing to a like-for-like re-run of the 2026-08-15 anchors,
+and it is not exact: the anchors used 15 tools (the 10-trial comparison) or
+ctx 16384 (both), 6 threads, and — because they predate 2026-08-24 — the
+PRE-TWEAK prompt. A3 is the arm that matches the anchors on wording.
+
+**Follow-up work is demanded if any of these trips.** Nothing else is.
+
+  1. ANY polarity inversion — a hide request answered with a publish tool —
+     in any trial of any arm. This is the veto, not a tiebreaker: it is the
+     one failure that reports success.
+  2. Any probe that was 10/10 in EITHER 2026-08-15 anchor scoring ≤5/10 in
+     the comparable arm.
+  3. "hide, phrased as a mistake" below 9/10 unpublish, or 2/10 or more
+     undo_last_change. This is a REGRESSION tripwire, not a test that the
+     tweak fixed something: the probe was already 10/10 here before the
+     tweak existed.
+  4. The pre-tweak arm beating the shipped arm by ≥5/10 on a probe that is
+     stable (0/10 or 10/10) in both. That would mean the prompt was changed
+     on another platform's numbers at this platform's expense, and it earns
+     a `decision` issue rather than a quiet fix.
+  5. The deletion probe ("Delete the Unit 1 folder in VVH2O") routing to a
+     real WRITE. rebuild_preview and cancel_scheduled_deploy are the known,
+     logged answers and are not fixed here; the wording fix that was tried
+     and REJECTED is in conversational-residue-results.txt ~:59-71 and is not
+     to be retried.
+  6. Write-misses above the 13-tool anchor's rate on the same probes.
+  7. A fabricated date on any probe other than `typos`, or any malformed tool
+     call, or any argument needing type coercion.
+  8. The em-dash arm differing from the hyphen arm by ≥5/10 on any stable
+     probe. ONLY if this trips does Windows owe anything, and then a
+     `windows` issue is drafted — otherwise the divergence is something the
+     other side must merely KNOW, and it goes in documentation/.
+
+  **Not grounds, decided now so it cannot be argued later:** a single control
+  moving; an unstable probe (1-9/10 in an arm) moving; the five intercepted
+  probes scoring badly, since the app never sends them.
+
+Every probe is classified stable-pass (10/10), stable-fail (0/10) or unstable
+(anything between), and the thresholds are read against that classification.
+
+**The five probes the app answers in code**, found by the harness's
+interception guard against contracts/assist-cases.json rather than by hand,
+all five of them promise-card probes:
+
+    card: publish tomorrow   -> publish_class_on
+    card: check the section  -> check_section
+    card: rebuild preview    -> rebuild_preview
+    card: undo               -> undo_last_change
+    card: deploy now         -> deploy_section
+
+They are measured anyway and reported separately, because the
+bring-your-own-assistant path — Claude Code over MCP — has no interception
+layer in front of it and does route them.
+
+RESULTS
+-------
+(To be appended. Nothing above this line was written after the first model
+call.)
