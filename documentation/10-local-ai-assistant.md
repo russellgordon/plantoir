@@ -648,31 +648,46 @@ tier at its own context size:
 |---|---|---|
 | All 29 probes, shipped prompt | **271 / 290 (93%)** | 208 / 290 (72%) |
 | The same, with the pre-2026-08-24 prompt | 270 / 290 (93%) | 199 / 290 (69%) |
-| The eleven the window offers | **110 / 110** | 90 / 110 |
+| The eleven promise-card probes (**Windows'** `ExampleRequests`, not this app's shelf) | **110 / 110** | 90 / 110 |
 | Polarity inversions | **0** | **0** |
-| Tool calls whose arguments were truncated | **0** | 12-19 per 290 |
+| Tool calls whose arguments were truncated (suite body, `max_tokens` 256) | **0** | 12-19 per 290 |
+| The same under the app's own body (no cap) | **0** | 3 per 87 |
 
-Two things to take from it, and nothing more. **The 2026-08-24 change is
-neutral on the tier this Mac runs** — 27 of the 29 probes give the identical
-tool with the old wording and the new one — and the cluster it was written
-for was never present here: "I posted Unit 2, Day 3 by mistake. Make it a
-draft again." is `unpublish_pages` 10/10 in every arm of both models, before
-the tweak and after it. And **the two tiers are not two grades of the same
-thing**: the small one is solidly right on 19 of 29 probes and solidly wrong
-on 7, including "Deploy tomorrow's class at 6:30 AM", which it answers by
-deploying now. That is why the small tier shows what it is about to do before
-doing it, and the large one does not.
+Three things to take from it. **The 2026-08-24 change is neutral on the tier
+this Mac runs** — 28 of the 29 probes give the identical tool with the old
+wording and the new one — and the cluster it was written for was never present
+here: "I posted Unit 2, Day 3 by mistake. Make it a draft again." is
+`unpublish_pages` 10/10 in every arm of both models, before the tweak and
+after it. **On the small tier it did buy something**: the older wording let
+the model DECLINE a plain hide request 6 times in 10, where the current one
+declines once.
+
+And **the two tiers are not two grades of the same thing**: the small one is
+solidly right on 19 of 29 probes and solidly wrong on 7, including every way
+of asking for a deploy at a time — the mac's own shelf card "Deploy at 6:30
+AM" routes to `deploy_section`, deploying immediately, 10/10 on the small tier
+while the 4B gets it right 10/10. Confirmation before acting does not turn
+that into a safe failure by itself: `assistantAsksBeforeChanging` is ONE
+setting for both tiers and defaults on for both (`AssistantSettingsTests`
+asserts it on a 48 GB machine), approval is per TOOL — `needsApproval: true`
+on `deploy_section` and `schedule_deploy` and nothing else — and the tier only
+changes the CAUTION a teacher is shown when they turn confirmation off
+(`AssistModelLibrary.confirmationCaution`). A sentence here previously claimed
+the small tier confirms and the large one does not; it never has.
 
 **Something both platforms must know before quoting a zero.** Every suite in
-`research/ai-assist/` parses a tool call's arguments as
-`try: json.loads(...) except: args = {}`, so a call whose argument JSON was cut
-off short has always been recorded as a call with no arguments, and never as a
-malformed one. `trimmed-surface-suite.py` counts it now; `teachers-say-suite.py`
-and `adversarial-suite.py` — the Windows-side ones — still do not, so a "0
-malformed" from either means "no HTTP errors". It is not a Windows bug to fix
-on a deadline: the mac is the platform EXPOSED to it, because
-`AssistModelClient` sends no `max_tokens` at all where Windows'
-`LocalModel` sends 512.
+`research/ai-assist/` that PRINTS a `malformed tool calls: N` line parses a
+tool call's arguments as `try: json.loads(...) except: args = {}`, so a call
+whose argument JSON was cut off short has always been recorded as a call with
+no arguments, and never as a malformed one. `trimmed-surface-suite.py` counts
+it now; `teachers-say-suite.py` still does not, so a "0 malformed" from it
+means "no HTTP errors". (`routing-suite.py` is the exception worth naming: it
+keeps the raw string as `{"__unparseable__": …}` and labels its own line
+"runtime rejected", so it does not make the false claim — it simply has no
+count of the other kind.) It is not a Windows bug to fix on a deadline: the
+mac is the platform EXPOSED to it, because `AssistModelClient` sends no
+`max_tokens` at all where Windows' `LocalModel` sends 512, so a runaway here
+runs until the context is full.
 
 The figures above are not a failure rate. The suite runs at temperature 0.1
 (0 in the arms that copy the app's own request), which is near-greedy: ten
