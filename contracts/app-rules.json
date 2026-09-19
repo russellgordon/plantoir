@@ -1068,6 +1068,93 @@
     ]
   },
   "note" : "What both apps must agree on outside the assistant. See contracts/README.md.",
+  "outsideAgents" : {
+    "agents" : [
+      {
+        "arguments" : [
+          "--mcp-config",
+          "{config}",
+          "--strict-mcp-config",
+          "{greeting}"
+        ],
+        "couldNotStart" : "Plantoir couldn’t start a Claude session for {course}. If Claude Code was updated or moved recently, restarting Plantoir may be enough.",
+        "didNotOpenTitle" : "Claude didn’t open",
+        "executable" : "claude",
+        "handover" : "a configuration file written for this one session and named after the course",
+        "isolatesTheTeachersOwnServers" : true,
+        "isolationNote" : "--strict-mcp-config means only the server in that file is loaded, so a teacher's own MCP servers are neither used nor disturbed.",
+        "key" : "claude",
+        "menuItem" : "Revise with Claude…",
+        "trailLine" : "started Claude Code for {course}",
+        "writes" : [
+          "launch-{course}.command",
+          "mcp-{course}.json"
+        ],
+        "writesNothingElse" : "Both files are in the app's own data directory. Nothing is written into the teacher's working folder, and nothing global is touched."
+      },
+      {
+        "arguments" : [
+          "-c",
+          "mcp_servers.plantoir.command=\"{server}\"",
+          "-c",
+          "mcp_servers.plantoir.args=[\"--mcp-stdio\",\"{folder}\"]",
+          "-c",
+          "mcp_servers.plantoir.startup_timeout_sec=60",
+          "-c",
+          "mcp_servers.plantoir.tool_timeout_sec=1800",
+          "{greeting}"
+        ],
+        "argumentsNote" : "Four dotted -c overrides and the greeting as a positional first message. No sandbox flag and no approval flag: Codex asks the teacher itself before any tool that changes a page, and passing a flag would quietly widen permissions they set for themselves. Dotted keys rather than one inline table because they merge into a teacher's configuration one key at a time and match the published documentation.",
+        "couldNotStart" : "Plantoir couldn’t start a Codex session for {course}. If Codex was updated or moved recently, restarting Plantoir may be enough.",
+        "didNotOpenTitle" : "Codex didn’t open",
+        "executable" : "codex",
+        "handover" : "inline configuration on the command line, so nothing at all is written for the connection",
+        "isolatesTheTeachersOwnServers" : false,
+        "isolationNote" : "Codex has no equivalent of --strict-mcp-config, and the command-line layer is MERGED with the teacher's own configuration rather than replacing it, so their own MCP servers load beside Plantoir's. This is structural rather than an omission in the documentation and cannot be fixed from Plantoir's side.",
+        "key" : "codex",
+        "menuItem" : "Revise with Codex…",
+        "scriptNameCarriesTheAgentWhy" : "The second door's script is named after the agent as well as the course. The script is read by the terminal AFTER Plantoir has handed it over, so two doors sharing one name would let a second launch seconds later reach the first window with the wrong command line - which is the same race the per-course naming already exists to stop.",
+        "timeoutsAreOverriddenWhy" : "Codex's own defaults are version-dependent - 30s startup and 300s per tool in its current source, 10s and 60s in its published reference - and both tool figures are too short, because a publish is awaited and a first one builds the image and uploads, which takes minutes. 60s and 1800s are passed rather than trusted.",
+        "trailLine" : "started Codex for {course}",
+        "valuesAreEscapedTwice" : "Each value sits inside a TOML basic string inside a shell-single-quoted argument, so it is escaped for TOML first (backslash, double quote and control characters) and for the shell second. Getting the inner layer wrong fails QUIETLY: an unparseable value is not rejected, it is treated as a raw string, so args stops being a list and the door greets the teacher and then cannot start its server.",
+        "writes" : [
+          "launch-{course}-codex.command"
+        ],
+        "writesNothingElse" : "No configuration file exists for this door: the server is described in the arguments. Nothing is written into the teacher's working folder, and nothing is added to or read from their own Codex configuration."
+      }
+    ],
+    "courseIsNamedInTheGreetingOnly" : "The server is given the WORKING FOLDER, never a course, so every course in the folder is reachable from either door. The only thing that points a session at one course is the greeting. This is a real difference from the assistant Plantoir carries itself, whose window is bound to one section and refuses any other course (assist-cases.json -> windowBinding), and it is stated here because a reader who assumed otherwise would give a door a narrowing it does not have.",
+    "greetingCarriesNoDoubleQuotes" : "The greeting is passed as one shell argument, so double quotes are replaced with apostrophes before it goes anywhere near a command line.",
+    "greetingIsTheSameForEveryAgent" : true,
+    "greetingMustSay" : [
+      "the course it is about, by code, and its name when that differs",
+      "that the plantoir tools are the way to do anything to do with this course",
+      "that the session should start by listing the course's sections",
+      "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to"
+    ],
+    "hiddenWhenNotInstalled" : true,
+    "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown the menu item at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: with one installed a teacher sees one item, with both they see both, with neither they see no sign that either exists.",
+    "neverInstalled" : "Plantoir never installs an outside assistant and never offers to. These are developer tools with accounts, sign-ins and their own update paths; an app that puts one onto a teacher's machine has taken on a support surface nobody wants, and the teacher has not agreed to it. The door opens onto something they chose to install themselves.",
+    "neverProbedForSignIn" : "Finding the tool says nothing about whether the teacher is signed in to it, and the door does not try to find out: that would mean running the tool while a context menu is being drawn. A teacher who is signed out meets their assistant's own sign-in step inside the terminal, which is where it belongs.",
+    "note" : "The OUTSIDE doors: handing one course to a command-line assistant the teacher already has on their own machine, so it can work on their pages through Plantoir's MCP server. Distinct from the assistant Plantoir carries itself (contracts/assist-cases.json), which runs on the teacher's machine with no account and no CLI. AUTHORED, not generated. This block is the first contract data either door has ever had: it arrived on the mac with issue #205, which added the Codex door, and it describes BOTH doors so that the Claude half states what the two apps already do rather than leaving it written down nowhere.",
+    "searchedForInOrder" : [
+      "every directory on PATH",
+      "{home}/.local/bin",
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "{home}/.npm-global/bin",
+      "{home}/.bun/bin",
+      "{home}/.nvm/versions/node/*/bin"
+    ],
+    "searchedForWhy" : "PATH alone is not enough and the explicit list does nearly all of the work: an app launched from the Dock inherits launchd's minimal PATH, so the tool is usually not on it even when the teacher's own shell finds it at once. Both doors search the same directories with only the tool's name changed - Codex's official installer writes into {home}/.local/bin, which is already the first place looked. This is the first thing somebody will try to simplify away.",
+    "serverArguments" : [
+      "--mcp-stdio",
+      "{folder}"
+    ],
+    "serverIsThePlantoirBinary" : "The MCP server is the Plantoir binary itself answering --mcp-stdio, so there is no second executable to find, sign or forget. On Windows it is plantoir-mcp.exe, which is the one part of this block that differs by platform.",
+    "serverName" : "plantoir",
+    "whatADoorIs" : "Plantoir finds the assistant's command-line tool, writes a throwaway .command script into its OWN data directory, and hands that script to a terminal. The teacher watches a real session in a real terminal window. Nothing is typed by them, and nothing is left in the folder Obsidian is watching."
+  },
   "previewPorts" : {
     "containerPorts" : [
       8081,

@@ -13,14 +13,32 @@ import Foundation
 ///   and nothing is left behind when the session ends.
 /// * **Nothing lands in the teacher's folder.** The config sits in the app's
 ///   own data directory, not in the vault Obsidian is watching.
-/// * **The session is locked to the course it was started from.** Passed to
-///   the server rather than asked for in a prompt, so it holds however the
-///   conversation wanders.
+/// * **The course is named in the opening message, and nowhere else.** This
+///   used to claim the session was "locked to the course … passed to the
+///   server rather than asked for in a prompt", and that was never true:
+///   `--mcp-stdio` takes the WORKING FOLDER, so every course in it is
+///   reachable, and the only thing that points the session at one course is
+///   the greeting. Corrected 2026-09-19, when a second door made the
+///   difference matter: a reader who believed the old sentence would have
+///   given Codex a narrowing that neither door has.
 ///
 /// The menu item only appears when this returns true from
 /// `isAvailable` — a teacher without Claude Code should not be offered a
 /// door that opens onto an error.
+///
+/// `CodexLauncher` is the same door for `codex`, and borrows the helpers
+/// below rather than copying them.
 nonisolated enum ClaudeCodeLauncher {
+
+    // MARK: - Stored properties
+
+    /// The three sentences this door shows a teacher, in one place, because
+    /// `contracts/app-rules.json` → `outsideAgents` carries them and a test
+    /// compares the two. A sentence typed into the view and again into the
+    /// contract is a sentence that will disagree with itself.
+    static let menuItemTitle: String = "Revise with Claude…"
+
+    static let didNotOpenTitle: String = "Claude didn’t open"
 
     // MARK: - Computed properties
 
@@ -31,27 +49,42 @@ nonisolated enum ClaudeCodeLauncher {
 
     // MARK: - Functions
 
-    /// Where Claude Code is, or nil. Checked on PATH first, then the places
-    /// its own installers put it.
+    /// Where Claude Code is, or nil.
     static func findClaude() -> String? {
-        if let onPath = onPath("claude") {
+        return findCommandLineTool(named: "claude")
+    }
+
+    /// Where a command-line assistant is, or nil. Checked on PATH first, then
+    /// the places its own installers put it.
+    ///
+    /// The explicit list does nearly all of the work, and it is the first
+    /// thing somebody will try to simplify away: an app launched from the Dock
+    /// inherits launchd's minimal PATH, so `onPath` usually finds nothing even
+    /// on a Mac where the teacher's own shell finds the tool immediately.
+    ///
+    /// The same directories serve both doors — Codex's official installer
+    /// script uses `$HOME/.local/bin`, and Homebrew, npm-global and bun land
+    /// where they always do — so the list is written once with the name as a
+    /// parameter rather than copied with one word changed.
+    static func findCommandLineTool(named name: String) -> String? {
+        if let onPath = onPath(name) {
             return onPath
         }
 
         let homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
         var candidates: [String] = [
-            homeDirectory.appendingPathComponent(".local/bin/claude").path,
-            "/opt/homebrew/bin/claude",
-            "/usr/local/bin/claude",
-            homeDirectory.appendingPathComponent(".npm-global/bin/claude").path,
-            homeDirectory.appendingPathComponent(".bun/bin/claude").path,
+            homeDirectory.appendingPathComponent(".local/bin/\(name)").path,
+            "/opt/homebrew/bin/\(name)",
+            "/usr/local/bin/\(name)",
+            homeDirectory.appendingPathComponent(".npm-global/bin/\(name)").path,
+            homeDirectory.appendingPathComponent(".bun/bin/\(name)").path,
         ]
 
         let nvmNodeDirectory: URL = homeDirectory.appendingPathComponent(".nvm/versions/node")
         if let nodeVersions = try? FileManager.default.contentsOfDirectory(atPath: nvmNodeDirectory.path) {
             for version in nodeVersions {
-                let nvmClaudePath: String = nvmNodeDirectory.appendingPathComponent("\(version)/bin/claude").path
-                candidates.append(nvmClaudePath)
+                let nvmToolPath: String = nvmNodeDirectory.appendingPathComponent("\(version)/bin/\(name)").path
+                candidates.append(nvmToolPath)
             }
         }
 
@@ -124,9 +157,20 @@ nonisolated enum ClaudeCodeLauncher {
             return false
         }
 
-        ActivityTrail.note(.assistantOpened, "started Claude Code for \(courseCode)")
+        ActivityTrail.note(.assistantOpened, trailSentence(courseCode: courseCode))
 
         return launchTerminal(scriptPath: scriptPath)
+    }
+
+    /// What a teacher is told when the door did not open.
+    static func couldNotStartSentence(courseCode: String) -> String {
+        return "Plantoir couldn’t start a Claude session for \(courseCode). "
+            + "If Claude Code was updated or moved recently, restarting Plantoir may be enough."
+    }
+
+    /// The line the trail carries. It names WHICH assistant was started.
+    static func trailSentence(courseCode: String) -> String {
+        return "started Claude Code for \(courseCode)"
     }
 
     /// The opening message. It names the course and points at the plan tools,
@@ -150,9 +194,7 @@ nonisolated enum ClaudeCodeLauncher {
     /// One file per course so two sessions on different courses do not
     /// overwrite each other's configuration mid-launch.
     static func writeConfig(workspacePath: String, courseCode: String, serverPath: String) throws -> String {
-        let appSupportDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Plantoir/assist")
-        try FileManager.default.createDirectory(at: appSupportDirectory, withIntermediateDirectories: true)
+        let appSupportDirectory: URL = try supportDirectory()
 
         let configuration: [String: Any] = [
             "mcpServers": [
@@ -183,9 +225,7 @@ nonisolated enum ClaudeCodeLauncher {
         configPath: String,
         prompt: String
     ) throws -> String {
-        let appSupportDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Plantoir/assist")
-        try FileManager.default.createDirectory(at: appSupportDirectory, withIntermediateDirectories: true)
+        let appSupportDirectory: URL = try supportDirectory()
 
         let scriptContent: String = """
         #!/bin/bash
@@ -200,6 +240,16 @@ nonisolated enum ClaudeCodeLauncher {
         return scriptFile.path
     }
 
+    /// The app's own data directory for these sessions, created if needed.
+    /// Deliberately not the teacher's working folder: nothing either door
+    /// writes should appear in the vault Obsidian is watching.
+    static func supportDirectory() throws -> URL {
+        let appSupportDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Plantoir/assist")
+        try FileManager.default.createDirectory(at: appSupportDirectory, withIntermediateDirectories: true)
+        return appSupportDirectory
+    }
+
     /// Single-quote a string safely for POSIX shell execution.
     static func escapeForShell(_ text: String) -> String {
         return "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
@@ -209,7 +259,7 @@ nonisolated enum ClaudeCodeLauncher {
     ///
     /// Uses LaunchServices via `NSWorkspace` instead of AppleScript/AppleEvents
     /// so macOS does not require Automation / AppleEvents permissions.
-    private static func launchTerminal(scriptPath: String) -> Bool {
+    static func launchTerminal(scriptPath: String) -> Bool {
         let itermBundleID: String = "com.googlecode.iterm2"
         let isITermRunning: Bool = !NSRunningApplication.runningApplications(
             withBundleIdentifier: itermBundleID
