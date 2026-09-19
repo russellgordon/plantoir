@@ -1696,9 +1696,23 @@ this — abandons. An inner scope is a no-op, so the outermost call still owns
 the entry and a tool that calls another tool records one operation rather
 than two. The five older sites each wrapped their individual file writes in
 `try`/`catch` and nothing else, so a `ReadAllText` outside those — a page
-Obsidian deleted between the plan and the Go — escaped to
-`PlantoirTools.Guarded`, which turns an exception into an ANSWER, and the
-entry was still open when the teacher asked for the next thing.
+Obsidian deleted between the plan and the Go — escaped the method with the
+entry still open, and it was still open when the teacher asked for the next
+thing.
+
+**Where that exception then goes differs by tool, and the difference matters
+more than it looks.** Re-dating, syncing dates, curriculum, making room and
+duplicating are called through `PlantoirTools.Guarded`, which catches
+`IOException` and `UnauthorizedAccessException` and turns them into an ANSWER
+the teacher reads. **Publishing and unpublishing are not**:
+`PlantoirTools.Act` catches only `AssistRefusal` and
+`OperationCanceledException`, so anything else leaves the tool altogether —
+no answer is built, `CarryingTheConversationBackup` never stamps the result,
+and the teacher gets a protocol-level failure naming no backup at all. The
+undo entry is abandoned either way, which is this section's subject; the
+reply is worse on the publish path than on any other, and that gap is
+[issue #165](https://github.com/russellgordon/plantoir/issues/165) rather
+than something fixed in passing.
 
 **Abandon on a throw, rather than committing what was written — and this was
 a decision, not a default.** The case to think about is a publish of five
@@ -1714,9 +1728,20 @@ happen is worse than no line, because it will be believed. The mac reaches
 the same place from the other end — `AssistToolRunner` records a whole
 `AssistChange` only after the operation returns, so a throw records nothing
 (its whole-unit publish answers "was only partly published: …" and calls
-`history.record` never) — so abandoning is also what matches. The cost is
-real and is covered: the conversation backup is taken before the first write,
-and it is what the reply points at.
+`history.record` never) — so abandoning is also what matches.
+
+**The cost is real, and on one path it is not yet covered.** The conversation
+backup is taken before the first write and is the way back for everything
+here. On the tools that go through `Guarded` the teacher reads a sentence and
+can be pointed at it. On the PUBLISH path they currently cannot: the
+exception leaves the tool, so no reply is built and no backup is named, and
+they are left with a failure and a half-published section. The mac says
+something there — that inline "was only partly published: …" — and Windows
+says nothing; matching it is not a wording decision this side may take alone,
+since the sentence is an inline mac literal rather than an `AssistWording`
+key, so it is written down as [issue
+#165](https://github.com/russellgordon/plantoir/issues/165) instead of
+improvised.
 
 The rule both apps now follow, tool by tool:
 
