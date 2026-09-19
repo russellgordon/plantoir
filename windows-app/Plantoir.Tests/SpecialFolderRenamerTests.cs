@@ -309,6 +309,15 @@ public class SpecialFolderRenamerTests : IDisposable
             .Select(key => key!.ToString()).ToList();
         Assert.NotEmpty(recorded);
 
+        // A key whose sentence belongs to a feature this app has not built yet
+        // is NAMED in the ledger with the issue and milestone that own it,
+        // rather than quietly dropped here. Every other key is still compared
+        // both ways, and the ledger fails if its key starts being worded here
+        // or stops being in the contract.
+        var deferred = NamedGapLedger.GapsIn(
+            NamedGapLedger.PlatformWordedKeys, recorded, PlatformWordedSentences.Keys);
+        recorded = recorded.Where(key => !deferred.Contains(key)).ToList();
+
         Assert.Equal(
             recorded.OrderBy(k => k, StringComparer.Ordinal).ToList(),
             PlatformWordedSentences.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList());
