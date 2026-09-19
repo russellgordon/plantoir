@@ -130,8 +130,11 @@ public static class FolderRemoval
         // it ("no longer offered AND the course had already been asked"), and
         // it is NOT what makes cases 1 and 2 pass TODAY — saying otherwise
         // would be the kind of wrong reason that gets acted on. Measured
-        // 2026-09-18: replacing this line with `MaterializedGradedFolders(...)`
-        // over the SAME post-exclusion walk leaves all six cases green.
+        // 2026-09-18, and the mutation is a SUBSTITUTION rather than a deletion
+        // throughout — these two lines REPLACED by
+        // `MaterializedGradedFolders(...)` over the same post-exclusion walk,
+        // since simply deleting the null check would dereference a null pool —
+        // and all six cases stay green.
         //
         // **DO NOT "SIMPLIFY" IT AWAY.** That redundancy holds only while TWO
         // things are true at once: `InferredPool` returns names drawn FROM the
@@ -139,13 +142,13 @@ public static class FolderRemoval
         // the drop below. Break the second and the guard is the only thing left
         // standing. Measured, not argued (2026-09-18): with an EXACT
         // still-offered test — which is what issue #172 proposes to settle, and
-        // the mac's shape today — and this guard removed, a never-asked course
-        // that removes a top-level `Tasks` while `Portfolios/tasks` survives
-        // falls through (the walk offers `tasks`, not `Tasks`), materialises
-        // `["tasks"]`, and the case-insensitive `RemoveAll` strips it: the file
-        // gets `graded_folders: []`. Nothing counts for marks, permanently —
-        // the exact #142 damage, reintroduced by deleting a line that looked
-        // dead.
+        // the mac's shape today — and these two lines replaced the same way, a
+        // never-asked course that removes a top-level `Tasks` while
+        // `Portfolios/tasks` survives falls through (the walk offers `tasks`,
+        // not `Tasks`), materialises `["tasks"]`, and the case-insensitive
+        // `RemoveAll` strips it: the file gets `graded_folders: []`. Nothing
+        // counts for marks, permanently — the exact #142 damage, brought back
+        // by tidying away a check that looked dead.
         var pool = config.GradedFolders;
         if (pool is null) return;                       // never asked: leave it that way
         if (pool.RemoveAll(folder => string.Equals(folder, name, StringComparison.OrdinalIgnoreCase)) == 0) return;

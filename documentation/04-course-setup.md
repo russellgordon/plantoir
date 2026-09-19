@@ -680,14 +680,16 @@ here, because a contract case landing unannounced turns the other suite red and
 reads as damage.
 
 **Whichever way #172 settles, keep the never-asked guard.** It looks dead: with
-the walk taken after the exclusion, dropping it leaves all six cases green,
-because the historical rule only ever names folders the walk offered. That
-redundancy depends on the still-offered test and the drop asking with the SAME
-comparer, and it is exactly what #172 is about. Measured 2026-09-18: with an
-exact still-offered test and the guard removed, a never-asked course removing a
+the walk taken after the exclusion, replacing it with the materialised pool
+leaves all six cases green, because the historical rule only ever names folders
+drawn FROM the choices — the copy lists plus the walk — so a name no longer
+among them cannot be in the materialised pool either. That redundancy depends
+on the still-offered test and the drop asking with the SAME comparer, which is
+exactly what #172 is about. Measured 2026-09-18: with an exact still-offered
+test, and the guard replaced the same way, a never-asked course removing a
 top-level `Tasks` while `Portfolios/tasks` survives writes `graded_folders: []`
-— nothing counting for marks, permanently. The #142 damage itself, 
-reintroduced by deleting a line that looked redundant.
+— nothing counting for marks, permanently. The #142 damage itself, brought back
+by tidying away a check that looked redundant.
 
 Nothing new is written to the activity trail for any of this. The removal
 already leaves its own line (`item excluded`), and what changed is only which
