@@ -537,6 +537,20 @@ unpublishing are **separate verbs** with separate names, because a boolean is
 a coin flip under pressure and a verb is not — which is precisely the failure
 that vetoed both 3B models.
 
+**And "publish this page" can correctly do nothing.** Whether a page is already
+published is decided by what the BUILT SITE does with its flag, not by whether
+the line reads `true` — so `publish: maybe`, `publish: on` and `publish: true
+# covered Tuesday` are all pages students can already see. Asked to publish one
+of those, the assistant answers `It's already been published.` and leaves the
+file exactly as the teacher wrote it: tidying the value would be an edit nobody
+asked for, in a file Obsidian very likely has open. Asked to HIDE the same
+page, it changes and the odd value goes. Settled 2026-09-18 (issue #140); the
+measured table is
+[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page),
+and the residue it knowingly leaves — a value the reader cannot read at all is
+reported as visible, so the plan says "already published" — is written up
+there too.
+
 ### No dangerous tool exists
 
 There is no delete tool, no rename tool and no archive tool. Not "guarded by a

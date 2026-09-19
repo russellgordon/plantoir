@@ -168,6 +168,29 @@ rewritten:
   exactly as it always did.
 - *All* per-section keys — both spellings — are then deleted.
 
+**The rewrite is not a rewrite of those keys alone — it is a full YAML round
+trip, and that is the root of an entire class of bug.** `process_frontmatter`
+uses `frontmatter.load` / `frontmatter.dumps` (python-frontmatter → PyYAML,
+**YAML 1.1**), so what Quartz eventually parses has already been NORMALISED:
+`no`/`off` have become `false` and `yes`/`on` have become `true`, `FALSE` has
+become lowercase `false`, an inline `# comment` is gone, and anything PyYAML
+could not resolve has become a quoted string. A tool that reads the teacher's
+raw line and a tool that reads the built site are therefore answering two
+different questions, and until 2026-09-18 both apps answered the wrong one —
+`publish: true # why` made Plantoir list a live page as held back. The measured
+table, and the rule both apps now implement, is
+[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page);
+`scripts/check_visibility_against_the_site.py` re-measures it on every
+`verify.sh` run.
+
+Two consequences worth knowing here. Frontmatter the round trip cannot parse —
+tab indentation, an unclosed flow collection — is NOT resolved: the function
+warns and leaves the file exactly as it found it, and Quartz's own parser then
+throws and stops the whole build. And the `pip install` in the Dockerfile pins
+python-frontmatter and PyYAML deliberately, because the visibility table rests
+on YAML 1.1 and a PyYAML that moved to YAML 1.2 would republish pages teachers
+had hidden with nothing failing anywhere.
+
 So a shared file marked `publishForSection1: true, publishForSection3: false`
 is published on Section 1's site but excluded from Section 3's — one file,
 independent publication state per section. This mechanism is why the workshop

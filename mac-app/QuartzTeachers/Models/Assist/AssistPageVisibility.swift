@@ -24,9 +24,14 @@ import Foundation
 /// → `pageVisibility.writingRules`.
 ///
 /// A page that says nothing either way IS published. That is Quartz's own rule
-/// here — `patches/publish.ts` drops a page only when it says `publish: false`
-/// — and guessing the other way round would hide every page a teacher wrote
-/// without thinking about frontmatter at all.
+/// here — `patches/publish.ts` drops a page only for the boolean false or the
+/// exact string `"false"` — and guessing the other way round would hide every
+/// page a teacher wrote without thinking about frontmatter at all. What COUNTS
+/// as saying false is not what reading the line suggests, because the build
+/// round-trips every page through PyYAML first: `publish: no` hides,
+/// `publish: true # why` and `publish: maybe` publish, and `publish: "False"`
+/// is visible while `publish: FALSE` is not. `PageVisibilityReader` is the one
+/// place that knows the table, and it is measured rather than reasoned.
 ///
 /// **READING does not depend on where the page lives.** The build consults all
 /// four keys, in order, on every page it copies, so `PageVisibilityReader`
