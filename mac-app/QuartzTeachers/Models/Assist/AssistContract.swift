@@ -18,12 +18,14 @@ import Foundation
 /// no longer matches, so a changed sentence fails HERE, in the same test run
 /// that changed it — not on a Windows machine three weeks later.
 ///
-/// **What it deliberately does NOT generate.** Four top-level keys of the
+/// **What it deliberately does NOT generate.** Five top-level keys of the
 /// cases file are hand-written and are preserved on every run: `nearMisses`,
-/// `scenarios`, `promptHistory` and `deployAtATime`. Nothing in the code says
-/// which near-miss phrasings are worth guarding, which ORDER events must
-/// happen in, or which spellings of a time a teacher actually types — those
-/// are decisions, and a decision cannot be read off the thing it produced.
+/// `scenarios`, `promptHistory`, `deployAtATime` and `windowBinding`. Nothing
+/// in the code says which near-miss phrasings are worth guarding, which ORDER
+/// events must happen in, which spellings of a time a teacher actually types,
+/// or which arguments a window takes back from the model and which it refuses
+/// the turn over — those are decisions, and a decision cannot be read off the
+/// thing it produced.
 /// The list is spelled out rather than summarised because it was already two
 /// short when somebody checked, and a key nobody mentions is a key somebody
 /// deletes believing it was generated. `generatedCaseKeys` below is the one
@@ -43,6 +45,13 @@ enum AssistContract {
 
     /// The placeholder a section number leaves in a generated template.
     static let sectionPlaceholder: String = "{section}"
+
+    /// The OTHER course — the one the model named instead of this window's.
+    ///
+    /// A second course placeholder rather than a second use of `{course}`,
+    /// because the two refusal sentences name both and a rendering that spelt
+    /// them the same way could not be checked against anything.
+    static let otherCoursePlaceholder: String = "{otherCourse}"
 
     /// Stands in for a change's own past-tense clause in the undo sentences.
     static let changePlaceholder: String = "{change}"
@@ -143,6 +152,16 @@ enum AssistContract {
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
             "answerWasCutOff": AssistWording.answerWasCutOff,
+            // A call naming a course that is not this window's. Two keys for
+            // two different facts, not two phrasings of one: the first can
+            // tell a teacher to go and open that course, the second cannot,
+            // because there is no such course to open.
+            "askedAboutAnotherCourse": AssistWording.askedAboutAnotherCourse(
+                course: course, otherCourse: otherCoursePlaceholder
+            ),
+            "askedAboutACourseThatIsNotHere": AssistWording.askedAboutACourseThatIsNotHere(
+                course: course, otherCourse: otherCoursePlaceholder
+            ),
             // Taking something back. The placeholder stands in for the change's
             // own past-tense clause — "unpublished Unit 4, Day 23" — which is
             // what makes these sentences rather than slots: the undo used to
@@ -201,6 +220,9 @@ enum AssistContract {
             "placeholders": [
                 "course": "a course code, e.g. ICS3U",
                 "section": "a section number, e.g. 1",
+                "otherCourse": "the course the model named instead of the window's own, "
+                             + "e.g. MCV4U — or, in askedAboutACourseThatIsNotHere, a code "
+                             + "naming no course in the working folder at all",
                 "change": "what was done, as a past-tense clause naming it: "
                         + "\"unpublished Unit 4, Day 23\". Never a bare count — the "
                         + "teacher asked about a class, not about a number of files.",
@@ -487,7 +509,8 @@ enum AssistContract {
             "note": "These top-level keys are written by `Plantoir --write-contracts` from the app's own "
                   + "types and will be overwritten: " + generatedCaseKeys.joined(separator: ", ")
                   + ". Every other top-level key — nearMisses, scenarios, promptHistory, "
-                  + "deployAtATime — is hand-written intent and is PRESERVED by a regeneration, so "
+                  + "deployAtATime, windowBinding — is hand-written intent and is PRESERVED by a "
+                  + "regeneration, so "
                   + "a case may be proposed from either platform. Listing them rather than naming "
                   + "two: the list was already two short when this was noticed, and a key nobody "
                   + "mentions is a key somebody deletes believing it was generated.",

@@ -698,7 +698,7 @@
       "tools",
       "toolSchemas"
     ],
-    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
+    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
   },
   "nearMisses" : {
     "note" : "Must NOT match — each one only looks like a card phrasing, and answering the wrong question with total confidence is worse than routing it. The last three are the rollover's website question, and they record a KNOWN LIMIT rather than guarding a near-miss: the reply offers two sentences word for word, those exact strings are the only way back in, and a teacher who paraphrases matches nothing at all — re_date_classes is shown to no local model, so nothing catches the paraphrase and the section stays pinned to last year's website with nothing said. Both apps already pass these, so nothing goes red; they are written down so the limit is visible, and so a future looser matcher has to change this list on purpose. \"publish next monday's class\" is a different shape again: it is the near miss of a phrasing that DOES match, and it must reach the model precisely because \"next Monday\" is the one weekday word neither app will settle on its own - see schedule-rules.json, relativeDays.",
@@ -2464,5 +2464,100 @@
       }
     ],
     "note" : "The tool definitions exactly as each client sends them. The DESCRIPTIONS are measured, not decorative — see the note on steering with code rather than with tool descriptions. `local` is what the on-device model is shown; `mcp` is what Claude Code sees. Point a routing measurement at these rather than at a copy."
+  },
+  "windowBinding" : {
+    "cases" : [
+      {
+        "runs" : {
+          "course" : "ICS3U",
+          "date" : "2026-09-08",
+          "section" : 1
+        },
+        "said" : {
+          "course" : "ICS3U",
+          "date" : "2026-09-08",
+          "section" : 4
+        },
+        "tool" : "publish_class_on",
+        "why" : "The reason the binding exists at all: \"Unpublish Unit 4, Day 12\" is read as section 4, and the teacher is told their course has no Section 4. A perfectly reasonable misreading of a page name that begins with a number, reported twice before it was fixed."
+      },
+      {
+        "runs" : {
+          "course" : "ICS3U",
+          "date" : "2026-09-08",
+          "section" : 1
+        },
+        "said" : {
+          "course" : "ICS3U",
+          "date" : "2026-09-08"
+        },
+        "tool" : "publish_class_on",
+        "why" : "An ABSENT section is bound too. No tool reads an omission as \"every section\", so a call that left it out is simply a lost turn - refused by the tool with a complaint that reads as though the teacher's own sentence were the problem."
+      },
+      {
+        "runs" : {
+          "course" : "ICS3U",
+          "date" : "2026-09-08",
+          "section" : 1
+        },
+        "said" : {
+          "course" : "ics3u",
+          "date" : "2026-09-08",
+          "section" : 1
+        },
+        "tool" : "publish_class_on",
+        "why" : "The same course in another casing is not another course, so the turn runs - and the WINDOW's spelling is what runs. The approval card a teacher reads before pressing Go prints the code verbatim, so leaving the model's casing would put \"deploy ics3u Section 1\" in front of them."
+      },
+      {
+        "refusedWith" : "askedAboutAnotherCourse",
+        "said" : {
+          "course" : "MCV4U",
+          "date" : "2026-09-08",
+          "section" : 1
+        },
+        "tool" : "publish_class_on",
+        "why" : "A different course, and it is in this working folder. Nothing runs: no plan, no approval card, no tool. Binding it to this window instead would publish an ICS3U class and report success, which is the one failure a teacher cannot catch. The sentence names both courses and says to open that one."
+      },
+      {
+        "refusedWith" : "askedAboutAnotherCourse",
+        "said" : {
+          "course" : "MCV4U",
+          "section" : 1
+        },
+        "tool" : "list_pages",
+        "why" : "The refusal holds for READS as well. Allowing them was REJECTED: a teacher cannot tell which tool the model picked, so a rule that held only for writes would read as random."
+      },
+      {
+        "refusedWith" : "askedAboutACourseThatIsNotHere",
+        "said" : {
+          "course" : "ZZZ9Z",
+          "date" : "2026-09-08",
+          "section" : 1
+        },
+        "tool" : "publish_class_on",
+        "why" : "A typo, or a code the model invented: it names no course here. REFUSED rather than bound to this window, which is the decision worth writing down, because binding it looks harmless - a code matching nothing cannot reach another course - and would publish an ICS3U class off \"publish MCV4's class\". A second sentence rather than the first, because the first ends by telling the teacher to open that course and there is no such course to open."
+      },
+      {
+        "runs" : {
+          "course" : "MCV4U",
+          "section" : 9
+        },
+        "said" : {
+          "course" : "MCV4U",
+          "section" : 9
+        },
+        "tool" : "undo_last_change",
+        "why" : "Its schema declares NEITHER argument, so neither is the window's to take back and there is nothing to refuse - the tool ignores both. The case is here to pin the gate on the schema rather than on a list of tools."
+      }
+    ],
+    "coursesInTheFolder" : [
+      "ICS3U",
+      "MCV4U"
+    ],
+    "note" : "An assistant window is opened for ONE section of ONE course. Given that window and the arguments the MODEL wrote on its tool call, these say what actually runs - or which refusal the teacher reads instead. AUTHORED, and preserved across `Plantoir --write-contracts`. The rule in one sentence: the SECTION is always the window's, present or absent, and the COURSE is the window's or the turn was refused. Gated on the TOOL'S OWN SCHEMA declaring the argument, never on a list of tool names - today the schema and a list of twelve would agree, which is exactly when a list looks harmless. Only the MODEL's calls are bound this way; a client driving the tools directly over MCP chooses its own course and section, and nothing here applies to it.",
+    "window" : {
+      "course" : "ICS3U",
+      "section" : 1
+    }
   }
 }
