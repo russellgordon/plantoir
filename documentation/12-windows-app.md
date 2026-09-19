@@ -1581,7 +1581,13 @@ red run:
   section — the record the other class has just written and is about to read. It
   showed as one red `AWorkingFolderWithSpacesInItsNameStillBuilds` on
   2026-09-18 (`Assert.Single` on an empty list), green alone and on re-run.
-  Both classes are in the collection since 2026-09-19.
+  Both classes are in the collection since 2026-09-19. **That fixes the two
+  classes against each other and nothing against the MACHINE**: xUnit cannot
+  serialise the suite against a real scheduled publish for a course called
+  ICS3U running at half six, which would write and consume the same file — and
+  `Take` consumes the record, so a genuine overnight finding cleared by a
+  test's stub build is never noticed. Making those directories injectable is
+  [issue #179](https://github.com/russellgordon/plantoir/issues/179).
 
 The general rule, and the cheap check when a test fails once and cannot be
 reproduced: **ask what the class writes that another class can see** — a static,

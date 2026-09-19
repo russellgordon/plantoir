@@ -368,7 +368,7 @@ recounted 2026-09-07.
 | The browser-safe address | `app-rules.json` → `linkRules` | BrowserSafeURL (2) |
 | Asking for a publishing credential | `app-rules.json` → `credentialRequests`, `credentialPrompts` | AppRulesContract (3) |
 | `course_config.json` keys, types, defaults | `file-formats.json` → `courseConfigKeys` | CourseConfiguration (10) |
-| Page visibility: `publish:`, legacy `draft:`, per-section keys, and WHAT EACH VALUE MEANS | `file-formats.json` → `pageVisibility` | ~50 tests across the suite, plus 54 `readingCases` and 10 `writingCases` run as data by `FileFormatsContractTests`, `PageVisibilityReadingTests` for the three-way answer (24 on the mac; its Windows twin of the same name, plus `PageVisibilityWritingTests`, `PageVisibilityCertaintyTests` and `SectionCarryVisibilityTests`, since 2026-09-19), and `scripts/test_page_visibility.py` for the Python. The writing half has been RUN only since 2026-09-09 (issue #107), and its absence is how the mac stayed green for two days against a rule it did not implement; **on Windows it has been run since 2026-09-19** ([#138](https://github.com/russellgordon/plantoir/issues/138)), by `FileFormatContractTests.TheWritingCasesInTheContractAreFollowed`, which plays all ten against `PageFrontmatter.SetDraft` and collects every failing case rather than stopping at the first — until that day it answered `writingRules` with five of the cases retyped into the test file, and had no test at all for the other five. **Two things this list deliberately does NOT carry**, added 2026-09-18 with issue #140: the forms each app reads as `cannot tell` (a value on the next line, a tag, a block scalar, an anchor or alias, a flow collection, an indented key, unparseable frontmatter) — a shared case states what the SITE does, and each app's REPORTING answer for those is `visible` whatever the site does, so pinning one here would oblige the other platform to be wrong in the same direction; those live in each platform's own tests. And YAML trivia with no teacher behind it: `y`/`n` are here because somebody might type them, sexagesimals and octals are not. `scripts/check_visibility_against_the_site.py`, run by `verify.sh`, re-measures every case here down the real build chain — and twenty-three more forms that CANNOT be shared cases, because both readers report them as visible whatever the site does and the refusal is only justified while the measurement holds — so the LIST being wrong fails rather than making both apps confidently wrong together |
+| Page visibility: `publish:`, legacy `draft:`, per-section keys, and WHAT EACH VALUE MEANS | `file-formats.json` → `pageVisibility` | ~50 tests across the suite, plus 54 `readingCases` and 10 `writingCases` run as data by `FileFormatsContractTests`, `PageVisibilityReadingTests` for the three-way answer (24 on the mac; its Windows twin of the same name, plus `PageVisibilityWritingTests`, `PageVisibilityCertaintyTests` and `SectionCarryVisibilityTests`, since 2026-09-19), and `scripts/test_page_visibility.py` for the Python. The writing half has been RUN only since 2026-09-09 (issue #107), and its absence is how the mac stayed green for two days against a rule it did not implement; **on Windows it has been run since 2026-09-19** ([#138](https://github.com/russellgordon/plantoir/issues/138)), by `FileFormatContractTests.TheWritingCasesInTheContractAreFollowed`, which plays all ten against `PageFrontmatter.SetDraft` and collects every failing case rather than stopping at the first — until that day it answered `writingRules` with five of the cases retyped into the test file. Three of the other five were already asserted elsewhere in that suite in its own words (`PageVisibilityWritingTests` for the two odd values, `TheRulesForWritingAPagesVisibilityAreFollowed` for a page with no frontmatter); what the loop adds is that all ten are read from the FILE and so cannot drift from it, and that two — a block carrying neither spelling, and an oddly-worded `published` asked to be HIDDEN — are covered there for the first time. **Two things this list deliberately does NOT carry**, added 2026-09-18 with issue #140: the forms each app reads as `cannot tell` (a value on the next line, a tag, a block scalar, an anchor or alias, a flow collection, an indented key, unparseable frontmatter) — a shared case states what the SITE does, and each app's REPORTING answer for those is `visible` whatever the site does, so pinning one here would oblige the other platform to be wrong in the same direction; those live in each platform's own tests. And YAML trivia with no teacher behind it: `y`/`n` are here because somebody might type them, sexagesimals and octals are not. `scripts/check_visibility_against_the_site.py`, run by `verify.sh`, re-measures every case here down the real build chain — and twenty-three more forms that CANNOT be shared cases, because both readers report them as visible whatever the site does and the refusal is only justified while the measurement holds — so the LIST being wrong fails rather than making both apps confidently wrong together |
 | Image pins and the Quartz patches | `toolchain.json` | checked against `Dockerfile` and `patches/` |
 | Example-content payloads (all 38) | `example-content.json` | ExampleContent (10), and the payloads themselves |
 | Reading a teacher's date list, and which day “tomorrow” or “Monday” names | `schedule-rules.json` | SectionScheduleSource (23) |
@@ -472,11 +472,35 @@ The 2026-09-06 audit was a count; this is the same question asked of the file
 as it stands, and it is the milestone's "definition of done" for
 [#138](https://github.com/russellgordon/plantoir/issues/138): **every case list
 in every `contracts/*.json` is either run by a Windows gate, or owned by an
-open issue, or exempt for a reason written down here.** Taken by walking every
-JSON array of objects in all ten files and looking for a reader in
-`windows-app/Plantoir.Tests/**`, `scripts/*.py` (which `PythonToolchainTests`
-discovers and runs inside `dotnet test`) and `windows-app/*.ps1`, then checking
-every miss by hand. **104 case lists; 94 are run.** The other ten:
+open issue, or exempt for a reason written down here.** **111 case lists; 100
+have a reader here.** The other eleven are below.
+
+**Re-take it rather than trusting this paragraph** — a census nobody can repeat
+is a number that rots. A case list is *an array of objects reached through
+objects only*: an array inside a case is a FIELD of that case (each
+`stopPreview` case has its own `snapshot`), and counting those gives 159 and
+means nothing. Run from the repository root:
+
+```python
+import json, os
+found = []
+def walk(node, path):
+    if isinstance(node, dict):
+        for k, v in node.items(): walk(v, (path + '.' + k) if path else k)
+    elif isinstance(node, list) and node and all(isinstance(e, dict) for e in node):
+        found.append((path, len(node)))
+for fn in sorted(os.listdir('contracts')):
+    if fn.endswith('.json'): walk(json.load(open('contracts/' + fn, encoding='utf-8')), fn)
+for p, n in found: print(n, p)
+print('TOTAL', len(found))
+```
+
+Then look for a reader of each path in `windows-app/Plantoir.Tests/**`,
+`scripts/*.py` (which `PythonToolchainTests` discovers and runs inside `dotnet
+test`) and `windows-app/*.ps1` — and **check every miss by hand**, because a
+grep for two key names agrees with itself too easily in a large file, in both
+directions. The table below is the hand-checked half; the 100 is the
+subtraction.
 
 | List | Cases | Where it stands |
 |---|---|---|
@@ -487,6 +511,7 @@ every miss by hand. **104 case lists; 94 are run.** The other ten:
 | `shared-rules.json` → `workingFolderPathBar.ancestorPaths.cases` | 2 | **Exempt, by construction.** POSIX paths (`/Users/teacher/…`). The rule is shared; only the spelling of a root is the platform's, and `windowsCases` beside it — three cases including a `D:\` drive — is what `SharedRuleContractTests` runs. |
 | `shared-rules.json` → `cloudSyncedFolders.detection.cases` | 11 | **Exempt, by construction.** Every path is a mac one (`{home}/Library/Mobile Documents`, `/Volumes/…`); the markers Windows detects from are a different list, and `CloudSyncedFolderTests` covers them. |
 | `shared-rules.json` → `stopPreview.identity.evidences`, `.notShared` | 3 + 4 | **Exempt: prose with fields.** The behaviour they describe is exercised through `stopPreview.cases`, and those 23 are gated TWICE here — `scripts/test_stop_preview.py` through `PythonToolchainTests`, and `windows-app/test_stop_preview.ps1` through `TheLauncherMatcherAnswersTheContract`, which asserts "0 failed" so a runner that skipped everything cannot pass. |
+| `toolchain.json` → `rules` | 3 | **Read by NOBODY, on either platform** — the one list in the census with no reader anywhere and no issue, and it is left that way deliberately. It is reasoning rather than cases: the image tag being a hash of the build context, building with BuildKit, and revalidating Quartz before chasing a newer CLI. All three are held by the launchers and by `verify.sh`, which does not run on Windows at all. The other three `rules` arrays ARE read — `buildFreshness.rules` by `BuildOutputLocationTests`, `example-content.rules` and `courseConfigKeys.rules` by `SharedRuleContractTests`. |
 
 **And the exemptions inside lists that ARE run**, because "run" is not the
 whole answer for a list a named key has been lifted out of:
@@ -500,14 +525,10 @@ the requirement is withdrawn. The two exemption sets in `FileFormatContractTests
 `writingRules` — are **both empty today**, kept so the next knowing divergence
 is named in a run's output rather than in a comment.
 
-**Two things the census does not count**, said so nobody re-derives them as
-gaps. Lists of plain strings are not cases (`tools.local`, `acceptedDateForms`,
-the skeleton-toggle folder lists, and so on) and are checked wherever the thing
-they name is checked. And three top-level `rules` arrays — `toolchain.json`'s
-in particular — are reasoning rather than cases: nothing on either platform
-runs `toolchain.rules`, and what it describes (the build-context hash, BuildKit,
-revalidating Quartz before chasing a newer CLI) is held by the launchers and by
-`verify.sh`, which does not run here at all.
+**What the census does not count**, said so nobody re-derives it as a gap:
+lists of plain STRINGS are not case lists (`tools.local`, `acceptedDateForms`,
+the skeleton-toggle folder lists, and so on), and the walker above does not
+count them. Each is checked wherever the thing it names is checked.
 
 **Three habits came out of that work and are worth copying on either side.**
 

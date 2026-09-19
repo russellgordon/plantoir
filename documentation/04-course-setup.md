@@ -322,8 +322,10 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > **Both suites run that list**: the mac since 2026-09-09 with issue #107,
 > and Windows since 2026-09-19 with
 > [issue #138](https://github.com/russellgordon/plantoir/issues/138), which
-> replaced five of the cases retyped into the test file — and no test at all
-> for the other five.)
+> replaced five of the cases retyped into that test file. Three of the other
+> five were already asserted there in the suite's own words; what running the
+> list adds is that all ten are read from the FILE and so cannot drift from
+> it, and that two of them are covered there for the first time.)
 > Two things are
 > deliberately NOT migrations: restoring a backup puts back the spelling the
 > backup held, because a restore is not an edit; and adding a section writes
