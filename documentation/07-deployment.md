@@ -793,7 +793,11 @@ in under half a second.
 **A preview showing changes nothing about this.** The notice lives in the base
 layer of the section's `ZStack`, underneath the full-bleed web view, so a band
 arriving mid-preview does not shove the site around; it is there when the
-preview closes.
+preview closes. Checked by hand on 2026-09-19 with a real preview on screen: the
+site did not move and the window survived, which is the corner #211 lived in.
+The same hand check, at the window's minimum height with nothing touched, saw
+the band come up flush under the toolbar and another section's sidebar warning
+appear at the same moment — and both go again when the records are removed.
 
 **And it now sits where it belongs.** In the same smoke Russell found the band
 floating in the MIDDLE of an empty window. The cause was that the base layer hugged
