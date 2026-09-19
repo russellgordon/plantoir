@@ -136,12 +136,20 @@ public static class Workspace
     /// <summary>
     /// New-window folder rule: no other windows → nothing (show the picker);
     /// else the most recently key folder if still open; else the first open.
+    ///
+    /// <para>"Still open" is <see cref="WorkingFolder.IsTheSame"/> rather than
+    /// a string match, and the OPEN window's spelling is what comes back — the
+    /// remembered key path and the window holding that folder can be spelled
+    /// differently, and a new window inheriting a second spelling of a folder
+    /// already open is how one folder comes to look like two.</para>
     /// </summary>
     public static string? FolderForNewWindow(IReadOnlyList<string> otherOpenFolderPaths, string? mostRecentKeyPath)
     {
         if (otherOpenFolderPaths.Count == 0) return null;
-        if (mostRecentKeyPath is not null && otherOpenFolderPaths.Contains(mostRecentKeyPath))
-            return mostRecentKeyPath;
+        if (mostRecentKeyPath is not null
+            && otherOpenFolderPaths.FirstOrDefault(open => WorkingFolder.IsTheSame(open, mostRecentKeyPath))
+               is { } stillOpen)
+            return stillOpen;
         return otherOpenFolderPaths[0];
     }
 }
