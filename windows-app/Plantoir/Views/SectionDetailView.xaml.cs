@@ -29,6 +29,42 @@ public sealed partial class SectionDetailView : UserControl
     private readonly MultiDestinationDeployRunner _deployRunner = new(SynchronizationContext.Current);
     private PreviewLeases.Lease? _lease;
 
+    /// <summary>
+    /// The working folder a preview or a deploy was STARTED in — noted where
+    /// the folder is DECIDED (the two preview starts, and the deploy once its
+    /// own preview stop is over), and read by everything that unwinds that
+    /// work.
+    ///
+    /// <para>The alternative — asking <c>_window.Workspace.WorkspacePath</c>
+    /// at teardown — names whatever folder the window happens to be showing
+    /// by then, which is the wrong one exactly when it matters: a window
+    /// pointed at a different working folder replaces the detail pane, and
+    /// <c>Unloaded</c> → <see cref="StopPreview"/> is dispatched a layout pass
+    /// later, with the window already naming the NEW folder. The stop would
+    /// then run against a folder this view never worked in.</para>
+    ///
+    /// <para>Null means no work has started, so there is nothing to stop.
+    /// Every reader is already guarded by a runner being live or a preview
+    /// having been up, so null never reaches one of them with work
+    /// outstanding.</para>
+    ///
+    /// <para>Mac parity: <c>SectionDetailView.swift</c> notes the folder at
+    /// the same three moments rather than at appearance — see
+    /// documentation/12-windows-app.md, "Which folder a teardown names".</para>
+    /// </summary>
+    private string? _folderThisSectionWorksIn;
+
+    /// <summary>
+    /// The working folder this view was BUILT in, and the key its lease rows
+    /// are filed under. Kept separately from
+    /// <see cref="_folderThisSectionWorksIn"/> and written exactly once (the
+    /// compiler enforces it): a deploy started in the one render pass between
+    /// a folder change and the teardown moves the WORK folder, and if the
+    /// registration rode along with it the old folder's lease row would be
+    /// stranded — the mac's own finding, from the review of issue #93.
+    /// </summary>
+    private readonly string? _folderThisSectionRegisteredIn;
+
     // The on-disk half of the same claims. In-memory leases are invisible to
     // the MCP server, which is a different process entirely.
     private IDisposable? _previewWork;
@@ -159,6 +195,7 @@ public sealed partial class SectionDetailView : UserControl
         _window = window;
         _course = course;
         _sectionNumber = sectionNumber;
+        _folderThisSectionRegisteredIn = window.Workspace.WorkspacePath;
         SectionTitle.Text = TitleText;
         ObsidianButton.IsEnabled = FolderActions.ObsidianIsInstalled;
 
@@ -836,6 +873,8 @@ public sealed partial class SectionDetailView : UserControl
         {
             if (_previewRunner.IsRunning) { StopPreview(); return; }
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+            // Decided here, so the stop that follows names the same folder.
+            _folderThisSectionWorksIn = workspacePath;
 
             // Clear any prior lease for this section before starting anew
             PreviewLeases.Release(workspacePath, _course.Code, _sectionNumber);
@@ -951,6 +990,8 @@ public sealed partial class SectionDetailView : UserControl
             if (_previewRunner.IsRunning) { StopPreview(); return; }
             if (await TheAssistantIsBuilding()) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+            // Decided here, so the stop that follows names the same folder.
+            _folderThisSectionWorksIn = workspacePath;
 
             try
             {
@@ -1066,13 +1107,6 @@ public sealed partial class SectionDetailView : UserControl
         }
     }
 
-    private void AbandonWait()
-    {
-        _isWaitingForServer = false;
-        ReleaseLease();
-        RefreshChrome();
-    }
-
     /// <summary>Interface updates must never yank the teacher back from a page they navigated to.</summary>
     private void LoadIfNeeded(Uri url)
     {
@@ -1081,9 +1115,43 @@ public sealed partial class SectionDetailView : UserControl
         Preview.Source = url;
     }
 
+    // ---- Teardown ---------------------------------------------------------
+    //
+    // Everything from here to END TEARDOWN REGION unwinds work that has
+    // already started: it stops container-side processes, releases preview
+    // leases and gives back claims. All of it must name the folder the work
+    // STARTED in — which is not necessarily the folder the window is pointing
+    // at by the time the teardown runs.
+    //
+    // A window pointed at a different working folder replaces the detail
+    // pane, and `Unloaded` → StopPreview() is dispatched a layout pass later,
+    // with `_window.Workspace.WorkspacePath` already naming the NEW folder.
+    // Reading it here would stop the new folder's container — which is
+    // another window's preview of the same course and section — and delete
+    // that window's lease row, while the folder being left carried on
+    // serving. The intended behaviour is the opposite: a preview running in
+    // folder A when the window switches to B is stopped against A and A's
+    // lease row released, and nothing of B's is touched.
+    //
+    // So no read of the window's LIVE working folder is allowed below this
+    // line. `_folderThisSectionWorksIn` and `_folderThisSectionRegisteredIn`
+    // are the only folders named here, and
+    // SectionDetailTeardownSourceTests asserts that this region contains ZERO
+    // reads of `_window.Workspace` — a test naming five known methods would
+    // go stale the moment somebody added a sixth.
+    //
+    // ==== BEGIN TEARDOWN REGION ===========================================
+
+    private void AbandonWait()
+    {
+        _isWaitingForServer = false;
+        ReleaseLease();
+        RefreshChrome();
+    }
+
     private void CancelPreview()
     {
-        if (_previewRunner.IsRunning && _window.Workspace.WorkspacePath is { } workspacePath)
+        if (_previewRunner.IsRunning && _folderThisSectionWorksIn is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
         _previewRunner.CancelByUser();
         _previewUrl = null;
@@ -1094,7 +1162,7 @@ public sealed partial class SectionDetailView : UserControl
 
     private void CancelDeploy()
     {
-        if (_deployRunner.IsRunning && _window.Workspace.WorkspacePath is { } workspacePath)
+        if (_deployRunner.IsRunning && _folderThisSectionWorksIn is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
         _deployRunner.Cancel();
     }
@@ -1111,7 +1179,7 @@ public sealed partial class SectionDetailView : UserControl
         // a build the sweep then kills.
         bool hadPreview = _previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null;
         _serverWait?.Cancel();
-        if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePath)
+        if (hadPreview && _folderThisSectionWorksIn is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
         if (_previewRunner.IsRunning) _previewRunner.StopByUser();
         _previewUrl = null;
@@ -1129,7 +1197,7 @@ public sealed partial class SectionDetailView : UserControl
         // (mac order — see StopPreview). A second sweep after the runner
         // dies catches whatever the first missed while the server was still
         // spawning, and the awaited wait covers both.
-        if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePath)
+        if (hadPreview && _folderThisSectionWorksIn is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
         if (_previewRunner.IsRunning)
         {
@@ -1138,7 +1206,7 @@ public sealed partial class SectionDetailView : UserControl
             // just told to die, so hanging here is the only failure left.
             await _previewRunner.WaitUntilFinishedOrKill(5000);
         }
-        if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePathAgain)
+        if (hadPreview && _folderThisSectionWorksIn is { } workspacePathAgain)
         {
             await PreviewStopper.StopSectionProcessesAsync(workspacePathAgain, _course.Code, _sectionNumber);
         }
@@ -1160,18 +1228,31 @@ public sealed partial class SectionDetailView : UserControl
         _buildWork = null;
     }
 
+    /// <summary>
+    /// Give the preview lease back, both the exact row and any row for this
+    /// section that a previous view left behind.
+    ///
+    /// <para>The exact release already names the right folder on its own —
+    /// <c>PreviewLeases.Lease</c> carries the <c>FolderPath</c> it was taken
+    /// with. The folder-keyed sweep beside it cannot, so it is filed under
+    /// the folder this view was REGISTERED in rather than under the window's
+    /// current one: under the current one it would delete another window's
+    /// lease row in a folder this section was never previewed in.</para>
+    /// </summary>
     private void ReleaseLease()
     {
         ReleaseBuildClaim();
         _previewWork?.Dispose();
         _previewWork = null;
         if (_lease is { } lease) PreviewLeases.Release(lease);
-        if (_window.Workspace.WorkspacePath is { } wp)
+        if (_folderThisSectionRegisteredIn is { } wp)
         {
             PreviewLeases.Release(wp, _course.Code, _sectionNumber);
         }
         _lease = null;
     }
+
+    // ==== END TEARDOWN REGION =============================================
 
     // ---- Deploy ----------------------------------------------------------
 
@@ -1249,6 +1330,12 @@ public sealed partial class SectionDetailView : UserControl
                 await StopPreviewAsync();
             else
                 await PreviewStopper.WaitForStopsToFinish(_course.Code, _sectionNumber);
+
+            // AFTER the preview stop, never before it: the stop is unwinding
+            // the PREVIEW's work and must keep naming the folder that preview
+            // started in. Only once it is over does this deploy become the
+            // work this view is doing.
+            _folderThisSectionWorksIn = workspacePath;
 
             // Said AFTER the stop, as on the mac: a deploy that began while
             // we were waiting is the one thing that still stands in the way.
