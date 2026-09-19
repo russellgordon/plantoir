@@ -45,9 +45,14 @@ enum AssistFixture {
 
 
 
+    /// - Parameter alsoCourse: a SECOND course in the same working folder,
+    ///   with sections 1 and 2. Added for the window-binding tests, which need
+    ///   a course a window is not for; defaulted to none, so every existing
+    ///   caller gets exactly the folder it always got.
     @MainActor
     static func makeRunner(hasDeployedBefore: Bool = false,
                             registeringPreview: Bool = false,
+                            alsoCourse: String? = nil,
                             clock: TestClock? = nil,
                             openMainWindow: (@MainActor () -> Void)? = nil) throws
         -> (root: URL, course: Course, runner: AssistToolRunner, siteWork: StubSiteWork) {
@@ -93,9 +98,40 @@ enum AssistFixture {
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
             .write(to: courseURL.appendingPathComponent("course_config.json"))
 
+        if let secondCode = alsoCourse {
+            let secondURL: URL = root.appendingPathComponent("courses")
+                .appendingPathComponent(secondCode)
+            try fileManager.createDirectory(
+                at: secondURL.appendingPathComponent("section1/All Classes"),
+                withIntermediateDirectories: true
+            )
+            try fileManager.createDirectory(
+                at: secondURL.appendingPathComponent("section2/All Classes"),
+                withIntermediateDirectories: true
+            )
+            let second: [String: Any] = [
+                "course_code": secondCode,
+                "course_name": "Another course entirely",
+                "section_numbers": [1, 2],
+                "num_sections": 2,
+                "per_section_folders": ["All Classes"],
+                "per_section_files": [],
+            ]
+            try JSONSerialization.data(withJSONObject: second, options: [.prettyPrinted])
+                .write(to: secondURL.appendingPathComponent("course_config.json"))
+        }
+
         let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
         workspace.chooseWorkspace(at: root)
-        let course: Course = try XCTUnwrap(workspace.courses.first)
+        // Looked up BY CODE rather than taken as `.first`. A second course
+        // whose code sorts before ICS3U would otherwise change what every
+        // existing caller's `course` is, which is a failure in twenty tests
+        // for a reason nobody would find.
+        var found: Course? = nil
+        for candidate in workspace.courses where candidate.code == "ICS3U" {
+            found = candidate
+        }
+        let course: Course = try XCTUnwrap(found)
 
         let siteWork: StubSiteWork = StubSiteWork()
         // Pinned to 2026-09-08 unless a test hands in a clock of its own: a
