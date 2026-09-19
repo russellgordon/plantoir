@@ -114,8 +114,10 @@ struct AssistPublishPlan {
         guard changesNothing, unknownNames.isEmpty, !namedPages.isEmpty else {
             return nil
         }
-        // Every page they named is already the way they asked for it.
-        for page in namedPages where page.isVisibleToStudents != publishes {
+        // Every page they named is already the way they asked for it — and
+        // this app is SURE of that for every one of them. A page whose flag
+        // cannot be read is not "already done"; it is a page to write.
+        for page in namedPages where page.isVisibleToStudents != publishes || !page.visibilityIsCertain {
             return nil
         }
         let done: String = publishes ? "published" : "hidden"
@@ -476,7 +478,13 @@ enum AssistPublishPlanner {
         alreadyRight: inout [AssistSectionPage]
     ) {
         for page in pages {
-            if page.isVisibleToStudents == publishes {
+            // "Already the way you asked" needs CERTAINTY, not just a match.
+            // A page whose flag this app will not read is reported visible,
+            // and a plan that believed that would tell a teacher their page
+            // was already published and write nothing, while the build was
+            // holding it back. So an unreadable flag is always a change, and
+            // `AssistPageVisibility.setting` writes it out in full.
+            if page.isVisibleToStudents == publishes && page.visibilityIsCertain {
                 alreadyRight.append(page)
                 continue
             }
@@ -864,7 +872,13 @@ enum AssistPublishPlanner {
                     continue
                 }
                 // Already out where students can see it — leave it alone.
-                if page.isVisibleToStudents {
+                //
+                // CERTAINLY out, that is. A page whose flag this app will not
+                // read is reported visible, and it is about to be published
+                // by the change list above; skipping it here would publish it
+                // with whatever date it happened to have rather than the day
+                // of the class that brought it.
+                if page.isVisibleToStudents && page.visibilityIsCertain {
                     continue
                 }
                 // A class's date is its place in the schedule.

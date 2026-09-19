@@ -141,24 +141,27 @@ enum PageFrontmatter {
     }
 
     /// Where the frontmatter block starts and ends, and the lines inside it.
-    /// A page whose first line is not `---` has no frontmatter to speak of.
+    ///
+    /// **The READER's idea of a block, so that a writer can never edit a
+    /// different one.** `PageVisibilityReader.frontmatterBlock` follows
+    /// python-frontmatter, which accepts three dashes OR MORE and tolerates
+    /// blank lines before the opening fence. A writer that insisted on
+    /// exactly `---` at line 0 saw no block on such a page and PREPENDED one
+    /// of its own — leaving the teacher's real frontmatter behind it as body
+    /// text, printed to their students. Measured 2026-09-19.
+    ///
+    /// A page with no fence at all still has no frontmatter to speak of, and
+    /// that is what nil means here.
     nonisolated static func block(in pageText: String) -> (openIndex: Int, closeIndex: Int, lines: [String])? {
-        let lines: [String] = pageText.components(separatedBy: "\n")
-        guard let first = lines.first, trimmingCarriageReturn(first) == "---" else {
+        guard let fences = PageVisibilityReader.fenceIndices(in: pageText) else {
             return nil
         }
-        var index: Int = 1
-        while index < lines.count {
-            if trimmingCarriageReturn(lines[index]) == "---" {
-                var inside: [String] = []
-                for position in 1..<index {
-                    inside.append(lines[position])
-                }
-                return (openIndex: 0, closeIndex: index, lines: inside)
-            }
-            index += 1
+        let lines: [String] = pageText.components(separatedBy: "\n")
+        var inside: [String] = []
+        for position in (fences.openIndex + 1)..<fences.closeIndex {
+            inside.append(lines[position])
         }
-        return nil
+        return (openIndex: fences.openIndex, closeIndex: fences.closeIndex, lines: inside)
     }
 
     /// A line without the carriage return a Windows-written file leaves on it.

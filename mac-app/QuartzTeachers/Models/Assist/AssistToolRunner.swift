@@ -697,7 +697,11 @@ final class AssistToolRunner {
             guard let page = graph.page(titled: summary.title) else {
                 continue
             }
-            if page.isVisibleToStudents != publishing {
+            // A page whose flag this app will not read counts as moving, for
+            // the reason `AssistPublishPlan.appendChanges` gives: "already the
+            // way you asked" needs certainty, or a whole unit can be reported
+            // published while the build is holding pages back.
+            if page.isVisibleToStudents != publishing || !page.visibilityIsCertain {
                 moving.append(page.displayTitle)
             }
         }

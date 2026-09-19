@@ -2609,6 +2609,167 @@ final class AssistToolRunnerTests: XCTestCase {
         }
     }
 
+    /// A flag the teacher annotated, or typed a word into, still PUBLISHES
+    /// the page — the build strips a comment before Quartz sees it, and makes
+    /// a string of anything it cannot read as a boolean, and a string that is
+    /// not "false" is published.
+    ///
+    /// So asking for such a page to be published is asking for what is already
+    /// there: four words back, and the file left exactly as the teacher wrote
+    /// it. Rewriting the flag to a tidy `true` would be an edit nobody asked
+    /// for, in a file Obsidian very likely has open, and it would throw away
+    /// whatever the word meant to them. Until 2026-09-18 Plantoir read all
+    /// three of these as HIDDEN and offered to publish a page students were
+    /// already reading (issue #140).
+    @MainActor
+    func testAFlagTheTeacherAnnotatedIsAlreadyPublished() async throws {
+        for value in ["true # covered Tuesday", "on", "maybe"] {
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            try write(page: "Unit 4, Day 23", publish: value, date: "2026-09-08",
+                      body: "Nothing linked.", in: made.course)
+            let url: URL = pageURL(of: "Unit 4, Day 23", in: made.course)
+            let before: String = try String(contentsOf: url, encoding: .utf8)
+
+            let outcome: AssistToolOutcome = await made.runner.run(call: call(
+                "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+            ))
+            XCTAssertEqual(outcome.summary, "It's already been published.", "publish: \(value)")
+            XCTAssertEqual(
+                try String(contentsOf: url, encoding: .utf8), before,
+                "publish: \(value) — the teacher's own line is left alone"
+            )
+        }
+    }
+
+    /// And the same page asked to be HIDDEN does change, because the only way
+    /// to say the opposite of what it says is to say it plainly.
+    @MainActor
+    func testTheSameAnnotatedFlagStillHidesWhenAsked() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 23", publish: "true # covered Tuesday", date: "2026-09-08",
+                  body: "Nothing linked.", in: made.course)
+
+        _ = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+        ))
+        let after: String = try String(
+            contentsOf: pageURL(of: "Unit 4, Day 23", in: made.course), encoding: .utf8
+        )
+        XCTAssertTrue(after.contains("publish: false"))
+        XCTAssertFalse(after.contains("# covered Tuesday"))
+    }
+
+    /// A linked page whose flag cannot be read takes the class's date too.
+    ///
+    /// It is about to be published by the change list, so skipping it as
+    /// "already out where students can see it" would publish it with whatever
+    /// date it happened to have rather than the day of the class that brought
+    /// it — which is the one thing the date move exists to fix.
+    @MainActor
+    func testALinkedPageThisAppCannotReadStillTakesTheClassesDate() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 24", publish: "false", date: "2027-01-19",
+                  body: "See [[Bananas]].", in: made.course)
+        try write(courseLevelPage: "Bananas", publishForSection1: "!!str false",
+                  dated: "2026-09-08", body: "Yellow.", in: made.course)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "plan_publish_pages",
+            arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 24"]
+        ))
+        XCTAssertTrue(
+            outcome.detail.contains(
+                "“Bananas” will become visible, with the same date as “Unit 4, Day 24”."
+            ),
+            outcome.detail
+        )
+    }
+
+    /// A flag this app will NOT read is not "already done".
+    ///
+    /// Each of these hides the page on the built site, and the reader calls
+    /// every one of them `cannot tell` rather than guessing. Reporting treats
+    /// that as visible, which is the mild mistake — but a PLAN that believed
+    /// it answered "It's already been published." and wrote nothing, while
+    /// students could not see the page. That is the failure that reports
+    /// success, and it is the one this whole issue exists to remove.
+    @MainActor
+    func testAFlagThisAppCannotReadIsAlwaysWritten() async throws {
+        for value in ["!!str false", "&flag false", "!!bool false"] {
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            try write(page: "Unit 4, Day 23", publish: value, date: "2026-09-08",
+                      body: "Nothing linked.", in: made.course)
+            let url: URL = pageURL(of: "Unit 4, Day 23", in: made.course)
+
+            let outcome: AssistToolOutcome = await made.runner.run(call: call(
+                "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+            ))
+            let after: String = try String(contentsOf: url, encoding: .utf8)
+            XCTAssertTrue(
+                after.contains("publish: true"),
+                "publish: \(value) — the flag must be written out in full: \(outcome.summary)"
+            )
+            XCTAssertEqual(
+                PageVisibilityReader.answer(in: after, forSection: 1), .visible,
+                "publish: \(value) — and the page must now really be published"
+            )
+        }
+    }
+
+    /// The same, asked to hide.
+    @MainActor
+    func testAFlagThisAppCannotReadIsWrittenWhenHidingToo() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 23", publish: "!!str false", date: "2026-09-08",
+                  body: "Nothing linked.", in: made.course)
+
+        _ = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+        ))
+        let after: String = try String(
+            contentsOf: pageURL(of: "Unit 4, Day 23", in: made.course), encoding: .utf8
+        )
+        XCTAssertEqual(PageVisibilityReader.answer(in: after, forSection: 1), .hidden)
+    }
+
+    /// And the same page inside a whole-unit publish, which counts what would
+    /// MOVE and had the identical blind spot.
+    @MainActor
+    func testAWholeUnitPublishCountsAPageItCannotRead() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 1", publish: "true", date: "2026-09-08",
+                  body: "Done.", in: made.course)
+        try write(page: "Unit 4, Day 2", publish: "!!str false", date: "2026-09-09",
+                  body: "Not read.", in: made.course)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
+        ))
+        XCTAssertFalse(
+            outcome.detail.contains("already been published"),
+            "A page whose flag cannot be read is not one that needs no change: \(outcome.detail)"
+        )
+        let after: String = try String(
+            contentsOf: pageURL(of: "Unit 4, Day 2", in: made.course), encoding: .utf8
+        )
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: after, forSection: 1), .visible,
+            "and the page whose flag could not be read is now really published"
+        )
+    }
+
     /// And the mirror, for hiding.
     @MainActor
     func testUnpublishingAPageThatIsAlreadyHiddenSaysSo() async throws {
