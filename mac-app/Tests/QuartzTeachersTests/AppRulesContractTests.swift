@@ -669,7 +669,223 @@ final class AppRulesContractTests: XCTestCase {
         }
     }
 
+    // MARK: - The outside doors
+
+    /// Runs `outsideAgents` — the two menu items that hand one course to a
+    /// command-line assistant the teacher already has, "Revise with Claude…"
+    /// and "Revise with Codex…".
+    ///
+    /// The block covers BOTH doors deliberately. The Claude door had shipped
+    /// for a year with none of it written down anywhere two apps could
+    /// compare, and adding the second door was the moment that stopped being
+    /// harmless: the sentences, the arguments and what each one writes to disk
+    /// are now data, so a drift on either side is a named failure rather than
+    /// a teacher's report months later.
+    ///
+    /// Every sentence is read FROM the contract and compared with the named
+    /// constant in the code. Nothing here retypes one.
+    func testTheOutsideDoorsSayAndPassWhatTheContractSays() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let agents: [[String: Any]] = try XCTUnwrap(section["agents"] as? [[String: Any]])
+        XCTAssertEqual(agents.count, 2, "Both doors are described here, not only the new one.")
+
+        // Fixed, deliberately plain values: this test is about the SHAPE of
+        // what each door passes, and CodexLauncherTests is where the awkward
+        // paths live.
+        let folder: String = "/Users/teacher/Teaching"
+        let server: String = "/Applications/Plantoir.app/Contents/MacOS/Plantoir"
+        let courseCode: String = "ICS3U_CONTRACT_TEST"
+        let greeting: String = ClaudeCodeLauncher.greeting(courseCode: courseCode, courseName: "Grade 11 Computer Science")
+
+        XCTAssertEqual(section["hiddenWhenNotInstalled"] as? Bool, true)
+        XCTAssertEqual(section["greetingIsTheSameForEveryAgent"] as? Bool, true)
+        XCTAssertEqual(section["serverName"] as? String, "plantoir")
+        XCTAssertFalse(greeting.contains("\""), "greetingCarriesNoDoubleQuotes")
+
+        for agent in agents {
+            let key: String = try XCTUnwrap(agent["key"] as? String)
+            let menuItem: String = try XCTUnwrap(agent["menuItem"] as? String)
+            let didNotOpenTitle: String = try XCTUnwrap(agent["didNotOpenTitle"] as? String)
+            let couldNotStart: String = try XCTUnwrap(agent["couldNotStart"] as? String)
+            let trailLine: String = try XCTUnwrap(agent["trailLine"] as? String)
+            let expectedArguments: [String] = try XCTUnwrap(agent["arguments"] as? [String])
+            let writes: [String] = try XCTUnwrap(agent["writes"] as? [String])
+
+            let scriptPath: String
+            let actualMenuItem: String
+            let actualDidNotOpenTitle: String
+            let actualCouldNotStart: String
+            let actualTrailLine: String
+            var tokens: [String: String] = [
+                "{course}": courseCode,
+                "{folder}": folder,
+                "{server}": server,
+                "{greeting}": greeting,
+            ]
+
+            switch key {
+            case "claude":
+                let configPath: String = try ClaudeCodeLauncher.writeConfig(
+                    workspacePath: folder,
+                    courseCode: courseCode,
+                    serverPath: server
+                )
+                tokens["{config}"] = configPath
+                scriptPath = try ClaudeCodeLauncher.writeLauncherScript(
+                    workspacePath: folder,
+                    courseCode: courseCode,
+                    claudePath: "/usr/local/bin/claude",
+                    configPath: configPath,
+                    prompt: greeting
+                )
+                actualMenuItem = ClaudeCodeLauncher.menuItemTitle
+                actualDidNotOpenTitle = ClaudeCodeLauncher.didNotOpenTitle
+                actualCouldNotStart = ClaudeCodeLauncher.couldNotStartSentence(courseCode: courseCode)
+                actualTrailLine = ClaudeCodeLauncher.trailSentence(courseCode: courseCode)
+            case "codex":
+                scriptPath = try CodexLauncher.writeLauncherScript(
+                    workspacePath: folder,
+                    courseCode: courseCode,
+                    codexPath: "/opt/homebrew/bin/codex",
+                    serverPath: server,
+                    prompt: greeting
+                )
+                actualMenuItem = CodexLauncher.menuItemTitle
+                actualDidNotOpenTitle = CodexLauncher.didNotOpenTitle
+                actualCouldNotStart = CodexLauncher.couldNotStartSentence(courseCode: courseCode)
+                actualTrailLine = CodexLauncher.trailSentence(courseCode: courseCode)
+            default:
+                XCTFail("The contract describes a door \"\(key)\" this app does not implement.")
+                continue
+            }
+            defer {
+                try? FileManager.default.removeItem(atPath: scriptPath)
+                if let configPath = tokens["{config}"] {
+                    try? FileManager.default.removeItem(atPath: configPath)
+                }
+            }
+
+            XCTAssertEqual(actualMenuItem, menuItem, key)
+            XCTAssertEqual(actualDidNotOpenTitle, didNotOpenTitle, key)
+            XCTAssertEqual(actualCouldNotStart, AppRulesContractTests.filled(couldNotStart, with: tokens), key)
+            XCTAssertEqual(actualTrailLine, AppRulesContractTests.filled(trailLine, with: tokens), key)
+
+            // The arguments as the tool will RECEIVE them, not as the script
+            // happens to spell them: the script leaves a bare flag unquoted
+            // and single-quotes everything else, which is a fact about the
+            // writer rather than about the contract.
+            var expectedArgv: [String] = []
+            for argument in expectedArguments {
+                expectedArgv.append(AppRulesContractTests.filled(argument, with: tokens))
+            }
+            let script: String = try String(contentsOfFile: scriptPath, encoding: .utf8)
+            let commandLine: String = try XCTUnwrap(script.components(separatedBy: "\n").last)
+            var argv: [String] = try XCTUnwrap(AppRulesContractTests.splitShellWords(commandLine))
+            XCTAssertFalse(argv.isEmpty, key)
+            argv.removeFirst()
+            XCTAssertEqual(
+                argv, expectedArgv,
+                "The \(key) door does not pass what the contract says.\nscript:\n\(script)"
+            )
+
+            // The server is handed the WORKING FOLDER, by both doors.
+            let serverArguments: [String] = try XCTUnwrap(section["serverArguments"] as? [String])
+            var filledServerArguments: [String] = []
+            for argument in serverArguments {
+                filledServerArguments.append(AppRulesContractTests.filled(argument, with: tokens))
+            }
+            XCTAssertEqual(filledServerArguments, ["--mcp-stdio", folder])
+
+            // What each door writes, and what it therefore does NOT write.
+            let supportDirectory: URL = try ClaudeCodeLauncher.supportDirectory()
+            var expectedFiles: [String] = []
+            for name in writes {
+                expectedFiles.append(AppRulesContractTests.filled(name, with: tokens))
+            }
+            for name in expectedFiles {
+                XCTAssertTrue(
+                    FileManager.default.fileExists(atPath: supportDirectory.appendingPathComponent(name).path),
+                    "\(key) was supposed to write \(name)"
+                )
+            }
+            if key == "codex" {
+                XCTAssertFalse(
+                    expectedFiles.contains("mcp-\(courseCode).json"),
+                    "The Codex door writes no configuration file — its server is described in its arguments."
+                )
+            }
+        }
+    }
+
     // MARK: - Private
+
+    /// Split one line of the generated script back into the arguments a tool
+    /// would receive.
+    ///
+    /// The writers emit only two shapes — a bare word, and a POSIX
+    /// single-quoted string in which an apostrophe is written `\'` between
+    /// quoted runs — so this reads both rather than shelling out. Returns nil
+    /// if a quote is left open, which would mean the script is malformed.
+    static func splitShellWords(_ line: String) -> [String]? {
+        var words: [String] = []
+        var current: String = ""
+        var hasCurrent: Bool = false
+        var isInsideQuotes: Bool = false
+        var isEscaped: Bool = false
+
+        for character in line {
+            if isEscaped {
+                current.append(character)
+                hasCurrent = true
+                isEscaped = false
+                continue
+            }
+            if isInsideQuotes {
+                if character == "'" {
+                    isInsideQuotes = false
+                } else {
+                    current.append(character)
+                }
+                continue
+            }
+            switch character {
+            case "'":
+                isInsideQuotes = true
+                hasCurrent = true
+            case "\\":
+                isEscaped = true
+            case " ", "\t":
+                if hasCurrent {
+                    words.append(current)
+                    current = ""
+                    hasCurrent = false
+                }
+            default:
+                current.append(character)
+                hasCurrent = true
+            }
+        }
+
+        if isInsideQuotes || isEscaped {
+            return nil
+        }
+        if hasCurrent {
+            words.append(current)
+        }
+        return words
+    }
+
+    /// Substitute the contract's `{tokens}` without a regular expression, so
+    /// the substitution is as plain as the contract's own notation.
+    private static func filled(_ text: String, with tokens: [String: String]) -> String {
+        var filled: String = text
+        for (token, value) in tokens {
+            filled = filled.replacingOccurrences(of: token, with: value)
+        }
+        return filled
+    }
+
 
     private func roundTripped(_ values: [String: Any]) throws -> CourseConfiguration {
         let data: Data = try JSONSerialization.data(withJSONObject: values, options: [.sortedKeys])
