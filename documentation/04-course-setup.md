@@ -69,6 +69,87 @@ of starting content, and never both:
   become the DEFAULT answers to step 5's questions rather than replacing
   them.
 
+**Both apps' wizards let the teacher decline a skeleton, and the structure
+editor must follow them in BOTH directions.** Turning "Start from a
+<subject> skeleton" ON adopts that subject's five lists; turning it OFF puts
+the defaults back — the LCS variants for the two shared lists when the
+terminology switch is on, the plain defaults for the two per-section lists,
+which have no LCS variant — for each list still EQUAL to what the adoption
+put there, and leaves the rest as the teacher left them — except the marks
+pool, which is kept where the teacher ticked it but narrowed to the folders
+the course will actually have (below). With nothing adopted there is nothing
+to compare against and nothing changes. A teacher
+who has declined the skeleton then reads the same sentence as one whose code
+has no skeleton at all ("Example content isn't available for this course
+code yet…"), because the course starts empty either way.
+
+Russell decided this for Windows on 2026-09-06 and Windows shipped it on
+2026-09-07; the mac copied it on 2026-09-18 ([issue
+#77](https://github.com/russellgordon/plantoir/issues/77)), having until
+then adopted one way only. The bug that made it worth fixing is the shape to
+remember: a teacher typed SNC4M, watched Investigations and Concepts appear,
+turned the toggle off — and was shown, and got, the science skeleton's
+folders with none of its pages, while `course_config.json` said
+`use_skeleton: false`. A wizard that lies about what it is about to make is
+a worse product than one that never asked.
+
+The rule and its thirteen cases are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`wizard.skeletonToggle`, run on the mac by `SharedRulesContractTests`;
+`WizardStructureTests` covers what cases cannot reach — the pieces the rule
+is assembled from, and a scan proving the toggle is WIRED, a control with no
+handler being the original bug. Three things about it are decisions rather than
+mechanics; the fourth is what to know before reading a green run as coverage:
+
+- **A list is recognised as untouched by VALUE, not by a dirty flag.** A
+  list edited and then edited BACK to exactly what the adoption set is
+  restored with the untouched ones, and that is intended: a teacher cannot
+  see the difference, so neither can the rule. Order counts as part of the
+  value — the same names in a different order is an edit and is left alone.
+  Per-list dirty flags were rejected: a flag has to be got right in every
+  editing path and gets one wrong the first time a list is changed from
+  somewhere new, which value equality cannot.
+- **The LCS switch rewrites the two SHARED lists**, so flipping it after an
+  adoption leaves them unequal to the snapshot and they stay exactly as the
+  switch left them, while the per-section lists still go back. Re-taking the
+  snapshot on a terminology flip would make the restore delete the College
+  Board folder the teacher had just asked for.
+- **The marks pool can never name a folder that has just left the editor**,
+  and it takes TWO rules to keep that true: a pool still equal to the
+  adoption's is re-inferred over the restored folders, and a pool the teacher
+  has ticked themselves is kept but NARROWED to the folders the course will
+  actually have. Miss the second and a teacher who adopted the mathematics
+  skeleton, unticked `Tasks` and then declined the skeleton is shown a
+  checklist with nothing ticked while the wizard writes
+  `graded_folders: ["Thinking Tasks"]` against a course with no such folder —
+  and the two apps then write DIFFERENT files for the same clicks, which is
+  what the contract exists to stop. (`setup_course.py` reconciles the key
+  again when it reads it, so no teacher ends up with a broken course; that is
+  a second net, not a licence for the wizard to write something untrue. The
+  first version of the mac's restore did exactly that, and the adversarial
+  review of it found it.) The two apps reach the same answer from
+  opposite ends: the mac narrows inside the restore, Windows leaves the pool
+  and narrows it on every read (`CurrentGradedFolders`) and again when the
+  file is written. The mac narrows ONCE MORE as the file is written, for the
+  one path the editor does not cover: the terminology switch takes `College
+  Board Curriculum` out of the folder list without asking the marks pool, so
+  a teacher who had ticked it would otherwise have it written into a course
+  that has no such folder.
+- **Two of the five lists cannot tell one answer from another for most
+  codes**, which matters when reading a green run as coverage: every bundled
+  family ships `per_section_folders` of exactly `["All Classes"]`, the
+  factory default, so only the per-section FILES prove that half of a
+  restore; and every family declares `graded_folders` of `["Tasks"]` except
+  mathematics, so a marks-pool expectation means nothing unless its case uses
+  a mathematics code. The contract carries cases on `MPM1D` for that reason.
+  A third thing not to read as coverage, which the contract's `lists.note`
+  also names: in a runner that resolves the `skeleton` symbol through the same
+  catalog an adoption copies from, a `turnOn` case's four list expectations
+  prove that the adoption FIRED rather than what it copied — which is why the
+  `MPM1D` adoption case spells its marks pool out as a literal.
+- **A narrow extra rule for the hole value equality leaves was rejected.**
+  It would have made the two apps differ over a case no teacher can tell
+  apart, which is how the contract stops being worth having.
+
 Both are poured in by the same `install_example_content()`, which replaces
 the payload's sentinels: `__CREATED__`, `__CREATED_CLASS_K__` (spread
 across the semester), `__SECTION_NUMBER__`, and — for skeletons —
@@ -155,6 +236,13 @@ skeleton applies (step 0b), every default below comes from that subject's
 manifest instead of the factory list, and a folder the teacher adds at the
 prompt is treated like any other section — visible, with a chevron. When
 example content is being installed, this whole step is skipped.
+
+**In both apps' wizards this step and the skeleton question are one
+thing**, and the editor follows the toggle both ways: declining the skeleton
+puts the factory (or LCS) defaults back into every list the teacher has not
+edited since it was adopted, so what the four lists show is what
+`course_config.json` will carry and what will be created on disk. Step 0b
+has the rule, what it deliberately costs, and where its cases live.
 
 - **Shared folders** (factory default: Concepts, Discussions, Examples,
   Exercises, Ontario Curriculum, Recaps, Setup, Style, Tasks, Tutorials, …;
@@ -361,7 +449,9 @@ Windows needs exactly three UI behaviours:
   off). When no content exists for the code, this is where the SKELETON
   toggle goes instead (entry 123) — "Start from a <subject> skeleton" —
   and the quiet "empty folders" caption is now the last resort, for a code
-  with neither.
+  with neither. (Both apps also show that caption while the skeleton
+  toggle is OFF, and the toggle puts the defaults back when it goes off:
+  step 0b above has that rule, which postdates this list.)
 - **Structure lock**: when pre-populating, HIDE the folders/files
   editor behind a caption — the payload's manifest is the entire
   structure authority and the Python wizard skips all structure
