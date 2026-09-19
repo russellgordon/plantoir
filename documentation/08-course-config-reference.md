@@ -74,7 +74,7 @@ A representative example:
 | `class_folder` | string or null | setup, and a rename in Course Settings | build, both apps | Which per-section folder holds this course's class pages. **Absent falls back to the GUESS** — the first per-section folder whose name contains `class`, else the first, else the literal `All Classes` — which is what every course made before 2026-09-01 relies on. The key exists because the guess quietly decided what a teacher was allowed to CALL the folder: somebody whose vocabulary is "Thread 2, Day 3" would sensibly call it `All Days`, and the guess would then point the next-class button and the coverage map at whatever folder happened to be first. **A rename writes this key even on a course that never had one**, because a rename is the one moment Plantoir witnesses the change. A stale name loses to the guess; a name differing only in case yields the folder LIST's spelling, because file paths are built from the answer. |
 | `unit_word` | string | setup (new courses); Course Settings → Rename… (a course in use — mac; Windows: [#158](https://github.com/russellgordon/plantoir/issues/158)) | build, both apps | What this course calls the first half of a class page's name — `Unit 2, Day 3`, or `Module 2, Day 3`. **Absent means `Unit`**, and so does an empty string; unlike `graded_folders`, the two are not distinguished, because there is no sensible reading of "the teacher cleared the word". Chosen when the course is made, where the ready-made pages are written in that word as they are poured; changed later from Course Settings → Rename…, which renames every class page and follows the links before writing the key (see [09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a unit"). `Day` is deliberately fixed. |
 | `excluded_items` | object with `shared` and/or `per_section` arrays | Course Settings | build | Folder and file names the teacher removed in Settings, kept out of previews and deploys. **Authoritative at build time**: preflight drops an excluded name it finds back in the folder lists rather than re-adding it, and never un-hides it. Keyed by scope because the same bare name can legitimately exist in both, and the two are found by different scans. An exclusion does NOT expire when the folder is deleted and re-created — discovery is name-based, so the build cannot tell "the folder I excluded" from "the new folder I just made". |
-| `graded_folders` | array of strings | setup, and the Marks checklist in Course Settings | build, both apps | The folders whose work counts for marks, which is what makes an expectation "assessed" on the coverage map. **Absent is not empty.** Absent means the teacher has never been asked, so the historical rule applies (any folder whose name contains `task`) and an existing course keeps exactly the marks it had; `[]` means they were asked and cleared it. Seeding existing courses would not have been safe — the mathematics skeleton ships `Thinking Tasks`, which the old rule counted and a pool of `["Tasks"]` does not. **The first tick FREEZES the pool**: the moment a teacher touches the checklist, the key is written with everything the course was already counting, and the historical rule stops applying to it. **A REMOVAL does not** — taking a folder out of the course in Settings is not an answer to the marks question, so a never-asked course is left with the key ABSENT rather than frozen to the historical answer minus that folder (which, on the ordinary course whose only marked folder is `Tasks`, would be `[]`: nothing counting for marks, permanently, from a gesture the teacher was told would do one narrow thing). The rule, its second exception and what it deliberately leaves unpinned are `gradedFolders.removingAFolder`, six cases, run on both platforms since 2026-09-18. Which is why what the checklist OFFERS matters as much as what it writes — the build matches a folder at any depth, so the apps offer the two folder lists plus every folder found inside the course, four levels deep. That rule, its skip list and what it deliberately leaves out are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) → `gradedFolders.choices`, and both apps run its 14 cases. Two parts of it are easy to leave out and cost a teacher their marks: a folder named in `excluded_items` is NOT offered (it is still on disk, so the walk hands back a folder they just removed unless it is told not to), and each folder's children are sorted ORDINALLY and case-insensitively — see [`04-course-setup.md`](04-course-setup.md) for the measured table of which comparison, because the natural call on each platform is a different one. |
+| `graded_folders` | array of strings | setup, and the Marks checklist in Course Settings | build, both apps | The folders whose work counts for marks, which is what makes an expectation "assessed" on the coverage map. **Absent is not empty.** Absent means the teacher has never been asked, so the historical rule applies (any folder whose name contains `task`) and an existing course keeps exactly the marks it had; `[]` means they were asked and cleared it. Seeding existing courses would not have been safe — the mathematics skeleton ships `Thinking Tasks`, which the old rule counted and a pool of `["Tasks"]` does not. **The first tick FREEZES the pool**: the moment a teacher touches the checklist, the key is written with everything the course was already counting, and the historical rule stops applying to it. **A REMOVAL does not** — taking a folder out of the course in Settings is not an answer to the marks question, so a never-asked course is left with the key ABSENT rather than frozen to the historical answer minus that folder (which, on the ordinary course whose only marked folder is `Tasks`, would be `[]`: nothing counting for marks, permanently, from a gesture the teacher was told would do one narrow thing). The rule, its second exception and what it deliberately leaves unpinned are `gradedFolders.removingAFolder`, seven cases, run on both platforms (six since 2026-09-18, the seventh since 2026-09-19). The second exception — a name the checklist STILL OFFERS keeps its place — is asked CASE-INSENSITIVELY, the way the build asks it, since 2026-09-19 ([#172](https://github.com/russellgordon/plantoir/issues/172), raised from Windows): the checklist returns names as they are spelled on disk, so an exact test drops a pooled `Tasks` when `Portfolios/tasks` survives while the build goes on counting that folder. What remains unpinned is the DROP's own comparison, which the mac makes exactly and Windows with `OrdinalIgnoreCase`. Which is why what the checklist OFFERS matters as much as what it writes — the build matches a folder at any depth, so the apps offer the two folder lists plus every folder found inside the course, four levels deep. That rule, its skip list and what it deliberately leaves out are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) → `gradedFolders.choices`, and both apps run its 14 cases. Two parts of it are easy to leave out and cost a teacher their marks: a folder named in `excluded_items` is NOT offered (it is still on disk, so the walk hands back a folder they just removed unless it is told not to), and each folder's children are sorted ORDINALLY and case-insensitively — see [`04-course-setup.md`](04-course-setup.md) for the measured table of which comparison, because the natural call on each platform is a different one. |
 | `include_coverage_notes` | bool (default `true`) | setup | build | Whether that page carries its explanatory sections ("What counts", "Reading it honestly") or the map alone. |
 | `use_lcs_terminology` | bool | setup | setup (starting folder and file names) | A school-specific mode: swaps the factory shared-folder and shared-file lists for one school's own words — "College Board Curriculum", "SIC Drop-In Sessions.md" and "Grove Time.md" in place of "Extra Help.md". Affects the names a new course starts with, nothing after that. |
 
@@ -199,7 +199,10 @@ in `windows-app/Plantoir.Core/Models/` (which `PageFrontmatter.IsDraft`,
 `StoredDraft` and `Visibility` are collapses of), and `page_visibility.py` in
 the shared Python — answers **three ways**: `visible`, `hidden`, and
 `cannotTell` for a handful of forms it will not guess at (a value on the line
-BELOW the key — over a blank line as happily as not — a tag such as
+BELOW the key — over a blank line as happily as not, and **whatever is on the
+key's own line**; see "A writer must take a value's CONTINUATION lines with the
+key" below for why the second half of that sentence is the dangerous one — a
+tag such as
 `!!str false`, a block scalar, an anchor or alias, a flow collection, an escape
 inside double quotes, an indented key, a value that starts with a character
 YAML reserves (`%`, `@`, a backtick, `- `) or carries its own `key: value`, and
@@ -291,6 +294,18 @@ on Windows), not in the shared contract. A shared case says what the SITE does;
 writing `expectVisible: true` for a form the site HIDES would oblige the other
 platform to be wrong in the same direction rather than merely allow it.
 
+**With one deliberate exception, added 2026-09-19 with issue #176.** The test
+is not "can the reader read it" but "does the REPORTING answer match the site",
+and for two continuation forms it does: `publish: false` with an indented
+`false` under it, with or without a blank line between them, is PUBLISHED by
+the site — the fold is the string `"false false"`, which is not `"false"` —
+and both readers answer `cannotTell`, which reporting collapses to visible.
+Those two are in `readingCases`, and they earn the place because the reader
+that got them wrong got them wrong CONFIDENTLY, which is what let a writer's
+already-right gate turn "hide this page" into a no-op. The polarity siblings
+(`no`, `off`, `FALSE`, `true`, `maybe` with a value below) are equally honest
+and add nothing the two do not, so they stay in each platform's own tests.
+
 ### What a WRITER does with an odd value
 
 Four rules, all deliberate. The first two are about the VALUE; the last two are
@@ -319,6 +334,20 @@ separately from the reader:
   keeps it a null rather than deciding for the teacher. A page wrongly held back is
   one a teacher notices and fixes; a page wrongly published is one nobody
   notices at all.
+
+  **The carry asks the one reader, so correcting the reader moved it** (issue
+  #176, 2026-09-19). `SectionAdder.publishValue` / `PublishValue` now reads a
+  legacy `draftSection1: false` or `: no` with a line under it as `cannot tell`
+  rather than off the key's own line, so both are carried HELD BACK where the
+  mac used to carry them as published; Windows had already moved. Measured,
+  **neither app reproduces the site here and neither is trying to.** The site
+  PUBLISHES `draftSection1: false`, `: no`, `: true` and `: yes` each with an
+  indented `x` under them — the fold is `"false x"`, `"no x"` and so on, which
+  `_as_bool` cannot make a boolean of, so `process_frontmatter` writes
+  `publish: true` — while `draftSection1:` over an indented `true` is the
+  boolean and the page is HIDDEN. Both apps err HELD BACK on all five; the mac
+  in four rows now, as Windows does. Uniformly held back is the documented
+  preference and it is what `setup_course.per_section_frontmatter` writes.
 * **A writer takes the LAST line naming a key, because the reader does and the
   build does.** PyYAML keeps the last of two identical keys. A writer that set
   the first left `publish: true` above a `publish: false` the build still
@@ -373,13 +402,25 @@ separately from the reader:
   The rule is `setup_course.per_section_frontmatter`'s, which has done this
   since 2026-09-18, and it is the same stepping the reader's
   `firstNonBlankLine` does: walk forward from the key, STEP OVER blank lines
-  and indented `# note`s rather than stopping at them, stop at the first line
-  that is not indented, and take everything up to the last indented line that
-  was not a comment. So a complete value followed by an indented note keeps
-  the note — nothing is taken, because no value line was found below it —
+  and `# note`s **at any indent** rather than stopping at them, stop at the
+  first line that is not indented, and take everything up to the last indented
+  line that was not a comment. So a complete value followed by an indented note
+  keeps the note — nothing is taken, because no value line was found below it —
   while a note with a real value under it goes with the value, which is what
   the reader sees through it anyway. Do not try to PARSE the block scalar;
   only find where the value ends.
+
+  **"At any indent" is the half that drifts, and it has drifted twice.**
+  Windows' first `ContinuationLines` stepped over a comment only when it was
+  indented, and `setup_course.per_section_frontmatter` did the same until
+  2026-09-19 — so a note at COLUMN 0 between a key and its value ended the
+  walk. Measured for the splitter: `publish:` / `# note` / `  false` is HIDDEN
+  before the split and **VISIBLE in section 1** after it (section 2 gets the
+  value and is hidden), and with a single section it happens to survive, which
+  is why nothing noticed. On the mac the two halves now share one predicate,
+  `PageVisibilityReader.isSteppedOverLookingForAValue`, used by
+  `firstNonBlankLine` and by `continuationLineIndices`, precisely so a reader
+  and a writer cannot step differently again.
 
   **A value below a key is a value below a key however complete the key's own
   line looks — and the READER has to be the one that says so.** Measured,
@@ -394,25 +435,51 @@ separately from the reader:
   reading it. **The sweep cannot save a page the writer is never asked to
   write.**
 
-  So `ReadScalar` answers `cannot tell` whenever the first line that could be
+  So the reader answers `cannot tell` whenever the first line that could be
   a value is indented, whatever is on the key's own line. Reporting then says
   visible — which is what the site does — and the writer writes the flag out
   in full and sweeps. Measured after that write: `False` → HIDDEN. It changes
-  none of the 54 shared `readingCases`.
+  none of the 54 shared `readingCases` that existed before it.
 
-  **Windows fixed all of this on 2026-09-19** — `PageVisibilityReader
+  **"Whatever is on the key's own line" is closed; "the first line that could
+  be a value" has one pre-existing exception, and it is the one that reaches
+  this same fault.** A line of INDENTED DASHES — `publish: false` over
+  `  ---` — never reaches the rule above, because `isFence` trims leading
+  whitespace before testing for dashes and so takes `  ---` for the CLOSING
+  fence. python-frontmatter's own boundary is `^-{3,}\s*$`, which allows no
+  leading whitespace at all, so the build reads that line as part of the value
+  and the site PUBLISHES the page (`"false ---"`), while the reader says
+  `hidden` — confidently — and "hide this page" is a no-op, exactly the shape
+  this section exists to close. `publish: no` over `  ---` behaves the same;
+  `publish: >-` and `publish:` over `  ---` are written but the `  ---` is
+  left behind, because `continuationLineIndices` is bounded by
+  `block.closeIndex`, which is the fake fence. All measured; `origin/dev` and
+  Windows produce byte-identical output on every row, so this is pre-existing
+  and shared rather than anything this piece introduced. It is NOT fixed here
+  on purpose: `isFence` is the fence finder that the reader, both visibility
+  writers and `PageFrontmatter` all share, so changing it is its own piece
+  rather than a ride-along.
+  [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
+
+  **Windows fixed all of this — everything above except that one indented-dashes
+  shape — on 2026-09-19** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
   sweep, used by both of `SetDraft`'s branches; tests in
   `PageVisibilityReadingTests` →
   `AValuesContinuationLinesGoWithIt` (14 rows),
   `AValueBelowACompleteLookingOneIsStillAValueBelow` (6) and the two beside
-  them. **The mac still owes both halves** — it reads these as `hidden` and
-  `AssistPageVisibility.setting:152-159` / `:160-169` replace one line and
-  nothing else — and that is
-  [issue #176](https://github.com/russellgordon/plantoir/issues/176), which
-  carries the proposed shared reading case. **The two apps therefore disagree
-  at the three-way level until it lands**, deliberately: the mac is the one
-  that differs from the site.
+  them. **The mac followed the same day**, issue
+  [#176](https://github.com/russellgordon/plantoir/issues/176), implementing
+  Windows' design unchanged:
+  `PageVisibilityReader.reading(ofValue:followedBy:)` for the reading,
+  `PageVisibilityReader.continuationLineIndices` for the sweep, called from
+  both branches of `AssistPageVisibility.setting`, with the stepping shared
+  through `isSteppedOverLookingForAValue`. Tests:
+  `PageVisibilityReadingTests.testAValuesContinuationLinesGoWithIt` (16 rows —
+  Windows' 14 plus two of the mac's own),
+  `testAValueBelowACompleteLookingOneIsStillAValueBelow` (6),
+  `testABlankLineDoesNotEndAValueEither`, the two guards and the CRLF test.
+  The two apps agree at the three-way level again.
 
   Two continuations are not indented and are swept anyway, both measured, both
   a stopped build if left: a column-0 `# note` between a key and its value
@@ -421,7 +488,82 @@ separately from the reader:
   (`publish:` over `- a` is the list `['a']`). A sequence under a key that
   HAS a value is left alone — that page is a `ParserError` before anything is
   written, so there is nothing to rescue and sweeping a teacher's list on that
-  guess would be the larger mistake.
+  guess would be the larger mistake. `keyValueWasEmpty` is therefore asked
+  BEFORE the key's line is rewritten: the rewrite always puts a value there,
+  so asking afterwards always answers false and the sequence is never swept.
+
+  **What was REJECTED, with the reasons, so they are not proposed again.**
+
+  * *Gating the sweep on `isCompleteOnItsOwnLine`* — the obvious shape, and
+    it is wrong: it would leave `publish: false` / `  false` published after a
+    hide, which is the dangerous row.
+  * *Fixing the sweep and leaving the reader* — the fix the first Windows
+    round made, and it buys nothing on the dangerous path, because `setting`'s
+    "already right" gate returns BEFORE the writer runs. The generalisable
+    lesson: when a reader and a writer are fixed in the same piece, check
+    which of the two the early return lives in.
+  * *Tidying `build_site._first_non_blank` to step over comments too* — it
+    steps over blank lines but not comments, unlike every other stepping in
+    this family. Measured consequence: `publish: false` / `# note` /
+    `  false` is a page the build cannot parse, and `_is_draft` calls it
+    hidden. **Left alone deliberately.** It is not unreachable —
+    `process_frontmatter` CATCHES the YAML error, prints `⚠️ Could not read
+    frontmatter from …` and leaves the file byte-identical
+    (`build_site.py:1976-1979`), so such a page reaches the merged tree with
+    its comments intact and `_is_draft` reads raw text. But every page that
+    can reach it is a page that stops the Quartz build anyway, so the gap has
+    no teacher behind it; and `scripts/build_site.py` is inside
+    `.githooks/pre-commit`'s publishing closure, which engages `RELEASING.md`'s
+    rule that a release changing the publishing path needs a full
+    `verify-deploy` run. Twenty minutes and three credentials for a two-line
+    tidy in a function production never reaches. If it is ever changed, change
+    it with something else in that file.
+  * *Putting the sweeper in `PageFrontmatter`, where Windows keeps theirs* —
+    on the mac `PageFrontmatter` is the date and title writer and
+    `PageVisibilityReader` is "the one place that knows the rule". Finding
+    where a value ENDS is reading, and it has to step identically to
+    `firstNonBlankLine` two functions above it.
+
+  **`verify-deploy.sh` is NOT owed for this change, and the argument is a
+  measurement rather than a file list.** `scripts/page_visibility.py` is
+  imported by `scripts/build_site.py`, which IS in the publishing closure, and
+  the hook matches literal paths — so "nothing in the closure changed" is a
+  fact about a list, not a reason. What was measured, over every shipped page
+  in `support/example_content` and `support/skeletons`: **9,553 pages; 387
+  hidden before the change and 387 after; 0 `publish` lines followed by an
+  indented line; 0 coverage-map verdicts moved.** And over the same trees for
+  the splitter change: **11,891 pages, 0 whose split output moves.** Nothing
+  the build does changes.
+
+  **Three of this app's own write paths still orphan a continuation**, and
+  they are named here rather than left to be discovered:
+
+  * `SectionAdder.extendFrontmatter` inserts the new section's
+    `createdSection<N>` / `publishForSection<N>` pair after the last
+    per-section KEY LINE, so on a page whose value continues below it the pair
+    lands between the key and its value — measured, a page HIDDEN in section 1
+    becomes VISIBLE in both sections.
+    [Issue #181](https://github.com/russellgordon/plantoir/issues/181).
+  * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
+    the backup's without either side's continuation lines — measured, a live
+    `publishForSection1:` / `  a: 1` whose backup had no such key is left as
+    `  a: 1` alone and the build stops.
+    [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
+  * **`setting`'s own INSERT branch** — the third branch of the very function
+    the sweep was added to, and the surprising one. It CREATES an orphan
+    rather than leaving one: a block whose first line is indented gets the new
+    key inserted above it at `openIndex + 1`, and that indented line becomes
+    the new key's value. Measured, `---` / `  a: 1` / `---` is VISIBLE (no
+    flag at all) and after a hide it STOPS the build — `bad indentation of a
+    mapping entry (3:4)`. There is nothing to SWEEP there; the fix is where to
+    insert, which is a decision about a teacher's hand-edited YAML rather than
+    a mechanical one.
+    [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
+
+  All three are pre-existing, all three are shared with Windows (which inserts
+  at `open + 1` too), and none is worsened by this piece. The first two are not
+  reached by the fixed reader or writer at all — neither calls `setting`. The
+  rule above is the app's rule; these three are where it is not yet kept.
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a
@@ -493,14 +635,21 @@ own expression. Not reasoned: this issue was once opened on a claim about
 `publish: no` that was read off two plausible-looking files and never run, and
 the claim was backwards.
 
-`contracts/file-formats.json` → `pageVisibility.readingCases` carries 54 of
-those measurements as the list both app suites run, and
+`contracts/file-formats.json` → `pageVisibility.readingCases` carries **56** of
+those measurements as the list both app suites run (54 until 2026-09-19, when
+issue #176 added the two continuation forms the site publishes), and
 `scripts/check_visibility_against_the_site.py` re-runs every one of them down
-the real chain on each `verify.sh` — along with twenty-three more it carries
+the real chain on each `verify.sh` — along with **25** more it carries
 itself, the forms each reader REFUSES to answer about. Those cannot be shared
 cases (a shared case states what the SITE does, and both readers report these
 as visible whatever it does) but the refusals are only justified while the
-measurement holds, so the measurement is pinned where it can fail. That check also asserts that Quartz still
+measurement holds, so the measurement is pinned where it can fail. Since
+2026-09-19 it also carries `CONTINUATIONS_A_WRITER_MUST_SWEEP` — **9** rows,
+three pages each: the page before the write, the page it becomes if the value's
+lines are LEFT, and the page it becomes when they go with the key. That list
+pins the ARGUMENT for the sweep, not the sweep itself: nothing in `verify.sh`
+runs Swift or C#, so deleting `continuationLineIndices` leaves every row green
+and only the app suites go red. Its own comment says so. That check also asserts that Quartz still
 parses with `JSON_SCHEMA` and that `publish.ts` still compares against `false`
 and `"false"` — because if either moves, the whole table moves with it and
 every suite would otherwise stay green.
