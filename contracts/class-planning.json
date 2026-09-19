@@ -194,7 +194,7 @@
       "rule": "record undo ONLY when nothing else moved - no renames AND no date moves",
       "why": "A partial undo that deleted the copy and left every later class renamed and re-dated is worse than no undo at all. When classes shuffled, the way back is the backup taken before any of it, and the reply names it."
     },
-    "note": "Duplicating a lesson as the next class. Windows runs these in ClassPlanningContractTests.Duplication_MatchesContract; the mac owes a runner, and the second case is expected to FAIL there until its undo is keyed on date moves as well as renames (issue for the mac, 2026-09-18)."
+    "note": "Duplicating a lesson as the next class. Windows runs these in ClassPlanningContractTests.Duplication_MatchesContract; the mac owes a runner, and the second case is expected to FAIL there until its undo is keyed on date moves as well as renames (mac issue #163)."
   },
   "nextClass": {
     "cases": [
