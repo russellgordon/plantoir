@@ -122,12 +122,200 @@ belong in the same mental model:
 | Frontmatter key | Where | Effect |
 |---|---|---|
 | `publishForSection<N>` / `createdSection<N>` | shared content | Per-section publication state; collapsed to `publish`/`created` when building section N ([mechanism](05-build-pipeline.md#frontmatter-processing)). |
-| `publish` | any page | `false` keeps the page out of the built site. Anything else — including no key at all — publishes it. |
+| `publish` | any page | `false` keeps the page out of the built site. Anything else — including no key at all — publishes it. **"`false`" is not the same as "looks false"**: see [Whether students see a page](#whether-students-see-a-page) below, which is the measured table and the one both apps are written against. |
 | `created` | any page | The displayed and sort date ([C1-3](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)). |
 | `draft` / `draftSection<N>` | any page | **Legacy, still read.** The same idea with the opposite polarity (`draft: true` hides). Used only when no `publish` key is present. Editing such a page's visibility rewrites the key to `publish` / `publishForSection<N>` on the same line and removes the old one (decided 2026-09-07; `contracts/file-formats.json` → `pageVisibility.writingRules`). The build reads both spellings either way. |
 | `renderFolderPages: false` | a folder's `index.md` | Suppresses the auto-generated file listing on that folder page ([A3](06-quartz-customizations.md#a3-foldercontenttsx-folder-listing-page)). |
 | `excludeBacklinks: true` | any page | Hides the "When did we do this?" backlinks panel on that page ([D1](06-quartz-customizations.md#d1-patched-backlinkstsx-supportbacklinkstsx)). |
 | `transcludeTitleSize: h2` | a transcluded page | Heading level used for the page's title when embedded via `![[…]]` ([C1-10](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)). |
+
+<a name="whether-students-see-a-page"></a>
+
+## Whether students see a page
+
+The single most consequential field in the product, and the one where reading
+the line is not the same as knowing the answer. Settled 2026-09-18 (GitHub
+issue #140, `decision`, Russell): **an app's answer must be the BUILT SITE's
+answer.** The governing rule underneath that is narrower and matters more —
+*Plantoir must never call a page hidden while students can read it.*
+
+### Why a hand-rolled reader gets this wrong
+
+**The build never shows Quartz what the teacher typed.** Every page copied into
+a section's content goes through `build_site.py` → `process_frontmatter`, which
+loads it with `frontmatter.load` (python-frontmatter → PyYAML, **YAML 1.1**),
+resolves this section's per-section keys onto a plain `publish:`, and writes it
+back with `frontmatter.dumps`. Quartz then parses THAT with `gray-matter` using
+`js-yaml` on its **`JSON_SCHEMA`** (`quartz/plugins/transformers/frontmatter.ts`
+in v4.5.0 — the schema matters: it resolves only lowercase `true`/`false`, so
+everything PyYAML did not already turn into a boolean arrives as a string), and
+`patches/publish.ts` drops the page only when the value it gets is **the
+boolean false or the exact string `"false"`**.
+
+Three things fall out of that round trip, each of them a page a line reader
+gets wrong:
+
+* **YAML 1.1's spellings are real booleans.** `publish: no` and `publish: off`
+  HIDE the page; `publish: yes` and `publish: on` publish it. Nine spellings
+  each, and exactly nine: all lower, Initial, ALL CAPS.
+* **Comments are gone, and so is anything that is not a boolean.** An inline
+  `# comment` is stripped by the round trip, so `publish: true # covered
+  Tuesday` publishes. Anything PyYAML cannot resolve becomes a STRING, and a
+  string that is not `"false"` is published — `maybe`, `y`, `n`, `0`, `oN`.
+* **Case matters, in opposite directions on either side of the round trip.**
+  `publish: FALSE` hides (PyYAML resolves it and writes lowercase `false`),
+  while `publish: "False"` does NOT (the quotes keep it a string, and
+  `publish.ts` compares strings exactly). Quoting cuts both ways: `publish:
+  'no'` is published where the unquoted spelling hides.
+
+### The rule, in two predicates
+
+The build consults four keys **in one order on every page it copies**,
+regardless of which folder the page came from:
+
+```
+publishForSection<N>  >  publish  >  draftSection<N>  >  draft
+```
+
+A key naming another section is deleted unread. When the same key appears
+twice, the LAST one wins — that is what PyYAML keeps.
+
+**PUBLISH family** (`publish`, `publishForSection<N>`). Hidden if and only if
+the value is one of the nine spellings of false, *or* is the quoted string
+`false` spelled exactly that way. Everything else — including null, an empty
+value, `~`, and every other string — publishes.
+
+**DRAFT family** (`draft`, `draftSection<N>`), the legacy spelling with the
+opposite polarity. The build asks `build_site._as_bool`: a real boolean counts
+as itself, and anything else is turned into text, trimmed, lowercased and
+compared with `"true"`. So an unquoted `yes` HIDES the page and a quoted
+`"yes"` does not, while `TrUe` hides it either way. That asymmetry is why there
+are two predicates and not one.
+
+### Three answers inside, two outside
+
+Each app's reader — `PageVisibilityReader` on the mac, `page_visibility.py` in
+the shared Python — answers **three ways**: `visible`, `hidden`, and
+`cannotTell` for a handful of forms it will not guess at (a value on the line
+BELOW the key, a tag such as `!!str false`, a block scalar, an anchor or alias,
+a flow collection, an escape inside double quotes, an indented key, and
+frontmatter the build cannot parse at all — tab indentation or an unclosed
+fence, which stop the whole build so there is no site verdict to mirror).
+
+What happens to `cannotTell` depends on who asked, and this is the part to get
+right:
+
+* **Anything REPORTING to a teacher collapses it to VISIBLE.** The sidebar, the
+  section graph, a publish plan's "already right" list, the scheduled deploy's
+  "classes students cannot see yet". Never to hidden: listing a live page among
+  the ones still to publish costs a second look, while calling a page hidden
+  when students are already reading it is the failure that reports success.
+* **Anything WRITING to a teacher's file never collapses it at all.**
+  `AssistPageVisibility.setting`'s "already right, change nothing" shortcut
+  fires only on a CONFIDENT reading that already matches; on `cannotTell` it
+  writes the flag out in full, in whichever direction was asked for. A writer
+  that believed the reporting collapse would decline to publish a page on the
+  strength of a guess, and tell the teacher it had published it.
+
+The forms that read `cannotTell` are pinned in each platform's OWN tests
+(`PageVisibilityReadingTests` on the mac), not in the shared contract. A shared
+case says what the SITE does; writing `expectVisible: true` for a form the site
+HIDES would oblige the other platform to be wrong in the same direction rather
+than merely allow it.
+
+### What a WRITER does with an odd value
+
+Two rules, both deliberate:
+
+* **A page that already SAYS what was asked is left alone**, however oddly it
+  says it. `publish: maybe` publishes the page, so "publish this page" is
+  answered "It's already been published." and the file is not touched. Tidying
+  the value to `true` would be an edit nobody asked for, in a file Obsidian very
+  likely has open, and it would throw away whatever the word meant to the
+  teacher. Asked to HIDE the same page, it changes and the odd value goes —
+  the only way to say the opposite of what it says is to say it plainly.
+* **A value being carried to another section is copied character for
+  character.** `SectionAdder` and `setup_course.per_section_frontmatter` copy a
+  `publish`-family value exactly, comment and quotes and all: whatever the
+  build makes of the original it makes of the copy, so no reader standing
+  between the two can invert it. The exception is a value that runs onto the
+  NEXT line (a block scalar, or a key with the value indented beneath it),
+  which cannot be copied to another key's line at all; that, and a DRAFT value
+  the reader cannot read, are written as HELD BACK. A page wrongly held back is
+  one a teacher notices and fixes; a page wrongly published is one nobody
+  notices at all.
+
+### What this replaced, and what was rejected
+
+Until 2026-09-18 the mac accepted only `true`/`yes` after stripping quotes and
+lowercasing, and BRANCHED its reading on where the page lived — so a
+course-level page carrying a plain `publish: false` was reported visible while
+the build hid it. Windows reads it differently again (`Block.BoolValue` returns
+null for anything but `true`/`false`, and `IsDraft` falls through to `?? false`),
+so `publish: no` reads VISIBLE there while the site HIDES it. Two real
+inversions were also fixed: `SectionAdder.publishValue` and
+`per_section_frontmatter` compared a legacy draft value with the literal string
+`"true"`, so `draftSection1: yes` was carried into a new section as PUBLISHED
+while the build went on hiding the original.
+
+Rejected, with reasons:
+
+* **Option 1 — strip an inline comment and accept `on`/`off`, and leave the
+  rest.** The smallest change that fixes every case a teacher plausibly types,
+  and it was rejected because it leaves genuine junk (`publish: maybe`) reading
+  as HIDDEN, which is the dangerous direction. Half a rule is a rule nobody can
+  reason about.
+* **Option 3 as a teacher-facing state — say "Plantoir cannot tell" in the
+  sidebar and leave the page out of a publish plan.** The only option that
+  surfaces the teacher's mistake rather than quietly picking a side, and the
+  right long-term answer. Deferred past v1.2.0: it is new UI, in every surface
+  that lists pages, on both platforms. The three-way answer now exists INSIDE
+  the reader, so adopting it later is a presentation change rather than a
+  re-derivation. **The residue this leaves, said out loud:** asked to publish a
+  page whose value reads `cannotTell`, the assistant answers "It's already been
+  published" and writes nothing, because the plan layer is a reporting
+  consumer. That is the one place the collapse is visible to a teacher, it
+  affects only the forms listed above (none of which anything Plantoir writes
+  can produce), and closing it is what option 3 is for.
+* **Erring VISIBLE everywhere, writers included.** It makes the reader one line
+  shorter and silently publishes pages: a writer that trusts the collapse
+  declines the edit and reports success.
+* **Carrying a legacy `draftSection<N>` value across as a literal `true`.**
+  This is what produced the inversion above. Inverting the ANSWER rather than
+  the text is the fix; copying the text is only safe for the key that is not
+  being inverted.
+* **A Python test that SKIPS when python-frontmatter is missing.** The Windows
+  machine has no python-frontmatter, and `PythonToolchainTests` judges by exit
+  code — a loud skip there is green having run nothing. So the rule lives in
+  `scripts/page_visibility.py`, stdlib only, and `scripts/test_page_visibility.py`
+  runs everywhere; the round trip that genuinely needs the image is
+  `scripts/check_visibility_against_the_site.py`, run by `verify.sh`.
+
+### What was measured, and how to re-measure it
+
+Everything above was run through the real image on 2026-09-18 —
+**python-frontmatter 1.3.0, PyYAML 6.0.3**, then `gray-matter` with `js-yaml`
+on `JSON_SCHEMA` out of `/opt/quartz/node_modules`, then `patches/publish.ts`'s
+own expression. Not reasoned: this issue was once opened on a claim about
+`publish: no` that was read off two plausible-looking files and never run, and
+the claim was backwards.
+
+`contracts/file-formats.json` → `pageVisibility.readingCases` carries 52 of
+those measurements as the list both app suites run, and
+`scripts/check_visibility_against_the_site.py` re-runs every one of them down
+the real chain on each `verify.sh`. That check also asserts that Quartz still
+parses with `JSON_SCHEMA` and that `publish.ts` still compares against `false`
+and `"false"` — because if either moves, the whole table moves with it and
+every suite would otherwise stay green.
+
+**The Dockerfile pins python-frontmatter, PyYAML and Pillow** for the same
+reason: `publish: no` hides a page ONLY because PyYAML reads YAML 1.1, and
+PyYAML 7 is expected to move to YAML 1.2, where `no` is the string "no" and
+that page would be published. An unpinned upgrade would flip real pages in a
+teacher's course with nothing failing anywhere. The pins are the versions the
+image already had, read off `pip freeze` rather than chosen, so they changed
+nothing about what is installed — but they DO change the build-context hash, so
+every working folder rebuilds its image once after updating.
 
 ## `course_config.json` has two writers, and they can erase each other
 
