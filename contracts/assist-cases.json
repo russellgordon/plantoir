@@ -327,7 +327,7 @@
         "tool" : "make_room_for_classes"
       },
       {
-        "becauseNotThis" : "A comma means one PAGE was named, which has a title in it for the model to read out. Only a bare unit number is a whole unit.",
+        "becauseNotThis" : "Publishing is the direction that reaches students, so this verb is read by a frame of its own that has not moved: the literal opening 'publish unit ' and a bare number. A comma means one PAGE was named, and that request goes to the model — and so does every spelling the hide and unpublish family beside it tolerates, so 'publish unit 4?', 'please publish unit 4' and 'publish  unit 5' are refused too, each pinned in hideIsUnpublish.refused. The asymmetry is the decision: unpublishing errs safe, a question mark on a publish request is plausibly a teacher ASKING, and this phrasing is answered correctly by the model anyway, so there is nothing to buy by widening it.",
         "example" : "publish unit 5",
         "fills" : {
           "pages" : "Unit <number>"
@@ -337,13 +337,13 @@
         "tool" : "publish_pages"
       },
       {
-        "becauseNotThis" : "As above: a comma names a page, not a unit.",
-        "example" : "unpublish unit 4",
+        "becauseNotThis" : "A matched card binds THIS window's course and section into the call unconditionally, and the guard that refuses a request naming another course only runs on the model's answers. So a frame that swallowed a sentence naming another course would act on this one and report success. Any extra word falls through.",
+        "example" : "hide unit 4, day 21",
         "fills" : {
-          "pages" : "Unit <number>"
+          "pages" : "Unit <number>, or Unit <number>, Day <number> when a day was named — always in these capitals, since the frame only fires on the literal word 'unit'. Every accepted and refused spelling is in hideIsUnpublish."
         },
-        "notThis" : "unpublish unit 4, day 3",
-        "shape" : "unpublish unit <number>",
+        "notThis" : "hide unit 4, day 21 in ICS3U",
+        "shape" : "[please] hide|unpublish unit <number>[, day <number>] [please]",
         "tool" : "unpublish_pages"
       },
       {
@@ -692,16 +692,258 @@
       }
     ]
   },
+  "echoedRequest" : {
+    "cases" : [
+      {
+        "expectEcho" : true,
+        "hasToolCall" : false,
+        "reply" : "Hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "The measured echo, verbatim - including the capital the model put on the first letter, which is why the comparison is case-folded."
+      },
+      {
+        "expectEcho" : true,
+        "hasToolCall" : false,
+        "reply" : "hide unit 4, day 20",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "The same fault with the parenthetical trimmed off. A model that drops the date line is echoing just as plainly, so the sentence the teacher TYPED is compared as well as the message as sent."
+      },
+      {
+        "expectEcho" : true,
+        "hasToolCall" : false,
+        "reply" : "  Hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)!  ",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "Whitespace at the ends and a piece of punctuation a model added are not a different reply."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : false,
+        "reply" : "Sure: hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "An echo with a preamble, and v1 lets it through deliberately. Catching it needs a similarity measure, and a fuzzy rule that fires on a real answer would throw the answer away and tell the teacher it did not follow - worse than the fault."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : false,
+        "reply" : "hide unit 4",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "A partial echo. Same reasoning: near is not equal, and guessing how near counts is the thing this rule refuses to do."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : true,
+        "reply" : "Hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "THE ONE THAT KEEPS THE GUARD FROM EATING WORK. A reply that chose a tool is an instruction whatever its text says, and the text beside a tool call is often the model narrating the request. The guard is only ever asked about replies with no tool call in them."
+      },
+      {
+        "expectEcho" : true,
+        "hasToolCall" : false,
+        "reply" : "Deploy at half six tomorrow (Today is 2026-09-19, a Saturday.)",
+        "sent" : "Deploy at half six tomorrow (Today is 2026-09-19, a Saturday.)",
+        "typed" : "Deploy at half six tomorrow",
+        "why" : "The fault is not about the word \"hide\": any sentence the model answers with plain words can come back as an echo, which is why the sentence the teacher reads names no verbs and no page."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : false,
+        "reply" : "There is no page called Unit 4, Day 20 in this section.",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "The control. An ordinary plain-words reply must still reach the teacher and stay in the conversation, or a guard that refused everything would pass every case above."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : false,
+        "reply" : "",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "An empty reply is a different thing that already has an answer of its own (wording.nothingToDo), and treating emptiness as equality would fire the guard on it."
+      }
+    ],
+    "note" : "When the model's whole reply is the teacher's own sentence handed back, the app refuses the turn, says one honest sentence (wording.didNotFollowThat) and winds the turn back out of the conversation - the same rewind an unfinished answer gets. MEASURED, 2026-09-19, issue #215: Qwen2.5-1.5B Q4_K_M with the app's own server flags, request body and system prompt, temperature 0, the date line on every user message. \"hide unit 4, day 20\" came back word for word, date line and all, with no tool chosen. The echo was then KEPT in the history and the model copied the pattern it could see - user says X, assistant says X - so the very next request echoed too, including \"Unpublish Unit 4, Day 20\", a sentence the same model answers correctly every time in a FRESH conversation. Replayed on ICD2O and ICS4U, pages \"Unit 4, Day 20\" and \"Unit 4, Day 21\": identical in all four. One unrecognised phrase made the window useless until it was closed and opened again, so the rewind is the half that cures it rather than reports it. THE RULE: no tool call in the reply, and the reply's text equals the turn's own user message - compared case-folded and with . ! ? trimmed from both ends. Both spellings of the question count: the message AS SENT (with the date line) and the sentence the teacher typed, because a model that trims the parenthetical is not a different fault. The message compared is the one at the START of the turn, never the last user message anywhere - that is what makes a card-matched second lap safe by construction, since such a turn begins with a TOOL RESULT and so has no user message in it at all. STRICT ON PURPOSE, and here is what that misses: an echo with a preamble (\"Sure: hide unit 4, day 21\"), a partial echo, and any other kind of residue in the history. Each would need a similarity measure, and a fuzzy rule that fires on a legitimate answer is worse than the fault - it would throw a real reply away and tell the teacher it did not follow. The one corner it leaves is a teacher typing a content-free token (\"ok\") to which the model replies with the same token; they read one honest sentence instead, and nothing can be lost, because everything carrying state is a button or a sheet rather than free text. NOT EXPRESSIBLE AS A SCENARIO: the scenario runner builds its agent with no engine behind it, so a model reply cannot be scripted - the same limit windowBinding records. These cases are the predicate; a platform runs them against its own reader of (what was sent, what came back, whether there was a tool call)."
+  },
   "generated" : {
     "keys" : [
       "cardPhrasings",
       "tools",
       "toolSchemas"
     ],
-    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
+    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
+  },
+  "hideIsUnpublish" : {
+    "accepted" : [
+      {
+        "expectPages" : "Unit 4, Day 21",
+        "expectTool" : "unpublish_pages",
+        "input" : "hide unit 4, day 21",
+        "why" : "The measured sentence, word for word - the one the model answered with no tool at all in an ICS4U window."
+      },
+      {
+        "expectPages" : "Unit 4, Day 21",
+        "expectTool" : "unpublish_pages",
+        "input" : "Hide Unit 4, Day 21",
+        "why" : "Capitalised the way a teacher types a page title; matching is case-folded, and the title handed on is built in canonical capitals rather than sliced from what they typed."
+      },
+      {
+        "expectPages" : "Unit 4",
+        "expectTool" : "unpublish_pages",
+        "input" : "hide unit 4",
+        "why" : "A whole unit, said with the shorter verb. Byte-identical to what \"unpublish unit 4\" has always produced."
+      },
+      {
+        "expectPages" : "Unit 4, Day 21",
+        "expectTool" : "unpublish_pages",
+        "input" : "unpublish unit 4, day 21",
+        "why" : "The verb a teacher used to have to type. It reached the model correctly every trial, and it is answered in code now so that the two verbs cannot drift apart - one frame, one table."
+      },
+      {
+        "expectPages" : "Unit 2, Day 3",
+        "expectTool" : "unpublish_pages",
+        "input" : "Unpublish Unit 2, Day 3",
+        "why" : "The shelf's own card, word for word. It left the model-routed list the day this landed, which is the cost stated plainly: one fewer sentence in the routing measurement."
+      },
+      {
+        "expectPages" : "Unit 4",
+        "expectTool" : "unpublish_pages",
+        "input" : "unpublish unit 4",
+        "why" : "The shape that shipped before this family grew a second arm. Here so that widening the frame cannot quietly change what it already did."
+      },
+      {
+        "expectPages" : "Unit 4, Day 21",
+        "expectTool" : "unpublish_pages",
+        "input" : "hide unit 4 day 21",
+        "why" : "The comma is punctuation in the frame rather than part of a value, so leaving it out is the same request. The title is BUILT here, not sliced, so there is no ambiguity to resolve."
+      },
+      {
+        "expectPages" : "Unit 4, Day 21",
+        "expectTool" : "unpublish_pages",
+        "input" : "hide unit 4 , day 21",
+        "why" : "A space before the comma is a typing slip, not a different sentence - commas are dropped before the words are counted."
+      },
+      {
+        "expectPages" : "Unit 4, Day 21",
+        "expectTool" : "unpublish_pages",
+        "input" : "hide  unit   4,  day  21",
+        "why" : "Odd spacing is read the same way for the same reason: the frame counts WORDS, not characters."
+      },
+      {
+        "expectPages" : "Unit 4, Day 21",
+        "expectTool" : "unpublish_pages",
+        "input" : "hide unit 4, day 21?",
+        "why" : "A question mark on a request like this is a teacher hedging, not a different request. Stripped inside this family rather than by the shared tidier, because two of the fixed shapes are matched by EQUALITY and carry one."
+      },
+      {
+        "expectPages" : "Unit 4, Day 21",
+        "expectTool" : "unpublish_pages",
+        "input" : "please hide unit 4, day 21",
+        "why" : "Courtesy at the front, the same tolerance the deploy-at-a-time family already has."
+      },
+      {
+        "expectPages" : "Unit 4, Day 21",
+        "expectTool" : "unpublish_pages",
+        "input" : "hide unit 4, day 21 please",
+        "why" : "And courtesy at the back."
+      },
+      {
+        "expectPages" : "Unit 04",
+        "expectTool" : "unpublish_pages",
+        "input" : "hide unit 04",
+        "why" : "The teacher's own digits travel into the title unchanged - this is what the unit family has always done, and tightening it here would change a shipped behaviour for no reported fault."
+      }
+    ],
+    "note" : "\"Hide\" means what \"unpublish\" means, and it is answered in CODE rather than by the model. Measured on 2026-09-19 (issue #215): Qwen2.5-1.5B Q4_K_M, the app's own server flags, request body and system prompt, temperature 0, an ICS4U section window. \"unpublish unit 4, day 21\" reached unpublish_pages every time; \"hide unit 4, day 21\" reached NO tool at all, in five phrasings out of five - the model handed the teacher their own sentence back as text, date line and all. It errs in the safe direction and it reads as broken. Steering the model with a sentence in a tool description was REJECTED: one clarifying sentence added to publish_pages' description once took the promise-card score from 110/110 to 90/110 and broke three probes that had been perfect, because a small model reads a description naming another tool as a recommendation rather than a boundary. So the frame lives in code and the router never sees these sentences. THE VERB GATES THE WHOLE FRAME, not only the day arm: hide and unpublish take a whole unit or one class page AND tolerate the spellings listed at the end of this note, while publish is read by a separate frame that has not moved - the literal opening \"publish unit \" and a bare number. So \"publish unit 4, day 3\" still goes to the model, and so do \"publish unit 4?\", \"please publish unit 4\", \"publish unit 4 please\", \"publish  unit 5\" and \"publish unit, 4\", every one of them a refused row below. The split was made deliberately rather than inherited: the first version of this frame read the verb AFTER stripping the courtesy words and the question mark, and an adversarial differential fuzz of 13,464 sentences across the old matcher and the new one found 0 matches lost and 141 NEW publish_pages matches, none of them asked for. \"publish unit 4?\" is the case that decided it - a teacher typing a question mark is plausibly ASKING, and that sentence would have published a whole unit with no model in the loop, which is the same ambiguity this note uses below to reject \"show unit 4\". Unpublishing errs safe - a page nobody can see - while publishing puts a page in front of students, and \"Publish Unit 2, Day 3\" is answered correctly by the small model 10 trials out of 10, so there is nothing to buy by widening the dangerous direction on the same day. \"show\" and \"unhide\" are out for a nearer reason: \"show unit 4\" is at least as likely to mean \"display it to me\", and getting that wrong publishes. THE REFUSALS ARE THE SAFETY HALF. A matched card binds THIS window's course and section into the call unconditionally, and the guard that refuses a request naming another course runs only on the model's answers - so a frame that swallowed \"hide unit 4, day 21 in ICS3U\" would act on this window's course and report success, which is the failure a teacher cannot catch. The frame therefore reads a fixed number of words and refuses anything else, including a negation and a sentence naming two pages. TERM-BLIND, deliberately and for now: only the literal word \"unit\" is matched, because the matcher is a pure function of the sentence and a course's own word for a unit is not in it. A Module course loses nothing - \"hide module 4, day 21\" falls through to the model exactly as it does today, and \"hide unit 4\" still works there because the planner accepts \"unit\" alongside the course's own word. Spellings are the whole question for a frame like this, so they are written out here rather than left to one example: commas are read as frame punctuation and dropped before the words are counted (the same reading make_room_for_classes uses), a trailing question mark comes off, and \"please\" is courtesy at either end.",
+    "refused" : [
+      {
+        "input" : "publish unit 4, day 3",
+        "why" : "THE ASYMMETRY, as data rather than as a comment somebody deletes. Publishing is the direction that reaches students, so the day arm is gated on the verb: this stays with the model, exactly as it did before hide was added. It is also the near-miss of the publish-unit family, asserted on both platforms."
+      },
+      {
+        "input" : "hide unit 4, day 21 in ICS3U",
+        "why" : "The critical one. A matched card binds THIS window's course and section into the call unconditionally, and the guard against a request naming another course runs only on the model's answers - so this would act on the window's own course and report success. Any extra word falls through."
+      },
+      {
+        "input" : "hide section 2's unit 4",
+        "why" : "The same fault from the other direction: the window is about one section, and a card that appeared to honour another one would answer a different question with total confidence."
+      },
+      {
+        "input" : "don't hide unit 2, day 3",
+        "why" : "A negation, and the one failure that would act AGAINST the teacher. The frame refuses any leading word but 'please'."
+      },
+      {
+        "input" : "hide unit 2, day 3 and unit 2, day 4",
+        "why" : "Two pages named, and this frame takes one. A sentence naming several belongs with the model, which reads a list out."
+      },
+      {
+        "input" : "hide the answers on unit 2, day 3",
+        "why" : "About PART of a page, which nothing here can do. Extra words, so the frame refuses it and the model gets a request it can at least explain."
+      },
+      {
+        "input" : "hide everything",
+        "why" : "No reference in it at all. 'Everything' is a judgement, and the model at least has the tool descriptions to make it with."
+      },
+      {
+        "input" : "hide the syllabus",
+        "why" : "Not a numbered class page: there is no unit number to read, so there is nothing for this frame to fill."
+      },
+      {
+        "input" : "unhide unit 4",
+        "why" : "A publish-side synonym, deliberately out. Getting a synonym for the publishing direction wrong puts a page in front of students."
+      },
+      {
+        "input" : "show unit 4",
+        "why" : "Worse than 'unhide': it is at least as likely to mean 'display it to me', and resolving that guess by publishing is the wrong way to be wrong."
+      },
+      {
+        "input" : "hide module 4, day 21",
+        "why" : "Term-blind for now - only the literal word 'unit' is matched. No regression for a Module course: this falls through to the model exactly as it did before, and 'hide unit 4' still works there because the planner accepts 'unit' alongside the course's own word."
+      },
+      {
+        "input" : "hide unit 4, day21",
+        "why" : "'day21' is not a word this frame has. Splitting a number off a word would be guessing, and a frame that guesses is the thing these tables exist to avoid."
+      },
+      {
+        "input" : "hide unit four, day 21",
+        "why" : "Spelled-out numbers are not read here. The unit family has always taken digits, and a teacher naming a page is copying a title that carries digits."
+      },
+      {
+        "input" : "hide unit",
+        "why" : "No number, so there is nothing to fill the page reference with."
+      },
+      {
+        "input" : "hide unit 4, day",
+        "why" : "A day was announced and not given. Falling back to the whole unit would hide far more than was asked for."
+      },
+      {
+        "input" : "publish unit 4?",
+        "why" : "THE CASE THAT DECIDED THE GATE. A teacher typing a question mark on a publish request is plausibly ASKING rather than instructing, and answering it in code would publish a whole unit to the shelf with no model in the loop - the same ambiguity this family uses to reject \"show unit 4\". The hide and unpublish arm strips a trailing \"?\" and publish does not, and that difference is the decision."
+      },
+      {
+        "input" : "please publish unit 4",
+        "why" : "Courtesy is stripped for hide and unpublish and NOT for publish. Symmetry would be tidier and would widen the direction that reaches students on the day the other direction was fixed, for no reported fault."
+      },
+      {
+        "input" : "publish unit 4 please",
+        "why" : "The same, at the other end. Both spellings were among the 141 new publish_pages matches the differential fuzz found in the first version of the frame."
+      },
+      {
+        "input" : "publish  unit 5",
+        "why" : "A doubled space. The hide arm counts WORDS and so reads it; the publish arm matches a literal opening and so does not. Pinned because it is the spelling most likely to be \"fixed\" by somebody tidying the two arms into one."
+      },
+      {
+        "input" : "publish unit, 4",
+        "why" : "A stray comma. The hide arm drops commas before counting words; the publish arm refuses any comma outright, which is the shipped behaviour and stays."
+      }
+    ]
   },
   "nearMisses" : {
-    "note" : "Must NOT match — each one only looks like a card phrasing, and answering the wrong question with total confidence is worse than routing it. The last three are the rollover's website question, and they record a KNOWN LIMIT rather than guarding a near-miss: the reply offers two sentences word for word, those exact strings are the only way back in, and a teacher who paraphrases matches nothing at all — re_date_classes is shown to no local model, so nothing catches the paraphrase and the section stays pinned to last year's website with nothing said. Both apps already pass these, so nothing goes red; they are written down so the limit is visible, and so a future looser matcher has to change this list on purpose. \"publish next monday's class\" is a different shape again: it is the near miss of a phrasing that DOES match, and it must reach the model precisely because \"next Monday\" is the one weekday word neither app will settle on its own - see schedule-rules.json, relativeDays.",
+    "note" : "Must NOT match — each one only looks like a card phrasing, and answering the wrong question with total confidence is worse than routing it. Three of them - \"a new website\", \"new one please\" and \"roll this section over onto a new site\" - are the rollover's website question, and they record a KNOWN LIMIT rather than guarding a near-miss: the reply offers two sentences word for word, those exact strings are the only way back in, and a teacher who paraphrases matches nothing at all — re_date_classes is shown to no local model, so nothing catches the paraphrase and the section stays pinned to last year's website with nothing said. Both apps already pass these, so nothing goes red; they are written down so the limit is visible, and so a future looser matcher has to change this list on purpose. \"publish next monday's class\" is a different shape again: it is the near miss of a phrasing that DOES match, and it must reach the model precisely because \"next Monday\" is the one weekday word neither app will settle on its own - see schedule-rules.json, relativeDays. The two hide phrasings were added on 2026-09-19 with issue #215, when \"hide <page>\" became a phrasing answered in code: \"hide unit 4, day 21 in ICS3U\" is the one that matters, because a matched card binds THIS window's course and section into the call unconditionally and the guard against a request naming another course runs only on the model's answers - so a frame that swallowed it would act on the wrong course and report success. \"don't hide unit 2, day 3\" is the negation, the one failure that would act against the teacher. Both are in hideIsUnpublish.refused with their full reasons; they are here as well so that the near-miss walk both apps already run covers them without anything new being wired up.",
     "phrasings" : [
       "Undo that change to Unit 2, Day 3",
       "Deploy this section now, but only the published pages",
@@ -712,7 +954,9 @@
       "new one please",
       "roll this section over onto a new site",
       "",
-      "Deploy Section 2 at 6:30 AM"
+      "Deploy Section 2 at 6:30 AM",
+      "hide unit 4, day 21 in ICS3U",
+      "don't hide unit 2, day 3"
     ]
   },
   "note" : "Generated from the macOS app by `Plantoir --assist-contract`. Do not hand-edit; see contracts/README.md.",
@@ -1039,6 +1283,22 @@
         "name" : "a deploy asked for at a time is answered in code and asks about the MOMENT",
         "when" : "decline",
         "why" : "Measured on 2026-09-18: the smaller assistant sent this sentence to deploy_section 10 trials out of 10, so a teacher who asked for half six tomorrow got a deploy to students on the spot, behind an approval card that mentioned no time at all. Answered in code it cannot reach the model, and the card it does reach names the section, the destination and the whole moment. 'Section 1' is what is asserted because it is LOCALE-FREE and appears in the scheduled card on both platforms while appearing in the immediate one on neither: a formatted time is written '6:30 AM' here, '6:30 a.m.' on another Mac and with a different separator again in a 24-hour locale, so asserting one would pin the machine rather than the behaviour. The MOMENT is pinned instead by deployAtATime.resolving, which is pure and portable. Declined rather than approved because approving would write a real scheduled job."
+      },
+      {
+        "expectTranscriptContains" : [
+          "teacher: hide Unit 1, Day 1",
+          "assistant: wording.planQuestion",
+          "teacher: wording.planAccepted"
+        ],
+        "given" : {
+          "pending" : "unpublish_pages",
+          "saying" : [
+            "hide Unit 1, Day 1"
+          ]
+        },
+        "name" : "\"hide\" is answered in code and puts the unpublish plan up",
+        "when" : "approve",
+        "why" : "Measured on 2026-09-19 (issue #215): the smaller assistant answered \"hide unit 4, day 21\" with no tool at all - five phrasings out of five, the teacher's own sentence handed back as text - while answering the same request worded \"unpublish\" correctly every time. So the word is answered in code, and this case is what proves the whole path a card phrasing unlocks rather than just the match: the scenario runner builds the agent with NO engine behind it, so a sentence that reached the model here could not be answered at all. Approved rather than said, because confirmation before acting is on in the fixture and unpublish_pages has a plan twin, so the turn ends on a card - \"say\" would fail by construction. The three lines are the portable ones: the teacher's sentence, the question the card asks, and their Go. The outcome sentence is deliberately NOT pinned - it is built in the runner rather than being an AssistWording key on either platform, so asserting it would hold one app to the other's phrasing. ONE THING THIS CASE NEEDS THAT THE OTHERS DO NOT: a PUBLISHED \"Unit 1, Day 1\" in the fixture. `pending: unpublish_pages` has nothing to propose otherwise, so no card appears and the failure reads as the phrasing not matching when it is the fixture that is empty. Said here rather than in one platform's harness because a runner that sets up only publish_class_on and re_date_classes will meet this the day it implements the frame, and lose an afternoon to it."
       }
     ],
     "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN."

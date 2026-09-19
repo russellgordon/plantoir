@@ -52,6 +52,13 @@ AssistPromptShelfTests.testEveryCardIsEitherMatchedInCodeOrKnownToGoToTheModel,
 which now names three. If a future run wants the shelf's split, count it there
 rather than here.
 
+  [Added 2026-09-19, later the same day, rather than editing the lines above:
+   that test now names TWO. Issue #215 made "hide" and "unpublish" one frame
+   which takes a class page as well as a whole unit, so "Unpublish Unit 2,
+   Day 3" is answered in code too and the split is 17/2. Which is exactly the
+   advice this section ends with — count it in the test, not here. See
+   echo-postscript-215.txt beside this file.]
+
 WHY NO ROUTING RE-MEASUREMENT IS OWED
 -------------------------------------
 No tool was added or removed; no description, parameter, `required`,

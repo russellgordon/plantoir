@@ -29,6 +29,7 @@
     "deployed" : "{course} Section {section} is deployed. Students can reach it now.",
     "deployQuestion" : "Shall I deploy?",
     "deployWasCancelled" : "Deploy cancelled.",
+    "didNotFollowThat" : "I didn't follow that, so I haven't changed anything. Try saying it again in different words.",
     "duplicated" : "Duplicated “{page}” as “{copy}”.",
     "linkedClassesWereLeftAlone" : "“Unit 2, Day 4” and “Unit 2, Day 5” are classes of their own, so they stay as they are — publish each one when you get to it.",
     "linkedClassWasLeftAlone" : "“Unit 2, Day 4” is a class of its own, so it stays as it is — publish it when you get to that class.",
