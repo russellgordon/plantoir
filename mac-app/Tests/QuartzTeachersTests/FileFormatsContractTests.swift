@@ -146,7 +146,15 @@ final class FileFormatsContractTests: XCTestCase {
         let section: [String: Any] = try FileFormatsContractTests.section("pageVisibility")
         let group: [String: Any] = try XCTUnwrap(section["writingCases"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
-        XCTAssertFalse(cases.isEmpty, "contracts/file-formats.json carries no writing cases to run")
+        // A FLOOR, not a census — Windows' own runner carries one for the same
+        // reason (`>= 10`, raised here to what the list holds today). A loop
+        // over a list an edit has emptied passes having run nothing, which is
+        // exactly the failure this whole file exists to prevent. Raise it when
+        // cases are added; never lower it to make an edit go through.
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 13,
+            "contracts/file-formats.json → pageVisibility.writingCases has shrunk"
+        )
 
         for testCase in cases {
             let before: String = try XCTUnwrap(testCase["before"] as? String)
