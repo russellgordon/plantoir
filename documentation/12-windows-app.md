@@ -1744,6 +1744,137 @@ over it would collide with a real file. The logic already existed inside
 divergence issue #70 described, in the direction it suggested: an argument
 nobody can get wrong beats one with a sensible default.
 
+### A stamp that cannot be true never decides what gets deleted
+
+Added 2026-09-19 for [issue #161](https://github.com/russellgordon/plantoir/issues/161),
+which arrived from the mac. It belongs beside the two above because it is the
+same kind of fault — a rule that is right about the common case and silently
+destructive about one it never considered — and because `PruneBackups` is the
+code the `back_up_course` fix above was about.
+
+`CourseArchiver.PruneBackups` sorts the assistant's backups by the date parsed
+out of their file names and deletes everything past the fifth. **This app has
+always written that stamp correctly**: `CourseArchiver.TimestampedName` and
+both readers (`ArchivedItem.From`, `BackupItem.From`) are pinned to
+`InvariantCulture`, so no Windows machine has ever written its own calendar
+into a name. The mac did, until 2026-09-10 — a `DateFormatter` with a format
+and no locale renders `yyyy` in whatever calendar the Mac is set to — and a
+working folder moves between machines. So a folder carried from a pre-fix Thai
+Mac holds `ICS3U_backup_2569-08-09_141530_assistant-section1.zip`, invariant
+parsing reads that cleanly as the year **2569**, it sorts as the newest thing
+in the folder, it takes one of the five kept places, and a real backup is
+deleted. Nothing reports a fault.
+
+`Plantoir.Core/Models/ArchiveStamp.cs` is the answer, matching the mac's type
+of the same name:
+
+- **`EarliestPossible` = 2025-01-01.** The floor is "before Plantoir could have
+  written one", not a round number — the archive feature was written
+  2026-08-09, so no zip of this kind is older than that. It is set a year and a
+  half earlier so no real name is ever refused (a machine whose clock is a few
+  months out still writes a name this accepts), and it still clears the nearest
+  wrong reading — Ethiopic `2018-12-03` — by six years. Any floor between the
+  two works; one in the middle is wrong in neither direction.
+- **`FutureAllowance` = 2 days.** Not one. The stamp is local wall time on BOTH
+  ends, so a zip written this morning in Kiritimati (UTC+14) and read the same
+  morning on Baker Island (UTC−12) is 26 hours ahead of `DateTime.Now` — absurd
+  as travel, ordinary as a folder in OneDrive — and two days also absorbs a
+  daylight-saving step. The extra day costs nothing: no wrong reading of any
+  calendar lands within a year of the ceiling.
+- **Both bounds inclusive, local time, never `UtcNow`.** A parsed stamp comes
+  back through `TryParseExact` as `DateTimeKind.Unspecified` and means what the
+  clock said where it was written; measuring it against a UTC now would refuse
+  real names for up to half a day at either end of the world. `now` is
+  injectable so a test's answer cannot change between one assertion and the
+  next; nothing in the app passes it.
+
+The guard itself is one `continue` in the COLLECTION loop, which is the part
+that matters: a refused backup is **neither counted toward the five nor
+deleted**, and it stays LISTED. Its date is the only thing about it known to be
+wrong, and a teacher may still want to restore it or delete it themselves.
+
+**No sentence and no trail line**, both deliberately, both matching the mac.
+Nothing a teacher can see changes — the zip they had is the zip they still have
+— so there is no wording to add; and a new `activityTrail.mustRecord` key would
+turn the mac's suite red for a line the mac chose not to write. A prune line
+answers a question about a COUNT, not about a moment.
+
+**The accepted cost, written down here so it is not rediscovered as a bug.** A
+PC whose clock is badly wrong — a dead CMOS battery reading 2009 or 1601, or a
+machine days fast — stamps *every* assistant backup implausibly. None is ever
+counted, so none is ever pruned: one zip per conversation, for ever, on a course
+that may be hundreds of megabytes. That is the right trade, because the two
+failures are not symmetrical. A disk filling slowly is visible, complained
+about, and recoverable by deleting backups from the list; a deleted backup is
+none of those things. It is worth naming on this side in particular: a dead RTC
+on a desktop PC is commoner than the mac's write-up weighed, and this is the
+platform where the folder is most likely to have travelled.
+
+**One sentence it makes approximately false, and why it was left alone.**
+`BackupItem.KeptDescription` tells the teacher "The assistant made this one; its
+five most recent are kept" about a zip that will now never be pruned. The mac's
+`BackupItem` says exactly the same thing, it is not contract data, and neither
+side changed it — so the two still match, and this is a shared decision rather
+than something each platform finds separately. Changing it would mean saying
+"unless its date is implausible" to a teacher who has no idea their folder came
+from a Thai Mac, which is rule 1's problem rather than a fix.
+**The same is true of one sentence in `documentation/10-local-ai-assistant.md`,
+and it is NOT left alone — it is fixed on the mac's branch.** "Prune only the
+ASSISTANT's own backups, keeping its five most recent per course" is now
+approximately false in exactly the way `KeptDescription` is: the five kept are
+the five most recent PLAUSIBLE ones, and an implausible zip is kept beside them
+for ever. (It would be fair to say the guard makes the sentence's INTENT truer
+— a 2569 zip was stealing one of the five — but the sentence as written still
+describes something the code no longer does, and that is the kind of
+almost-right line that gets believed.) It is not corrected here, because 10 is a
+shared page and `origin/issue/160-archive-stamp-calendar` already rewrites that
+bullet with the caveat and a pointer to `09-mac-app.md` for what it costs;
+editing it from this side would conflict with that branch for no gain. **When
+#160 merges, check that bullet reads correctly for both platforms** — the mac's
+wording says "since 2026-09-10", which is its date, not this one's.
+
+**Tests** are in `CourseBackupTests` (`ModelTests.cs`) — a plain temp-folder
+class, nothing process-wide, so it stays out of `SharedActivityState`. The one
+worth copying is `PruneBackups_ABackupWhoseStampCannotBeTrue_IsNeitherCountedNorDeleted`:
+it asserts the number of surviving REAL backups, not merely that the 2569 zip is
+still there, because a guard that worked by refusing to PARSE the name would
+pass the weaker assertion while still deleting two real copies instead of one.
+`PruneBackups_AStampPastTheCeiling_CountsOnceTheClockCatchesUp` is the reason
+`PruneBackups` takes a `now`: the ceiling is half the rule and nothing on disk
+exercises it, since whether a stamp is past it depends on when the suite runs.
+It asks about ONE file twice with the clock in two places — three days ahead of
+`now` it is uncounted and undeleted; with `now` moved forward two days it is
+counted, and being the newest it keeps its place while the oldest real backup
+goes. Without that test the parameter was dead plumbing described by a comment
+that was not true, which a review caught.
+Three mutations were run: removing the `continue` reddens the 2569 and
+below-floor tests; making either bound exclusive reddens
+`CouldHaveBeenStamped_IsInclusiveAtBothBounds`; dropping `, now` where
+`PruneBackups` calls the guard reddens the ceiling test.
+
+**Part 2 of #161 is deliberately not done, and the issue stays open.** The mac
+turned these bounds into contract data — `contracts/course-management.json` →
+`zipNames` → `couldHaveBeenStamped`, ten cases plus the two bounds, and a
+`moment` on each recognised `zipNames` case — but that block lives only on the
+unmerged `issue/160-archive-stamp-calendar` branch. Nothing here touches that
+file. When it reaches `dev`, Windows runs the ten cases and pins both bounds
+against `ArchiveStamp`, and `CouldHaveBeenStamped_BoundsAreTheOnesTheMacUses` —
+the one test here holding the literals, marked as such in its own comment —
+goes away. Take the `moment` apart with a Gregorian calendar and compare the
+pieces; do not re-spell it with `CourseArchiver.TimestampedName`, because a
+round trip stays green while the writer and the reader are wrong together, which
+is exactly the state the mac was found in.
+
+**Found while in this code, filed rather than fixed:**
+[issue #187](https://github.com/russellgordon/plantoir/issues/187) — the
+same-second collision name `CourseArchiver.Archive` writes
+(`ICS3U_2026-09-19_120000-2.zip`, or `…_assistant-section1-2.zip` for a backup)
+is readable by neither parser, so such a zip is invisible to both sidebar lists
+and to pruning; for a whole-course archive, `ArchiveAndRemoveCourse` then
+deletes the course folder and the only copy never appears in Archives. The mac
+has no collision retry at all, so it is Windows-only and no `zipNames` case
+covers the form.
+
 ### The check that found the one still open — and how it was closed
 
 `TheCardsArgumentsReachTheToolThatReadsThem` walked only `cardPhrasings.matches`
