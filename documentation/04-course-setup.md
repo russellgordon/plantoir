@@ -75,8 +75,10 @@ editor must follow them in BOTH directions.** Turning "Start from a
 the defaults back — the LCS variants for the two shared lists when the
 terminology switch is on, the plain defaults for the two per-section lists,
 which have no LCS variant — for each list still EQUAL to what the adoption
-put there, and leaves the rest as the teacher left them. With nothing
-adopted there is nothing to compare against and nothing changes. A teacher
+put there, and leaves the rest as the teacher left them — except the marks
+pool, which is kept where the teacher ticked it but narrowed to the folders
+the course will actually have (below). With nothing adopted there is nothing
+to compare against and nothing changes. A teacher
 who has declined the skeleton then reads the same sentence as one whose code
 has no skeleton at all ("Example content isn't available for this course
 code yet…"), because the course starts empty either way.
