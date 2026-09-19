@@ -323,9 +323,10 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > and Windows since 2026-09-19 with
 > [issue #138](https://github.com/russellgordon/plantoir/issues/138), which
 > replaced five of the cases retyped into that test file. Three of the other
-> five were already asserted there in the suite's own words; what running the
+> five were already asserted elsewhere in the Windows suite in its own words
+> (one in that file, two in `PageVisibilityReadingTests.cs`); what running the
 > list adds is that all ten are read from the FILE and so cannot drift from
-> it, and that two of them are covered there for the first time.)
+> it, and that two of them are covered on Windows for the first time.)
 > Two things are
 > deliberately NOT migrations: restoring a backup puts back the spelling the
 > backup held, because a restore is not an edit; and adding a section writes
