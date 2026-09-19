@@ -495,6 +495,38 @@ nonisolated enum AssistWording {
              + "Look the section over in Plantoir."
     }
 
+    // MARK: - Publishing stops at a class
+
+    /// Said when publishing followed a link onto another class and left it
+    /// alone.
+    ///
+    /// A teacher who is not told this reads a plan quietly smaller than the one
+    /// they pictured, and has no way to tell "it decided" from "it missed it".
+    /// The class is NAMED rather than counted: "1 class was left alone" is a
+    /// number about a lesson.
+    ///
+    /// **Only about a class students cannot already see.** Said about a class
+    /// that is already published it is simply false — it would tell a teacher
+    /// to publish a page that is already published — and the sentence exists to
+    /// explain a link students cannot follow yet. `AssistPublishPlan` decides
+    /// which classes reach this.
+    ///
+    /// Two branches rather than two names, because a caller never has to
+    /// choose: the count decides. Both are in the contract, since one rendering
+    /// cannot show the other.
+    ///
+    /// - Parameter listing: the classes, already quoted and joined — "“a” and
+    ///   “b”".
+    /// - Parameter count: how many classes that listing names.
+    static func linkedClassesWereLeftAlone(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "\(listing) is a class of its own, so it stays as it is — publish it when you "
+                 + "get to that class."
+        }
+        return "\(listing) are classes of their own, so they stay as they are — publish each one "
+             + "when you get to it."
+    }
+
     // MARK: - What publishing means here
 
     /// The two acts, in a teacher's words, said once.

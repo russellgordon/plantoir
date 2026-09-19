@@ -119,7 +119,10 @@ struct AssistPromptShelfView: View {
             ("Making pages visible", [
                 // No "and everything it links to" any more: publishing a page
                 // publishes what it links to by rule, so the short phrasing is
-                // the true one.
+                // the true one. Still true since #173 — the reach now stops at
+                // another CLASS page, which makes the short phrasing more
+                // accurate rather than less: a teacher who typed "and
+                // everything it links to" would be promised more than they get.
                 "Publish Unit 2, Day 3",
                 "Publish tomorrow's class",
                 // Reads the way a teacher says it, and — unlike the earlier

@@ -471,12 +471,54 @@
       "takesLinkedPages": true,
       "transitive": true,
       "disclosedInThePlan": true,
-      "why": "Publishing a page whose links lead somewhere students cannot see is the one thing publishing must never do, so it always takes what it links to, and what those link to in turn. The plan names every page that will become visible, so a teacher agreeing to publish one class can see the four pages going with it."
+      "why": "Publishing a page whose links lead somewhere students cannot see is the one thing publishing must never do, so it always takes what it links to, and what those link to in turn. The plan names every page that will become visible, so a teacher agreeing to publish one class can see the four pages going with it. These three stay TRUE alongside stopsAtAClassPage below: the walk is still transitive and still takes what a page links to, it has ONE stop, and the plan names the classes it stopped at as well as the pages it took."
     },
     "unpublishing": {
       "takesALinkedPageOnlyWhenNothingElseNeedsIt": true,
       "aReferrerCountsOnlyWhenVisible": true,
-      "why": "'X still links to it' is a reason to keep a page published only when students can SEE X. Counting hidden referrers left pages visible and reachable from nothing, held up by drafts nobody had published - kept alive by a page that is not there. Safe in one direction because of the other: publishing is transitive, so a page taken down here comes back the moment anything visible needs it again."
+      "why": "'X still links to it' is a reason to keep a page published only when students can SEE X. Counting hidden referrers left pages visible and reachable from nothing, held up by drafts nobody had published - kept alive by a page that is not there. Safe in one direction because of the other: publishing is transitive, so a page taken down here comes back the moment anything visible needs it again. That safety argument has ONE exception since 2026-09-19 (issue #173): publishing now stops at a class page, so a CLASS this sweep takes down does not come back by republishing the page that referred to it. The exception exists because the two reaches were decided apart - publishing and date-moving stop at a class, unpublishing does not yet - and closing issue #201 removes it rather than adding a rule."
+    },
+    "stopsAtAClassPage": {
+      "value": true,
+      "appliesTo": ["publishing", "the dates a class brings"],
+      "why": "A class goes up when the teacher names that class. A link that lands on another class publishes nothing and is not followed through, so material reachable only THROUGH another class belongs to that class and goes up with it. Publishing Day 4's worksheet because Day 3 links to Day 4 puts it in front of students a day early and dates it to the wrong lesson. Decided 2026-09-19 (issue #173), after the two apps were found to disagree: Windows stopped, the mac walked through. REJECTED: the middle position - do not publish the linked class, but walk past it to the material beyond - for the same two reasons. UNPUBLISHING is deliberately NOT in this list: its reach is the sibling decision, held as issue #201, and until that lands an unpublish still walks through a class page on both platforms.",
+      "theNamedPagesAreNeverStopped": "The rule is about pages REACHED. Naming two classes makes both of them starting points, and publishing a whole unit names every class in it, so nothing is lost by asking for more.",
+      "saidToTheTeacher": "The plan and the reply name the linked classes that were left alone, so a teacher is not surprised by a link students cannot follow yet - but only the ones students cannot already see, since 'publish it when you get to that class' is false about a class that is already published.",
+      "cases": [
+        {
+          "name": "a class linked from a class is neither published nor walked through",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": false, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": false, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": false, "links": []}
+          ],
+          "publish": ["Unit 2, Day 3"],
+          "expectVisible": ["Unit 2, Day 3"],
+          "expectUntouched": ["Unit 2, Day 4", "Worksheet"]
+        },
+        {
+          "name": "both classes named means both are starting points",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": false, "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": false, "links": ["Worksheet"]},
+            {"title": "Worksheet", "isClassPage": false, "visible": false, "links": []}
+          ],
+          "publish": ["Unit 2, Day 3", "Unit 2, Day 4"],
+          "expectVisible": ["Unit 2, Day 3", "Unit 2, Day 4", "Worksheet"],
+          "expectUntouched": []
+        },
+        {
+          "name": "a page both classes link to directly is unaffected",
+          "pages": [
+            {"title": "Unit 2, Day 3", "isClassPage": true, "visible": false, "links": ["Shared Note"]},
+            {"title": "Unit 2, Day 4", "isClassPage": true, "visible": false, "links": ["Shared Note"]},
+            {"title": "Shared Note", "isClassPage": false, "visible": false, "links": []}
+          ],
+          "publish": ["Unit 2, Day 3"],
+          "expectVisible": ["Unit 2, Day 3", "Shared Note"],
+          "expectUntouched": ["Unit 2, Day 4"]
+        }
+      ]
     },
     "neverTakenDownByFollowingLinks": [
       {
