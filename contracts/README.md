@@ -19,7 +19,7 @@ mechanics, a measurement taken on one machine: not.
 | File | What it holds |
 |---|---|
 | [`assist-wording.json`](assist-wording.json) | Every sentence the assistant says to a teacher about deploying, previewing and agreeing to things, with `{course}` and `{section}` where values go. |
-| [`assist-cases.json`](assist-cases.json) | The assistant's behaviour: which phrasings are matched in code rather than routed, which tools wait for a button, what must happen in what ORDER when it deploys, and how the arrow keys walk the prompt history. |
+| [`assist-cases.json`](assist-cases.json) | The assistant's behaviour: which phrasings are matched in code rather than routed, which tools wait for a button, what must happen in what ORDER when it deploys, how the arrow keys walk the prompt history, and — for the one family whose variable part is a TIME — every spelling of "deploy at &lt;time&gt;" that is answered in code, every one that goes to the model, and which day a bare time means. |
 | [`toolchain.json`](toolchain.json) | The image both platforms build from the same recipe: the four pins with the REASON each sits where it does, and what each of the seven Quartz patches changes and why it cannot be dropped. |
 | [`example-content.json`](example-content.json) | The ready-made courses: how a payload is discovered, the manifest's keys, and the allow-list rule that decides what actually installs. |
 | [`file-formats.json`](file-formats.json) | **The two files both apps WRITE and the Python then reads**: every `course_config.json` key with its type and default, and the frontmatter that decides whether students see a page — including the legacy `draft:` spelling, which means the opposite. |
@@ -39,7 +39,7 @@ the boundary is a TOP-LEVEL key — the file names them under `generated.keys`:
 | `cardPhrasings` | `AssistCardCommand.fixedShapes` |
 | `tools` | `AssistToolRunner.tools` / `.localTools` / `.mcpOnlyTools`, and each definition's `needsApproval` and `planTwinName` |
 | `toolSchemas` | `AssistToolRunner.localTools` and `.mcpTools`, emitted as each client really sends them — every argument, every description. **This row was missing until 2026-09-10**; what its absence cost is under "Reading a red suite" below. |
-| `nearMisses`, `scenarios` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and a decision lives in the `documentation/` page that owns its subject, with a GitHub issue pointing at it when the other platform owes work — the handoff documents that used to hold them were retired on 2026-09-08. |
+| `nearMisses`, `scenarios`, `promptHistory`, `deployAtATime` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and a decision lives in the `documentation/` page that owns its subject, with a GitHub issue pointing at it when the other platform owes work — the handoff documents that used to hold them were retired on 2026-09-08. |
 
 In `app-rules.json` the same split applies: `milestones` is a readout of
 `TaskMilestones` and `credentialRequests` a readout of `CredentialRequest` —
@@ -118,8 +118,8 @@ it in both places, on both platforms.
 The generator runs on the **mac** — `Plantoir --write-contracts` — so Windows
 cannot regenerate the derived halves. The AUTHORED halves are a different
 matter and can be proposed from either side: `scenarios`, `nearMisses`,
-`promptHistory`, and every case list in the other four files survive a mac
-regeneration untouched.
+`promptHistory`, `deployAtATime`, and every case list in the other four files
+survive a mac regeneration untouched.
 
 **Both directions work the same way, and the rule is one rule.** A change
 committed to this folder makes the OTHER app's suite go red, because the other
@@ -386,7 +386,9 @@ recounted 2026-09-07.
 | Dating the pages a class brings when it is published | `class-planning.json` → `datingPagesAClassBrings` | ClassPlanningContract (2), AssistToolRunner (7) |
 | What publishing and unpublishing do to linked pages, and what is never swept | `shared-rules.json` → `followingLinks` | SharedRulesContract (2), AssistToolRunner (3) |
 | Whether the assistant asks before changing anything, and when it says so | `shared-rules.json` → `assistantConfirmation` | SharedRulesContract (1), AssistPlanMode (6), AssistantSettings (6) |
-| Phrasings matched in code, including the four PARSED families | `assist-cases.json` → `cardPhrasings` | AssistContract (1), AssistPromptShelf (2), AssistToolRunner (4) |
+| Phrasings matched in code, including the six PARSED families | `assist-cases.json` → `cardPhrasings` | AssistContract (1), AssistPromptShelf (2), AssistToolRunner (4), AssistScenario (1, walking `parsed`) |
+| The spellings of "deploy at &lt;time&gt;" that are answered in code, the ones that go to the model, and which day a bare time means | `assist-cases.json` → `deployAtATime` | ScheduleDeployCard (10), and `research/ai-assist/trimmed-surface-suite.py`, whose own interception guard is checked against these rows before it measures anything — a guard that went one family stale scores a routing result for a sentence the app never routes. AUTHORED, and the one `cardPhrasings.parsed` cannot carry: a family whose variable part is a TIME needs its spellings written out, or one example becomes one spelling |
+| That the card for an IMMEDIATE deploy says it is immediate | `shared-rules.json` → `assistantConfirmation.theImmediateDeployCardSaysItIsImmediate` | SharedRulesContract (1). A property of `wording.deployApproval` rather than the sentence, so it outlives the next rewording |
 | The New Course wizard's affirmative button | `shared-rules.json` → `wizard` | SharedRulesContract (1). On Windows the label is asserted only in `Plantoir.UiTests/NewCourseWizardUiTests`, which carries `[UiFact]` and runs only under `PLANTOIR_UI_TESTS=1` — so it is part of no gate there ([issue #119](https://github.com/russellgordon/plantoir/issues/119)) |
 | What the wizard's skeleton toggle does to the structure editor, both ways, and what a teacher whose course will start empty is told | `shared-rules.json` → `wizard.skeletonToggle`, `wizard.noExampleContentNote` | SharedRulesContract (3, including the thirteen cases and the vocabulary pinned against `WizardDefaults`), WizardStructure (15). Proposed FROM the mac 2026-09-18 ([#77](https://github.com/russellgordon/plantoir/issues/77)), copying behaviour Windows shipped 2026-09-07 — so this is the rare case where the contract arrives AFTER both apps agree, and **the Windows suite stays green rather than going red**: nothing there deserialises the key yet, and what they owe is the test plus a seam to run it against (their restore is private to `NewCourseDialog`). Whether a teacher can SEE it is the mac's `QuartzTeachersUITests.testDecliningTheSkeletonPutsTheDefaultFoldersBack`, which drives the real toggle and is part of no gate |
 | Backup, archive and wizard zip names | `course-management.json` → `zipNames` | BackupItem, ArchivedItem (18) |
@@ -472,12 +474,13 @@ The 2026-09-06 audit was a count; this is the same question asked of the file
 as it stands, and it is the milestone's "definition of done" for
 [#138](https://github.com/russellgordon/plantoir/issues/138): **every case list
 in every `contracts/*.json` is either run by a Windows gate, or owned by an
-open issue, or exempt for a reason written down here.** **111 case lists; 102
-have a reader here.** The other nine are below. (It was 100 of 111 when this
+open issue, or exempt for a reason written down here.** **114 case lists; 102
+have a reader here.** The other twelve are below. (It was 100 of 111 when this
 paragraph was first written; `workingFolderSelection.cases` and `.rejected`
 have a Windows reader since [#162](https://github.com/russellgordon/plantoir/issues/162)
-landed, and the count above was RE-TAKEN with the walker below rather than
-adjusted by hand — no `contracts/*.json` changed, so the 111 is unmoved.)
+landed, and the count was RE-TAKEN with the walker below rather than adjusted
+by hand. It moved from 111 to 114 when `deployAtATime` arrived with #168 —
+three lists, all owed, all in the table.)
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
@@ -514,6 +517,7 @@ subtraction.
 | `shared-rules.json` → `workingFolderPathBar.ancestorPaths.cases` | 2 | **Exempt, by construction.** POSIX paths (`/Users/teacher/…`). The rule is shared; only the spelling of a root is the platform's, and `windowsCases` beside it — three cases including a `D:\` drive — is what `SharedRuleContractTests` runs. |
 | `shared-rules.json` → `cloudSyncedFolders.detection.cases` | 11 | **Exempt, by construction.** Every path is a mac one (`{home}/Library/Mobile Documents`, `/Volumes/…`); the markers Windows detects from are a different list, and `CloudSyncedFolderTests` covers them. |
 | `shared-rules.json` → `stopPreview.identity.evidences`, `.notShared` | 3 + 4 | **Exempt: prose with fields.** The behaviour they describe is exercised through `stopPreview.cases`, and those 23 are gated TWICE here — `scripts/test_stop_preview.py` through `PythonToolchainTests`, and `windows-app/test_stop_preview.ps1` through `TheLauncherMatcherAnswersTheContract`, which asserts "0 failed" so a runner that skipped everything cannot pass. |
+| `assist-cases.json` → `deployAtATime.accepted`, `.refused`, `.resolving` | 23 + 25 + 11 | **Owed**, [#193](https://github.com/russellgordon/plantoir/issues/193), the `windows` issue opened from [#168](https://github.com/russellgordon/plantoir/issues/168) — the whole family is theirs to implement, and these rows ARE the specification: one example in `cardPhrasings.parsed` cannot describe a grammar of times. `CardPhrasings_AllParsedExamplesFromContract_Pass` will go red on the sixth family the moment the contract lands, so the work is visible there; what these three add is every spelling and the day rule. |
 | `toolchain.json` → `rules` | 3 | **Read by NOBODY, on either platform** — the one list in the census with no reader anywhere and no issue, and it is left that way deliberately. It is reasoning rather than cases: the image tag being a hash of the build context, building with BuildKit, and revalidating Quartz before chasing a newer CLI. All three are held by the launchers and by `verify.sh`, which does not run on Windows at all. The other three `rules` arrays ARE read — `buildFreshness.rules` by `BuildOutputLocationTests`, `example-content.rules` and `courseConfigKeys.rules` by `SharedRuleContractTests`. |
 
 **And the exemptions inside lists that ARE run**, because "run" is not the
