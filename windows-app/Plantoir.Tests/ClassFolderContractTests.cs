@@ -106,8 +106,14 @@ public class ClassFolderContractTests
     /// The regression that matters most on THIS platform: Plan() used to test
     /// the whole ABSOLUTE directory string, so a working folder called
     /// C:\Users\x\Classroom made every page in every course a class page.
-    /// The rule is a pure segment matcher, so what protects it is Plan()
-    /// passing Relative(pagePath) — asserted here as the shape the rule expects.
+    /// The rule is a pure segment matcher, so what protects it is entirely
+    /// what Plan() PASSES it — <c>AssistWorkspace.PathWithinSection(...)</c>,
+    /// the page's path relative to its section, since 2026-09-19; it passed
+    /// <c>Relative(pagePath)</c> before that, which closed this bug and left
+    /// <c>courses</c>, the course code and <c>sectionN</c> still above it.
+    /// Asserted here as the SHAPE the rule expects; that Plan() really hands
+    /// it that shape is <c>ClassFolderMembershipTests</c>, which builds the
+    /// folder tree and asks through a real workspace.
     /// </summary>
     [Fact]
     public void OnlyARelativePathIsEverAskedAbout()
@@ -115,8 +121,9 @@ public class ClassFolderContractTests
         var folders = new[] { "All Classes" };
         Assert.False(ClassFolderRule.IsClassPage(@"Concepts\Loops.md", folders));
         Assert.True(ClassFolderRule.IsClassPage(@"All Classes\Unit 1, Day 1.md", folders));
-        // A page whose ancestors mention classes, once made relative, is not a
-        // lesson — which is the whole point of passing Relative(pagePath).
+        // A page whose ancestors mention classes, once the path is cut back to
+        // the section, is not a lesson — which is the whole point of passing a
+        // narrowed path rather than an absolute one.
         Assert.False(ClassFolderRule.IsClassPage(@"Concepts\Recursion.md", folders));
     }
 
