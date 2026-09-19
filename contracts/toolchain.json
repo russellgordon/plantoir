@@ -73,22 +73,22 @@
       "pin": "pythonFrontmatter",
       "value": "1.3.0",
       "dockerfileContains": "python-frontmatter==1.3.0",
-      "owedIn": "windows-app/Vendor/fetch-runtime.ps1",
-      "whyOwed": "That file still does an UNPINNED `pip install python-frontmatter Pillow`, and it builds the runtime a Windows teacher's site is really produced by — so this pin does not hold there yet. Named as owed rather than as done: GitHub issue #140.", "why": "Reads and REWRITES every page's frontmatter in `build_site.process_frontmatter`, which is what decides whether a teacher's page reaches their students. Pinned 2026-09-18 with issue #140, at the version the image already had — the pin changes nothing about what is installed and everything about what can change underneath it."
+      "windowsRuntimeContains": "python-frontmatter==1.3.0",
+      "why": "Reads and REWRITES every page's frontmatter in `build_site.process_frontmatter`, which is what decides whether a teacher's page reaches their students. Pinned 2026-09-18 with issue #140, at the version the image already had — the pin changes nothing about what is installed and everything about what can change underneath it."
     },
     {
       "pin": "pyyaml",
       "value": "6.0.3",
       "dockerfileContains": "PyYAML==6.0.3",
-      "owedIn": "windows-app/Vendor/fetch-runtime.ps1",
-      "whyOwed": "That file still does an UNPINNED `pip install python-frontmatter Pillow`, and it builds the runtime a Windows teacher's site is really produced by — so this pin does not hold there yet. Named as owed rather than as done: GitHub issue #140.", "why": "**The pin that decides what a teacher's `publish:` line MEANS.** python-frontmatter parses with PyYAML, which is YAML **1.1** — and that is the only reason `publish: no` and `publish: off` hide a page. PyYAML 7 is expected to move to YAML 1.2, where `no` is the string \"no\" and every such page would be PUBLISHED, silently, in courses already in front of students. `contracts/file-formats.json` -> `pageVisibility` states the 1.1 table as fact and both apps are written against it, so an unpinned upgrade would fail nothing anywhere. Named explicitly rather than left to python-frontmatter's own dependency range, because that range is not ours to control."
+      "windowsRuntimeContains": "PyYAML==6.0.3",
+      "why": "**The pin that decides what a teacher's `publish:` line MEANS.** python-frontmatter parses with PyYAML, which is YAML **1.1** — and that is the only reason `publish: no` and `publish: off` hide a page. PyYAML 7 is expected to move to YAML 1.2, where `no` is the string \"no\" and every such page would be PUBLISHED, silently, in courses already in front of students. `contracts/file-formats.json` -> `pageVisibility` states the 1.1 table as fact and both apps are written against it, so an unpinned upgrade would fail nothing anywhere. Named explicitly rather than left to python-frontmatter's own dependency range, because that range is not ours to control."
     },
     {
       "pin": "pillow",
       "value": "12.3.0",
       "dockerfileContains": "Pillow==12.3.0",
-      "owedIn": "windows-app/Vendor/fetch-runtime.ps1",
-      "whyOwed": "That file still does an UNPINNED `pip install python-frontmatter Pillow`, and it builds the runtime a Windows teacher's site is really produced by — so this pin does not hold there yet. Named as owed rather than as done: GitHub issue #140.", "why": "Draws each section's social sharing card. Pinned with the other two rather than for a known break: an unpinned image is not reproducible, and a card that renders differently is a thing teachers notice after the fact."
+      "windowsRuntimeContains": "Pillow==12.3.0",
+      "why": "Draws each section's social sharing card. Pinned with the other two rather than for a known break: an unpinned image is not reproducible, and a card that renders differently is a thing teachers notice after the fact."
     }
   ],
   "rules": [
