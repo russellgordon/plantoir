@@ -225,6 +225,107 @@ enum AssistPageVisibility {
         return (lines.joined(separator: "\n"), true)
     }
 
+    /// The page text with every PER-SECTION key taken out of its frontmatter.
+    ///
+    /// **For a page that has just been copied INTO one section's own folder.**
+    /// A per-section key on a section-local page is not merely redundant, it
+    /// wins: the build resolves `publishForSection<N>` onto `publish` and
+    /// `createdSection<N>` onto `created` before Quartz sees either, so an
+    /// inherited one overrules whatever this app writes on the plain key —
+    /// while `AssistPageVisibility.setting` and `PageFrontmatter.settingCreated`
+    /// go on writing the plain key, because which key is WRITTEN is decided by
+    /// where the page lives. The result is a page that cannot be published
+    /// however often a teacher asks, and is told it has been.
+    ///
+    /// `createdSection<N>` goes with the other two rather than being left as
+    /// harmless: `scripts/build_site.py` → `process_frontmatter` does
+    /// `post["created"] = post[created_key]` on exactly the same line as the
+    /// publish one, so an inherited date key would show the SOURCE's day on
+    /// the built site while the copy's own file said otherwise.
+    ///
+    /// Answering by ADDING a per-section key instead was tried and is the
+    /// trap this replaces: it hides the page and makes it unpublishable. The
+    /// build deletes all three families after resolving them, so removing
+    /// them changes nothing about a page that was already correct.
+    ///
+    /// Lines, not one line: a key's value can continue below it, and a value
+    /// left behind by its key is the failure `PageVisibilityReader.continuationLineIndices`
+    /// exists for.
+    static func withoutPerSectionKeys(in pageText: String) -> String {
+        guard let block = PageFrontmatter.block(in: pageText) else {
+            return pageText
+        }
+        var lines: [String] = pageText.components(separatedBy: "\n")
+
+        // Gathered before anything is removed, so every index still means
+        // what it said — the same reason `setting` above works this way.
+        var removals: Set<Int> = []
+        for index in (block.openIndex + 1)..<block.closeIndex {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
+                continue
+            }
+            guard let key = perSectionKey(namedIn: bare) else {
+                continue
+            }
+            removals.insert(index)
+            for taken in PageVisibilityReader.continuationLineIndices(
+                belowKeyAt: index, in: lines, closeIndex: block.closeIndex,
+                keyValueWasEmpty: valueIsEmpty(ofKey: key, inLine: lines[index])
+            ) {
+                removals.insert(taken)
+            }
+        }
+        if removals.isEmpty {
+            return pageText
+        }
+
+        var doomed: [Int] = []
+        for index in removals {
+            doomed.append(index)
+        }
+        doomed.sort()
+        for index in doomed.reversed() {
+            lines.remove(at: index)
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// The per-section key this frontmatter line names, or nil.
+    ///
+    /// Any section's number, not just one: a page copied out of a shared
+    /// folder carries a key for every section the course has. Confirmed with
+    /// the READER's own matcher once the name is known, so a quoted
+    /// `"publishForSection2": true` is found — `SectionAdder.perSectionKeyNumber`
+    /// answers the same question with a plain prefix test and misses that
+    /// spelling, which is why this does not call it.
+    static func perSectionKey(namedIn line: String) -> String? {
+        var name: Substring = Substring(line)
+        if name.hasPrefix("\"") || name.hasPrefix("'") {
+            name = name.dropFirst()
+        }
+        for family in ["publishForSection", "draftSection", "createdSection"] {
+            guard name.hasPrefix(family) else {
+                continue
+            }
+            var digits: String = ""
+            for character in name.dropFirst(family.count) {
+                if !character.isNumber {
+                    break
+                }
+                digits.append(character)
+            }
+            if digits.isEmpty {
+                continue
+            }
+            let key: String = family + digits
+            if PageVisibilityReader.valuePart(ofKey: key, inLine: line) != nil {
+                return key
+            }
+        }
+        return nil
+    }
+
     /// True when this line names the key with nothing after its colon — the
     /// one shape whose value can continue at COLUMN 0, as a block sequence.
     ///

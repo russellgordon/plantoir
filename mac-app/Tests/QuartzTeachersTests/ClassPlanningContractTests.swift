@@ -141,7 +141,515 @@ final class ClassPlanningContractTests: XCTestCase {
         }
     }
 
+    // MARK: - Duplicating a lesson as the next class
+
+    /// The three `duplication` cases, run through the REAL tool.
+    ///
+    /// **Not through a re-implementation of the rule, and the undo is ASKED
+    /// for rather than read off a list.** What the contract fixes is what a
+    /// teacher gets when they say "undo that", and a test that inspected the
+    /// history would pass on a change that recorded an entry the undo path
+    /// then declined to honour. `MakeRoomForClassesTests` makes the same
+    /// argument about the tool it covers.
+    func testDuplicatingMatchesTheContract() async throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("duplication")
+        // The rule the cases are cases OF, read rather than restated. A rule
+        // nobody explained is a rule the next reader simplifies away.
+        let undoRule: [String: Any] = try XCTUnwrap(section["undoRule"] as? [String: Any])
+        let statedRule: String = try XCTUnwrap(undoRule["rule"] as? String)
+        XCTAssertNotNil(undoRule["why"] as? String, "undoRule has no 'why'")
+        let forcedUnpublished: Bool =
+            (section["forcedUnpublished"] as? [String: Any])?["value"] as? Bool == true
+
+        for testCase in try ClassPlanningContractTests.cases(in: "duplication") {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let made = try AssistFixture.makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+            try rememberTimetable(
+                try XCTUnwrap(testCase["timetable"] as? [String]), in: made.course
+            )
+
+            // Every page gets a body of its own, so a rename can be checked by
+            // where the WORDS ended up rather than by trusting the planner to
+            // have moved what it said it moved.
+            for existing in try XCTUnwrap(testCase["existingClasses"] as? [[String: String]]) {
+                let title: String = try XCTUnwrap(existing["title"])
+                try AssistFixture.write(
+                    page: title, publish: "true", date: try XCTUnwrap(existing["date"]),
+                    body: "the words of \(title)", in: made.course
+                )
+            }
+
+            // Asked of the plan BEFORE anything runs, because a plan changes
+            // nothing: the rename order is the contract's highest-stakes
+            // field and the number on the card is read from the same object.
+            let source: String = try XCTUnwrap(testCase["duplicate"] as? String)
+            let numbers: UnitDay = try XCTUnwrap(
+                UnitDay(pageTitle: source, term: made.course.configuration.unitWord), name
+            )
+            let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+                unit: numbers.unit, atDay: numbers.day + 1, count: 1,
+                forSection: 1, in: made.course
+            )
+            var renames: [String] = []
+            for rename in plan.renames {
+                renames.append("\(rename.from) → \(rename.to)")
+            }
+            XCTAssertEqual(
+                renames, try XCTUnwrap(testCase["expectRenamesInOrder"] as? [String]),
+                "\(name): renames, in order"
+            )
+            XCTAssertEqual(
+                plan.otherClassesMoving, testCase["expectOtherClassesMoving"] as? Int,
+                "\(name): how many other classes the card says move"
+            )
+            // The gate itself, against the rule the contract states in words:
+            // an undo is offered exactly when nothing else moves.
+            let undoOffered: Bool = try XCTUnwrap(testCase["expectUndoOffered"] as? Bool)
+            XCTAssertEqual(
+                plan.movesAnythingElse, !undoOffered,
+                "\(name): the contract's rule is “\(statedRule)” — this plan has "
+                + "\(plan.renames.count) renames and \(plan.moves.count) date moves"
+            )
+
+            let said: String = await run(
+                made.runner, "add_next_class",
+                ["course": "ICS3U", "section": 1, "duplicate": source]
+            )
+
+            let newTitle: String = try XCTUnwrap(testCase["expectNewTitle"] as? String)
+            let copyURL: URL = AssistFixture.pageURL(of: newTitle, in: made.course)
+            let copy: String = try XCTUnwrap(
+                try? String(contentsOf: copyURL, encoding: .utf8),
+                "\(name): no copy was made at \(newTitle) — \(said)"
+            )
+            XCTAssertTrue(
+                copy.contains("the words of \(source)"), "\(name): the copy is not a copy"
+            )
+            XCTAssertTrue(
+                copy.contains("created: \(try XCTUnwrap(testCase["expectDate"] as? String))"),
+                "\(name): the copy is dated for the wrong day — \(copy)"
+            )
+            if forcedUnpublished {
+                XCTAssertFalse(
+                    AssistPageVisibility.publishes(in: copy, forSection: 1),
+                    "\(name): a copy of a published lesson must start hidden"
+                )
+            }
+
+            // A rename really happened when the renamed page holds the words
+            // the OLD name's page held.
+            for step in try XCTUnwrap(testCase["expectRenamesInOrder"] as? [String]) {
+                let parts: [String] = step.components(separatedBy: " → ")
+                let from: String = try XCTUnwrap(parts.first)
+                let to: String = try XCTUnwrap(parts.last)
+                let moved: String = try XCTUnwrap(
+                    try? String(contentsOf: AssistFixture.pageURL(of: to, in: made.course),
+                                encoding: .utf8),
+                    "\(name): \(to) is not there"
+                )
+                XCTAssertTrue(
+                    moved.contains("the words of \(from)"), "\(name): \(from) did not become \(to)"
+                )
+            }
+
+            let undone: String = await run(made.runner, "undo_last_change", [:])
+            if undoOffered {
+                XCTAssertNotEqual(
+                    undone, AssistWording.nothingToUndo,
+                    "\(name): nothing else moved, so the copy must be takeable back"
+                )
+                // Taken AWAY, not blanked. `aCreatedPageCanBeTakenBack` says
+                // "takes the page away again", and a blank class page left
+                // standing is a sentence a teacher would believe and that
+                // would not be true.
+                XCTAssertFalse(
+                    FileManager.default.fileExists(atPath: copyURL.path),
+                    "\(name): the undo left a blank class page where the copy was"
+                )
+            } else {
+                XCTAssertEqual(
+                    undone, AssistWording.nothingToUndo,
+                    "\(name): a partial undo is worse than none — \(undone)"
+                )
+                XCTAssertTrue(
+                    said.contains(AssistWording.otherClassesMoved),
+                    "\(name): the reply must say where the way back is — \(said)"
+                )
+                XCTAssertTrue(
+                    FileManager.default.fileExists(atPath: copyURL.path),
+                    "\(name): nothing may have been half-undone"
+                )
+            }
+        }
+    }
+
+    /// The copy starts hidden even when the page it was copied from carries a
+    /// per-section publish key.
+    ///
+    /// The plain `publish: false` the copy is given is NOT the last word: the
+    /// build consults `publishForSection<N>` first, so a source carrying
+    /// `publishForSection1: true` — which the page a teacher names may well
+    /// be, since a shared course-level page is nameable here — leaves the copy
+    /// visible to students the moment it exists, with the FILE still reading
+    /// `publish: false`. Measured through the real toolchain image; the table
+    /// is in `documentation/10-local-ai-assistant.md`.
+    func testTheCopyIsHiddenEvenWhenItsSourceCarriesAPerSectionKey() async throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("duplication")
+        let forced: [String: Any] = try XCTUnwrap(section["forcedUnpublished"] as? [String: Any])
+        try XCTSkipUnless(forced["value"] as? Bool == true)
+
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try rememberTimetable(
+            ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16"], in: made.course
+        )
+        // Written by hand: `AssistFixture.write` builds a fixed template of
+        // title, publish and created, and the whole point here is the key it
+        // does not have.
+        try writeRawPage(
+            """
+            ---
+            title: Unit 1, Day 1
+            publish: true
+            publishForSection1: true
+            created: 2026-09-08T07:00:00.000-0400
+            ---
+
+            a lesson that started life as a shared page
+            """,
+            named: "Unit 1, Day 1", in: made.course
+        )
+
+        _ = await run(
+            made.runner, "add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 1"]
+        )
+
+        let copy: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course), encoding: .utf8
+        ))
+        XCTAssertFalse(
+            AssistPageVisibility.publishes(in: copy, forSection: 1),
+            "The copy was visible to students the moment it was made: \(copy)"
+        )
+        XCTAssertEqual(
+            AssistPageVisibility.answer(in: copy, forSection: 1), .hidden,
+            "Hidden has to be CERTAIN here, not merely unsaid: \(copy)"
+        )
+
+        // **And the copy can still be PUBLISHED.** Hiding it by writing a
+        // per-section key of its own would pass every assertion above and
+        // leave a page nobody can ever publish: the publish path picks its key
+        // from where the page LIVES, so it writes the plain one, and the
+        // per-section key goes on beating it — while the teacher is told
+        // "Published 1 page" every time they ask. A failure that reports
+        // success is worse than the one it replaced.
+        let said: String = await run(
+            made.runner, "publish_pages",
+            ["course": "ICS3U", "section": 1, "pages": ["Unit 1, Day 2"]]
+        )
+        let published: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course), encoding: .utf8
+        ))
+        XCTAssertTrue(
+            AssistPageVisibility.publishes(in: published, forSection: 1),
+            "The copy was hidden in a way that cannot be undone — \(said)\n\(published)"
+        )
+        // Asked of the frontmatter LINES, not of the whole file: a page shaped
+        // like the example content's `_DUPLICATE ME.md` names the key in a
+        // `%%` comment in its body, and a substring test would fail on the one
+        // page most likely to be duplicated.
+        XCTAssertTrue(
+            ClassPlanningContractTests.perSectionKeys(in: published).isEmpty,
+            "No per-section key belongs on a page inside one section's own folder: \(published)"
+        )
+    }
+
+    /// A source this app cannot read well enough to be sure of is ABANDONED
+    /// rather than copied.
+    ///
+    /// **A tab used as indentation reaches it**, which is not a corner: the
+    /// reader answers `.unreadable` there because the build's own parser
+    /// throws on the same page, so nothing this writes can make the copy
+    /// certainly hidden. A copy of a lesson students can already see is the
+    /// one thing that must not be written on a guess.
+    ///
+    /// The other half of the assertion is what the teacher is LEFT with. The
+    /// room has been made by the time this is answered, so the planner's blank
+    /// class page is standing on the copy's day — hidden, which is the safe
+    /// end state — and nothing goes on the undo list, because taking back a
+    /// page this never wrote is not something an undo can honour.
+    func testASourceThisAppCannotReadIsNotCopiedAtAll() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let scratchFolderURL: URL = made.root.appendingPathComponent("trail")
+        try FileManager.default.createDirectory(at: scratchFolderURL, withIntermediateDirectories: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer { ActivityTrail.store = previousStore }
+
+        try rememberTimetable(["2026-09-08", "2026-09-10", "2026-09-14"], in: made.course)
+        // The tab is the whole fixture. Everything else about this page is
+        // ordinary, and it is published, which is what makes the copy
+        // dangerous.
+        try writeRawPage(
+            "---\ntitle: Unit 1, Day 1\ntags:\n\t- a\npublish: true\n"
+            + "created: 2026-09-08T07:00:00.000-0400\n---\n\nthe words of Unit 1, Day 1\n",
+            named: "Unit 1, Day 1", in: made.course
+        )
+
+        let said: String = await run(
+            made.runner, "add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 1"]
+        )
+
+        XCTAssertEqual(
+            said,
+            AssistWording.theCopyCouldNotBeMadeHidden(
+                page: "Unit 1, Day 1", as: "Unit 1, Day 2",
+                backupNamed: ClassPlanningContractTests.backupName(in: said)
+            ),
+            "The refusal is the contract's sentence, not one of its own: \(said)"
+        )
+
+        let standing: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course), encoding: .utf8
+        ), "The planner's blank page should still be there")
+        XCTAssertFalse(
+            standing.contains("the words of Unit 1, Day 1"),
+            "The copy was written after all: \(standing)"
+        )
+        XCTAssertEqual(
+            AssistPageVisibility.answer(in: standing, forSection: 1), .hidden,
+            "What is left standing must be certainly hidden: \(standing)"
+        )
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("did not copy a class"),
+            "A duplicate abandoned after the room was made must leave a line: \(trail)"
+        )
+
+        let undone: String = await run(made.runner, "undo_last_change", [:])
+        XCTAssertEqual(
+            undone, AssistWording.nothingToUndo,
+            "Nothing was copied, so nothing may be offered back: \(undone)"
+        )
+    }
+
+    /// A lesson still sitting where the copy would go is never written over.
+    ///
+    /// **Deterministic, and it has to be**, because the shape only arises when
+    /// the planner skips a rename. A page it cannot read stops the rename
+    /// above it, which leaves the next destination occupied, which stops that
+    /// rename too — and the page the copy was meant to BECOME is still
+    /// somebody's class when the copy is written. The refusal also has to
+    /// survive the planner's link rewriting, which changes the destination's
+    /// own text: a guard that asked "is this still the same words?" would
+    /// answer no and take the lesson.
+    func testALessonStillSittingWhereTheCopyWouldGoIsNeverWrittenOver() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let scratchFolderURL: URL = made.root.appendingPathComponent("trail")
+        try FileManager.default.createDirectory(at: scratchFolderURL, withIntermediateDirectories: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer { ActivityTrail.store = previousStore }
+
+        try rememberTimetable(
+            ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16", "2026-09-18",
+             "2026-09-22", "2026-09-24", "2026-09-28", "2026-09-30"],
+            in: made.course
+        )
+        let dates: [String] = ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16",
+                               "2026-09-18", "2026-09-22"]
+        for day in 1...6 {
+            try AssistFixture.write(
+                page: "Unit 1, Day \(day)", publish: "true", date: dates[day - 1],
+                body: day == 3
+                    ? "a real lesson that links to [[Unit 1, Day 6]]"
+                    : "the words of Unit 1, Day \(day)",
+                in: made.course
+            )
+        }
+        // Day 5 cannot be read at all, which is what stops the rename above it.
+        try Data([0xFF, 0xFE, 0x41]).write(
+            to: AssistFixture.pageURL(of: "Unit 1, Day 5", in: made.course)
+        )
+
+        let said: String = await run(
+            made.runner, "add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 2"]
+        )
+
+        let lesson: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 3", in: made.course), encoding: .utf8
+        ))
+        XCTAssertTrue(
+            lesson.contains("a real lesson that links to"),
+            "The lesson was written over by the copy: \(lesson)"
+        )
+        XCTAssertTrue(said.contains("Unit 1, Day 3"), "The refusal must say which page: \(said)")
+        XCTAssertEqual(
+            said,
+            AssistWording.thePlaceForTheCopyIsStillTaken(
+                page: "Unit 1, Day 3",
+                backupNamed: ClassPlanningContractTests.backupName(in: said)
+            ),
+            "The refusal is the contract's sentence, not one of its own: \(said)"
+        )
+
+        // The room HAD been made by the time it refused, so the trail carries
+        // the one line that explains classes that moved with no copy to show
+        // for it.
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("did not copy a class"),
+            "A refusal after a half-applied shuffle must leave a line: \(trail)"
+        )
+    }
+
+    /// The plan card says how many classes move even when nothing is renamed.
+    ///
+    /// Contract case 2's shape. Keyed on the rename count the card said
+    /// nothing at all here, and this is the card a teacher agrees to.
+    func testThePlanSaysHowManyClassesMoveWhenNothingIsRenamed() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try rememberTimetable(
+            ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16", "2026-09-18"],
+            in: made.course
+        )
+        for existing in [("Unit 1, Day 1", "2026-09-08"), ("Unit 1, Day 2", "2026-09-10"),
+                         ("Unit 2, Day 1", "2026-09-12"), ("Unit 2, Day 2", "2026-09-14")] {
+            try AssistFixture.write(
+                page: existing.0, publish: "true", date: existing.1,
+                body: "the words of \(existing.0)", in: made.course
+            )
+        }
+
+        let card: String = await card(
+            made.runner, "plan_add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 2"]
+        )
+        XCTAssertTrue(
+            card.contains(AssistWording.otherClassesWouldMove(moving: 2, renaming: 0)),
+            "Two classes are about to be re-dated and the card did not say so: \(card)"
+        )
+    }
+
+    /// And still says the links are rewritten when something IS renamed.
+    ///
+    /// Contract case 1's shape. True before this was touched; it is here so a
+    /// refactor cannot lose the branch that was already right.
+    func testThePlanStillSaysLinksAreRewrittenWhenSomethingIsRenamed() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try rememberTimetable(
+            ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16"], in: made.course
+        )
+        for existing in [("Unit 1, Day 1", "2026-09-08"), ("Unit 1, Day 2", "2026-09-10"),
+                         ("Unit 2, Day 1", "2026-09-12")] {
+            try AssistFixture.write(
+                page: existing.0, publish: "true", date: existing.1,
+                body: "the words of \(existing.0)", in: made.course
+            )
+        }
+
+        let card: String = await card(
+            made.runner, "plan_add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 1"]
+        )
+        XCTAssertTrue(
+            card.contains(AssistWording.otherClassesWouldMove(moving: 2, renaming: 1)),
+            "One page is renamed and two move, and the card must say both: \(card)"
+        )
+    }
+
     // MARK: - Private
+
+    /// The backup's file name as the refusal names it, or nil when it names
+    /// none — so the assertion above compares the whole sentence rather than
+    /// re-deriving a path the test fixture chose.
+    /// Every per-section key this page carries as a top-level frontmatter
+    /// line, asked through the app's own matcher rather than by looking for
+    /// the word anywhere in the file.
+    private static func perSectionKeys(in pageText: String) -> [String] {
+        guard let block = PageFrontmatter.block(in: pageText) else {
+            return []
+        }
+        let lines: [String] = pageText.components(separatedBy: "\n")
+        var found: [String] = []
+        for index in (block.openIndex + 1)..<block.closeIndex {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
+                continue
+            }
+            if let key = AssistPageVisibility.perSectionKey(namedIn: bare) {
+                found.append(key)
+            }
+        }
+        return found
+    }
+
+    private static func backupName(in sentence: String) -> String? {
+        for word in sentence.components(separatedBy: " ") {
+            let bare: String = word.trimmingCharacters(in: CharacterSet(charactersIn: ",."))
+            if bare.hasSuffix(".zip") {
+                return bare
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    private func rememberTimetable(_ dates: [String], in course: Course) throws {
+        try SectionTimetableStore.applyRememberTimetable(
+            try SectionTimetableStore.planRememberTimetable(
+                dates: dates, source: "timetable.xlsx, block H", forSection: 1, in: course
+            )
+        )
+    }
+
+    @MainActor
+    private func writeRawPage(_ text: String, named title: String, in course: Course) throws {
+        try text.write(
+            to: AssistFixture.pageURL(of: title, in: course), atomically: true, encoding: .utf8
+        )
+    }
+
+    @MainActor
+    private func run(
+        _ runner: AssistToolRunner, _ tool: String, _ arguments: [String: Any]
+    ) async -> String {
+        return await outcome(runner, tool, arguments).detail
+    }
+
+    /// What a plan card actually shows, which is not the same string as the
+    /// summary a caller reads back.
+    @MainActor
+    private func card(
+        _ runner: AssistToolRunner, _ tool: String, _ arguments: [String: Any]
+    ) async -> String {
+        return await outcome(runner, tool, arguments).forTheCard
+    }
+
+    @MainActor
+    private func outcome(
+        _ runner: AssistToolRunner, _ tool: String, _ arguments: [String: Any]
+    ) async -> AssistToolOutcome {
+        let encoded: Data = (try? JSONSerialization.data(withJSONObject: arguments)) ?? Data("{}".utf8)
+        return await runner.run(
+            call: AssistToolCall(
+                id: UUID().uuidString,
+                type: "function",
+                function: AssistToolCall.Function(
+                    name: tool, arguments: String(decoding: encoded, as: UTF8.self)
+                )
+            )
+        )
+    }
 
     private static func name(of problem: ClassInsertionPlanner.Problem) -> String {
         switch problem {

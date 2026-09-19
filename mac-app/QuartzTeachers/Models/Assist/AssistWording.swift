@@ -1,7 +1,8 @@
 import Foundation
 
-/// Every sentence the assistant says to a teacher about deploying, previewing
-/// and agreeing to things — written once, here.
+/// Every sentence the assistant says to a teacher about deploying, previewing,
+/// agreeing to things and changing the class pages themselves — written once,
+/// here.
 ///
 /// **Why a table rather than the sentences where they are used.** They were
 /// where they were used, and the same sentence existed four times: in the
@@ -21,9 +22,17 @@ import Foundation
 /// See `AssistContract` and `contracts/README.md`.
 ///
 /// **What belongs here.** Sentences BOTH platforms say — the approval card,
-/// the cancels, what a deploy or a preview reports. Not the model's own words,
-/// not anything composed from a list (a plan naming eleven pages is written
-/// where the pages are known), and nothing platform-specific.
+/// the cancels, what a deploy or a preview reports, and since 2026-09-19 what
+/// duplicating a class says and refuses. Not the model's own words, not
+/// anything composed from a list (a plan naming eleven pages is written where
+/// the pages are known), and nothing platform-specific.
+///
+/// The class-change sentences came in from the other direction, and it is
+/// worth saying which: Windows gathered them in a `ClassChangeWording` of its
+/// own precisely BECAUSE the mac worded them inline and a generated file
+/// cannot gain keys from that side. Both apps said nearly the same eight
+/// sentences with nothing holding them together, which is the drift this table
+/// exists to stop.
 nonisolated enum AssistWording {
 
     // MARK: - Agreeing to something
@@ -356,6 +365,135 @@ nonisolated enum AssistWording {
     static let undoDoesNotReachTheLiveSite: String =
         "If you had already deployed this section, undoing it here does not change what students "
         + "see. Deploy again when you want the live site to match."
+
+    // MARK: - Duplicating a class
+
+    /// The one line a teacher reads in the chat when a copy is made.
+    static func duplicated(page: String, as copy: String) -> String {
+        return "Duplicated “\(page)” as “\(copy)”."
+    }
+
+    /// What the copy is, where it landed, and that nobody can see it yet.
+    ///
+    /// **The date is a String here, and it is a literal in the generated
+    /// contract rather than a placeholder.** Windows formats a real date
+    /// before it ever reaches its own sentence, so "{date}" is a shape that
+    /// side cannot produce; a real date is the only form both apps can render.
+    /// `backedUpCourse` set that precedent with a real file name.
+    static func copiedTo(page: String, as copy: String, on date: String) -> String {
+        return "“\(page)” was copied to “\(copy)”, dated \(date). It is hidden, so nothing changed "
+             + "on the site — write it, then publish when it is ready."
+    }
+
+    /// The same fact in the future tense, for the plan a teacher agrees to.
+    static func wouldBeCopiedTo(page: String, as copy: String, on date: String) -> String {
+        return "“\(page)” would be copied to “\(copy)”, dated \(date)."
+    }
+
+    /// Said in the plan, because "hidden" is the part a teacher would
+    /// otherwise have to ask about.
+    static let theCopyStartsHidden: String =
+        "The copy starts hidden, so nothing changes on the site until you publish it."
+
+    /// What a plan says about the classes that would move along to make room.
+    ///
+    /// **`moving` is the UNION of renamed and re-dated pages, not the rename
+    /// count** — `ClassInsertionPlan.otherClassesMoving`. Renames happen only
+    /// WITHIN the unit being changed, so duplicating the last day of a unit
+    /// renames nothing while re-dating every class of every later unit. Keyed
+    /// on renames alone, this line was not printed at all in that case, and a
+    /// teacher agreed to a plan smaller than what ran.
+    ///
+    /// Two branches rather than two names, because a caller never has to
+    /// choose: the numbers decide. Both are in the contract, since one
+    /// rendering cannot show the other.
+    ///
+    /// - Parameter moving: how many other class pages move, counted once each.
+    /// - Parameter renaming: how many of those are also renamed.
+    static func otherClassesWouldMove(moving: Int, renaming: Int) -> String {
+        let verb: String = moving == 1 ? "class moves" : "classes move"
+        if renaming > 0 {
+            return "\(moving) later \(verb) a day along to make room, and the links that point at "
+                 + "them are rewritten to match."
+        }
+        // Nothing is renamed, so nothing links anywhere new — but the dates
+        // still move, and that is the half a rename count leaves out.
+        let theirs: String = moving == 1 ? "Its name does" : "Their names do"
+        return "\(moving) later \(verb) onto a later class day to make room. \(theirs) not change."
+    }
+
+    /// Said after a change that shuffled other classes: the undo list cannot
+    /// take this back, and the backup is what can.
+    ///
+    /// A partial undo — the copy deleted, every later class left renamed and
+    /// re-dated — is worse than no undo at all, so the way back is named
+    /// instead. Windows' `ClassChangeWording.OtherClassesMoved` has a second
+    /// form that names the backup's file; this is the form both apps say, and
+    /// theirs is a platform extra measured against this one.
+    static let otherClassesMoved: String =
+        "Because other classes moved, “Undo that” will not take this back. The copy made before "
+        + "any of it is in Plantoir's Backups list."
+
+    /// A page that is not "Unit N, Day N" has no next day to become.
+    static func notANumberedClassPage(page: String) -> String {
+        return "“\(page)” isn’t a numbered class page, so there is no next day for it to become."
+    }
+
+    /// The copy's place is still occupied, so nothing was written over it.
+    ///
+    /// **The one refusal here that has to admit to half a job.** It is
+    /// answered AFTER the room has been made, so later classes may already
+    /// have been renamed and re-dated when a teacher reads it — saying only
+    /// "nothing was copied" would be true and would leave them believing
+    /// nothing happened. Nothing else in this table fires after a change has
+    /// begun, which is why this is the only sentence that says so.
+    ///
+    /// Two forms, the way Windows' has two: the backup is named when there is
+    /// a name for it, because a teacher looking at a list of five backups is
+    /// better off with the file than with the category.
+    static func thePlaceForTheCopyIsStillTaken(page: String, backupNamed name: String?) -> String {
+        var wayBack: String = "The copy of the course made before any of this is "
+        if let name {
+            wayBack += "\(name), in Plantoir's Backups list."
+        } else {
+            wayBack += "in Plantoir's Backups list."
+        }
+        return "“\(page)” is still there — the class that had to move out of the way did not, and "
+             + "I will not write over a lesson. Nothing was copied, but other classes may already "
+             + "have moved. \(wayBack) Look the section over in Plantoir."
+    }
+
+    /// The copy could not be made certainly hidden, so it was not made at all.
+    ///
+    /// **Reachable, and only where the page being copied is one this app
+    /// cannot read well enough to answer about** — a tab used as indentation
+    /// in the settings at the top of the page, or a value that runs on below
+    /// its own line. Measured: both are pages the BUILD refuses too, so the
+    /// honest answer is to stop rather than to guess, and a copy of a lesson
+    /// students can already see is the one thing that must not be guessed at.
+    ///
+    /// Said after the room has been made, like its sibling
+    /// `thePlaceForTheCopyIsStillTaken`, so it carries the same two facts that
+    /// sentence carries and one of its own: other classes may already have
+    /// moved, the backup is the way back — and a blank class page is standing
+    /// on the day the copy was meant to have, because the planner wrote it
+    /// before any of this was known. Leaving that unsaid would let a teacher
+    /// read "was not copied" as "nothing happened", twice over.
+    static func theCopyCouldNotBeMadeHidden(
+        page: String, as copy: String, backupNamed name: String?
+    ) -> String {
+        var wayBack: String = "The copy of the course made before any of this is "
+        if let name {
+            wayBack += "\(name), in Plantoir's Backups list."
+        } else {
+            wayBack += "in Plantoir's Backups list."
+        }
+        return "“\(page)” was not copied — I could not be certain the copy would start hidden, "
+             + "and a lesson students can already see must not turn up somewhere new where they "
+             + "can read it. A blank class page called “\(copy)” is waiting on that day instead, "
+             + "and it is hidden. Other classes may already have moved. \(wayBack) "
+             + "Look the section over in Plantoir."
+    }
 
     // MARK: - What publishing means here
 

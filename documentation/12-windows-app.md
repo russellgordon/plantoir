@@ -1920,9 +1920,20 @@ that test fails on a pair that is listed and has started arriving, so deleting
 it is not optional. Both halves of `add_next_class` now declare `duplicate`;
 the pair moved to `agreedExtras` with the binder reason, since the mac needs
 no such argument (its card and tool runner share a process). What the feature
-does, and the two places it is deliberately stricter than the mac, is in
-[`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "Which tools record an
-undo entry, and which deliberately do not".
+does is in [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "Which
+tools record an undo entry, and which deliberately do not".
+
+**The two places this was stricter than the mac are no longer two.** Both —
+the undo keyed on renames AND date moves, and the plan card counting the
+union of the two lists — were proposed from here as
+`contracts/class-planning.json` → `duplication` and implemented on the mac in
+[#163](https://github.com/russellgordon/plantoir/issues/163) on 2026-09-19,
+along with three faults that side found in the same path while doing it. Two
+of those three are faults Windows shares, and the same section says which and
+gives the construction that reaches them: the text comparison in
+`AssistWorkspace.ApplyDuplicateClass` does not stop a lesson being written
+over when the planner rewrote a link inside it, and the duplicate's refusal
+there leaves no line on the trail.
 
 **One thing to know before adding another card-only argument.**
 `add_next_class` IS one of the thirteen tools the local model routes to, so an

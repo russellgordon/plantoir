@@ -47,6 +47,12 @@ enum AssistContract {
     /// Stands in for a change's own past-tense clause in the undo sentences.
     static let changePlaceholder: String = "{change}"
 
+    /// The page a teacher named, in the duplicate sentences.
+    static let pagePlaceholder: String = "{page}"
+
+    /// What the copy of that page is called.
+    static let copyPlaceholder: String = "{copy}"
+
     static let wordingFileName: String = "assist-wording.json"
     static let casesFileName: String = "assist-cases.json"
 
@@ -132,6 +138,46 @@ enum AssistContract {
             "nothingToUndo": AssistWording.nothingToUndo,
             "undoDoesNotReachTheLiveSite": AssistWording.undoDoesNotReachTheLiveSite,
             "aCreatedPageCanBeTakenBack": AssistWording.aCreatedPageCanBeTakenBack,
+            // Duplicating a class. The date is a LITERAL rather than a
+            // placeholder: Windows formats a real date before its own
+            // sentence ever sees it, so "{date}" is a shape that side cannot
+            // render, and `backedUpCourse` above already passes a real file
+            // name for the same reason.
+            "duplicated": AssistWording.duplicated(page: pagePlaceholder, as: copyPlaceholder),
+            "copiedTo": AssistWording.copiedTo(
+                page: pagePlaceholder, as: copyPlaceholder, on: "2026-09-14"
+            ),
+            "wouldBeCopiedTo": AssistWording.wouldBeCopiedTo(
+                page: pagePlaceholder, as: copyPlaceholder, on: "2026-09-14"
+            ),
+            "theCopyStartsHidden": AssistWording.theCopyStartsHidden,
+            // Two keys for one function: a rendering cannot show both
+            // branches, and the branch that says nothing is renamed is the
+            // one the mac did not say at all until 2026-09-19.
+            "otherClassesWouldMoveAndLinksFollow": AssistWording.otherClassesWouldMove(
+                moving: 2, renaming: 1
+            ),
+            "otherClassesWouldMoveKeepingTheirNames": AssistWording.otherClassesWouldMove(
+                moving: 2, renaming: 0
+            ),
+            "otherClassesMoved": AssistWording.otherClassesMoved,
+            "notANumberedClassPage": AssistWording.notANumberedClassPage(page: pagePlaceholder),
+            "thePlaceForTheCopyIsStillTaken": AssistWording.thePlaceForTheCopyIsStillTaken(
+                page: copyPlaceholder, backupNamed: nil
+            ),
+            "thePlaceForTheCopyIsStillTakenNamingTheBackup":
+                AssistWording.thePlaceForTheCopyIsStillTaken(
+                    page: copyPlaceholder,
+                    backupNamed: "{course}_backup_2026-09-08_190000.zip"
+                ),
+            "theCopyCouldNotBeMadeHidden": AssistWording.theCopyCouldNotBeMadeHidden(
+                page: pagePlaceholder, as: copyPlaceholder, backupNamed: nil
+            ),
+            "theCopyCouldNotBeMadeHiddenNamingTheBackup":
+                AssistWording.theCopyCouldNotBeMadeHidden(
+                    page: pagePlaceholder, as: copyPlaceholder,
+                    backupNamed: "{course}_backup_2026-09-08_190000.zip"
+                ),
         ]
         return [
             "note": "Generated from mac-app AssistWording by `Plantoir --write-contracts`. "
@@ -143,6 +189,12 @@ enum AssistContract {
                         + "\"unpublished Unit 4, Day 23\". Never a bare count — the "
                         + "teacher asked about a class, not about a number of files.",
                 "leftAlone": "how many pages an undo could not put back, here 2",
+                "page": "the page being copied, e.g. Unit 3, Day 2",
+                "copy": "what the copy is called, e.g. Unit 3, Day 3",
+                "moving": "how many later classes move, counted once each even when a page is "
+                        + "both renamed and re-dated — here 2",
+                "renaming": "how many of those are also renamed, here 1 in the "
+                          + "…AndLinksFollow key and 0 in the …KeepingTheirNames one",
             ],
             "wording": table,
         ]

@@ -138,6 +138,32 @@ nonisolated enum ActivityTrail {
         /// joins when it is closed, without a rename on either platform.
         case folderProblemNotRepaired = "folder problem not repaired"
 
+        /// A teacher asked for a class to be duplicated, the room for it was
+        /// made, and then no copy appeared.
+        ///
+        /// **The one refusal here that fires after a change has begun.** The
+        /// place for the copy is decided by the planner, which renames and
+        /// re-dates every later class BEFORE anything is copied — so a lesson
+        /// still sitting where the copy would go is discovered with the
+        /// shuffle already done. The teacher sees their classes move and no
+        /// new page, and "I duplicated a class, my classes moved, and nothing
+        /// was copied" is a report nothing else in this trail could answer:
+        /// the tool that ran is recorded, and its conclusion is not.
+        ///
+        /// The other refusals on that path deliberately record nothing,
+        /// because they answer before anything is touched — a page that is not
+        /// there, a page with no numbers in its name, a timetable that has run
+        /// out. Nothing happened, so there is nothing to explain afterwards.
+        ///
+        /// Carries the course and the section, and NOT the pages' titles. The
+        /// assistant's own `assistantChoseATool` leaves argument values out
+        /// for the same reason, and the line answers the report without them.
+        ///
+        /// Named for the OUTCOME rather than for today's single cause, the way
+        /// `folderProblemNotRepaired` is: a second reason a copy is not made
+        /// joins this line rather than earning a rename on both platforms.
+        case classCopyNotMade = "class copy not made"
+
         /// A publish set to happen on its own stopped because it needed an
         /// answer.
         ///
