@@ -787,6 +787,31 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(tooltip.contains("on and awake"))
     }
 
+    /// The orange triangle has to say what it means, both on hover and to
+    /// anyone listening to the row rather than looking at it.
+    ///
+    /// Asked for by Russell on 2026-09-19: the clock beside it has had hover
+    /// text since it shipped, and a warning mark that says nothing leaves a
+    /// teacher to guess which of the two badges is the bad one.
+    func testTheWarningBesideASectionSaysWhatItMeans() throws {
+        let tooltip: String = SidebarView.stoppedPublishTooltip()
+        XCTAssertTrue(
+            tooltip.contains("did not get through"),
+            "The hover text has to say what went wrong in words a teacher would use"
+        )
+        XCTAssertTrue(
+            tooltip.contains("Open this section"),
+            "And it has to say what to do about it"
+        )
+        // Rule 1: nothing in the interface names the machinery.
+        for word in ["script", "toolchain", "Docker", "container", "launchd", "agent"] {
+            XCTAssertFalse(
+                tooltip.localizedCaseInsensitiveContains(word),
+                "The hover text must not mention \(word)"
+            )
+        }
+    }
+
     /// Every record the wrapper writes has to LAND in one move.
     ///
     /// The app watches the record folder so a run that finishes while the

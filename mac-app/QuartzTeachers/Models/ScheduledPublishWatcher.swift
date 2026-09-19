@@ -184,9 +184,17 @@ final class ScheduledPublishWatcher {
             }
             if !theFolderWentAway {
                 // The stream ended without the folder being deleted, which
-                // means the folder could not be opened at all. Stop here; the
-                // app coming back to the front re-reads regardless, and a
+                // means the folder could not be opened at all. Stop here: a
                 // retry without an event to cause it would be a spin.
+                //
+                // Say plainly what that costs, because the watch does NOT come
+                // back afterwards — `watchTask` stays non-nil, so `start()`
+                // does nothing more. What still works is the READING: the app
+                // coming back to the front re-reads, and so does opening the
+                // section. A teacher is then exactly where they were before
+                // this existed, which is the right floor for a case that needs
+                // the folder to become unopenable between making it and
+                // opening it.
                 return
             }
             makeTheFolderIfItIsNotThereYet()
@@ -299,7 +307,17 @@ final class ScheduledPublishWatcher {
         // argument: the write that completes a record is the only event that
         // record will ever produce, so a watch armed after it has landed waits
         // for ever. Arming first means the look below is the only other way the
-        // completion can be discovered, and one of the two always sees it.
+        // completion can be discovered, and one of the two always sees it —
+        // unless a record that is ALREADY being waited on is unlinked and
+        // replaced by another unreadable one within a single turn, in which
+        // case this watch is left on the old file and the app coming back to
+        // the front, or the section being opened, is what carries it. That
+        // needs a record left half written by a killed run AND a second run
+        // compressing its `rm` and its first `echo` into one event window; the
+        // wrapper puts a whole build and publish between the two, measured as
+        // two separate turns. Re-arming from the tail of the watching task is
+        // NOT the fix: when the file cannot be opened the stream finishes at
+        // once, so the tail would re-arm immediately and spin.
         //
         // Letting go of the stream when the record turns out to be readable
         // costs nothing: measured, an `AsyncStream` that is never iterated runs
