@@ -121,9 +121,19 @@ public class ClassFolderContractTests
         var folders = new[] { "All Classes" };
         Assert.False(ClassFolderRule.IsClassPage(@"Concepts\Loops.md", folders));
         Assert.True(ClassFolderRule.IsClassPage(@"All Classes\Unit 1, Day 1.md", folders));
-        // A page whose ancestors mention classes, once the path is cut back to
-        // the section, is not a lesson — which is the whole point of passing a
-        // narrowed path rather than an absolute one.
+
+        // The rule CANNOT protect itself, and this is the assertion that says
+        // so: an ancestor segment matches wherever it sits, including one the
+        // teacher's own folder names put there. That is not a fault in the
+        // matcher — it is why the CALLER has to narrow the path first, which
+        // is what PathWithinSection does and what ClassFolderMembershipTests
+        // checks against a real tree. (This assertion used to be a third
+        // `Concepts\...` path asserted False, under a comment about ancestors
+        // that mention classes; the path had no such ancestors, so it proved
+        // nothing the first line had not.)
+        Assert.True(ClassFolderRule.IsClassPage(
+            @"All Classes\courses\ICS3U\Concepts\Recursion.md", folders));
+        // Cut back to the section, the same page is not a lesson.
         Assert.False(ClassFolderRule.IsClassPage(@"Concepts\Recursion.md", folders));
     }
 

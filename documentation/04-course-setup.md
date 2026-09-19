@@ -868,9 +868,9 @@ components" and is stale — the mac changed the code after review, precisely
 because the last two components put the immediate parent's name back in front
 of the rule, which is the discredited "does the parent mention classes" sniff.
 
-**Two changes a teacher can see**, neither of them a new invention — both are
-the shared rule arriving on a platform that had its own — and both pinned by
-tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
+**Three changes a teacher can see**, none of them a new invention — each is
+the shared class-folder rule arriving on a platform that had its own — and
+each pinned by tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
 
 - **Membership can SHRINK.** The rule falls back to ONE folder when no folder
   name mentions classes, so a course whose folders are `["Lessons","Labs"]` had
@@ -890,7 +890,7 @@ tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
   followed, and "publish Day 1 and everything it links to" now reaches it.
   **That guard is WINDOWS-ONLY, and this is where it was found.** The mac's
   `AssistSectionGraph.linkedPages(from:)` (`:256-281`) has no class-page test
-  at all, and `AssistPublishPlan.swift:433,449` publishes every page it
+  at all, and `AssistPublishPlan.swift:434,449` publishes every page it
   returns, so on the mac a publish follows links INTO class pages too. The
   outcome of this particular change converges — the demoted shared page was
   already non-class on the mac, so its links were already followed — but the
@@ -901,14 +901,29 @@ tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
   note that `documentation/10-local-ai-assistant.md` states the mac's rule as
   though it were shared. Deliberately NOT changed here: how far a publish
   reaches is a different question from which folders hold classes.
-- **The "introducing class" credit changes hands**, and this half IS parity. An
-  undated page inherits the date of the earliest class linking to it and the
-  teacher is told which class brought it in; a class page never inherits, on
-  both platforms (`AssistWorkspace.cs:777`, `AssistPublishPlan.swift:867`, and
-  `contracts/class-planning.json` → `datingPagesAClassBrings`). A shared page
-  in a folder named like the class folder used to win that credit here (a
-  course-level folder sorts before `section1`), so the teacher was told a page
-  they never taught from was what introduced it.
+- **The "introducing class" credit changes hands.** An undated page inherits
+  the date of the earliest class linking to it and the teacher is told which
+  class brought it in (`AssistWorkspace.cs:777` finds that class here). A
+  shared page in a folder named like the class folder used to win the credit
+  (a course-level folder sorts before `section1`), so the teacher was told a
+  page they never taught from was what introduced it.
+
+  **The EXCLUSION is shared; the REACH is not** — and this needs saying
+  carefully, because an earlier draft of this page called the whole thing
+  parity. A class page never inherits a date on either platform
+  (`AssistWorkspace.cs:916`, `AssistPublishPlan.swift:871`, and
+  `contracts/class-planning.json` → `datingPagesAClassBrings`: "a class's date
+  is its place in the schedule"). But Windows' `continue` at `:916` sits in
+  front of `queue.Enqueue(target)` at `:917`, so it stops the walk THERE,
+  while the mac's date code reaches its pages through
+  `graph.linkedPages(from:)` (`AssistPublishPlan.swift:862`), which traverses
+  straight through class pages and only filters them out of the move list
+  afterwards. So a page reachable ONLY by way of another class page — Day 3
+  links to Day 4, Day 4 links to a new worksheet nothing else points at — is
+  re-dated on the mac and is not on Windows. That is the same divergence as
+  the publish-following one above, inside the very rule that looked like the
+  settled ground, and [#173](https://github.com/russellgordon/plantoir/issues/173)
+  covers both reaches rather than only the publish one.
 
 **Rejected: keeping Windows' wider membership.** It is the more generous
 reading — everything the teacher put in a per-section folder is a class — and
