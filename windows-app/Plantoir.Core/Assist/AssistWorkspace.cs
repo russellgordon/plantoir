@@ -2549,33 +2549,54 @@ public sealed class AssistWorkspace
             throw new AssistRefusal($"{course.Code} couldn’t be backed up, so the page was not changed: {error.Message}");
         }
 
+        // BEGIN and END are a pair, and the END is the half that was missing
+        // until 2026-09-18. `UndoHistory.Begin` ignores a nested call, so an
+        // entry left open does two things, both silent: this tool records no
+        // undo at all ("undo that" answers "I have not changed any pages"),
+        // and the NEXT operation's files are swallowed into this open entry
+        // and committed under THIS description. A teacher who added
+        // expectations, then published a class, then said "undo that" was
+        // told they had added expectations and had the publish taken back
+        // with them.
         _undo?.Begin($"added {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
-
-        string path = PagePaths.ResolveInside(_folder, plan.RelativePath);
-        string text = File.ReadAllText(path);
-        string lineEnd = text.Contains("\r\n") ? "\r\n" : "\n";
-        string transclusions = string.Join(lineEnd, plan.Adding.Select(e => $"![[{e.Code}]]"));
-
-        if (plan.HasBlockAlready)
+        try
         {
-            // Append inside the existing block, keeping what is already there.
-            int end = text.IndexOf(CurriculumEnd, StringComparison.OrdinalIgnoreCase);
-            text = text[..end].TrimEnd() + lineEnd + transclusions + lineEnd + text[end..];
+            string path = PagePaths.ResolveInside(_folder, plan.RelativePath);
+            string text = File.ReadAllText(path);
+            string lineEnd = text.Contains("\r\n") ? "\r\n" : "\n";
+            string transclusions = string.Join(lineEnd, plan.Adding.Select(e => $"![[{e.Code}]]"));
+
+            if (plan.HasBlockAlready)
+            {
+                // Append inside the existing block, keeping what is already there.
+                int end = text.IndexOf(CurriculumEnd, StringComparison.OrdinalIgnoreCase);
+                text = text[..end].TrimEnd() + lineEnd + transclusions + lineEnd + text[end..];
+            }
+            else
+            {
+                // A new block, before the "things to do" list if there is one —
+                // that list closes a class page, and the curriculum note belongs
+                // with the lesson rather than after the homework.
+                string block = CurriculumStart + lineEnd + "Today's work points here:" + lineEnd + lineEnd +
+                               transclusions + lineEnd + CurriculumEnd + lineEnd;
+                int before = text.IndexOf("## Things to do", StringComparison.OrdinalIgnoreCase);
+                text = before > 0
+                    ? text[..before] + block + lineEnd + text[before..]
+                    : text.TrimEnd() + lineEnd + lineEnd + block;
+            }
+
+            Save(path, text);
+            _undo?.End();
         }
-        else
+        catch
         {
-            // A new block, before the "things to do" list if there is one —
-            // that list closes a class page, and the curriculum note belongs
-            // with the lesson rather than after the homework.
-            string block = CurriculumStart + lineEnd + "Today's work points here:" + lineEnd + lineEnd +
-                           transclusions + lineEnd + CurriculumEnd + lineEnd;
-            int before = text.IndexOf("## Things to do", StringComparison.OrdinalIgnoreCase);
-            text = before > 0
-                ? text[..before] + block + lineEnd + text[before..]
-                : text.TrimEnd() + lineEnd + lineEnd + block;
+            // A page that could not be read or written leaves an entry that
+            // describes work nobody did. Abandoning it is what keeps the next
+            // operation's undo its own.
+            _undo?.Abandon();
+            throw;
         }
 
-        Save(path, text);
         return new AssistResult(true,
             $"Added {plan.Adding.Count} curriculum expectation{(plan.Adding.Count == 1 ? "" : "s")} to " +
             $"“{plan.PageTitle}” — {string.Join(", ", plan.Adding.Select(e => e.Code))}. " +
@@ -2770,8 +2791,21 @@ public sealed class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so nothing was moved: {error.Message}");
         }
 
-        _undo?.Begin($"made room for {plan.Added.Count} classes at {UnitWordFor(plan.CourseCode)} {plan.Unit}, Day {plan.AtDay} " +
-                     $"in {course.Code} Section {section}");
+        // NO undo entry of its own, deliberately — and this is the mac's rule
+        // rather than a Windows shortcut (`AssistToolRunner.makeRoomForClasses`
+        // records nothing either). Making room renames later days, re-dates
+        // every class from the insertion point onwards and rewrites the links
+        // that pointed at the old names; an undo that put some of that back
+        // and not the rest would leave a course in a state nobody chose. The
+        // way back is the backup taken above, which the reply names.
+        //
+        // It used to call Begin here and never End, which is worse than
+        // either: no entry was recorded AND the next operation's files were
+        // swallowed into the open one under this description.
+        //
+        // The Touch/Wrote calls below stay. They do nothing while no entry is
+        // open, and they are what lets a CALLER that opened its own entry —
+        // ApplyDuplicateClass — record the whole of what happened.
 
         // Highest day first, so a rename never lands on a name still in use.
         progress?.Report("Renaming the classes that come after…");
@@ -2821,13 +2855,22 @@ public sealed class AssistWorkspace
             Save(path, ClassSkeleton(added, plan.Unit, plan.Added.Count, tail));
         }
 
-        return new AssistResult(true,
+        string said =
             $"Made room for {plan.Added.Count} class{(plan.Added.Count == 1 ? "" : "es")} at {UnitWordFor(plan.CourseCode)} " +
             $"{plan.Unit}, Day {plan.AtDay}. Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
             $"later class days, and updated {plan.LinksToRewrite} link" +
             $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
-            "Look the section over in Plantoir before you deploy it.",
-            backup);
+            "Look the section over in Plantoir before you deploy it.";
+
+        // Said because it is now TRUE and was not said before: this records no
+        // undo entry, so "undo that" afterwards reaches back past it to
+        // whatever the conversation did before — or answers that nothing has
+        // been changed. The mac says the same sentence, on the same condition
+        // (`makeRoomForClasses` → `movesAnythingElse`).
+        if (plan.Renames.Count > 0 || plan.Moves.Count > 0)
+            said += "\n\n" + ClassChangeWording.OtherClassesMoved(backup);
+
+        return new AssistResult(true, said, backup);
     }
 
     /// <summary>
@@ -3046,20 +3089,35 @@ public sealed class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so no pages were created: {error.Message}");
         }
 
+        // Undoable, and the END is what makes that true. `Save` records each
+        // created page with no "before" at all, so undo deletes it — which is
+        // exactly what AssistWording.ACreatedPageCanBeTakenBack promises the
+        // teacher, and what this tool did not do until 2026-09-18 because the
+        // entry was opened and never closed. Nothing here renames or re-dates
+        // anything else, so there is no partial-undo question to ask: the mac
+        // records this one too (AssistToolRunner, the placeholder-class path).
         _undo?.Begin($"added {plan.Classes.Count} class pages to {UnitWordFor(plan.CourseCode)} {plan.Unit} of " +
                      $"{course.Code} Section {section}");
-
-        // Match the time of day and UTC offset the section's existing classes
-        // use, so a new page sorts beside them rather than at midnight.
-        string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
-        string folder = ClassFolder(course, section);
-        Directory.CreateDirectory(folder);
-
-        foreach (var created in plan.Classes)
+        try
         {
-            string path = Path.Combine(folder, created.Title + ".md");
-            if (File.Exists(path)) continue;       // checked again: the plan may be minutes old
-            Save(path, ClassSkeleton(created, plan.Unit, plan.Classes.Count, tail));
+            // Match the time of day and UTC offset the section's existing classes
+            // use, so a new page sorts beside them rather than at midnight.
+            string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+            string folder = ClassFolder(course, section);
+            Directory.CreateDirectory(folder);
+
+            foreach (var created in plan.Classes)
+            {
+                string path = Path.Combine(folder, created.Title + ".md");
+                if (File.Exists(path)) continue;       // checked again: the plan may be minutes old
+                Save(path, ClassSkeleton(created, plan.Unit, plan.Classes.Count, tail));
+            }
+            _undo?.End();
+        }
+        catch
+        {
+            _undo?.Abandon();
+            throw;
         }
 
         return new AssistResult(true,
