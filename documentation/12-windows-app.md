@@ -593,6 +593,22 @@ and not reopening it — that part is the teacher's).
 It does **not** judge anything visual: colour, contrast, dark-mode legibility,
 how a long name wraps. That is a screenshot pass, not this.
 
+**One of them now reads a FILE rather than the screen**, and it is worth
+knowing why that belongs here. `MarksPoolRemovalUiTests` removes a folder in
+Course Settings — the row's own button, the confirmation, Save — and then
+asserts that the written `course_config.json` still has no `graded_folders`
+key. The RULE is pinned by the unit suite against the contract's six cases
+([#142](https://github.com/russellgordon/plantoir/issues/142)); what no unit
+test here can reach is that the gesture a teacher makes arrives at that rule
+at all, with the confirmation agreeing and Save writing what the rule decided.
+Mutation-measured: restoring the pre-fix body fails it with
+`graded_folders: ["Thinking Tasks"]` in the file, which is the damage itself,
+while the old pool arithmetic over a CORRECT walk leaves it green — so what
+it guards is the ORDER reaching the file. It drives no launcher, so the
+`--state-dir` caveat above does not bite, and it writes its own one-course
+fixture rather than joining `CourseFixtures.WriteBoth`, which every other
+suite here reads.
+
 **It cannot crash its host, and that was measured rather than assumed**
 (2026-09-08). The question came from the mac, where the unit suite segfaulted
 its own test host about a third of the time because the test bundle is injected
