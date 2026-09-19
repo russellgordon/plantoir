@@ -163,25 +163,49 @@ folder rather than to one way of doing it.
 Clearing the selection tears `SectionDetailView` down, and its `onDisappear`
 ran against `workspace.workspaceURL` — which by then is the NEW folder. So
 `PreviewStopper.stopSectionProcesses` ran the new folder's `preview.sh` for a
-section that folder may not even have, while the old folder's container-side
-build or server kept going, unreclaimed and invisible. The same read left a
-stale entry in `SectionWindowControllers`, which is keyed by folder path:
-registered under one folder, unregistered under another, so the old key was
-never removed.
+section that folder may not even have, and the same read left a stale entry in
+`SectionWindowControllers`, which is keyed by folder path: registered under one
+folder, unregistered under another, so the old key was never removed.
+
+**How bad each half is, stated precisely, because the obvious version of this
+is too strong.** The stale registry entry is unconditional — nothing else ever
+removes it. The unreclaimed build is NOT: `chooseWorkspace` calls
+`WorkspaceModel.releaseFolderIfUnused(previousPath)` synchronously, and by then
+this window has already moved on, so when the LAST window leaves a folder its
+container is already being stopped before SwiftUI ever runs `onDisappear` — and
+the container going down takes the build with it. The leak is real when ANOTHER
+window still holds the old folder: the container stays up, and nothing reclaims
+that section's build or server. Aiming a stop at a folder whose container has
+just been released is inert rather than harmful, because stop mode must never
+start anything — `preview.sh`'s `--stop` block exits with "Nothing to stop" when
+no container is running for the folder, and creates neither engine, image nor
+container.
 
 This is older than issue #93 — it already happened whenever a folder change
 tore the view down — and it is fixed structurally rather than by ordering the
-teardown or delaying it: the view notes the folder it APPEARED in
-(`folderThisSectionOpenedIn`) and unwinds against that, in `stopPreview`,
+teardown or delaying it: the view notes the folder its work belongs to
+(`folderThisSectionWorksIn`) and unwinds against that, in `stopPreview`,
 `stopPreviewAndWait`, `cancelPreview`, `cancelDeploy` and the unregister.
 Nothing has to happen before anything else for it to be right.
+
+**The folder is noted at all three places one is DECIDED**, not only on
+appearance: `.onAppear` (before it registers, so a registration and its
+unregister cannot name different folders), `startPreview()` beside the lease,
+and `deployAndWait()`. Appearance alone is not enough, and the hole is quiet: a
+section that appeared while the window had no folder would leave the note nil
+while `startPreview()` went on resolving one from the model perfectly happily —
+a preview that can start and that no stop is aimed at.
 
 It is guarded by a source scan rather than by a behavioural test, and that is
 the honest limit: no real `SectionDetailView` ever mounts in a unit test —
 `AssistRevealsSectionOnScreenTests` says the same of itself — so the test reads
-the four functions and the teardown closure and fails if any of them goes back
-to the model's current folder. The behaviour itself was verified by reading the
-teardown path.
+the four stops, the three captures and the teardown closure, and fails if any
+stop goes back to the model's current folder, if any capture is dropped, or if
+the appearance stops noting the folder before it registers. Guarding the
+captures is the half that is easy to leave out, and leaving it out would be
+worse than no guard: delete the capture and every stop reads a permanently nil
+property and does nothing at all, wearing the shape of the fix working. The
+behaviour itself was verified by reading the teardown path.
 
 ## Which folders Plantoir uses
 

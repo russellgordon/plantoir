@@ -154,20 +154,38 @@ final class WindowRestorationScenarioTests: XCTestCase {
     /// it is the reason the clearing lives in the folder funnel rather than
     /// in `reloadCourses()` — a window that restores its folder and then its
     /// selection reloads courses in between.
+    /// A real working folder with a real course, not a bare temporary
+    /// directory: asserting that a selection naming nothing survives proves
+    /// nothing, since a window showing "Course Not Found" would satisfy it.
+    /// The selection has to NAME the course that is there, and go on naming
+    /// it after everything the restoration then does.
     @MainActor
     func testARestoredWindowKeepsTheSelectionItComesBackWith() throws {
-        let folders: [String] = try makeFolders(1)
-        defer { removeAll(folders) }
+        let folder: URL = try FixtureWorkspace.materialize()
+        defer { try? FileManager.default.removeItem(at: folder) }
 
         let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
         // The order `WindowRootView.adopt(_:how:)` uses, and the order that
         // matters: folder, then the sidebar as it was left.
-        workspace.adoptRestoredPath(folders[0])
-        workspace.selection = .section("ICS3U", 2)
+        workspace.adoptRestoredPath(folder.path)
+        workspace.selection = .section("EXC2O", 2)
+        XCTAssertNotNil(workspace.selectedCourse, "the fixture's course should be there to name")
+
+        // The two things that happen to a restored window afterwards and
+        // could take the selection with them: the folder being adopted again
+        // — which the funnel must read as the SAME folder rather than a
+        // change — and an ordinary reload, which is what every rename,
+        // backup, restore and archive causes.
+        workspace.adoptRestoredPath(folder.path)
+        workspace.reloadCourses()
 
         XCTAssertEqual(
-            workspace.selection, .section("ICS3U", 2),
-            "A restored window must come back to what the teacher was looking at"
+            workspace.selection, .section("EXC2O", 2),
+            "A restored window must come back to what the teacher was looking at, and stay there"
+        )
+        XCTAssertNotNil(
+            workspace.selectedCourse,
+            "and the selection must still name the course, not merely be non-nil"
         )
     }
 

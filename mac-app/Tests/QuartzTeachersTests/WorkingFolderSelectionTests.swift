@@ -206,29 +206,39 @@ final class WorkingFolderSelectionTests: XCTestCase {
 
     /// A folder change tears the section view down, and its `onDisappear`
     /// runs when the window ALREADY points at the new folder. Anything that
-    /// unwinds there must therefore use the folder the section opened in,
-    /// not the model's current one — or the old folder's container-side
-    /// build is never reclaimed and a stale entry is left in
-    /// `SectionWindowControllers`, which is keyed by folder path.
+    /// unwinds there must therefore use the folder the section's work
+    /// belongs to, not the model's current one — or the old folder's
+    /// container-side build is never reclaimed (when another window still
+    /// holds that folder; see `documentation/09-mac-app.md`) and a stale
+    /// entry is left in `SectionWindowControllers`, which is keyed by folder
+    /// path and which no release of a container ever tidies.
     ///
     /// A source scan because there is no other seam: no real
     /// `SectionDetailView` ever mounts in a unit test (see
     /// `AssistRevealsSectionOnScreenTests`, which says the same of itself),
     /// so this is a deletion guard rather than a behavioural test. The
     /// behaviour itself was verified by reading the teardown path.
-    func testTheSectionViewStopsAgainstTheFolderItOpenedIn() throws {
+    ///
+    /// It guards BOTH halves on purpose. A scan that only checked the stops
+    /// would stay green if the line that CAPTURES the folder were deleted —
+    /// every stop would then read a permanently nil property and quietly do
+    /// nothing at all, which is the failure the fix exists to prevent
+    /// wearing the shape of the fix working.
+    func testTheSectionViewStopsAgainstTheFolderItsWorkBelongsTo() throws {
         let source: String = try readSource("QuartzTeachers/Views/Section/SectionDetailView.swift")
-        let functions: [String] = [
+
+        // The stops, which must read the captured folder and never the model.
+        let stops: [String] = [
             "func stopPreview()", "func stopPreviewAndWait()", "func cancelPreview()", "func cancelDeploy()",
         ]
-        for function in functions {
+        for function in stops {
             let body: String = try XCTUnwrap(
                 bodyOfFunction(startingWith: function, in: source),
                 "\(function) is no longer in SectionDetailView"
             )
             XCTAssertTrue(
-                body.contains("folderThisSectionOpenedIn"),
-                "\(function) must stop against the folder the section opened in"
+                body.contains("folderThisSectionWorksIn"),
+                "\(function) must stop against the folder this section's work belongs to"
             )
             XCTAssertFalse(
                 body.contains("workspace.workspaceURL"),
@@ -236,12 +246,59 @@ final class WorkingFolderSelectionTests: XCTestCase {
                 + "current folder is the wrong one to aim at"
             )
         }
+
+        // The captures, without which every one of those stops is a no-op.
+        // A folder is decided in three places and each has to write it down.
+        let captures: [(where: String, why: String)] = [
+            (
+                ".onAppear {",
+                "the unregister in onDisappear must name the folder this section registered under"
+            ),
+            (
+                "func startPreview()",
+                "a preview can start from the model on an appearance that had no folder, and "
+                    + "nothing would ever reclaim it"
+            ),
+            (
+                "func deployAndWait()",
+                "cancelDeploy reclaims the container-side build against the folder noted here"
+            ),
+        ]
+        for capture in captures {
+            let body: String = try XCTUnwrap(
+                bodyOfFunction(startingWith: capture.where, in: source),
+                "\(capture.where) is no longer in SectionDetailView"
+            )
+            XCTAssertTrue(
+                body.contains("folderThisSectionWorksIn = "),
+                "\(capture.where) must note the folder it is working in — \(capture.why)"
+            )
+        }
+
+        // And the appearance has to note it BEFORE it registers, or a
+        // registration made under one folder could be unregistered under
+        // another — the stale-key half of the same bug.
+        let appearance: String = try XCTUnwrap(
+            bodyOfFunction(startingWith: ".onAppear {", in: source)
+        )
+        let noted: Range<String.Index> = try XCTUnwrap(
+            appearance.range(of: "folderThisSectionWorksIn = ")
+        )
+        let registered: Range<String.Index> = try XCTUnwrap(
+            appearance.range(of: "SectionWindowControllers.shared.register("),
+            "onAppear no longer registers this section"
+        )
+        XCTAssertTrue(
+            noted.lowerBound < registered.lowerBound,
+            "the folder must be noted before the section registers under it"
+        )
+
         let teardown: String = try XCTUnwrap(
             bodyOfFunction(startingWith: ".onDisappear {", in: source),
             "SectionDetailView no longer has an onDisappear"
         )
         XCTAssertTrue(
-            teardown.contains("folderThisSectionOpenedIn"),
+            teardown.contains("folderThisSectionWorksIn"),
             "unregistering must name the folder the section registered under"
         )
         XCTAssertFalse(
