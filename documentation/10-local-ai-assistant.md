@@ -1363,10 +1363,16 @@ routing, `add_classes` and `make_room_for_classes` as WIDENINGS of something
 that already ships rather than new features (`add_next_class` already calls
 `PlaceholderClassPlanner.apply`, and a `duplicate` key on the same call
 already reaches `ClassInsertionPlanner.plan(count: 1)` — so the ENGINES are
-both wired up already). Note the limit: `duplicate` is not on
-`add_next_class`' published schema at all, only on the hardcoded card phrasing
-`AssistCardCommand.swift:85`, so no model and no MCP client can reach it — the
-mac needs a schema argument, not just a bigger count. And `roll_over_section`
+both wired up already). Note the limit, **which since 2026-09-18 is the
+mac's alone**: `duplicate` is not on the mac's `add_next_class` published
+schema at all, only on the hardcoded card phrasing `AssistCardCommand.swift:85`,
+so no model and no MCP client can reach it there — the mac needs a schema
+argument, not just a bigger count. Windows now declares it on both halves of
+`add_next_class` (issue #149), because it had to: the card reaches the tool
+through an MCP binder that DROPS an undeclared key, so the sentence was
+making a blank page. The mac's card and tool runner share a process, so the
+absence costs it nothing except that Claude Code cannot ask for a duplicate.
+And `roll_over_section`
 because of the defect in item 41's first open part. Two are
 Windows-shaped and stay there: `read_timetable`, because the mac puts
 spreadsheet reading behind its schedule sheet on purpose and has no file-path
@@ -1665,6 +1671,112 @@ It has one property worth copying exactly: before restoring a file it
 compares what is on disk to what it wrote, and **skips anything the teacher
 has edited since**. Publishing a class, then spending ten minutes writing it
 in Obsidian, then saying "undo that" must not cost those ten minutes.
+
+### Which tools record an undo entry, and which deliberately do not
+
+**A tool records an entry only when taking it back is WHOLE.** Written down
+2026-09-18, after Windows found that three tools —
+`add_curriculum_mentions`, `make_room_for_classes` and
+`add_classes`/`add_next_class` — opened an entry and never closed it
+(`UndoHistory.Begin` … no `End`), and that the other five closed theirs only
+on the path where nothing threw. The consequence was two-sided and entirely
+silent, which is why it lived so long: the tool recorded NO entry at all, so
+"undo that" answered that nothing had been changed — while `add_next_class`'s
+own reply promised the page could be taken back — and the still-open entry
+then swallowed the NEXT operation's files and committed them under the
+earlier description. A teacher who made room, published a class and said
+"undo that" was told they had made room, and had the publish taken back with
+it.
+
+**The pairing is no longer something to remember.** Every recording site is
+now `using var recording = UndoHistory.Record(_undo, "…");` with
+`recording.Done()` where the operation finishes. Leaving the scope any other
+way — a throw, or a `return` added years later by somebody who never read
+this — abandons. An inner scope is a no-op, so the outermost call still owns
+the entry and a tool that calls another tool records one operation rather
+than two. The five older sites each wrapped their individual file writes in
+`try`/`catch` and nothing else, so a `ReadAllText` outside those — a page
+Obsidian deleted between the plan and the Go — escaped the method with the
+entry still open, and it was still open when the teacher asked for the next
+thing.
+
+**Where that exception then goes differs by tool, and the difference matters
+more than it looks.** Re-dating, syncing dates, curriculum, making room and
+duplicating are called through `PlantoirTools.Guarded`, which catches
+`IOException` and `UnauthorizedAccessException` and turns them into an ANSWER
+the teacher reads. **Publishing and unpublishing are not**:
+`PlantoirTools.Act` catches only `AssistRefusal` and
+`OperationCanceledException`, so anything else leaves the tool altogether —
+no answer is built, `CarryingTheConversationBackup` never stamps the result,
+and the teacher gets a protocol-level failure naming no backup at all. The
+undo entry is abandoned either way, which is this section's subject; the
+reply is worse on the publish path than on any other, and that gap is
+[issue #165](https://github.com/russellgordon/plantoir/issues/165) rather
+than something fixed in passing.
+
+**Abandon on a throw, rather than committing what was written — and this was
+a decision, not a default.** The case to think about is a publish of five
+pages that writes three and then throws. Committing the entry (an `End` in a
+`finally`) would make those three undoable, which sounds strictly kinder. It
+was rejected because **the description is written at `Begin`, from the
+PLAN**: the entry would say "published “A”, “B”, “C”, “D” and “E”", and
+`AssistWording.Undid` reads that clause straight back to the teacher — "Earlier,
+you published A, B, C, D and E" — at the one moment they are checking that
+the right thing was put back. A truthful file list under a false sentence is
+the failure rule 5 of `CLAUDE.md` names: a line describing what did not
+happen is worse than no line, because it will be believed. The mac reaches
+the same place from the other end — `AssistToolRunner` records a whole
+`AssistChange` only after the operation returns, so a throw records nothing
+(its whole-unit publish answers "was only partly published: …" and calls
+`history.record` never) — so abandoning is also what matches.
+
+**The cost is real, and on one path it is not yet covered.** The conversation
+backup is taken before the first write and is the way back for everything
+here. On the tools that go through `Guarded` the teacher reads a sentence and
+can be pointed at it. On the PUBLISH path they currently cannot: the
+exception leaves the tool, so no reply is built and no backup is named, and
+they are left with a failure and a half-published section. The mac says
+something there — that inline "was only partly published: …" — and Windows
+says nothing; matching it is not a wording decision this side may take alone,
+since the sentence is an inline mac literal rather than an `AssistWording`
+key, so it is written down as [issue
+#165](https://github.com/russellgordon/plantoir/issues/165) instead of
+improvised.
+
+The rule both apps now follow, tool by tool:
+
+| Tool | Records undo? | Why |
+|---|---|---|
+| publish / unpublish, re-date, sync dates, rollover | yes | Files edited in place, nothing renamed. |
+| `add_classes` / `add_next_class` | yes | Created pages are recorded with no "before", so undo deletes them. |
+| `add_curriculum_mentions` | yes | One page, one block, edited in place. |
+| `make_room_for_classes` | **no** | Renames later days, re-dates every class after the insertion point, rewrites the links that pointed at the old names. |
+| duplicate as next class | **only when nothing else moved** | The common case moves nothing; the rest is a make-room. |
+
+**What was rejected, and why it matters more than what was chosen.** The
+obvious fix for make-room was to record the whole thing and let undo put it
+all back. It was rejected because undo is not a transaction: it restores
+files whose contents still match what was written and SKIPS the rest, so a
+teacher who touched one page in Obsidian gets a half-undone shuffle — some
+classes renamed, some not, links pointing at both. A partial undo of a
+rename is worse than no undo, because nothing tells the teacher which half
+happened. So the way back for anything that shuffled is the backup taken
+before it, and the reply NAMES that file
+(`ClassChangeWording.OtherClassesMoved`). The mac reached the same answer
+first and Windows mirrored it rather than improving on it.
+
+**The condition is renames OR date moves, and this is the one place Windows
+is stricter than the mac.** `AssistToolRunner` keys the duplicate's undo on
+`renames.isEmpty` alone. Renames happen only WITHIN the unit being changed,
+so duplicating the LAST day of a unit renames nothing and re-dates every
+class of every later unit — and the mac offers an undo there that takes back
+the copy and leaves the rest of the year moved. Windows counts both lists
+(`DuplicateClassPlan.MovesOtherClasses`), and the same count is what the
+plan tells the teacher before they agree, so an approved plan is never silent
+about a re-dated later unit. Both halves are contract data now:
+`contracts/class-planning.json` → `duplication`, with `undoRule` and three
+cases; the mac owes a runner, and the second case is expected to fail there
+until its gate widens.
 
 ### Back up once per conversation, not once per command
 

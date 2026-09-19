@@ -1592,17 +1592,38 @@ over it would collide with a real file. The logic already existed inside
 divergence issue #70 described, in the direction it suggested: an argument
 nobody can get wrong beats one with a sensible default.
 
-### The check that found the one still open
+### The check that found the one still open — and how it was closed
 
 `TheCardsArgumentsReachTheToolThatReadsThem` walked only `cardPhrasings.matches`
 — the LITERAL phrasings. It now walks `cardPhrasings.parsed` as well, which is
 the half where an argument is most easily misnamed, because it is built in code
 from a number rather than written out beside the sentence. It found a live
-defect on its first run: `add_next_class` declares no `duplicate` parameter, so
+defect on its first run: `add_next_class` declared no `duplicate` parameter, so
 "duplicate Unit 3, Day 2 as my next class" — a sentence `AssistPromptShelf`
-OFFERS — has the argument dropped by the binder and quietly makes a **blank**
-page. Recorded in `KnownToBeDropped` naming issue #149, the way #116 was
-carried there until it was fixed.
+OFFERS — had the argument dropped by the binder and quietly made a **blank**
+page. It was recorded in `KnownToBeDropped` naming issue #149, the way #116
+was carried there until it was fixed.
+
+**Fixed 2026-09-18, and the entry is gone** — the mend-check at the bottom of
+that test fails on a pair that is listed and has started arriving, so deleting
+it is not optional. Both halves of `add_next_class` now declare `duplicate`;
+the pair moved to `agreedExtras` with the binder reason, since the mac needs
+no such argument (its card and tool runner share a process). What the feature
+does, and the two places it is deliberately stricter than the mac, is in
+[`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "Which tools record an
+undo entry, and which deliberately do not".
+
+**One thing to know before adding another card-only argument.**
+`add_next_class` IS one of the thirteen tools the local model routes to, so an
+argument on its schema is an argument the router can invent — here, a page
+title for a request that named none. `AssistAgent.CardOnlyArguments` strips it
+from `properties` and `required` in the narrowed schema, and
+`NarrowToolsMirrorTests` pins that `research/ai-assist/narrow-tools.py` strips
+it too, because a routing score measured through a surface the app does not
+ship is worse than no score. The alternative — leaving it visible and writing
+a sentence in the description telling the model not to use it — is the thing
+CLAUDE.md warns about: one clarifying sentence in `publish_pages`' description
+once took a probe suite from 110/110 to 90/110.
 
 **The general lesson**: a silent drop is invisible to any test that does not go
 looking, and "the tool ran and returned something sensible" is exactly what it
