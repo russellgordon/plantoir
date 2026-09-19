@@ -2034,6 +2034,13 @@ final class AssistToolRunner {
             request.located.course, forSection: request.located.sectionNumber
         )
 
+        // Asked BEFORE anything moves. Afterwards there is a file at this path
+        // either way, and only this answers which question the guard below is
+        // really asking.
+        let destinationHeldAPage: Bool = FileManager.default.fileExists(
+            atPath: request.newURL.path
+        )
+
         let outcome: ClassChangeOutcome
         do {
             outcome = try ClassInsertionPlanner.apply(request.plan, in: request.located.course)
@@ -2041,6 +2048,40 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(
                 "Nothing was changed: \(error.localizedDescription)"
             )
+        }
+
+        // The one case here that could destroy a lesson. `ClassInsertionPlanner`
+        // SKIPS a rename whose destination already exists, or whose page it
+        // cannot read — right in itself — but a skipped rename leaves the page
+        // the copy was meant to BECOME still holding somebody's real class,
+        // and the write below is unconditional.
+        //
+        // **Asked of the planner, not of the file's text.** The obvious guard
+        // — "is what is there now what was there before?" — is defeated by the
+        // planner's own link rewriting, which touches every page of the
+        // section including this one: a lesson that happens to link to a page
+        // that WAS renamed comes back with different text, the comparison says
+        // "not the same page", and the lesson is written over anyway. The
+        // planner already knows exactly which pages it wrote, so ask it.
+        //
+        // A PRE-check cannot do this job: when the destination exists at plan
+        // time it is ALWAYS in `plan.renames` — it is a numbered page at or
+        // after the insertion point — so nothing before the shuffle can tell
+        // the ordinary duplicate from the dangerous one.
+        if destinationHeldAPage && !wasCreatedByThisRun(request.newURL, outcome: outcome) {
+            // Worth its own line on the trail: the room has been made by the
+            // time this is answered, so a teacher sees their classes move and
+            // no copy appear, and nothing else recorded would say why.
+            ActivityTrail.note(
+                .classCopyNotMade,
+                "did not copy a class — the page the copy would have become still held a lesson, "
+                + "and other classes may already have moved",
+                course: request.located.course.code, section: request.located.sectionNumber
+            )
+            return AssistToolOutcome.refused(AssistWording.thePlaceForTheCopyIsStillTaken(
+                page: request.newTitle,
+                backupNamed: conversationBackups[request.located.course.code]?.lastPathComponent
+            ))
         }
 
         // The new page exists as a blank class page; give it the source's
@@ -2064,7 +2105,47 @@ final class AssistToolRunner {
             forSection: request.located.sectionNumber, isSectionLocal: true
         ).text
 
-        let before: String? = try? String(contentsOf: request.newURL, encoding: .utf8)
+        // Read back what was just written rather than trusting it, and force
+        // the matter when the answer is anything but a confident "hidden".
+        //
+        // The plain `publish: false` above is not the last word: the build
+        // consults `publishForSection<N>` FIRST, so a source page carrying
+        // `publishForSection1: true` — every `_DUPLICATE ME.md` in the shipped
+        // example content does, and the page a teacher names can itself be a
+        // course-level shared page — beats it, and the copy is visible to
+        // students the moment it exists. Measured through the real toolchain
+        // image (CPython 3.11.15 / PyYAML 6.0.3): such a copy leaves
+        // `process_frontmatter` as `publish: true` while the FILE still reads
+        // `publish: false`, which is the worst shape of all, because the
+        // teacher's own page looks hidden.
+        //
+        // The test is `!= .hidden`, not `== .visible`, deliberately. A value
+        // this reader will not guess at is one the build may well publish — a
+        // key with an indented continuation reaches the site as the string
+        // `'false false'`, which publishes — so a copy it cannot vouch for
+        // gets the flag written out in full. Writing through
+        // `AssistPageVisibility.setting` rather than hand-rolling the line is
+        // what makes that safe: it takes the value's continuation lines with
+        // it, and it migrates a legacy key rather than leaving two that
+        // disagree.
+        if AssistPageVisibility.answer(
+            in: copied, forSection: request.located.sectionNumber
+        ) != .hidden {
+            copied = AssistPageVisibility.setting(
+                published: false, in: copied,
+                forSection: request.located.sectionNumber, isSectionLocal: false
+            ).text
+        }
+
+        // Nil, and provably so. Past the guard above, either this page did not
+        // exist before the shuffle, or it existed, was vacated by a rename and
+        // the planner created the blank now standing there — and the branch
+        // below only records when nothing was renamed or re-dated at all,
+        // which is the case where a page here could not have existed. So an
+        // undo DELETES the copy rather than putting a blank class page back,
+        // which is what `AssistWording.aCreatedPageCanBeTakenBack` has always
+        // said and is only now true.
+        let before: String? = nil
         do {
             try copied.write(to: request.newURL, atomically: true, encoding: .utf8)
         } catch {
@@ -2073,11 +2154,19 @@ final class AssistToolRunner {
             )
         }
 
-        // Undoable ONLY when nothing else moved. A partial undo that deleted
-        // the new page and left every later class renamed would be worse than
-        // no undo at all, so when classes were shuffled the way back is the
-        // backup taken before any of it.
-        let shuffled: Bool = !request.plan.renames.isEmpty
+        // Undoable ONLY when nothing else moved — renames AND date moves. A
+        // partial undo that deleted the new page and left every later class
+        // renamed would be worse than no undo at all, so when classes were
+        // shuffled the way back is the backup taken before any of it.
+        //
+        // Keyed on renames alone this was wrong in the one shape that hurts
+        // most: `ClassInsertionPlanner` renames only WITHIN the unit being
+        // changed, so duplicating the LAST day of a unit renames nothing while
+        // re-dating every class of every later unit — and the undo was offered
+        // there, took back the copy, and left the rest of the year moved with
+        // nothing said about it. `movesAnythingElse` is the same property, and
+        // the same reasoning, `makeRoomForClasses` has always used.
+        let shuffled: Bool = request.plan.movesAnythingElse
         if !shuffled {
             history.record(AssistChange(
                 whatHappened: "duplicated “\(request.sourceTitle)” as “\(request.newTitle)”",
@@ -2088,21 +2177,41 @@ final class AssistToolRunner {
             ))
         }
 
-        var detail: String = "“\(request.sourceTitle)” was copied to “\(request.newTitle)”, "
-                           + "dated \(request.newDate.text). It is hidden, so nothing changed on "
-                           + "the site — write it, then publish when it is ready."
+        var detail: String = AssistWording.copiedTo(
+            page: request.sourceTitle, as: request.newTitle, on: request.newDate.text
+        )
         if shuffled {
             detail += "\n\n" + outcome.message
-            detail += "\n\nBecause other classes moved, “Undo that” will not take this back. "
-                    + "The copy made before any of it is in Plantoir's Backups list."
+            detail += "\n\n" + AssistWording.otherClassesMoved
+        } else {
+            // Nothing else moved, so the copy really can be taken away again —
+            // which this sentence has always claimed and, until the undo
+            // recorded no "before" for a page it created, was not quite true.
+            detail += "\n\n" + AssistWording.aCreatedPageCanBeTakenBack
         }
         if backedUp {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
 
         return AssistToolOutcome.wrote(
-            "Duplicated “\(request.sourceTitle)” as “\(request.newTitle)”.", detail: detail
+            AssistWording.duplicated(page: request.sourceTitle, as: request.newTitle),
+            detail: detail
         )
+    }
+
+    /// Whether this run of the planner is what put a page at this URL.
+    ///
+    /// Content-free on purpose — see the guard that calls it. The comparison
+    /// is exact because both URLs come from the same plan object:
+    /// `request.newURL` IS `plan.added[0].fileURL`, and `created` carries the
+    /// very same values.
+    private func wasCreatedByThisRun(_ url: URL, outcome: ClassChangeOutcome) -> Bool {
+        for made in outcome.created {
+            if made == url {
+                return true
+            }
+        }
+        return false
     }
 
     /// The card a teacher agrees to before a duplicate, which may move other
@@ -2118,15 +2227,21 @@ final class AssistToolRunner {
             return nil
         }
         var lines: [String] = []
-        lines.append("“\(request.sourceTitle)” would be copied to “\(request.newTitle)”, "
-                     + "dated \(request.newDate.text).")
-        lines.append("The copy starts hidden, so nothing changes on the site until you publish it.")
-        if !request.plan.renames.isEmpty {
+        lines.append(AssistWording.wouldBeCopiedTo(
+            page: request.sourceTitle, as: request.newTitle, on: request.newDate.text
+        ))
+        lines.append(AssistWording.theCopyStartsHidden)
+        // Counted from renames AND date moves, and said whenever either
+        // happens. Keyed on the rename count this line was not printed at all
+        // when a short unit was widened — the plan said not one word about the
+        // whole of the rest of the year being re-dated, and this is the card a
+        // teacher reads before pressing Go.
+        if request.plan.movesAnythingElse {
             lines.append("")
-            lines.append("\(request.plan.renames.count) later "
-                         + "\(request.plan.renames.count == 1 ? "class moves" : "classes move") "
-                         + "a day along to make room, and the links that point at them are "
-                         + "rewritten to match.")
+            lines.append(AssistWording.otherClassesWouldMove(
+                moving: request.plan.otherClassesMoving,
+                renaming: request.plan.renames.count
+            ))
         }
         return AssistToolOutcome.planned(
             "Worked out what duplicating “\(request.sourceTitle)” would do.",
@@ -2173,10 +2288,7 @@ final class AssistToolRunner {
         guard let numbers = UnitDay(
             pageTitle: source.title, term: located.course.configuration.unitWord
         ) else {
-            return .failure(
-                "“\(source.displayTitle)” isn't a numbered class page, so there is no next day "
-                + "for it to become."
-            )
+            return .failure(AssistWording.notANumberedClassPage(page: source.displayTitle))
         }
 
         let plan: ClassInsertionPlan
