@@ -515,7 +515,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "update every link that pointed at them, move the classes that follow onto later class days, " +
                  "and create the new pages unpublished. " +
                  "\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is " +
-                 "backed up first and undo_last_change reverses the whole thing. Afterwards, tell them to look " +
+                 "backed up first, and the backup is the way back: because this moves and renames many pages " +
+                 "at once, undo_last_change does NOT reverse it. Afterwards, tell them to look " +
                  "the section over in Plantoir before deploying — many pages moved at once.")]
     public CallToolResult MakeRoomForClasses(
         [Description("The course code, for example ICS3U.")] string course,
