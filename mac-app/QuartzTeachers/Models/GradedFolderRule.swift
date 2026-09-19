@@ -30,11 +30,13 @@ enum GradedFolderRule {
     /// actually ends up with — in the order they chose them.
     ///
     /// A name they ticked and then took out of the course would otherwise be
-    /// written into `graded_folders` matching nothing on disk, so the build
-    /// counts it, finds nothing, and the coverage map reads as though that
-    /// work were never assessed. Windows narrows the pool the same way
-    /// (`GradedFolderRule.Reconciled`) but at the moment the file is written
-    /// rather than the moment the folders change.
+    /// written into `graded_folders` matching nothing on disk: the file would
+    /// say something untrue, and the two apps would write DIFFERENT files for
+    /// the same clicks. (`setup_course.py` reconciles the key again when it
+    /// reads it, so no teacher ends up with a broken course — that is the
+    /// second net, not a reason to write it.) Windows narrows the pool the
+    /// same way (`GradedFolderRule.Reconciled`), on every read of it
+    /// (`CurrentGradedFolders`) and again as the file is written.
     ///
     /// **This is NOT Windows' `Reconciled` to the letter, and the difference
     /// is deliberate for now.** Theirs matches case-INSENSITIVELY (as
