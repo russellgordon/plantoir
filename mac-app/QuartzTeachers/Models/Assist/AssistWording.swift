@@ -686,8 +686,10 @@ nonisolated enum AssistWording {
     /// exists to fix, arriving through the one door left open. The measured
     /// cost of refusing instead is negligible: with the real course code
     /// written into the tool descriptions, which is what the app always does,
-    /// the model wrote a course that was not this window's **0 times in 634
-    /// recorded responses** (`research/ai-assist/`, per-file tally).
+    /// the model wrote a course that was not this window's **0 times in 686
+    /// recorded responses**. Every wrong course value in `research/ai-assist/`
+    /// — 19 of them — sits in the one results file whose arms were shown a
+    /// PLACEHOLDER code in the schema, and echoed it back.
     static func askedAboutACourseThatIsNotHere(course: String, otherCourse: String) -> String {
         return "There is no course called \(otherCourse) in this working folder, so nothing "
              + "was done. This window is for \(course)."
