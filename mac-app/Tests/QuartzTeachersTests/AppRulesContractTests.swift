@@ -377,23 +377,52 @@ final class AppRulesContractTests: XCTestCase {
         // The cap, with the contract's own number rather than a copy of it:
         // this is the assertion that stops the two apps drifting on a value
         // neither interface shows.
+        //
+        // Found by the rule it belongs to, not by "the last entry carrying a
+        // cap": a second entry gaining one would otherwise win silently, and
+        // the point of this test is that nothing here is decided by position.
+        let capRule: String = "Every request caps how much the model may write"
+        var entriesCarryingACap: Int = 0
         var capInTheContract: Int?
         for requirement in requirements {
-            if let cap = requirement["cap"] as? Int {
+            guard let cap = requirement["cap"] as? Int else {
+                continue
+            }
+            entriesCarryingACap += 1
+            if (requirement["rule"] as? String) == capRule {
                 capInTheContract = cap
             }
         }
+        XCTAssertEqual(entriesCarryingACap, 1, "More than one requirement carries a `cap`; which one is the wire value is now a guess.")
         XCTAssertEqual(capInTheContract, AssistModelClient.mostTokensPerReply)
         let body: [String: Any] = try AssistModelClient(
             baseURL: try XCTUnwrap(URL(string: "http://127.0.0.1:1"))
         ).requestBody(messages: [AssistMessage.user("Hello")], tools: [])
         XCTAssertEqual(body["max_tokens"] as? Int, capInTheContract)
-        answer("Every request caps how much the model may write")
+        answer(capRule)
 
-        // And what happens when a reply stops at that cap. Executed in
-        // `AssistCutOffAnswerTests` against a stub engine, where a page on
-        // disk is the assertion; what belongs here is that the sentence the
-        // contract names exists and is the one the gate uses.
+        // And what happens when a reply stops at that cap.
+        //
+        // The full behaviour is executed in `AssistCutOffAnswerTests`, where a
+        // page on disk is the assertion. What is asserted HERE is the
+        // mechanism the rule names, rather than the existence of a string: a
+        // reply carrying `finish_reason: "length"` reads as cut off, and
+        // arguments that stopped mid-JSON read as unreadable. Both are the
+        // conditions `AssistAgent.think` gates on, so this fails if either
+        // stops working — which "the sentence is not empty" would not.
+        let stopped: AssistReply = AssistReply(
+            message: AssistMessage(role: "assistant", content: "", toolCalls: nil),
+            completionTokens: 512,
+            wasCutOff: true
+        )
+        XCTAssertTrue(stopped.wasCutOff)
+        let halfWritten: AssistToolCall = AssistToolCall(
+            id: "1", type: "function",
+            function: AssistToolCall.Function(
+                name: "publish_pages", arguments: #"{"course": "ICS3U", "pages": "Unit 1, Day"#
+            )
+        )
+        XCTAssertFalse(halfWritten.argumentsAreReadable, "A call that stopped mid-JSON reads as readable, so the gate would run it.")
         XCTAssertFalse(AssistWording.answerWasCutOff.isEmpty)
         answer("A reply the engine stopped part way runs no tool and says so")
 

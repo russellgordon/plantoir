@@ -83,6 +83,15 @@ final class AssistAgent {
     /// and neither could be asserted while this was private.
     private(set) var messages: [AssistMessage] = []
 
+    /// How long `messages` was when the teacher's current turn began.
+    ///
+    /// The mark an abandoned turn is wound back to. Taken at the top of
+    /// `say()` rather than beside the user message, so it is right for the
+    /// fixed-phrase branch too — that one runs a tool without ever appending
+    /// a user message, and the tool result it leaves behind belongs to the
+    /// same turn.
+    private var messageCountAtTheStartOfTheTurn: Int = 0
+
     /// Where the record of each turn is written. Replaceable so a test can
     /// point it somewhere of its own.
     var reportStore: ProblemReportStore = ProblemReportStore.standard
@@ -129,6 +138,9 @@ final class AssistAgent {
         self.tools = tools
         self.planMode = planMode
         messages = [AssistMessage.system(AssistAgent.systemPrompt(course: courseCode, section: sectionNumber))]
+        // So that winding a turn back can never reach past the system prompt,
+        // even if something were ever to reach `think()` without `say()`.
+        messageCountAtTheStartOfTheTurn = messages.count
     }
 
     // MARK: - Functions
@@ -144,6 +156,9 @@ final class AssistAgent {
         if trimmed.isEmpty {
             return
         }
+        // Where this turn starts, so a turn that has to be abandoned can be
+        // wound back to exactly here. See `sayTheAnswerDidNotFinish`.
+        messageCountAtTheStartOfTheTurn = messages.count
         entries.append(Entry(speaker: .teacher, text: trimmed))
 
         // Recorded HERE — the moment the teacher's words are accepted, before
@@ -340,11 +355,37 @@ final class AssistAgent {
 
     /// Throw an unfinished answer away, and say so.
     ///
-    /// **The reply is deliberately NOT added to `messages`.** A cut-off reply
-    /// carrying a `tool_call` that no `tool` message ever answers is a
-    /// conversation some chat templates reject outright, and every later turn
-    /// would carry it. Dropping it leaves the history exactly as if the model
-    /// had not answered, which is the truth of what happened.
+    /// **The whole TURN is wound back, not just the reply.** The reply is not
+    /// added to `messages` — a cut-off reply carrying a `tool_call` that no
+    /// `tool` message ever answers is a conversation some chat templates
+    /// reject outright — and the teacher's sentence goes with it, back to
+    /// `messageCountAtTheStartOfTheTurn`.
+    ///
+    /// Dropping only the reply was the first version, and it made the
+    /// assistant's own advice unfollowable. The sentence a teacher reads here
+    /// asks them to try again with "a shorter sentence, or fewer pages at a
+    /// time" — and the request that ran away was still sitting in the
+    /// conversation, so the retry would have been sent with the runaway
+    /// sentence still in front of it. The stated reason for dropping the
+    /// reply is that it "leaves the history exactly as if the model had not
+    /// answered, which is the truth"; that is not what the history says while
+    /// the question is still in it. A second lap's read exchange goes too,
+    /// which is the same answer: the turn was abandoned, and nothing it did
+    /// changed a page (see `AssistWording.answerWasCutOff` for why that is
+    /// true on every path that reaches here).
+    ///
+    /// **The `catch` path below is deliberately NOT wound back**, and has
+    /// never been: an engine that could not be reached, or one that timed
+    /// out, leaves the teacher's sentence in the conversation. Three reasons
+    /// to leave it that way rather than "tidy it up" here. Nothing is being
+    /// retried on our advice — that path says the engine failed rather than
+    /// asking the teacher to rephrase. The failure is usually the engine
+    /// rather than the sentence, so dropping the sentence would lose context
+    /// the next turn wants. And `RelativeDayFreshnessTests` reads
+    /// `messages` after exactly that path to pin the dateline's POSITION,
+    /// which is a measured finding worth 15 points of routing accuracy; the
+    /// place that finding is asserted should not be quietly removed by a
+    /// change about something else.
     ///
     /// The TEACHER is told the same thing either way — from their side an
     /// answer that ran out of room and one that came out garbled are the same
@@ -354,6 +395,9 @@ final class AssistAgent {
     /// answer whose arguments will not parse is a question about the model
     /// itself. Same event, different sentence.
     private func sayTheAnswerDidNotFinish(tool: String?, stoppedByTheEngine: Bool) {
+        if messages.count > messageCountAtTheStartOfTheTurn {
+            messages.removeLast(messages.count - messageCountAtTheStartOfTheTurn)
+        }
         entries.append(Entry(speaker: .assistant, text: AssistWording.answerWasCutOff))
         // The tool it had BEGUN to name, in the words a teacher would
         // recognise rather than the function's own: "it ran away trying to

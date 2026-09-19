@@ -199,6 +199,101 @@ final class AssistCutOffAnswerTests: XCTestCase {
         }
     }
 
+    /// The retry the wording asks for must not carry the request that ran
+    /// away.
+    ///
+    /// The sentence a teacher reads here is "Ask me again — a shorter
+    /// sentence, or fewer pages at a time", and that advice is unfollowable
+    /// if the runaway request is still in the conversation: the next turn
+    /// would be sent with both. So the whole turn is wound back out of
+    /// `messages` — and the transcript keeps the teacher's sentence, because
+    /// what they can SEE is a different thing from what goes to the model.
+    func testAnAbandonedTurnIsNotCarriedIntoTheNextRequest() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let engine: StubEngine = try StubEngine()
+        defer { engine.stop() }
+        engine.serve([
+            Canned.stopped(
+                tool: "publish_pages",
+                arguments: #"{"course": "ICS3U", "section": 1, "pages": "Unit 1, Day 1"}"#
+            ),
+            Canned.text("All right.", finishReason: "stop"),
+        ])
+
+        let agent: AssistAgent = AssistFixture.makeAgent(
+            tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
+        )
+        let runaway: String = "Publish tomorrow's class and every single page it links to, all of them"
+        await agent.say(runaway)
+
+        let afterTheAbandonedTurn: Int = agent.messages.count
+        XCTAssertEqual(
+            afterTheAbandonedTurn, 1,
+            "An abandoned turn left something behind — only the system prompt should remain."
+        )
+
+        await agent.say("Publish Unit 1, Day 1")
+
+        // Exactly one new message: the retry, and nothing of the turn that
+        // was abandoned.
+        var sentences: [String] = []
+        for message in agent.messages where message.role == "user" {
+            sentences.append(message.content ?? "")
+        }
+        XCTAssertEqual(sentences.count, 1, "The abandoned sentence was sent again with the retry.")
+        XCTAssertTrue(try XCTUnwrap(sentences.first).hasPrefix("Publish Unit 1, Day 1"))
+
+        // And the SECOND request on the wire carries the same thing, which is
+        // the claim that actually matters.
+        let secondRequest: [String: Any] = try XCTUnwrap(engine.requestBodies.last)
+        let sent: [[String: Any]] = try XCTUnwrap(secondRequest["messages"] as? [[String: Any]])
+        var sentByTheTeacher: [String] = []
+        for message in sent where (message["role"] as? String) == "user" {
+            sentByTheTeacher.append((message["content"] as? String) ?? "")
+        }
+        XCTAssertEqual(sentByTheTeacher.count, 1, "The runaway request was sent to the model a second time.")
+        XCTAssertFalse(
+            try XCTUnwrap(sentByTheTeacher.first).contains("every single page it links to"),
+            "The retry was sent with the request that ran away still in front of it."
+        )
+
+        // What the teacher can see is untouched: their own sentence is still
+        // in the transcript, above the answer.
+        XCTAssertTrue(transcript(of: agent).contains(runaway))
+    }
+
+    /// A cut-off `deploy_section` must not put a Go button in front of a
+    /// teacher.
+    ///
+    /// Unreachable by construction — the approval branch is inside
+    /// `run(call:)`, below the gate — and named anyway, because "it offered to
+    /// publish to students from an answer it never finished" is the sentence
+    /// somebody will look for in this file.
+    func testACutOffDeployNeverReachesTheApprovalButton() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(hasDeployedBefore: true)
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let engine: StubEngine = try StubEngine()
+        defer { engine.stop() }
+        // The measured shape: stopped at 28 tokens, and the arguments parse.
+        engine.serve(Canned.stopped(
+            tool: "deploy_section", arguments: #"{"course": "ICS3U", "section": 1}"#
+        ))
+
+        let agent: AssistAgent = AssistFixture.makeAgent(
+            tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
+        )
+        await agent.say("Put section 1 in front of the students this evening please")
+
+        XCTAssertNil(agent.pendingApproval, "A deploy nobody finished asking for was offered a Go button.")
+        XCTAssertFalse(agent.pendingIsDeploy)
+        XCTAssertEqual(made.siteWork.deploys, 0)
+        XCTAssertEqual(agent.activity, .idle)
+        XCTAssertTrue(transcript(of: agent).contains(AssistWording.answerWasCutOff))
+    }
+
     /// The same, with plan mode ON — which is what a teacher actually has.
     ///
     /// Not a duplicate: on this path the old code reached `showPlan` rather
@@ -348,6 +443,12 @@ final class AssistCutOffAnswerTests: XCTestCase {
         XCTAssertTrue(onDisk.contains("publish: false"))
         XCTAssertTrue(transcript(of: agent).contains(AssistWording.answerWasCutOff))
         XCTAssertEqual(agent.activity, .idle)
+        // The read that DID run goes back with the rest of the turn. The turn
+        // was abandoned, and nothing in it changed a page.
+        XCTAssertEqual(
+            agent.messages.count, 1,
+            "A second lap's read exchange was left in the conversation of an abandoned turn."
+        )
     }
 
     // MARK: - A whole answer still runs

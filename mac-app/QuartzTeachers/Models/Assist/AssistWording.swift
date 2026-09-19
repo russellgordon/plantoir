@@ -418,7 +418,10 @@ nonisolated enum AssistWording {
     /// `deployWasCancelled`, where the teacher already knew. And **say
     /// something they can act on**: the shape that causes this is a long
     /// list, so "fewer pages at a time" addresses the cause rather than
-    /// shrugging politely.
+    /// shrugging politely. The advice is followable because the abandoned
+    /// turn is wound out of the conversation as well — a shorter retry sent
+    /// with the runaway request still in front of it would meet the same
+    /// wall. See `AssistAgent.sayTheAnswerDidNotFinish`.
     ///
     /// **"I haven't changed anything" is true on every path that can reach
     /// this, and it was checked rather than assumed.** A turn only comes back

@@ -412,10 +412,12 @@ at that tier's measured 63.2 tok/s, about **216 seconds**, past this client's
 own 180-second timeout, so it would fail rather than answer.
 
 **Why 512 rather than a rounder, larger number.** Measured against the model's
-own tokenizer, the largest tool call this surface can legitimately produce is
-much smaller than the cap: an ordinary call is 16 to 60 tokens, twenty page
-titles is 203, twenty-four long real-world titles is 384, and fifty-eight
-short titles is 545. So the only legitimate shape 512 cuts is an explicit list
+own tokenizer, the tool calls this surface produces in practice sit well
+inside the cap, and the ones that do not are reachable only by asking for
+something there is a shorter way to ask for: an ordinary call is 16 to 60
+tokens, twenty page titles is 203, twenty-four long real-world titles is 384,
+and fifty-eight short titles is 545 — past the cap, which is the point at
+which it starts to bite. So the only legitimate shape 512 cuts is an explicit list
 of about fifty-five or more class pages — and `publish_pages` already takes
 `onOrAfter` and `before`, which asks for any number of classes in about sixty
 tokens. Nothing on the local surface takes free text or a page BODY:
@@ -431,13 +433,25 @@ worst imaginable call is a cap that never fires, which is the state this
 issue was about. The two apps also send the same number deliberately — it is
 in `contracts/app-rules.json` → `modelTiers.requirements` with its `cap`,
 because two apps sending different caps is a difference no test on either
-side could see. Also **not** rejected, and worth saying plainly: a cap is a
-routing change until proved otherwise — this codebase has already watched one
-added sentence in a tool description move the promise card from 110/110 to
-90/110 — so the routing suite is re-run BEFORE and AFTER, per probe, at
-temperature 0. The mechanism cannot change what the model chooses, only where
-it is stopped, so the only available outcomes are "neutral" and "it cost
-something"; the run is what tells the two apart.
+side could see.
+
+**A cap is a routing change until proved otherwise**, and this is the last
+thing to know about the number. This codebase has already watched one added
+sentence in a tool description move the promise card from 110/110 to 90/110,
+so "it only changes where a generation stops" is a claim to be checked rather
+than assumed. The check is available from one command line:
+`trimmed-surface-suite.py --app-body` sends the cap it reads out of the Swift,
+and `--app-body --uncapped` sends the body as it stood before #166, so the two
+arms differ in `max_tokens` and in nothing else — run per probe at temperature
+0, where the arms reproduce exactly, the comparison is the bag of tool names
+each probe chose. The mechanism cannot change what the model chooses, only
+where it is stopped, so the only outcomes available to such a run are
+"neutral" and "it cost something"; no reading of it can say the cap improved
+routing.
+
+<!-- #166 RESULTS POINTER -->
+
+### Step 2 — What comes back
 
 ### Step 2 — What comes back
 
@@ -458,10 +472,23 @@ the OpenAI convention, and it is parsed in `AssistAgent`.
 the engine stopped the model part way rather than the model finishing, and
 `AssistAgent.think` then runs **nothing at all**: the teacher is answered with
 `AssistWording.answerWasCutOff`, the trail gets an `assistant answer was cut
-off` line naming the tool the model had begun to name, and the half-written
-reply is not added to the conversation. A small model that emits arguments
-which do not parse, with the turn finishing normally, is refused the same way
-and for the same reason.
+off` line naming the tool the model had begun to name, and **the whole turn is
+wound back out of the conversation** — the half-written reply and the
+teacher's sentence with it. A small model that emits arguments which do not
+parse, with the turn finishing normally, is refused the same way and for the
+same reason.
+
+Winding the sentence back matters as much as dropping the reply, and it is
+what makes the assistant's own advice followable: the teacher is asked to try
+again with "a shorter sentence, or fewer pages at a time", and if the request
+that ran away were still sitting in the conversation the shorter retry would
+be sent with it still in front. What the teacher SEES is untouched — the
+transcript keeps their sentence; it is only what goes back to the model that
+is wound back. (The `catch` path — an engine that could not be reached, or the
+180-second timeout — is deliberately not wound back, and never has been: it
+tells the teacher the engine failed rather than asking them to rephrase, the
+sentence is usually not the problem there, and `RelativeDayFreshnessTests`
+reads exactly that state to pin the dateline's measured position.)
 
 The teacher hears the same sentence for both, because from their side the two
 are one event and both are mended by asking again. **The trail tells them
@@ -498,6 +525,17 @@ tool-call branch and why parsing could never have been enough:
 And `undo_last_change` takes no arguments at all, so a call to it cut off
 before it wrote anything is readable by any check that could be written — and
 would simply run.
+
+**The gate is keyed to one spelling, and it fails OPEN.** `wasCutOff` is
+`finish_reason == "length"` and nothing else, so `content_filter`, a null, an
+absent field or a future spelling all read as "the model finished" and the
+reply is acted on. That is deliberate: refusing every reply from a server that
+does not send the field would leave the assistant unable to answer at all, and
+the engine is pinned to b10435 by `mac-app/Vendor/fetch-llama.sh`, so the set
+of spellings is known. **It belongs on the checklist for an engine bump**
+alongside revalidating Quartz for a Node bump — if a later llama.cpp spells a
+truncated turn differently, this gate goes quiet and the fault #166 fixed
+comes back looking like a new one.
 
 **A consequence worth knowing about in advance.** The thinking flags
 (`--reasoning off` and `--reasoning-budget 0`) are what keep a Qwen3 template
