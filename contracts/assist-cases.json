@@ -591,6 +591,14 @@
       {
         "input" : "publish at 6:30 am",
         "why" : "Publishing is not deploying, and the two are the distinction the assistant spends most of its words teaching."
+      },
+      {
+        "input" : "deploy at 007:30 am",
+        "why" : "The hour is one or two digits, always. Padding beyond that is not a spelling anybody types, and reading it would mean the two apps disagreed on a boundary no suite could see - Int() does not care how a number was padded, so this has to be stated rather than inherited."
+      },
+      {
+        "input" : "deploy at 0007 pm",
+        "why" : "The same rule with no minutes: four digits of hour is not a clock reading, however it adds up."
       }
     ],
     "resolving" : [

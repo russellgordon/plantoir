@@ -268,12 +268,24 @@ final class SharedRulesContractTests: XCTestCase {
             section["theImmediateDeployCardSaysItIsImmediate"] as? [String: Any]
         )
         XCTAssertNotNil(rule["why"] as? String, "a rule nobody explained is a rule that gets deleted")
-        guard rule["value"] as? Bool == true else {
-            return
-        }
+        // ASSERTED, not read as a switch. Reading it as a guard would mean the
+        // whole check could be turned off by flipping one word in a JSON file,
+        // with a green suite either way — and a rule that can go quiet without
+        // anybody deciding to turn it off is not a rule.
+        XCTAssertEqual(rule["value"] as? Bool, true)
+
+        // A WHOLE WORD, case-folded. `contains` would be satisfied by "knows",
+        // "known" or "nowhere", so a sentence saying nothing about time could
+        // keep this green.
+        XCTAssertEqual(rule["mustContainIsAWholeWord"] as? Bool, true)
         let wanted: String = try XCTUnwrap(rule["mustContain"] as? String)
+        var spoken: [String] = []
+        for piece in AssistWording.deployApproval.lowercased()
+            .split(whereSeparator: { character in return !character.isLetter }) {
+            spoken.append(String(piece))
+        }
         XCTAssertTrue(
-            AssistWording.deployApproval.lowercased().contains(wanted.lowercased()),
+            spoken.contains(wanted.lowercased()),
             "the immediate deploy card says nothing about when it happens: "
             + AssistWording.deployApproval
         )
