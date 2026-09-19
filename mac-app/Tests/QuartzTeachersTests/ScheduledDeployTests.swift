@@ -786,6 +786,71 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(tooltip.contains("Right-click to cancel"))
         XCTAssertTrue(tooltip.contains("on and awake"))
     }
+
+    /// Every record the wrapper writes has to LAND in one move.
+    ///
+    /// The app watches the record folder so a run that finishes while the
+    /// teacher is looking at that section shows its notice there and then. A
+    /// folder watch sees an entry arrive; it does not see a second line
+    /// appended to a file that is already there — measured, 0 of 40 first
+    /// events carried a readable record when the wrapper wrote with two
+    /// `echo`s, and the completing line produced no event at all. So the record
+    /// is assembled in a temporary file beside the folder and moved in.
+    ///
+    /// **An assertion on generated TEXT, which this file's neighbours rightly
+    /// distrust**: `ScheduledPublishOutcomeTests` RUNS the same generated bash
+    /// for every kind, and that is what proves the record still says the right
+    /// thing. What cannot be tested from here is the timing of the events, and
+    /// the behavioural half of that would need a delay injected into the
+    /// wrapper — which is the very thing being removed.
+    func testTheWrapperWritesEveryRecordInOneMove() throws {
+        let home: URL = URL(fileURLWithPath: "/Users/someone")
+        let command: String = ScheduledDeploy.oneShotCommand(
+            courseCode: "ICS3U",
+            sectionNumber: 2,
+            workspaceURL: URL(fileURLWithPath: "/Users/someone/Class Websites"),
+            deployArgumentsList: [["ICS3U", "2", "--to", "Netlify"]],
+            destinationTypes: ["netlify"],
+            destinationDescriptions: ["Netlify"],
+            homeFolder: home
+        )
+        let record: String = ScheduledPublishOutcome.recordURL(
+            inHomeFolder: home, course: "ICS3U", section: 2
+        ).path
+        let partial: String = ScheduledPublishOutcome.partialRecordURL(
+            inHomeFolder: home, course: "ICS3U", section: 2
+        ).path
+
+        XCTAssertFalse(
+            command.contains(">> '\(record)'"),
+            "Nothing may be appended to the record itself — the line that completes it reaches no watcher"
+        )
+        XCTAssertFalse(
+            command.contains("> '\(record)'"),
+            "The record must be MOVED into place rather than written there"
+        )
+        XCTAssertTrue(
+            command.contains("/bin/mv '\(partial)' '\(record)'"),
+            "The finished record has to be moved into the watched folder in one step"
+        )
+        // Three places write a record: a build that failed, a destination that
+        // failed, and a run that got all the way through.
+        var moves: Int = 0
+        for line in command.components(separatedBy: "\n") {
+            if line.contains("/bin/mv '\(partial)' '\(record)'") {
+                moves += 1
+            }
+        }
+        XCTAssertEqual(moves, 3, "Every one of the three record-writing branches must end in the move")
+        // The temporary file sits BESIDE the watched folder, not in it: a
+        // temporary file inside it is three events, two of them carrying no
+        // readable record. See ScheduledPublishOutcome.partialRecordURL.
+        XCTAssertEqual(
+            URL(fileURLWithPath: partial).deletingLastPathComponent().path,
+            URL(fileURLWithPath: record).deletingLastPathComponent()
+                .deletingLastPathComponent().path
+        )
+    }
 }
 
 /// `launchctl`, stood in for.

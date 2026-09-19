@@ -36,6 +36,19 @@ import Foundation
 @Observable
 final class ScheduledPublishWatcher {
 
+    // MARK: - Types
+
+    /// What one change was.
+    ///
+    /// A `DispatchSource.FileSystemEvent` is not `Sendable`, and the difference
+    /// that matters to a reader is only ever this one: something changed, or
+    /// the thing being watched is not there any more — in which case the watch
+    /// on it is now deaf and has to be made again.
+    enum Change: Sendable {
+        case somethingChanged
+        case theWatchedThingWentAway
+    }
+
     // MARK: - Stored properties
 
     /// The one the app uses.
@@ -91,17 +104,35 @@ final class ScheduledPublishWatcher {
     // MARK: - Functions
 
     /// Begin watching. Calling it again does nothing.
+    ///
+    /// **Both watches are armed HERE, before this function returns**, and the
+    /// consuming task only reads what they deliver. `AsyncStream`'s build
+    /// closure runs during its `init`, so a record moved into place — or an
+    /// activation posted — the instant after this call cannot be missed. A
+    /// watcher that armed itself inside its task would lose whatever happened
+    /// in between, which in the app is a run finishing during launch and in the
+    /// suite is every test needing a sleep to paper over it.
     func start() {
         guard watchTask == nil else {
             return
         }
+        makeTheFolderIfItIsNotThereYet()
+        let folderChanges: AsyncStream<Change> = Self.changes(
+            at: folder, watching: [.write, .delete, .rename]
+        )
+        let comingBack: AsyncStream<Void> = Self.appComingBackToTheFront()
+        // A record already half written when the app started — a run that was
+        // interrupted mid-write, or one in flight during launch — gets its own
+        // watch straight away rather than waiting for a change it has already
+        // made.
+        watchAnyHalfWrittenRecords()
         watchTask = Task { [weak self] in
             await withTaskGroup(of: Void.self) { group in
                 group.addTask {
-                    await self?.watchTheFolder()
+                    await self?.watchTheFolder(startingWith: folderChanges)
                 }
                 group.addTask {
-                    await self?.watchForTheAppComingBack()
+                    await self?.reRead(whenever: comingBack)
                 }
             }
         }
@@ -139,17 +170,17 @@ final class ScheduledPublishWatcher {
     /// defensive. Every attempt at it is caused by an EVENT, which a dead watch
     /// cannot deliver, so this cannot become a polling loop: there is no timer
     /// here and no sleep.
-    private func watchTheFolder() async {
+    private func watchTheFolder(startingWith firstWatch: AsyncStream<Change>) async {
+        var changes: AsyncStream<Change> = firstWatch
         while !Task.isCancelled {
-            makeTheFolderIfItIsNotThereYet()
             var theFolderWentAway: Bool = false
-            for await event in Self.changes(at: folder, watching: [.write, .delete, .rename]) {
-                watchAnyHalfWrittenRecords()
-                noteChanged()
-                if event.contains(.delete) || event.contains(.rename) {
+            for await change in changes {
+                if change == .theWatchedThingWentAway {
                     theFolderWentAway = true
                     break
                 }
+                watchAnyHalfWrittenRecords()
+                noteChanged()
             }
             if !theFolderWentAway {
                 // The stream ended without the folder being deleted, which
@@ -158,6 +189,15 @@ final class ScheduledPublishWatcher {
                 // retry without an event to cause it would be a spin.
                 return
             }
+            makeTheFolderIfItIsNotThereYet()
+            changes = Self.changes(at: folder, watching: [.write, .delete, .rename])
+            // Say so only NOW, with the new watch already armed. Announcing the
+            // folder's disappearance first would invite every observer to look
+            // at a folder nothing was watching yet, and a record written in
+            // that gap would be seen by nobody until the app was next brought
+            // to the front.
+            watchAnyHalfWrittenRecords()
+            noteChanged()
         }
     }
 
@@ -173,13 +213,36 @@ final class ScheduledPublishWatcher {
     /// and because this is already the app's idiom for exactly this refresh
     /// (`SectionDetailView` watches the same notification for the " — Edited"
     /// marker).
-    private func watchForTheAppComingBack() async {
-        let comingBack = NotificationCenter.default.notifications(
-            named: NSApplication.didBecomeActiveNotification
-        )
+    private func reRead(whenever comingBack: AsyncStream<Void>) async {
         for await _ in comingBack {
             watchAnyHalfWrittenRecords()
             noteChanged()
+        }
+    }
+
+    /// Every time the app is brought back to the front, as an `AsyncStream`.
+    ///
+    /// Its own stream rather than a block observer left registered for ever:
+    /// the observer is removed when the stream ends, so a watcher that stops —
+    /// which in practice means a test's watcher — leaves nothing behind. It
+    /// also arms synchronously, which is what lets `start()` promise that an
+    /// activation straight afterwards is not lost.
+    nonisolated static func appComingBackToTheFront() -> AsyncStream<Void> {
+        return AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            // `nonisolated(unsafe)` for the token alone: it is handed straight
+            // back to the notification centre, which is thread-safe, and it is
+            // touched nowhere else.
+            nonisolated(unsafe) let token: any NSObjectProtocol =
+                NotificationCenter.default.addObserver(
+                    forName: NSApplication.didBecomeActiveNotification,
+                    object: nil,
+                    queue: nil
+                ) { _ in
+                    continuation.yield(())
+                }
+            continuation.onTermination = { _ in
+                NotificationCenter.default.removeObserver(token)
+            }
         }
     }
 
@@ -237,7 +300,7 @@ final class ScheduledPublishWatcher {
         // record will ever produce, so a watch armed after it has landed waits
         // for ever. Arming first means the look below is the only other way the
         // completion can be discovered, and one of the two always sees it.
-        let changes: AsyncStream<DispatchSource.FileSystemEvent> = Self.changes(
+        let changes: AsyncStream<Change> = Self.changes(
             at: url, watching: [.write, .extend, .delete, .rename]
         )
         if ScheduledPublishOutcome.record(at: url) != nil {
@@ -298,10 +361,8 @@ final class ScheduledPublishWatcher {
     nonisolated static func changes(
         at url: URL,
         watching events: DispatchSource.FileSystemEvent
-    ) -> AsyncStream<DispatchSource.FileSystemEvent> {
-        return AsyncStream<DispatchSource.FileSystemEvent>(
-            bufferingPolicy: .bufferingNewest(1)
-        ) { continuation in
+    ) -> AsyncStream<Change> {
+        return AsyncStream<Change>(bufferingPolicy: .bufferingNewest(1)) { continuation in
             let descriptor: Int32 = open(url.path, O_EVTONLY)
             if descriptor < 0 {
                 continuation.finish()
@@ -317,7 +378,12 @@ final class ScheduledPublishWatcher {
                     queue: deliveries
                 )
             source.setEventHandler {
-                continuation.yield(source.data)
+                let happened: DispatchSource.FileSystemEvent = source.data
+                if happened.contains(.delete) || happened.contains(.rename) {
+                    continuation.yield(.theWatchedThingWentAway)
+                } else {
+                    continuation.yield(.somethingChanged)
+                }
             }
             source.setCancelHandler {
                 close(descriptor)
