@@ -383,8 +383,8 @@ recounted 2026-09-07.
 | When the report asks about the assistant, and what it is called | `shared-rules.json` → `problemReportDialog` | SharedRulesContract (2), ProblemReport (2) |
 | Which assistant a teacher may choose, the caution, and when one may be removed | `shared-rules.json` → `assistantModelChoice` | SharedRulesContract (5), AssistantSettings (22) |
 | What a page is called when the assistant names it | `shared-rules.json` → `pageNaming` | SharedRulesContract (2), AssistPageNaming (7), AssistToolRunner (2) |
-| Dating the pages a class brings when it is published | `class-planning.json` → `datingPagesAClassBrings` | ClassPlanningContract (2), AssistToolRunner (7) |
-| What publishing and unpublishing do to linked pages, and what is never swept | `shared-rules.json` → `followingLinks` | SharedRulesContract (2), AssistToolRunner (3) |
+| Dating the pages a class brings when it is published | `class-planning.json` → `datingPagesAClassBrings` | ClassPlanningContract (3), AssistToolRunner (10). Its `reachStopsAtAClassPage.cases` (2) arrived 2026-09-19 with [#173](https://github.com/russellgordon/plantoir/issues/173) and has **no Windows reader** — see the census table below |
+| What publishing and unpublishing do to linked pages, and what is never swept | `shared-rules.json` → `followingLinks` | SharedRulesContract (3), AssistToolRunner (9). Its `stopsAtAClassPage.cases` (3) arrived 2026-09-19 with [#173](https://github.com/russellgordon/plantoir/issues/173) and has **no Windows reader** — see the census table below. The three `publishing` booleans stay TRUE and both suites assert them: the walk is still transitive, it has one stop |
 | Whether the assistant asks before changing anything, and when it says so | `shared-rules.json` → `assistantConfirmation` | SharedRulesContract (1), AssistPlanMode (6), AssistantSettings (6) |
 | Phrasings matched in code, including the six PARSED families | `assist-cases.json` → `cardPhrasings` | AssistContract (1), AssistPromptShelf (2), AssistToolRunner (4), AssistScenario (1, walking `parsed`) |
 | The spellings of "deploy at &lt;time&gt;" that are answered in code, the ones that go to the model, and which day a bare time means | `assist-cases.json` → `deployAtATime` | ScheduleDeployCard (10), and `research/ai-assist/trimmed-surface-suite.py`, whose own interception guard is checked against these rows before it measures anything — a guard that went one family stale scores a routing result for a sentence the app never routes. AUTHORED, and the one `cardPhrasings.parsed` cannot carry: a family whose variable part is a TIME needs its spellings written out, or one example becomes one spelling |
@@ -476,13 +476,23 @@ The 2026-09-06 audit was a count; this is the same question asked of the file
 as it stands, and it is the milestone's "definition of done" for
 [#138](https://github.com/russellgordon/plantoir/issues/138): **every case list
 in every `contracts/*.json` is either run by a Windows gate, or owned by an
-open issue, or exempt for a reason written down here.** **114 case lists; 102
-have a reader here.** The other twelve are below. (It was 100 of 111 when this
+open issue, or exempt for a reason written down here.** **117 case lists; 102
+have a reader here.** The other fifteen are below. (It was 100 of 111 when this
 paragraph was first written; `workingFolderSelection.cases` and `.rejected`
 have a Windows reader since [#162](https://github.com/russellgordon/plantoir/issues/162)
 landed, and the count was RE-TAKEN with the walker below rather than adjusted
 by hand. It moved from 111 to 114 when `deployAtATime` arrived with #168 —
 three lists, all owed, all in the table.)
+
+**Re-taken 2026-09-19 with the walker, and it had already gone stale by one.**
+The walker read **115** at `origin/dev` where this paragraph said 114:
+`zipNames.couldHaveBeenStamped.cases` arrived with the archive-stamp work and
+nobody re-took the count. It is in the table below now.
+[#173](https://github.com/russellgordon/plantoir/issues/173) then added two
+more, which is how the number reached 117. **This is the failure mode the
+"re-take it" instruction below exists for**, met within a fortnight of being
+written: three lists in, and the only reason it was caught is that somebody
+ran the walker instead of adding to the number in their head.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
@@ -520,6 +530,9 @@ subtraction.
 | `shared-rules.json` → `cloudSyncedFolders.detection.cases` | 11 | **Exempt, by construction.** Every path is a mac one (`{home}/Library/Mobile Documents`, `/Volumes/…`); the markers Windows detects from are a different list, and `CloudSyncedFolderTests` covers them. |
 | `shared-rules.json` → `stopPreview.identity.evidences`, `.notShared` | 3 + 4 | **Exempt: prose with fields.** The behaviour they describe is exercised through `stopPreview.cases`, and those 23 are gated TWICE here — `scripts/test_stop_preview.py` through `PythonToolchainTests`, and `windows-app/test_stop_preview.ps1` through `TheLauncherMatcherAnswersTheContract`, which asserts "0 failed" so a runner that skipped everything cannot pass. |
 | `assist-cases.json` → `deployAtATime.accepted`, `.refused`, `.resolving` | 23 + 25 + 11 | **Owed**, [#193](https://github.com/russellgordon/plantoir/issues/193), the `windows` issue opened from [#168](https://github.com/russellgordon/plantoir/issues/168) — the whole family is theirs to implement, and these rows ARE the specification: one example in `cardPhrasings.parsed` cannot describe a grammar of times. `CardPhrasings_AllParsedExamplesFromContract_Pass` will go red on the sixth family the moment the contract lands, so the work is visible there; what these three add is every spelling and the day rule. |
+| `shared-rules.json` → `followingLinks.stopsAtAClassPage.cases` | 3 | **Owed**, the `windows` issue opened from [#173](https://github.com/russellgordon/plantoir/issues/173) ([#203](https://github.com/russellgordon/plantoir/issues/203), v1.3.0). **Green by BEHAVIOUR, unrun by their SUITE**, which is the quiet kind of gap: `AssistWorkspace.cs:730` already guards both the add and the enqueue on `!targetPage.IsClassPage`, so all three cases would pass today — but `SharedRules_FollowingLinks_MatchesContract` asserts named booleans and walks no `cases` array, so nothing there runs them and nothing there goes red. What they owe is the loop, and the SENTENCE (`wording.linkedClassWasLeftAlone` / `…ClassesWereLeftAlone`), which is the one behaviour they do not have. The rule deliberately did NOT go into `neverTakenDownByFollowingLinks`, which `ContractTests.cs:295` asserts is exactly three. |
+| `class-planning.json` → `datingPagesAClassBrings.reachStopsAtAClassPage.cases` | 2 | **Owed**, the same `windows` issue as the row above. Green by behaviour for the same reason — their date walk stops on `classPaths` at `AssistWorkspace.cs:927`, before the enqueue at `:928`, and the backwards earliest-class walk does not pass through a class either — and unrun for the same reason. |
+| `course-management.json` → `zipNames.couldHaveBeenStamped.cases` | 3 | **Owed**, [#161](https://github.com/russellgordon/plantoir/issues/161) part 2. Windows holds the two bounds as literals in `ModelTests.CouldHaveBeenStamped_BoundsAreTheOnesTheMacUses`, whose own summary says it is replaced by the contract loop once this block reaches `dev` — which it now has. Arrived after the census was taken and was missed by it; see the re-take note above. |
 | `toolchain.json` → `rules` | 3 | **Read by NOBODY, on either platform** — the one list in the census with no reader anywhere and no issue, and it is left that way deliberately. It is reasoning rather than cases: the image tag being a hash of the build context, building with BuildKit, and revalidating Quartz before chasing a newer CLI. All three are held by the launchers and by `verify.sh`, which does not run on Windows at all. The other three `rules` arrays ARE read — `buildFreshness.rules` by `BuildOutputLocationTests`, `example-content.rules` and `courseConfigKeys.rules` by `SharedRuleContractTests`. |
 
 **And the exemptions inside lists that ARE run**, because "run" is not the

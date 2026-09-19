@@ -180,6 +180,38 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
+    /// The walk stops at a class page — the rule decided in issue #173.
+    ///
+    /// **The three booleans above stay TRUE.** The walk is still transitive and
+    /// still takes what a page links to; it has one stop. "Correcting"
+    /// `transitive` to false is the single most plausible edit here, and both
+    /// suites assert it.
+    ///
+    /// The BEHAVIOUR is run against a real course in `AssistToolRunnerTests`,
+    /// which reads the same `cases` array. What is pinned here is what the file
+    /// has to SAY: that the rule is on, which acts it covers, and that it
+    /// explains itself.
+    @MainActor
+    func testTheWalkStopsAtAClassPageAndSaysWhy() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("followingLinks")
+        let stop: [String: Any] = try XCTUnwrap(section["stopsAtAClassPage"] as? [String: Any])
+
+        XCTAssertEqual(stop["value"] as? Bool, true)
+        XCTAssertNotNil(stop["why"] as? String)
+        XCTAssertNotNil(stop["theNamedPagesAreNeverStopped"] as? String)
+        XCTAssertNotNil(stop["saidToTheTeacher"] as? String)
+
+        // UNPUBLISHING is deliberately absent. Its reach is the sibling
+        // decision, held as issue #201 — and a contract that claimed it were
+        // already true would be false on BOTH platforms the day it landed, in
+        // the file that exists to stop this rule drifting.
+        let appliesTo: [String] = try XCTUnwrap(stop["appliesTo"] as? [String])
+        XCTAssertTrue(appliesTo.contains("publishing"))
+        XCTAssertTrue(appliesTo.contains("the dates a class brings"))
+        XCTAssertFalse(appliesTo.contains("unpublishing"),
+                       "Unpublish reach is #201; claiming it here is false on both platforms")
+    }
+
     /// The kinds the sweep must never reach, each with the reason it is
     /// exempt — a list of exemptions nobody explained is a list nobody can
     /// safely change.
