@@ -269,6 +269,14 @@ public sealed class FileFormatContractTests : IDisposable
     /// completeness at the end, so a rule the mac ADDS fails here by name
     /// rather than sitting unread — which is the failure the 2026-09-06 contract audit
     /// 29 exists to end.</para>
+    ///
+    /// <para>The rules are SENTENCES; their runnable half is
+    /// <c>pageVisibility.writingCases</c>, played case by case in
+    /// <see cref="TheWritingCasesInTheContractAreFollowed"/>. Rule 1 is
+    /// answered there rather than here, because the copy of its case that used
+    /// to sit in this test was a second, hand-typed spelling of contract case 1
+    /// — free to drift from the contract while both tests stayed green, which
+    /// is the failure issue #138 is about.</para>
     /// </summary>
     [Fact]
     public void TheRulesForWritingAPagesVisibilityAreFollowed()
@@ -286,6 +294,19 @@ public sealed class FileFormatContractTests : IDisposable
                 "removed on the mac and this test is answering a question nobody asked.");
         }
 
+        // The same, for a rule whose assertions live in ANOTHER test. The
+        // pointer is a `nameof` rather than prose or a `<see cref>` because
+        // this project generates no documentation file, so an unresolved cref
+        // is not even a warning here — while a `nameof` naming a test that has
+        // been renamed does not compile. A rule marked answered by a test that
+        // no longer exists is a rule answered by nothing.
+        void AnsweredBy(string rule, string test)
+        {
+            Assert.True(unanswered.Remove(rule),
+                $"No rule in the contract reads \"{rule}\" any more — it has been renamed or " +
+                $"removed on the mac, and {test} is answering a question nobody asked.");
+        }
+
         // The first rule was this app's own behaviour before it was the
         // contract's: until 2026-09-07 the contract said the opposite (keep
         // the old key, inverted), this test held that rule in a
@@ -296,14 +317,13 @@ public sealed class FileFormatContractTests : IDisposable
         // fails here by name instead of being quietly marked answered.
         var knowinglyNotFollowed = new HashSet<string>(StringComparer.Ordinal);
 
-        // A page in the old spelling is migrated: the new key on the old
-        // key's line, the legacy key gone. The full set of cases, including
-        // the deliberate exception to rule 4, is TheOldSpellingIsMigratedToTheNewKey.
-        var (migrated, migration) = PageFrontmatter.SetDraft(
-            "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n", "publishForSection1", draft: false, sectionNumber: 1);
-        Assert.True(migration.Changed);
-        Assert.Equal("---\ntitle: Day one\npublishForSection1: true\n---\nBody.\n", migrated);
-        Answered("A page written in the old spelling is MIGRATED to the new key, and the legacy key removed, the first time something edits its visibility");
+        // A page in the old spelling is migrated: the new key on the old key's
+        // line, the legacy key gone. Answered by the contract's own cases —
+        // four of the ten are migrations, including the exception to rule 4 —
+        // and no longer by a retyped copy of case 1 sitting here.
+        AnsweredBy(
+            "A page written in the old spelling is MIGRATED to the new key, and the legacy key removed, the first time something edits its visibility",
+            nameof(TheWritingCasesInTheContractAreFollowed));
 
         // Edit the LINE, never round-trip the YAML.
         string withComment =
@@ -351,49 +371,100 @@ public sealed class FileFormatContractTests : IDisposable
     }
 
     /// <summary>
-    /// <c>pageVisibility.writingRules[0]</c>, as decided 2026-09-07: a page
-    /// in the old spelling is MIGRATED — the new key on the old key's line,
-    /// the legacy key gone — and a page carrying both loses the legacy one.
-    /// Until that day this test asserted the opposite and was skipped as a
-    /// named divergence (the contract and the mac kept the old key inverted;
-    /// this app migrated). The contract moved to this app's behaviour, so
-    /// the mac's suite fails on it until the mac adopts it — a request, not
-    /// damage (issue #107).
+    /// <c>pageVisibility.writingCases</c>, played as data: give the writer the
+    /// case's WHOLE file, ask for the visibility it names, and expect its
+    /// <c>after</c> and <c>expectChanged</c> exactly.
     ///
-    /// <para>The last assertion is the one genuine design question: a legacy
-    /// page whose value is already right IS rewritten, once, to migrate the
-    /// key, as the contract's own exception to rule 4 says. The case is
-    /// reachable only inside a batch that is changing other pages, so the
-    /// build that follows was happening anyway.</para>
+    /// <para>This test used to type five of those cases into this file by
+    /// hand, and the mac's equivalent used to assert the OPPOSITE rule
+    /// entirely — that a page written as <c>draft:</c> kept that key,
+    /// inverted — in sentences typed into ITS file. Both suites were green the
+    /// whole time, because each test agreed with its own app rather than with
+    /// the contract. Deserialising the list is what stops that happening
+    /// again, and it is why two cases neither app had a test for — a page with
+    /// no frontmatter at all, and a block carrying neither spelling — are now
+    /// checked here for nothing.</para>
+    ///
+    /// <para>Both suites run this list as of 2026-09-19. The comment here
+    /// previously said the mac's suite "fails on it until the mac adopts it"
+    /// (issue #107): that never happened, because no mac test read the writing
+    /// rules at all — which is what let the divergence sit for two days. A
+    /// claim about what the other side runs is worth checking before it is
+    /// repeated.</para>
+    ///
+    /// <para>Case 4 is the one genuine design question: a legacy page whose
+    /// value is ALREADY right is still rewritten, once, to migrate the key —
+    /// the contract's own exception to rule 4. No PLAN on either platform
+    /// reaches it, because each drops an already-right page into its "already
+    /// right" list and never writes it; the copy-a-class tool does, on both
+    /// platforms. On this side that is
+    /// <c>AssistWorkspace.ApplyDuplicateClass</c>, which calls
+    /// <see cref="PageFrontmatter.SetDraft"/> with <c>draft: true</c>
+    /// unconditionally (issue #149), so a copy of a legacy hidden page is born
+    /// migrated here too.</para>
     /// </summary>
     [Fact]
-    public void TheOldSpellingIsMigratedToTheNewKey()
+    public void TheWritingCasesInTheContractAreFollowed()
     {
-        // The per-section spelling, on a course-level page: same line, new key.
-        string shared = "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n";
-        var (writtenShared, sharedEdit) = PageFrontmatter.SetDraft(shared, "publishForSection1", draft: false, sectionNumber: 1);
-        Assert.Equal("---\ntitle: Day one\npublishForSection1: true\n---\nBody.\n", writtenShared);
-        Assert.True(sharedEdit.Changed);
+        var doc = ContractLoader.LoadJson("file-formats.json");
+        var cases = doc["pageVisibility"]!["writingCases"]!["cases"]!.AsArray();
 
-        // And the plain one, on a page inside a section's own folder.
-        string local = "---\ntitle: Day one\ndraft: true\n---\nBody.\n";
-        var (writtenLocal, _) = PageFrontmatter.SetDraft(local, "publish", draft: false, sectionNumber: 1);
-        Assert.Equal("---\ntitle: Day one\npublish: true\n---\nBody.\n", writtenLocal);
+        // A loop over an empty list is a test that passes having checked
+        // nothing — and a shrinking list is how a rule stops being checked
+        // without anything going red. Ten on 2026-09-19.
+        Assert.True(cases.Count >= 10,
+            $"contracts/file-formats.json carries {cases.Count} page-visibility writing cases; " +
+            "at least 10 were there on 2026-09-19. Cases are added, not removed — a list that " +
+            "shrank means a rule nobody is checking any more.");
 
-        // Both spellings on one page: the legacy line goes.
-        string both = "---\npublishForSection1: false\ndraftSection1: true\n---\nBody.\n";
-        var (writtenBoth, _) = PageFrontmatter.SetDraft(both, "publishForSection1", draft: false, sectionNumber: 1);
-        Assert.Equal("---\npublishForSection1: true\n---\nBody.\n", writtenBoth);
+        // Every case is played and the failures are reported TOGETHER: which
+        // cases a change turns red is the evidence that this list pins the
+        // rule rather than one accident of it, and a loop that stops at the
+        // first failure cannot show it.
+        var failures = new List<string>();
 
-        // Already right, still legacy: migrated once, on purpose (rule 4's one exception).
-        string alreadyRight = "---\ndraftSection1: false\n---\nBody.\n";
-        var (migrated, edit) = PageFrontmatter.SetDraft(alreadyRight, "publishForSection1", draft: false, sectionNumber: 1);
-        Assert.True(edit.Changed);
-        Assert.Equal("---\npublishForSection1: true\n---\nBody.\n", migrated);
+        int number = 0;
+        foreach (var testCase in cases)
+        {
+            number++;
+            string before = testCase!["before"]!.ToString();
+            string after = testCase["after"]!.ToString();
+            bool setVisible = testCase["setVisible"]!.GetValue<bool>();
+            bool expectChanged = testCase["expectChanged"]!.GetValue<bool>();
+            string why = testCase["why"]?.ToString() ?? "";
 
-        // And once migrated, rule 4 holds: the same value again touches nothing.
-        var (untouched, again) = PageFrontmatter.SetDraft(migrated, "publishForSection1", draft: false, sectionNumber: 1);
-        Assert.False(again.Changed);
-        Assert.Equal(migrated, untouched);
+            // Section 1 when a case does not say, the way the mac reads it.
+            // Defaulting to 0 instead would quietly ask for
+            // `publishForSection0`, a key nothing writes and nothing reads.
+            int section = testCase["section"]?.GetValue<int>() ?? 1;
+            bool sectionLocal = testCase["sectionLocal"]!.GetValue<bool>();
+            string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
+
+            try
+            {
+                var (written, edit) = PageFrontmatter.SetDraft(
+                    before, key, draft: !setVisible, sectionNumber: section);
+
+                // Whole files, newline for newline — not a fragment wrapped in
+                // fences the way `readingCases` are — so the block a page with
+                // no frontmatter is GIVEN can be one of these cases.
+                Assert.Equal(after, written);
+
+                // Asserted separately from the text: a page the writer left
+                // alone and a page it rewrote to the same bytes are the same
+                // string and a different product, because only one of them
+                // moves the modification time and sends the next build after
+                // a page nothing happened to.
+                Assert.Equal(expectChanged, edit.Changed);
+            }
+            catch (Xunit.Sdk.XunitException problem)
+            {
+                failures.Add($"case {number} — {why}\n{problem.Message}");
+            }
+        }
+
+        Assert.True(failures.Count == 0,
+            "contracts/file-formats.json → pageVisibility.writingCases, played against " +
+            "PageFrontmatter.SetDraft:\n\n" + string.Join("\n\n", failures));
     }
 }

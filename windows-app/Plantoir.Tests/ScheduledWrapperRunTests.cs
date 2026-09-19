@@ -18,7 +18,24 @@ namespace Plantoir.Tests;
 ///
 /// <para>These tests are skipped where PowerShell is not present, so the suite
 /// still runs on a machine without it.</para>
+///
+/// <para><b>Serialised with the rest of the process-wide and machine-wide
+/// state, for two reasons rather than one.</b> The record these tests write and
+/// read lives in the real
+/// <c>%LOCALAPPDATA%\Plantoir\scheduled\folder-problems</c> under ICS3U section
+/// 1 — <c>$healthDir</c> resolves <c>$env:LOCALAPPDATA</c> inside the wrapper at
+/// RUN time, so no substitution can move it — and
+/// <see cref="ScheduledPublishOutcomeTests"/> runs wrappers for the same course
+/// and section whose stub build finds nothing, which DELETES that record. That
+/// is the flake seen on 2026-09-18: <c>Assert.Single</c> on an empty list in
+/// <c>AWorkingFolderWithSpacesInItsNameStillBuilds</c>, green alone and on
+/// re-run. And <c>Take</c> leaves <c>folder problem found</c> on the activity
+/// trail, whose path is process-wide: the classes that REDIRECT it are all in
+/// this collection, so a class writing trail lines from outside it can land
+/// them in another class's scratch trail while that class is asserting on what
+/// is in it.</para>
 /// </summary>
+[Collection(SharedActivityState.Name)]
 public class ScheduledWrapperRunTests : IDisposable
 {
     private readonly string _root;
