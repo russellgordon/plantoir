@@ -31,6 +31,19 @@ namespace Plantoir.Core.Models;
 /// thing. A teacher who reaches the same folder twice by two genuinely
 /// different routes loses nothing worse than an extra container stop; a
 /// teacher whose network folder is offline must not lose the window.</para>
+///
+/// <para><b>And one case where it is wrong in the other direction, accepted
+/// knowingly.</b> Windows can mark a directory CASE-SENSITIVE per folder
+/// (<c>fsutil file setCaseSensitiveInfo</c>, which is what WSL does to the
+/// folders it creates), and inside one of those <c>Work</c> and <c>work</c>
+/// are two REAL sibling folders that this compares as equal. The consequence
+/// is a container stopped for a sibling folder, or a folder change read as
+/// no change — recoverable, and the next preview starts the container again.
+/// It is accepted rather than closed because closing it means asking the
+/// filesystem per comparison, which is the handle open rejected just above,
+/// and because a teacher's working folder living inside a WSL-created
+/// case-sensitive directory is a shape nobody has met: Plantoir's own
+/// working folders are chosen from the ordinary Windows picker.</para>
 /// </summary>
 public static class WorkingFolder
 {

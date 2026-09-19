@@ -78,6 +78,73 @@ public class SectionDetailTeardownSourceTests
             "_folderThisSectionWorksIn or _folderThisSectionRegisteredIn instead.");
     }
 
+    /// <summary>
+    /// The scan above is LEXICAL, and a method called FROM the region can read
+    /// the live folder just as easily. One does: every teardown path ends in
+    /// <c>RefreshChrome()</c>, which asks the live folder whether the course is
+    /// being built elsewhere and sets the Deploy button's state from it.
+    ///
+    /// <para>That one is correct — what a teacher may click next is a question
+    /// about the folder now on screen, and it stops and releases nothing — so
+    /// it is named here rather than tidied away. What must not happen is a
+    /// SECOND one arriving unnoticed and taking the first's cover.</para>
+    /// </summary>
+    [Fact]
+    public void RefreshChromeIsTheOnlyCalleeThatReadsTheLiveFolder()
+    {
+        string source = Source;
+        string region = WithoutComments(TeardownRegion(source));
+        var bodies = MethodBodies(WithoutComments(source));
+
+        var reading = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (Match call in Regex.Matches(region, @"(?<![.\w])([A-Za-z_]\w*)\s*\("))
+        {
+            string name = call.Groups[1].Value;
+            if (bodies.TryGetValue(name, out string? body) && Regex.IsMatch(body, @"_window\s*\.\s*Workspace"))
+                reading.Add(name);
+        }
+
+        Assert.True(reading.SetEquals(new[] { "RefreshChrome" }),
+            "Methods called from the teardown region whose own bodies read the window's live " +
+            $"working folder: [{string.Join(", ", reading)}]. Exactly one is allowed — RefreshChrome, " +
+            "which only decides what the teacher may click next. Anything else is the wrong-folder " +
+            "stop arriving by another door; give it the capture instead.");
+
+        // It cannot see past this file: a callee in another class that reads
+        // the folder through some other route is invisible here. The region's
+        // own comment says which properties are the honest ones to name.
+        Assert.True(bodies.ContainsKey("RefreshChrome"),
+            "RefreshChrome is no longer a method of this file, so this scan is no longer reading what it thinks.");
+    }
+
+    /// <summary>
+    /// Every method in the file by name, mapped to its body — brace counting
+    /// over comment-stripped source. Overloads collapse onto one entry, which
+    /// is fine for a "does ANY of these read the folder" question.
+    /// </summary>
+    private static Dictionary<string, string> MethodBodies(string code)
+    {
+        var bodies = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (Match header in Regex.Matches(code, @"\b([A-Za-z_]\w*)\s*\([^()]*\)\s*\r?\n\s*\{"))
+        {
+            int open = code.IndexOf('{', header.Index + header.Length - 1);
+            if (open < 0) continue;
+            int depth = 0;
+            for (int i = open; i < code.Length; i++)
+            {
+                if (code[i] == '{') depth++;
+                else if (code[i] == '}' && --depth == 0)
+                {
+                    string body = code[(open + 1)..i];
+                    string name = header.Groups[1].Value;
+                    bodies[name] = bodies.TryGetValue(name, out string? already) ? already + "\n" + body : body;
+                    break;
+                }
+            }
+        }
+        return bodies;
+    }
+
     [Fact]
     public void EveryStartNotesTheFolderItDecidedOn()
     {
@@ -86,12 +153,16 @@ public class SectionDetailTeardownSourceTests
         // Three starts decide a folder: the Preview button, the assistant's
         // automated preview (which "Preview Again" after a repair also goes
         // through), and the deploy — the last AFTER its own preview stop, so
-        // that stop still names the preview's folder.
+        // that stop still names the preview's folder. The fourth is
+        // StagePreviewForCapture, which is the marketing-shot harness: it sets
+        // _previewUrl, so `hadPreview` is true and a later stop would sweep,
+        // and a staged view must not answer the teardown's question any
+        // differently from a real one.
         var written = Regex.Matches(code, @"_folderThisSectionWorksIn\s*=\s*[^=]");
-        Assert.True(written.Count == 3,
-            $"_folderThisSectionWorksIn is written {written.Count} time(s), expected 3 (the two " +
-            "preview starts and the deploy). Delete one and every stop it fed becomes a silent " +
-            "no-op wearing the shape of this fix working.");
+        Assert.True(written.Count == 4,
+            $"_folderThisSectionWorksIn is written {written.Count} time(s), expected 4 (the two " +
+            "preview starts, the deploy, and the shot harness). Delete one and every stop it fed " +
+            "becomes a silent no-op wearing the shape of this fix working.");
 
         // The registration key is written exactly once, and readonly makes
         // the compiler say so: a deploy starting in the one render pass

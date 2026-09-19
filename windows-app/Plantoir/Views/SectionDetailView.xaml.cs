@@ -1140,6 +1140,16 @@ public sealed partial class SectionDetailView : UserControl
     // reads of `_window.Workspace` — a test naming five known methods would
     // go stale the moment somebody added a sixth.
     //
+    // ONE EXCEPTION, and it is named rather than tidied away: the scan is
+    // LEXICAL, and every method here ends in RefreshChrome(), which reads the
+    // live folder itself (at the `building` line near the top of the file).
+    // That read is harmless — it decides whether the Deploy button is enabled
+    // and what its tooltip says, for the folder now on screen, which is the
+    // right folder for a question about what the teacher may click next. It
+    // stops nothing and releases nothing. The scan asserts that RefreshChrome
+    // is the ONLY method called from here whose body reads the live folder,
+    // so a second one cannot arrive unnoticed.
+    //
     // ==== BEGIN TEARDOWN REGION ===========================================
 
     private void AbandonWait()
@@ -1483,6 +1493,13 @@ public sealed partial class SectionDetailView : UserControl
     public void StagePreviewForCapture(ElementTheme theme, string? siteImagePath = null)
     {
         _previewUrl = new Uri("http://localhost:8081");
+        // Setting _previewUrl makes `hadPreview` true, so a later StopPreview
+        // would try to sweep — and with no capture it would name nothing and
+        // sweep nothing. Marketing shots only, and nothing is really running,
+        // but a staged view that answers the teardown's question differently
+        // from a real one is exactly the difference a shot harness should not
+        // introduce.
+        _folderThisSectionWorksIn = _window.Workspace.WorkspacePath;
         PreviewLabel.Text = "Stop Preview";
         PreviewIcon.Glyph = Glyphs.Stop;
         BackButton.IsEnabled = true;
