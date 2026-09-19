@@ -695,13 +695,12 @@ public class PageVisibilityWritingTests
         Assert.Contains("publish: true", changed, StringComparison.Ordinal);
     }
 
-    // The ten `writingCases` in contracts/file-formats.json all pass against
-    // this writer — replayed here on 2026-09-19, all ten, including case 8
-    // (`publish: maybe` asked to be PUBLISHED, expecting no rewrite), which
-    // needed the certainty gate above. Running them as data belongs to
-    // FileFormatContractTests, which still answers `writingRules` with
-    // hand-written assertions: that adoption is issue #138, and
-    // contracts/README.md still says Windows does not run the list.
+    // The ten `writingCases` in contracts/file-formats.json are played against
+    // this writer by FileFormatContractTests.TheWritingCasesInTheContractAreFollowed
+    // (issue #138) — as data, from the file, rather than replayed by hand the
+    // way they were here on 2026-09-19. Case 8 is the one that needed the
+    // certainty gate above: `publish: maybe` asked to be PUBLISHED, expecting
+    // no rewrite.
 }
 
 /// <summary>
