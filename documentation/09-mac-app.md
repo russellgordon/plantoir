@@ -454,8 +454,8 @@ one real thing: the older wording let the model DECLINE a plain hide request
 on the smaller assistant. Of its 19 cards, 15 are answered in code by
 `AssistCardCommand` and 4 reach the model; of those four, three are routed
 correctly every trial and **"Deploy at 6:30 AM" is not — it is answered by
-`deploy_section`, an immediate deploy, 10 trials out of 10.** The same card is
-correct 10/10 on the larger assistant. Conditions, thresholds and per-probe
+`deploy_section`, an immediate deploy, 10 trials out of 10** (issue #168).
+The same card is correct 10/10 on the larger assistant. Conditions, thresholds and per-probe
 tables are in `research/ai-assist/metal-routing-results.txt`, which is also
 the file to read before quoting any "0 malformed calls" from that folder.
 
