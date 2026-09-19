@@ -194,7 +194,9 @@ are two predicates and not one.
 
 ### Three answers inside, two outside
 
-Each app's reader — `PageVisibilityReader` on the mac, `page_visibility.py` in
+Each app's reader — `PageVisibilityReader` on the mac, `PageVisibilityReader`
+in `windows-app/Plantoir.Core/Models/` (which `PageFrontmatter.IsDraft`,
+`StoredDraft` and `Visibility` are collapses of), and `page_visibility.py` in
 the shared Python — answers **three ways**: `visible`, `hidden`, and
 `cannotTell` for a handful of forms it will not guess at (a value on the line
 BELOW the key — over a blank line as happily as not — a tag such as
@@ -240,8 +242,12 @@ What happens to `cannotTell` depends on who asked, and this is the part to get
 right:
 
 * **Anything REPORTING to a teacher collapses it to VISIBLE.** The section
-  graph (`AssistSectionGraph`), the scheduled deploy's "classes students cannot
-  see yet" (`ScheduledDeploy.unpublishedClasses`), the index pointer and the
+  graph (`AssistSectionGraph`; `AssistWorkspace.Plan` on Windows), the
+  scheduled deploy's "classes students cannot see yet"
+  (`ScheduledDeploy.unpublishedClasses`, `ScheduledDeploy.UnpublishedClassesIn`
+  — so a page whose flag cannot be read is NOT listed there as one students
+  cannot see, on either platform), the index pointer, the dangling-link check,
+  the "N linked pages stay visible" sweep (`AssistWorkspace.cs:692`), and the
   re-date planner. (No VIEW reads a page's flag — a sentence here said "the
   sidebar" until 2026-09-18 and there is no such reader; the sidebar lists
   courses.) Never to hidden: listing a live page among the ones still to
@@ -249,24 +255,41 @@ right:
   already reading it is the failure that reports success.
 * **Anything DECIDING WHETHER TO WRITE needs certainty, not a match.** A page
   whose flag cannot be read is not "already the way you asked" — it is a page
-  to write. `AssistSectionPage.visibilityIsCertain` carries that, and both
-  places that skip a page because it already matches require it: the publish
-  plan's "already right" list and the whole-unit count of what would move.
-  Without it, "publish this page" on such a page answered *It's already been
-  published* and wrote nothing while the build was holding the page back —
-  reporting success about the exact failure this rule exists to remove.
+  to write. `AssistSectionPage.visibilityIsCertain` carries that on the mac and
+  `PlannedPage.VisibilityIsCertain` on Windows, and every place that skips a
+  page because it already matches requires it: the publish plan's "already
+  right" list (both the NAMED pages and the LINKED ones on Windows), the
+  nothing-to-do sentence, the whole-unit count of what would move, and the date
+  a linked page inherits from the class that brought it. Without it, "publish
+  this page" on such a page answered *It's already been published* and wrote
+  nothing while the build was holding the page back — reporting success about
+  the exact failure this rule exists to remove. **The honest way to find these
+  is to grep for every place a collapsed "visible" decides to SKIP a write**,
+  rather than to trust a count: the number differs between the platforms
+  because the plan layers are not the same shape.
 * **Anything WRITING to a teacher's file never collapses it at all.**
-  `AssistPageVisibility.setting`'s "already right, change nothing" shortcut
-  fires only on a CONFIDENT reading that already matches; on `cannotTell` it
-  writes the flag out in full, in whichever direction was asked for. A writer
-  that believed the reporting collapse would decline to publish a page on the
-  strength of a guess, and tell the teacher it had published it.
+  `AssistPageVisibility.setting` on the mac and `PageFrontmatter.SetDraft` on
+  Windows: the "already right, change nothing" shortcut fires only on a
+  CONFIDENT reading that already matches; on `cannotTell` it writes the flag
+  out in full, in whichever direction was asked for. A writer that believed the
+  reporting collapse would decline to publish a page on the strength of a
+  guess, and tell the teacher it had published it.
+
+  **The gate reads all four keys; the write goes to one.** Which key is written
+  is decided by where the page lives, and that is the only thing a page's
+  folder decides — so `SetDraft` takes a section NUMBER as well as a key, and
+  it is required rather than optional. An optional one would make a second
+  rule: omitted, the gate would judge the page on that key alone, while the
+  build reads `publishForSection<N>` FIRST on every page, so a section-local
+  page carrying a stray per-section key could have its write skipped in the
+  dangerous direction. (The mac's `setting` has the same asymmetry, taking
+  `forSection` and `isSectionLocal` separately.)
 
 The forms that read `cannotTell` are pinned in each platform's OWN tests
-(`PageVisibilityReadingTests` on the mac), not in the shared contract. A shared
-case says what the SITE does; writing `expectVisible: true` for a form the site
-HIDES would oblige the other platform to be wrong in the same direction rather
-than merely allow it.
+(`PageVisibilityReadingTests` on the mac, `Plantoir.Tests/PageVisibilityReadingTests.cs`
+on Windows), not in the shared contract. A shared case says what the SITE does;
+writing `expectVisible: true` for a form the site HIDES would oblige the other
+platform to be wrong in the same direction rather than merely allow it.
 
 ### What a WRITER does with an odd value
 
@@ -282,7 +305,8 @@ separately from the reader:
   teacher. Asked to HIDE the same page, it changes and the odd value goes —
   the only way to say the opposite of what it says is to say it plainly.
 * **A value being carried to another section is copied character for
-  character.** `SectionAdder` and `setup_course.per_section_frontmatter` copy a
+  character.** `SectionAdder` (both apps') and
+  `setup_course.per_section_frontmatter` copy a
   `publish`-family value exactly, comment and quotes and all: whatever the
   build makes of the original it makes of the copy, so no reader standing
   between the two can invert it. The exception is a value that runs onto the
@@ -301,27 +325,54 @@ separately from the reader:
   obeys, and a carry that read the first took the value PyYAML throws away.
 * **A writer finds the line with the READER's own matcher, never a prefix
   test.** `publish : false` and `"publish": false` are the same key to YAML and
-  were invisible to `hasPrefix("publish:")` — so publishing such a page
-  INSERTED a second `publish: true` above it, PyYAML kept the last, and the
-  page stayed hidden while the teacher was told it had been published. The
-  line is then rebuilt in the plain spelling, which is the point: one line
-  changes and the page really says what was asked. `PageVisibilityReader
-  .valuePart` is that matcher on the mac, and `page_visibility`'s key pattern
-  in the Python. **Leaving the reader ahead of the writer is its own bug
-  class**, and it is the one to check first in any new writer.
+  were invisible to `hasPrefix("publish:")` (and to C#'s `StartsWith(key)` plus
+  a colon test) — so publishing such a page INSERTED a second `publish: true`
+  above it, PyYAML kept the last, and the page stayed hidden while the teacher
+  was told it had been published. `PageVisibilityReader.valuePart` is that
+  matcher on the mac, `PageVisibilityReader.ValuePart` on Windows, and
+  `page_visibility`'s key pattern in the Python. **Leaving the reader ahead of
+  the writer is its own bug class**, and it is the one to check first in any
+  new writer.
+
+  The mac rebuilds the line in the plain spelling; Windows rewrites the value
+  after the colon and keeps whatever the teacher wrote before it, including an
+  inline `# comment`. Both end with the page really saying what was asked,
+  which is what the contract pins — `pageVisibility.writingCases` stays inside
+  the subset where the two agree and says so.
+
+* **A writer must find the BLOCK the way the reader finds it, too.**
+  python-frontmatter's fence is `^-{3,}\s*$` — three dashes OR MORE — and it
+  tolerates blank lines before the opening one. A writer that insisted on
+  exactly `---` at line 0 decided a page fenced with `----` had no frontmatter
+  and PREPENDED a block of its own, leaving the teacher's real frontmatter
+  behind it as body text, printed to their students. One fence finder serves
+  reader and writers on both platforms. (`...` is not a closing fence:
+  python-frontmatter does not accept one, and Windows' `Block.Parse` did until
+  2026-09-19, which read a block as ending early.)
+
+* **A `#` inside quotes is not a comment**, wherever a writer looks for one.
+  Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a
+  `publish: "false # why"` page left an unbalanced quote — frontmatter the
+  build cannot parse at all, written by an ordinary request. It uses the
+  reader's quote-aware scan now.
 
 ### What this replaced, and what was rejected
 
 Until 2026-09-18 the mac accepted only `true`/`yes` after stripping quotes and
 lowercasing, and BRANCHED its reading on where the page lived — so a
 course-level page carrying a plain `publish: false` was reported visible while
-the build hid it. Windows reads it differently again (`Block.BoolValue` returns
-null for anything but `true`/`false`, and `IsDraft` falls through to `?? false`),
-so `publish: no` reads VISIBLE there while the site HIDES it. Two real
-inversions were also fixed: `SectionAdder.publishValue` and
-`per_section_frontmatter` compared a legacy draft value with the literal string
-`"true"`, so `draftSection1: yes` was carried into a new section as PUBLISHED
-while the build went on hiding the original.
+the build hid it. Windows read it differently again until 2026-09-19
+(`Block.BoolValue` returned null for anything but `true`/`false`, and `IsDraft`
+fell through to `?? false`), so `publish: no` read VISIBLE there while the site
+HID it — the same class of bug pointing the other way. It also fell THROUGH an
+unreadable key to the next one, which the build never does, and it branched on
+where the page lived in the other direction: `StoredDraft` took a KEY, so a
+course-level page's plain `publish: false` was never looked at. It takes a
+section now. Three real inversions were fixed along the way:
+`SectionAdder.publishValue` (mac), `SectionAdder.PublishValue` (Windows) and
+`per_section_frontmatter` (Python) each compared a legacy draft value with the
+literal string `"true"`, so `draftSection1: yes` was carried into a new section
+as PUBLISHED while the build went on hiding the original.
 
 Rejected, with reasons:
 
@@ -389,6 +440,16 @@ teacher's course with nothing failing anywhere. The pins are the versions the
 image already had, read off `pip freeze` rather than chosen, so they changed
 nothing about what is installed — but they DO change the build-context hash, so
 every working folder rebuilds its image once after updating.
+
+**There are TWO fetch paths, and the second one is the one a Windows teacher's
+site is really built by.** `windows-app/Vendor/fetch-runtime.ps1` builds the
+native Windows runtime; nothing on that machine builds the Docker image at all.
+It did an unpinned `pip install python-frontmatter Pillow` until 2026-09-19 —
+PyYAML arriving as a dependency, unnamed. It carries the same three pins now,
+and each pin in `contracts/toolchain.json` names both places it must appear
+(`dockerfileContains`, `windowsRuntimeContains`), with a test on each side
+holding its own file against them, so the two cannot drift apart again. Neither
+test RUNS a fetch — the Windows one is ~600 MB — so both assert the recipe.
 
 ## `course_config.json` has two writers, and they can erase each other
 
