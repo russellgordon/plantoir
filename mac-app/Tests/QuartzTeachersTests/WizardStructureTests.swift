@@ -161,15 +161,23 @@ final class WizardStructureTests: XCTestCase {
     func testTheToggleIsWiredToAdoptAndToRestore() throws {
         let source: String = try WizardStructureTests.wizardSource()
 
-        XCTAssertTrue(
-            source.contains(".onChange(of: startsFromSkeleton)"),
+        // The handler's own body, not merely the handler: a test that asks
+        // whether the file mentions `restoreGenericStructure()` passes on the
+        // function's own declaration, with nothing calling it.
+        let handler: String = try XCTUnwrap(
+            WizardStructureTests.text(following: ".onChange(of: startsFromSkeleton)", in: source),
             "Nothing in the wizard watches the skeleton toggle, so turning it off leaves the "
             + "skeleton's folders in the structure editor for a course that will not have them "
             + "(contracts/shared-rules.json → wizard.skeletonToggle)."
         )
         XCTAssertTrue(
-            source.contains("restoreGenericStructure()"),
-            "The wizard never restores the generic structure — see wizard.skeletonToggle."
+            handler.contains("adoptSkeletonStructure()"),
+            "The skeleton toggle no longer adopts when it goes on."
+        )
+        XCTAssertTrue(
+            handler.contains("restoreGenericStructure()"),
+            "The skeleton toggle no longer restores the generic structure when it goes off — "
+            + "see wizard.skeletonToggle."
         )
 
         // The snapshot is what tells an untouched list from an edited one, so
@@ -199,7 +207,12 @@ final class WizardStructureTests: XCTestCase {
         let source: String = try WizardStructureTests.wizardSource()
 
         let branch: String = try XCTUnwrap(
-            WizardStructureTests.text(following: "if !startsFromSkeleton {", in: source),
+            WizardStructureTests.text(
+                // Short on purpose: the ELSE branch a few lines below shows the
+                // same note, and a window that reached it would pass while this
+                // branch showed anything at all.
+                following: "if !startsFromSkeleton {", in: source, charactersToRead: 120
+            ),
             "The wizard no longer says anything while the skeleton is declined. A teacher who "
             + "turns the toggle off is in exactly the situation "
             + "WizardWording.noExampleContentNote describes, and both apps say so "
@@ -307,12 +320,17 @@ final class WizardStructureTests: XCTestCase {
     }
 
     /// The few lines that follow a marker in a file, or nil when the marker
-    /// is not there — enough to see what a short branch does.
-    static func text(following marker: String, in source: String) -> String? {
+    /// is not there — enough to see what a short branch or handler does.
+    ///
+    /// The window is generous on purpose: a scan that reaches exactly as far
+    /// as today's code starts failing on a renamed variable rather than on a
+    /// lost behaviour, which is the kind of test that gets deleted.
+    static func text(following marker: String, in source: String,
+                     charactersToRead: Int = 600) -> String? {
         guard let found = source.range(of: marker) else {
             return nil
         }
         let remainder: Substring = source[found.upperBound...]
-        return String(remainder.prefix(200))
+        return String(remainder.prefix(charactersToRead))
     }
 }
