@@ -317,9 +317,16 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > kept the old key inverted until 2026-09-09, when it adopted this too —
 > issue #107; `contracts/file-formats.json` → `pageVisibility.writingRules`
 > carries the rule and the reasoning, and `writingCases` beside it is the
-> same list as data — run by the mac's suite, and replayed against Windows'
-> writer on 2026-09-19 with all ten passing, though deserialising them there
-> is still [issue #138](https://github.com/russellgordon/plantoir/issues/138).)
+> same list as data — ten whole files, each given to the writer with the
+> visibility it should be asked for and the exact text it must come back as.
+> **Both suites run that list**: the mac since 2026-09-09 with issue #107,
+> and Windows since 2026-09-19 with
+> [issue #138](https://github.com/russellgordon/plantoir/issues/138), which
+> replaced five of the cases retyped into that test file. Three of the other
+> five were already asserted elsewhere in the Windows suite in its own words
+> (one in that file, two in `PageVisibilityReadingTests.cs`); what running the
+> list adds is that all ten are read from the FILE and so cannot drift from
+> it, and that two of them are covered on Windows for the first time.)
 > Two things are
 > deliberately NOT migrations: restoring a backup puts back the spelling the
 > backup held, because a restore is not an edit; and adding a section writes

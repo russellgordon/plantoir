@@ -134,11 +134,14 @@ final class FileFormatsContractTests: XCTestCase {
     /// instead of with the contract. Reading `writingCases` is what stops that
     /// happening again.
     ///
-    /// Windows does NOT yet run this list — `Plantoir.Tests` answers
-    /// `writingRules` with hand-written assertions instead, which is the same
-    /// shape of gap this test was written to close. Said plainly because this
-    /// comment claimed the opposite until 2026-09-18, and a false claim about
-    /// what the other side runs is how a divergence survives review.
+    /// Windows runs the same list as of 2026-09-19 —
+    /// `FileFormatContractTests.TheWritingCasesInTheContractAreFollowed`,
+    /// issue #138, which replaced five of these cases retyped into that file.
+    /// Until then this comment said Windows did NOT run it, which was true when
+    /// written and is the second time in two days this paragraph has been
+    /// wrong: a claim about what the other side runs is how a divergence
+    /// survives review, so it is worth re-checking rather than repeating.
+    /// (Corrected from the Windows side, 2026-09-19, comment only.)
     func testTheLegacySpellingIsMigratedToTheCurrentOne() throws {
         let section: [String: Any] = try FileFormatsContractTests.section("pageVisibility")
         let group: [String: Any] = try XCTUnwrap(section["writingCases"] as? [String: Any])

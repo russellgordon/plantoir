@@ -12,6 +12,17 @@ namespace Plantoir.Tests;
 /// list around every one of its methods — which would yank the lease
 /// CourseActivityTests is in the middle of asserting on, roughly one run in
 /// three. Sharing a collection serializes them.
+///
+/// <para>It has since taken in two more kinds of shared thing, because the
+/// question it answers is "what does this class touch that outlives it", not
+/// "is it about previews": the ACTIVITY TRAIL's log path, which is a
+/// process-wide static that several classes redirect to a scratch file and then
+/// assert on — so a class merely WRITING trail lines belongs here too, or its
+/// lines land in somebody else's file; and the SCHEDULED records under
+/// <c>%LOCALAPPDATA%\Plantoir\scheduled</c>, which the generated wrapper
+/// resolves at run time from the environment and no test can substitute away.
+/// Two classes run those wrappers for ICS3U section 1, and one of them deletes
+/// the record the other has just written (2026-09-18).</para>
 /// </summary>
 [CollectionDefinition(SharedActivityState.Name, DisableParallelization = true)]
 public class SharedActivityStateCollection { }
