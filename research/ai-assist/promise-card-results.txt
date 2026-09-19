@@ -1,3 +1,10 @@
+# [NOTE ADDED 2026-09-18, #117 — nothing below is changed.]
+# "malformed tool calls: 0" in this file means "no HTTP errors". The harness
+# recorded a tool call whose argument JSON was TRUNCATED as a call with no
+# arguments, so truncation could not reach that line. Counted properly on an
+# M4 Pro with the same weights, Qwen2.5-1.5B truncates 12-19 arguments per 290
+# responses and Qwen3-4B none — see metal-routing-results.txt.
+#
 # Promise-card routing run, 2026-08-14 evening — shipped config (--date-appended --real-course --course VVH2O)
 # After the deploy-only gate's system-prompt change. 29 probes x 3 trials, cache-restored (no cold read).
 # Headline: arguments perfect (0 wrong dates/courses/types, 0 inversions, 0 malformed) but routing 63/87 (72%),
