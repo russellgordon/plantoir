@@ -3356,12 +3356,20 @@ final class AssistToolRunnerTests: XCTestCase {
         try write(page: "Unit 2, Day 4", publish: "true", date: "2026-10-07",
                   body: "Already out.", in: made.course)
 
+        // Built from the wording rather than quoted. A negative assertion
+        // against a copied fragment is the one that passes VACUOUSLY the day
+        // the sentence is reworded — it would then be absent for the wrong
+        // reason, and nothing would say so.
+        let wouldHaveSaid: String = AssistWording.linkedClassesWereLeftAlone(
+            AssistPublishPlan.listing(["Unit 2, Day 4"]), count: 1
+        )
+
         let done: AssistToolOutcome = await made.runner.run(call: call(
             "publish_pages",
             arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 2, Day 3"]
         ))
         XCTAssertFalse(
-            done.detail.contains("is a class of its own"),
+            done.detail.contains(wouldHaveSaid),
             "A teacher was told to publish a class that is already published: \(done.detail)"
         )
     }
