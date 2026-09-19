@@ -27,6 +27,14 @@ import Foundation
 /// here — `patches/publish.ts` drops a page only when it says `publish: false`
 /// — and guessing the other way round would hide every page a teacher wrote
 /// without thinking about frontmatter at all.
+///
+/// **READING does not depend on where the page lives.** The build consults all
+/// four keys, in order, on every page it copies, so `PageVisibilityReader`
+/// does too and none of the reading here takes an `isSectionLocal`. Only
+/// `setting` still does, because which key is WRITTEN is the one thing a
+/// page's folder really decides. Until 2026-09-18 the reading branched as
+/// well, and a course-level page carrying a plain `publish: false` was
+/// therefore reported visible while the build hid it.
 enum AssistPageVisibility {
 
     // MARK: - Functions
@@ -41,51 +49,40 @@ enum AssistPageVisibility {
         return isSectionLocal ? "draft" : "draftSection\(sectionNumber)"
     }
 
-    /// Whether this section publishes this page, or nil when the page says
-    /// nothing either way.
+    /// What the build does with this page — including the case where this app
+    /// will not say.
     ///
-    /// Course-level pages go through `SectionAdder.publishValue(forSection:in:)`
-    /// — the same reader that carries visibility across when a section is
-    /// added, so the two can never disagree about what `draftSection2: true`
-    /// meant.
-    static func statedPublishing(
-        in pageText: String,
-        forSection sectionNumber: Int,
-        isSectionLocal: Bool
-    ) -> Bool? {
-        if !isSectionLocal {
-            guard let block = PageFrontmatter.block(in: pageText) else {
-                return nil
-            }
-            var lines: [String] = []
-            for line in block.lines {
-                lines.append(PageFrontmatter.trimmingCarriageReturn(line))
-            }
-            guard let value = SectionAdder.publishValue(forSection: sectionNumber, in: lines) else {
-                return nil
-            }
-            return isTrue(value)
-        }
+    /// The one reader. Everything below collapses this answer for its own
+    /// purposes, and nothing else parses a visibility line.
+    static func answer(in pageText: String, forSection sectionNumber: Int) -> PageVisibilityAnswer {
+        return PageVisibilityReader.answer(in: pageText, forSection: sectionNumber)
+    }
 
-        if let value = PageFrontmatter.rawValue(forKey: "publish", in: pageText) {
-            return isTrue(value)
+    /// Whether this section publishes this page, or nil when the page says
+    /// nothing either way — the answer for anything REPORTING to a teacher.
+    ///
+    /// A page this app cannot read is reported as VISIBLE. That is the mild
+    /// mistake of the two: listing a live page among the ones a teacher still
+    /// has to publish costs them a second look, while calling a page hidden
+    /// when students are already reading it is the failure that reports
+    /// success. Nothing that WRITES uses this — see `setting`.
+    static func statedPublishing(in pageText: String, forSection sectionNumber: Int) -> Bool? {
+        switch answer(in: pageText, forSection: sectionNumber) {
+        case .saysNothing:
+            return nil
+        case .visible:
+            return true
+        case .hidden:
+            return false
+        case .cannotTell:
+            return true
         }
-        if let value = PageFrontmatter.rawValue(forKey: "draft", in: pageText) {
-            return !isTrue(value)
-        }
-        return nil
     }
 
     /// Whether students meet this page, with Quartz's own default applied to a
     /// page that says nothing.
-    static func publishes(
-        in pageText: String,
-        forSection sectionNumber: Int,
-        isSectionLocal: Bool
-    ) -> Bool {
-        return statedPublishing(
-            in: pageText, forSection: sectionNumber, isSectionLocal: isSectionLocal
-        ) ?? true
+    static func publishes(in pageText: String, forSection sectionNumber: Int) -> Bool {
+        return statedPublishing(in: pageText, forSection: sectionNumber) ?? true
     }
 
     /// The page text with this section's visibility set, and whether that
@@ -115,10 +112,16 @@ enum AssistPageVisibility {
         // Already saying the right thing in the current spelling: leave the
         // file alone, so its modification time does not move and the next
         // build is not fooled into thinking the content changed.
-        let stated: Bool? = statedPublishing(
-            in: pageText, forSection: sectionNumber, isSectionLocal: isSectionLocal
-        )
-        if stated == published && !carriesLegacyKey {
+        //
+        // The shortcut needs a CONFIDENT answer, which is why it asks
+        // `answer` rather than `statedPublishing`. A value this app cannot
+        // read is reported as visible, and a writer that believed that would
+        // decline to publish a page on the strength of a guess — so a page
+        // whose flag cannot be read gets the flag written out in full, in
+        // whichever direction was asked for.
+        let stated: PageVisibilityAnswer = answer(in: pageText, forSection: sectionNumber)
+        let alreadySaysIt: Bool = (stated == .visible && published) || (stated == .hidden && !published)
+        if alreadySaysIt && !carriesLegacyKey {
             return (pageText, false)
         }
 
@@ -168,14 +171,5 @@ enum AssistPageVisibility {
             .standardizedFileURL.path
         let page: String = url.standardizedFileURL.path
         return page.hasPrefix(folder + "/")
-    }
-
-    /// YAML's spelling of yes, as the toolchain reads it.
-    static func isTrue(_ value: String) -> Bool {
-        let tidied: String = value
-            .trimmingCharacters(in: .whitespaces)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-            .lowercased()
-        return tidied == "true" || tidied == "yes"
     }
 }

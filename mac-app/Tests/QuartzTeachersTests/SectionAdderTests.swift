@@ -233,6 +233,101 @@ final class SectionAdderTests: XCTestCase {
                       "The existing section's own key is left exactly as it was")
     }
 
+    /// The legacy key with a value that is not literally `true`.
+    ///
+    /// `draftSection1: yes` holds a page back — YAML 1.1's `yes` is the
+    /// boolean true, and the build reads it that way. Comparing the value with
+    /// the literal string "true" said otherwise, and PUBLISHED the page into
+    /// the new section while the build went on hiding the original. Measured
+    /// against the real image on 2026-09-18; the table is in
+    /// contracts/file-formats.json → pageVisibility.readingCases.
+    @MainActor
+    func testALegacyDraftValueIsReadTheWayTheBuildReadsIt() throws {
+        let heldBack: [String] = ["yes", "on", "True", "ON", "\"true\"", "TrUe"]
+        let published: [String] = ["false", "no", "off", "maybe", "\"yes\"", "1"]
+
+        for value in heldBack + published {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            title: Held Back
+            createdSection1: 2026-09-08T07:00:00.000
+            draftSection1: \(value)
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Held Back.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            let expected: String = heldBack.contains(value) ? "false" : "true"
+            XCTAssertTrue(
+                updated.contains("publishForSection2: \(expected)"),
+                "draftSection1: \(value) should carry across as publishForSection2: \(expected)"
+            )
+        }
+    }
+
+    /// A draft value this app cannot read is carried across as HELD BACK.
+    /// A page wrongly held back is one a teacher notices and fixes; a page
+    /// wrongly published is one nobody notices at all.
+    @MainActor
+    func testAnUnreadableLegacyValueCarriesAcrossAsHeldBack() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let shared: String = """
+        ---
+        title: Unreadable
+        createdSection1: 2026-09-08T07:00:00.000
+        draftSection1: !!str true
+        ---
+        Body.
+        """
+        let sharedURL: URL = course.directoryURL.appendingPathComponent("Unreadable.md")
+        try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+        XCTAssertTrue(updated.contains("publishForSection2: false"))
+    }
+
+    /// The CURRENT key's value is copied character for character, whatever it
+    /// says. That is what makes the copy safe: whatever the build makes of the
+    /// original it makes of the copy, so no reader standing between the two
+    /// can invert it by misreading it.
+    @MainActor
+    func testTheCurrentKeysValueIsCopiedExactly() throws {
+        for value in ["true", "false", "oN", "maybe", "\"False\"", "no # for now"] {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            title: Carried Across
+            createdSection1: 2026-09-08T07:00:00.000
+            publishForSection1: \(value)
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Carried Across.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            XCTAssertTrue(
+                updated.contains("publishForSection2: \(value)"),
+                "publishForSection1: \(value) should be copied as it stands"
+            )
+        }
+    }
+
     /// A page written with plain `created:` applies to every section
     /// already, including the new one. Splitting it would change what the
     /// existing sections show, so it is left exactly as it is.

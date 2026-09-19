@@ -21,6 +21,7 @@ _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_health
 import contracts
 import class_pages
+import page_visibility
 import stop_preview
 import toolchain_paths
 from datetime import datetime, timezone
@@ -4094,23 +4095,47 @@ def _is_draft(text: str) -> bool:
     Visibility is `publish: false`. `draft: true` is the older spelling
     with the opposite polarity and is still read, because a teacher's
     existing course may carry it — but an explicit `publish` always wins.
+
+    The text this runs over has ALREADY been through `process_frontmatter`:
+    the only caller is the curriculum-coverage map, which walks the merged
+    `content/` tree. So the per-section keys are gone, `draft:` has been
+    deleted, and PyYAML has rewritten any real boolean as lowercase `false`.
+    The `draft` branch below is therefore unreachable for anything the build
+    copied, and is kept only so that handing this raw source text still
+    answers the way the site would.
+
+    It asks `page_visibility` rather than deciding for itself, because this
+    used to lowercase the value and so called `publish: "False"` and
+    `publish: fAlSe` hidden — both of which are pages students can see.
+    A page wrongly left out of the coverage map is an expectation the map
+    says nobody teaches.
     """
     if not text.startswith("---\n"):
         return False
     end = text.find("\n---", 4)
     if end < 0:
         return False
-    legacy = None
+    publish_value = None
+    draft_value = None
     for line in text[4:end].split("\n"):
-        match = re.match(r"^(publish|draft):\s*(.+?)\s*$", line)
+        # `publish : x` and `"publish": x` are the same key to YAML. They
+        # cannot survive `process_frontmatter`, which rewrites every key, so
+        # this only matters if raw source text is ever handed here — but a
+        # reader that agrees with the site on every line costs one character
+        # class more than one that agrees on most of them.
+        match = re.match(r"^[\"']?(publish|draft)[\"']?[ \t]*:(.*)$", line)
         if match:
-            key = match.group(1)
-            value = match.group(2).strip().strip('"').strip("'").lower()
-            if key == "publish":
-                return value == "false"
-            if legacy is None:
-                legacy = value == "true"
-    return bool(legacy)
+            # The LAST line wins, because that is the one PyYAML keeps when a
+            # page carries the same key twice.
+            if match.group(1) == "publish":
+                publish_value = match.group(2)
+            else:
+                draft_value = match.group(2)
+    if publish_value is not None:
+        return page_visibility.publish_family_answer(publish_value) == page_visibility.HIDDEN
+    if draft_value is not None:
+        return page_visibility.draft_family_answer(draft_value) == page_visibility.HIDDEN
+    return False
 
 
 def class_folder_name(config: dict) -> str:
