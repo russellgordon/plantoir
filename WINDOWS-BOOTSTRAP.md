@@ -118,9 +118,43 @@ reasons rather than tasks:
 
 ## 5. Rules while you work
 
-- **Never hand-edit the generated keys** in `contracts/` — `cardPhrasings`,
-  `tools`, `milestones`. The mac overwrites them and the diff looks like
-  vandalism.
+- **Never hand-edit the generated keys** in `contracts/`. The mac overwrites
+  them and the diff looks like vandalism. **Read which they are from each
+  file's own `generated.keys`**, never from a list somebody typed into prose:
+  this line named three of them until 2026-09-10 and had `toolSchemas` — where
+  every tool's ARGUMENTS live — missing, which is why `back_up_course`'s
+  arguments changing on the mac arrived here looking like it came from nowhere.
+  Only `assist-cases.json` and `app-rules.json` carry that key, because they
+  are the two MIXED files and it marks the boundary; `assist-wording.json` is
+  generated in full and says so in its `note`, and the seven authored files
+  have no generated half to mark.
+- **A red contract test is usually a HANDOVER arriving, and the issue naming it
+  is often already open.** The mac opens a `windows` issue in the session it
+  changes a contract (`CLAUDE.md` rule 3), so a failure in
+  `AssistCardCommandTests`, `AssistSurfaceContractTests` or `ContractTests`
+  usually means the mac moved and this side has not followed yet. **Read the
+  open `windows` issues before filing a new one** — issue #146 was written
+  because two tests failed with a bare `Assert.NotNull() Failure: Value is
+  null` and were read as nobody having said anything, when #70 had named all
+  five phrasings the evening before. Those assertions say where to look now.
+  **But check rather than assume**, because #146 was also half RIGHT: a third
+  failure in the same run, `back_up_course` gaining a `section`, had no issue
+  anywhere. When you find none, say so and open one labelled `mac` — that is
+  the same courtesy in reverse, not a complaint.
+- **When the handover's issue is milestoned for a LATER release, name the gap
+  rather than softening the contract.** `windows-app/Plantoir.Tests/NamedGapLedger.cs`
+  carries one entry per key — the key, the issue, the milestone, the reason —
+  and the two it holds today are the unit-word rename's trail event and
+  sentence, owed under [#158](https://github.com/russellgordon/plantoir/issues/158)
+  at v1.3.0. Everything not in it is asserted as before, and the ledger fails
+  the moment a ledgered thing starts existing here or stops being in the
+  contract, so an entry cannot outlive either. **It is allowed only while an
+  open issue milestoned LATER than the release being cut owns the work, and
+  never for a difference a teacher can see at the current milestone** — that
+  one is a defect to fix or a release to hold. Editing the contract to quiet
+  your suite (an `appliesOn: ["mac"]` on something this side owes, say) is the
+  thing this exists to replace: `contracts/README.md` → "Named gaps" says
+  why, and a green run can therefore mean "green, with two written debts".
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
   `promptHistory`, and the case lists in the other files). Doing so will make
   the **mac** suite fail until they implement it — that is the mechanism
