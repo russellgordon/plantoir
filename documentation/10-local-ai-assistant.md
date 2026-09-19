@@ -404,7 +404,7 @@ appearing to honour another section would answer a different question with
 total confidence.
 
 Every accepted and refused spelling is DATA, in `contracts/assist-cases.json`
-→ `deployAtATime` (23 accepted, 23 refused, 11 resolving rows), authored rather
+→ `deployAtATime` (23 accepted, 25 refused, 11 resolving rows), authored rather
 than generated and preserved across `--write-contracts`. One example and one
 near-miss — all `cardPhrasings.parsed` can carry — would have described a
 grammar of times as a single spelling, and the other platform would have built
@@ -442,7 +442,7 @@ memory — `schedule_deploy` and `plan_scheduled_deploy` are the two today, and
 `publish_class_on`'s day-shaped `when` is untouched without anybody having to
 remember that it is different.
 
-**Three consequences written down rather than discovered.**
+**Five consequences written down rather than discovered.**
 
 - **The settler quietly changes the MODEL's path too.** It runs in
   `run(call:)` for every call, so a model that answers `when: "06:30"` now gets
