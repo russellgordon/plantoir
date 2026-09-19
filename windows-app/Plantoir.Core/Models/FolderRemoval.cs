@@ -123,6 +123,8 @@ public static class FolderRemoval
         // come off the coverage map because of a capital letter. The drop below
         // has always been case-insensitive for the same reason, and the two
         // must agree or a name can be judged absent and removed anyway.
+        // Proposed to the mac as a contract case by issue #172; the six cases
+        // above cannot see the difference, which is why it is an issue.
 
         // The never-asked guard, written out because it is half of the rule as
         // the contract states it ("no longer offered AND the course had already
