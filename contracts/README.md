@@ -474,12 +474,13 @@ The 2026-09-06 audit was a count; this is the same question asked of the file
 as it stands, and it is the milestone's "definition of done" for
 [#138](https://github.com/russellgordon/plantoir/issues/138): **every case list
 in every `contracts/*.json` is either run by a Windows gate, or owned by an
-open issue, or exempt for a reason written down here.** **111 case lists; 102
-have a reader here.** The other nine are below. (It was 100 of 111 when this
+open issue, or exempt for a reason written down here.** **114 case lists; 102
+have a reader here.** The other twelve are below. (It was 100 of 111 when this
 paragraph was first written; `workingFolderSelection.cases` and `.rejected`
 have a Windows reader since [#162](https://github.com/russellgordon/plantoir/issues/162)
-landed, and the count above was RE-TAKEN with the walker below rather than
-adjusted by hand — no `contracts/*.json` changed, so the 111 is unmoved.)
+landed, and the count was RE-TAKEN with the walker below rather than adjusted
+by hand. It moved from 111 to 114 when `deployAtATime` arrived with #168 —
+three lists, all owed, all in the table.)
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
@@ -516,6 +517,7 @@ subtraction.
 | `shared-rules.json` → `workingFolderPathBar.ancestorPaths.cases` | 2 | **Exempt, by construction.** POSIX paths (`/Users/teacher/…`). The rule is shared; only the spelling of a root is the platform's, and `windowsCases` beside it — three cases including a `D:\` drive — is what `SharedRuleContractTests` runs. |
 | `shared-rules.json` → `cloudSyncedFolders.detection.cases` | 11 | **Exempt, by construction.** Every path is a mac one (`{home}/Library/Mobile Documents`, `/Volumes/…`); the markers Windows detects from are a different list, and `CloudSyncedFolderTests` covers them. |
 | `shared-rules.json` → `stopPreview.identity.evidences`, `.notShared` | 3 + 4 | **Exempt: prose with fields.** The behaviour they describe is exercised through `stopPreview.cases`, and those 23 are gated TWICE here — `scripts/test_stop_preview.py` through `PythonToolchainTests`, and `windows-app/test_stop_preview.ps1` through `TheLauncherMatcherAnswersTheContract`, which asserts "0 failed" so a runner that skipped everything cannot pass. |
+| `assist-cases.json` → `deployAtATime.accepted`, `.refused`, `.resolving` | 23 + 25 + 11 | **Owed**, the `windows` issue opened from [#168](https://github.com/russellgordon/plantoir/issues/168) — the whole family is theirs to implement, and these rows ARE the specification: one example in `cardPhrasings.parsed` cannot describe a grammar of times. `CardPhrasings_AllParsedExamplesFromContract_Pass` will go red on the sixth family the moment the contract lands, so the work is visible there; what these three add is every spelling and the day rule. |
 | `toolchain.json` → `rules` | 3 | **Read by NOBODY, on either platform** — the one list in the census with no reader anywhere and no issue, and it is left that way deliberately. It is reasoning rather than cases: the image tag being a hash of the build context, building with BuildKit, and revalidating Quartz before chasing a newer CLI. All three are held by the launchers and by `verify.sh`, which does not run on Windows at all. The other three `rules` arrays ARE read — `buildFreshness.rules` by `BuildOutputLocationTests`, `example-content.rules` and `courseConfigKeys.rules` by `SharedRuleContractTests`. |
 
 **And the exemptions inside lists that ARE run**, because "run" is not the
