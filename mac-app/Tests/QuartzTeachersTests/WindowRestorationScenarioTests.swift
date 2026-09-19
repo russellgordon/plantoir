@@ -154,11 +154,20 @@ final class WindowRestorationScenarioTests: XCTestCase {
     /// it is the reason the clearing lives in the folder funnel rather than
     /// in `reloadCourses()` — a window that restores its folder and then its
     /// selection reloads courses in between.
+    ///
     /// A real working folder with a real course, not a bare temporary
     /// directory: asserting that a selection naming nothing survives proves
     /// nothing, since a window showing "Course Not Found" would satisfy it.
     /// The selection has to NAME the course that is there, and go on naming
     /// it after everything the restoration then does.
+    ///
+    /// **What this does NOT do is tell the chosen design from the rejected
+    /// one.** A selection naming a course that exists survives a
+    /// validate-inside-`reloadCourses()` too; this is a regression guard on
+    /// restoration, no more. The rejected design is pinned by
+    /// `WorkingFolderSelectionTests.testACourseThatDisappearsFromThisFolder…`
+    /// and by the contract case carrying `expectNamesALoadedCourse: false`,
+    /// where the selection must survive naming NOTHING.
     @MainActor
     func testARestoredWindowKeepsTheSelectionItComesBackWith() throws {
         let folder: URL = try FixtureWorkspace.materialize()
@@ -172,11 +181,17 @@ final class WindowRestorationScenarioTests: XCTestCase {
         XCTAssertNotNil(workspace.selectedCourse, "the fixture's course should be there to name")
 
         // The two things that happen to a restored window afterwards and
-        // could take the selection with them: the folder being adopted again
+        // could take the selection with them: the folder being chosen again
         // — which the funnel must read as the SAME folder rather than a
         // change — and an ordinary reload, which is what every rename,
         // backup, restore and archive causes.
-        workspace.adoptRestoredPath(folder.path)
+        //
+        // `chooseWorkspace` rather than `adoptRestoredPath` on purpose:
+        // adopting returns early when the path is the one already set, so it
+        // never reaches the funnel and would exercise nothing at all. The
+        // picker has no such guard, so this is the route that really asks the
+        // funnel whether the folder has changed.
+        workspace.chooseWorkspace(at: folder)
         workspace.reloadCourses()
 
         XCTAssertEqual(

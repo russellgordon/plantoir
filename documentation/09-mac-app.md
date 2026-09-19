@@ -183,29 +183,56 @@ container.
 
 This is older than issue #93 — it already happened whenever a folder change
 tore the view down — and it is fixed structurally rather than by ordering the
-teardown or delaying it: the view notes the folder its work belongs to
-(`folderThisSectionWorksIn`) and unwinds against that, in `stopPreview`,
-`stopPreviewAndWait`, `cancelPreview`, `cancelDeploy` and the unregister.
-Nothing has to happen before anything else for it to be right.
+teardown or delaying it: the view writes down which folder it is dealing with
+and unwinds against that, never against the model. Nothing has to happen before
+anything else for it to be right.
 
-**The folder is noted at all three places one is DECIDED**, not only on
-appearance: `.onAppear` (before it registers, so a registration and its
-unregister cannot name different folders), `startPreview()` beside the lease,
-and `deployAndWait()`. Appearance alone is not enough, and the hole is quiet: a
-section that appeared while the window had no folder would leave the note nil
-while `startPreview()` went on resolving one from the model perfectly happily —
-a preview that can start and that no stop is aimed at.
+**Two folders are written down, not one, and the reason is the whole of the
+third review.** They answer different questions and they are allowed to differ:
+
+- **`folderThisSectionRegisteredIn`** — which folder was this view REGISTERED
+  under? Written in exactly ONE place, `.onAppear`, before the registration,
+  and read in exactly one place, the unregister. That is what makes "a
+  registration and its unregister name the same folder" true by construction.
+  It matters because nothing sweeps `SectionWindowControllers`: an entry
+  unregistered under the wrong key is stranded for the life of the app.
+- **`folderThisSectionWorksIn`** — which folder did the work in flight START
+  in? Written where a piece of work's folder is DECIDED: `startPreview()`
+  beside the lease, and `deployAndWait()` — the latter AFTER any running
+  preview has been stopped, so a deploy cannot retarget that preview's own
+  stop. Read by `stopPreview`, `stopPreviewAndWait`, `cancelPreview` and
+  `cancelDeploy`. Nil means there is nothing to stop, and every reader is
+  already guarded by a runner's `isRunning`.
+
+One property served both jobs until the third review, and the state that broke
+it is one render pass wide: `chooseWorkspace` clears the selection
+synchronously, `onDisappear` runs on the next pass, and in between the
+assistant — whose own model may still point at the old folder — can find this
+controller registered under it and press Deploy. The deploy noted the folder
+its work belonged to, which was the same property, so the unregister that
+followed used the NEW folder and the entry under the old one was stranded.
+
+Appearance alone is not enough for the work folder either, and that hole is
+quiet: a section that appeared while the window had no folder would leave the
+note nil while `startPreview()` went on resolving one from the model perfectly
+happily — a preview that can start and that no stop is aimed at.
+
+**One note serves both a preview and a deploy deliberately.** They never run at
+once for a section: a deploy stops a running preview and waits for it before
+noting anything of its own, and the Preview button is disabled while a deploy
+runs. A third folder would be a second name for the same one.
 
 It is guarded by a source scan rather than by a behavioural test, and that is
 the honest limit: no real `SectionDetailView` ever mounts in a unit test —
 `AssistRevealsSectionOnScreenTests` says the same of itself — so the test reads
-the four stops, the three captures and the teardown closure, and fails if any
-stop goes back to the model's current folder, if any capture is dropped, or if
-the appearance stops noting the folder before it registers. Guarding the
-captures is the half that is easy to leave out, and leaving it out would be
-worse than no guard: delete the capture and every stop reads a permanently nil
-property and does nothing at all, wearing the shape of the fix working. The
-behaviour itself was verified by reading the teardown path.
+the four stops, the two work captures and the teardown closure, and fails if a
+stop goes back to the model's current folder, if a capture is dropped, if the
+appearance stops noting its key before it registers, or if the registration key
+gains a second write site anywhere in the file. Guarding the captures is the
+half that is easy to leave out, and leaving it out would be worse than no
+guard: delete a capture and every stop reads a permanently nil property and
+does nothing at all, wearing the shape of the fix working. The behaviour itself
+was verified by reading the teardown path.
 
 ## Which folders Plantoir uses
 

@@ -248,12 +248,9 @@ final class WorkingFolderSelectionTests: XCTestCase {
         }
 
         // The captures, without which every one of those stops is a no-op.
-        // A folder is decided in three places and each has to write it down.
+        // A piece of work's folder is decided in two places, and each has to
+        // write it down.
         let captures: [(where: String, why: String)] = [
-            (
-                ".onAppear {",
-                "the unregister in onDisappear must name the folder this section registered under"
-            ),
             (
                 "func startPreview()",
                 "a preview can start from the model on an appearance that had no folder, and "
@@ -275,14 +272,26 @@ final class WorkingFolderSelectionTests: XCTestCase {
             )
         }
 
-        // And the appearance has to note it BEFORE it registers, or a
-        // registration made under one folder could be unregistered under
-        // another — the stale-key half of the same bug.
+        // The REGISTRATION key is a separate property with exactly one write
+        // site, and that is the whole of its guarantee. Sharing one property
+        // with the work folder is what let a deploy — startable by the
+        // assistant in the render pass between the selection clearing and
+        // this view disappearing — move the key the unregister then used,
+        // stranding the entry under the old folder for the life of the app.
+        // Nothing sweeps that registry.
+        let writes: Int = source.components(separatedBy: "folderThisSectionRegisteredIn = ").count - 1
+        XCTAssertEqual(
+            writes, 1,
+            "the folder a section registered under must be written in exactly ONE place, or a "
+            + "registration and its unregister can name different folders again"
+        )
         let appearance: String = try XCTUnwrap(
-            bodyOfFunction(startingWith: ".onAppear {", in: source)
+            bodyOfFunction(startingWith: ".onAppear {", in: source),
+            ".onAppear is no longer in SectionDetailView"
         )
         let noted: Range<String.Index> = try XCTUnwrap(
-            appearance.range(of: "folderThisSectionWorksIn = ")
+            appearance.range(of: "folderThisSectionRegisteredIn = "),
+            "the one write site must be the appearance, which is what registers"
         )
         let registered: Range<String.Index> = try XCTUnwrap(
             appearance.range(of: "SectionWindowControllers.shared.register("),
@@ -298,8 +307,8 @@ final class WorkingFolderSelectionTests: XCTestCase {
             "SectionDetailView no longer has an onDisappear"
         )
         XCTAssertTrue(
-            teardown.contains("folderThisSectionWorksIn"),
-            "unregistering must name the folder the section registered under"
+            teardown.contains("folderThisSectionRegisteredIn"),
+            "unregistering must name the folder the section REGISTERED under"
         )
         XCTAssertFalse(
             teardown.contains("workspace.workspaceURL"),
@@ -312,8 +321,16 @@ final class WorkingFolderSelectionTests: XCTestCase {
     /// A real working folder with an empty `courses/` — the state a teacher
     /// meets when they set up a folder and have not added anything yet, and
     /// the folder the defect was first seen against.
+    ///
+    /// The clean-up is registered the moment the folder exists, rather than
+    /// left to the caller's `defer`: emptying it can throw, and a throw
+    /// between materialising and returning would leave the folder behind
+    /// with nothing holding a reference to delete it.
     private func makeFolderWithNoCourses() throws -> URL {
         let folder: URL = try FixtureWorkspace.materialize()
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: folder)
+        }
         try FileManager.default.removeItem(
             at: folder.appendingPathComponent("courses").appendingPathComponent("EXC2O")
         )
