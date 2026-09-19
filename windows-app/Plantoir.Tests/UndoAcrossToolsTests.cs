@@ -120,10 +120,17 @@ public sealed class UndoAcrossToolsTests : IDisposable
     public async Task AnOperationThatThrewPartWayLeavesNothingOpenToSwallowTheNext()
     {
         // The half the first fix missed. Five older tools closed their entry
-        // only on the path where nothing threw — and every one of them is
-        // called through PlantoirTools.Guarded, which turns the exception into
-        // an ANSWER. So the entry stayed open, and the next operation's files
-        // went into it under the earlier description.
+        // only on the path where nothing threw, so the entry stayed open and
+        // the next operation's files went into it under the earlier
+        // description.
+        //
+        // This one is the PUBLISH path, and it is the worst case rather than
+        // the mildest: PlantoirTools.Act catches only AssistRefusal and
+        // OperationCanceledException, so an IOException leaves the tool
+        // altogether — no reply is built and no backup is named (issue #165).
+        // The workspace object serving the conversation lives on regardless,
+        // which is why the entry being left open would still reach the
+        // teacher's NEXT request.
         //
         // The throw here is a real one: Obsidian is open in the other window,
         // and a page named by a plan made a minute ago is gone by the time the
@@ -142,7 +149,8 @@ public sealed class UndoAcrossToolsTests : IDisposable
         // before any of it happened, so committing the entry would tell a
         // teacher they had published two pages when one was written — at the
         // one moment they are checking. The backup taken before the first
-        // write is the way back.
+        // write is the way back, though on THIS path nothing yet names it to
+        // the teacher (#165).
         Assert.Empty(_history.Entries);
 
         // And the next operation's undo is ITS OWN.
