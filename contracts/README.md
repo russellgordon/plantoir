@@ -503,7 +503,7 @@ Then look for a reader of each path in `windows-app/Plantoir.Tests/**`,
 `scripts/*.py` (which `PythonToolchainTests` discovers and runs inside `dotnet
 test`) and `windows-app/*.ps1` — and **check every miss by hand**, because a
 grep for two key names agrees with itself too easily in a large file, in both
-directions. The table below is the hand-checked half; the 100 is the
+directions. The table below is the hand-checked half; the 102 is the
 subtraction.
 
 | List | Cases | Where it stands |
