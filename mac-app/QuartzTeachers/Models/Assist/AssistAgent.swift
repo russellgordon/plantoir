@@ -185,15 +185,14 @@ final class AssistAgent {
         // The fixed shapes never reach the model — see AssistCardCommand for
         // the measurement that decided this.
         if let command = AssistCardCommand.matching(trimmed) {
-            // Worth its own line: "why did it not think about what I said?"
-            // is answered by this and by nothing else in the trail.
-            ActivityTrail.note(
-                .assistantMatchedAFixedPhrase,
-                "matched in code, not sent to the model — ran " + command.toolName,
-                course: courseCode,
-                section: sectionNumber
-            )
-            await run(call: AssistToolCall(
+            // Built and SETTLED before the line is written, and then run
+            // without being settled again. The order is the whole point: the
+            // matcher is clock-free, so "deploy at 6:30 am" arrives here as
+            // "06:30" and the day it means does not exist until the settler
+            // has run. Writing the line first would record a time with no day
+            // on it; settling twice would read the clock twice, which is the
+            // bug `withTheDaySettled` exists to prevent.
+            let call: AssistToolCall = settled(AssistToolCall(
                 id: UUID().uuidString,
                 type: "function",
                 function: AssistToolCall.Function(
@@ -201,6 +200,15 @@ final class AssistAgent {
                     arguments: encode(command.arguments)
                 )
             ))
+            // Worth its own line: "why did it not think about what I said?"
+            // is answered by this and by nothing else in the trail.
+            ActivityTrail.note(
+                .assistantMatchedAFixedPhrase,
+                AssistAgent.matchedInCodeLine(for: call),
+                course: courseCode,
+                section: sectionNumber
+            )
+            await run(settledCall: call)
             return
         }
 
@@ -542,8 +550,76 @@ final class AssistAgent {
         )
     }
 
+    /// The same call, with a bare clock time turned into the whole moment it
+    /// means.
+    ///
+    /// The sibling of `withTheDaySettled`, and here for the same reason:
+    /// the card holds these arguments while the teacher decides, and
+    /// `approvePending` hands the very same object to `execute`. The runner's
+    /// own clock supplies the DAY, and `Date()` is read in exactly one place —
+    /// here — so a card shown at 06:29 and agreed to at 06:31 still names the
+    /// minute it named.
+    ///
+    /// **This covers the model's path too, quietly**, the way the day settler
+    /// already does: a model that answers `when: "06:30"` used to meet the
+    /// runner's "I could not read that time" and now gets the same reading a
+    /// card gets. A model that answers `"6:30"` still meets the refusal — the
+    /// settler reads an exact `HH:mm` and nothing looser.
+    private func withTheMomentSettled(_ call: AssistToolCall) -> AssistToolCall {
+        guard let definition = tools.definition(named: call.function.name) else {
+            return call
+        }
+        let settled: [String: Any] = AssistToolRunner.settlingTheDeployMoment(
+            in: call.argumentValues, forTool: definition, today: tools.today, now: Date()
+        )
+        guard let data = try? JSONSerialization.data(withJSONObject: settled),
+              let rewritten = String(data: data, encoding: .utf8) else {
+            return call
+        }
+        return AssistToolCall(
+            id: call.id,
+            type: call.type,
+            function: AssistToolCall.Function(name: call.function.name, arguments: rewritten)
+        )
+    }
+
+    /// A call ready to be run: bound to this window's section, with a relative
+    /// day and a bare clock time already resolved.
+    ///
+    /// One function rather than three calls in a row at each site, because
+    /// "settled" is a state the rest of the agent depends on and a caller that
+    /// forgot one of the three would look exactly like a caller that had not.
+    private func settled(_ rawCall: AssistToolCall) -> AssistToolCall {
+        return withTheMomentSettled(withTheDaySettled(boundToThisSection(rawCall)))
+    }
+
+    /// The trail line for a sentence answered in code, naming the tool — and
+    /// the MOMENT, when the sentence carried one.
+    ///
+    /// Named rather than typed where it is asserted, the way every sentence a
+    /// teacher reads is. The moment is on the line because it is a guess made
+    /// in code: "at 6:30" with no day on it becomes tomorrow morning, and a
+    /// teacher who writes in saying "it went out on Saturday, I meant Friday"
+    /// leaves a trail that otherwise records their sentence and the tool but
+    /// not the day the app chose. The conversation is not on the trail, so
+    /// this is the only place the choice is recoverable.
+    ///
+    /// Only a WHOLE moment is ever added — a value `moment(named:)` can read —
+    /// so nothing a teacher wrote, and no half-settled word, can arrive here.
+    static func matchedInCodeLine(for call: AssistToolCall) -> String {
+        let line: String = "matched in code, not sent to the model — ran " + call.function.name
+        guard let when = call.argumentValues["when"] as? String,
+              AssistToolRunner.moment(named: when) != nil else {
+            return line
+        }
+        return line + " for " + when
+    }
+
     private func run(call rawCall: AssistToolCall) async {
-        let call: AssistToolCall = withTheDaySettled(boundToThisSection(rawCall))
+        await run(settledCall: settled(rawCall))
+    }
+
+    private func run(settledCall call: AssistToolCall) async {
         guard let definition = tools.definition(named: call.function.name) else {
             messages.append(AssistMessage.toolResult(
                 callID: call.id, name: call.function.name,

@@ -16,7 +16,7 @@
     "couldNotUndo" : "Earlier, you {change}, and you have asked me to undo that — but I have not changed anything, because those 2 pages have been edited since. Putting my old copy back would throw away that newer work.",
     "courseIsBusy" : "{course} is busy in Plantoir — a preview or a deploy is running. Wait for that to finish, then ask again.",
     "deployAccepted" : "Deploy",
-    "deployApproval" : "Students will see what is deployed. Be certain to review changes you have made.",
+    "deployApproval" : "This happens now. Students will see what is deployed. Be certain to review changes you have made.",
     "deployDidNotFinish" : "The deploy of {course} Section {section} did not finish. The output is in that section's window in Plantoir.",
     "deployed" : "{course} Section {section} is deployed. Students can reach it now.",
     "deployQuestion" : "Shall I deploy?",
