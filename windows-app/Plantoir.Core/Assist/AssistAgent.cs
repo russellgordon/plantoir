@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -536,6 +537,27 @@ public sealed class AssistAgent
     /// </summary>
     public Func<bool> ConfirmationMode { get; set; } = () => true;
 
+    /// <summary>
+    /// This class's ONE clock: today, read when it is needed rather than
+    /// stored.
+    /// </summary>
+    /// <remarks>
+    /// <para>A function rather than a date because a window stays open longer
+    /// than a calendar day, and a stored "today" would answer "publish
+    /// tomorrow's class" against the day the conversation BEGAN — a wrong day
+    /// that reports success. <c>PlantoirTools.Today</c> on the server is the
+    /// same shape for the same reason.</para>
+    ///
+    /// <para><b>One clock, not two.</b> Everything in this class that needs a
+    /// day asks this: the dateline the model reasons from, the scheduled
+    /// deploy a card sets up, the card's own relative word, and
+    /// <see cref="WithTheDaySettled"/>. Two clocks in one conversation is two
+    /// answers to what today is, differing on one night in a thousand, with no
+    /// test able to pin the one a teacher's request actually used — the mac
+    /// met exactly that in an earlier draft of its own settler.</para>
+    /// </remarks>
+    public Func<DateOnly> Today { get; init; } = () => DateOnly.FromDateTime(DateTime.Now);
+
     /// <summary>Invoked whenever a pending plan/write action is accepted by the teacher.</summary>
     public Action? OnPlanAccepted { get; set; }
 
@@ -606,8 +628,17 @@ public sealed class AssistAgent
         if (PreviewAskedForPlainly(text) is { } handled) return handled;
         if (await CardCommand(text, cancellation) is { } commanded) return commanded;
 
-        var today = DateTime.Now;
-        _dateline = $" (Today is {today:yyyy-MM-dd}, a {today.DayOfWeek}.)";
+        // InvariantCulture, and this class's one clock. A machine whose
+        // default calendar is not Gregorian renders "yyyy" in ITS year —
+        // 2569 for Thai Buddhist — so an affected teacher's assistant would
+        // be told the wrong year on every single message, in the one sentence
+        // it does all its date arithmetic from. Byte-identical on a Gregorian
+        // machine, which is what keeps the routing measurements standing.
+        // (The writer half of that trap is issue #144.) DayOfWeek is an enum
+        // name and carries no culture of its own.
+        var today = Today();
+        _dateline = string.Create(CultureInfo.InvariantCulture,
+            $" (Today is {today:yyyy-MM-dd}, a {today.DayOfWeek}.)");
         _messages.Add(new JsonObject
         {
             ["role"] = "user",
@@ -644,7 +675,7 @@ public sealed class AssistAgent
 
             if (match.ToolName.Equals("deploy_section", StringComparison.OrdinalIgnoreCase))
             {
-                return AskFirst(text, "deploy_section", match.ToJsonObject(_courseCode, _section));
+                return AskFirst(text, "deploy_section", match.ToJsonObject(_courseCode, _section, Today()));
             }
             if (match.ToolName.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
             {
@@ -655,7 +686,11 @@ public sealed class AssistAgent
                 return new List<Line> { new("assistant", said) };
             }
 
-            return await RunCommand(text, match.ToolName, match.ToJsonObject(_courseCode, _section), cancellation);
+            // The card settles its own relative word at match time, and it is
+            // handed this class's clock to settle it against rather than
+            // reading one of its own.
+            return await RunCommand(text, match.ToolName,
+                                    match.ToJsonObject(_courseCode, _section, Today()), cancellation);
         }
 
         string request = text.Trim().TrimEnd('.', '!');
@@ -701,7 +736,11 @@ public sealed class AssistAgent
             int minute = scheduled.Groups["minute"].Success ? int.Parse(scheduled.Groups["minute"].Value) : 0;
             if (scheduled.Groups["half"].Value.Equals("pm", StringComparison.OrdinalIgnoreCase) && hour < 12) hour += 12;
             if (scheduled.Groups["half"].Value.Equals("am", StringComparison.OrdinalIgnoreCase) && hour == 12) hour = 0;
-            string when = $"{DateTime.Now.AddDays(1):yyyy-MM-dd} {hour:00}:{minute:00}";
+            // Same clock and same culture as the dateline above: this one is a
+            // date the app WRITES, into a scheduled deploy that fires while
+            // nobody is watching.
+            string when = string.Create(CultureInfo.InvariantCulture,
+                $"{Today().AddDays(1):yyyy-MM-dd} {hour:00}:{minute:00}");
             return AskFirst(text, "schedule_deploy", new JsonObject
             {
                 ["course"] = _courseCode,
@@ -827,6 +866,122 @@ public sealed class AssistAgent
         if (call["function"]?["arguments"]?.GetValue<string>() is not { } raw) return new JsonObject();
         try { return JsonNode.Parse(raw) as JsonObject ?? new JsonObject(); }
         catch { return new JsonObject(); }
+    }
+
+    // ---- Rewriting what the model filled in ------------------------------
+
+    /// <summary>
+    /// Let <paramref name="rewrite"/> change one tool call's arguments, and
+    /// put them back on the call.
+    /// </summary>
+    /// <remarks>
+    /// <para>The round trip every rewrite at this seam needs, written once:
+    /// the arguments are a JSON STRING inside the call, so changing one means
+    /// parse, edit, re-serialise. <see cref="WithTheDaySettled"/> is the first
+    /// of these and is not expected to be the last — binding the model's
+    /// <c>course</c> and <c>section</c> to the window's own is the next
+    /// (issue #180), and it belongs here beside it rather than parsing the
+    /// same string a second time.</para>
+    ///
+    /// <para>Anything it cannot read it leaves exactly as it arrived: a small
+    /// model sends malformed JSON often enough that <see cref="ArgumentsOf"/>
+    /// and <c>RunTool</c> both already defend against it, and a rewrite is
+    /// the last place that should be the one to throw.</para>
+    ///
+    /// <para>The call is changed IN PLACE and returned, for chaining. That is
+    /// safe: the message history holds its own deep clone of the model's
+    /// reply, taken before this runs, so nothing rewrites what the model is
+    /// shown next turn.</para>
+    /// </remarks>
+    private static JsonObject WithArgumentsRewritten(JsonObject call, Action<JsonObject> rewrite)
+    {
+        if (call["function"] is not JsonObject function) return call;
+        if (function["arguments"] is not JsonValue raw || !raw.TryGetValue(out string? json)) return call;
+
+        JsonObject? arguments;
+        try { arguments = JsonNode.Parse(json) as JsonObject; }
+        catch { return call; }
+        if (arguments is null) return call;
+
+        rewrite(arguments);
+        function["arguments"] = arguments.ToJsonString();
+        return call;
+    }
+
+    /// <summary>
+    /// Turn a relative day the MODEL filled in — <c>date: "tomorrow"</c> —
+    /// into the date it means, ONCE, where the call is created.
+    /// </summary>
+    /// <remarks>
+    /// <para>The card path settles its own word at match time
+    /// (<c>AssistCardCommand.ToJsonObject</c>). This is the other path: a
+    /// <c>date</c> the model wrote itself, which <c>ClassDateHelp</c> tells it
+    /// not to write relatively and which a small model does anyway. One call
+    /// object is then read three times — the approval card, the <c>plan_</c>
+    /// twin, and the act the teacher presses Go on — and each of those used to
+    /// reach the server's <c>DayFor</c>, which reads the clock per call. A plan
+    /// shown at 23:59 and agreed to at 00:01 described one class and published
+    /// the next. Settled here, the three carry the same argument BY
+    /// CONSTRUCTION, and the clock may then be read as freely as it likes.</para>
+    ///
+    /// <para><b>The gate asks the tool surface, and what it really tracks is
+    /// WHAT CONSULTS THE CLOCK.</b> A tool is touched only if its own schema
+    /// declares a <c>date</c> property, so a list kept beside this code cannot
+    /// fall behind the tools. Today that is exactly <c>publish_class_on</c>,
+    /// whose <c>date</c> goes to <c>PlantoirTools.DayFor</c> — the one place a
+    /// relative word is read against the clock. <c>schedule_deploy</c>'s
+    /// <c>when</c> is a day AND a time and declares no <c>date</c>, so it is
+    /// excluded by construction rather than by being remembered.
+    /// <c>publish_pages</c> and <c>unpublish_pages</c> take <c>before</c> and
+    /// <c>onOrAfter</c>, which reach <c>ParseDate</c> — strict, invariant, and
+    /// it REFUSES "tomorrow" — so they consult no clock and want no settling.
+    /// The trap to know: a future forgiving parser behind one of those names
+    /// would reopen this hole with the gate shut, because the gate is spelled
+    /// <c>date</c> and the exposure is not. <c>TheSettlerTouchesExactlyTheToolsDeclaringADate</c>
+    /// makes that at least a visible decision.</para>
+    ///
+    /// <para>A word the reader cannot make a day of — "next monday", which is
+    /// refused rather than guessed — passes through untouched, so the tool
+    /// answers with its own sentence about it. An absolute date settles to
+    /// itself. A <c>date</c> that is not a string at all (a model that sends
+    /// <c>20260920</c> as a number) passes through untouched too, rather than
+    /// throwing where nothing would catch it.</para>
+    ///
+    /// <para>Nothing the model SEES changes: no schema, no description, no
+    /// <c>ClassDateHelp</c>. It has already chosen the tool by the time this
+    /// runs, so no routing re-measurement is owed.</para>
+    /// </remarks>
+    private JsonObject WithTheDaySettled(JsonObject call)
+    {
+        if (call["function"]?["name"]?.ToString() is not { } name) return call;
+        if (!DeclaresAClassDay(name)) return call;
+
+        return WithArgumentsRewritten(call, arguments =>
+        {
+            if (arguments["date"] is not JsonValue given || !given.TryGetValue(out string? word)) return;
+            if (SectionScheduleSource.ReadRelativeDay(word, Today()) is not { } day) return;
+
+            // InvariantCulture: the tool must not be sent looking for a class
+            // on a day no course has — see the dateline above.
+            arguments["date"] = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        });
+    }
+
+    /// <summary>
+    /// Whether the tool the model chose declares a <c>date</c> — asked of the
+    /// schemas this conversation was built with, which are the ones the model
+    /// was shown.
+    /// </summary>
+    internal bool DeclaresAClassDay(string tool)
+    {
+        foreach (var schema in _schemas)
+        {
+            if (schema?["function"] is not JsonObject function) continue;
+            if (function["name"]?.ToString() is not { } named) continue;
+            if (!named.Equals(tool, StringComparison.OrdinalIgnoreCase)) continue;
+            return function["parameters"]?["properties"]?["date"] is not null;
+        }
+        return false;
     }
 
     /// <summary>
@@ -1025,6 +1180,12 @@ public sealed class AssistAgent
             // One at a time, so a teacher reading the transcript can follow it.
             var call = calls![0] as JsonObject;
             if (call is null) return lines;
+
+            // Where the model's call is made is where its arguments are put
+            // right — once, before the card, the plan twin and the act each
+            // read this same object. Today that is the relative day; a
+            // section binding belongs beside it.
+            call = WithTheDaySettled(call);
 
             string name = call["function"]?["name"]?.GetValue<string>() ?? "";
             ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool,

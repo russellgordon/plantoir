@@ -107,12 +107,28 @@ public class AssistAgentTests
         /// </summary>
         public bool Confirming = true;
 
+        /// <summary>
+        /// The agent's one clock, pinned so nothing here is a function of the
+        /// wall clock. A Tuesday, the day the contract's relative-day cases
+        /// count from.
+        /// </summary>
+        /// <remarks>
+        /// The SCHEMAS are still empty below, and that matters for one thing
+        /// only: <c>AssistAgent.WithTheDaySettled</c> asks the tool surface
+        /// which argument carries a class day, so it is inert in this rig.
+        /// What the settler does is pinned in
+        /// <see cref="RelativeDayFreshnessTests"/>, which deserialises the real
+        /// surface from <c>contracts/assist-cases.json</c>.
+        /// </remarks>
+        public DateOnly Today = new(2026, 9, 8);
+
         public readonly AssistAgent Agent;
 
         public Rig()
         {
             Agent = new AssistAgent(Model, Tools, new JsonArray(), "VVH2O", 1)
             {
+                Today = () => this.Today,
                 ShowPreviewInApp = () => AppActions.Add("show preview"),
                 StopPreviewInApp = () => AppActions.Add("stop preview"),
                 StartDeployInApp = () => AppActions.Add("deploy"),
@@ -223,7 +239,11 @@ public class AssistAgentTests
 
         string userTurn = rig.Model.Asked[0][^1]!["content"]!.GetValue<string>();
         Assert.StartsWith("Publish tomorrow's class, but not the linked pages (Today is ", userTurn);
-        Assert.Contains(DateTime.Now.ToString("yyyy-MM-dd"), userTurn);
+        // Built from the agent's own clock rather than from DateTime.Now: the
+        // dateline is what the model does its date arithmetic from, and a
+        // test that reads the wall clock cannot tell a wrong day from a slow
+        // one. RelativeDayFreshnessTests pins the whole sentence.
+        Assert.Contains(rig.Today.ToString("yyyy-MM-dd"), userTurn);
         Assert.Equal("publish_class_on", Assert.Single(rig.Tools.Calls).Name);
     }
 
@@ -454,7 +474,7 @@ public class AssistAgentTests
         var answer = rig.Approve();
         var call = Assert.Single(rig.Tools.Calls);
         Assert.Equal("schedule_deploy", call.Name);
-        Assert.Equal($"{DateTime.Now.AddDays(1):yyyy-MM-dd} 06:30", call.Arguments["when"]!.GetValue<string>());
+        Assert.Equal($"{rig.Today.AddDays(1):yyyy-MM-dd} 06:30", call.Arguments["when"]!.GetValue<string>());
         Assert.Contains(answer, l => l.Text.Contains("06:30"));
     }
 
@@ -521,8 +541,10 @@ public class AssistAgentTests
     public void TheDatelineNeverAppearsInWhatTheTeacherReads()
     {
         var rig = new Rig();
-        string today = DateTime.Now.ToString("yyyy-MM-dd");
-        rig.Model.ThenSays($"Tomorrow is the day after (Today is {today}, a {DateTime.Now.DayOfWeek}.) — nothing to do.");
+        // The parroted dateline has to be the one the agent actually appended,
+        // so it is built from the agent's clock, not the machine's.
+        string today = rig.Today.ToString("yyyy-MM-dd");
+        rig.Model.ThenSays($"Tomorrow is the day after (Today is {today}, a {rig.Today.DayOfWeek}.) — nothing to do.");
 
         var lines = rig.Say("What day is it?");
 
