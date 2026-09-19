@@ -82,12 +82,18 @@ enum WizardStructure {
     ///   after an adoption leaves them unequal to the snapshot and they stay
     ///   as the switch left them. The per-section lists, which have no LCS
     ///   variant, still go back.
-    /// - The marks pool is re-inferred over the RESTORED folders rather than
-    ///   copied from anywhere, so it can never name a folder that has just
-    ///   left the editor. Windows clears the pool and lets its lazy
-    ///   `CurrentGradedFolders()` infer it on the next read; doing it eagerly
-    ///   here gives the same answer, because that inference runs over the same
-    ///   restored lists.
+    /// - The marks pool can never name a folder that has just left the
+    ///   editor, and it takes two rules to keep that true. A pool still equal
+    ///   to the adoption's is RE-INFERRED over the restored folders; a pool
+    ///   the teacher has ticked themselves is theirs and is kept, but
+    ///   NARROWED to the folders the course will actually have. Without the
+    ///   second, a teacher who adopted the mathematics skeleton, unticked
+    ///   `Tasks` and then declined the skeleton would be left with
+    ///   `graded_folders: ["Thinking Tasks"]` naming a folder the course does
+    ///   not have — the build counts nothing, the checklist shows nothing
+    ///   ticked, and neither says so. Windows reaches the same place from the
+    ///   other end: it leaves the pool alone here and narrows it on every
+    ///   read (`CurrentGradedFolders`) and again when the file is written.
     static func restoringDefaults(
         in current: Lists,
         adopted: Lists?,
@@ -124,11 +130,12 @@ enum WizardStructure {
             perSectionFiles = WizardDefaults.perSectionFiles
         }
 
-        var gradedFolders: [String] = current.gradedFolders
+        let foldersTheCourseWillHave: [String] = sharedFolders + perSectionFolders
+        var gradedFolders: [String] = GradedFolderRule.reconciled(
+            current.gradedFolders, toFolders: foldersTheCourseWillHave
+        )
         if current.gradedFolders == adopted.gradedFolders {
-            gradedFolders = GradedFolderRule.inferredPool(
-                from: sharedFolders + perSectionFolders
-            )
+            gradedFolders = GradedFolderRule.inferredPool(from: foldersTheCourseWillHave)
         }
 
         return Lists(

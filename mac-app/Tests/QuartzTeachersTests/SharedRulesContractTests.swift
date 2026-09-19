@@ -700,11 +700,15 @@ final class SharedRulesContractTests: XCTestCase {
     func testTheSkeletonToggleRestoresWhatTheContractSays() throws {
         let toggle: [String: Any] = try SharedRulesContractTests.skeletonToggleRules()
         let defaultCode: String = try XCTUnwrap(toggle["courseCode"] as? String)
+        let otherCode: String = try XCTUnwrap(toggle["otherCourseCode"] as? String)
         let vocabulary: [String: Any] = try XCTUnwrap(toggle["lists"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(toggle["cases"] as? [[String: Any]])
 
+        // The floor is the count as it stands, not a round number below it:
+        // a floor four cases down lets four be deleted without a word, in a
+        // check whose whole purpose is to notice that. Raise it with the list.
         XCTAssertGreaterThanOrEqual(
-            cases.count, 8,
+            cases.count, 13,
             "wizard.skeletonToggle has lost cases. The list is the acceptance list for both "
             + "apps; a case removed here is a behaviour neither suite checks any more."
         )
@@ -725,23 +729,27 @@ final class SharedRulesContractTests: XCTestCase {
             var snapshot: WizardStructure.Lists? = (given["hasSnapshot"] as? Bool == true)
                 ? WizardStructure.adopting(family)
                 : nil
+            // Where a new wizard opens, and what the guard in
+            // adoptSkeletonStructure() reads when a code is typed.
+            var skeletonIsWanted: Bool = true
 
             for step in try XCTUnwrap(testCase["steps"] as? [String]) {
                 switch step {
                 case "turnOn":
-                    // The adoption rule that predates this one: a folder list
-                    // the teacher has changed is never overwritten.
-                    if let adoptable = SkeletonCatalog.structureToAdopt(
-                        forCode: code, currentSharedFolders: lists.sharedFolders
-                    ) {
-                        lists = WizardStructure.adopting(adoptable)
-                        snapshot = lists
-                    }
+                    skeletonIsWanted = true
+                    adopt(forCode: code, into: &lists, snapshot: &snapshot)
                 case "turnOff":
+                    skeletonIsWanted = false
                     lists = WizardStructure.restoringDefaults(
                         in: lists, adopted: snapshot, usesLCSTerminology: usesLCSTerminology
                     )
                     snapshot = nil
+                case "typeAnotherCode":
+                    // What `adoptSkeletonStructure()` does on a change to the
+                    // course code — nothing at all while the toggle is off.
+                    if skeletonIsWanted {
+                        adopt(forCode: otherCode, into: &lists, snapshot: &snapshot)
+                    }
                 default:
                     XCTFail("\(name): unknown step \"\(step)\"")
                 }
@@ -2014,6 +2022,23 @@ final class SharedRulesContractTests: XCTestCase {
             try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
         )
         return try XCTUnwrap(all[name] as? [String: Any], "No \(name) in shared-rules.json")
+    }
+
+    /// One adoption, as `adoptSkeletonStructure()` performs it: the rule that
+    /// predates this one still holds, so a folder list the teacher has changed
+    /// is never overwritten and no snapshot is taken.
+    private func adopt(
+        forCode code: String,
+        into lists: inout WizardStructure.Lists,
+        snapshot: inout WizardStructure.Lists?
+    ) {
+        guard let adoptable = SkeletonCatalog.structureToAdopt(
+            forCode: code, currentSharedFolders: lists.sharedFolders
+        ) else {
+            return
+        }
+        lists = WizardStructure.adopting(adoptable)
+        snapshot = lists
     }
 
     /// `wizard.skeletonToggle` — the rule, its vocabulary and its cases.

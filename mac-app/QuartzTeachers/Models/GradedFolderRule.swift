@@ -34,6 +34,32 @@ enum GradedFolderRule {
     /// same folder can reach this from two lists at once (a course's shared
     /// folders and its per-section folders), and offering a teacher the same
     /// name twice would tick one box and leave the other looking unticked.
+    /// A pool the teacher has chosen, narrowed to the folders the course
+    /// actually ends up with — in the order they chose them.
+    ///
+    /// A name they ticked and then took out of the course would otherwise be
+    /// written into `graded_folders` matching nothing on disk, so the build
+    /// counts it, finds nothing, and the coverage map reads as though that
+    /// work were never assessed. Windows narrows the pool the same way
+    /// (`GradedFolderRule.Reconciled`) but at the moment the file is written
+    /// rather than the moment the folders change.
+    ///
+    /// **Matched EXACTLY, case included, where Windows and `setup_course.py`
+    /// match case-INSENSITIVELY.** That difference predates this function —
+    /// it is the behaviour `NewCourseWizardView.reconciledGradedFolders` has
+    /// always had, moved here rather than changed — and it is
+    /// [issue #152](https://github.com/russellgordon/plantoir/issues/152)'s
+    /// fourth item, where it can be fixed in one place for everybody.
+    nonisolated static func reconciled(_ declared: [String], toFolders folders: [String]) -> [String] {
+        var kept: [String] = []
+        for name in declared {
+            if folders.contains(name) {
+                kept.append(name)
+            }
+        }
+        return kept
+    }
+
     nonisolated static func inferredPool(from folderNames: [String]) -> [String] {
         var counted: [String] = []
         for name in folderNames {
