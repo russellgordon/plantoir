@@ -692,6 +692,83 @@
       }
     ]
   },
+  "echoedRequest" : {
+    "cases" : [
+      {
+        "expectEcho" : true,
+        "hasToolCall" : false,
+        "reply" : "Hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "The measured echo, verbatim - including the capital the model put on the first letter, which is why the comparison is case-folded."
+      },
+      {
+        "expectEcho" : true,
+        "hasToolCall" : false,
+        "reply" : "hide unit 4, day 20",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "The same fault with the parenthetical trimmed off. A model that drops the date line is echoing just as plainly, so the sentence the teacher TYPED is compared as well as the message as sent."
+      },
+      {
+        "expectEcho" : true,
+        "hasToolCall" : false,
+        "reply" : "  Hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)!  ",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "Whitespace at the ends and a piece of punctuation a model added are not a different reply."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : false,
+        "reply" : "Sure: hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "An echo with a preamble, and v1 lets it through deliberately. Catching it needs a similarity measure, and a fuzzy rule that fires on a real answer would throw the answer away and tell the teacher it did not follow - worse than the fault."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : false,
+        "reply" : "hide unit 4",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "A partial echo. Same reasoning: near is not equal, and guessing how near counts is the thing this rule refuses to do."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : true,
+        "reply" : "Hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "THE ONE THAT KEEPS THE GUARD FROM EATING WORK. A reply that chose a tool is an instruction whatever its text says, and the text beside a tool call is often the model narrating the request. The guard is only ever asked about replies with no tool call in them."
+      },
+      {
+        "expectEcho" : true,
+        "hasToolCall" : false,
+        "reply" : "Deploy at half six tomorrow (Today is 2026-09-19, a Saturday.)",
+        "sent" : "Deploy at half six tomorrow (Today is 2026-09-19, a Saturday.)",
+        "typed" : "Deploy at half six tomorrow",
+        "why" : "The fault is not about the word \"hide\": any sentence the model answers with plain words can come back as an echo, which is why the sentence the teacher reads names no verbs and no page."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : false,
+        "reply" : "There is no page called Unit 4, Day 20 in this section.",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "The control. An ordinary plain-words reply must still reach the teacher and stay in the conversation, or a guard that refused everything would pass every case above."
+      },
+      {
+        "expectEcho" : false,
+        "hasToolCall" : false,
+        "reply" : "",
+        "sent" : "hide unit 4, day 20 (Today is 2026-09-19, a Saturday.)",
+        "typed" : "hide unit 4, day 20",
+        "why" : "An empty reply is a different thing that already has an answer of its own (wording.nothingToDo), and treating emptiness as equality would fire the guard on it."
+      }
+    ],
+    "note" : "When the model's whole reply is the teacher's own sentence handed back, the app refuses the turn, says one honest sentence (wording.didNotFollowThat) and winds the turn back out of the conversation - the same rewind an unfinished answer gets. MEASURED, 2026-09-19, issue #215: Qwen2.5-1.5B Q4_K_M with the app's own server flags, request body and system prompt, temperature 0, the date line on every user message. \"hide unit 4, day 20\" came back word for word, date line and all, with no tool chosen. The echo was then KEPT in the history and the model copied the pattern it could see - user says X, assistant says X - so the very next request echoed too, including \"Unpublish Unit 4, Day 20\", a sentence the same model answers correctly every time in a FRESH conversation. Replayed on ICD2O and ICS4U, pages \"Unit 4, Day 20\" and \"Unit 4, Day 21\": identical in all four. One unrecognised phrase made the window useless until it was closed and opened again, so the rewind is the half that cures it rather than reports it. THE RULE: no tool call in the reply, and the reply's text equals the turn's own user message - compared case-folded and with . ! ? trimmed from both ends. Both spellings of the question count: the message AS SENT (with the date line) and the sentence the teacher typed, because a model that trims the parenthetical is not a different fault. The message compared is the one at the START of the turn, never the last user message anywhere - that is what makes a card-matched second lap safe by construction, since such a turn begins with a TOOL RESULT and so has no user message in it at all. STRICT ON PURPOSE, and here is what that misses: an echo with a preamble (\"Sure: hide unit 4, day 21\"), a partial echo, and any other kind of residue in the history. Each would need a similarity measure, and a fuzzy rule that fires on a legitimate answer is worse than the fault - it would throw a real reply away and tell the teacher it did not follow. The one corner it leaves is a teacher typing a content-free token (\"ok\") to which the model replies with the same token; they read one honest sentence instead, and nothing can be lost, because everything carrying state is a button or a sheet rather than free text. NOT EXPRESSIBLE AS A SCENARIO: the scenario runner builds its agent with no engine behind it, so a model reply cannot be scripted - the same limit windowBinding records. These cases are the predicate; a platform runs them against its own reader of (what was sent, what came back, whether there was a tool call)."
+  },
   "generated" : {
     "keys" : [
       "cardPhrasings",

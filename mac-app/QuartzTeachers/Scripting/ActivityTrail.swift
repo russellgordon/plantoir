@@ -79,6 +79,29 @@ nonisolated enum ActivityTrail {
         /// refused the answer, and a line saying it could not answer would
         /// send whoever reads it looking for a crash that did not happen.
         case assistantAnswerWasCutOff = "assistant answer was cut off"
+        /// The assistant's whole reply was the teacher's own sentence handed
+        /// back, so the turn was refused and taken out of the conversation.
+        ///
+        /// Measured on 2026-09-19 (issue #215): "hide unit 4, day 21" came
+        /// back word for word, date line and all, and then POISONED the rest
+        /// of the conversation — the echo stayed in the history and the model
+        /// copied the pattern, so the next sentence, one it gets right every
+        /// time in a fresh window, echoed too.
+        ///
+        /// Carries this window's course and section, that nothing was run, and
+        /// that the turn was wound back. Never the sentence: `assistant asked`
+        /// already has it, on its own marked line, and repeating the echoed
+        /// text here would put a teacher's page titles on a second line that
+        /// is not marked.
+        ///
+        /// Not folded into `assistant answer was cut off`. Those two sentences
+        /// share a genuine kind — an answer the app refused because it was
+        /// unfinished — and this answer was finished; the event's NAME says
+        /// "cut off", which would be false, and a line describing something
+        /// other than what happened is worse than no line because it will be
+        /// believed. Not `assistant could not answer` either: that is for an
+        /// engine that FAILED, and here the engine answered perfectly badly.
+        case assistantRepeatedTheRequestBack = "assistant repeated the request back"
         /// The model filled in a COURSE that is not the one the window is
         /// for, so the turn was refused and nothing ran.
         ///

@@ -92,6 +92,17 @@ final class AssistAgent {
     /// same turn.
     private var messageCountAtTheStartOfTheTurn: Int = 0
 
+    /// What the teacher typed this turn, trimmed, BEFORE the date line was
+    /// put on the end of it.
+    ///
+    /// Kept because nothing else keeps it: what goes into `messages` is the
+    /// sentence and the date line together, and recomputing the date line to
+    /// take it off again would read the clock a second time — the very thing
+    /// `withTheDaySettled` exists to prevent. Read by
+    /// `theReplyIsTheRequestBackAgain`, so that a model echoing the sentence
+    /// WITHOUT the parenthetical is recognised as the same fault.
+    private var sentenceThisTurnBeganWith: String = ""
+
     /// Where the record of each turn is written. Replaceable so a test can
     /// point it somewhere of its own.
     var reportStore: ProblemReportStore = ProblemReportStore.standard
@@ -159,6 +170,7 @@ final class AssistAgent {
         // Where this turn starts, so a turn that has to be abandoned can be
         // wound back to exactly here. See `sayTheAnswerDidNotFinish`.
         messageCountAtTheStartOfTheTurn = messages.count
+        sentenceThisTurnBeganWith = trimmed
         entries.append(Entry(speaker: .teacher, text: trimmed))
 
         // Recorded HERE — the moment the teacher's words are accepted, before
@@ -363,6 +375,15 @@ final class AssistAgent {
                 return
             }
 
+            // The reply IS the question, handed back. Below the tool-call
+            // branch by definition — an echo is a reply with no tool call in
+            // it — and above the append, because the whole point is that this
+            // reply must not reach the history.
+            if theReplyIsTheRequestBackAgain(reply) {
+                sayItDidNotFollow()
+                return
+            }
+
             messages.append(reply)
             let text: String = (reply.content ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             entries.append(Entry(
@@ -450,14 +471,138 @@ final class AssistAgent {
         activity = .idle
     }
 
+    /// Whether the model's whole answer was the teacher's own sentence, given
+    /// back to them.
+    ///
+    /// **Measured, and it is worse than it looks** (issue #215, 2026-09-19,
+    /// Qwen2.5-1.5B with the app's own flags and request body, temperature 0,
+    /// replayed on two courses and two pages). "hide unit 4, day 21" came back
+    /// word for word with the date line still on it and no tool chosen. The
+    /// echoed reply was then KEPT in the conversation, and the model copied
+    /// the pattern it could see — user says X, assistant says X — so the very
+    /// next sentence echoed too, including "Unpublish Unit 4, Day 20", which
+    /// the same model answers correctly every time in a fresh window. One
+    /// unrecognised phrase made the assistant useless until the window was
+    /// closed and opened again.
+    ///
+    /// **Compared against the message at the START of this turn, not against
+    /// the last user message anywhere.** That is what makes a card-matched
+    /// second lap safe by construction: on that path the turn begins with a
+    /// TOOL RESULT, so this sees no user message and can never fire. Searching
+    /// backwards for the most recent user message — the obvious
+    /// implementation, and the one a reader of `windTheTurnBack` would reach
+    /// for — would compare a read's narration against a sentence from some
+    /// earlier turn.
+    ///
+    /// **Both spellings of the question are compared**: the message as SENT
+    /// (with the date line on the end, which is what the measured echo carried)
+    /// and the sentence the teacher actually typed. A model that trims the
+    /// parenthetical is not a different fault.
+    ///
+    /// **Exact, modulo case and edge punctuation.** An echo with a preamble
+    /// ("Sure: hide unit 4, day 21"), a partial echo, and a reply that poisons
+    /// the history some other way all get through. Each of those would need a
+    /// similarity measure, and a fuzzy rule that fires on a legitimate answer
+    /// is worse than the fault it fixes: it would throw a real answer away and
+    /// tell the teacher it did not follow. The one corner this leaves is a
+    /// teacher typing a content-free token — "ok", "thanks" — to which the
+    /// model replies with the same token. They then read one honest sentence
+    /// instead of "ok", and a turn carrying nothing is wound out of a history
+    /// it was adding nothing to. Nothing can be lost that way: everything with
+    /// state in it (a plan, a deploy, the dates sheet) is a button or a sheet
+    /// rather than free text, and `entries` keeps the teacher's own words on
+    /// every path.
+    private func theReplyIsTheRequestBackAgain(_ reply: AssistMessage) -> Bool {
+        guard messageCountAtTheStartOfTheTurn < messages.count else {
+            return false
+        }
+        let began: AssistMessage = messages[messageCountAtTheStartOfTheTurn]
+        guard began.role == "user", let asked = began.content else {
+            return false
+        }
+        return AssistAgent.isTheRequestBackAgain(
+            sent: asked,
+            typed: sentenceThisTurnBeganWith,
+            reply: reply.content ?? "",
+            hasToolCall: reply.toolCalls?.isEmpty == false
+        )
+    }
+
+    /// The rule itself, as a pure function of what was sent, what the teacher
+    /// typed, what came back, and whether the reply chose a tool.
+    ///
+    /// Separated from the message bookkeeping above so the contract's own
+    /// cases (`assist-cases.json` → `echoedRequest`) can be run straight
+    /// against it, on either platform, without a conversation to set up. The
+    /// history question — WHICH message counts as "what was sent" — is the
+    /// part that is not portable, and it stays above.
+    ///
+    /// `hasToolCall` is taken rather than assumed, although `think()` only
+    /// asks about replies that have none: a reply choosing a tool is an
+    /// instruction whatever its text says, and the text beside a tool call is
+    /// often the model narrating the request back. A later caller that forgot
+    /// that would quietly throw work away.
+    static func isTheRequestBackAgain(
+        sent: String, typed: String, reply: String, hasToolCall: Bool
+    ) -> Bool {
+        if hasToolCall {
+            return false
+        }
+        let said: String = forComparing(reply)
+        if said.isEmpty {
+            return false
+        }
+        if said == forComparing(sent) {
+            return true
+        }
+        let asTyped: String = forComparing(typed)
+        return !asTyped.isEmpty && said == asTyped
+    }
+
+    /// Two pieces of text reduced to what they have to share to be the same
+    /// sentence.
+    ///
+    /// Case-folded because the measured echo capitalised the first letter
+    /// ("hide…" came back as "Hide…"), and stripped of the punctuation a model
+    /// adds or drops at either end. Nothing else is normalised — the date line
+    /// ends in a bracket, which neither side touches, so the symmetry holds.
+    static func forComparing(_ text: String) -> String {
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".!?"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    /// Say that it did not follow, and take the turn back.
+    ///
+    /// The wind-back is the half that cures the fault rather than reporting
+    /// it: the measured failure is not one dead turn, it is every turn after
+    /// it. The next request then meets the conversation the model gets right.
+    ///
+    /// The echoed text is never shown. Handing a teacher their own sentence
+    /// back is the fault; repeating it inside an apology would be the same
+    /// fault, politely.
+    private func sayItDidNotFollow() {
+        windTheTurnBack()
+        entries.append(Entry(speaker: .assistant, text: AssistWording.didNotFollowThat))
+        ActivityTrail.note(
+            .assistantRepeatedTheRequestBack,
+            "the assistant repeated the request back instead of answering it — nothing was run, "
+            + "and the turn was taken back out of the conversation",
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
+    }
+
     /// Take the whole turn back out of the conversation, down to where it
     /// began.
     ///
-    /// Shared by the two places that abandon a turn — an answer that did not
-    /// finish, and a request that named another course — because they make
-    /// the same claim about the history and the two must not drift. What the
-    /// teacher can SEE is untouched: `entries` keeps their sentence on every
-    /// path.
+    /// Shared by the three places that abandon a turn — an answer that did
+    /// not finish, a request that named another course, and a reply that was
+    /// the request back again — because they make the same claim about the
+    /// history and the three must not drift. What the teacher can SEE is
+    /// untouched: `entries` keeps their sentence on every path.
     ///
     /// Two reasons it is the whole turn rather than the reply alone, and both
     /// were learned rather than assumed. A reply carrying a `tool_call` that
