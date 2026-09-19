@@ -44,9 +44,13 @@ The image is layered as follows (in order):
    fact and both apps are written against it, so an unpinned upgrade would
    fail nothing anywhere. The reasoning is in
    [08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page),
-   the pins are in `contracts/toolchain.json` → `pins`, and **Windows owes the
-   same three pins in `windows-app/Vendor/fetch-runtime.ps1`**, which builds
-   the runtime that really produces a Windows teacher's site.
+   and the pins are in `contracts/toolchain.json` → `pins`. **The same three
+   are pinned in `windows-app/Vendor/fetch-runtime.ps1`** (since 2026-09-19),
+   which builds the runtime that really produces a Windows teacher's site —
+   nothing on that machine builds this image. Each pin names both files it
+   must appear in (`dockerfileContains`, `windowsRuntimeContains`) and a test
+   on each platform holds its own file against them, so a pin raised in one
+   place cannot quietly stay put in the other.
 3. **Node.js 20 + tools** — installed from NodeSource. Quartz is a Node
    program (`npx quartz build`). Also installed: `curl`, `git` (needed to
    clone Quartz), `lsof` (used to kill a previous preview server holding

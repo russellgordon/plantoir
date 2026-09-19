@@ -317,7 +317,10 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > kept the old key inverted until 2026-09-09, when it adopted this too —
 > issue #107; `contracts/file-formats.json` → `pageVisibility.writingRules`
 > carries the rule and the reasoning, and `writingCases` beside it is the
-> runnable list both suites now check themselves against.) Two things are
+> same list as data — run by the mac's suite, and replayed against Windows'
+> writer on 2026-09-19 with all ten passing, though deserialising them there
+> is still [issue #138](https://github.com/russellgordon/plantoir/issues/138).)
+> Two things are
 > deliberately NOT migrations: restoring a backup puts back the spelling the
 > backup held, because a restore is not an edit; and adding a section writes
 > the new section's `publishForSection<N>` while leaving the other sections'
@@ -341,6 +344,15 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > value is turned round with the build's own rule rather than by comparing it
 > with the literal text `"true"` — which used to publish a `draft: yes` page
 > into every section while the build went on hiding the unsplit original.
+>
+> **Adding a SECTION carries the same value the same way**, in each app's own
+> `SectionAdder` — the new section's `publishForSection<N>` takes the value
+> the lowest existing section already carries. The mac's fix landed
+> 2026-09-18 and Windows' on 2026-09-19, and both had the identical
+> inversion: a legacy `draftSection1: yes` was carried across as PUBLISHED.
+> A key with nothing after it is a null, which publishes, so the emptiness is
+> copied rather than turned into `false`; a value that runs onto the next line
+> cannot be copied at all and is written as held back.
 
 For each **section**: `section<N>/` with an `index.md` (site home page —
 its stored title is only a starting value: the build recomputes the

@@ -860,7 +860,14 @@ as work happens:
 WSL2 and the whole image/container model on 2026-08-19 (`GUI-IMPROVEMENTS.md`
 entry 290) in favour of a **native runtime**: `windows-app/Vendor/fetch-runtime.ps1`
 fetches pinned, portable pieces — Node 20 (zip, no installer), Python 3.11
-(the embeddable distribution plus `python-frontmatter` and `Pillow`), a clone
+(the embeddable distribution plus `python-frontmatter==1.3.0`,
+`PyYAML==6.0.3` and `Pillow==12.3.0`, pinned there since 2026-09-19 and held
+against `contracts/toolchain.json` → `pins` by
+`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins`; PyYAML is
+named explicitly because it is what decides whether a teacher's `publish: no`
+hides a page — see
+[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page)),
+a clone
 of Quartz v4.5.0 with this repo's `patches/` applied, wrangler, and the Noto
 emoji font — into `windows-app/Vendor/runtime/`, which the app then ships
 inside its own bundle the same way it ships the assistant's `llama/` engine.
@@ -1241,6 +1248,88 @@ imitation ever starts costing more than it saves.
 — keep the real control.** The mac ended up here because it had already been
 forced off the native control for the flyout's sake; do not inherit that
 position by accident.
+
+## Reading a page's visibility: four .NET defaults that get it wrong
+
+The rule itself — what the BUILT SITE does with a `publish:` line, and why
+that is not what reading the line suggests — belongs to
+[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page),
+and `Plantoir.Core/Models/PageVisibilityReader.cs` is the same rule as
+`scripts/page_visibility.py` and the mac's Swift file of the same name. What
+is worth writing down HERE is the part that is about C#, because a
+transliteration of either reference is wrong in four places and every one of
+them is silent (issue #140, 2026-09-19):
+
+- **`Trim()`, `TrimEnd()` and `char.IsWhiteSpace` strip the non-breaking
+  space.** YAML's whitespace is a space and a tab and nothing else, so
+  `publish: false<NBSP>` is the string "false " and the page is
+  PUBLISHED. Trimming it calls a live page hidden — the one direction that
+  must never be wrong. `Block.IndexOf` used both of these. Trim space and tab
+  by hand. (The single exception is the DRAFT family's final compare, which
+  mirrors Python's `str(value).strip()` inside `build_site._as_bool` and so
+  *should* strip it.)
+- **`StartsWith`, `EndsWith`, `IndexOf(string)` and `Contains(string)` are
+  CULTURE-SENSITIVE by default**, and a culture-sensitive compare matches
+  across characters it considers ignorable. Every one of them in this reader
+  passes `StringComparison.Ordinal` explicitly. `string ==` is already
+  ordinal, but it is written as `string.Equals(..., Ordinal)` where the answer
+  turns on it, so nobody has to remember which operators are which.
+- **`ToLower()` is not `ToLowerInvariant()`.** In Turkish, `I` lowercases to a
+  dotless `ı`, so `TRUE` would stop being `true`.
+- **`string.Split('\n')` is right and `splitlines()`-style splitting is not.**
+  Both references split on `"\n"` alone and strip a trailing `\r` per line;
+  splitting on every Unicode line break would find boundaries inside a
+  teacher's value.
+
+Two faults found here were in the WRITER rather than the reader, and both are
+worth knowing because they are the shape a writer goes wrong in: `ReplaceValue`
+looked for an inline comment with `IndexOf('#')`, so hiding a
+`publish: "false # why"` page left an unbalanced quote in the teacher's file;
+and `Block.Parse` demanded exactly `---` on line 0 while accepting `...` as a
+close, where python-frontmatter's boundary is `^-{3,}\s*$` for both — so a page
+fenced with `----` got a second block PREPENDED and the teacher's real
+frontmatter became body text on the student's site.
+
+One fence finder and one key matcher now serve the reader and every
+VISIBILITY writer — and that qualifier is load-bearing, because two other
+finders are still hand-rolled and were deliberately left alone:
+`CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
+#140, so a restore reaches different pages on the two platforms — that is
+[issue #177](https://github.com/russellgordon/plantoir/issues/177), a
+`decision`) and `SectionAdder.FrontmatterLines` (strict on BOTH platforms, so
+the section carry agrees with itself — parity, not a divergence, and
+documented rather than filed). Four finders, two unified. Check which one you
+are looking at before "tidying" any of them.
+
+A third fault was shared with the mac and **is fixed here, on Windows only**.
+Both writers replaced a key's line and orphaned the indented CONTINUATION
+line below it onto the new value, so **hiding** a page whose value is a block
+scalar left it PUBLISHED — the failure that reports success, and reached by
+the very rule #140 introduced ("on `cannot tell`, write the flag out in
+full"), so it could not ship as a known issue. `PageFrontmatter
+.ContinuationLines` takes those lines with the key in both of `SetDraft`'s
+branches, following `setup_course.per_section_frontmatter`'s loop —
+stepping over blank lines and `# note`s, so a complete value's note stays
+where the teacher wrote it.
+
+**And the half of it a sweep cannot reach, which is the part worth carrying
+away.** `publish: false` with an indented `false` under it is the string
+`"false false"` on the site and the page is PUBLISHED — but the reader called
+it hidden, and called it CONFIDENTLY, so `SetDraft`'s "already right, change
+nothing" gate returned before the writer ran at all. Hiding the page was a
+no-op the teacher was told had worked. A sweep in the writer is no use
+against a request the writer never receives: `PageVisibilityReader.ReadScalar`
+had to stop trusting the key's own line, and it now answers `cannot tell`
+whenever the first line that could be a value is indented. **The lesson
+generalises past this bug** — when a reader and a writer are fixed in the same
+piece, check which of them the guard clause runs in.
+
+[Issue #176](https://github.com/russellgordon/plantoir/issues/176) carries the
+measured table and both halves, and is now the MAC's to do; a one-sided fix in
+this field is normally a silent divergence, and the reason this one was taken
+anyway is that the divergence is Windows being right. It does mean the two
+apps disagree at the THREE-WAY level until it lands, which is stated in the
+issue along with the shared reading case it proposes.
 
 ## Two macOS mechanics NOT to port
 
