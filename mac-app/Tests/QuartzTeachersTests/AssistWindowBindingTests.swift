@@ -37,6 +37,22 @@ final class AssistWindowBindingTests: XCTestCase {
                 + #""usage":{"completion_tokens":48}}"#
         }
 
+        /// Plain words, with no tool call at all.
+        ///
+        /// Served as the SECOND reply wherever the scripted tool is a READ.
+        /// A read hands back to the model, and the stub's last reply answers
+        /// every request after it — so a regression that let a refused read
+        /// run would meet the same tool call again, for ever. Measured while
+        /// proving the must-fail rows: the suite hung rather than failing,
+        /// which reads as a broken machine rather than as the regression it
+        /// is. With a plain answer waiting, the same regression fails on
+        /// `requestCount` in under a second.
+        static func text(_ said: String) -> String {
+            return #"{"choices":[{"finish_reason":"stop","message":"#
+                + #"{"role":"assistant","content":"\#(escape(said))"}}],"#
+                + #""usage":{"completion_tokens":4}}"#
+        }
+
         private static func escape(_ text: String) -> String {
             var escaped: String = text.replacingOccurrences(of: "\\", with: "\\\\")
             escaped = escaped.replacingOccurrences(of: "\"", with: "\\\"")
@@ -356,9 +372,10 @@ final class AssistWindowBindingTests: XCTestCase {
 
         let engine: StubEngine = try StubEngine()
         defer { engine.stop() }
-        engine.serve(Canned.finished(
-            tool: "list_pages", arguments: #"{"course": "MCV4U", "section": 1}"#
-        ))
+        engine.serve([
+            Canned.finished(tool: "list_pages", arguments: #"{"course": "MCV4U", "section": 1}"#),
+            Canned.text("All right."),
+        ])
 
         let agent: AssistAgent = AssistFixture.makeAgent(
             tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
@@ -496,7 +513,9 @@ final class AssistWindowBindingTests: XCTestCase {
 
         let engine: StubEngine = try StubEngine()
         defer { engine.stop() }
-        engine.serve(Canned.finished(tool: tool, arguments: written))
+        // A plain answer behind the scripted call, because one of these cases
+        // names a READ — see `Canned.text`.
+        engine.serve([Canned.finished(tool: tool, arguments: written), Canned.text("All right.")])
 
         let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner, engineAt: engine.baseURL)
         let sentence: String = "Have a look at that lesson of mine and sort it out"
