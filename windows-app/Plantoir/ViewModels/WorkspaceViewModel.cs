@@ -138,7 +138,12 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
             $"working folder opened — {path}");
         Reload();
         MarkBuildsFolder();
-        if (previous is not null && previous != path) ReleaseFolderIfUnused(previous);
+        // WorkingFolder, never a string comparison: the picker hands back the
+        // true on-disk casing while `previous` carries whatever casing it was
+        // stored with, so re-choosing the folder already open read as a
+        // CHANGE — and the release below then stopped the container of the
+        // folder still on screen, killing a preview running in it.
+        if (WorkingFolder.IsLeavingAFolderBehind(previous, path)) ReleaseFolderIfUnused(previous!);
         NoteBecameKey();
         Notify(nameof(WorkspacePath));
     }
@@ -146,7 +151,8 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     public void AdoptRestoredPath(string path)
     {
         App.LogDiagnostic($"AdoptRestoredPath called with '{path}'");
-        if (string.IsNullOrEmpty(path) || !Directory.Exists(path) || path == _workspacePath)
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path)
+            || WorkingFolder.IsTheSame(path, _workspacePath))
         {
             App.LogDiagnostic($"AdoptRestoredPath early return: empty/not exists/already path");
             return;
@@ -199,16 +205,26 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         if (_workspacePath is not null) ReleaseFolderIfUnused(_workspacePath);
     }
 
+    /// <summary>
+    /// Stop a folder's container once no window still holds it.
+    ///
+    /// <para>The match is <see cref="WorkingFolder.IsTheSame"/>, not string
+    /// equality: a window holding <c>C:\work</c> holds <c>C:\Work</c> too,
+    /// and answering otherwise here does not merely miss a cleanup — it stops
+    /// the container of a folder that IS still open, taking a running preview
+    /// with it.</para>
+    /// </summary>
     private static void ReleaseFolderIfUnused(string path)
     {
-        if (_windowModels.Any(m => m.WorkspacePath == path)) return;
+        if (WorkingFolder.AnyWindowStillHolds(_windowModels.Select(m => m.WorkspacePath), path)) return;
         FolderContainers.StopContainer(path);
     }
 
     public static IReadOnlyList<WorkspaceViewModel> WindowModels => _windowModels;
 
     public static List<string> OpenFolderPaths() =>
-        _windowModels.Where(m => m.WorkspacePath is not null).Select(m => m.WorkspacePath!).Distinct().ToList();
+        _windowModels.Where(m => m.WorkspacePath is not null).Select(m => m.WorkspacePath!)
+                     .Distinct(WorkingFolder.Comparer).ToList();
 
     // ---- Loading ---------------------------------------------------------
 
