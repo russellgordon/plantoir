@@ -317,7 +317,7 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > kept the old key inverted until 2026-09-09, when it adopted this too —
 > issue #107; `contracts/file-formats.json` → `pageVisibility.writingRules`
 > carries the rule and the reasoning, and `writingCases` beside it is the
-> same list as data — ten whole files, each given to the writer with the
+> same list as data — thirteen whole files, each given to the writer with the
 > visibility it should be asked for and the exact text it must come back as.
 > **Both suites run that list**: the mac since 2026-09-09 with issue #107,
 > and Windows since 2026-09-19 with
@@ -325,8 +325,12 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > replaced five of the cases retyped into that test file. Three of the other
 > five were already asserted elsewhere in the Windows suite in its own words
 > (one in that file, two in `PageVisibilityReadingTests.cs`); what running the
-> list adds is that all ten are read from the FILE and so cannot drift from
-> it, and that two of them are covered on Windows for the first time.)
+> list adds is that every case is read from the FILE and so cannot drift from
+> it, and that two of them are covered on Windows for the first time. The
+> three most recent — a value's CONTINUATION lines going with its key, and an
+> indented `# note` after a complete value staying where the teacher wrote it
+> — arrived on 2026-09-19 with issue #176, which is why the list is thirteen
+> rather than the ten it was when both suites started running it.)
 > Two things are
 > deliberately NOT migrations: restoring a backup puts back the spelling the
 > backup held, because a restore is not an edit; and adding a section writes

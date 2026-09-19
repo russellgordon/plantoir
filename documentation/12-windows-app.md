@@ -1301,7 +1301,8 @@ the section carry agrees with itself — parity, not a divergence, and
 documented rather than filed). Four finders, two unified. Check which one you
 are looking at before "tidying" any of them.
 
-A third fault was shared with the mac and **is fixed here, on Windows only**.
+A third fault was shared with the mac and **was fixed here first, on
+2026-09-19; the mac followed the same day.**
 Both writers replaced a key's line and orphaned the indented CONTINUATION
 line below it onto the new value, so **hiding** a page whose value is a block
 scalar left it PUBLISHED — the failure that reports success, and reached by
@@ -1309,8 +1310,12 @@ the very rule #140 introduced ("on `cannot tell`, write the flag out in
 full"), so it could not ship as a known issue. `PageFrontmatter
 .ContinuationLines` takes those lines with the key in both of `SetDraft`'s
 branches, following `setup_course.per_section_frontmatter`'s loop —
-stepping over blank lines and `# note`s, so a complete value's note stays
-where the teacher wrote it.
+stepping over blank lines and `# note`s **at any indent**, so a complete
+value's note stays where the teacher wrote it and a column-0 note between a
+key and its value does not end the walk. That second half was got wrong here
+first (the sweeper stepped over indented comments only, orphaned the value and
+stopped the build) and it was still wrong in the shared Python until the mac's
+half landed; `setup_course.per_section_frontmatter` now steps the same way.
 
 **And the half of it a sweep cannot reach, which is the part worth carrying
 away.** `publish: false` with an indented `false` under it is the string
@@ -1325,11 +1330,24 @@ generalises past this bug** — when a reader and a writer are fixed in the same
 piece, check which of them the guard clause runs in.
 
 [Issue #176](https://github.com/russellgordon/plantoir/issues/176) carries the
-measured table and both halves, and is now the MAC's to do; a one-sided fix in
-this field is normally a silent divergence, and the reason this one was taken
-anyway is that the divergence is Windows being right. It does mean the two
-apps disagree at the THREE-WAY level until it lands, which is stated in the
-issue along with the shared reading case it proposes.
+measured table and both halves. It was taken on Windows first even though a
+one-sided fix in this field is normally a silent divergence, because the
+divergence was Windows being right; the mac took it the same day and
+implemented this design unchanged, so the two apps agree at the THREE-WAY
+level again. What landed with the mac's half and reaches this side:
+`contracts/file-formats.json` gained two `readingCases` (the two continuation
+forms the SITE publishes, where each app's reporting answer agrees with it —
+`PageFrontmatter.IsDraft` is `Answer(...) == Hidden` and `ReadScalar` already
+answers `CannotTell`, so both pass here unchanged) and three `writingCases`
+for the sweep, which `FileFormatContractTests
+.TheWritingCasesInTheContractAreFollowed` now runs. Those three were derived
+from `ReplaceValue` and `ContinuationLines` by reading rather than by running
+— macOS cannot build `net9.0-windows` — and checked against a transliteration
+calibrated on the ten cases already in the list; if one is red on this side it
+is a real difference and worth an issue back, saying which case and what
+Windows produced. The reasoning lives in
+`documentation/08-course-config-reference.md` → "A writer must take a value's
+CONTINUATION lines with the key".
 
 ## Two macOS mechanics NOT to port
 
