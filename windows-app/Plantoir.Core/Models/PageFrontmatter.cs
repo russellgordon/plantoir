@@ -321,14 +321,18 @@ public static class PageFrontmatter
             // the one to rewrite: setting the first of two would leave the page
             // saying the opposite of what was asked for.
             int at = currentKeyLines[^1];
+            // Asked BEFORE the line is rewritten, because the rewrite always
+            // puts a value there.
+            bool wasEmpty = ValueIsEmpty(lines[at], key);
             lines[at] = ReplaceValue(lines[at], key, publish);
-            remove.UnionWith(ContinuationLines(lines, at, fences.Close));
+            remove.UnionWith(ContinuationLines(lines, at, fences.Close, wasEmpty));
             // Already migrated; every leftover legacy line is noise that now
             // says the opposite of the line above it.
             foreach (int stale in legacyKeyLines)
             {
                 remove.Add(stale);
-                remove.UnionWith(ContinuationLines(lines, stale, fences.Close));
+                remove.UnionWith(ContinuationLines(
+                    lines, stale, fences.Close, ValueIsEmpty(lines[stale], legacy)));
             }
         }
         else if (hasLegacy)
@@ -337,12 +341,14 @@ public static class PageFrontmatter
             // teacher's frontmatter keeps its order. Moving it to the top would
             // show up as a reordered diff in a file Obsidian has open.
             int old = legacyKeyLines[^1];
+            bool wasEmpty = ValueIsEmpty(lines[old], legacy);
             lines[old] = line + (lines[old].EndsWith('\r') ? "\r" : "");
-            remove.UnionWith(ContinuationLines(lines, old, fences.Close));
+            remove.UnionWith(ContinuationLines(lines, old, fences.Close, wasEmpty));
             for (int i = 0; i < legacyKeyLines.Count - 1; i++)
             {
                 remove.Add(legacyKeyLines[i]);
-                remove.UnionWith(ContinuationLines(lines, legacyKeyLines[i], fences.Close));
+                remove.UnionWith(ContinuationLines(
+                    lines, legacyKeyLines[i], fences.Close, ValueIsEmpty(lines[legacyKeyLines[i]], legacy)));
             }
         }
         else
@@ -382,15 +388,34 @@ public static class PageFrontmatter
     /// a real value under it goes with the value, which is also what the
     /// reader sees through it.</para>
     ///
+    /// <para>A comment is stepped over at ANY indent, not only an indented
+    /// one, because that is what the reader does. Measured: <c>publish:</c>
+    /// with a column-0 <c># note</c> and then an indented <c>false</c> is
+    /// HIDDEN on the site; a sweeper that stopped at the comment left the
+    /// <c>false</c> orphaned and the build stopped with a <c>ParserError</c>.
+    /// A top-level comment with no value under it is still left alone — the
+    /// walk takes nothing, because it found no value line below it.</para>
+    ///
+    /// <para><paramref name="sweepLeadingSequence"/> covers the one
+    /// continuation that is NOT indented: a block sequence written at column 0
+    /// directly under a key with an empty value. Measured, <c>publish:</c>
+    /// with <c>- a</c> under it is the list <c>['a']</c> and the page is
+    /// published; leaving the <c>- a</c> behind after a hide is a
+    /// <c>ParserError</c> and the build stops. It is passed only when the
+    /// key's own value was empty, because that is the only shape where such a
+    /// line can belong to this key.</para>
+    ///
     /// <para>This does NOT parse block scalars and must not start: it only
-    /// finds where a key's value ends. Note that it sweeps whether or not the
-    /// key's own line LOOKED complete, and that is deliberate — measured,
-    /// <c>publish: false</c> with an indented <c>false</c> below it is the
-    /// string "false false" and the page is PUBLISHED, so the reader's
-    /// <c>Hidden</c> for that shape is wrong and taking the line is what makes
-    /// the WRITE right anyway.</para>
+    /// finds where a key's value ends. It sweeps whether or not the key's own
+    /// line LOOKED complete — <c>publish: false</c> with an indented
+    /// <c>false</c> under it is the string "false false" and the page is
+    /// PUBLISHED — but the sweep is not what saves that page. The READER has
+    /// to refuse it first, or <see cref="SetDraft"/>'s "already right" gate
+    /// returns before any of this runs; see
+    /// <see cref="PageVisibilityReader.ReadScalar"/>.</para>
     /// </remarks>
-    private static List<int> ContinuationLines(List<string> lines, int keyIndex, int closeIndex)
+    private static List<int> ContinuationLines(
+        List<string> lines, int keyIndex, int closeIndex, bool sweepLeadingSequence)
     {
         int lastValueLine = keyIndex;
         for (int follow = keyIndex + 1; follow < closeIndex && follow < lines.Count; follow++)
@@ -398,9 +423,13 @@ public static class PageFrontmatter
             string bare = PageVisibilityReader.TrimCarriageReturn(lines[follow]);
             string content = PageVisibilityReader.TrimYamlSpaces(bare);
             bool indented = bare.StartsWith(' ') || bare.StartsWith('\t');
-            if (content.Length == 0) continue;                      // a blank line does not end a value
-            if (indented && content.StartsWith('#')) continue;      // and a comment is not one
-            if (!indented) break;                                   // a top-level key ends it
+            if (content.Length == 0) continue;       // a blank line does not end a value
+            if (content.StartsWith('#')) continue;   // and a comment is not one, at any indent
+            if (!indented)
+            {
+                if (!sweepLeadingSequence) break;                   // a top-level key ends it
+                if (content != "-" && !content.StartsWith("- ", StringComparison.Ordinal)) break;
+            }
             lastValueLine = follow;
         }
 
@@ -408,6 +437,14 @@ public static class PageFrontmatter
         for (int index = keyIndex + 1; index <= lastValueLine; index++) taken.Add(index);
         return taken;
     }
+
+    /// <summary>
+    /// Whether this line names <paramref name="key"/> with nothing after its
+    /// colon — the one shape whose value can continue at column 0.
+    /// </summary>
+    private static bool ValueIsEmpty(string line, string key) =>
+        PageVisibilityReader.ValuePart(key, PageVisibilityReader.TrimCarriageReturn(line)) is { } value
+        && PageVisibilityReader.TrimYamlSpaces(value).Length == 0;
 
     /// <summary>The pre-change key that answers the same question as <paramref name="key"/>.</summary>
     private static string LegacyKeyOf(string key) =>

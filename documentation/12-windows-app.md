@@ -1309,12 +1309,27 @@ the very rule #140 introduced ("on `cannot tell`, write the flag out in
 full"), so it could not ship as a known issue. `PageFrontmatter
 .ContinuationLines` takes those lines with the key in both of `SetDraft`'s
 branches, following `setup_course.per_section_frontmatter`'s loop —
-stepping over blank lines and indented `# note`s, so a complete value's note
-stays where the teacher wrote it.
+stepping over blank lines and `# note`s, so a complete value's note stays
+where the teacher wrote it.
+
+**And the half of it a sweep cannot reach, which is the part worth carrying
+away.** `publish: false` with an indented `false` under it is the string
+`"false false"` on the site and the page is PUBLISHED — but the reader called
+it hidden, and called it CONFIDENTLY, so `SetDraft`'s "already right, change
+nothing" gate returned before the writer ran at all. Hiding the page was a
+no-op the teacher was told had worked. A sweep in the writer is no use
+against a request the writer never receives: `PageVisibilityReader.ReadScalar`
+had to stop trusting the key's own line, and it now answers `cannot tell`
+whenever the first line that could be a value is indented. **The lesson
+generalises past this bug** — when a reader and a writer are fixed in the same
+piece, check which of them the guard clause runs in.
+
 [Issue #176](https://github.com/russellgordon/plantoir/issues/176) carries the
-measured table and is now the MAC's to do; a one-sided fix in this field is
-normally a silent divergence, and the reason this one was taken anyway is
-that the divergence is Windows being right.
+measured table and both halves, and is now the MAC's to do; a one-sided fix in
+this field is normally a silent divergence, and the reason this one was taken
+anyway is that the divergence is Windows being right. It does mean the two
+apps disagree at the THREE-WAY level until it lands, which is stated in the
+issue along with the shared reading case it proposes.
 
 ## Two macOS mechanics NOT to port
 

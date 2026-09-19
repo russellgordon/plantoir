@@ -381,21 +381,47 @@ separately from the reader:
   the reader sees through it anyway. Do not try to PARSE the block scalar;
   only find where the value ends.
 
-  **The sweep runs whether or not the key's own line LOOKED complete**, and
-  that is deliberate: measured, `publish: false` with an indented `false`
-  below it is the string `"false false"` and the page is PUBLISHED, so the
-  readers' `hidden` for that shape is WRONG — on both platforms, since neither
-  consults the next line once the value on the key's line is non-empty. Taking
-  the line is what makes the WRITE right regardless. The reading half of that
-  is not fixed and is not in the shared cases; it is the mild direction on the
-  mac's side of the table and worth measuring again before anybody changes it.
+  **A value below a key is a value below a key however complete the key's own
+  line looks — and the READER has to be the one that says so.** Measured,
+  `publish: false` with an indented `false` under it is the string
+  `"false false"` and the page is PUBLISHED; so are `no`, `off` and `FALSE`
+  (`'no false'`, `'off false'`, `'FALSE false'`). A reader that consults the
+  next line only when the key's line is EMPTY calls all of those `hidden`, and
+  calls it CONFIDENTLY — which is the part that bites, because the writer's
+  "already right, change nothing" gate then returns before the writer or its
+  continuation sweep ever run. Asking to hide such a page was a NO-OP: the
+  file untouched, the teacher told it was already hidden, students still
+  reading it. **The sweep cannot save a page the writer is never asked to
+  write.**
 
-  **Windows fixed this on 2026-09-19** (`PageFrontmatter.ContinuationLines`,
-  used by both of `SetDraft`'s branches; tests in
-  `PageVisibilityReadingTests.AValuesContinuationLinesGoWithIt`). **The mac
-  still owes it** — `AssistPageVisibility.setting:152-159` and `:160-169`
-  replace one line and nothing else — and that is
-  [issue #176](https://github.com/russellgordon/plantoir/issues/176).
+  So `ReadScalar` answers `cannot tell` whenever the first line that could be
+  a value is indented, whatever is on the key's own line. Reporting then says
+  visible — which is what the site does — and the writer writes the flag out
+  in full and sweeps. Measured after that write: `False` → HIDDEN. It changes
+  none of the 54 shared `readingCases`.
+
+  **Windows fixed all of this on 2026-09-19** — `PageVisibilityReader
+  .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
+  sweep, used by both of `SetDraft`'s branches; tests in
+  `PageVisibilityReadingTests` →
+  `AValuesContinuationLinesGoWithIt` (14 rows),
+  `AValueBelowACompleteLookingOneIsStillAValueBelow` (6) and the two beside
+  them. **The mac still owes both halves** — it reads these as `hidden` and
+  `AssistPageVisibility.setting:152-159` / `:160-169` replace one line and
+  nothing else — and that is
+  [issue #176](https://github.com/russellgordon/plantoir/issues/176), which
+  carries the proposed shared reading case. **The two apps therefore disagree
+  at the three-way level until it lands**, deliberately: the mac is the one
+  that differs from the site.
+
+  Two continuations are not indented and are swept anyway, both measured, both
+  a stopped build if left: a column-0 `# note` between a key and its value
+  (the reader steps over a comment at any indent, so the sweeper must too),
+  and a column-0 block SEQUENCE directly under a key with an empty value
+  (`publish:` over `- a` is the list `['a']`). A sequence under a key that
+  HAS a value is left alone — that page is a `ParserError` before anything is
+  written, so there is nothing to rescue and sweeping a teacher's list on that
+  guess would be the larger mistake.
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a
