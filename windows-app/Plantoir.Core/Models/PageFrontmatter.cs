@@ -309,17 +309,27 @@ public static class PageFrontmatter
         }
 
         var lines = new List<string>(pageText.Split('\n'));
+        // A key's value can live on the lines BELOW it, and those lines go
+        // wherever the key goes — see ContinuationLines for what that costs
+        // when they are left behind. Gathered before anything is removed, so
+        // every index still means what it said.
+        var remove = new SortedSet<int>();
 
         if (currentKeyLines.Count > 0)
         {
             // The LAST line naming a key is the one the build reads, so it is
             // the one to rewrite: setting the first of two would leave the page
             // saying the opposite of what was asked for.
-            lines[currentKeyLines[^1]] = ReplaceValue(lines[currentKeyLines[^1]], key, publish);
+            int at = currentKeyLines[^1];
+            lines[at] = ReplaceValue(lines[at], key, publish);
+            remove.UnionWith(ContinuationLines(lines, at, fences.Close));
             // Already migrated; every leftover legacy line is noise that now
-            // says the opposite of the line above it. Removed last first, so
-            // the earlier indices stay put.
-            for (int i = legacyKeyLines.Count - 1; i >= 0; i--) lines.RemoveAt(legacyKeyLines[i]);
+            // says the opposite of the line above it.
+            foreach (int stale in legacyKeyLines)
+            {
+                remove.Add(stale);
+                remove.UnionWith(ContinuationLines(lines, stale, fences.Close));
+            }
         }
         else if (hasLegacy)
         {
@@ -328,14 +338,75 @@ public static class PageFrontmatter
             // show up as a reordered diff in a file Obsidian has open.
             int old = legacyKeyLines[^1];
             lines[old] = line + (lines[old].EndsWith('\r') ? "\r" : "");
-            for (int i = legacyKeyLines.Count - 2; i >= 0; i--) lines.RemoveAt(legacyKeyLines[i]);
+            remove.UnionWith(ContinuationLines(lines, old, fences.Close));
+            for (int i = 0; i < legacyKeyLines.Count - 1; i++)
+            {
+                remove.Add(legacyKeyLines[i]);
+                remove.UnionWith(ContinuationLines(lines, legacyKeyLines[i], fences.Close));
+            }
         }
         else
         {
             lines.Insert(fences.Open + 1, line);
         }
 
+        // Last first, so the earlier indices stay put.
+        foreach (int index in remove.Reverse()) lines.RemoveAt(index);
+
         return (Rebuild(lines, newline), new DraftEdit(key, before, draft, Changed: true));
+    }
+
+    /// <summary>
+    /// The lines BELOW a key that are part of its value, and so have to go
+    /// wherever the key's line goes.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Leaving them behind is the failure that reports success.</b>
+    /// A page reading <c>publish: &gt;-</c> with <c>  false</c> under it is
+    /// HIDDEN on the site; rewriting only the key's line leaves that
+    /// <c>  false</c> orphaned onto the new value, and PyYAML folds the two
+    /// into the multi-line plain scalar <c>"false false"</c> — a string that is
+    /// not <c>"false"</c>, so the page is PUBLISHED while the teacher is told
+    /// it was hidden. Measured, python-frontmatter 1.3.0 / PyYAML 6.0.3 /
+    /// CPython 3.11.9. When the orphan is a MAPPING it is a <c>ScannerError</c>
+    /// and the whole build stops instead.</para>
+    ///
+    /// <para>The rule is <c>setup_course.per_section_frontmatter</c>'s, which
+    /// has taken these lines with the key since 2026-09-18, and it is the
+    /// same stepping <see cref="PageVisibilityReader.FirstNonBlankLine"/> does:
+    /// walk forward, STEP OVER blank lines and indented <c># note</c>s rather
+    /// than stopping at them, stop at the first line that is not indented, and
+    /// take everything up to the last indented line that was not a comment. So
+    /// a complete value followed by an indented note keeps the note — nothing
+    /// is taken, because no value line was found below it — while a note with
+    /// a real value under it goes with the value, which is also what the
+    /// reader sees through it.</para>
+    ///
+    /// <para>This does NOT parse block scalars and must not start: it only
+    /// finds where a key's value ends. Note that it sweeps whether or not the
+    /// key's own line LOOKED complete, and that is deliberate — measured,
+    /// <c>publish: false</c> with an indented <c>false</c> below it is the
+    /// string "false false" and the page is PUBLISHED, so the reader's
+    /// <c>Hidden</c> for that shape is wrong and taking the line is what makes
+    /// the WRITE right anyway.</para>
+    /// </remarks>
+    private static List<int> ContinuationLines(List<string> lines, int keyIndex, int closeIndex)
+    {
+        int lastValueLine = keyIndex;
+        for (int follow = keyIndex + 1; follow < closeIndex && follow < lines.Count; follow++)
+        {
+            string bare = PageVisibilityReader.TrimCarriageReturn(lines[follow]);
+            string content = PageVisibilityReader.TrimYamlSpaces(bare);
+            bool indented = bare.StartsWith(' ') || bare.StartsWith('\t');
+            if (content.Length == 0) continue;                      // a blank line does not end a value
+            if (indented && content.StartsWith('#')) continue;      // and a comment is not one
+            if (!indented) break;                                   // a top-level key ends it
+            lastValueLine = follow;
+        }
+
+        var taken = new List<int>();
+        for (int index = keyIndex + 1; index <= lastValueLine; index++) taken.Add(index);
+        return taken;
     }
 
     /// <summary>The pre-change key that answers the same question as <paramref name="key"/>.</summary>

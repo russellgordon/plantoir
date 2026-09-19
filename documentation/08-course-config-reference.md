@@ -362,18 +362,40 @@ separately from the reader:
   a decision. The trap to avoid is reading "one fence finder" and making the
   MAC strict, which puts the second-block bug straight back.
 
-* **A writer must take a value's CONTINUATION lines with the key**, and
-  neither app does. Replacing a key's line alone orphans the indented line
-  below it onto the new value, so `publish: >-` with `  false` under it,
-  asked to be HIDDEN, becomes the multi-line plain scalar `"false false"` —
-  a string that is not `"false"`, so the page is PUBLISHED while the teacher
-  is told it was hidden. Measured; the table is in
+* **A writer must take a value's CONTINUATION lines with the key.**
+  Replacing a key's line alone orphans the indented line below it onto the new
+  value, so `publish: >-` with `  false` under it, asked to be HIDDEN, becomes
+  the multi-line plain scalar `"false false"` — a string that is not
+  `"false"`, so the page is PUBLISHED while the teacher is told it was hidden.
+  When the orphan is a MAPPING it is a `ScannerError` and the whole build
+  stops instead. Both measured, python-frontmatter 1.3.0 / PyYAML 6.0.3.
+
+  The rule is `setup_course.per_section_frontmatter`'s, which has done this
+  since 2026-09-18, and it is the same stepping the reader's
+  `firstNonBlankLine` does: walk forward from the key, STEP OVER blank lines
+  and indented `# note`s rather than stopping at them, stop at the first line
+  that is not indented, and take everything up to the last indented line that
+  was not a comment. So a complete value followed by an indented note keeps
+  the note — nothing is taken, because no value line was found below it —
+  while a note with a real value under it goes with the value, which is what
+  the reader sees through it anyway. Do not try to PARSE the block scalar;
+  only find where the value ends.
+
+  **The sweep runs whether or not the key's own line LOOKED complete**, and
+  that is deliberate: measured, `publish: false` with an indented `false`
+  below it is the string `"false false"` and the page is PUBLISHED, so the
+  readers' `hidden` for that shape is WRONG — on both platforms, since neither
+  consults the next line once the value on the key's line is non-empty. Taking
+  the line is what makes the WRITE right regardless. The reading half of that
+  is not fixed and is not in the shared cases; it is the mild direction on the
+  mac's side of the table and worth measuring again before anybody changes it.
+
+  **Windows fixed this on 2026-09-19** (`PageFrontmatter.ContinuationLines`,
+  used by both of `SetDraft`'s branches; tests in
+  `PageVisibilityReadingTests.AValuesContinuationLinesGoWithIt`). **The mac
+  still owes it** — `AssistPageVisibility.setting:152-159` and `:160-169`
+  replace one line and nothing else — and that is
   [issue #176](https://github.com/russellgordon/plantoir/issues/176).
-  `setup_course.per_section_frontmatter` was fixed on 2026-09-18 and is the
-  model: walk forward from the key taking every indented line with it,
-  stepping OVER blank lines and indented `# note`s rather than stopping at
-  them. Left unfixed on both apps on purpose — this is the one field where
-  half a fix is a silent divergence.
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a

@@ -1301,14 +1301,20 @@ the section carry agrees with itself — parity, not a divergence, and
 documented rather than filed). Four finders, two unified. Check which one you
 are looking at before "tidying" any of them.
 
-A third fault is shared with the mac and was NOT fixed here, because fixing
-half of it would be a silent divergence in the one field the two apps must
-agree on: both writers replace a key's line and orphan an indented
-CONTINUATION line, so **hiding** a page whose value is a block scalar leaves
-it PUBLISHED — the failure that reports success, measured.
+A third fault was shared with the mac and **is fixed here, on Windows only**.
+Both writers replaced a key's line and orphaned the indented CONTINUATION
+line below it onto the new value, so **hiding** a page whose value is a block
+scalar left it PUBLISHED — the failure that reports success, and reached by
+the very rule #140 introduced ("on `cannot tell`, write the flag out in
+full"), so it could not ship as a known issue. `PageFrontmatter
+.ContinuationLines` takes those lines with the key in both of `SetDraft`'s
+branches, following `setup_course.per_section_frontmatter`'s loop —
+stepping over blank lines and indented `# note`s, so a complete value's note
+stays where the teacher wrote it.
 [Issue #176](https://github.com/russellgordon/plantoir/issues/176) carries the
-table and names `setup_course.per_section_frontmatter`, which was fixed on
-2026-09-18, as the model.
+measured table and is now the MAC's to do; a one-sided fix in this field is
+normally a silent divergence, and the reason this one was taken anyway is
+that the divergence is Windows being right.
 
 ## Two macOS mechanics NOT to port
 

@@ -441,6 +441,98 @@ public class PageVisibilityWritingTests
     }
 
     /// <summary>
+    /// A key's CONTINUATION lines go wherever its line goes.
+    /// </summary>
+    /// <remarks>
+    /// <para>Rewriting only the key's line orphans the indented lines below it
+    /// onto the new value. <b>Measured by hand on 2026-09-19</b> through the
+    /// vendored runtime — python-frontmatter 1.3.0 / PyYAML 6.0.3 / CPython
+    /// 3.11.9, the runtime that really builds a Windows teacher's site — then
+    /// <c>patches/publish.ts</c>'s own rule (hidden iff the boolean false or
+    /// the exact string "false"). Measured rather than asserted in a test,
+    /// because <c>Vendor/runtime/</c> is fetched and not committed, so a test
+    /// that shelled out to it would fail on a clean clone.</para>
+    ///
+    /// <code>
+    /// page                        site before    after the write, WITHOUT the sweep
+    /// publish: >- / "  false"     'false' HIDDEN 'false false'  -> PUBLISHED
+    /// publish:    / "  false"     False   HIDDEN 'false false'  -> PUBLISHED
+    /// publish: |- / "  false"     'false' HIDDEN 'false false'  -> PUBLISHED
+    /// publish:    / "  a: 1"      {a:1} published ScannerError  -> BUILD STOPS
+    /// publish: false / "  false"  'false false' PUBLISHED (the reader says Hidden — see below)
+    /// </code>
+    ///
+    /// <para>Every one of those lands <c>False -&gt; HIDDEN</c> with the sweep.
+    /// The teacher asked for the page to be taken down and was told it had
+    /// been; without this they could still read it. Issue #176 — the mac still
+    /// owes the same fix.</para>
+    /// </remarks>
+    [Theory]
+    // The value is a folded or literal block scalar.
+    [InlineData("publish: >-\n  false\ntitle: x", true, "publish: false\ntitle: x")]
+    [InlineData("publish: |-\n  false\ntitle: x", true, "publish: false\ntitle: x")]
+    [InlineData("publish: >-\n  false\ntitle: x", false, "publish: true\ntitle: x")]
+    // The value sits indented below the key, with and without things in between.
+    [InlineData("publish:\n  false\ntitle: x", true, "publish: false\ntitle: x")]
+    [InlineData("publish:\n\n  false\ntitle: x", true, "publish: false\ntitle: x")]
+    [InlineData("publish:\n  # n\n  false\ntitle: x", true, "publish: false\ntitle: x")]
+    // A mapping below the key: this is the one that STOPS THE BUILD if left.
+    [InlineData("publish:\n  a: 1\ntitle: x", true, "publish: false\ntitle: x")]
+    // The key is the last line before the closing fence.
+    [InlineData("publish: >-\n  false", true, "publish: false")]
+    // Duplicate keys where the LAST one carries the continuation.
+    [InlineData("publish: true\npublish: >-\n  false\ntitle: x", true, "publish: true\npublish: false\ntitle: x")]
+    // The legacy spelling, migrating: the old key's continuation goes too.
+    [InlineData("draft: >-\n  true\ntitle: x", true, "publish: false\ntitle: x")]
+    public void AValuesContinuationLinesGoWithIt(string frontmatter, bool draft, string expected)
+    {
+        string before = $"---\n{frontmatter}\n---\nBody.\n";
+        var (after, edit) = PageFrontmatter.SetDraft(before, "publish", draft, 1);
+
+        Assert.True(edit.Changed);
+        Assert.Equal($"---\n{expected}\n---\nBody.\n", after);
+        Assert.Equal(draft ? PageVisibility.Hidden : PageVisibility.Visible,
+                     PageVisibilityReader.Answer(after, 1));
+    }
+
+    /// <summary>
+    /// An indented <c># note</c> after a COMPLETE value is not a continuation,
+    /// so it stays where the teacher wrote it.
+    /// </summary>
+    /// <remarks>
+    /// Measured: PyYAML ignores such a line entirely — <c>publish: true</c>
+    /// with <c>  # note</c> under it reads as <c>True</c>, and after the write
+    /// as <c>False</c> with the note still there. The sweep steps over
+    /// comments and takes nothing when no value line follows one.
+    /// </remarks>
+    [Fact]
+    public void AnIndentedNoteAfterACompleteValueIsLeftAlone()
+    {
+        var (after, _) = PageFrontmatter.SetDraft(
+            "---\npublish: true\n  # the teacher's note\ntitle: x\n---\nBody.\n", "publish", draft: true, 1);
+
+        Assert.Equal("---\npublish: false\n  # the teacher's note\ntitle: x\n---\nBody.\n", after);
+        Assert.Equal(PageVisibility.Hidden, PageVisibilityReader.Answer(after, 1));
+
+        // And a key that is null with only a comment under it keeps the note too.
+        var (nulled, _) = PageFrontmatter.SetDraft(
+            "---\npublish:\n  # mine\ntitle: x\n---\nBody.\n", "publish", draft: true, 1);
+        Assert.Equal("---\npublish: false\n  # mine\ntitle: x\n---\nBody.\n", nulled);
+    }
+
+    /// <summary>A CRLF file keeps its line endings through the sweep.</summary>
+    [Fact]
+    public void SweepingAContinuationOutOfACrlfFileLeavesCrlfBehind()
+    {
+        var (after, _) = PageFrontmatter.SetDraft(
+            "---\r\npublish: >-\r\n  false\r\ntitle: x\r\n---\r\nBody.\r\n", "publish", draft: true, 1);
+
+        Assert.Equal("---\r\npublish: false\r\ntitle: x\r\n---\r\nBody.\r\n", after);
+        Assert.Equal(PageVisibility.Hidden, PageVisibilityReader.Answer(after, 1));
+        Assert.Equal(after.Split('\n').Length - 1, after.Split("\r\n").Length - 1);
+    }
+
+    /// <summary>
     /// A value is ALWAYS separated from its colon, because a colon with
     /// nothing after it does not make a mapping.
     /// </summary>
