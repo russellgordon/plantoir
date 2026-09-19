@@ -366,9 +366,331 @@
         "notThis" : "duplicate Unit 3, Day 2",
         "shape" : "duplicate <page title> as my next class",
         "tool" : "add_next_class"
+      },
+      {
+        "becauseNotThis" : "A one-digit hour with no am or pm is morning or evening and nobody can tell which. A deploy set twelve hours wrong is a site that updates after the class it was meant for, so the doubt goes to the model rather than being resolved by a coin toss.",
+        "example" : "deploy at 6:30 am",
+        "fills" : {
+          "when" : "<time> as HH:mm, with the day word in front of it when one was said — settled into a whole moment where the call is made, not here. Every accepted and refused spelling is in deployAtATime."
+        },
+        "notThis" : "deploy at 6:30",
+        "shape" : "[please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow]",
+        "tool" : "schedule_deploy"
       }
     ],
     "parsedNote" : "Families the matcher PARSES rather than compares, because the number or title in them is unbounded. They are matched in code for the same reason the literals are — the whole sentence IS the request, and reading an integer or a title off a fixed shape is not a judgement anybody needs a language model for. `notThis` is the near-miss each family must REFUSE, and it is the half that stops a family swallowing requests that belong to the model."
+  },
+  "deployAtATime" : {
+    "accepted" : [
+      {
+        "expectWhen" : "06:30",
+        "input" : "deploy at 6:30 am",
+        "why" : "The shelf's own card, word for word (it offers it capitalised; matching is case-folded)."
+      },
+      {
+        "expectWhen" : "06:30",
+        "input" : "deploy at 6:30am",
+        "why" : "Written up against the digits, which is how a teacher in a hurry types it."
+      },
+      {
+        "expectWhen" : "06:30",
+        "input" : "deploy at 6:30 a.m.",
+        "why" : "The dotted spelling. The shared tidier removes the trailing full stop and the family folds the rest."
+      },
+      {
+        "expectWhen" : "06:30",
+        "input" : "deploy at 6:30 a.m",
+        "why" : "The same, already missing its last dot."
+      },
+      {
+        "expectWhen" : "19:00",
+        "input" : "deploy at 7 pm",
+        "why" : "A whole hour with a meridiem needs no minutes to be exact."
+      },
+      {
+        "expectWhen" : "19:00",
+        "input" : "deploy at 7pm",
+        "why" : "The same, written up against the digit."
+      },
+      {
+        "expectWhen" : "12:00",
+        "input" : "deploy at 12 pm",
+        "why" : "Noon, as a teacher writes it on a clock."
+      },
+      {
+        "expectWhen" : "00:00",
+        "input" : "deploy at 12 am",
+        "why" : "Midnight. Accepted for the same reason 'midnight' is: the approval card names the whole day and time before anything is set, so the reading is put in front of the teacher rather than guessed at silently."
+      },
+      {
+        "expectWhen" : "23:59",
+        "input" : "deploy at 11:59 pm",
+        "why" : "The last minute of the day, and the one a teacher picks to mean 'tonight'."
+      },
+      {
+        "expectWhen" : "06:30",
+        "input" : "deploy at 06:30",
+        "why" : "24-hour time, and the form schedule_deploy's own schema asks for."
+      },
+      {
+        "expectWhen" : "18:30",
+        "input" : "deploy at 18:30",
+        "why" : "The same, in the afternoon."
+      },
+      {
+        "expectWhen" : "00:00",
+        "input" : "deploy at 00:00",
+        "why" : "Midnight in 24-hour time."
+      },
+      {
+        "expectWhen" : "12:00",
+        "input" : "deploy at noon",
+        "why" : "One of the two times a teacher writes with no digits in it."
+      },
+      {
+        "expectWhen" : "00:00",
+        "input" : "deploy at midnight",
+        "why" : "The other. Treated exactly like '12 am' - one rule rather than two, and the card names the day it landed on."
+      },
+      {
+        "expectWhen" : "tomorrow 06:30",
+        "input" : "deploy tomorrow at 6:30 am",
+        "why" : "The day word may lead."
+      },
+      {
+        "expectWhen" : "tomorrow 06:30",
+        "input" : "deploy at 6:30 am tomorrow",
+        "why" : "…or follow. Either way it is carried as a word and settled where the call is made."
+      },
+      {
+        "expectWhen" : "today 06:30",
+        "input" : "deploy today at 6:30 am",
+        "why" : "An explicit day word overrides the next-such-time rule, even into the past - see resolving."
+      },
+      {
+        "expectWhen" : "today 06:30",
+        "input" : "deploy at 6:30 am today",
+        "why" : "The same, trailing."
+      },
+      {
+        "expectWhen" : "06:30",
+        "input" : "deploy this section at 6:30 am",
+        "why" : "'This section' is the only section a card can reach anyway; 'deploy this section now' is already a fixed phrasing, so the words are worth accepting here too."
+      },
+      {
+        "expectWhen" : "06:30",
+        "input" : "deploy it at 6:30 am",
+        "why" : "'It' means the same thing as 'this section' and costs nothing to read."
+      },
+      {
+        "expectWhen" : "06:30",
+        "input" : "please deploy at 6:30 am",
+        "why" : "Courtesy rather than content."
+      },
+      {
+        "expectWhen" : "06:30",
+        "input" : "deploy at 6:30 am please",
+        "why" : "The same, at the other end."
+      },
+      {
+        "expectWhen" : "06:30",
+        "input" : "deploy at 6:30 am?",
+        "why" : "A question mark is dropped INSIDE this family and not by the shared tidier - two fixed phrasings are matched by equality with a question mark in them ('what courses do i have?'), and a shared strip would stop those matching at all."
+      }
+    ],
+    "note" : "The family 'deploy at <time>', matched in code and never sent to the model. AUTHORED, not generated: cardPhrasings.parsed carries one example and one near-miss, which is nowhere near enough to describe a family whose variable part is a TIME - one example would have the other platform build one spelling. The frame, after trimming, case-folding and removing a trailing . ! or ?: [please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow] [please]. Anything else in the sentence - a section, a course, a weekday, a condition, a second request - falls through to the model. THE RULE THAT CARRIES THE MOST WEIGHT: a time with no am or pm must be written with two digits for the hour, because that is what 24-hour time looks like and it is the form schedule_deploy's own schema asks for. Measured on 2026-09-18: the smaller assistant sent 'Deploy at 6:30 AM' to deploy_section 10 trials out of 10, so a teacher who asked for half six tomorrow got a deploy to students on the spot (research/ai-assist/metal-routing-results.txt, issue #168). accepted and refused run the matcher; resolving runs the settling step that turns a bare time into a whole moment, and is pure input to output with an injected clock so it means the same thing in any time zone.",
+    "refused" : [
+      {
+        "input" : "deploy at 6:30",
+        "why" : "A one-digit hour with no am or pm is morning or evening and nobody can tell which. A deploy set twelve hours wrong is a site that updates after the class it was meant for, so the doubt goes to the model - which is given the date in every message and is measured reading arguments out reliably."
+      },
+      {
+        "input" : "deploy at 7",
+        "why" : "A bare number is not a time anybody has spelled out. Read as an hour it would schedule a deploy off a number that might have been a unit or a section."
+      },
+      {
+        "input" : "deploy at 6.30",
+        "why" : "A dot is a sentence ending in this frame, not a clock separator."
+      },
+      {
+        "input" : "deploy at 630",
+        "why" : "A number, not a clock reading."
+      },
+      {
+        "input" : "deploy at 13:30 pm",
+        "why" : "The hour and the meridiem disagree, so the sentence contradicts itself."
+      },
+      {
+        "input" : "deploy at 25:00",
+        "why" : "There is no such hour."
+      },
+      {
+        "input" : "deploy at 6:75 pm",
+        "why" : "There is no such minute."
+      },
+      {
+        "input" : "deploy at 6:3 pm",
+        "why" : "One digit of minutes is a slip, and it is not knowable whether 3 or 30 was meant."
+      },
+      {
+        "input" : "deploy at 6:305 pm",
+        "why" : "Three digits of minutes is not a clock reading."
+      },
+      {
+        "input" : "deploy at 0:30",
+        "why" : "A one-digit hour with no meridiem, the same rule as 6:30. '00:30' is the spelling that says exactly what it means."
+      },
+      {
+        "input" : "deploy at half six",
+        "why" : "A teacher's idiom, and it means half past six in one country and half past five in another."
+      },
+      {
+        "input" : "deploy at am",
+        "why" : "There is no time in the sentence at all."
+      },
+      {
+        "input" : "deploy at :30 pm",
+        "why" : "No hour."
+      },
+      {
+        "input" : "deploy section 2 at 6:30 am",
+        "why" : "A section is named that this window cannot honour: the assistant window is scoped to ONE section and binds that section whatever the sentence said, so a card appearing to honour another section would answer a different question with total confidence."
+      },
+      {
+        "input" : "deploy ics3u at 6:30 am",
+        "why" : "A course is named, for the same reason."
+      },
+      {
+        "input" : "deploy on monday at 6:30 am",
+        "why" : "A weekday is a day the frame does not read. It belongs to the model, which is given today's date in every message."
+      },
+      {
+        "input" : "deploy tomorrow at 6:30 am tomorrow",
+        "why" : "A day word on both sides is a sentence disagreeing with itself, and picking a half is what a fixed shape exists to avoid."
+      },
+      {
+        "input" : "can you deploy at 7 pm?",
+        "why" : "A question about ability as much as an instruction. 'Please' was measured as unambiguous courtesy and is accepted; this was not, so it goes to the model."
+      },
+      {
+        "input" : "don't deploy at 6:30 am",
+        "why" : "The opposite request. The frame requires 'deploy' as the first word for exactly this reason."
+      },
+      {
+        "input" : "deploy at 6:30 am if the preview looks ok",
+        "why" : "A condition, which nothing here can evaluate."
+      },
+      {
+        "input" : "deploy at 6:30 am every day",
+        "why" : "A repeating schedule, which the tool cannot set."
+      },
+      {
+        "input" : "deploy at 6:30 am is too early",
+        "why" : "Commentary about a time rather than a request to use it."
+      },
+      {
+        "input" : "publish at 6:30 am",
+        "why" : "Publishing is not deploying, and the two are the distinction the assistant spends most of its words teaching."
+      },
+      {
+        "input" : "deploy at 007:30 am",
+        "why" : "The hour is one or two digits, always. Padding beyond that is not a spelling anybody types, and reading it would mean the two apps disagreed on a boundary no suite could see - Int() does not care how a number was padded, so this has to be stated rather than inherited."
+      },
+      {
+        "input" : "deploy at 0007 pm",
+        "why" : "The same rule with no minutes: four digits of hour is not a clock reading, however it adds up."
+      }
+    ],
+    "resolving" : [
+      {
+        "expectMoment" : "2026-09-19 06:30",
+        "now" : "2026-09-19 05:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "06:30",
+        "why" : "Still to come today, so today is what it means."
+      },
+      {
+        "expectMoment" : "2026-09-20 06:30",
+        "now" : "2026-09-19 09:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "06:30",
+        "why" : "The next such time, forwards, counting today while it is still to come - word for word the rule already applied to a bare weekday one unit up (schedule-rules.json, relativeDays). The guess is never silent: schedule_deploy waits for a button and its card names the whole moment, weekday and date included, before anything is written. The alternative considered and rejected was 'today at that time, always', which invents no rule but answers the shelf's own card with a refusal for most of the day."
+      },
+      {
+        "expectMoment" : "2026-09-20 06:30",
+        "now" : "2026-09-19 06:30",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "06:30",
+        "why" : "The same minute is not still to come. Equal counts as gone, so nothing is ever scheduled for an instant that has already arrived."
+      },
+      {
+        "expectMoment" : "2026-09-19 18:30",
+        "now" : "2026-09-19 09:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "18:30",
+        "why" : "Later today, so today."
+      },
+      {
+        "expectMoment" : "2026-09-20 00:00",
+        "now" : "2026-09-19 09:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "00:00",
+        "why" : "Midnight and '12 am' are the same instant and are answered by the same rule; the card says which night it landed on."
+      },
+      {
+        "expectMoment" : "2026-09-20 06:30",
+        "now" : "2026-09-19 05:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "tomorrow 06:30",
+        "why" : "An explicit day word is obeyed even when today would still have done."
+      },
+      {
+        "expectMoment" : "2026-09-19 06:30",
+        "now" : "2026-09-19 09:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "today 06:30",
+        "why" : "Into the past ON PURPOSE. They named the day, so the app does not move it for them - and the existing refusal ('that has already passed') says so in the teacher's own words when they press the button."
+      },
+      {
+        "expectMoment" : "2026-10-01 06:30",
+        "now" : "2026-09-30 09:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-30",
+        "when" : "06:30",
+        "why" : "Tomorrow crosses the end of the month, which is arithmetic on a calendar rather than on a number."
+      },
+      {
+        "expectMoment" : null,
+        "now" : "2026-09-19 09:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "2026-10-01 06:30",
+        "why" : "Already a whole moment - the form the model itself is told to send. Settling nothing is what makes the settler IDEMPOTENT, which is what lets the caller settle once, write its trail line from the settled arguments, and hand the same call straight on."
+      },
+      {
+        "expectMoment" : null,
+        "now" : "2026-09-19 09:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "6:30",
+        "why" : "Not a clock reading this will complete. The matcher never produces it, and a MODEL that sends it still meets the tool's own 'I could not read that time' rather than having a day guessed onto a time nobody could read."
+      },
+      {
+        "expectMoment" : null,
+        "now" : "2026-09-19 09:00",
+        "timeZone" : "UTC",
+        "today" : "2026-09-19",
+        "when" : "half six",
+        "why" : "Unreadable, so it travels on exactly as it arrived and the teacher meets the runner's own refusal rather than a silent change of subject."
+      }
+    ]
   },
   "generated" : {
     "keys" : [
@@ -376,7 +698,7 @@
       "tools",
       "toolSchemas"
     ],
-    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. The rest — nearMisses, scenarios — is hand-written intent and is preserved."
+    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
   },
   "nearMisses" : {
     "note" : "Must NOT match — each one only looks like a card phrasing, and answering the wrong question with total confidence is worse than routing it. The last three are the rollover's website question, and they record a KNOWN LIMIT rather than guarding a near-miss: the reply offers two sentences word for word, those exact strings are the only way back in, and a teacher who paraphrases matches nothing at all — re_date_classes is shown to no local model, so nothing catches the paraphrase and the section stays pinned to last year's website with nothing said. Both apps already pass these, so nothing goes red; they are written down so the limit is visible, and so a future looser matcher has to change this list on purpose. \"publish next monday's class\" is a different shape again: it is the near miss of a phrasing that DOES match, and it must reach the model precisely because \"next Monday\" is the one weekday word neither app will settle on its own - see schedule-rules.json, relativeDays.",
@@ -389,7 +711,8 @@
       "a new website",
       "new one please",
       "roll this section over onto a new site",
-      ""
+      "",
+      "Deploy Section 2 at 6:30 AM"
     ]
   },
   "note" : "Generated from the macOS app by `Plantoir --assist-contract`. Do not hand-edit; see contracts/README.md.",
@@ -699,6 +1022,23 @@
         "name" : "a page edit, with a preview running",
         "when" : "unpublish_pages",
         "why" : "The stop sits beside the WRITES, not beside the start: a preview left serving while the pages beneath it are rewritten serves a half-changed site, and the teacher's next refresh is a race they cannot see they are in. No expectReply on purpose — the reply is about the pages that changed, not about the preview; this case was written claiming the preview sentence, and running it said otherwise."
+      },
+      {
+        "expectTranscriptContains" : [
+          "teacher: Deploy at 6:30 AM",
+          "assistant: Section 1",
+          "assistant: wording.deployQuestion",
+          "teacher: wording.cancelled"
+        ],
+        "given" : {
+          "pending" : "schedule_deploy",
+          "saying" : [
+            "Deploy at 6:30 AM"
+          ]
+        },
+        "name" : "a deploy asked for at a time is answered in code and asks about the MOMENT",
+        "when" : "decline",
+        "why" : "Measured on 2026-09-18: the smaller assistant sent this sentence to deploy_section 10 trials out of 10, so a teacher who asked for half six tomorrow got a deploy to students on the spot, behind an approval card that mentioned no time at all. Answered in code it cannot reach the model, and the card it does reach names the section, the destination and the whole moment. 'Section 1' is what is asserted because it is LOCALE-FREE and appears in the scheduled card on both platforms while appearing in the immediate one on neither: a formatted time is written '6:30 AM' here, '6:30 a.m.' on another Mac and with a different separator again in a 24-hour locale, so asserting one would pin the machine rather than the behaviour. The MOMENT is pinned instead by deployAtATime.resolving, which is pure and portable. Declined rather than approved because approving would write a real scheduled job."
       }
     ],
     "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN."
