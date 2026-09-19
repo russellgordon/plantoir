@@ -36,6 +36,22 @@ struct SectionDetailView: View {
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
 
+    /// The working folder this section appeared in — and the folder its
+    /// preview must be stopped against, whatever the window points at by the
+    /// time the stop runs.
+    ///
+    /// Not `workspace.workspaceURL`, and the difference is the whole reason
+    /// this exists. Choosing a different working folder clears the selection,
+    /// which tears this view down; `onDisappear` then runs with the window
+    /// ALREADY pointing at the new folder. A stop read from the model at that
+    /// moment runs the new folder's `preview.sh` — for a section that folder
+    /// may not even have — while the old folder's container-side build or
+    /// server keeps going, unreclaimed and invisible. The same mistake left a
+    /// stale entry behind in `SectionWindowControllers`, which is keyed by
+    /// folder path: registered under the old folder, unregistered under the
+    /// new one, so the old key was never removed.
+    @State var folderThisSectionOpenedIn: URL?
+
     /// Why a preview could not start, shown as an alert.
     @State var previewRefusal: String?
 
@@ -299,6 +315,10 @@ struct SectionDetailView: View {
             guard let folder = workspace.workspaceURL else {
                 return
             }
+            // Noted while the window still points here, because everything
+            // this view unwinds on the way out has to be aimed at THIS
+            // folder — see the property's own comment.
+            folderThisSectionOpenedIn = folder
             SectionWindowControllers.shared.register(
                 folderPath: folder.path,
                 courseCode: course.code,
@@ -342,7 +362,7 @@ struct SectionDetailView: View {
             }
         }
         .onDisappear {
-            if let folder = workspace.workspaceURL {
+            if let folder = folderThisSectionOpenedIn {
                 SectionWindowControllers.shared.unregister(
                     folderPath: folder.path,
                     courseCode: course.code,
@@ -1004,7 +1024,7 @@ struct SectionDetailView: View {
     func stopPreviewAndWait() async {
         let courseCode: String = course.code
         let section: Int = sectionNumber
-        let folder: URL? = workspace.workspaceURL
+        let folder: URL? = folderThisSectionOpenedIn
         stopPreview()
         if let folder {
             await PreviewStopper.stopSectionProcessesAndWait(
@@ -1016,7 +1036,10 @@ struct SectionDetailView: View {
     func stopPreview() {
         // Ending the host-side script leaves the build or server inside
         // the container running; the launcher's stop mode reclaims them.
-        if previewRunner.isRunning, let workspaceURL = workspace.workspaceURL {
+        // Against the folder this section OPENED in, never the one the
+        // window points at now — this also runs from `onDisappear`, which
+        // is after a folder change has already moved the window on.
+        if previewRunner.isRunning, let workspaceURL = folderThisSectionOpenedIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -1036,7 +1059,7 @@ struct SectionDetailView: View {
 
     /// Cancels the running preview from the progress view.
     func cancelPreview() {
-        if previewRunner.isRunning, let workspaceURL = workspace.workspaceURL {
+        if previewRunner.isRunning, let workspaceURL = folderThisSectionOpenedIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -1052,7 +1075,7 @@ struct SectionDetailView: View {
 
     /// Cancels the running deploy from the progress view.
     func cancelDeploy() {
-        if deployRunner.isRunning, let workspaceURL = workspace.workspaceURL {
+        if deployRunner.isRunning, let workspaceURL = folderThisSectionOpenedIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
