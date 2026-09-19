@@ -217,10 +217,24 @@ the dangerous way round before they were measured:
   `publish: false<NBSP>` is the STRING "false\u{00A0}" and the page is
   published. Swift's `trimmingCharacters(in: .whitespaces)` and Python's
   `str.strip()` both strip it; both readers trim space and tab by hand instead.
-  (One exception, measured and accepted: when such a value is the LAST thing in
-  the frontmatter block, python-frontmatter's own `.strip()` removes it and the
-  build hides the page, where these readers say visible. That is the mild
-  direction, and it is the only place they knowingly differ.)
+
+  **One exception, measured and accepted, and the trigger is not the obvious
+  one.** python-frontmatter's `YAMLHandler.export` ends with
+  `yaml.dump(...).strip()`, and `yaml.dump` SORTS the keys — so the trailing
+  non-breaking space survives only while something else sorts after `publish`.
+  `publish: false<NBSP>` on its own comes out as `publish: false` and the page
+  is HIDDEN, where these readers say visible; `title: x` beside it (or `zzz:`,
+  or anything sorting after `publish`) leaves the space in place and the page
+  is published, which is what they say. Not "when it is last in the block" —
+  when it sorts last in the RE-DUMPED block. It is the mild direction, it is
+  the only place the readers knowingly differ from the site, and the alone-form
+  is pinned in `scripts/check_visibility_against_the_site.py` so the day the
+  library stops doing this, the difference fails rather than quietly becoming
+  something else.
+
+  It is deliberately NOT a shared reading case. An invisible character in a
+  JSON file that two platforms must match character for character is a trap
+  laid for whoever next edits the list.
 
 What happens to `cannotTell` depends on who asked, and this is the part to get
 right:

@@ -413,6 +413,56 @@ final class SectionAdderTests: XCTestCase {
         XCTAssertFalse(updated.contains("publishForSection2: false"))
     }
 
+    /// The CURRENT key's value can run onto the next line too, and then it
+    /// cannot be copied onto another key's line at all.
+    @MainActor
+    func testACurrentValueOnTheNextLineIsCarriedAcrossAsHeldBack() throws {
+        for frontmatter in ["publishForSection1:\n  false", "publishForSection1: >-\n  false"] {
+            let (root, course) = try makeWorkspace()
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let shared: String = """
+            ---
+            createdSection1: 2026-09-08T07:00:00.000
+            \(frontmatter)
+            ---
+            Body.
+            """
+            let sharedURL: URL = course.directoryURL.appendingPathComponent("Below.md")
+            try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+            try SectionAdder.addSection(2, to: course)
+
+            let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+            XCTAssertTrue(updated.contains("publishForSection2: false"), frontmatter)
+            XCTAssertFalse(updated.contains("publishForSection2: true"), frontmatter)
+        }
+    }
+
+    /// A legacy key with NOTHING after it is not a draft — `_as_bool` of null
+    /// is false — so the new section is published, like the old one.
+    @MainActor
+    func testAnEmptyLegacyValueIsCarriedAcrossAsPublished() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let shared: String = """
+        ---
+        createdSection1: 2026-09-08T07:00:00.000
+        draftSection1:
+        title: Learning Goals
+        ---
+        Body.
+        """
+        let sharedURL: URL = course.directoryURL.appendingPathComponent("EmptyDraft.md")
+        try shared.write(to: sharedURL, atomically: true, encoding: .utf8)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let updated: String = try String(contentsOf: sharedURL, encoding: .utf8)
+        XCTAssertTrue(updated.contains("publishForSection2: true"))
+    }
+
     /// A page written with plain `created:` applies to every section
     /// already, including the new one. Splitting it would change what the
     /// existing sections show, so it is left exactly as it is.

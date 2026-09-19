@@ -2663,6 +2663,34 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertFalse(after.contains("# covered Tuesday"))
     }
 
+    /// A linked page whose flag cannot be read takes the class's date too.
+    ///
+    /// It is about to be published by the change list, so skipping it as
+    /// "already out where students can see it" would publish it with whatever
+    /// date it happened to have rather than the day of the class that brought
+    /// it — which is the one thing the date move exists to fix.
+    @MainActor
+    func testALinkedPageThisAppCannotReadStillTakesTheClassesDate() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 24", publish: "false", date: "2027-01-19",
+                  body: "See [[Bananas]].", in: made.course)
+        try write(courseLevelPage: "Bananas", publishForSection1: "!!str false",
+                  dated: "2026-09-08", body: "Yellow.", in: made.course)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "plan_publish_pages",
+            arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 24"]
+        ))
+        XCTAssertTrue(
+            outcome.detail.contains(
+                "“Bananas” will become visible, with the same date as “Unit 4, Day 24”."
+            ),
+            outcome.detail
+        )
+    }
+
     /// A flag this app will NOT read is not "already done".
     ///
     /// Each of these hides the page on the built site, and the reader calls

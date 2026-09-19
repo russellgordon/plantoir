@@ -60,6 +60,36 @@ nonisolated enum PageVisibilityAnswer: Equatable {
 /// `AssistPageVisibility.setting`'s business — and nothing else.
 nonisolated enum PageVisibilityReader {
 
+    // One key's value, and one page's frontmatter — the two small shapes the
+    // functions below pass between themselves.
+
+    /// One key's value, as far as this reader is willing to read it.
+    enum ScalarReading: Equatable {
+
+        /// A plain value, with whether the teacher put quotes around it —
+        /// which changes the answer, because quotes stop PyYAML resolving
+        /// `no` or `false` into a boolean.
+        case text(value: String, wasQuoted: Bool)
+
+        /// YAML this reader will not guess at.
+        case cannotTell
+    }
+
+    /// A page's frontmatter, or why there is none to read.
+    enum FrontmatterBlock: Equatable {
+
+        /// No opening fence: an ordinary Markdown page with no metadata.
+        case noFrontmatter
+
+        /// Where the fences are, and the lines between them.
+        case lines(openIndex: Int, closeIndex: Int, inside: [String])
+
+        /// There IS a fence, and what follows it is not something this reader
+        /// should answer about — an opening fence with no closing one, or a
+        /// block indented with tabs, which the build itself cannot parse.
+        case unreadable
+    }
+
     // MARK: - Functions
 
     /// YAML 1.1's nine spellings of yes, as PyYAML resolves them. Written out
@@ -104,7 +134,7 @@ nonisolated enum PageVisibilityReader {
             return .saysNothing
         case .unreadable:
             return .cannotTell
-        case .lines(let inside):
+        case .lines(_, _, let inside):
             return answer(inFrontmatterLines: inside, forSection: sectionNumber)
         }
     }
@@ -237,18 +267,6 @@ nonisolated enum PageVisibilityReader {
             trimmed = trimmed.dropLast()
         }
         return String(trimmed)
-    }
-
-    /// One key's value, as far as this reader is willing to read it.
-    enum ScalarReading: Equatable {
-
-        /// A plain value, with whether the teacher put quotes around it —
-        /// which changes the answer, because quotes stop PyYAML resolving
-        /// `no` or `false` into a boolean.
-        case text(value: String, wasQuoted: Bool)
-
-        /// YAML this reader will not guess at.
-        case cannotTell
     }
 
     /// Everything after a key's colon, read.
@@ -396,15 +414,20 @@ nonisolated enum PageVisibilityReader {
         return found
     }
 
-    /// The first line below this one that is not blank, or nil at the end of
-    /// the block. Blank lines are skipped because YAML skips them: a value
-    /// indented under its key still belongs to that key with an empty line in
-    /// between, and that was measured rather than assumed.
+    /// The first line below this one that could be a VALUE, or nil when there
+    /// is none before the end of the block.
+    ///
+    /// Blank lines and comment lines are skipped, because YAML skips them: a
+    /// value indented under its key still belongs to that key with an empty
+    /// line or a `# note` in between. Both measured — `publish:` followed by
+    /// an indented comment is a null and PUBLISHES the page, while the same
+    /// comment with an indented `false` under it hides it.
     static func firstNonBlankLine(after index: Int, in lines: [String]) -> String? {
         var position: Int = index + 1
         while position < lines.count {
             let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[position])
-            if !trimmingYAMLSpaces(bare).isEmpty {
+            let content: String = trimmingYAMLSpaces(bare)
+            if !content.isEmpty && !content.hasPrefix("#") {
                 return bare
             }
             position += 1
@@ -469,21 +492,6 @@ nonisolated enum PageVisibilityReader {
 
     // Finding the block.
 
-    /// A page's frontmatter, or why there is none to read.
-    enum FrontmatterBlock: Equatable {
-
-        /// No opening fence: an ordinary Markdown page with no metadata.
-        case noFrontmatter
-
-        /// The lines between the fences.
-        case lines(inside: [String])
-
-        /// There IS a fence, and what follows it is not something this reader
-        /// should answer about — an opening fence with no closing one, or a
-        /// block indented with tabs, which the build itself cannot parse.
-        case unreadable
-    }
-
     /// Is this line one of the fences around a page's frontmatter?
     ///
     /// Three dashes OR MORE, with nothing after them but spaces and tabs —
@@ -496,8 +504,10 @@ nonisolated enum PageVisibilityReader {
         if bare.count < 3 {
             return false
         }
-        for character in bare where character != "-" {
-            return false
+        for character in bare {
+            if character != "-" {
+                return false
+            }
         }
         return true
     }
@@ -508,6 +518,33 @@ nonisolated enum PageVisibilityReader {
     /// python-frontmatter accepts them, so the build reads the block and this
     /// reader had better read the same one.
     static func frontmatterBlock(in pageText: String) -> FrontmatterBlock {
+        guard let fences = fenceIndices(in: pageText) else {
+            return pageTextOpensAFence(pageText) ? .unreadable : .noFrontmatter
+        }
+        let lines: [String] = pageText.components(separatedBy: "\n")
+        var inside: [String] = []
+        for position in (fences.openIndex + 1)..<fences.closeIndex {
+            inside.append(lines[position])
+        }
+        // A tab used as INDENTATION is the one thing YAML forbids outright:
+        // the build's own parser throws on it and stops the whole build, so
+        // there is no site verdict to mirror.
+        for line in inside {
+            if PageFrontmatter.trimmingCarriageReturn(line).hasPrefix("\t") {
+                return .unreadable
+            }
+        }
+        return .lines(openIndex: fences.openIndex, closeIndex: fences.closeIndex, inside: inside)
+    }
+
+    /// Where a page's two fences are, whatever is between them.
+    ///
+    /// Separate from `frontmatterBlock` because a WRITER still needs to find
+    /// the block on a page the build cannot parse: editing the line in place
+    /// leaves the teacher's own frontmatter where they put it, while treating
+    /// the page as having none would prepend a second block and turn theirs
+    /// into body text.
+    static func fenceIndices(in pageText: String) -> (openIndex: Int, closeIndex: Int)? {
         let lines: [String] = pageText.components(separatedBy: "\n")
         var openIndex: Int = 0
         while openIndex < lines.count {
@@ -516,32 +553,28 @@ nonisolated enum PageVisibilityReader {
             }
             openIndex += 1
         }
-        guard openIndex < lines.count else {
-            return .noFrontmatter
+        guard openIndex < lines.count, isFence(lines[openIndex]) else {
+            return nil
         }
-        guard isFence(lines[openIndex]) else {
-            return .noFrontmatter
-        }
-
         var index: Int = openIndex + 1
         while index < lines.count {
             if isFence(lines[index]) {
-                var inside: [String] = []
-                for position in (openIndex + 1)..<index {
-                    inside.append(lines[position])
-                }
-                // A tab used as INDENTATION is the one thing YAML forbids
-                // outright: the build's own parser throws on it and stops the
-                // whole build, so there is no site verdict to mirror.
-                for line in inside {
-                    if PageFrontmatter.trimmingCarriageReturn(line).hasPrefix("\t") {
-                        return .unreadable
-                    }
-                }
-                return .lines(inside: inside)
+                return (openIndex: openIndex, closeIndex: index)
             }
             index += 1
         }
-        return .unreadable
+        return nil
+    }
+
+    /// True when the page starts with a fence that is never closed — there IS
+    /// frontmatter here, and it is not something to answer about.
+    static func pageTextOpensAFence(_ pageText: String) -> Bool {
+        for line in pageText.components(separatedBy: "\n") {
+            if trimmingYAMLSpaces(line).isEmpty {
+                continue
+            }
+            return isFence(line)
+        }
+        return false
     }
 }

@@ -138,6 +138,18 @@ final class PageVisibilityReadingTests: XCTestCase {
         )
     }
 
+    /// An indented `# note` is a comment, not a value.
+    func testAnIndentedCommentIsNotAValue() {
+        // Measured: each of these is what a line reader would say anyway —
+        // which is the point, since the value-below rule must not swallow a
+        // comment and call a published page unreadable.
+        XCTAssertEqual(answer("publish: true\n  # mine"), .visible)
+        XCTAssertEqual(answer("publish:\n  # mine"), .visible,
+                       "A key with only a comment under it is still a null, which publishes")
+        XCTAssertEqual(answer("publish:\n  # mine\n  false"), .cannotTell,
+                       "But a real value under the comment is a value this reader will not follow")
+    }
+
     /// A key of one of the four names, indented under something else. It may
     /// be nothing to do with the page, and it may be everything.
     func testAnIndentedKeyIsNotThisPagesFlag() {
@@ -330,6 +342,31 @@ final class PageVisibilityReadingTests: XCTestCase {
                 "\(frontmatter) — inserting a second key above this one left the page hidden"
             )
         }
+    }
+
+    /// The writer has to find the same BLOCK the reader found, or it edits a
+    /// different page from the one it read.
+    ///
+    /// Measured: prepending a block of its own leaves the teacher's real
+    /// frontmatter behind it as BODY TEXT, printed to their students.
+    func testTheWriterEditsTheBlockTheReaderFound() {
+        let longerFence: String = "----\npublish: false\n----\nBody.\n"
+        let published = AssistPageVisibility.setting(
+            published: true, in: longerFence, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertEqual(published.text, "----\npublish: true\n----\nBody.\n")
+
+        let blankFirst: String = "\n---\npublish: false\n---\nBody.\n"
+        let second = AssistPageVisibility.setting(
+            published: true, in: blankFirst, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertEqual(second.text, "\n---\npublish: true\n---\nBody.\n")
+
+        let mismatchedClose: String = "---\npublish: false\n----\nBody.\n"
+        let third = AssistPageVisibility.setting(
+            published: true, in: mismatchedClose, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertEqual(third.text, "---\npublish: true\n----\nBody.\n")
     }
 
     /// And it must rewrite the LAST of two, because that is the one the build
