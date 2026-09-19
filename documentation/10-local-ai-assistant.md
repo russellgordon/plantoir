@@ -1930,8 +1930,12 @@ All three were found from the Windows side and closed on the mac in #163.
 **1. A copy could arrive already visible to students.** The copy is given a
 plain `publish: false`, but the build consults `publishForSection<N>` FIRST —
 and the page a teacher names can itself be a course-level shared page, since
-`AssistSectionGraph.read` walks the whole course directory. Every
-`_DUPLICATE ME.md` in the shipped example content carries that key. Measured
+`AssistSectionGraph.read` walks the whole course directory. This is not a
+shape the product manufactures — `AssistPageVisibility.isSectionLocal` decides
+from the path, so the app never writes a per-section key onto a section-local
+page — but it is one the shipped content hands a teacher: **324 files under
+`support/example_content/*/shared/` carry `publishForSection<N>`, including
+all 301 `_DUPLICATE ME.md`**, counted rather than remembered. Measured
 in the real toolchain image (`teaching-quartz:src-0b2b2e9c`, CPython 3.11.15,
 PyYAML 6.0.3, python-frontmatter 1.3.0), calling the build's own
 `process_frontmatter` and then applying `patches/publish.ts`'s rule:
