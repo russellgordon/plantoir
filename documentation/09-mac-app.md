@@ -954,10 +954,17 @@ The same card is correct 10/10 on the larger assistant. Conditions, thresholds a
 tables are in `research/ai-assist/metal-routing-results.txt`, which is also
 the file to read before quoting any "0 malformed calls" from that folder.
 
-**The split is 16 and 3 since 2026-09-19**, and that is a fact about the CODE
-rather than a second measurement: "deploy at &lt;time&gt;" became a parsed
-family in `AssistCardCommand`, so the card no longer reaches the model at all
-and the measured misroute is unreachable from the shelf. The model itself is
+**The split went to 16 and 3 on 2026-09-19, and to 17 and 2 later the same
+day**, and that is a fact about the CODE rather than a second measurement:
+"deploy at &lt;time&gt;" became a parsed family in `AssistCardCommand`
+([#168](https://github.com/russellgordon/plantoir/issues/168)), so the card no
+longer reaches the model at all and the measured misroute is unreachable from
+the shelf; then
+[#215](https://github.com/russellgordon/plantoir/issues/215) made "hide" and
+"unpublish" one frame that takes a class page, which did the same for
+"Unpublish Unit 2, Day 3". Count it in
+`AssistPromptShelfTests.testEveryCardIsEitherMatchedInCodeOrKnownToGoToTheModel`
+rather than from this prose. The model itself is
 unchanged and still gets that sentence wrong when it is phrased in a way the
 family does not read — which is the point of the second half of the same
 piece, the immediate deploy card now saying that it happens now. Both halves

@@ -292,9 +292,14 @@ PUBLISHERS = {"publish_class_on", "plan_publish_class_on", "publish_pages", "pla
 #
 # Kept as the Windows list rather than replaced, because every comparable
 # figure in this folder was taken against it. No course is named in any of
-# them, because the window names it in the system prompt. Five of them never
-# reach the model in the app; they are measured anyway, for the
-# bring-your-own-assistant path, and the run reports them separately.
+# them, because the window names it in the system prompt. SIX of them never
+# reach the model in the app — five until 2026-09-19, when "Unpublish Unit 2,
+# Day 3" became a code-answered phrasing with issue #215 and the promise-card
+# denominator the run prints dropped from 6 of 11 to 5 of 11. They are
+# measured anyway, for the bring-your-own-assistant path, and the run reports
+# them separately. Count them from the run's own line rather than from this
+# comment: `intercepted in code before the model (N of M probes)` is computed,
+# and a number typed in prose is a number that rots.
 PROMISED = [
     (("plan_publish_pages", "publish_pages"),
      "Publish Unit 2, Day 3, and everything it links to",
@@ -532,11 +537,19 @@ def intercepted(message):
     Same tidying as the Swift: trim, strip leading and trailing `.` and `!`,
     lower-case, then EQUALITY — never a substring. Then the six parsed
     families, which cannot be listed because the number, title or TIME in them
-    is unbounded. The sixth — "deploy at <time>" — is checked against the
-    contract's own accepted and refused rows before any probe is sent, by
-    `assert_deploy_at_a_time_matches_contract()` below: this guard went one
-    family stale once already, and a stale guard scores a routing result for a
-    sentence the app never routes.
+    is unbounded. TWO of them are checked against the contract's own accepted
+    and refused rows before any probe is sent — "deploy at <time>" by
+    `assert_deploy_at_a_time_matches_contract()` and the hide/unpublish frame
+    by `assert_hide_is_unpublish_matches_contract()`, both below. This guard
+    went one family stale once already, and a stale guard scores a routing
+    result for a sentence the app never routes.
+
+    Widened 2026-09-19 with issue #215: "hide" means what "unpublish" means and
+    is answered in code, and both verbs take a class page as well as a whole
+    unit. The WHOLE VERB is gated, not only the day arm — publish keeps the
+    frame it shipped with, so `publish unit 4, day 3`, `publish unit 4?` and
+    `please publish unit 4` all still go to the model. That asymmetry is what
+    the Swift argues for and the contract carries as five refused rows.
     """
     with open(ROOT / "contracts" / "assist-cases.json", encoding="utf-8") as handle:
         phrasings = json.load(handle)["cardPhrasings"]["matches"]
@@ -544,8 +557,9 @@ def intercepted(message):
     for entry in phrasings:
         if tidied == entry["phrasing"]:
             return entry["tool"]
-    if re.fullmatch(r"(un)?publish unit \d+", tidied):
-        return "unpublish_pages" if tidied.startswith("un") else "publish_pages"
+    whole_unit_or_class_page = unit_or_class_page(tidied)
+    if whole_unit_or_class_page:
+        return whole_unit_or_class_page
     counts = r"(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)"
     if re.fullmatch(r"add %s more days to unit \d+" % counts, tidied):
         return "add_next_class"
@@ -561,6 +575,88 @@ def intercepted(message):
     if re.fullmatch(r"duplicate .+ as (my next class|the next class|my next lesson)", tidied):
         return "add_next_class"
     return None
+
+
+def unit_or_class_page(tidied):
+    """Which tool "hide unit 4, day 21" and its relatives are answered with.
+
+    Mirrors `AssistCardCommand.wholeUnitOrClassPage`, which is TWO frames read
+    by different rules — and the split is the part to keep. The hide/unpublish
+    arm drops commas before counting words, takes a trailing question mark off
+    and allows "please" at either end (so "day21" is refused, not being a word
+    this frame has). The PUBLISH arm gets none of that: a literal opening
+    `"publish unit "` and a bare number, exactly as it shipped, because
+    publishing is the direction that reaches students and "publish unit 4?" is
+    plausibly a teacher asking. Both are pinned by
+    `assert_hide_is_unpublish_matches_contract()` below, whose refused rows
+    include all five of the publish spellings.
+    """
+    hidden = hide_or_unpublish(tidied)
+    if hidden:
+        return hidden
+    return whole_unit_to_publish(tidied)
+
+
+def whole_unit_to_publish(tidied):
+    """"publish unit 5", read the way it has been read since it shipped."""
+    opening = "publish unit "
+    if not tidied.startswith(opening):
+        return None
+    rest = tidied[len(opening):].strip(" \t")
+    if not rest or "," in rest or not swift_int(rest):
+        return None
+    return "publish_pages"
+
+
+def hide_or_unpublish(tidied):
+    """"hide unit 4, day 21" and "unpublish unit 4" — the widened arm."""
+    frame = tidied.rstrip("?").strip()
+    # SPLIT ON THE LITERAL SPACE, not on any whitespace. The Swift uses
+    # `split(separator: " ")`, so "hide unit\t4" leaves it with a word
+    # "unit\t4" and no match; a bare `.split()` here would accept it and the
+    # mirror would be describing a matcher the app does not have. Measured:
+    # a tab was one of three shapes on which this mirror and the Swift
+    # disagreed before the reading was tightened.
+    words = [word for word in frame.replace(",", " ").split(" ") if word]
+    if words[:1] == ["please"]:
+        words = words[1:]
+    if words[-1:] == ["please"]:
+        words = words[:-1]
+    if len(words) < 3 or words[1] != "unit":
+        return None
+    if words[0] not in ("hide", "unpublish"):
+        return None
+    if not swift_int(words[2]):
+        return None
+    if len(words) == 3:
+        return "unpublish_pages"
+    if len(words) != 5 or words[3] != "day":
+        return None
+    if not swift_int(words[4]):
+        return None
+    return "unpublish_pages"
+
+
+def swift_int(text):
+    """Whether Swift's `Int(_:)` would read this, which is the acceptance test.
+
+    Narrower than `[+-]?\\d+` in two ways that were MEASURED as disagreements
+    rather than reasoned about — 552 inputs through this mirror and a compiled
+    copy of the real matcher, 7 one-way misses. `Int` is 64-bit, so
+    "unit 99999999999999999999" overflows and returns nil where a regex
+    matches; and `Int` reads ASCII digits only, while Python's `\\d` is
+    Unicode-aware and accepts "unit ٤" and "unit ４". Neither is reachable
+    from a contract row or a probe, so no number here was ever distorted —
+    but a mirror that claims a spelling cannot go unnoticed had better not
+    have three of them.
+    """
+    if not re.fullmatch(r"[+-]?[0-9]+", text):
+        return False
+    try:
+        value = int(text)
+    except ValueError:
+        return False
+    return -(2 ** 63) <= value <= (2 ** 63) - 1
 
 
 def deploy_at_a_time(tidied):
@@ -673,6 +769,41 @@ def assert_deploy_at_a_time_matches_contract():
     return len(family["accepted"]) + len(family["refused"])
 
 
+def assert_hide_is_unpublish_matches_contract():
+    """Fail the run if the hide/unpublish frame has drifted from the contract.
+
+    The same argument as the function above, and the same cost of skipping it.
+    This family matters more than most here because one of its rows is the
+    shelf's own "Unpublish Unit 2, Day 3": an accepted row this guard missed
+    would be SENT to the model and scored as a routing result for a sentence
+    the app answers itself, which is exactly the number nobody should quote.
+    Each accepted row carries the tool it must reach, so the verb gating is
+    checked too — `publish unit 4, day 3` is a REFUSED row, and a guard that
+    let it through would be describing a frame the app does not have.
+    """
+    with open(ROOT / "contracts" / "assist-cases.json", encoding="utf-8") as handle:
+        family = json.load(handle).get("hideIsUnpublish")
+    if not family:
+        sys.exit("contracts/assist-cases.json carries no hideIsUnpublish rows to check against.")
+    wrong = []
+    for row in family["accepted"]:
+        reached = intercepted(row["input"])
+        if reached != row["expectTool"]:
+            wrong.append("accepted as %s and this guard says %r: %r"
+                         % (row["expectTool"], reached, row["input"]))
+    for row in family["refused"]:
+        reached = intercepted(row["input"])
+        if reached in ("unpublish_pages", "publish_pages"):
+            wrong.append("refused and intercepted as %s anyway: %r" % (reached, row["input"]))
+    if wrong:
+        sys.exit(
+            "unit_or_class_page() no longer agrees with contracts/assist-cases.json "
+            "-> hideIsUnpublish:\n  %s\nFix it before quoting a number from this suite."
+            % "\n  ".join(wrong)
+        )
+    return len(family["accepted"]) + len(family["refused"])
+
+
 def ask(prompt):
     payload = {
         "model": "local", "temperature": TEMPERATURE,
@@ -729,6 +860,7 @@ CARD_LABELS = [probe for _, _, probe, _ in PROMISED]
 # The one parsed family this guard cannot describe with a one-line regex is
 # pinned against the contract before anything is measured.
 DEPLOY_ROWS_CHECKED = assert_deploy_at_a_time_matches_contract()
+HIDE_ROWS_CHECKED = assert_hide_is_unpublish_matches_contract()
 INTERCEPTED = {}
 for acceptable, prompt, probe, needs_date in CASES:
     tool = intercepted(prompt.replace("EXC2O", COURSE).replace("exc2o", COURSE.lower()))
@@ -754,6 +886,8 @@ if MAC_SHELF_ONLY:
           % (assert_shelf_is_current(), SHELF_SWIFT))
 print("### deploy-at-a-time guard agrees with %d contract rows"
       % DEPLOY_ROWS_CHECKED)
+print("### hide-is-unpublish guard agrees with %d contract rows"
+      % HIDE_ROWS_CHECKED)
 print("### intercepted in code before the model (%d of %d probes): %s" % (
     len(INTERCEPTED), len(CASES),
     ", ".join("%s -> %s" % (p, t) for p, t in INTERCEPTED.items())))
