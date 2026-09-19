@@ -461,7 +461,8 @@ separately from the reader:
   rather than a ride-along.
   [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
 
-  **Windows fixed all of this on 2026-09-19** — `PageVisibilityReader
+  **Windows fixed all of this — everything above except that one indented-dashes
+  shape — on 2026-09-19** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
   sweep, used by both of `SetDraft`'s branches; tests in
   `PageVisibilityReadingTests` →
