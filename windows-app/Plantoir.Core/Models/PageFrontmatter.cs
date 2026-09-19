@@ -315,7 +315,7 @@ public static class PageFrontmatter
             // The LAST line naming a key is the one the build reads, so it is
             // the one to rewrite: setting the first of two would leave the page
             // saying the opposite of what was asked for.
-            lines[currentKeyLines[^1]] = ReplaceValue(lines[currentKeyLines[^1]], publish);
+            lines[currentKeyLines[^1]] = ReplaceValue(lines[currentKeyLines[^1]], key, publish);
             // Already migrated; every leftover legacy line is noise that now
             // says the opposite of the line above it. Removed last first, so
             // the earlier indices stay put.
@@ -355,23 +355,51 @@ public static class PageFrontmatter
     /// splitting <c>publish: "false # why"</c> at it left an unbalanced quote
     /// in the teacher's file — frontmatter the build cannot parse at all.
     /// </remarks>
-    private static string ReplaceValue(string line, bool publish)
+    private static string ReplaceValue(string line, string key, bool publish)
     {
         // A CRLF file's lines still carry their '\r' here; rebuilding the line
         // without putting it back would quietly convert that one line to LF.
         string carriageReturn = line.EndsWith('\r') ? "\r" : "";
         string body = line.TrimEnd('\r');
 
-        int colon = body.IndexOf(':');
-        if (colon < 0) return line;   // not a mapping line; leave it alone
-        string head = body[..(colon + 1)];
-        string tail = body[(colon + 1)..];
+        // Split at the colon the READER's matcher found, not at the first
+        // colon on the line. The two happen to agree for every key this app
+        // writes — a top-level line beginning with the key, quoted or not —
+        // but "happens to agree" is how a reader and a writer drift apart, and
+        // that drift is this file's oldest bug class.
+        string tail;
+        if (PageVisibilityReader.ValuePart(key, body) is { } afterColon)
+        {
+            tail = afterColon;
+        }
+        else
+        {
+            int colon = body.IndexOf(':');
+            if (colon < 0) return line;   // not a mapping line; leave it alone
+            tail = body[(colon + 1)..];
+        }
+        string head = body[..(body.Length - tail.Length)];
 
         string beforeComment = PageVisibilityReader.StripComment(tail);
         string comment = tail.Length > beforeComment.Length
             ? tail[beforeComment.Length..].TrimEnd(' ', '\t')
             : "";
-        string spacing = tail.Length > 0 && tail[0] == ' ' ? " " : "";
+        // ALWAYS separate the value from the colon. YAML needs a space, a tab
+        // or the end of the line after a key's colon to make a mapping at all,
+        // so `publish:false` is one plain scalar — and beside any other key it
+        // is a ScannerError that STOPS THE BUILD while this app reports the
+        // page hidden. Measured, python-frontmatter 1.3.0 / PyYAML 6.0.3.
+        //
+        // Two lines reached it. `publish:<TAB>false` reads as hidden today
+        // (a tab after the colon is perfectly good YAML), and publishing it
+        // emitted `publish:true`. And a key with an EMPTY value emitted
+        // `publish:false` — which is not a corner: `SectionAdder.PublishValue`
+        // deliberately copies the emptiness of a null `publishForSection<N>`,
+        // and writes `createdSection<N>:` on the line beside it, so Plantoir
+        // was corrupting a page Plantoir had just generated.
+        //
+        // The teacher's own tab is kept; anything else becomes one space.
+        string spacing = tail.StartsWith('\t') ? "\t" : " ";
         string gap = comment.Length > 0 ? " " : "";
 
         return head + spacing + (publish ? "true" : "false") + gap + comment + carriageReturn;
