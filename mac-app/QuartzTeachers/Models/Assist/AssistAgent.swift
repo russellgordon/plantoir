@@ -496,7 +496,11 @@ final class AssistAgent {
         guard let written = call.argumentValues["course"] as? String else {
             return nil
         }
-        let named: String = written.trimmingCharacters(in: .whitespaces)
+        // `whitespacesAndNewlines`, exactly as `AssistToolRunner.text(_:in:)`
+        // trims before `locate` ever sees the value. Trimming less here would
+        // refuse `"ICS3U\n"` in an ICS3U window — a lost turn on the
+        // teacher's own course, and told about in the wrong words.
+        let named: String = written.trimmingCharacters(in: .whitespacesAndNewlines)
         if named.isEmpty || named.lowercased() == courseCode.lowercased() {
             return nil
         }
@@ -537,20 +541,26 @@ final class AssistAgent {
     /// saying so stops it being added later as an oversight.
     private func sayTheRequestNamedAnotherCourse(_ otherCourse: String, tool: String) {
         windTheTurnBack()
-        let isHere: Bool = tools.knowsACourse(called: otherCourse)
-        entries.append(Entry(
-            speaker: .assistant,
-            text: isHere
-                ? AssistWording.askedAboutAnotherCourse(
-                    course: courseCode, otherCourse: otherCourse
-                )
-                : AssistWording.askedAboutACourseThatIsNotHere(
-                    course: courseCode, otherCourse: otherCourse
-                )
-        ))
+        // Named as the FOLDER spells it when the folder has it — a teacher
+        // sent to open "mcv4u" is being sent to look for something their
+        // sidebar does not show. When the folder does not have it there is
+        // nothing else to show, so the model's own text stands (already
+        // trimmed), and the other sentence is careful not to tell them to go
+        // and open it.
+        var said: String = AssistWording.askedAboutACourseThatIsNotHere(
+            course: courseCode, otherCourse: otherCourse
+        )
+        if let known = tools.knownCourseCode(matching: otherCourse) {
+            said = AssistWording.askedAboutAnotherCourse(course: courseCode, otherCourse: known)
+        }
+        entries.append(Entry(speaker: .assistant, text: said))
         // Both course codes and the tool, in the words a teacher would
         // recognise. Never their sentence — `assistantAsked` already has
         // that, on its own marked line — and never the argument values.
+        //
+        // What the MODEL wrote, deliberately, where the sentence above says
+        // what the FOLDER calls it: the trail is evidence about the model, so
+        // a code it spelt oddly is worth keeping as it spelt it.
         ActivityTrail.note(
             .assistantWasAskedAboutAnotherCourse,
             "the assistant was asked about " + otherCourse + " in this window, which is for "

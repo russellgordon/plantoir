@@ -2547,14 +2547,25 @@
           "section" : 9
         },
         "tool" : "undo_last_change",
-        "why" : "Its schema declares NEITHER argument, so neither is the window's to take back and there is nothing to refuse - the tool ignores both. The case is here to pin the gate on the schema rather than on a list of tools."
+        "why" : "Its schema declares NEITHER argument, so neither is the window's to take back and there is nothing to refuse - the tool ignores both. The case is here to pin the gate on the schema rather than on a list of tools. NOTE for a second implementation: `runs` cannot be observed from outside on the mac, because the tool reads neither argument and there is no plan card to hold them; the mac asserts that the tool RAN and that the turn was not refused. Assert whatever your own seam can see."
+      },
+      {
+        "namesTheCourseAs" : "MCV4U",
+        "refusedWith" : "askedAboutAnotherCourse",
+        "said" : {
+          "course" : "mcv4u",
+          "date" : "2026-09-08",
+          "section" : 1
+        },
+        "tool" : "publish_class_on",
+        "why" : "Refused like any other differing code - and the sentence names that course the way the WORKING FOLDER spells it, not the way the model wrote it. A teacher told to open \"mcv4u\" is being sent to look for something their sidebar does not show. The same courtesy the window's OWN code already gets when it reaches the approval card. Only for a course that is here: when the folder has no such course there is nothing else to show, so askedAboutACourseThatIsNotHere carries the model's own text, trimmed."
       }
     ],
     "coursesInTheFolder" : [
       "ICS3U",
       "MCV4U"
     ],
-    "note" : "An assistant window is opened for ONE section of ONE course. Given that window and the arguments the MODEL wrote on its tool call, these say what actually runs - or which refusal the teacher reads instead. AUTHORED, and preserved across `Plantoir --write-contracts`. The rule in one sentence: the SECTION is always the window's, present or absent, and the COURSE is the window's or the turn was refused. Gated on the TOOL'S OWN SCHEMA declaring the argument, never on a list of tool names - today the schema and a list of twelve would agree, which is exactly when a list looks harmless. Only the MODEL's calls are bound this way; a client driving the tools directly over MCP chooses its own course and section, and nothing here applies to it.",
+    "note" : "An assistant window is opened for ONE section of ONE course. Given that window and the arguments the MODEL wrote on its tool call, these say what actually runs - or which refusal the teacher reads instead, and - where a case says so - which SPELLING of the other course that refusal puts in front of the teacher. AUTHORED, and preserved across `Plantoir --write-contracts`. The rule in one sentence: the SECTION is always the window's, present or absent, and the COURSE is the window's or the turn was refused. Gated on the TOOL'S OWN SCHEMA declaring the argument, never on a list of tool names - today the schema and a list of twelve would agree, which is exactly when a list looks harmless. Only the MODEL's calls are bound this way; a client driving the tools directly over MCP chooses its own course and section, and nothing here applies to it.",
     "window" : {
       "course" : "ICS3U",
       "section" : 1

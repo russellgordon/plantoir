@@ -177,7 +177,8 @@ final class AssistToolRunner {
         return nil
     }
 
-    /// Whether the working folder holds a course with this code.
+    /// The code of the course this working folder holds under this name — as
+    /// the FOLDER spells it — or nil when it holds none.
     ///
     /// **A READING, not a guard.** It refuses nothing, changes nothing and is
     /// asked by nobody here: the one caller is `AssistAgent`, which has to
@@ -189,15 +190,22 @@ final class AssistToolRunner {
     /// Deleting this in the belief that it is the guard would take away the
     /// question and leave the guard where it is.
     ///
-    /// Compared the way `locate` compares, and for that reason: two answers
-    /// to "is this the same course" is one more than a working folder can
-    /// afford.
-    func knowsACourse(called code: String) -> Bool {
-        let wanted: String = code.trimmingCharacters(in: .whitespaces).lowercased()
+    /// It hands back the CODE rather than a yes or no because the sentence it
+    /// feeds is read by a teacher looking at their sidebar: a model that
+    /// answered `mcv4u` should not produce "Open mcv4u's section in Plantoir",
+    /// naming something that appears nowhere on screen. The same courtesy the
+    /// window's own code already gets on the approval card.
+    ///
+    /// Compared the way `locate` compares — `whitespacesAndNewlines`, because
+    /// `text(_:in:)` trims those before `locate` sees the value — and for that
+    /// reason: two answers to "is this the same course" is one more than a
+    /// working folder can afford.
+    func knownCourseCode(matching code: String) -> String? {
+        let wanted: String = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         for candidate in workspace.courses where candidate.code.lowercased() == wanted {
-            return true
+            return candidate.code
         }
-        return false
+        return nil
     }
 
     /// What pressing the button would do, for the two acts that ask for one.

@@ -395,6 +395,117 @@ final class AssistWindowBindingTests: XCTestCase {
         XCTAssertEqual(agent.activity, .idle)
     }
 
+    /// A course code with a stray newline on it is still this window's course.
+    ///
+    /// The guard compares the way the tools compare — `locate` reads the value
+    /// through `text(_:in:)`, which trims whitespace AND newlines — because a
+    /// guard that trims less refuses a turn the tool would have run: a lost
+    /// turn on the teacher's own course, and told about in words that name a
+    /// course sitting in their sidebar.
+    func testACourseCodeWithAStrayNewlineIsStillThisWindowsCourse() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(alsoCourse: "MCV4U")
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "A class.", in: made.course)
+
+        let engine: StubEngine = try StubEngine()
+        defer { engine.stop() }
+        engine.serve(Canned.finished(
+            tool: "publish_pages",
+            arguments: #"{"course": "ICS3U\n", "section": 1, "pages": "Unit 1, Day 1"}"#
+        ))
+
+        let agent: AssistAgent = AssistFixture.makeAgent(
+            tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
+        )
+        let sentence: String = "Let my students see that first lesson now please"
+        XCTAssertNil(AssistCardCommand.matching(sentence), "The sentence is answered in code, so nothing was tested.")
+        await agent.say(sentence)
+
+        XCTAssertEqual(engine.requestCount, 1, "The scripted reply was never consumed.")
+        let onDisk: String = try String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 1", in: made.course), encoding: .utf8
+        )
+        XCTAssertTrue(
+            onDisk.contains("publish: true"),
+            "This window's own course was refused over a trailing newline."
+        )
+        XCTAssertEqual(toolResults(in: agent), ["publish_pages"])
+    }
+
+    /// And a stray newline on ANOTHER course's code does not turn that course
+    /// into one the folder has never heard of.
+    ///
+    /// The same trim, the other way round: untrimmed, `MCV4U\n` matches no
+    /// course, and the teacher reads "there is no course called MCV4U here"
+    /// about a course sitting in their sidebar — the exact lie the second
+    /// sentence exists to avoid, arriving from the other direction.
+    func testAnotherCourseWithAStrayNewlineIsStillThatCourse() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(alsoCourse: "MCV4U")
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let engine: StubEngine = try StubEngine()
+        defer { engine.stop() }
+        engine.serve(Canned.finished(
+            tool: "publish_pages",
+            arguments: #"{"course": "MCV4U\n", "section": 1, "pages": "Unit 1, Day 1"}"#
+        ))
+
+        let agent: AssistAgent = AssistFixture.makeAgent(
+            tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
+        )
+        let sentence: String = "Put my calculus lesson in front of the students"
+        XCTAssertNil(AssistCardCommand.matching(sentence), "The sentence is answered in code, so nothing was tested.")
+        await agent.say(sentence)
+
+        XCTAssertEqual(engine.requestCount, 1, "The scripted reply was never consumed.")
+        XCTAssertTrue(
+            transcript(of: agent).contains(
+                AssistWording.askedAboutAnotherCourse(course: "ICS3U", otherCourse: "MCV4U")
+            ),
+            transcript(of: agent)
+        )
+        XCTAssertEqual(toolResults(in: agent), [], "A tool ran.")
+    }
+
+    /// The refusal names the other course the way the FOLDER spells it.
+    ///
+    /// A teacher told to open "mcv4u" is being sent to look for something
+    /// their sidebar does not show. The window's own code already gets this
+    /// courtesy on the approval card; the course being refused gets it here.
+    func testTheRefusalNamesTheOtherCourseTheWayTheFolderSpellsIt() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner(alsoCourse: "MCV4U")
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let engine: StubEngine = try StubEngine()
+        defer { engine.stop() }
+        engine.serve(Canned.finished(
+            tool: "publish_pages",
+            arguments: #"{"course": "mcv4u", "section": 1, "pages": "Unit 1, Day 1"}"#
+        ))
+
+        let agent: AssistAgent = AssistFixture.makeAgent(
+            tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
+        )
+        let sentence: String = "Publish the lesson in my other class for me"
+        XCTAssertNil(AssistCardCommand.matching(sentence), "The sentence is answered in code, so nothing was tested.")
+        await agent.say(sentence)
+
+        XCTAssertEqual(engine.requestCount, 1, "The scripted reply was never consumed.")
+        XCTAssertTrue(
+            transcript(of: agent).contains(
+                AssistWording.askedAboutAnotherCourse(course: "ICS3U", otherCourse: "MCV4U")
+            ),
+            transcript(of: agent)
+        )
+        XCTAssertFalse(
+            transcript(of: agent).contains("mcv4u"),
+            "The model's spelling reached the teacher:\n\(transcript(of: agent))"
+        )
+        // The TRAIL keeps what the model wrote, deliberately: it is evidence
+        // about the model rather than a sentence a teacher is sent to act on.
+        XCTAssertEqual(toolResults(in: agent), [], "A tool ran.")
+    }
+
     // MARK: - The MCP path is untouched
 
     /// A client driving the tools over `--mcp-stdio` chooses its own course
@@ -524,12 +635,19 @@ final class AssistWindowBindingTests: XCTestCase {
         XCTAssertEqual(engine.requestCount, 1, "\(tool): the scripted reply was never consumed.")
 
         if let refusal = entry["refusedWith"] as? String {
+            // The other course is named the way the WORKING FOLDER spells it
+            // wherever the folder has it, so a case may pin a spelling that
+            // is not the one the model wrote.
+            var naming: String = try XCTUnwrap(said["course"] as? String)
+            if let spelling = entry["namesTheCourseAs"] as? String {
+                naming = spelling
+            }
             let expected: String = try AssistWindowBindingTests.sentence(
-                named: refusal, otherCourse: try XCTUnwrap(said["course"] as? String)
+                named: refusal, otherCourse: naming
             )
             XCTAssertTrue(
                 transcript(of: agent).contains(expected),
-                "\(tool): the wrong refusal, or none:\n\(transcript(of: agent))"
+                "\(tool): the wrong refusal, or the wrong spelling of \(naming):\n\(transcript(of: agent))"
             )
             XCTAssertNil(agent.pendingApproval, "\(tool): a refused turn was put in front of a button.")
             XCTAssertEqual(toolResults(in: agent), [], "\(tool): a tool ran on a refused turn.")
