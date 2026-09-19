@@ -24,9 +24,22 @@ import Foundation
 /// → `pageVisibility.writingRules`.
 ///
 /// A page that says nothing either way IS published. That is Quartz's own rule
-/// here — `patches/publish.ts` drops a page only when it says `publish: false`
-/// — and guessing the other way round would hide every page a teacher wrote
-/// without thinking about frontmatter at all.
+/// here — `patches/publish.ts` drops a page only for the boolean false or the
+/// exact string `"false"` — and guessing the other way round would hide every
+/// page a teacher wrote without thinking about frontmatter at all. What COUNTS
+/// as saying false is not what reading the line suggests, because the build
+/// round-trips every page through PyYAML first: `publish: no` hides,
+/// `publish: true # why` and `publish: maybe` publish, and `publish: "False"`
+/// is visible while `publish: FALSE` is not. `PageVisibilityReader` is the one
+/// place that knows the table, and it is measured rather than reasoned.
+///
+/// **READING does not depend on where the page lives.** The build consults all
+/// four keys, in order, on every page it copies, so `PageVisibilityReader`
+/// does too and none of the reading here takes an `isSectionLocal`. Only
+/// `setting` still does, because which key is WRITTEN is the one thing a
+/// page's folder really decides. Until 2026-09-18 the reading branched as
+/// well, and a course-level page carrying a plain `publish: false` was
+/// therefore reported visible while the build hid it.
 enum AssistPageVisibility {
 
     // MARK: - Functions
@@ -41,51 +54,40 @@ enum AssistPageVisibility {
         return isSectionLocal ? "draft" : "draftSection\(sectionNumber)"
     }
 
-    /// Whether this section publishes this page, or nil when the page says
-    /// nothing either way.
+    /// What the build does with this page — including the case where this app
+    /// will not say.
     ///
-    /// Course-level pages go through `SectionAdder.publishValue(forSection:in:)`
-    /// — the same reader that carries visibility across when a section is
-    /// added, so the two can never disagree about what `draftSection2: true`
-    /// meant.
-    static func statedPublishing(
-        in pageText: String,
-        forSection sectionNumber: Int,
-        isSectionLocal: Bool
-    ) -> Bool? {
-        if !isSectionLocal {
-            guard let block = PageFrontmatter.block(in: pageText) else {
-                return nil
-            }
-            var lines: [String] = []
-            for line in block.lines {
-                lines.append(PageFrontmatter.trimmingCarriageReturn(line))
-            }
-            guard let value = SectionAdder.publishValue(forSection: sectionNumber, in: lines) else {
-                return nil
-            }
-            return isTrue(value)
-        }
+    /// The one reader. Everything below collapses this answer for its own
+    /// purposes, and nothing else parses a visibility line.
+    static func answer(in pageText: String, forSection sectionNumber: Int) -> PageVisibilityAnswer {
+        return PageVisibilityReader.answer(in: pageText, forSection: sectionNumber)
+    }
 
-        if let value = PageFrontmatter.rawValue(forKey: "publish", in: pageText) {
-            return isTrue(value)
+    /// Whether this section publishes this page, or nil when the page says
+    /// nothing either way — the answer for anything REPORTING to a teacher.
+    ///
+    /// A page this app cannot read is reported as VISIBLE. That is the mild
+    /// mistake of the two: listing a live page among the ones a teacher still
+    /// has to publish costs them a second look, while calling a page hidden
+    /// when students are already reading it is the failure that reports
+    /// success. Nothing that WRITES uses this — see `setting`.
+    static func statedPublishing(in pageText: String, forSection sectionNumber: Int) -> Bool? {
+        switch answer(in: pageText, forSection: sectionNumber) {
+        case .saysNothing:
+            return nil
+        case .visible:
+            return true
+        case .hidden:
+            return false
+        case .cannotTell:
+            return true
         }
-        if let value = PageFrontmatter.rawValue(forKey: "draft", in: pageText) {
-            return !isTrue(value)
-        }
-        return nil
     }
 
     /// Whether students meet this page, with Quartz's own default applied to a
     /// page that says nothing.
-    static func publishes(
-        in pageText: String,
-        forSection sectionNumber: Int,
-        isSectionLocal: Bool
-    ) -> Bool {
-        return statedPublishing(
-            in: pageText, forSection: sectionNumber, isSectionLocal: isSectionLocal
-        ) ?? true
+    static func publishes(in pageText: String, forSection sectionNumber: Int) -> Bool {
+        return statedPublishing(in: pageText, forSection: sectionNumber) ?? true
     }
 
     /// The page text with this section's visibility set, and whether that
@@ -110,15 +112,28 @@ enum AssistPageVisibility {
     ) -> (text: String, changed: Bool) {
         let key: String = publishKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
         let legacy: String = draftKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
-        let carriesLegacyKey: Bool = PageFrontmatter.rawValue(forKey: legacy, in: pageText) != nil
+        // Found with the READER's own key matcher, so the writer rewrites the
+        // line the reader read. A `"publish": false` was invisible to a plain
+        // prefix test, which meant this inserted a second `publish: true`
+        // above it — and PyYAML keeps the LAST of two, so the page stayed
+        // hidden while the teacher was told it had been published.
+        let currentKeyLines: [Int] = topLevelLineIndices(ofKey: key, in: pageText)
+        let legacyKeyLines: [Int] = topLevelLineIndices(ofKey: legacy, in: pageText)
+        let carriesLegacyKey: Bool = !legacyKeyLines.isEmpty
 
         // Already saying the right thing in the current spelling: leave the
         // file alone, so its modification time does not move and the next
         // build is not fooled into thinking the content changed.
-        let stated: Bool? = statedPublishing(
-            in: pageText, forSection: sectionNumber, isSectionLocal: isSectionLocal
-        )
-        if stated == published && !carriesLegacyKey {
+        //
+        // The shortcut needs a CONFIDENT answer, which is why it asks
+        // `answer` rather than `statedPublishing`. A value this app cannot
+        // read is reported as visible, and a writer that believed that would
+        // decline to publish a page on the strength of a guess — so a page
+        // whose flag cannot be read gets the flag written out in full, in
+        // whichever direction was asked for.
+        let stated: PageVisibilityAnswer = answer(in: pageText, forSection: sectionNumber)
+        let alreadySaysIt: Bool = (stated == .visible && published) || (stated == .hidden && !published)
+        if alreadySaysIt && !carriesLegacyKey {
             return (pageText, false)
         }
 
@@ -130,35 +145,55 @@ enum AssistPageVisibility {
         }
 
         var lines: [String] = pageText.components(separatedBy: "\n")
-        var currentKeyIndex: Int? = nil
-        var legacyKeyIndex: Int? = nil
-        for index in (block.openIndex + 1)..<block.closeIndex {
-            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
-            if currentKeyIndex == nil && bare.hasPrefix(key + ":") {
-                currentKeyIndex = index
-            }
-            if legacyKeyIndex == nil && bare.hasPrefix(legacy + ":") {
-                legacyKeyIndex = index
-            }
-        }
 
-        if let index = currentKeyIndex {
+        // The LAST line naming a key is the one the build reads, so it is the
+        // one to rewrite: setting the first of two would leave the page saying
+        // the opposite of what was asked for.
+        if let index = currentKeyLines.last {
             lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
             // This page was migrated already, and a leftover legacy key now
-            // says the opposite of the line above it. It goes.
-            if let stale = legacyKeyIndex {
+            // says the opposite of the line above it. Every one of them goes,
+            // last first so the earlier indices stay put.
+            for stale in legacyKeyLines.reversed() {
                 lines.remove(at: stale)
             }
-        } else if let index = legacyKeyIndex {
+        } else if let index = legacyKeyLines.last {
             // Migrating. The new key takes the old key's own line, so the
             // teacher's frontmatter keeps its order — moving it to the top of
             // the block would show up as a reordered diff in a file they very
-            // likely have open.
+            // likely have open. Any earlier copies of the legacy key go with
+            // it, for the same reason a leftover does above.
             lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
+            for stale in legacyKeyLines.dropLast().reversed() {
+                lines.remove(at: stale)
+            }
         } else {
             lines.insert(line, at: block.openIndex + 1)
         }
         return (lines.joined(separator: "\n"), true)
+    }
+
+    /// Every line of this page's frontmatter that names this key at the top
+    /// level, in the order they appear.
+    ///
+    /// The same matcher `PageVisibilityReader` uses, so a key the reader can
+    /// see is a key this can rewrite. A page with no frontmatter has none.
+    static func topLevelLineIndices(ofKey key: String, in pageText: String) -> [Int] {
+        guard let block = PageFrontmatter.block(in: pageText) else {
+            return []
+        }
+        let lines: [String] = pageText.components(separatedBy: "\n")
+        var found: [Int] = []
+        for index in (block.openIndex + 1)..<block.closeIndex {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
+                continue
+            }
+            if PageVisibilityReader.valuePart(ofKey: key, inLine: bare) != nil {
+                found.append(index)
+            }
+        }
+        return found
     }
 
     /// True when this page lives in one section's own folder, and so carries
@@ -168,14 +203,5 @@ enum AssistPageVisibility {
             .standardizedFileURL.path
         let page: String = url.standardizedFileURL.path
         return page.hasPrefix(folder + "/")
-    }
-
-    /// YAML's spelling of yes, as the toolchain reads it.
-    static func isTrue(_ value: String) -> Bool {
-        let tidied: String = value
-            .trimmingCharacters(in: .whitespaces)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-            .lowercased()
-        return tidied == "true" || tidied == "yes"
     }
 }

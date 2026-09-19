@@ -261,6 +261,7 @@ final class ClassPlanningContractTests: XCTestCase {
                 relativePath: "courses/ICS3U/\(folder)/\(title).md",
                 isSectionLocal: folder.contains("Classes"),
                 isVisibleToStudents: visible,
+                visibilityIsCertain: true,
                 date: day,
                 linkedTitles: links.map { $0.lowercased() },
                 classFolderNames: ["All Classes"],

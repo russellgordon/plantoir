@@ -9,6 +9,7 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import class_pages
+import page_visibility
 import toolchain_paths
 import re
 import sys
@@ -1655,6 +1656,21 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     `draft:` that came out unsplit would silently share one publish state
     across every section, which is the bug this function exists to prevent.
 
+    A `publish:` value is COPIED, character for character, comment and quotes
+    and all: whatever the build makes of `publish: oN`, it makes the same
+    thing of `publishForSection1: oN`, so no reader standing between the two
+    can invert it. A `draft:` value cannot be copied — it has to be turned
+    round — so it is read with the build's own rule (`page_visibility`), which
+    until 2026-09-18 was `value.strip().lower() == "true"` here and so
+    PUBLISHED a `draft: yes` or `draft: On` page into every section while the
+    build went on hiding the unsplit original.
+
+    A value this cannot read — one that runs onto the NEXT line, or a draft
+    flag written as a tag or an alias — is written as HELD BACK, and the
+    continuation lines go with it rather than being orphaned under whatever
+    key follows. A page wrongly held back is one a teacher notices and fixes;
+    a page wrongly published is one nobody notices at all.
+
     Only the frontmatter block is touched — a `draft: true` shown inside a
     fenced code block on a tutorial page is documentation, not metadata.
     """
@@ -1666,18 +1682,86 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     head = text[4:end]
     rest = text[end:]
 
-    values = {}
-    for line in head.split("\n"):
-        match = re.match(r"^(created|draft|publish):[ \t]*(.*)$", line)
-        if match:
-            values.setdefault(match.group(1), match.group(2))
+    head_lines = head.split("\n")
+
+    def trim(line):
+        return page_visibility.trim(line)
+
+    def is_comment(line):
+        return page_visibility.is_comment_line(line)
+
+    # The reader's own key shapes: `publish :` and `"publish":` are the same
+    # key to YAML, and `publish:x` is NOT a key at all — it is one plain
+    # scalar. The LAST line naming a key wins, because that is the one PyYAML
+    # keeps when a page carries the same key twice; taking the first carried
+    # the value the build throws away.
+    key_line = re.compile(r"^[\"']?(created|draft|publish)[\"']?[ \t]*:(?=[ \t]|$)(.*)$")
+
+    values = {}          # key -> (raw value, does it run onto the next line?)
+    taken = set()        # line numbers this function is responsible for
+    for index, line in enumerate(head_lines):
+        match = key_line.match(line)
+        if not match:
+            continue
+        key, raw = match.group(1), match.group(2)
+        taken.add(index)
+        # A value written BELOW the key, indented under it, belongs to the key
+        # — and cannot be copied onto another key's line. Those lines are
+        # taken too: leaving them behind orphans an indented scalar under
+        # whatever key happens to follow, which stops the build.
+        #
+        # Blank lines and indented COMMENTS are stepped over rather than
+        # stopping the scan, because YAML steps over them: `draft:` then a
+        # blank line then an indented `true` hides the page, measured, and a
+        # scan that stopped at the blank called the key null and published it
+        # into every section. A comment is not a value, so a complete value
+        # followed by an indented `# note` does NOT continue — and the note
+        # is the teacher's, so it stays where they wrote it.
+        continues = False
+        follow = index + 1
+        last_value_line = index
+        while follow < len(head_lines):
+            line_below = head_lines[follow]
+            if trim(line_below) == "" or (line_below[:1] in (" ", "\t") and is_comment(line_below)):
+                follow += 1
+                continue
+            if line_below[:1] not in (" ", "\t"):
+                break
+            continues = True
+            last_value_line = follow
+            follow += 1
+        for swallowed in range(index + 1, last_value_line + 1):
+            taken.add(swallowed)
+        values[key] = (raw, continues)
     if not values:
         return text
 
     if "publish" in values:
-        publish = values["publish"]
+        raw, continues = values["publish"]
+        if continues:
+            # The value is on the line below, which cannot be copied onto
+            # another key's line, so it is written as held back.
+            publish = "false"
+        elif page_visibility.trim(raw) == "":
+            # `publish:` with nothing after it is a null, which PUBLISHES the
+            # page. Copying the emptiness keeps it that way; writing "false"
+            # here would hide a page at course setup that the teacher's own
+            # file publishes.
+            publish = ""
+        elif not page_visibility.is_complete_on_its_own_line(raw):
+            publish = "false"
+        else:
+            # Copied character for character: whatever the build makes of the
+            # original it makes of the copy, so nothing between them can
+            # invert it.
+            publish = page_visibility.trim(raw)
     elif "draft" in values:
-        publish = "false" if values["draft"].strip().lower() == "true" else "true"
+        raw, continues = values["draft"]
+        if continues:
+            publish = "false"
+        else:
+            draft_answer = page_visibility.draft_family_answer(raw)
+            publish = "true" if draft_answer == page_visibility.VISIBLE else "false"
     else:
         publish = None
 
@@ -1686,13 +1770,14 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     block = []
     for number in section_numbers:
         if "created" in values:
-            block.append(f"createdSection{number}: {values['created']}")
+            created = page_visibility.trim(values["created"][0])
+            block.append(f"createdSection{number}: {created}".rstrip())
         if publish is not None:
-            block.append(f"publishForSection{number}: {publish}")
+            block.append(f"publishForSection{number}: {publish}".rstrip())
 
     out = []
-    for line in head.split("\n"):
-        if re.match(r"^(created|draft|publish):", line):
+    for index, line in enumerate(head_lines):
+        if index in taken:
             if block:
                 out.extend(block)
                 block = []
