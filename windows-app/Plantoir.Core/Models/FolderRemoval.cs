@@ -126,18 +126,26 @@ public static class FolderRemoval
         // Proposed to the mac as a contract case by issue #172; the six cases
         // above cannot see the difference, which is why it is an issue.
 
-        // The never-asked guard, written out because it is half of the rule as
-        // the contract states it ("no longer offered AND the course had already
-        // been asked") — but it is NOT what makes cases 1 and 2 pass today, and
-        // saying otherwise would be the kind of wrong reason that gets acted
-        // on. Measured 2026-09-18: replacing this line with
-        // `MaterializedGradedFolders(...)` over the SAME post-exclusion walk
-        // leaves all six cases green, because `InferredPool` only ever returns
-        // names drawn FROM those choices, so a name no longer offered cannot be
-        // in the materialised pool either. It is kept because it says the rule
-        // plainly and because it does not depend on that subset property: give
-        // the historical rule a default of its own and this line is the only
-        // thing still standing between a legacy course and a frozen pool.
+        // The never-asked guard. It is half of the rule as the contract states
+        // it ("no longer offered AND the course had already been asked"), and
+        // it is NOT what makes cases 1 and 2 pass TODAY — saying otherwise
+        // would be the kind of wrong reason that gets acted on. Measured
+        // 2026-09-18: replacing this line with `MaterializedGradedFolders(...)`
+        // over the SAME post-exclusion walk leaves all six cases green.
+        //
+        // **DO NOT "SIMPLIFY" IT AWAY.** That redundancy holds only while TWO
+        // things are true at once: `InferredPool` returns names drawn FROM the
+        // choices, AND the still-offered test above uses the same comparer as
+        // the drop below. Break the second and the guard is the only thing left
+        // standing. Measured, not argued (2026-09-18): with an EXACT
+        // still-offered test — which is what issue #172 proposes to settle, and
+        // the mac's shape today — and this guard removed, a never-asked course
+        // that removes a top-level `Tasks` while `Portfolios/tasks` survives
+        // falls through (the walk offers `tasks`, not `Tasks`), materialises
+        // `["tasks"]`, and the case-insensitive `RemoveAll` strips it: the file
+        // gets `graded_folders: []`. Nothing counts for marks, permanently —
+        // the exact #142 damage, reintroduced by deleting a line that looked
+        // dead.
         var pool = config.GradedFolders;
         if (pool is null) return;                       // never asked: leave it that way
         if (pool.RemoveAll(folder => string.Equals(folder, name, StringComparison.OrdinalIgnoreCase)) == 0) return;

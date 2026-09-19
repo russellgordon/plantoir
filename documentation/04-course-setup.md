@@ -539,7 +539,9 @@ floor — the one that refuses to unpick the last pooled folder while the covera
 map is on — asks whether this is the last NAME in the pool, not whether the pool
 would survive the removal. So it still blocks removing a top-level `Tasks` on a
 course where `Portfolios/Tasks` would have kept the name. Conservative, rare,
-and the same on both platforms; sharpening it would be a shared change. **Order is the whole subject.** Ask before
+and the same on both platforms; sharpening it would be a shared change.
+
+**Order is the whole subject.** Ask before
 the exclusion is written and the removed folder is still on the list, so the
 pool freezes — which is what the mac did until 2026-09-09 and Windows until
 2026-09-18, from a walk cached one `BuildForm` pass earlier ([issue
@@ -586,6 +588,16 @@ Windows-only test; the case is PROPOSED to the mac as [issue
 #172](https://github.com/russellgordon/plantoir/issues/172) rather than added
 here, because a contract case landing unannounced turns the other suite red and
 reads as damage.
+
+**Whichever way #172 settles, keep the never-asked guard.** It looks dead: with
+the walk taken after the exclusion, dropping it leaves all six cases green,
+because the historical rule only ever names folders the walk offered. That
+redundancy depends on the still-offered test and the drop asking with the SAME
+comparer, and it is exactly what #172 is about. Measured 2026-09-18: with an
+exact still-offered test and the guard removed, a never-asked course removing a
+top-level `Tasks` while `Portfolios/tasks` survives writes `graded_folders: []`
+— nothing counting for marks, permanently. The #142 damage itself, 
+reintroduced by deleting a line that looked redundant.
 
 Nothing new is written to the activity trail for any of this. The removal
 already leaves its own line (`item excluded`), and what changed is only which
