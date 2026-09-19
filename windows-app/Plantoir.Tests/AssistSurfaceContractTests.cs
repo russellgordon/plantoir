@@ -207,6 +207,26 @@ public class AssistSurfaceContractTests
             // schema.
             "re_date_classes.rollover",
             "plan_re_date_classes.website", "plan_re_date_classes.rollover",
+
+            // "Duplicate Unit 3, Day 2 as my next class" — a fixed phrasing
+            // the prompt shelf OFFERS, and the binder reason above exactly:
+            // without the declaration the key is dropped and the sentence runs
+            // as a plain "add the next class", making a BLANK page where a
+            // teacher asked for a copy of a lesson. Issue #149; it was carried
+            // in KnownToBeDropped below until 2026-09-18 and the entry is gone
+            // because the pair now arrives.
+            //
+            // The mac needs no schema argument for the same phrasing — the
+            // card and the tool runner share a process there — so this is a
+            // platform difference rather than a product one, and the mac's own
+            // `duplicate` is deliberately absent from its published schema.
+            //
+            // Costs no routing accuracy either, though add_next_class IS one
+            // of the thirteen tools the local model sees:
+            // AssistAgent.CardOnlyArguments strips the argument from the
+            // narrowed schema, and NarrowToolsMirrorTests pins that the
+            // measurement script strips it too.
+            "add_next_class.duplicate", "plan_add_next_class.duplicate",
         }.Where(e => tools.Contains(e[..e.IndexOf('.')])).ToList();
 
         var unagreedExtras = onlyHere.Except(agreedExtras).OrderBy(e => e, StringComparer.Ordinal).ToList();
@@ -725,14 +745,15 @@ public class AssistSurfaceContractTests
         ["list_courses.course"] = "list_courses is about the folder, so both are surplus",
         ["list_courses.section"] = "list_courses is about the folder, so both are surplus",
 
-        // NOT harmless, and listed for exactly that reason — the way #116 was
-        // carried here until it was fixed. "Duplicate Unit 3, Day 2 as my next
-        // class" is offered by the prompt shelf and pinned by the contract,
-        // and add_next_class has no `duplicate` parameter at all: the binder
-        // drops it and the teacher gets a BLANK next class where they asked
-        // for a copy of a lesson. Issue #149 builds it; delete this entry then,
-        // which the check below insists on.
-        ["add_next_class.duplicate"] = "issue #149 — the tool cannot duplicate a page yet",
+        // Issue #149 was here — "duplicate Unit 3, Day 2 as my next class",
+        // offered by the prompt shelf and pinned by the contract, reaching an
+        // add_next_class with no `duplicate` parameter at all: the binder
+        // dropped it and the teacher got a BLANK next class where they had
+        // asked for a copy of a lesson. Fixed 2026-09-18: both halves of
+        // add_next_class declare it, and the pair is in `agreedExtras` above
+        // with the reason it is ours alone. Deleted rather than kept as
+        // history, because the check below fails on a pair that is listed and
+        // mended.
 
         // Issue #116 was here — the eight publish_class_on phrasings sending
         // `when` at a tool that takes `date`. Fixed 2026-09-09:

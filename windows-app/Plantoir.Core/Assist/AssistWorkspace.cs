@@ -2873,6 +2873,161 @@ public sealed class AssistWorkspace
         return new AssistResult(true, said, backup);
     }
 
+    // ---- Duplicating a lesson as the next class ----------------------------
+
+    /// <summary>
+    /// Work out what "duplicate Unit 3, Day 2 as my next class" would do,
+    /// changing nothing.
+    ///
+    /// <para>The copy becomes the SOURCE'S next day — Unit 3, Day 3 — not a
+    /// page after the last class of the course. Everything from there on
+    /// shuffles, which <see cref="PlanInsertClasses"/> works out; this adds
+    /// only which page is being copied and what it becomes.</para>
+    /// </summary>
+    /// <exception cref="AssistRefusal">
+    /// No such page, a page that is not numbered, a section with no remembered
+    /// timetable, a timetable with no day left, or a page that cannot be read.
+    /// </exception>
+    public DuplicateClassPlan PlanDuplicateClass(string courseCode, int sectionNumber, string pageTitle)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+
+        // ONE refusal for "no such page", reused rather than reworded. A
+        // second sentence for a fact a teacher already meets elsewhere is how
+        // two wordings for one thing start.
+        string path = Page(course, section, pageTitle);
+        string sourceTitle = Path.GetFileNameWithoutExtension(path);
+
+        var numbers = UnitDay.Parse(sourceTitle, course.Configuration.UnitWord)
+            ?? throw new AssistRefusal(
+                ClassChangeWording.NotANumberedClassPage(sourceTitle, course.Configuration.UnitWord));
+
+        // The source's own next day. Throws the timetable refusal unchanged,
+        // which is the sentence that asks for the class dates.
+        var insertion = PlanInsertClasses(course.Code, section, numbers.Unit, numbers.Day + 1, 1);
+        if (insertion.Added.Count == 0)
+        {
+            string why = string.Join(" ", insertion.Problems);
+            throw new AssistRefusal(why.Length > 0 ? why : ClassChangeWording.NoClassDateLeft);
+        }
+
+        string sourceText;
+        try { sourceText = File.ReadAllText(path); }
+        catch { throw new AssistRefusal(ClassChangeWording.CouldNotBeRead(sourceTitle)); }
+
+        var added = insertion.Added[0];
+        return new DuplicateClassPlan
+        {
+            CourseCode = course.Code,
+            SectionNumber = section,
+            SourceTitle = sourceTitle,
+            SourceText = sourceText,
+            NewTitle = added.Title,
+            NewDate = added.Date,
+            Insertion = insertion,
+        };
+    }
+
+    /// <summary>
+    /// Make the copy: room first, then the source's words under a new title, a
+    /// date of its own, and hidden.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Hidden however the source was.</b> A page made by duplicating
+    /// a published lesson is a draft of next week's, and putting it in front
+    /// of students the moment it is made is the one thing it must not do. The
+    /// body is copied verbatim — including the frontmatter keys belonging to
+    /// OTHER sections, which is what the mac does and what a teacher copying a
+    /// shared page would expect.</para>
+    ///
+    /// <para><b>Undoable only when nothing else moved.</b> The entry is opened
+    /// HERE, before <see cref="ApplyInsertClasses"/> — which records nothing of
+    /// its own — so this either records the whole change or records none of
+    /// it. A partial undo that deleted the copy and left every later class
+    /// renamed and re-dated would be worse than no undo at all, so when
+    /// classes shuffled the entry is abandoned and the reply names the backup
+    /// instead.</para>
+    /// </remarks>
+    public AssistResult ApplyDuplicateClass(DuplicateClassPlan plan, IProgress<string>? progress = null)
+    {
+        var course = Course(plan.CourseCode);
+        int section = Section(course, plan.SectionNumber);
+        string newPath = Path.Combine(ClassFolder(course, section), plan.NewTitle + ".md");
+
+        // Read BEFORE anything moves, so the guard below can tell "the page
+        // that was in the way is still there" from "the new skeleton".
+        string? occupying = null;
+        try { if (File.Exists(newPath)) occupying = File.ReadAllText(newPath); } catch { }
+
+        // OUTERMOST, and that is the whole of why this reads the way it does.
+        // Begin ignores a nested call, so whoever opens the entry first owns
+        // the description — and everything ApplyInsertClasses writes lands in
+        // this one.
+        _undo?.Begin($"duplicated “{plan.SourceTitle}” as “{plan.NewTitle}”");
+
+        AssistResult inserted;
+        string copied;
+        try
+        {
+            inserted = ApplyInsertClasses(plan.Insertion, progress);
+
+            // The one case that could destroy a lesson. ApplyInsertClasses
+            // SKIPS a rename whose destination already exists rather than
+            // writing over it — right in itself, but it leaves the page the
+            // copy was meant to become holding somebody's real class. Writing
+            // the copy there anyway would lose it.
+            if (occupying is not null && File.Exists(newPath) && File.ReadAllText(newPath) == occupying)
+                throw new AssistRefusal(
+                    ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath));
+
+            progress?.Report($"Copying “{plan.SourceTitle}”…");
+            bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, newPath);
+            copied = PageFrontmatter.SetTitle(plan.SourceText, plan.NewTitle);
+            copied = PageFrontmatter.SetCreated(
+                copied, PageFrontmatter.CreatedKeyFor(section, sectionLocal), plan.NewDate,
+                SiblingTimeAndOffset(course, section, ClassPages(course, section))).Text;
+            copied = PageFrontmatter.SetDraft(
+                copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true).Text;
+
+            // A shared source carrying publishForSection<N>: true beats the
+            // plain publish: false just written (PageFrontmatter.IsDraft reads
+            // the per-section key FIRST), so the copy would be VISIBLE to this
+            // section's students the moment it existed. Checked rather than
+            // assumed, because the frontmatter the copy inherits is whatever
+            // the teacher's page happened to carry.
+            if (!PageFrontmatter.IsDraft(copied, section))
+                copied = PageFrontmatter.SetDraft(
+                    copied, PageFrontmatter.PublishKeyFor(section, isSectionLocal: false), draft: true).Text;
+
+            Save(newPath, copied);
+        }
+        catch
+        {
+            _undo?.Abandon();
+            throw;
+        }
+
+        if (plan.MovesOtherClasses) _undo?.Abandon();
+        else _undo?.End();
+
+        string said = ClassChangeWording.CopiedTo(plan.SourceTitle, plan.NewTitle, plan.NewDate);
+        if (plan.MovesOtherClasses)
+        {
+            // What moved, and — already the last paragraph of that message, on
+            // exactly this condition — that the backup is the way back rather
+            // than "undo that". Saying ClassChangeWording.OtherClassesMoved
+            // here as well would print it twice.
+            said += "\n\n" + inserted.Message;
+        }
+        else
+        {
+            said += "\n\n" + AssistWording.ACreatedPageCanBeTakenBack;
+        }
+
+        return new AssistResult(true, said, inserted.BackupPath);
+    }
+
     /// <summary>
     /// Point every link at a renamed page's new name.
     ///
