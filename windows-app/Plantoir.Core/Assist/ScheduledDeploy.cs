@@ -1,3 +1,5 @@
+using System;
+using System.Globalization;
 using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
@@ -19,6 +21,59 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 public sealed class ScheduledDeploy
 {
+    /// <summary>
+    /// The form Plantoir itself WRITES a scheduled moment in — the assistant's
+    /// "deploy tomorrow's class at 6:30" card, and what the model is told to
+    /// send.
+    /// </summary>
+    public const string WrittenForm = "yyyy-MM-dd HH:mm";
+
+    /// <summary>
+    /// The moment a <c>when</c> names, or null when it names none. Every
+    /// reader of a scheduled moment goes through here.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>ONE reader, because the halves of a round trip have to agree
+    /// and each half looks right on its own.</b> The string is usually one
+    /// Plantoir wrote a moment earlier, invariantly; a bare
+    /// <c>DateTime.TryParse</c> reads its year in the machine's DEFAULT
+    /// CALENDAR. Measured on a Thai-locale machine: <c>"2026-09-20 06:30"</c>
+    /// comes back as <b>1483-09-20</b> — which is in the past, so
+    /// <see cref="Problem"/> answers "…has already passed. Pick a time still
+    /// to come." and NOTHING IS SCHEDULED, while the approval card the
+    /// teacher had just read named a weekday from the fifteenth century.</para>
+    ///
+    /// <para>Three steps, most specific first. <b>The form the app writes</b>,
+    /// exact and invariant. Then an <b>invariant lenient</b> parse, which
+    /// covers what a model sends when it is close but not exact — a <c>T</c>
+    /// separator, a missing leading zero, "6:30 AM". Only then the machine's
+    /// own culture, for a genuinely human-written shape, where there is no
+    /// fixed form to pin it to and the teacher's own conventions are the best
+    /// guess available.</para>
+    ///
+    /// <para>Formatting is NOT symmetrical with this and should not be: a
+    /// moment shown to a teacher is written in their culture, because that
+    /// sentence is theirs. What must be invariant is the wire.</para>
+    ///
+    /// <para>Same family as the writer sites in
+    /// <see href="https://github.com/russellgordon/plantoir/issues/144">issue
+    /// #144</see>, met from the reading end — which is how a culture audit
+    /// scoped to writers alone misses half of a round trip.</para>
+    /// </remarks>
+    public static DateTime? ReadTheMoment(string when)
+    {
+        if (DateTime.TryParseExact(when, WrittenForm, CultureInfo.InvariantCulture,
+                                          DateTimeStyles.None, out var written))
+        {
+            return written;
+        }
+        if (DateTime.TryParse(when, CultureInfo.InvariantCulture, DateTimeStyles.None, out var close))
+        {
+            return close;
+        }
+        return DateTime.TryParse(when, out var human) ? human : null;
+    }
+
     /// <summary>
     /// Why this section cannot be scheduled, in plain words, or null if it can.
     ///

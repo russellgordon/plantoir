@@ -2638,23 +2638,39 @@ from, on every single turn — and the card WROTE that year into a scheduled
 deploy, which is the half that lasts. Both are `InvariantCulture` now and built
 from the one clock.
 
-**And the same trap from the READING end, which the review of this piece
-found.** `AssistAgent.Explain` builds the approval card's sentence by parsing
-the `when` the app has just written and formatting the moment for the teacher.
-The parse was a bare `DateTime.TryParse`, which reads the year in the machine's
-default calendar: on a Thai-locale machine the invariant `2026-09-09 06:30`
-this piece now writes came back as Buddhist 2026 — **1483-09-09** — so the card
-named a weekday five centuries out for a deploy that then fired on the correct
-day, which is worse than saying nothing. `ReadTheMoment` now reads the form the
-app WRITES with `TryParseExact` and `InvariantCulture`, and keeps the old
-lenient parse only for a shape a model invented, there being no fixed form to
-pin that to. The DISPLAY stays cultural deliberately — it is the teacher's
-sentence, not a wire format — so the assertion that pins it renders the correct
-moment through the machine's own culture and compares that. Symmetry at a
-boundary is the general rule the [#144](https://github.com/russellgordon/plantoir/issues/144)
-family keeps teaching: `TimetableMemory` writes culturally and reads
-invariantly, this wrote invariantly and read culturally, and each half looks
-right on its own. Measured byte-identical on a Gregorian machine
+**And the READERS had to move with the writer, which is the part that would
+have shipped as a regression.** Measured under `th-TH` rather than reasoned
+about: before this piece BOTH halves were cultural, so the card wrote
+`2569-09-20 06:30` and every reader parsed it straight back to the right
+moment. Wrong on the wire and symmetric in practice — which is exactly why
+nobody had met it. Making the write invariant on its own would have turned
+"deploy tomorrow's class at 6:30" into a **refusal** on such a machine: a
+cultural parse of `2026-09-20 06:30` is **1483-09-20**, `ScheduledDeploy.Problem`
+sees a moment in the past and answers "…has already passed. Pick a time still
+to come.", and **nothing is scheduled at all** — after an approval card that
+said tomorrow, in the fifteenth century's weekday.
+
+Three readers of that same string, all fixed here: `AssistAgent.Explain`, which
+builds the card's sentence, and `plan_scheduled_deploy` and `schedule_deploy`
+in `Plantoir.Mcp/PlantoirTools.cs`, which is where it actually lands — the app
+reaches every tool through `plantoir-mcp`, so the card path crosses JSON-RPC
+and is parsed again on the far side. All three now call ONE reader,
+`ScheduledDeploy.ReadTheMoment`: the form the app WRITES, exact and invariant;
+then an invariant LENIENT parse, which covers what a model sends when it is
+close but not exact (`T` as the separator, a missing leading zero, "6:30 AM");
+and only then the machine's own culture, for a genuinely human-written shape
+with no fixed form to pin it to. This changes no tool schema and no
+description, so the model sees nothing of it. The DISPLAY stays cultural
+deliberately — that sentence is the teacher's, not a wire format — which is why
+the test renders the moment that is CORRECT through the machine's own culture
+and compares that, rather than asserting how Thai writes a Wednesday.
+
+**Symmetry at a boundary is the general rule** the
+[#144](https://github.com/russellgordon/plantoir/issues/144) family keeps
+teaching, and #144's own scope is WRITERS: `TimetableMemory` writes culturally
+and reads invariantly; this wrote invariantly and read culturally; each half
+looks right on its own, and neither is ever noticed from inside one function.
+An audit that greps writers alone finds one end of every one of these. Measured byte-identical on a Gregorian machine
 (en-CA: `" (Today is 2026-09-19, a Saturday.)"` either way), which is what keeps
 the routing measurements standing;
 `RelativeDayFreshnessTests.ANonGregorianMachineIsToldTheSameYearAsEverybodyElse`

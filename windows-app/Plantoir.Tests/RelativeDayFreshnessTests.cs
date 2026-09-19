@@ -1,9 +1,24 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Plantoir.Core.Assist;
+using Plantoir.Mcp;
 using Xunit;
 
 namespace Plantoir.Tests;
+
+/// <summary>
+/// Tests that change <see cref="CultureInfo.CurrentCulture"/> for the length
+/// of one test.
+/// </summary>
+/// <remarks>
+/// The culture is per-THREAD and every such test restores it in a
+/// <c>finally</c>, so a race was already hard to construct — but xUnit
+/// parallelises test CLASSES across a thread pool, and "hard to construct" is
+/// how an intermittent failure that looks exactly like a production bug gets
+/// introduced. This collection runs on its own.
+/// </remarks>
+[CollectionDefinition("CultureSwitching", DisableParallelization = true)]
+public class CultureSwitchingCollection { }
 
 /// <summary>
 /// A relative day the MODEL filled in, settled once where its call is made.
@@ -31,6 +46,7 @@ namespace Plantoir.Tests;
 /// <c>contracts/schedule-rules.json</c> → <c>relativeDays</c>, run by both
 /// platforms. What is asserted here is WHEN it is decided.</para>
 /// </summary>
+[Collection("CultureSwitching")]
 public class RelativeDayFreshnessTests
 {
     /// <summary>A Tuesday — the day the contract's relative-day cases count from.</summary>
@@ -123,6 +139,15 @@ public class RelativeDayFreshnessTests
         /// one of these tests is ever adopted as a card, the test says so
         /// instead of quietly going hollow. And the reply must have been
         /// taken, which is the other half of the same proof.</para>
+        ///
+        /// <para>The two halves cover different things. The matcher check
+        /// covers <see cref="AssistCardCommand"/>'s fixed table; the DEQUEUE
+        /// check covers everything else that can answer without the model —
+        /// <c>AssistAgent</c>'s own regex shapes ("…and everything it links
+        /// to", "deploy tomorrow's class at 6:30"), which are matched in the
+        /// agent rather than in the card and which the matcher knows nothing
+        /// about. What neither proves on its own is that the SETTLER site
+        /// ran, so every caller also pins the tool call that came out of it.</para>
         /// </remarks>
         public List<AssistAgent.Line> SayThroughTheModel(string text)
         {
@@ -311,6 +336,10 @@ public class RelativeDayFreshnessTests
         rig.SayThroughTheModel("put tomorrow's class up for me, please");
 
         Assert.Equal(nonsense, ArgumentsOn(reply));
+        // The call REACHED a tool, which is what makes the line above an
+        // assertion about the settler rather than about a call that never
+        // got as far as one.
+        Assert.Single(rig.Tools.Calls);
     }
 
     // ---- The gate, swept across the whole surface ------------------------
@@ -397,10 +426,13 @@ public class RelativeDayFreshnessTests
     /// The card's sentence parses the moment back out of the string the app
     /// has just written, and a lenient <c>DateTime.TryParse</c> reads 2026 in
     /// the machine's calendar — Buddhist 2026, which is 1483 — so the card
-    /// named a weekday five centuries out while the deploy itself fired on the
-    /// right day. The DATE is checked through the culture's own rendering of
-    /// the moment that is correct, so what is compared is which moment the
-    /// card describes rather than how Thai writes a Wednesday.</para>
+    /// named a weekday from the fifteenth century. What happens at the far
+    /// end of that same string is
+    /// <see cref="TheToolAcceptsTheMomentTheCardNamed"/>: not a wrong day, but
+    /// a REFUSAL, because a moment in 1483 has already passed. The date is
+    /// checked through the culture's own rendering of the moment that is
+    /// CORRECT, so what is compared is which moment the card describes rather
+    /// than how Thai writes a Wednesday.</para>
     /// </remarks>
     [Fact]
     public void ANonGregorianMachineIsToldTheSameYearAsEverybodyElse()
@@ -432,5 +464,85 @@ public class RelativeDayFreshnessTests
         {
             CultureInfo.CurrentCulture = was;
         }
+    }
+
+    /// <summary>
+    /// The tool the card's Go button reaches ACCEPTS the moment the card
+    /// named, and describes the same one back.
+    /// </summary>
+    /// <remarks>
+    /// <para>The card is not the end of this path: the app's only tool server
+    /// is <c>plantoir-mcp</c>, so the <c>when</c> the card wrote goes over
+    /// JSON-RPC and is parsed again by <c>plan_scheduled_deploy</c> and
+    /// <c>schedule_deploy</c>. Both used a bare <c>DateTime.TryParse</c>, and
+    /// on this machine's calendar that turns the invariant
+    /// <c>2026-…</c> the app had just written into <b>1483-…</b> — which is in
+    /// the past, so <c>ScheduledDeploy.Problem</c> refuses it with "has
+    /// already passed" and NOTHING IS SCHEDULED. A refusal, not a wrong day:
+    /// the teacher asks for a deploy before school, reads a card that says
+    /// tomorrow, presses Go, and is told the time has passed.</para>
+    ///
+    /// <para>So this drives the real workspace, not a fake, and asserts both
+    /// halves: the plan is accepted, and the sentence it describes names the
+    /// same moment the approval card did.</para>
+    /// </remarks>
+    [Fact]
+    public void TheToolAcceptsTheMomentTheCardNamed()
+    {
+        string folder = Directory.CreateTempSubdirectory("plantoir-when-culture").FullName;
+        var was = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo("th-TH");
+            ACourseThatHasDeployedBefore(folder);
+
+            // What the card writes, in the form this app writes it.
+            var moment = DateTime.Now.AddDays(1).Date.AddHours(6).AddMinutes(30);
+            string when = moment.ToString(ScheduledDeploy.WrittenForm, CultureInfo.InvariantCulture);
+
+            // The SERVER's own parse, which is where the string actually
+            // lands: the app reaches every tool through plantoir-mcp.
+            var tools = new PlantoirTools(new AssistWorkspace(folder, new FakeLauncher()));
+            string planned = tools.PlanScheduledDeploy("ICS3U", 1, when).Detail();
+
+            Assert.DoesNotContain("has already passed", planned);
+            Assert.Contains(moment.ToString("dddd d MMMM, h:mm tt"), planned);
+
+            // And the card the teacher agreed to names that same moment.
+            var rig = new Rig();
+            rig.Model.Then(Calling("schedule_deploy",
+                $$"""{"course": "ICS3U", "section": 1, "when": "{{when}}"}"""));
+            string card = rig.SayThroughTheModel("set a deploy going before school")[0].Text;
+
+            Assert.Contains(moment.ToString("dddd d MMMM, h:mm tt"), card);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = was;
+            try { Directory.Delete(folder, recursive: true); } catch { }
+        }
+    }
+
+    /// <summary>A course that can legally be scheduled: one section, deployed before.</summary>
+    private static void ACourseThatHasDeployedBefore(string folder)
+    {
+        string course = Path.Combine(folder, "courses", "ICS3U");
+        Directory.CreateDirectory(Path.Combine(course, "section1", "All Classes"));
+        Directory.CreateDirectory(Path.Combine(course, ".netlify_sites"));
+        File.WriteAllText(Path.Combine(folder, "preview.ps1"), "# marker");
+        File.WriteAllText(Path.Combine(folder, "deploy.ps1"), "# marker");
+        File.WriteAllText(Path.Combine(course, ".netlify_sites", "section1.json"), "{}");
+        File.WriteAllText(Path.Combine(course, "course_config.json"),
+            """
+            {
+              "course_code": "ICS3U",
+              "course_name": "Computer Science",
+              "deploy_target": "netlify",
+              "num_sections": 1,
+              "per_section_folders": ["All Classes"],
+              "per_section_files": [],
+              "section_numbers": [1]
+            }
+            """);
     }
 }
