@@ -88,7 +88,11 @@ public sealed class PublishPlan
 
             foreach (var page in named)
             {
-                if (page.IsVisibleToStudents != Publishes)
+                // "Already published" has to be a CONFIDENT reading. A page
+                // whose flag this app will not read reports as visible, and
+                // saying nothing needed doing about it would leave the build
+                // holding it back while the teacher was told otherwise.
+                if (page.IsVisibleToStudents != Publishes || !page.VisibilityIsCertain)
                     return null;
             }
 
@@ -269,6 +273,14 @@ public sealed record IndexChange(
 }
 
 /// <summary>One page a plan would touch, and what would happen to it.</summary>
+/// <param name="VisibilityIsCertain">
+/// False when the page's flag is a form this app will not read — a value on
+/// the line below the key, a tag, a block scalar, an anchor, an alias.
+/// <para>Anything deciding a page is "already the way you asked" must require
+/// this. Without it, "publish this page" on such a page answered that it was
+/// already published and wrote nothing, while the build was holding it back —
+/// the exact failure the visibility reader exists to remove (issue #140).</para>
+/// </param>
 public sealed record PlannedPage(
     string Title,
     string RelativePath,
@@ -280,12 +292,21 @@ public sealed record PlannedPage(
     string? DisplayTitle = null,
     bool IsFolderIndex = false,
     bool IsClassPage = false,
-    bool IsSectionLocal = false)
+    bool IsSectionLocal = false,
+    bool VisibilityIsCertain = true)
 {
     /// <summary>What the teacher sees this page called (Quartz displayName).</summary>
     public string DisplayTitle { get; init; } = DisplayTitle ?? Title;
 
-    /// <summary>True when students currently see this page.</summary>
+    /// <summary>
+    /// True when students currently see this page.
+    ///
+    /// <para>Read the way the BUILT SITE reads it, and when the page's flag is
+    /// one this app will not guess at, this says VISIBLE — the mild mistake of
+    /// the two, since calling a page hidden while students are reading it is
+    /// the failure that reports success. <see cref="VisibilityIsCertain"/> is
+    /// how anything that WRITES tells the two apart.</para>
+    /// </summary>
     public bool IsVisibleToStudents => CurrentValue is null || !CurrentValue.Value;
 
     /// <summary>False when the page already carries the wanted value.</summary>

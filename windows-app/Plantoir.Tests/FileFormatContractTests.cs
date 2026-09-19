@@ -300,7 +300,7 @@ public sealed class FileFormatContractTests : IDisposable
         // key's line, the legacy key gone. The full set of cases, including
         // the deliberate exception to rule 4, is TheOldSpellingIsMigratedToTheNewKey.
         var (migrated, migration) = PageFrontmatter.SetDraft(
-            "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n", "publishForSection1", draft: false);
+            "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n", "publishForSection1", draft: false, sectionNumber: 1);
         Assert.True(migration.Changed);
         Assert.Equal("---\ntitle: Day one\npublishForSection1: true\n---\nBody.\n", migrated);
         Answered("A page written in the old spelling is MIGRATED to the new key, and the legacy key removed, the first time something edits its visibility");
@@ -308,7 +308,7 @@ public sealed class FileFormatContractTests : IDisposable
         // Edit the LINE, never round-trip the YAML.
         string withComment =
             "---\ntitle: Day one   # the teacher's own note\npublishForSection1: false\ntags: [unit1]\n---\nBody.\n";
-        var (edited, edit) = PageFrontmatter.SetDraft(withComment, "publishForSection1", draft: false);
+        var (edited, edit) = PageFrontmatter.SetDraft(withComment, "publishForSection1", draft: false, sectionNumber: 1);
         Assert.True(edit.Changed);
         Assert.Contains("# the teacher's own note", edited, StringComparison.Ordinal);
         Assert.Contains("tags: [unit1]", edited, StringComparison.Ordinal);
@@ -319,7 +319,7 @@ public sealed class FileFormatContractTests : IDisposable
         Answered("Edit the LINE, never round-trip the YAML");
 
         // A page with no frontmatter at all gets a block of its own.
-        var (given, gaveOne) = PageFrontmatter.SetDraft("# Just a heading\n", "publish", draft: true);
+        var (given, gaveOne) = PageFrontmatter.SetDraft("# Just a heading\n", "publish", draft: true, sectionNumber: 1);
         Assert.True(gaveOne.Changed);
         Assert.StartsWith("---", given, StringComparison.Ordinal);
         Assert.Contains("publish: false", given, StringComparison.Ordinal);
@@ -330,7 +330,7 @@ public sealed class FileFormatContractTests : IDisposable
         // write still moves the modification time, and the next build then
         // believes the content changed.
         string already = "---\npublish: true\n---\nBody.\n";
-        var (untouched, noEdit) = PageFrontmatter.SetDraft(already, "publish", draft: false);
+        var (untouched, noEdit) = PageFrontmatter.SetDraft(already, "publish", draft: false, sectionNumber: 1);
         Assert.False(noEdit.Changed);
         Assert.Equal(already, untouched);
         Answered("Writing the value it already has changes nothing");
@@ -371,28 +371,28 @@ public sealed class FileFormatContractTests : IDisposable
     {
         // The per-section spelling, on a course-level page: same line, new key.
         string shared = "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n";
-        var (writtenShared, sharedEdit) = PageFrontmatter.SetDraft(shared, "publishForSection1", draft: false);
+        var (writtenShared, sharedEdit) = PageFrontmatter.SetDraft(shared, "publishForSection1", draft: false, sectionNumber: 1);
         Assert.Equal("---\ntitle: Day one\npublishForSection1: true\n---\nBody.\n", writtenShared);
         Assert.True(sharedEdit.Changed);
 
         // And the plain one, on a page inside a section's own folder.
         string local = "---\ntitle: Day one\ndraft: true\n---\nBody.\n";
-        var (writtenLocal, _) = PageFrontmatter.SetDraft(local, "publish", draft: false);
+        var (writtenLocal, _) = PageFrontmatter.SetDraft(local, "publish", draft: false, sectionNumber: 1);
         Assert.Equal("---\ntitle: Day one\npublish: true\n---\nBody.\n", writtenLocal);
 
         // Both spellings on one page: the legacy line goes.
         string both = "---\npublishForSection1: false\ndraftSection1: true\n---\nBody.\n";
-        var (writtenBoth, _) = PageFrontmatter.SetDraft(both, "publishForSection1", draft: false);
+        var (writtenBoth, _) = PageFrontmatter.SetDraft(both, "publishForSection1", draft: false, sectionNumber: 1);
         Assert.Equal("---\npublishForSection1: true\n---\nBody.\n", writtenBoth);
 
         // Already right, still legacy: migrated once, on purpose (rule 4's one exception).
         string alreadyRight = "---\ndraftSection1: false\n---\nBody.\n";
-        var (migrated, edit) = PageFrontmatter.SetDraft(alreadyRight, "publishForSection1", draft: false);
+        var (migrated, edit) = PageFrontmatter.SetDraft(alreadyRight, "publishForSection1", draft: false, sectionNumber: 1);
         Assert.True(edit.Changed);
         Assert.Equal("---\npublishForSection1: true\n---\nBody.\n", migrated);
 
         // And once migrated, rule 4 holds: the same value again touches nothing.
-        var (untouched, again) = PageFrontmatter.SetDraft(migrated, "publishForSection1", draft: false);
+        var (untouched, again) = PageFrontmatter.SetDraft(migrated, "publishForSection1", draft: false, sectionNumber: 1);
         Assert.False(again.Changed);
         Assert.Equal(migrated, untouched);
     }
