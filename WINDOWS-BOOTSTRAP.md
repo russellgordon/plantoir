@@ -153,7 +153,7 @@ reasons rather than tasks:
   never for a difference a teacher can see at the current milestone** — that
   one is a defect to fix or a release to hold. Editing the contract to quiet
   your suite (an `appliesOn: ["mac"]` on something this side owes, say) is the
-  thing this exists to replace: `contracts/README.md` → "A third shape" says
+  thing this exists to replace: `contracts/README.md` → "Named gaps" says
   why, and a green run can therefore mean "green, with two written debts".
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
   `promptHistory`, and the case lists in the other files). Doing so will make

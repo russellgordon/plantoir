@@ -225,7 +225,7 @@ and `renameUnitWord.explanation` — are held there as named gaps
 (`windows-app/Plantoir.Tests/NamedGapLedger.cs`) against
 [issue #158](https://github.com/russellgordon/plantoir/issues/158), milestoned
 v1.3.0, which is what owes the whole feature. `contracts/README.md` →
-"A third shape" says when that is allowed.
+"Named gaps: the handover whose fix belongs to a LATER release" says when that is allowed.
 
 What it does, in the order it does it — and the order is part of the
 contract, because "disk first, configuration last" is the kind of reasoning a

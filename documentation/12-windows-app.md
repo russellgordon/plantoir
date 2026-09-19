@@ -560,7 +560,7 @@ reason. Everything else is asserted exactly as before, and the ledger fails
 both ways — if a ledgered thing starts existing here (saying to delete the
 entry) and if it stops being in the contract. **So a green totals line on this
 suite can mean "green, with two written debts"**, and the ledger file is the
-one place that says which. `contracts/README.md` → "A third shape" carries the
+one place that says which. `contracts/README.md` → "Named gaps" carries the
 boundary: a named gap is allowed only while an open issue milestoned LATER
 than the release being cut owns the work, and never for a difference a teacher
 can see at the current milestone. Softening the contract instead — an
