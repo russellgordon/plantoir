@@ -1928,15 +1928,36 @@ number is `expectOtherClassesMoving` in each contract case.
 All three were found from the Windows side and closed on the mac in #163.
 
 **1. A copy could arrive already visible to students.** The copy is given a
-plain `publish: false`, but the build consults `publishForSection<N>` FIRST —
-and the page a teacher names can itself be a course-level shared page, since
-`AssistSectionGraph.read` walks the whole course directory. This is not a
-shape the product manufactures — `AssistPageVisibility.isSectionLocal` decides
-from the path, so the app never writes a per-section key onto a section-local
-page — but it is one the shipped content hands a teacher: **324 files under
-`support/example_content/*/shared/` carry `publishForSection<N>`, including
-all 301 `_DUPLICATE ME.md`**, counted rather than remembered. Measured
-in the real toolchain image (`teaching-quartz:src-0b2b2e9c`, CPython 3.11.15,
+plain `publish: false`, but the build consults `publishForSection<N>` FIRST,
+so a source page carrying that key beats it and the copy is readable the
+moment it exists.
+
+**Why the guard is written for a value the reader will not vouch for, rather
+than for one key.** After
+[#176](https://github.com/russellgordon/plantoir/issues/176) the important
+`cannotTell` shapes PUBLISH — a key whose value continues on an indented line
+reaches the site as the string `'false false'` — so "there is a flag and this
+app will not guess what the build makes of it" is not a shrug, it is a page
+students may well be able to read. A copy this app cannot vouch for is exactly
+the copy to act on. That argument stands whatever the frontmatter turns out to
+say, and it is the reason to prefer it to a test for one key name.
+
+**And the per-section key really is reachable**, by a route the app itself
+builds. `AssistPageVisibility.isSectionLocal` decides from the PATH, so the
+app writes `publishForSection<N>` onto COURSE-LEVEL pages — that is what the
+key is for — and `AssistSectionGraph.read` walks
+`ClassPages.pagesOfSection`, which enumerates the whole course directory minus
+other sections' folders. So a course-level page titled "Unit N, Day N" that
+has been published for this section is nameable in "duplicate X as my next
+class" and carries the key, with no teacher doing anything unusual. (An
+earlier draft of this section cited 324 shipped example pages as carrying it.
+That was wrong and is worth recording as wrong: the 324 is a count of files
+whose `%%` comment mentions the key by name — `_DUPLICATE ME.md` says "such as
+createdSection1 dates or publishForSection1 flags" — and NO shipped
+`example_content` page carries it as a frontmatter key at all. A measurement
+that is wrong is worse than none.)
+
+Measured in the real toolchain image (`teaching-quartz:src-0b2b2e9c`, CPython 3.11.15,
 PyYAML 6.0.3, python-frontmatter 1.3.0), calling the build's own
 `process_frontmatter` and then applying `patches/publish.ts`'s rule:
 
@@ -1944,30 +1965,48 @@ PyYAML 6.0.3, python-frontmatter 1.3.0), calling the build's own
 |---|---|---|
 | `publish: false` + `publishForSection1: true` | `publish: True` | **VISIBLE TO STUDENTS** |
 | `publishForSection1: true`, `publish: false` inserted at the top of the block (what `AssistPageVisibility.setting` writes) | `publish: True` | **VISIBLE TO STUDENTS** |
-| `publish: false` + `publishForSection1: false` (what the fix writes) | `publish: False` | HIDDEN |
-| `publish: false` (control) | `publish: False` | HIDDEN |
+| `publish: false` + `publishForSection1: false` (the rejected fix — hidden, and unpublishable) | `publish: False` | HIDDEN |
+| `publish: false`, the per-section key REMOVED — which is the control, and is what ships | `publish: False` | HIDDEN |
 | `publish: false` + `draftSection1: false` | `publish: False` | HIDDEN |
 | `publish: false` + `publishForSection2: true` (another section's key) | `publish: False` | HIDDEN |
 
 The FILE says `publish: false` and the site shows the page, which is the
 worst available shape: the teacher's own page looks hidden. Only THIS
 section's per-section publish key can beat the plain one — a key naming
-another section is deleted unread — so one extra write closes it.
+another section is deleted unread.
 
-The guard is **broad**: the copy is read back through
-`AssistPageVisibility.answer` and the flag written out in full whenever the
-answer is anything other than a confident `hidden`. What was REJECTED is the
-narrow form, "only when a top-level `publishForSection<N>` line is present".
-It looks tighter and is wrong: `cannotTell` is not a shrug, it is a value
-this app will not guess at, and after
-[#176](https://github.com/russellgordon/plantoir/issues/176) the important
-`cannotTell` shapes PUBLISH — a key whose value continues on an indented
-line reaches the site as the string `'false false'`. A copy the reader cannot
-vouch for is exactly the copy to write the flag onto, so the guard firing
-there is the guard working. Writing through `AssistPageVisibility.setting`
-rather than hand-rolling the line is what makes it safe: the copy inherits
-#176's continuation sweep and the legacy-key migration for free, and no line
-of `AssistPageVisibility` needed changing to get them.
+**What was REJECTED, and it is the answer this piece shipped first.** Writing
+`publishForSection<N>: false` onto the copy as well hides it, passes every
+assertion about visibility, and leaves a page **nobody can ever publish**: the
+copy is section-local for ever, so `AssistPublishPlan` picks the plain key
+from the path and writes `publish: true`, never touching the per-section line,
+which goes on winning — while `publishPages` reports "Published 1 page"
+without re-reading. Asking again produces the same answer, because the page
+still reads as hidden and is listed as a change every time. That is the
+failure-that-reports-success this project treats as the worst kind, traded for
+a page that merely starts visible. Caught in review before it merged.
+
+What ships instead REMOVES what the copy inherited.
+`AssistPageVisibility.withoutPerSectionKeys` strips every top-level
+`publishForSection\d+`, `draftSection\d+` **and `createdSection\d+`** line,
+with its continuation lines, before anything is written on the plain keys.
+`createdSection<N>` goes with the other two rather than being left as inert:
+`process_frontmatter` does `post["created"] = post[created_key]` on the line
+after the publish one, so an inherited date key would show the SOURCE's day on
+the built site while the copy's own file said otherwise — the same precedence
+trap, one key over. The build deletes all three families after resolving them,
+so removing them changes nothing about a page that was already right.
+
+Then the copy is read back once more, and if the answer is anything other than
+a confident `hidden` the duplicate is **abandoned rather than written**. That
+branch is unreachable today, and it is there because
+[#186](https://github.com/russellgordon/plantoir/issues/186) may make
+`AssistPageVisibility.setting` decline to write; a check on its `changed` flag
+would be weaker, since `changed: false` cannot tell "already hidden" from
+"declined". Abandoning is safe by construction: `ClassInsertionPlanner.apply`
+has already written the blank class page at that path and `ClassPages.skeleton`
+writes `publish: false`, so the teacher keeps a hidden empty page rather than a
+visible copy of a published lesson, and the refusal leaves a trail line.
 
 **2. A lesson still sitting where the copy would go was written over.**
 `ClassInsertionPlanner.apply` SKIPS a rename whose destination already exists

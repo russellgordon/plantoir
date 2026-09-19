@@ -2034,13 +2034,6 @@ final class AssistToolRunner {
             request.located.course, forSection: request.located.sectionNumber
         )
 
-        // Asked BEFORE anything moves. Afterwards there is a file at this path
-        // either way, and only this answers which question the guard below is
-        // really asking.
-        let destinationHeldAPage: Bool = FileManager.default.fileExists(
-            atPath: request.newURL.path
-        )
-
         let outcome: ClassChangeOutcome
         do {
             outcome = try ClassInsertionPlanner.apply(request.plan, in: request.located.course)
@@ -2068,7 +2061,16 @@ final class AssistToolRunner {
         // time it is ALWAYS in `plan.renames` — it is a numbered page at or
         // after the insertion point — so nothing before the shuffle can tell
         // the ordinary duplicate from the dangerous one.
-        if destinationHeldAPage && !wasCreatedByThisRun(request.newURL, outcome: outcome) {
+        //
+        // Nor is the question "was a page there before the shuffle?", which
+        // this used to ask first. `apply` renames, rewrites links and re-dates
+        // between that sample and this write, and Obsidian is open in the
+        // other window — a page appearing in that gap read as "the planner
+        // must have made it", so the copy took it and `before: nil` meant
+        // "Undo that" would then delete it. `created` is exact on its own:
+        // `apply` cannot take its `changesNothing` early return here, because
+        // `duplicateAsked` has already failed if the plan added nothing.
+        if !wasCreatedByThisRun(request.newURL, outcome: outcome) {
             // Worth its own line on the trail: the room has been made by the
             // time this is answered, so a teacher sees their classes move and
             // no copy appear, and nothing else recorded would say why.
@@ -2089,6 +2091,27 @@ final class AssistToolRunner {
         var copied: String = PageFrontmatter.settingTitle(
             in: request.sourceText, to: request.newTitle
         )
+        // Every PER-SECTION key the source happened to carry comes out FIRST,
+        // before this writes a date and a visibility flag on the plain keys.
+        //
+        // The copy lands in one section's own folder, so it is section-local
+        // for ever (`AssistPageVisibility.isSectionLocal` decides from the
+        // path) and every key written to it from here on is a plain one — but
+        // the BUILD resolves `publishForSection<N>` onto `publish` and
+        // `createdSection<N>` onto `created` before Quartz reads either. An
+        // inherited key therefore beats everything below, and a copy that
+        // arrived carrying `publishForSection1: true` was visible to students
+        // the moment it existed while its own file read `publish: false`.
+        //
+        // What was REJECTED, because it is the obvious answer and it is a
+        // worse fault than the one it fixes: writing `publishForSection<N>:
+        // false` onto the copy as well. It does hide the page — and then the
+        // publish path, which picks its key from the path, writes plain
+        // `publish: true` and never touches the per-section line, so the page
+        // stays hidden while the teacher is told "Published 1 page", every
+        // time they ask. A page nobody can publish, reported as published, is
+        // worse than a page that starts visible.
+        copied = AssistPageVisibility.withoutPerSectionKeys(in: copied)
         copied = PageFrontmatter.settingCreated(
             in: copied,
             key: PageFrontmatter.createdKey(forSection: request.located.sectionNumber,
@@ -2105,36 +2128,45 @@ final class AssistToolRunner {
             forSection: request.located.sectionNumber, isSectionLocal: true
         ).text
 
-        // Read back what was just written rather than trusting it, and force
-        // the matter when the answer is anything but a confident "hidden".
-        //
-        // The plain `publish: false` above is not the last word: the build
-        // consults `publishForSection<N>` FIRST, so a source page carrying
-        // `publishForSection1: true` — every `_DUPLICATE ME.md` in the shipped
-        // example content does, and the page a teacher names can itself be a
-        // course-level shared page — beats it, and the copy is visible to
-        // students the moment it exists. Measured through the real toolchain
-        // image (CPython 3.11.15 / PyYAML 6.0.3): such a copy leaves
-        // `process_frontmatter` as `publish: true` while the FILE still reads
-        // `publish: false`, which is the worst shape of all, because the
-        // teacher's own page looks hidden.
+        // Read back what was just written rather than trusting it, and ABANDON
+        // the copy rather than write one this app cannot vouch for.
         //
         // The test is `!= .hidden`, not `== .visible`, deliberately. A value
-        // this reader will not guess at is one the build may well publish — a
-        // key with an indented continuation reaches the site as the string
-        // `'false false'`, which publishes — so a copy it cannot vouch for
-        // gets the flag written out in full. Writing through
-        // `AssistPageVisibility.setting` rather than hand-rolling the line is
-        // what makes that safe: it takes the value's continuation lines with
-        // it, and it migrates a legacy key rather than leaving two that
-        // disagree.
+        // the reader will not guess at is one the build may well publish — a
+        // key whose value continues on an indented line reaches the site as
+        // the string `'false false'` — so "cannot tell" is not an excuse to
+        // carry on. It is also strictly stronger than asking `setting` whether
+        // it CHANGED anything: `changed: false` cannot tell "the page already
+        // said hidden" from "this declined to write", which is the shape
+        // issue #186 is about, and both land here as an answer that is not
+        // `.hidden`.
+        //
+        // Refusing is the safe end state and that is why it is allowed to be
+        // this blunt: `ClassInsertionPlanner.apply` has already written the
+        // blank class page at this path, and `ClassPages.skeleton` writes
+        // `publish: false`, so a teacher who meets this keeps a hidden empty
+        // page where the copy would have been rather than a visible copy of a
+        // published lesson. Nothing here can reach it today — the strip above
+        // takes out the only keys that beat the plain one — and it is left in
+        // so that #186 inherits no trap.
         if AssistPageVisibility.answer(
             in: copied, forSection: request.located.sectionNumber
         ) != .hidden {
-            copied = AssistPageVisibility.setting(
-                published: false, in: copied,
-                forSection: request.located.sectionNumber, isSectionLocal: false
-            ).text
+            ActivityTrail.note(
+                .classCopyNotMade,
+                "did not copy a class — the copy could not be made certainly hidden, and a copy "
+                + "of a published lesson must never arrive where students can read it",
+                course: request.located.course.code, section: request.located.sectionNumber
+            )
+            // Inline, like the two refusals either side of it: this is the
+            // "something underneath would not do as it was asked" family, not
+            // a sentence the product means to say. If it becomes reachable,
+            // it earns an `AssistWording` key like the others.
+            return AssistToolOutcome.refused(
+                "“\(request.sourceTitle)” was not copied. I could not be certain the copy would "
+                + "start hidden, and a copy of a published lesson must never be visible to "
+                + "students the moment it is made. Nothing of yours was written over."
+            )
         }
 
         // Nil, and provably so. Past the guard above, either this page did not
