@@ -597,8 +597,11 @@ how a long name wraps. That is a screenshot pass, not this.
 knowing why that belongs here. `MarksPoolRemovalUiTests` removes a folder in
 Course Settings — the row's own button, the confirmation, Save — and then
 asserts that the written `course_config.json` still has no `graded_folders`
-key. The RULE is pinned by the unit suite against the contract's six cases
-([#142](https://github.com/russellgordon/plantoir/issues/142)); what no unit
+key. The RULE is pinned by the unit suite against the contract's seven cases
+([#142](https://github.com/russellgordon/plantoir/issues/142), plus the
+case-insensitive seventh that Windows proposed and the mac adopted on
+2026-09-19, [#172](https://github.com/russellgordon/plantoir/issues/172));
+what no unit
 test here can reach is that the gesture a teacher makes arrives at that rule
 at all, with the confirmation agreeing and Save writing what the rule decided.
 Mutation-measured: restoring the pre-fix body fails it with
