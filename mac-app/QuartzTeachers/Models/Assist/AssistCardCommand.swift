@@ -227,8 +227,15 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
             // number that might have been a section or a unit.
             return nil
         }
+        // One or two digits of hour, always. Without the upper bound "007:30
+        // am" and "0007 pm" are read as 07:30 and 19:00, because `Int` does
+        // not care how a number was padded — harmless in itself, since nobody
+        // types that, but it is a boundary the other platform would implement
+        // as one-or-two from reading the accepted rows, and a difference no
+        // suite could see. So it is stated here and pinned by a refused row.
         guard AssistCardCommand.isPlainDigits(hourText),
               AssistCardCommand.isPlainDigits(minuteText),
+              hourText.count <= 2,
               minuteText.count == 2,
               let hour = Int(hourText),
               let minute = Int(minuteText), minute <= 59 else {

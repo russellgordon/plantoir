@@ -76,6 +76,83 @@ final class ScheduleDeployCardTests: XCTestCase {
         }
     }
 
+    /// A wall time that does not exist settles onto one that does.
+    ///
+    /// **The one night a year this matters.** Clocks go forward at 02:00 on
+    /// 8 March 2026 in Toronto, so 02:30 that morning never happens. Joining
+    /// the day to the time would hand back "2026-03-08 02:30", which
+    /// `moment(named:)` — the app's own reader — cannot read: the trail line
+    /// would quietly lose its moment, the approval card would print the raw
+    /// text instead of a weekday and a time, and approving it would fail with
+    /// the app calling its own output unreadable. Building the text from the
+    /// INSTANT is what makes "a settled moment always reads back" true rather
+    /// than intended.
+    ///
+    /// A mac test rather than a contract row: the shift is what this
+    /// platform's calendar does, and .NET throws on an invalid wall time
+    /// instead — so the rule is named in the Windows handover as a trap for
+    /// them to meet deliberately, rather than asserted as agreed behaviour
+    /// before they have seen it.
+    func testATimeThatDoesNotExistThatNightSettlesOntoOneThatDoes() throws {
+        let zone: TimeZone = try XCTUnwrap(TimeZone(identifier: "America/Toronto"))
+        let springForward: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-03-08"))
+        let beforeItJumps: Date = try XCTUnwrap(
+            ScheduleDeployCardTests.moment("2026-03-08 01:00", in: zone)
+        )
+
+        let settled: String = try XCTUnwrap(AssistToolRunner.momentText(
+            forTimeOfDay: "02:30", today: springForward, now: beforeItJumps, timeZone: zone
+        ))
+        XCTAssertEqual(settled, "2026-03-08 03:30")
+        XCTAssertNotNil(
+            ScheduleDeployCardTests.moment(settled, in: zone),
+            "whatever comes out has to read back, or the card and the trail lose it"
+        )
+
+        // The explicit day word takes the same road, so the two cannot differ.
+        let saidToday: String = try XCTUnwrap(AssistToolRunner.momentText(
+            forTimeOfDay: "today 02:30", today: springForward, now: beforeItJumps, timeZone: zone
+        ))
+        XCTAssertEqual(saidToday, "2026-03-08 03:30")
+
+        // …and so does "tomorrow", asked the evening before.
+        let theNightBefore: Date = try XCTUnwrap(
+            ScheduleDeployCardTests.moment("2026-03-07 22:00", in: zone)
+        )
+        let saidTomorrow: String = try XCTUnwrap(AssistToolRunner.momentText(
+            forTimeOfDay: "tomorrow 02:30",
+            today: try XCTUnwrap(CalendarDay(text: "2026-03-07")),
+            now: theNightBefore, timeZone: zone
+        ))
+        XCTAssertEqual(saidTomorrow, "2026-03-08 03:30")
+    }
+
+    /// Every settled moment reads back, whatever the zone or the row.
+    ///
+    /// The invariant the trail line and the approval card both rest on, run
+    /// across the contract's own `resolving` rows rather than asserted in
+    /// prose: `matchedInCodeLine` appends a moment only when `moment(named:)`
+    /// can read it, and `explain` names a weekday only then too.
+    func testEverySettledMomentReadsBack() throws {
+        for row in try ScheduleDeployCardTests.rows(named: "resolving") {
+            let when: String = try XCTUnwrap(row["when"] as? String)
+            let today: CalendarDay = try XCTUnwrap(CalendarDay(text: try XCTUnwrap(row["today"] as? String)))
+            let zone: TimeZone = try XCTUnwrap(TimeZone(identifier: try XCTUnwrap(row["timeZone"] as? String)))
+            let now: Date = try XCTUnwrap(
+                ScheduleDeployCardTests.moment(try XCTUnwrap(row["now"] as? String), in: zone)
+            )
+            guard let settled = AssistToolRunner.momentText(
+                forTimeOfDay: when, today: today, now: now, timeZone: zone
+            ) else {
+                continue
+            }
+            XCTAssertNotNil(
+                ScheduleDeployCardTests.moment(settled, in: zone),
+                "\(when) settled onto \(settled), which cannot be read back"
+            )
+        }
+    }
+
     /// Settling twice changes nothing — which is what lets the agent settle a
     /// call, write its trail line from the settled arguments, and hand the
     /// same call on without reading the clock a second time.

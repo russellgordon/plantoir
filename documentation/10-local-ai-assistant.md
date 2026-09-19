@@ -393,7 +393,11 @@ tell which. A deploy set twelve hours wrong is a site that updates after the
 class it was meant for, so the doubt goes to the model, which has the dateline
 and is measured reading arguments out reliably. `noon` and `midnight` are both
 accepted, alike, and so are `12 pm` and `12 am`: one rule rather than two, and
-the card names the day it landed on. A section number, a course code, a
+the card names the day it landed on. **The hour is one or two digits either
+way**, which is stated rather than inherited: `Int` does not care how a number
+was padded, so without the bound "007:30 am" would be read as half past seven
+while the other platform, implementing from the accepted rows, would refuse it
+— a difference no suite could see. Two `refused` rows pin it. A section number, a course code, a
 weekday, a condition or a second request all fall through — the window is
 scoped to ONE section and binds it whatever the sentence said, so a card
 appearing to honour another section would answer a different question with
@@ -458,6 +462,37 @@ remember that it is different.
   (`ScheduledDeploy` removes any previous job), and neither the card nor the
   summary says so. Pre-existing, and untouched here; this family turns that
   path from rare into the easy one, so it is worth knowing.
+- **On the morning the clocks go forward, a wall time may not exist**, and the
+  settled text is therefore built from the INSTANT rather than by joining a day
+  to a time. Measured, America/Toronto, DST starting 02:00 on 8 March 2026:
+  joining the strings gives `"2026-03-08 02:30"`, which `Calendar` has no
+  instant for and `moment(named:)` — three strict `DateFormatter` patterns —
+  reads back as nothing. Everything downstream then failed silently: the trail
+  line dropped its moment, the card printed the raw text instead of "Sunday 8
+  March, 2:30 AM", and approving it failed with the app calling its own output
+  unreadable. `Calendar` moves a nonexistent wall time forward, so 02:30
+  settles onto **03:30** and the card names it. **Rejected: returning nil for
+  that hour**, which is one line and keeps the invariant too, but answers a
+  teacher who asked for an ordinary time with "I could not read that" on the
+  one night when the reason is a fact about their clock. The invariant is now
+  structural — what comes out is the canonical rendering of a real instant, so
+  it always reads back — and `ScheduleDeployCardTests` runs it over every
+  `resolving` row as well as over that morning.
+- **Going BACK, an ambiguous hour resolves to the first occurrence.** Measured,
+  America/Toronto, 1 November 2026: asked at 01:15 in the first 01:00 hour,
+  "1:30 am" settles onto the 01:30 forty-five minutes away; asked at 01:45,
+  it settles onto **tomorrow** rather than the second 01:30 an hour later,
+  because `Calendar.date(from:)` picks the earlier instant and that one has
+  gone. Defensible — it is what "the next such time" means with a
+  first-occurrence convention — and vanishingly rare, but it is a choice
+  rather than an accident.
+
+**Not made a contract row, deliberately: the spring-forward shift.** It is what
+THIS platform's calendar does for free, while .NET throws on an invalid wall
+time (`TimeZoneInfo.ConvertTimeToUtc`), so a row asserting 03:30 would hand
+Windows a DST requirement discovered here and never discussed there. It is a
+mac test and a named trap in the handover instead, to be proposed as a row once
+both sides have met it. The same goes for the fall-back convention.
 
 **`AssistMCPServer` deliberately settles nothing**, so `Plantoir --mcp-stdio`
 still refuses a bare `when: "06:30"` with the runner's own "I could not read

@@ -18,11 +18,17 @@ import Foundation
 /// no longer matches, so a changed sentence fails HERE, in the same test run
 /// that changed it — not on a Windows machine three weeks later.
 ///
-/// **What it deliberately does NOT generate.** `nearMisses` and `scenarios` in
-/// the cases file are hand-written and are preserved on every run. Nothing in
-/// the code says which near-miss phrasings are worth guarding, or which ORDER
-/// events must happen in — those are decisions, and a decision cannot be read
-/// off the thing it produced.
+/// **What it deliberately does NOT generate.** Four top-level keys of the
+/// cases file are hand-written and are preserved on every run: `nearMisses`,
+/// `scenarios`, `promptHistory` and `deployAtATime`. Nothing in the code says
+/// which near-miss phrasings are worth guarding, which ORDER events must
+/// happen in, or which spellings of a time a teacher actually types — those
+/// are decisions, and a decision cannot be read off the thing it produced.
+/// The list is spelled out rather than summarised because it was already two
+/// short when somebody checked, and a key nobody mentions is a key somebody
+/// deletes believing it was generated. `generatedCaseKeys` below is the one
+/// that decides; this is the sentence a developer reads first, so the two are
+/// kept in step by hand.
 /// Main-actor, because the tool surface is: `AssistToolRunner` is a
 /// `@MainActor` type and its three lists are its properties. Nothing here
 /// waits on anything, so this costs a hop and buys not having a second,

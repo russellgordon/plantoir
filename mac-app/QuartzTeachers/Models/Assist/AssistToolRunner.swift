@@ -3461,6 +3461,11 @@ final class AssistToolRunner {
     /// "…has already passed" refusal, in the teacher's own words. They named
     /// the day; the app does not move it for them.
     ///
+    /// **What comes back is always a real instant, written the way
+    /// `moment(named:)` reads it back** — see `text(ofMoment:timeZone:)`,
+    /// which is where that is made true rather than merely intended, and what
+    /// it costs on the morning the clocks go forward.
+    ///
     /// The time zone is a parameter so a test can pin the answer; everything
     /// in the app passes the machine's own, which is the zone
     /// `moment(named:)` reads the settled text back in.
@@ -3491,22 +3496,70 @@ final class AssistToolRunner {
                 return nil
             }
             if todayAt > now {
-                return "\(today.text) \(time)"
+                return AssistToolRunner.text(ofMoment: todayAt, timeZone: timeZone)
             }
-            guard let tomorrow = AssistToolRunner.shifting(today, byDays: 1) else {
-                return nil
-            }
-            return "\(tomorrow.text) \(time)"
+            return AssistToolRunner.text(
+                ofTimeOfDay: time, onDayAfter: today, timeZone: timeZone
+            )
         case "today":
-            return "\(today.text) \(time)"
-        case "tomorrow":
-            guard let tomorrow = AssistToolRunner.shifting(today, byDays: 1) else {
+            guard let todayAt = AssistToolRunner.moment(
+                on: today, atTimeOfDay: time, timeZone: timeZone
+            ) else {
                 return nil
             }
-            return "\(tomorrow.text) \(time)"
+            return AssistToolRunner.text(ofMoment: todayAt, timeZone: timeZone)
+        case "tomorrow":
+            return AssistToolRunner.text(
+                ofTimeOfDay: time, onDayAfter: today, timeZone: timeZone
+            )
         default:
             return nil
         }
+    }
+
+    /// The same, on the day after the one given.
+    private static func text(ofTimeOfDay time: String,
+                             onDayAfter today: CalendarDay,
+                             timeZone: TimeZone) -> String? {
+        guard let tomorrow = AssistToolRunner.shifting(today, byDays: 1),
+              let moment = AssistToolRunner.moment(
+                  on: tomorrow, atTimeOfDay: time, timeZone: timeZone
+              ) else {
+            return nil
+        }
+        return AssistToolRunner.text(ofMoment: moment, timeZone: timeZone)
+    }
+
+    /// A real instant, written the way `moment(named:)` reads it back.
+    ///
+    /// **Built from the INSTANT rather than by joining a day to a time**, and
+    /// that is the whole of the difference on one night a year. On the morning
+    /// the clocks go forward, 02:30 does not happen: joining the strings would
+    /// hand back "2026-03-08 02:30", which is a wall time this Mac's calendar
+    /// has no instant for — so `moment(named:)`, three strict `DateFormatter`
+    /// patterns, reads it back as NOTHING. The consequences were all silent
+    /// and all wrong: the trail line would drop its moment, the approval card
+    /// would fall back to printing the raw text instead of "Sunday 8 March,
+    /// 2:30 AM", and approving it would fail with the app quoting its own
+    /// output back at the teacher as unreadable.
+    ///
+    /// `Calendar` moves a nonexistent wall time FORWARD to the instant the
+    /// clocks jump to, so a teacher who asks for half two on that night is
+    /// shown 3:30 AM on the card and can say no. That is the same standard the
+    /// rest of this feature is held to: the app may choose, as long as it
+    /// shows what it chose before anything happens.
+    ///
+    /// **Rejected: returning nil for a wall time that does not exist.** It is
+    /// one line and it keeps the invariant too, but it answers a teacher who
+    /// asked for a perfectly ordinary time with "I could not read that" — on
+    /// the one night when the reason is a fact about their clock rather than
+    /// about their sentence, and with nothing anywhere to explain it.
+    private static func text(ofMoment moment: Date, timeZone: TimeZone) -> String {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: moment)
     }
 
     /// Whether the text is exactly `HH:mm` on a 24-hour clock.
