@@ -356,9 +356,85 @@ final class ClassPlanningContractTests: XCTestCase {
             AssistPageVisibility.publishes(in: published, forSection: 1),
             "The copy was hidden in a way that cannot be undone — \(said)\n\(published)"
         )
-        XCTAssertFalse(
-            published.contains("publishForSection"),
+        // Asked of the frontmatter LINES, not of the whole file: a page shaped
+        // like the example content's `_DUPLICATE ME.md` names the key in a
+        // `%%` comment in its body, and a substring test would fail on the one
+        // page most likely to be duplicated.
+        XCTAssertTrue(
+            ClassPlanningContractTests.perSectionKeys(in: published).isEmpty,
             "No per-section key belongs on a page inside one section's own folder: \(published)"
+        )
+    }
+
+    /// A source this app cannot read well enough to be sure of is ABANDONED
+    /// rather than copied.
+    ///
+    /// **A tab used as indentation reaches it**, which is not a corner: the
+    /// reader answers `.unreadable` there because the build's own parser
+    /// throws on the same page, so nothing this writes can make the copy
+    /// certainly hidden. A copy of a lesson students can already see is the
+    /// one thing that must not be written on a guess.
+    ///
+    /// The other half of the assertion is what the teacher is LEFT with. The
+    /// room has been made by the time this is answered, so the planner's blank
+    /// class page is standing on the copy's day — hidden, which is the safe
+    /// end state — and nothing goes on the undo list, because taking back a
+    /// page this never wrote is not something an undo can honour.
+    func testASourceThisAppCannotReadIsNotCopiedAtAll() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let scratchFolderURL: URL = made.root.appendingPathComponent("trail")
+        try FileManager.default.createDirectory(at: scratchFolderURL, withIntermediateDirectories: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer { ActivityTrail.store = previousStore }
+
+        try rememberTimetable(["2026-09-08", "2026-09-10", "2026-09-14"], in: made.course)
+        // The tab is the whole fixture. Everything else about this page is
+        // ordinary, and it is published, which is what makes the copy
+        // dangerous.
+        try writeRawPage(
+            "---\ntitle: Unit 1, Day 1\ntags:\n\t- a\npublish: true\n"
+            + "created: 2026-09-08T07:00:00.000-0400\n---\n\nthe words of Unit 1, Day 1\n",
+            named: "Unit 1, Day 1", in: made.course
+        )
+
+        let said: String = await run(
+            made.runner, "add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 1"]
+        )
+
+        XCTAssertEqual(
+            said,
+            AssistWording.theCopyCouldNotBeMadeHidden(
+                page: "Unit 1, Day 1", as: "Unit 1, Day 2",
+                backupNamed: ClassPlanningContractTests.backupName(in: said)
+            ),
+            "The refusal is the contract's sentence, not one of its own: \(said)"
+        )
+
+        let standing: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course), encoding: .utf8
+        ), "The planner's blank page should still be there")
+        XCTAssertFalse(
+            standing.contains("the words of Unit 1, Day 1"),
+            "The copy was written after all: \(standing)"
+        )
+        XCTAssertEqual(
+            AssistPageVisibility.answer(in: standing, forSection: 1), .hidden,
+            "What is left standing must be certainly hidden: \(standing)"
+        )
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("did not copy a class"),
+            "A duplicate abandoned after the room was made must leave a line: \(trail)"
+        )
+
+        let undone: String = await run(made.runner, "undo_last_change", [:])
+        XCTAssertEqual(
+            undone, AssistWording.nothingToUndo,
+            "Nothing was copied, so nothing may be offered back: \(undone)"
         )
     }
 
@@ -496,6 +572,27 @@ final class ClassPlanningContractTests: XCTestCase {
     /// The backup's file name as the refusal names it, or nil when it names
     /// none — so the assertion above compares the whole sentence rather than
     /// re-deriving a path the test fixture chose.
+    /// Every per-section key this page carries as a top-level frontmatter
+    /// line, asked through the app's own matcher rather than by looking for
+    /// the word anywhere in the file.
+    private static func perSectionKeys(in pageText: String) -> [String] {
+        guard let block = PageFrontmatter.block(in: pageText) else {
+            return []
+        }
+        let lines: [String] = pageText.components(separatedBy: "\n")
+        var found: [String] = []
+        for index in (block.openIndex + 1)..<block.closeIndex {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
+                continue
+            }
+            if let key = AssistPageVisibility.perSectionKey(namedIn: bare) {
+                found.append(key)
+            }
+        }
+        return found
+    }
+
     private static func backupName(in sentence: String) -> String? {
         for word in sentence.components(separatedBy: " ") {
             let bare: String = word.trimmingCharacters(in: CharacterSet(charactersIn: ",."))

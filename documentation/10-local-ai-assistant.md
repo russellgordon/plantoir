@@ -2349,15 +2349,37 @@ trap, one key over. The build deletes all three families after resolving them,
 so removing them changes nothing about a page that was already right.
 
 Then the copy is read back once more, and if the answer is anything other than
-a confident `hidden` the duplicate is **abandoned rather than written**. That
-branch is unreachable today, and it is there because
-[#186](https://github.com/russellgordon/plantoir/issues/186) may make
+a confident `hidden` the duplicate is **abandoned rather than written**.
+
+**That branch is REACHED today, and not by the keys the strip removes.** An
+early draft of this section called it unreachable — it is not, and the two
+shapes that reach it were measured rather than argued:
+
+| the source's frontmatter | why the copy still answers `cannotTell` |
+|---|---|
+| a TAB used as indentation anywhere in the block | `PageVisibilityReader.frontmatterBlock` answers `.unreadable`, because the build's own parser throws on the same page. Nothing written here can mend it: the strip and `setting` both find the fences and neither cares about tabs. |
+| the block's FIRST line indented, with a top-level `created:` and no publish or draft key | `setting` inserts `publish: false` at the top of the block, the first line that could be its value is the indented one, and `reading(ofValue:followedBy:)` will not guess at that. |
+
+Both are pages the BUILD refuses as well — measured in the image, source and
+copy alike raise `while scanning for the next token` / `mapping values are not
+allowed` — so stopping is the honest answer rather than a shrug, and a copy of
+a lesson students can already see is the one thing not to write on a guess.
+The branch ALSO covers
+[#186](https://github.com/russellgordon/plantoir/issues/186), which may make
 `AssistPageVisibility.setting` decline to write; a check on its `changed` flag
 would be weaker, since `changed: false` cannot tell "already hidden" from
-"declined". Abandoning is safe by construction: `ClassInsertionPlanner.apply`
-has already written the blank class page at that path and `ClassPages.skeleton`
-writes `publish: false`, so the teacher keeps a hidden empty page rather than a
-visible copy of a published lesson, and the refusal leaves a trail line.
+"declined".
+
+Abandoning is safe by construction: `ClassInsertionPlanner.apply` has already
+written the blank class page at that path and `ClassPages.skeleton` writes
+`publish: false`, so the teacher keeps a hidden empty page rather than a
+visible copy of a published lesson. Because it is reachable, the sentence is a
+contract key — `AssistWording.theCopyCouldNotBeMadeHidden`, in the same two
+forms as `thePlaceForTheCopyIsStillTaken` — and it says the same two things
+that one says, plus one of its own: other classes may already have moved, the
+backup is the way back, and **a blank class page is standing on the day the
+copy was meant to have**. "Was not copied" on its own reads as "nothing
+happened", which would be wrong twice over. It leaves a trail line.
 
 **2. A lesson still sitting where the copy would go was written over.**
 `ClassInsertionPlanner.apply` SKIPS a rename whose destination already exists
@@ -2376,7 +2398,7 @@ is skipped because the source cannot be read; `Day 4 → Day 5` is skipped
 because its destination is still there; `Day 3 → Day 4` likewise. The lesson
 is still at `Unit 1, Day 3` when the copy is written to it.
 
-Two guards were REJECTED before the one that shipped:
+Three guards were REJECTED before the one that shipped:
 
 - **Comparing the destination's TEXT** before and after — "is this still the
   page that was in the way?" This is what Windows does
@@ -2390,13 +2412,25 @@ Two guards were REJECTED before the one that shipped:
   at plan time it is ALWAYS in `plan.renames`, because it is a numbered page
   at or after the insertion point. Nothing before the shuffle can tell the
   dangerous case from the ordinary one.
+- **Sampling "was a page there?" before `apply` and ANDing it with the
+  question below.** This one shipped first and was taken out in review, which
+  is why it is worth recording: `apply` renames, rewrites links and re-dates
+  between the sample and the write, and the premise of the whole feature is
+  that Obsidian is open in the other window. A page appearing at the
+  destination during that pass reads as "the planner must have made it", so
+  the copy takes it — and `before = nil` then means "Undo that" DELETES it.
+  The sample cannot make the guard safer and can only make it blind.
 
-What shipped asks the PLANNER what it did.
+What shipped asks the PLANNER what it did, and nothing else.
 `ClassChangeOutcome.created` has carried the URLs a change wrote since it was
 written, `PlaceholderClassPlanner` fills it, and `ClassInsertionPlanner` was
-dropping it on the floor; now it fills it too, and the duplicate refuses when
-the destination held a page and is not among them. Content-free, so link
-rewriting and date moves cannot defeat it.
+dropping it on the floor; now it fills it too, and the duplicate refuses
+whenever the destination is **not among them** — one condition, asked after
+`apply`. That is exact here: `apply` cannot take its `changesNothing` early
+return on this path, because `duplicateAsked` has already failed if the plan
+added nothing, so `created` holds this page if and only if no file was there
+when the blanks were written. Content-free, so link rewriting and date moves
+cannot defeat it.
 
 The refusal is `AssistWording.thePlaceForTheCopyIsStillTaken`, and it is the
 only sentence in that table answered after a change has BEGUN: the room has

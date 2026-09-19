@@ -2146,9 +2146,18 @@ final class AssistToolRunner {
         // blank class page at this path, and `ClassPages.skeleton` writes
         // `publish: false`, so a teacher who meets this keeps a hidden empty
         // page where the copy would have been rather than a visible copy of a
-        // published lesson. Nothing here can reach it today — the strip above
-        // takes out the only keys that beat the plain one — and it is left in
-        // so that #186 inherits no trap.
+        // published lesson.
+        //
+        // **Reachable today, and not only through #186.** The strip above
+        // takes out the only KEYS that beat the plain one, but a `cannotTell`
+        // has two other causes, neither of which has anything to do with
+        // per-section keys and neither of which any write here can mend: a TAB
+        // used as indentation anywhere in the source's frontmatter (the reader
+        // answers `.unreadable`, because the build's own parser throws on it),
+        // and a frontmatter whose first line is indented, where the
+        // `publish: false` just inserted above it adopts that line as its
+        // value. Both were measured; both are pages the BUILD refuses as well,
+        // which is why stopping is the right answer rather than a shrug.
         if AssistPageVisibility.answer(
             in: copied, forSection: request.located.sectionNumber
         ) != .hidden {
@@ -2158,15 +2167,11 @@ final class AssistToolRunner {
                 + "of a published lesson must never arrive where students can read it",
                 course: request.located.course.code, section: request.located.sectionNumber
             )
-            // Inline, like the two refusals either side of it: this is the
-            // "something underneath would not do as it was asked" family, not
-            // a sentence the product means to say. If it becomes reachable,
-            // it earns an `AssistWording` key like the others.
-            return AssistToolOutcome.refused(
-                "“\(request.sourceTitle)” was not copied. I could not be certain the copy would "
-                + "start hidden, and a copy of a published lesson must never be visible to "
-                + "students the moment it is made. Nothing of yours was written over."
-            )
+            return AssistToolOutcome.refused(AssistWording.theCopyCouldNotBeMadeHidden(
+                page: request.sourceTitle,
+                as: request.newTitle,
+                backupNamed: conversationBackups[request.located.course.code]?.lastPathComponent
+            ))
         }
 
         // Nil, and provably so. Past the guard above, either this page did not
