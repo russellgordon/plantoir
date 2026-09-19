@@ -395,6 +395,50 @@ answer — a router that answers differently to the same request twice is a
 router a teacher cannot learn to trust. (The measurement suites ran at 0.1,
 so the shipped app is if anything more deterministic than the numbers below.)
 
+It also carries **`"max_tokens": 512`** — `AssistModelClient.mostTokensPerReply`,
+added for [#166](https://github.com/russellgordon/plantoir/issues/166), and the
+number Windows had been sending all along. It is not a tuning knob; it is a
+bound on how long a teacher waits. Without one, a reply is bounded only by the
+context, and the context is large: measured on an M4 Pro with the smaller
+assistant (llama.cpp b10435 on Metal, Qwen2.5-1.5B Q4_K_M at a context of
+8,192), the ordinary request *"Publish tomorrow's class for VVH2O section 1,
+and make sure every page it links to is published rather than left as a
+draft"* made the model write `Unit 2, Day 3; Unit 2, Day 4; …` for **5,435
+tokens and 42 seconds**, three trials in three, and the answer was unusable
+when it arrived. 2,757 prompt + 5,435 written = 8,192 exactly: the context was
+the only thing stopping it. The larger assistant is not immune, it fails
+differently and worse — the same shape there is 16,384 − 2,742 = 13,642 tokens
+at that tier's measured 63.2 tok/s, about **216 seconds**, past this client's
+own 180-second timeout, so it would fail rather than answer.
+
+**Why 512 rather than a rounder, larger number.** Measured against the model's
+own tokenizer, the largest tool call this surface can legitimately produce is
+much smaller than the cap: an ordinary call is 16 to 60 tokens, twenty page
+titles is 203, twenty-four long real-world titles is 384, and fifty-eight
+short titles is 545. So the only legitimate shape 512 cuts is an explicit list
+of about fifty-five or more class pages — and `publish_pages` already takes
+`onOrAfter` and `before`, which asks for any number of classes in about sixty
+tokens. Nothing on the local surface takes free text or a page BODY:
+`remember_timetable`, the one tool that would carry ninety dates, is in
+`AssistToolSurface.hiddenFromTheLocalModel` and never reaches a capped
+request. **One shape has not been measured**: the two-lap one, where
+`list_pages` hands back up to `AssistToolRunner.mostPagesListed` entries as
+relative PATHS and the next turn is asked to publish all of them. It is the
+gap in this argument, and it is written down here rather than assumed away.
+
+**Rejected: a larger cap, or none on the larger tier.** A cap sized to the
+worst imaginable call is a cap that never fires, which is the state this
+issue was about. The two apps also send the same number deliberately — it is
+in `contracts/app-rules.json` → `modelTiers.requirements` with its `cap`,
+because two apps sending different caps is a difference no test on either
+side could see. Also **not** rejected, and worth saying plainly: a cap is a
+routing change until proved otherwise — this codebase has already watched one
+added sentence in a tool description move the promise card from 110/110 to
+90/110 — so the routing suite is re-run BEFORE and AFTER, per probe, at
+temperature 0. The mechanism cannot change what the model chooses, only where
+it is stopped, so the only available outcomes are "neutral" and "it cost
+something"; the run is what tells the two apart.
+
 ### Step 2 — What comes back
 
 ```json
@@ -408,9 +452,52 @@ so the shipped app is if anything more deterministic than the numbers below.)
 ```
 
 Note `arguments` is a **string** containing JSON, not a JSON object — that is
-the OpenAI convention, and it is parsed in `AssistAgent`. A small model
-occasionally emits arguments that do not parse; that is treated as "no call
-was made" rather than guessed at.
+the OpenAI convention, and it is parsed in `AssistAgent`.
+
+**The reply also carries `finish_reason`, and it is read.** `"length"` means
+the engine stopped the model part way rather than the model finishing, and
+`AssistAgent.think` then runs **nothing at all**: the teacher is answered with
+`AssistWording.answerWasCutOff`, the trail gets an `assistant answer was cut
+off` line naming the tool the model had begun to name, and the half-written
+reply is not added to the conversation. A small model that emits arguments
+which do not parse, with the turn finishing normally, is refused the same way
+and for the same reason. (Until #166 neither was true: `finish_reason` was
+never read, the unparseable arguments were silently replaced with `{}`, and
+the tool RAN — against no course, producing "There is no course called "" in
+this working folder", which reads to a teacher as a complaint about what they
+typed.)
+
+**The gate is the finish reason, not a parse check, and that is measured.**
+Sweeping `max_tokens` across every cut point of two ordinary requests on the
+smaller assistant (llama.cpp b10435), llama.cpp closes the arguments object
+*before* the `</tool_call>` wrapper, so there is a window one or two tokens
+wide where a generation was stopped short and its arguments nevertheless parse
+perfectly: at a cap of 28, `deploy_section` came back stopped, with
+`{"course": "VVH2O", "section": 1}` parsing cleanly. What the model was about
+to write next is unknowable, and for a tool that changes pages the difference
+between "the four pages you named" and the first of forty is the whole of what
+was asked. Two more rows from the same sweep say why the gate sits ABOVE the
+tool-call branch and why parsing could never have been enough:
+
+| Cut at | What arrived |
+|---|---|
+| 8 tokens | No tool call at all — a raw `<tool_call>\n{\n"name": "publi` fragment in `content`, which a transcript that prints content verbatim would show a teacher |
+| 10–26 tokens | The tool name parsed; the arguments were a fragment |
+| 28 tokens | Stopped, and the arguments **parsed** |
+| 30+ | Finished normally |
+
+And `undo_last_change` takes no arguments at all, so a call to it cut off
+before it wrote anything is readable by any check that could be written — and
+would simply run.
+
+**A consequence worth knowing about in advance.** The thinking flags
+(`--reasoning off` and `--reasoning-budget 0`) are what keep a Qwen3 template
+from spending its whole budget inside a `<think>` block. If they ever regress,
+the symptom changes shape: it used to be an answer that was merely slow, and
+with a cap in place it becomes a visible *"I didn't get to the end of that"* —
+because the thinking now runs into the cap. Meeting that sentence after a
+change to the server flags means checking `AssistServerHost.serverArguments`,
+not the cap.
 
 ### Step 3 — Swift decides what actually happens
 
@@ -687,7 +774,7 @@ tier at its own context size:
 | The eleven promise-card probes (**Windows'** `ExampleRequests`, not this app's shelf) | **110 / 110** | 90 / 110 |
 | Polarity inversions | **0** | **0** |
 | Tool calls whose arguments were truncated (suite body, `max_tokens` 256) | **0** | 12-19 per 290 |
-| The same under the app's own body (no cap) | **0** | 3 per 87 |
+| The same under the app's own body (which sent no cap then — before #166) | **0** | 3 per 87 |
 
 Three things to take from it — and one that is not in the table: on this same
 suite the 4B scored **280/290 with the Windows-comparable 18 at 180/180** in
@@ -737,9 +824,19 @@ be meaningfully re-run, because its probes name tools the app no longer has.
 `{"__unparseable__": …}` and labels its own line "runtime rejected", so it
 never made the false claim — it simply has no count of the other kind.)
 
-The mac is the platform EXPOSED to the underlying fault, because
-`AssistModelClient` sends no `max_tokens` at all where Windows' `LocalModel`
-sends 512, so a runaway here runs until the context is full — issue #166.
+The mac WAS the platform exposed to the underlying fault: `AssistModelClient`
+sent no `max_tokens` at all where Windows' `LocalModel` sends 512, so a
+runaway here ran until the context was full. Closed by #166 — the mac now
+sends the same 512, and both halves of what happens to a stopped reply are
+described in "Step 1" and "Step 2" above. The rows in the table are from
+before that change and stay as they were written; a re-run of the `--app-body`
+arm reproduces them only with `--uncapped`.
+
+**Windows is not fixed by that, and this is the part they owe.** Their cap
+bounds the wait, and `LocalModel.Ask` returns `choices[0].message` and drops
+the rest of the response, so the finish reason never leaves `Ask` and a
+cut-off call is acted on. They meet it MORE often than the mac ever did,
+because their cap fires where the mac's context used to.
 
 The figures above are not a failure rate. The suite runs at temperature 0.1
 (0 in the arms that copy the app's own request), which is near-greedy: ten
