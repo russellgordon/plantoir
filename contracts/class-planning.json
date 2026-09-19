@@ -14,8 +14,35 @@
     "doesNotMoveWhen": [
       "the page is already visible to students - it has a place on the site somebody may have linked to or looked at, and republishing a class must not shuffle work that was already out",
       "the page named for publishing is not a class page - there is no class day to inherit",
-      "the page is a class page - a class's date is its position in the schedule and nothing may move it"
+      "the page is a class page - a class's date is its position in the schedule and nothing may move it",
+      "the page is reached only THROUGH another class page - the walk stops at a class, so material a different class brings takes that class's date and not this one's (issue #173, 2026-09-19)"
     ],
+    "reachStopsAtAClassPage": {
+      "value": true,
+      "why": "The same rule as shared-rules.json -> followingLinks.stopsAtAClassPage, said here because this is where the date half is specified. A class page never INHERITS a date on either platform and never did; what was decided in #173 is that the walk does not continue PAST it either. It applies wherever a class's date is followed outwards: at publish time, and when a whole section is re-dated from a new timetable - where material behind another class is now claimed by the class that actually brings it rather than by whichever earlier class could see it through that one.",
+      "cases": [
+        {
+          "name": "a worksheet behind another class keeps its own date",
+          "classes": [
+            {"title": "Unit 2, Day 3", "date": "2026-10-06", "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "date": "2026-10-07", "links": ["Worksheet"]}
+          ],
+          "pages": [{"title": "Worksheet", "visible": false, "date": "2026-08-01"}],
+          "publish": ["Unit 2, Day 3"],
+          "expectNoMove": ["Worksheet", "Unit 2, Day 4"]
+        },
+        {
+          "name": "named together, the class that brings it dates it",
+          "classes": [
+            {"title": "Unit 2, Day 3", "date": "2026-10-06", "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "date": "2026-10-07", "links": ["Worksheet"]}
+          ],
+          "pages": [{"title": "Worksheet", "visible": false, "date": "2026-08-01"}],
+          "publish": ["Unit 2, Day 3", "Unit 2, Day 4"],
+          "expectMoves": {"Worksheet": "2026-10-07"}
+        }
+      ]
+    },
     "sharedPagesMoveToo": {
       "value": true,
       "why": "A page several classes link to still moves, as long as students have never seen it. An earlier rule left shared pages alone - 'a concept page linked from three different lessons belongs to none of them' - which is sound for a page already on the site and beside the point for one nobody can reach. A page students cannot see has no place to be left in; it has only the day its FILE was made, which is a fact about the teacher's evening rather than about the course."
