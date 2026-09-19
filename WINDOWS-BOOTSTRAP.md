@@ -141,6 +141,20 @@ reasons rather than tasks:
   failure in the same run, `back_up_course` gaining a `section`, had no issue
   anywhere. When you find none, say so and open one labelled `mac` — that is
   the same courtesy in reverse, not a complaint.
+- **When the handover's issue is milestoned for a LATER release, name the gap
+  rather than softening the contract.** `windows-app/Plantoir.Tests/NamedGapLedger.cs`
+  carries one entry per key — the key, the issue, the milestone, the reason —
+  and the two it holds today are the unit-word rename's trail event and
+  sentence, owed under [#158](https://github.com/russellgordon/plantoir/issues/158)
+  at v1.3.0. Everything not in it is asserted as before, and the ledger fails
+  the moment a ledgered thing starts existing here or stops being in the
+  contract, so an entry cannot outlive either. **It is allowed only while an
+  open issue milestoned LATER than the release being cut owns the work, and
+  never for a difference a teacher can see at the current milestone** — that
+  one is a defect to fix or a release to hold. Editing the contract to quiet
+  your suite (an `appliesOn: ["mac"]` on something this side owes, say) is the
+  thing this exists to replace: `contracts/README.md` → "A third shape" says
+  why, and a green run can therefore mean "green, with two written debts".
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
   `promptHistory`, and the case lists in the other files). Doing so will make
   the **mac** suite fail until they implement it — that is the mechanism

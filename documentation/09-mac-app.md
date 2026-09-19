@@ -210,11 +210,22 @@ of `unit_word` that was deliberately not built on 2026-09-01. The wizard
 still asks the question at creation and pours the ready-made pages in the
 answer; this is what happens when the answer changes later. Code:
 `UnitWordRenamer` (the plan and the work), `UnitWordRenameWording` (the
-sentences), `UnitWordRenameSheet` (the sheet). The rules and the cases both
-suites run are [`contracts/class-planning.json`](../contracts/class-planning.json)
+sentences), `UnitWordRenameSheet` (the sheet). The rules and the cases are
+[`contracts/class-planning.json`](../contracts/class-planning.json)
 → `renamingTheUnitWord`; the sentences are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `specialNames.renameUnitWord`; the trail line is `word for a unit renamed`.
+
+**Only the mac runs any of it today**, and this line said "the cases both
+suites run" until 2026-09-18, which was never true: Windows has no renamer, so
+its suite has no counterpart of `ClassPlanningContractTests.testRenamingTheUnitWordCases`
+and the seven `cases` and three `linkCases` are UNRUN there rather than
+failing. The two pieces that did turn the Windows suite red — the trail event
+and `renameUnitWord.explanation` — are held there as named gaps
+(`windows-app/Plantoir.Tests/NamedGapLedger.cs`) against
+[issue #158](https://github.com/russellgordon/plantoir/issues/158), milestoned
+v1.3.0, which is what owes the whole feature. `contracts/README.md` →
+"A third shape" says when that is allowed.
 
 What it does, in the order it does it — and the order is part of the
 contract, because "disk first, configuration last" is the kind of reasoning a
