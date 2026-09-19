@@ -51,7 +51,7 @@
         "why": "The first publish of a section stops behind a dialog asking for a Netlify or Cloudflare token, and a teacher who does not notice it reports a publish that 'never finished'. This line is the difference between reading that as a hang and reading it as a question waiting. The answer is a live credential and is never written down - only the name of the thing asked for."
       },
       {
-        "carries": "course, section, and which assistant",
+        "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: 'Revise with Claude…', 'Revise with Codex…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report.",
         "event": "assistant opened",
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
       },

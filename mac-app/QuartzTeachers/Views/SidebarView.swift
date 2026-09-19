@@ -59,6 +59,13 @@ struct SidebarView: View {
     /// Why a Claude session could not be started, shown as an alert.
     @State var claudeProblem: String?
 
+    /// Why a Codex session could not be started, shown as an alert.
+    ///
+    /// A second property rather than one shared "outside assistant" one,
+    /// because the alert TITLE names the assistant, and a teacher who has both
+    /// installed should be told which of them did not open.
+    @State var codexProblem: String?
+
     // MARK: - Body
 
     var body: some View {
@@ -113,6 +120,7 @@ struct SidebarView: View {
                                         // editing and folder actions made it
                                         // read as an afterthought.
                                         reviseWithClaudeItem(course: course)
+                                        reviseWithCodexItem(course: course)
                                         reviseWithAIItem(course: course, sectionNumber: sectionNumber)
                                         Divider()
                                         openInObsidianItem(
@@ -164,6 +172,7 @@ struct SidebarView: View {
                                 .accessibilityIdentifier("sidebar-\(course.code)")
                                 .contextMenu {
                                     reviseWithClaudeItem(course: course)
+                                    reviseWithCodexItem(course: course)
                                     openInObsidianItem(revealing: course.directoryURL, vaultURL: course.directoryURL)
                                     Divider()
                                     // Renaming moves the folder a preview is
@@ -433,13 +442,7 @@ struct SidebarView: View {
         } message: {
             Text(removalProblem ?? "")
         }
-        .alert("Claude didn’t open", isPresented: claudeProblemBinding) {
-            Button("OK") {
-                claudeProblem = nil
-            }
-        } message: {
-            Text(claudeProblem ?? "")
-        }
+        .modifier(OutsideAgentAlerts(claudeProblem: $claudeProblem, codexProblem: $codexProblem))
         .sheet(item: $addSectionCourse) { course in
             AddSectionSheet(course: course) { sectionNumber in
                 workspace.reloadCourses()
@@ -829,17 +832,6 @@ struct SidebarView: View {
         )
     }
 
-    var claudeProblemBinding: Binding<Bool> {
-        return Binding(
-            get: { claudeProblem != nil },
-            set: { isPresented in
-                if !isPresented {
-                    claudeProblem = nil
-                }
-            }
-        )
-    }
-
     // MARK: - Functions
 
     /// When this section next deploys on its own, or nil when nothing is
@@ -920,7 +912,7 @@ struct SidebarView: View {
     @ViewBuilder
     func reviseWithClaudeItem(course: Course) -> some View {
         if ClaudeCodeLauncher.isAvailable, let folder = workspace.workspaceURL {
-            Button("Revise with Claude…", systemImage: "sparkles") {
+            Button(ClaudeCodeLauncher.menuItemTitle, systemImage: "sparkles") {
                 reviseWithClaude(course: course, folder: folder)
             }
             .accessibilityIdentifier("reviseWithClaude-\(course.code)")
@@ -935,7 +927,38 @@ struct SidebarView: View {
         ) {
             return
         }
-        claudeProblem = "Plantoir couldn’t start a Claude session for \(course.code). If Claude Code was updated or moved recently, restarting Plantoir may be enough."
+        claudeProblem = ClaudeCodeLauncher.couldNotStartSentence(courseCode: course.code)
+    }
+
+    /// Opens a Codex session in a terminal, connected to this course through
+    /// Plantoir's MCP server — the same door as the one above, for the other
+    /// assistant a teacher may already have.
+    ///
+    /// Hidden when Codex is not installed, and hidden INDEPENDENTLY of the
+    /// Claude item: a teacher with one of the two sees one item, a teacher
+    /// with both sees both, and a teacher with neither sees no sign that
+    /// either exists. Plantoir never installs an assistant, and never offers
+    /// to — this is a door onto something the teacher chose to put on their
+    /// own Mac.
+    @ViewBuilder
+    func reviseWithCodexItem(course: Course) -> some View {
+        if CodexLauncher.isAvailable, let folder = workspace.workspaceURL {
+            Button(CodexLauncher.menuItemTitle, systemImage: "sparkles") {
+                reviseWithCodex(course: course, folder: folder)
+            }
+            .accessibilityIdentifier("reviseWithCodex-\(course.code)")
+        }
+    }
+
+    func reviseWithCodex(course: Course, folder: URL) {
+        if CodexLauncher.open(
+            workspacePath: folder.path,
+            courseCode: course.code,
+            courseName: course.configuration.courseName
+        ) {
+            return
+        }
+        codexProblem = CodexLauncher.couldNotStartSentence(courseCode: course.code)
     }
 
     /// Opens the assistant for one section, in a window of its own.
@@ -1329,5 +1352,57 @@ struct CourseCodeField: View {
             }
             editor.selectAll(nil)
         }
+    }
+}
+
+/// The two outside doors' failure alerts — "Claude didn't open" and "Codex
+/// didn't open" — lifted out of `SidebarView.body`.
+///
+/// Not a tidy-up. Adding the second alert pushed the sidebar's modifier chain
+/// past what the Swift type-checker will finish, and the build failed with
+/// "the compiler is unable to type-check this expression in reasonable time"
+/// pointing at an unrelated alert two hundred lines away. One modifier in the
+/// chain, whose own body is type-checked on its own, is the smallest cut that
+/// puts it back — and it keeps the two doors' failure paths side by side,
+/// which is where they belong.
+private struct OutsideAgentAlerts: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Binding var claudeProblem: String?
+
+    @Binding var codexProblem: String?
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content
+            .alert(ClaudeCodeLauncher.didNotOpenTitle, isPresented: presentation(of: $claudeProblem)) {
+                Button("OK") {
+                    claudeProblem = nil
+                }
+            } message: {
+                Text(claudeProblem ?? "")
+            }
+            .alert(CodexLauncher.didNotOpenTitle, isPresented: presentation(of: $codexProblem)) {
+                Button("OK") {
+                    codexProblem = nil
+                }
+            } message: {
+                Text(codexProblem ?? "")
+            }
+    }
+
+    /// An alert wants a `Bool`; what the sidebar holds is the sentence itself,
+    /// or nothing.
+    private func presentation(of problem: Binding<String?>) -> Binding<Bool> {
+        return Binding(
+            get: { problem.wrappedValue != nil },
+            set: { isPresented in
+                if !isPresented {
+                    problem.wrappedValue = nil
+                }
+            }
+        )
     }
 }

@@ -907,6 +907,17 @@ How all of that fits together — what the model is, how it is configured, and
 the path a typed sentence takes to become a Swift function call — is
 [chapter 10](10-local-ai-assistant.md).
 
+**There are two OTHER doors beside this one**, and they are a different thing
+entirely: "Revise with Claude…" and "Revise with Codex…" in a course's or a
+section's context menu hand the whole course to a command-line assistant the
+teacher already has on their Mac, in a real terminal, with Plantoir's MCP
+server already connected. Nothing runs on the machine that Plantoir put there,
+nothing is installed for them, and each item is hidden when its tool is not
+present. They are course-wide where this window is bound to one section, and
+what each one launches, what it writes, what was measured and what was
+rejected is in
+[chapter 10 → "The other doors"](10-local-ai-assistant.md#the-other-doors-handing-a-course-to-an-assistant-the-teacher-already-has).
+
 The complete behavioural specification — every interface decision, with
 the reasoning and a Windows-porting note per entry — is
 [`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md). Architecture, build
