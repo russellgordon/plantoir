@@ -45,7 +45,10 @@ Beyond the actions, the app owns delivery and resources:
 - **Windows are independent.** Each window has its own working folder,
   restored precisely across relaunches (frame-keyed); a new window
   inherits the folder of the window that was key when it was opened, or
-  shows the folder picker when it is the only window.
+  shows the folder picker when it is the only window. **The selection
+  belongs to the window's folder** and is let go of when the window is
+  pointed at a different one — see "What a window lets go of when it
+  changes working folder" below.
 - **Resources are freed.** Each working folder has its own container,
   stopped when the folder's last window closes and at quit; Colima itself
   is stopped at quit only when nothing else is running in it.
@@ -73,6 +76,163 @@ Beyond the actions, the app owns delivery and resources:
   of its two implementations (`BuildOutputLocation.swift`), the three
   launchers are the other, for a teacher at the command line and for a
   publish scheduled with launchd.
+
+## What a window lets go of when it changes working folder
+
+The defect, reported as [issue
+#93](https://github.com/russellgordon/plantoir/issues/93) on 2026-09-05 and
+fixed 2026-09-18: with a course selected, choosing a different working folder
+showed **"Course Not Found"** for a course the new folder had never had, rather
+than that folder's own empty state. The selection simply stayed where it was
+while everything around it changed.
+
+**The rule, stated once and written down in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`workingFolderSelection`:** when a window changes working folder it lets go of
+anything that names a course, an archive or a backup in the folder being
+LEFT — and chooses nothing in its place. That is the selection, the course code
+being renamed in place, the five pending confirmations (restore an archive,
+delete an archive, restore a backup, delete a backup, the question about
+Obsidian a rename can stop on) and the four alerts describing what just
+happened in the old folder.
+
+Two failures, one rule. A selection carried across DESCRIBES the old folder
+while the new one is on screen, which is the reported defect. A pending
+confirmation carried across would ACT there: `restoreRequest` and its four
+siblings each hold the file they were asked about, so answering one after the
+window had moved would restore or delete something in a folder nobody is
+looking at.
+
+**What deliberately stays**, because the rule is about things NAMED rather
+than about clearing the window:
+
+- `filterText` is a way of LOOKING. A teacher who typed "3U" to narrow one
+  folder is usually after the same courses in the next, and the field is in
+  front of them either way.
+- `expandedCourseCodes`, `isShowingArchived` and `isShowingBackups` are the
+  sidebar's SHAPE. A code left open that this folder does not have draws
+  nothing at all, and no action hangs off a disclosure triangle for it to aim
+  at the wrong folder — so clearing them would buy nothing.
+
+**A course in the new folder wearing the same code clears too.** It is a
+different course; landing on it would be a guess dressed up as a memory. This
+is also the case that separates the rule from the obvious alternative, which
+cannot see it at all.
+
+**"Course Not Found" is still right, and still shown**, for a course deleted
+from disk in the folder the window is still working in. That sentence is true
+there and tells the teacher something; nothing about the folder changed, so
+nothing is let go of.
+
+### Where it lives, and what was rejected
+
+Both ways a folder is adopted — `chooseWorkspace(at:)`, the picker, and
+`adoptRestoredPath(_:)`, a window restoring its own or a new window inheriting
+one — go through a private `pointAtFolder(_:)` on `WorkspaceModel`. It does
+only four things: decide whether the folder is different, let go if it is, set
+the folder, reload the courses. Everything that differs between the two routes
+stays with its CALLER — the trail line, the remembered path, releasing the
+folder being left — because moving them into the funnel would give a restored
+window a trail line saying the teacher had opened something.
+
+The restored order matters and was checked before anything was changed, as the
+issue asked: a window comes back by setting its folder FIRST and its remembered
+selection second (`WindowRootView.adopt(_:how:)`), and a reload happens in
+between. `WindowRestorationScenarioTests` now pins that order.
+
+**Rejected — validating the selection against the courses just loaded, inside
+`reloadCourses()`.** It is the one-line fix the issue imagined, and it is wrong
+on three counts: it would erase the legitimately right "Course Not Found" above;
+it would make what a teacher sees depend on when some unrelated reload next
+happened to run, and courses are reloaded after every rename, backup, restore
+and archive; and it would still land on the wrong course when the new folder has
+one wearing the same code.
+
+**Rejected — a `didSet` on `workspaceURL`.** It fires for every write, including
+the ones a window makes while restoring, and hides a product rule where a reader
+of either caller will not find it.
+
+The clearing inside `adoptRestoredPath` is **defensive**. No caller in the
+product reaches it with a folder already set: every one of them is a fresh
+model, and the method's own guard turns away the one route that would arrive
+with the same folder. It clears anyway, so the rule belongs to adopting a
+folder rather than to one way of doing it.
+
+### The second defect this turned up: a stop aimed at the wrong folder
+
+Clearing the selection tears `SectionDetailView` down, and its `onDisappear`
+ran against `workspace.workspaceURL` — which by then is the NEW folder. So
+`PreviewStopper.stopSectionProcesses` ran the new folder's `preview.sh` for a
+section that folder may not even have, and the same read left a stale entry in
+`SectionWindowControllers`, which is keyed by folder path: registered under one
+folder, unregistered under another, so the old key was never removed.
+
+**How bad each half is, stated precisely, because the obvious version of this
+is too strong.** The stale registry entry is unconditional — nothing else ever
+removes it. The unreclaimed build is NOT: `chooseWorkspace` calls
+`WorkspaceModel.releaseFolderIfUnused(previousPath)` synchronously, and by then
+this window has already moved on, so when the LAST window leaves a folder its
+container is already being stopped before SwiftUI ever runs `onDisappear` — and
+the container going down takes the build with it. The leak is real when ANOTHER
+window still holds the old folder: the container stays up, and nothing reclaims
+that section's build or server. Aiming a stop at a folder whose container has
+just been released is inert rather than harmful, because stop mode must never
+start anything — `preview.sh`'s `--stop` block exits with "Nothing to stop" when
+no container is running for the folder, and creates neither engine, image nor
+container.
+
+This is older than issue #93 — it already happened whenever a folder change
+tore the view down — and it is fixed structurally rather than by ordering the
+teardown or delaying it: the view writes down which folder it is dealing with
+and unwinds against that, never against the model. Nothing has to happen before
+anything else for it to be right.
+
+**Two folders are written down, not one, and the reason is the whole of the
+third review.** They answer different questions and they are allowed to differ:
+
+- **`folderThisSectionRegisteredIn`** — which folder was this view REGISTERED
+  under? Written in exactly ONE place, `.onAppear`, before the registration,
+  and read in exactly one place, the unregister. That is what makes "a
+  registration and its unregister name the same folder" true by construction.
+  It matters because nothing sweeps `SectionWindowControllers`: an entry
+  unregistered under the wrong key is stranded for the life of the app.
+- **`folderThisSectionWorksIn`** — which folder did the work in flight START
+  in? Written where a piece of work's folder is DECIDED: `startPreview()`
+  beside the lease, and `deployAndWait()` — the latter AFTER any running
+  preview has been stopped, so a deploy cannot retarget that preview's own
+  stop. Read by `stopPreview`, `stopPreviewAndWait`, `cancelPreview` and
+  `cancelDeploy`. Nil means there is nothing to stop, and every reader is
+  already guarded by a runner's `isRunning`.
+
+One property served both jobs until the third review, and the state that broke
+it is one render pass wide: `chooseWorkspace` clears the selection
+synchronously, `onDisappear` runs on the next pass, and in between the
+assistant — whose own model may still point at the old folder — can find this
+controller registered under it and press Deploy. The deploy noted the folder
+its work belonged to, which was the same property, so the unregister that
+followed used the NEW folder and the entry under the old one was stranded.
+
+Appearance alone is not enough for the work folder either, and that hole is
+quiet: a section that appeared while the window had no folder would leave the
+note nil while `startPreview()` went on resolving one from the model perfectly
+happily — a preview that can start and that no stop is aimed at.
+
+**One note serves both a preview and a deploy deliberately.** They never run at
+once for a section: a deploy stops a running preview and waits for it before
+noting anything of its own, and the Preview button is disabled while a deploy
+runs. A third folder would be a second name for the same one.
+
+It is guarded by a source scan rather than by a behavioural test, and that is
+the honest limit: no real `SectionDetailView` ever mounts in a unit test —
+`AssistRevealsSectionOnScreenTests` says the same of itself — so the test reads
+the four stops, the two work captures and the teardown closure, and fails if a
+stop goes back to the model's current folder, if a capture is dropped, if the
+appearance stops noting its key before it registers, or if the registration key
+gains a second write site anywhere in the file. Guarding the captures is the
+half that is easy to leave out, and leaving it out would be worse than no
+guard: delete a capture and every stop reads a permanently nil property and
+does nothing at all, wearing the shape of the fix working. The behaviour itself
+was verified by reading the teardown path.
 
 ## Which folders Plantoir uses
 
