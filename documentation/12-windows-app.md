@@ -1053,12 +1053,14 @@ as history, not as what Windows does today.
   The scenario test suite in the macOS app is the porting spec. **The
   other half of that — what a window lets GO of when it is pointed at a
   different folder** — is `contracts/shared-rules.json` →
-  `workingFolderSelection`, new on 2026-09-18 and not deserialised here
-  yet, so this suite stays green while `ChooseWorkspace` and
-  `AdoptRestoredPath` still leave `Selection` pointing into the folder
-  that was left. The reasoning is in
-  [`09-mac-app.md`](09-mac-app.md) → "What a window lets go of when it
-  changes working folder".
+  `workingFolderSelection`, and since 2026-09-19 all four of its cases run
+  here too: both adoption routes go through one funnel,
+  `WorkspaceViewModel.PointAtFolder` → `WindowFolderState.PointAt`. The
+  reasoning is in [`09-mac-app.md`](09-mac-app.md) → "What a window lets go
+  of when it changes working folder"; what is Windows' about it — the state
+  having to move into Core before any test could reach it, which folder a
+  teardown names, and the one notion of "the same folder" — is at the foot of
+  this page.
 - **New windows** (entry 84): inherit the folder of the window that was
   key when the command ran; with no windows open, show the folder picker.
   Decide the folder BEFORE first paint or the picker flashes.
@@ -1928,6 +1930,155 @@ stayed green because its example says "two classes". A form one side supports
 and does not DECLARE is invisible to the other. If a family here accepts
 something the contract's `shape` does not spell out, that is a case to propose,
 not a detail to leave in the code.
+
+## What a window lets go of when its working folder changes
+
+Issue [#162](https://github.com/russellgordon/plantoir/issues/162), the
+Windows half of the mac's [#93](https://github.com/russellgordon/plantoir/issues/93).
+The reported defect: with a course selected, choosing another working folder
+left the selection naming a course that folder had never had, so the detail
+pane greeted the teacher with "Course Not Found" about a folder they had only
+just arrived in. The rule itself is in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`workingFolderSelection`, and `documentation/09-mac-app.md` explains it; what
+follows is only what is Windows'.
+
+### The state had to move into Core before anything could be tested
+
+`SidebarSelection` and the folder lived in `Plantoir/ViewModels/WorkspaceViewModel.cs`.
+`Plantoir.Tests` targets plain `net9.0` and references Core and Mcp only, so
+**no test in this repository could reach the rule at all** — which is the real
+reason the defect arrived here with every Windows gate green rather than red.
+Both now live in `Plantoir.Core/Models/WorkingFolderSelection.cs`:
+`SidebarSelection` unchanged (no XAML names it, and `Serialized`/`Parse`
+already delegated to Core's `WindowMemoryCodec`, so the strings
+`App.RememberOpenWindows` persists are byte-for-byte what they were), plus a
+new `WindowFolderState` holding the folder, the selection and the sidebar
+memory that survives a change. The precedent is `FolderRemoval`, moved the same
+way for [#142](https://github.com/russellgordon/plantoir/issues/142).
+
+`WorkspaceViewModel` keeps every public member it had and delegates; both
+`ChooseWorkspace` and `AdoptRestoredPath` go through one private
+`PointAtFolder` → `WindowFolderState.PointAt`. What is route-specific stays
+with its caller — the trail line, `Settings.Save`, `ReleaseFolderIfUnused`,
+`NoteBecameKey` — because a restored window must not record "working folder
+opened" twice.
+
+Two things are easy to drop and neither fails loudly:
+
+- **`Notify(nameof(Selection))` after the reload.** `MainWindow` subscribes to
+  it twice over: once to re-render the pane, and once to call
+  `App.RememberOpenWindows()`. Without the second, the remembered frame still
+  names the old folder's course and the whole defect returns on the next
+  launch — invisible until then. It fires only when a folder was actually left
+  behind, because the first adoption runs mid-construction, before the window
+  has finished building itself.
+- **The kept half.** `ExpandedCourseCodes`, `IsShowingArchived` and
+  `IsShowingBackups` are seeded by `MainWindow`'s constructor BEFORE the folder
+  is adopted, so clearing them in the funnel would silently break window
+  restoration rather than anything to do with this rule.
+
+### `alsoCleared` reduces to the selection here — a finding, not an omission
+
+The mac also lets go of five pending confirmations and four alerts, which it
+holds as FIELDS. On Windows every one of those is an awaited modal
+`ContentDialog` (`SidebarPane.xaml.cs`'s archive, restore, delete and rename
+confirmations): the state is a continuation on the stack, with no field to
+clear, and the folder it acts on is read INSIDE that continuation rather than
+pinned when the dialog went up. Inventing fields to clear would mean inventing
+the state to go with them.
+
+**What the modality does not close, and this is the part worth knowing.** The
+MENU route to the folder picker is genuinely shut while a dialog is up:
+`MainWindow.OpenWorkingFolder_Click` is a `MenuFlyoutItem`, and the dialog's
+overlay covers the menu bar. **Ctrl+O is not shut.** It is a
+`KeyboardAccelerator` declared on `MainWindow.xaml`'s `Root` grid; WinUI
+searches for accelerators window-wide unless a `ScopeOwner` narrows them, none
+is set, and `OpenWorkingFolderAccelerator` has no guard of its own. So a
+teacher who presses Ctrl+O with a restore confirmation on screen can still
+change folder, and answering the dialog afterwards acts on a file in the folder
+they have left — precisely what the contract's `alsoCleared` exists to prevent.
+It is written down rather than fixed with #162 because the fix is a guard
+across every dialog-raising path, not something this rule can reach; the same
+hole exists for `NewWindowAccelerator` and `ReloadCoursesAccelerator`.
+
+### Which folder a teardown names
+
+The second defect, and the one that had to land FIRST. `SectionDetailView`
+used to read `_window.Workspace.WorkspacePath` inside `StopPreview`,
+`StopPreviewAsync`, `CancelPreview`, `CancelDeploy` and `ReleaseLease`, and
+`Unloaded` calls `StopPreview()`.
+
+Clearing the selection replaces `DetailHost.Content`, and WinUI DISPATCHES
+`Unloaded` — it runs a layout pass later, with the window already pointing at
+the new folder. The stop would then run `preview.ps1 --stop` against folder B
+and remove B's lease row: inert if nothing is previewing there, and **harmful
+if something is**, because it stops another window's preview of that course and
+section while the folder being left carries on serving with nothing left to
+stop it. Today `Unloaded` never fires on a folder change, so the bug is inert;
+**clearing the selection without the captures is what would make it live**, and
+that is why the two are separate commits in that order.
+
+The fix is structural, and two notes rather than one:
+
+- `_folderThisSectionWorksIn` — written where a folder is DECIDED: the two
+  preview starts, and the deploy only AFTER its own preview stop, so that stop
+  still names the preview's folder. Read by every stop.
+- `_folderThisSectionRegisteredIn` — written once, `readonly`, at
+  construction, and read only by `ReleaseLease`'s folder-keyed sweep. Kept
+  apart from the work folder because a deploy starting in the one render pass
+  between the folder change and the teardown moves the work folder, and a
+  registration riding along with it would strand the old folder's lease row.
+  That was the mac's own finding on review of #93.
+
+`PreviewLeases.Lease` already carries its `FolderPath`, so `Release(lease)` was
+right all along; only the folder-keyed sweep beside it had to change.
+
+**It is gated by a source scan, and the shape of the scan matters.** No
+`SectionDetailView` mounts in a unit test, and CLAUDE.md forbids a `[UiFact]`
+that drives Preview, so `SectionDetailTeardownSourceTests` reads the file and
+asserts **zero** reads of the window's live folder between two marker comments
+— not a list of the five known sites. `ReleaseLease` alone has six callers
+(`AbandonWait` among them, which no earlier inventory named), and a test naming
+today's sites stays green the moment somebody adds a sixth, which is the whole
+failure it exists to prevent. It also pins the three write sites and the single
+registration write, since deleting a capture would otherwise leave every stop a
+silent no-op wearing the shape of the fix working.
+
+### One notion of "the same folder"
+
+Found while wiring the above, pre-existing and teacher-visible on its own.
+`MainWindow.IsTheOpenFolder` resolved and compared case-insensitively;
+`ChooseWorkspace` asked `previous != path` and `ReleaseFolderIfUnused` asked
+`m.WorkspacePath == path`, both **ordinal**. The OS folder picker hands back
+the true on-disk casing, and a stored path carries whatever casing it was saved
+with — so re-choosing the folder already open was "the same" to one and "a
+change" to the other. The change path then found no window holding the old
+spelling and stopped that folder's container: the container of the folder still
+on screen, with the teacher's preview inside it. The contract says re-choosing
+the open folder "costs the teacher nothing".
+
+`Plantoir.Core/Models/WorkingFolder.cs` is the one rule now, and every
+folder-equality test in those classes asks it, including
+`Workspace.FolderForNewWindow` — which also hands back the OPEN window's
+spelling rather than the remembered one, since inheriting a second spelling is
+how one folder comes to look like two.
+
+**What it deliberately does not resolve.** `Path.GetFullPath`, trailing
+separators trimmed, `OrdinalIgnoreCase` — and nothing more. No junctions, no
+symlinks, no deciding that `Z:\Courses` and `\\server\share\Courses` are one
+folder. Those answers need a handle open: `FolderContainers.PhysicalPath` does
+exactly that with `GetFinalPathNameByHandle`, which is right for NAMING a
+container (it must agree byte for byte with what `preview.ps1` derives) and
+wrong here. This question is asked on the UI thread, on every folder change and
+every window close, often about a folder that has just been unplugged, renamed
+or deleted, where a handle open blocks or fails. **Rejected for that reason:**
+an extra container stop costs a second and starts again by itself; losing the
+window costs the teacher their work.
+
+**No new trail event is owed.** `working folder opened` already records the
+act, its line is still true, and a selection being let go is not something a
+teacher DID — it is the consequence of what they did, recorded one line up.
 
 ---
 
