@@ -209,9 +209,7 @@ nonisolated enum PageVisibilityReader {
     /// copy would be a key with nothing after it, which is a different page,
     /// and for a block scalar it is YAML the build cannot read at all.
     static func isCompleteOnItsOwnLine(_ rawValue: String) -> Bool {
-        let value: String = PageFrontmatter
-            .trimmingCarriageReturn(rawValue)
-            .trimmingCharacters(in: .whitespaces)
+        let value: String = trimmingYAMLSpaces(rawValue)
         if value.isEmpty {
             return false
         }
@@ -221,7 +219,25 @@ nonisolated enum PageVisibilityReader {
         return true
     }
 
-    // MARK: - Reading one value
+    /// A string without the spaces and tabs at either end of it, and without a
+    /// Windows line ending's carriage return.
+    ///
+    /// Written out rather than using `trimmingCharacters(in: .whitespaces)`,
+    /// which strips every Unicode space — including the non-breaking space
+    /// Option-Space types on a Mac. YAML's whitespace is a space and a tab and
+    /// nothing else, so `publish: false<NBSP>` is the STRING "false\u{00A0}"
+    /// to the build and the page is published. Trimming it here would have
+    /// called that page hidden.
+    static func trimmingYAMLSpaces(_ text: String) -> String {
+        var trimmed: Substring = Substring(PageFrontmatter.trimmingCarriageReturn(text))
+        while trimmed.first == " " || trimmed.first == "\t" {
+            trimmed = trimmed.dropFirst()
+        }
+        while trimmed.last == " " || trimmed.last == "\t" {
+            trimmed = trimmed.dropLast()
+        }
+        return String(trimmed)
+    }
 
     /// One key's value, as far as this reader is willing to read it.
     enum ScalarReading: Equatable {
@@ -237,22 +253,20 @@ nonisolated enum PageVisibilityReader {
 
     /// Everything after a key's colon, read.
     ///
-    /// `nextLine` is the line below it inside the same block, or nil at the
-    /// end of the block: a key with nothing after the colon takes its value
-    /// from there, and this reader does not follow it.
+    /// `nextLine` is the first NON-BLANK line below the key inside the same
+    /// block, or nil when there is none. A key with nothing after the colon
+    /// takes its value from there — over a blank line as happily as not — and
+    /// this reader does not follow it.
     static func reading(ofValue rawValue: String, followedBy nextLine: String?) -> ScalarReading {
-        let value: String = PageFrontmatter
-            .trimmingCarriageReturn(rawValue)
-            .trimmingCharacters(in: .whitespaces)
+        let value: String = trimmingYAMLSpaces(rawValue)
 
         if value.isEmpty {
             // `publish:` on its own is null, and null publishes the page —
-            // UNLESS the value is on the next line, indented under it, which
-            // this reader does not follow.
+            // UNLESS the value is below it, indented under the key, which this
+            // reader does not follow. Measured: `publish:` then a blank line
+            // then an indented `false` hides the page.
             if let below = nextLine, below.hasPrefix(" ") || below.hasPrefix("\t") {
-                if !below.trimmingCharacters(in: .whitespaces).isEmpty {
-                    return .cannotTell
-                }
+                return .cannotTell
             }
             return .text(value: "", wasQuoted: false)
         }
@@ -262,16 +276,27 @@ nonisolated enum PageVisibilityReader {
         // what the value IS, and a flow collection (`[false]`) can run over
         // several lines. Each of them has been measured, and each of them is
         // rarer than the chance of getting it wrong here.
-        let first: Character = value.first!
+        guard let first = value.first else {
+            return .text(value: "", wasQuoted: false)
+        }
         if first == "!" || first == "&" || first == "*" || first == "|" || first == ">" {
             return .cannotTell
         }
         if first == "[" || first == "{" {
             return .cannotTell
         }
+        // Characters YAML reserves, and a sequence entry on the key's own
+        // line. Measured: `publish: %`, `publish: @x`, `` publish: `x `` and
+        // `publish: - false` each STOP THE BUILD, so there is no site verdict
+        // to mirror and this reader must not offer one.
+        if first == "%" || first == "@" || first == "`" {
+            return .cannotTell
+        }
+        if value == "-" || value.hasPrefix("- ") {
+            return .cannotTell
+        }
 
-        let withoutComment: String = strippingComment(from: value)
-            .trimmingCharacters(in: .whitespaces)
+        let withoutComment: String = trimmingYAMLSpaces(strippingComment(from: value))
         if withoutComment.isEmpty {
             // The whole value was a comment, so the key is null.
             return .text(value: "", wasQuoted: false)
@@ -300,6 +325,13 @@ nonisolated enum PageVisibilityReader {
                 return .cannotTell
             }
             return .text(value: inside, wasQuoted: true)
+        }
+
+        // An unquoted value carrying its own `key: value` is a second mapping
+        // where YAML expects a scalar. Measured: `publish: false: true` stops
+        // the build.
+        if withoutComment.contains(": ") || withoutComment.hasSuffix(":") {
+            return .cannotTell
         }
 
         return .text(value: withoutComment, wasQuoted: false)
@@ -342,13 +374,15 @@ nonisolated enum PageVisibilityReader {
         return kept
     }
 
-    // MARK: - Finding the key
+    // Finding the key.
 
-    /// A key's line inside the block: the text after its colon, and the line
-    /// below it. The LAST such line wins, because that is the one PyYAML keeps
-    /// when a page carries the same key twice.
-    static func lastTopLevelEntry(forKey key: String, in lines: [String]) -> (value: String, nextLine: String?)? {
-        var found: (value: String, nextLine: String?)? = nil
+    /// A key's line inside the block: where it is, the text after its colon,
+    /// and the first non-blank line below it. The LAST such line wins, because
+    /// that is the one PyYAML keeps when a page carries the same key twice.
+    static func lastTopLevelEntry(
+        forKey key: String, in lines: [String]
+    ) -> (index: Int, value: String, nextLine: String?)? {
+        var found: (index: Int, value: String, nextLine: String?)? = nil
         for (index, line) in lines.enumerated() {
             let bare: String = PageFrontmatter.trimmingCarriageReturn(line)
             if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
@@ -357,13 +391,25 @@ nonisolated enum PageVisibilityReader {
             guard let value = valuePart(ofKey: key, inLine: bare) else {
                 continue
             }
-            var below: String? = nil
-            if index + 1 < lines.count {
-                below = PageFrontmatter.trimmingCarriageReturn(lines[index + 1])
-            }
-            found = (value: value, nextLine: below)
+            found = (index: index, value: value, nextLine: firstNonBlankLine(after: index, in: lines))
         }
         return found
+    }
+
+    /// The first line below this one that is not blank, or nil at the end of
+    /// the block. Blank lines are skipped because YAML skips them: a value
+    /// indented under its key still belongs to that key with an empty line in
+    /// between, and that was measured rather than assumed.
+    static func firstNonBlankLine(after index: Int, in lines: [String]) -> String? {
+        var position: Int = index + 1
+        while position < lines.count {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[position])
+            if !trimmingYAMLSpaces(bare).isEmpty {
+                return bare
+            }
+            position += 1
+        }
+        return nil
     }
 
     /// Does one of the four names appear INDENTED anywhere in the block?
@@ -390,6 +436,13 @@ nonisolated enum PageVisibilityReader {
     /// the same key to YAML and each is cheap to recognise: `publish:`,
     /// `publish :` and `"publish":`. `publishForSection1:` is NOT `publish:`,
     /// which is why the colon has to be found rather than assumed.
+    ///
+    /// And the colon must be FOLLOWED by a space, a tab or the end of the
+    /// line, because that is what makes the line a mapping at all. Measured:
+    /// `publish:false` is one plain scalar, so a page whose whole frontmatter
+    /// is that line arrives at Quartz with no keys and is PUBLISHED — and a
+    /// page with another key beside it stops the build. Either way it is not
+    /// this page's flag, and reading it as one called a live page hidden.
     static func valuePart(ofKey key: String, inLine line: String) -> String? {
         var rest: Substring = Substring(line)
         if rest.hasPrefix("\"" + key + "\"") {
@@ -407,10 +460,14 @@ nonisolated enum PageVisibilityReader {
         guard rest.first == ":" else {
             return nil
         }
-        return String(rest.dropFirst())
+        rest = rest.dropFirst()
+        if let afterColon = rest.first, afterColon != " ", afterColon != "\t" {
+            return nil
+        }
+        return String(rest)
     }
 
-    // MARK: - Finding the block
+    // Finding the block.
 
     /// A page's frontmatter, or why there is none to read.
     enum FrontmatterBlock: Equatable {
@@ -427,6 +484,24 @@ nonisolated enum PageVisibilityReader {
         case unreadable
     }
 
+    /// Is this line one of the fences around a page's frontmatter?
+    ///
+    /// Three dashes OR MORE, with nothing after them but spaces and tabs —
+    /// which is python-frontmatter's own boundary (`^-{3,}\s*$`), and
+    /// therefore the build's. A page fenced with `----` really does have
+    /// frontmatter, and reading it as an ordinary page said a hidden page was
+    /// visible.
+    static func isFence(_ line: String) -> Bool {
+        let bare: String = trimmingYAMLSpaces(line)
+        if bare.count < 3 {
+            return false
+        }
+        for character in bare where character != "-" {
+            return false
+        }
+        return true
+    }
+
     /// Where this page's frontmatter is.
     ///
     /// Leading blank lines are skipped before the opening fence:
@@ -436,10 +511,7 @@ nonisolated enum PageVisibilityReader {
         let lines: [String] = pageText.components(separatedBy: "\n")
         var openIndex: Int = 0
         while openIndex < lines.count {
-            let bare: String = PageFrontmatter
-                .trimmingCarriageReturn(lines[openIndex])
-                .trimmingCharacters(in: .whitespaces)
-            if !bare.isEmpty {
+            if !trimmingYAMLSpaces(lines[openIndex]).isEmpty {
                 break
             }
             openIndex += 1
@@ -447,19 +519,13 @@ nonisolated enum PageVisibilityReader {
         guard openIndex < lines.count else {
             return .noFrontmatter
         }
-        let opening: String = PageFrontmatter
-            .trimmingCarriageReturn(lines[openIndex])
-            .trimmingCharacters(in: .whitespaces)
-        guard opening == "---" else {
+        guard isFence(lines[openIndex]) else {
             return .noFrontmatter
         }
 
         var index: Int = openIndex + 1
         while index < lines.count {
-            let bare: String = PageFrontmatter
-                .trimmingCarriageReturn(lines[index])
-                .trimmingCharacters(in: .whitespaces)
-            if bare == "---" {
+            if isFence(lines[index]) {
                 var inside: [String] = []
                 for position in (openIndex + 1)..<index {
                     inside.append(lines[position])

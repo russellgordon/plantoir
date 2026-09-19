@@ -43,27 +43,48 @@ CANNOT_TELL = "cannot tell"
 # A value starting with one of these is a tag, an anchor, an alias, a block
 # scalar or a flow collection. Each changes what the value IS, or runs over
 # more than one line, and each is rarer than the chance of getting it wrong.
-_REFUSED_FIRST_CHARACTERS = ("!", "&", "*", "|", ">", "[", "{")
+# The last three are characters YAML reserves: measured, `publish: %`,
+# `publish: @x` and `` publish: `x `` each STOP THE BUILD.
+_REFUSED_FIRST_CHARACTERS = ("!", "&", "*", "|", ">", "[", "{", "%", "@", "`")
+
+# YAML's whitespace is a space and a tab and nothing else — deliberately NOT
+# Python's `str.strip()`, which also strips the non-breaking space Option-Space
+# types on a Mac. `publish: false<NBSP>` is the STRING "false\xa0" to the build
+# and the page is published.
+_YAML_SPACES = " \t"
 
 
-def read_scalar(raw_value):
+def trim(text):
+    """A value without the spaces, tabs and carriage return around it."""
+    return text.replace("\r", "").strip(_YAML_SPACES)
+
+
+def read_scalar(raw_value, next_line=None):
     """
     A value written after a key's colon, read.
 
     Returns `(text, was_quoted)`, or None when this reader will not guess.
     `was_quoted` matters: quotes stop PyYAML resolving `no` or `false` into a
     boolean, so they change the answer.
+
+    `next_line` is the first NON-BLANK line below the key, when the caller can
+    see it: a key with nothing after the colon takes its value from there, and
+    this reader does not follow it.
     """
-    value = raw_value.replace("\r", "").strip()
+    value = trim(raw_value)
     if value == "":
-        # `publish:` on its own is null, which publishes the page. A value
-        # sitting INDENTED on the next line is a different matter, and the
-        # caller is the one that can see the next line.
+        # `publish:` on its own is null, which publishes the page — unless the
+        # value is sitting indented below it, which is a value this reader
+        # will not follow.
+        if next_line is not None and next_line[:1] in (" ", "\t"):
+            return None
         return ("", False)
     if value[0] in _REFUSED_FIRST_CHARACTERS:
         return None
+    if value == "-" or value.startswith("- "):
+        return None
 
-    value = _without_comment(value).strip()
+    value = trim(_without_comment(value))
     if value == "":
         return ("", False)
 
@@ -78,15 +99,20 @@ def read_scalar(raw_value):
                 return None
             return (inside, True)
 
+    # An unquoted value carrying its own `key: value` is a second mapping where
+    # YAML expects a scalar. Measured: `publish: false: true` stops the build.
+    if ": " in value or value.endswith(":"):
+        return None
+
     return (value, False)
 
 
-def publish_family_answer(raw_value):
+def publish_family_answer(raw_value, next_line=None):
     """
     What `publish:` or `publishForSection<N>:` means: VISIBLE, HIDDEN or
     CANNOT_TELL.
     """
-    scalar = read_scalar(raw_value)
+    scalar = read_scalar(raw_value, next_line)
     if scalar is None:
         return CANNOT_TELL
     text, was_quoted = scalar
@@ -102,7 +128,7 @@ def publish_family_answer(raw_value):
     return VISIBLE
 
 
-def draft_family_answer(raw_value):
+def draft_family_answer(raw_value, next_line=None):
     """
     What `draft:` or `draftSection<N>:` means — the older spelling, with the
     OPPOSITE polarity.
@@ -112,7 +138,7 @@ def draft_family_answer(raw_value):
     "true". So an unquoted `yes` hides the page and a quoted `"yes"` does not,
     while `TrUe` hides it either way.
     """
-    scalar = read_scalar(raw_value)
+    scalar = read_scalar(raw_value, next_line)
     if scalar is None:
         return CANNOT_TELL
     text, was_quoted = scalar
@@ -134,7 +160,7 @@ def is_complete_on_its_own_line(raw_value):
     would be a key with nothing after it, and for a block scalar it is YAML the
     build cannot read at all.
     """
-    value = raw_value.replace("\r", "").strip()
+    value = trim(raw_value)
     if value == "":
         return False
     return not value.startswith(("|", ">"))

@@ -37,6 +37,43 @@ from pathlib import Path
 import build_site
 import contracts
 
+# Forms the SHARED contract deliberately cannot carry, measured here anyway.
+#
+# Each app reads these as "cannot tell" and reports them as visible, so a
+# shared case stating what the SITE does would oblige the other platform to be
+# wrong in the same direction. The measurement still has to be pinned
+# somewhere: these are the lines each reader's REFUSAL is justified by, and a
+# PyYAML or Quartz change that moved any of them would make those refusals
+# wrong without failing anything. "stops" means the build cannot parse the
+# page at all, which is why there is no verdict to mirror.
+#
+# Measured 2026-09-18 against python-frontmatter 1.3.0 / PyYAML 6.0.3.
+FORMS_THE_CONTRACT_CANNOT_CARRY = [
+    ("publish:\n  false", "hidden"),
+    ("publish:\n\n  false", "hidden"),
+    ("draft:\n  true", "hidden"),
+    ("publishForSection1:\n  false", "hidden"),
+    ("publish: !!str false", "hidden"),
+    ("publish: !!bool false", "hidden"),
+    ("publish: >-\n  false", "hidden"),
+    ("publish: |-\n  false", "hidden"),
+    ("publish: &flag false", "hidden"),
+    ("flag: &flag false\npublish: *flag", "hidden"),
+    ("publish: \"fal\\u0073e\"", "hidden"),
+    ("publish: [false]", "visible"),
+    ("publish: {a: false}", "visible"),
+    ("publish: 'fal''se'", "visible"),
+    ("publish: false\u00a0\ntitle: x", "visible"),
+    ("title: x\n\tpublish: false", "stops"),
+    ("publish: \"false", "stops"),
+    ("publish: - false", "stops"),
+    ("publish: %", "stops"),
+    ("publish: @x", "stops"),
+    ("publish: `x", "stops"),
+    ("publish: false: true", "stops"),
+    ("title: x\npublish:false", "stops"),
+]
+
 QUARTZ = Path("/opt/quartz")
 FRONTMATTER_TRANSFORMER = QUARTZ / "quartz/plugins/transformers/frontmatter.ts"
 PUBLISH_FILTER = QUARTZ / "quartz/plugins/filters/publish.ts"
@@ -90,18 +127,31 @@ def the_chain_is_still_the_chain(failures):
         )
 
 
+def judge(work, frontmatters):
+    """Run each frontmatter fragment down the real chain; return what it became."""
+    processed = []
+    for index, (fragment, section) in enumerate(frontmatters):
+        page = work / f"page{index}.md"
+        page.write_text("---\n" + fragment + "\n---\n\nThe lesson.\n", encoding="utf-8")
+        build_site.process_frontmatter(page, section)
+        processed.append({"text": page.read_text(encoding="utf-8")})
+    return processed
+
+
 def main():
     cases = contracts.section("file-formats", "pageVisibility", "readingCases")
     failures = []
     the_chain_is_still_the_chain(failures)
 
     work = Path(tempfile.mkdtemp())
-    processed = []
-    for index, case in enumerate(cases):
-        page = work / f"case{index}.md"
-        page.write_text("---\n" + case["page"] + "\n---\n\nThe lesson.\n", encoding="utf-8")
-        build_site.process_frontmatter(page, case.get("section", 1))
-        processed.append({"text": page.read_text(encoding="utf-8")})
+    shared = work / "shared"
+    shared.mkdir()
+    refused = work / "refused"
+    refused.mkdir()
+    processed = judge(shared, [(case["page"], case.get("section", 1)) for case in cases])
+    processed += judge(
+        refused, [(fragment, 1) for fragment, _ in FORMS_THE_CONTRACT_CANNOT_CARRY]
+    )
 
     pages_json = work / "pages.json"
     pages_json.write_text(json.dumps(processed), encoding="utf-8")
@@ -113,6 +163,21 @@ def main():
         check=True,
     )
     verdicts = json.loads(verdicts_json.read_text(encoding="utf-8"))
+
+    for (fragment, expected), verdict in zip(
+        FORMS_THE_CONTRACT_CANNOT_CARRY, verdicts[len(cases):]
+    ):
+        if verdict["error"] is not None:
+            actual = "stops"
+        else:
+            actual = "visible" if verdict["visible"] else "hidden"
+        if actual != expected:
+            failures.append(
+                f"{fragment!r}: this form was measured as {expected} and the build now says "
+                f"{actual}. Each app REFUSES to read this form and reports it visible; the "
+                f"refusal was justified by this measurement, so re-read "
+                f"documentation/08-course-config-reference.md before changing either reader."
+            )
 
     for case, after, verdict in zip(cases, processed, verdicts):
         wanted = case["expectVisible"]
@@ -138,7 +203,10 @@ def main():
                 f"a page the site says visible={verdict['visible']}."
             )
 
-    print(f"Ran {len(cases)} reading cases down the real chain.")
+    print(
+        f"Ran {len(cases)} reading cases and "
+        f"{len(FORMS_THE_CONTRACT_CANNOT_CARRY)} refused forms down the real chain."
+    )
     if failures:
         for line in failures:
             print("FAIL: " + line)
