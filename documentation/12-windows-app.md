@@ -1998,8 +1998,12 @@ is set, and `OpenWorkingFolderAccelerator` has no guard of its own. Whether the
 key actually reaches it under a modal dialog cannot be settled by reading —
 that needs a run, and it is
 [issue #191](https://github.com/russellgordon/plantoir/issues/191), along with
-`NewWindowAccelerator` and `ReloadCoursesAccelerator`, which are unguarded the
-same way.
+the other three that are unguarded the same way: Ctrl+N
+(`NewWindowAccelerator`), Ctrl+Shift+R (`ReloadCoursesAccelerator`) and **F2**
+(`RenameCourseAccelerator`, `MainWindow.xaml:14`). F2 is the sharpest of the
+four — it is the only one that would raise a SECOND `ContentDialog` on top of
+the modal one, which WinUI refuses and swallows, so the key would appear to do
+nothing at all.
 
 **So the confirmations were made safe whether it fires or not**, which is the
 honest delivery of `alsoCleared` here. Every confirmation in `SidebarPane`
