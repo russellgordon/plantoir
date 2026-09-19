@@ -712,6 +712,55 @@ public class CourseBackupTests
     }
 
     /// <summary>
+    /// The CEILING, exercised through pruning rather than against
+    /// <see cref="ArchiveStamp"/> alone — which is the only thing on disk that
+    /// moves when the clock does, and the reason
+    /// <see cref="CourseArchiver.PruneBackups"/> takes a <c>now</c> at all.
+    ///
+    /// <para>The same file is asked about twice with the clock in two places:
+    /// three days ahead of the first <c>now</c> it cannot be true, so it is
+    /// neither counted nor deleted; with the clock moved forward two days it
+    /// is inside the allowance, is counted like any other backup, and being
+    /// the newest it keeps its place while the oldest REAL backup goes. A
+    /// <c>now</c> that never reached the guard would make the first half of
+    /// that wrong, because against the real clock this stamp is in the
+    /// past.</para>
+    /// </summary>
+    [Fact]
+    public void PruneBackups_AStampPastTheCeiling_CountsOnceTheClockCatchesUp()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            MakeCourse(coursesDir, "ICS3U");
+            string backupsDir = CourseArchiver.BackupsDirectory(coursesDir, "ICS3U");
+            Directory.CreateDirectory(backupsDir);
+
+            DateTime now = ArchiveStamp.EarliestPossible.AddYears(1);
+            var real = WritePlausibleAssistantBackups(backupsDir, CourseArchiver.MostBackupsKept + 1);
+
+            DateTime pastTheCeiling = now + ArchiveStamp.FutureAllowance + TimeSpan.FromDays(1);
+            string ahead = Path.Combine(backupsDir,
+                CourseArchiver.TimestampedName("ICS3U_backup", pastTheCeiling, "_assistant-section1"));
+            File.WriteAllText(ahead, "a clock that was wrong");
+            Assert.NotNull(BackupItem.From(ahead, "ICS3U"));
+
+            CourseArchiver.PruneBackups("ICS3U", coursesDir, now);
+
+            Assert.True(File.Exists(ahead), "A stamp past the ceiling must never be deleted");
+            Assert.Equal(CourseArchiver.MostBackupsKept, CountExisting(real));
+
+            // Move the clock past it. Nothing on disk changed; the answer does.
+            CourseArchiver.PruneBackups("ICS3U", coursesDir, now + ArchiveStamp.FutureAllowance);
+
+            Assert.True(File.Exists(ahead), "Now plausible, and the newest, so it is kept");
+            Assert.Equal(CourseArchiver.MostBackupsKept - 1, CountExisting(real));
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
+    /// <summary>
     /// Both bounds are INCLUSIVE, and the clock is injected so the ceiling
     /// cannot move between one assertion and the next.
     /// </summary>
