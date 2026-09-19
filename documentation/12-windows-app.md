@@ -1027,7 +1027,15 @@ as history, not as what Windows does today.
   way: resolve claims on the platform's restoration-complete signal
   rather than polling, and while a claim may still arrive show a quiet
   loading state, never the folder picker the claim is about to replace.
-  The scenario test suite in the macOS app is the porting spec.
+  The scenario test suite in the macOS app is the porting spec. **The
+  other half of that — what a window lets GO of when it is pointed at a
+  different folder** — is `contracts/shared-rules.json` →
+  `workingFolderSelection`, new on 2026-09-18 and not deserialised here
+  yet, so this suite stays green while `ChooseWorkspace` and
+  `AdoptRestoredPath` still leave `Selection` pointing into the folder
+  that was left. The reasoning is in
+  [`09-mac-app.md`](09-mac-app.md) → "What a window lets go of when it
+  changes working folder".
 - **New windows** (entry 84): inherit the folder of the window that was
   key when the command ran; with no windows open, show the folder picker.
   Decide the folder BEFORE first paint or the picker flashes.
