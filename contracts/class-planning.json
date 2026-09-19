@@ -151,6 +151,7 @@
         "expectNewTitle": "Unit 1, Day 2",
         "expectDate": "2026-09-10",
         "expectRenamesInOrder": ["Unit 1, Day 2 → Unit 1, Day 3"],
+        "expectOtherClassesMoving": 2,
         "expectUndoOffered": false,
         "why": "\"Duplicate Unit 1, Day 1 as my next class\" means tomorrow's lesson is a copy of that one. Landing the copy after the last class of the course would put it weeks away from the lesson it repeats, and leave the day the teacher meant holding the old page."
       },
@@ -167,6 +168,7 @@
         "expectNewTitle": "Unit 1, Day 3",
         "expectDate": "2026-09-12",
         "expectRenamesInOrder": [],
+        "expectOtherClassesMoving": 2,
         "expectUndoOffered": false,
         "why": "The case a renames-only test cannot see. Renames happen only WITHIN the unit being changed, so duplicating the last day of a unit renames nothing while re-dating every class of every later unit. An undo keyed on renames alone is offered here and takes back only the new page, leaving the rest of the year moved — a partial undo, which is worse than none. The way back is the backup, and the reply says so."
       },
@@ -182,6 +184,7 @@
         "expectNewTitle": "Unit 2, Day 3",
         "expectDate": "2026-09-14",
         "expectRenamesInOrder": [],
+        "expectOtherClassesMoving": 0,
         "expectUndoOffered": true,
         "why": "Nothing else moves, so taking the copy back is whole rather than partial — and this is the common case, since a teacher duplicating a lesson is usually working at the end of what they have written."
       }
@@ -194,7 +197,7 @@
       "rule": "record undo ONLY when nothing else moved - no renames AND no date moves",
       "why": "A partial undo that deleted the copy and left every later class renamed and re-dated is worse than no undo at all. When classes shuffled, the way back is the backup taken before any of it, and the reply names it."
     },
-    "note": "Duplicating a lesson as the next class. Windows runs these in ClassPlanningContractTests.Duplication_MatchesContract; the mac owes a runner, and the second case is expected to FAIL there until its undo is keyed on date moves as well as renames (mac issue #163)."
+    "note": "Duplicating a lesson as the next class. BOTH suites run all three cases plus forcedUnpublished and undoRule, through the real tool rather than through a re-implementation of the rule, and they ask for the undo the way a teacher does — Windows in ClassPlanningContractTests.Duplication_MatchesContract, the mac in ClassPlanningContractTests.testDuplicatingMatchesTheContract. Proposed FROM Windows 2026-09-18 (#149). The second case — \"a later unit re-dated is enough to withhold the undo, even with nothing renamed\" — was RED on the mac when its runner was first written, because AssistToolRunner keyed the duplicate's undo on renames.isEmpty alone; mac issue #163 widened it to ClassInsertionPlan.movesAnythingElse, which is the property make-room had used all along. That red run is the handover working rather than damage, and it is recorded here because a case nobody remembers catching anything gets \"simplified\" out. expectOtherClassesMoving is the number a teacher reads on the plan card before pressing Go: the UNION of renamed and re-dated pages, counted once each (case 1 renames one page and re-dates two, and the answer is 2, not 3). Windows' loop indexes by name and simply does not read it yet — see mac-proposed issue for #163."
   },
   "nextClass": {
     "cases": [

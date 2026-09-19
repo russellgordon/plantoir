@@ -343,7 +343,14 @@ enum ClassInsertionPlanner {
         // 4. The blank pages the room was made for. Checked a second time,
         //    because the plan may be minutes old and Obsidian is open.
         try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
-        var created: Int = 0
+        // The URLs, not just how many. A caller that is about to WRITE to one
+        // of these pages has exactly one safe question — "did this run make
+        // that page, or was it already somebody's lesson?" — and it cannot be
+        // answered by comparing the file's text, because step 2 above rewrites
+        // links inside pages it did not rename. `ClassChangeOutcome` has
+        // carried the field since it was written; this planner was the one
+        // that dropped it on the floor.
+        var created: [URL] = []
         for planned in plan.added {
             if fileManager.fileExists(atPath: planned.fileURL.path) {
                 continue
@@ -356,11 +363,11 @@ enum ClassInsertionPlanner {
                 tail: tail
             )
             try body.write(to: planned.fileURL, atomically: true, encoding: .utf8)
-            created += 1
+            created.append(planned.fileURL)
         }
 
-        let message: String = "Made room for \(created) class\(created == 1 ? "" : "es") at Unit \(plan.unit), Day \(plan.atDay). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
-        return ClassChangeOutcome(message: message, backupURL: backupURL)
+        let message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at Unit \(plan.unit), Day \(plan.atDay). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
+        return ClassChangeOutcome(message: message, backupURL: backupURL, created: created)
     }
 
     /// Only the pages named "Unit N, Day N", in unit then day order.
@@ -485,6 +492,36 @@ struct ClassInsertionPlan {
     /// renames alone stays silent in exactly the case that hurts most.
     var movesAnythingElse: Bool {
         return renames.isEmpty == false || moves.isEmpty == false
+    }
+
+    /// How many OTHER class pages move, counted once each.
+    ///
+    /// **The union of the two lists, not either one of them.** A renamed page
+    /// is usually re-dated as well, so the lists overlap; a LATER unit's pages
+    /// are re-dated and never renamed. `moves` carries each page under the
+    /// name it will HAVE — see the comment where `moves` is built — which is
+    /// what makes a union on names dedupe a page that is in both lists. Adding
+    /// the two counts instead would say 5 where three pages move.
+    ///
+    /// Counting renames alone is what made the duplicate's plan card silent in
+    /// exactly the shape that moves a teacher's whole year, which is the
+    /// reason this exists rather than a nicety. Mirrors Windows'
+    /// `DuplicateClassPlan.OtherClassesMoving`.
+    var otherClassesMoving: Int {
+        var names: [String] = []
+        for rename in renames {
+            let name: String = rename.to.lowercased()
+            if !names.contains(name) {
+                names.append(name)
+            }
+        }
+        for move in moves {
+            let name: String = move.title.lowercased()
+            if !names.contains(name) {
+                names.append(name)
+            }
+        }
+        return names.count
     }
 
     /// The proposal, as a teacher would hear it.
