@@ -2636,7 +2636,25 @@ dateline and the "deploy tomorrow's class at 6:30" card both formatted
 was told the year was **2569** in the sentence it does all its date arithmetic
 from, on every single turn — and the card WROTE that year into a scheduled
 deploy, which is the half that lasts. Both are `InvariantCulture` now and built
-from the one clock. Measured byte-identical on a Gregorian machine
+from the one clock.
+
+**And the same trap from the READING end, which the review of this piece
+found.** `AssistAgent.Explain` builds the approval card's sentence by parsing
+the `when` the app has just written and formatting the moment for the teacher.
+The parse was a bare `DateTime.TryParse`, which reads the year in the machine's
+default calendar: on a Thai-locale machine the invariant `2026-09-09 06:30`
+this piece now writes came back as Buddhist 2026 — **1483-09-09** — so the card
+named a weekday five centuries out for a deploy that then fired on the correct
+day, which is worse than saying nothing. `ReadTheMoment` now reads the form the
+app WRITES with `TryParseExact` and `InvariantCulture`, and keeps the old
+lenient parse only for a shape a model invented, there being no fixed form to
+pin that to. The DISPLAY stays cultural deliberately — it is the teacher's
+sentence, not a wire format — so the assertion that pins it renders the correct
+moment through the machine's own culture and compares that. Symmetry at a
+boundary is the general rule the [#144](https://github.com/russellgordon/plantoir/issues/144)
+family keeps teaching: `TimetableMemory` writes culturally and reads
+invariantly, this wrote invariantly and read culturally, and each half looks
+right on its own. Measured byte-identical on a Gregorian machine
 (en-CA: `" (Today is 2026-09-19, a Saturday.)"` either way), which is what keeps
 the routing measurements standing;
 `RelativeDayFreshnessTests.ANonGregorianMachineIsToldTheSameYearAsEverybodyElse`
