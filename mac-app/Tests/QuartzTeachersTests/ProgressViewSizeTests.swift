@@ -321,4 +321,82 @@ final class ProgressViewSizeTests: XCTestCase {
             "At 420 points wide the notice rendered \(atFourTwenty) points"
         )
     }
+
+    // MARK: - Where the notice sits in the window
+
+    /// Proposes a whole window and reports the height the content claims of it.
+    ///
+    /// This is the measurement that says whether something FILLS: the detail
+    /// column is a `ZStack`, and a `ZStack` centres a child that claims less
+    /// height than it offered. A base layer that claims all of it has nothing
+    /// left to be centred by, so what is at the top of that layer — the
+    /// scheduled-publish notice — is at the top of the window.
+    @MainActor
+    func heightClaimedOfAWholeWindow(of view: some View, width: CGFloat, height: CGFloat) -> CGFloat {
+        let controller: NSHostingController = NSHostingController(rootView: AnyView(view))
+        return controller.sizeThatFits(in: NSSize(width: width, height: height)).height
+    }
+
+    /// Nothing running, and a notice from last night's scheduled publish: the
+    /// notice belongs under the toolbar, not floating in the middle.
+    ///
+    /// Russell photographed the middle on 2026-09-19 — the band's top edge
+    /// about 470 points down a 1,254-point window, with nothing above it. The
+    /// cause was that the base layer hugged its content: measured here with the
+    /// fault in place, it claimed **246 points** of the 720 offered (189 of them
+    /// the placeholder's), so the `ZStack` centred it and put 237 points of
+    /// nothing above the notice.
+    ///
+    /// What this CAN pin is the filling, which is the structural cause; where
+    /// the pixels land is confirmed by eye against the real app, and by the
+    /// screenshot in the write-up. The console branch of the same layer has
+    /// always filled — `consoleArea` ends in a `Spacer(minLength: 0)` — which
+    /// is why the notice sat correctly whenever anything was running.
+    @MainActor
+    func testTheEmptySectionFillsItsWindowSoTheNoticeSitsAtTheTop() {
+        let outcome: ScheduledPublishOutcome.Stopped = ScheduledPublishOutcome.Stopped(
+            kind: .succeeded,
+            destination: "Netlify, Cloudflare Pages",
+            when: Date(timeIntervalSince1970: 1_758_297_000)
+        )
+        let baseLayer = VStack(spacing: 0) {
+            ScheduledPublishNoticeView(
+                outcome: outcome, course: "ICS4U", sectionNumber: 1, dismiss: {}
+            )
+            NoPreviewPlaceholderView(deploysToLocalFolder: false)
+        }
+        let claimed: CGFloat = heightClaimedOfAWholeWindow(of: baseLayer, width: 800, height: 720)
+        XCTAssertGreaterThanOrEqual(
+            claimed,
+            719,
+            "Offered a 720-point window, the section's base layer claimed only \(claimed) points, so the stack around it centres the notice instead of leaving it under the toolbar"
+        )
+    }
+
+    /// The placeholder is what does the filling, and it must keep doing it.
+    @MainActor
+    func testThePlaceholderFillsTheHeightItIsOffered() {
+        let claimed: CGFloat = heightClaimedOfAWholeWindow(
+            of: NoPreviewPlaceholderView(deploysToLocalFolder: true), width: 800, height: 720
+        )
+        XCTAssertGreaterThanOrEqual(
+            claimed,
+            719,
+            "The 'No Preview Running' placeholder claimed \(claimed) points of the 720 it was offered"
+        )
+    }
+
+    /// Filling must not mean RIGID — that is the #211 failure class, and this
+    /// is the same squeeze the notices above are measured under.
+    @MainActor
+    func testThePlaceholderDoesNotBalloonWhenSqueezed() {
+        let claimed: CGFloat = heightClaimedWhenSqueezed(
+            of: NoPreviewPlaceholderView(deploysToLocalFolder: false)
+        )
+        XCTAssertLessThanOrEqual(
+            claimed,
+            ProgressViewSizeTests.squeezedHeightBound,
+            "Squeezed, the 'No Preview Running' placeholder claimed \(claimed) points"
+        )
+    }
 }

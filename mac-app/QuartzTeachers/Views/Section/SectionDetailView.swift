@@ -208,12 +208,13 @@ struct SectionDetailView: View {
                 if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
                     consoleArea
                 } else {
-                    ContentUnavailableView(
-                        "No Preview Running",
-                        systemImage: "globe",
-                        description: Text(course.configuration.deploysToLocalFolder
-                            ? "Click Preview to build this section's website and see it here, or Deploy to copy it to your deploy folder."
-                            : "Click Preview to build this section's website and see it here, or Deploy to put it online.")
+                    // Fills the height it is offered, which is what keeps the
+                    // notice above it flush under the toolbar: a base layer
+                    // that claims less than the ZStack offers is CENTRED by it,
+                    // and the notice floated mid-window. See the view's own
+                    // comment for the measurement.
+                    NoPreviewPlaceholderView(
+                        deploysToLocalFolder: course.configuration.deploysToLocalFolder
                     )
                 }
             }
@@ -241,6 +242,17 @@ struct SectionDetailView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             refreshEditedMarker()
+        }
+        // A scheduled run is a separate process, so the FILE it writes is the
+        // only event there is. Reading the watcher's counter here is what
+        // registers this view as an observer of it; when it moves — a record
+        // arrived, one was cleared, or the app came back to the front — the
+        // section re-reads its own record and the band appears where the
+        // teacher is already looking, instead of waiting for them to click away
+        // and back. The sidebar's badge follows the same counter, so the two
+        // move together.
+        .onChange(of: ScheduledPublishWatcher.shared.generation) { _, _ in
+            loadStoppedScheduledPublish()
         }
         .toolbar {
             // Every item is ALWAYS present (disabled when inapplicable):
@@ -346,10 +358,11 @@ struct SectionDetailView: View {
         // assistant and the buttons can never drift apart.
         .onAppear {
             // Looked for on every appearance rather than once at launch: a
-            // scheduled run can finish while the app is open, and a teacher
-            // coming back to this section should see it without relaunching.
-            // noteOnTrailIfNeeded is what keeps the trail from gaining a line
-            // each time.
+            // section opened after a run finished must show what it left, and
+            // this is also what a window restored at launch reads. A run that
+            // finishes while this section is ALREADY showing is the watcher's
+            // job, above. The trail line belongs to the run, not to either of
+            // these reads.
             loadStoppedScheduledPublish()
             guard let folder = workspace.workspaceURL else {
                 return
@@ -852,7 +865,11 @@ struct SectionDetailView: View {
         // The sidebar's badge is read during a row's render, so it
         // needs telling that the answer changed — Dismiss happens
         // here, in a different view with its own state.
-        workspace.stoppedPublishGeneration += 1
+        //
+        // Said out loud even though `clear` deletes the file and the watcher
+        // would see that: a button must not wait on the filesystem to show what
+        // the teacher just did, and the test suite runs with no watcher started.
+        ScheduledPublishWatcher.shared.noteChanged()
     }
 
     /// Look for a stopped run. READ ONLY — the trail line is written by the
