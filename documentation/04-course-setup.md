@@ -97,8 +97,8 @@ The rule and its thirteen cases are in [`contracts/shared-rules.json`](../contra
 `wizard.skeletonToggle`, run on the mac by `SharedRulesContractTests`;
 `WizardStructureTests` covers what cases cannot reach — the pieces the rule
 is assembled from, and a scan proving the toggle is WIRED, a control with no
-handler being the original bug. Four things about it are decisions rather than
-mechanics, and two more are worth knowing before reading a green run as coverage:
+handler being the original bug. Three things about it are decisions rather than
+mechanics; the fourth is what to know before reading a green run as coverage:
 
 - **A list is recognised as untouched by VALUE, not by a dirty flag.** A
   list edited and then edited BACK to exactly what the adoption set is
@@ -141,6 +141,11 @@ mechanics, and two more are worth knowing before reading a green run as coverage
   restore; and every family declares `graded_folders` of `["Tasks"]` except
   mathematics, so a marks-pool expectation means nothing unless its case uses
   a mathematics code. The contract carries cases on `MPM1D` for that reason.
+  A third thing not to read as coverage, which the contract's `lists.note`
+  also names: in a runner that resolves the `skeleton` symbol through the same
+  catalog an adoption copies from, a `turnOn` case's four list expectations
+  prove that the adoption FIRED rather than what it copied — which is why the
+  `MPM1D` adoption case spells its marks pool out as a literal.
 - **A narrow extra rule for the hole value equality leaves was rejected.**
   It would have made the two apps differ over a case no teacher can tell
   apart, which is how the contract stops being worth having.
