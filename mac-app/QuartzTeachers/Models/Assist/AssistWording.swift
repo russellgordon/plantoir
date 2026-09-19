@@ -39,8 +39,26 @@ nonisolated enum AssistWording {
     /// against the question that follows it: agreeing to do a thing and then
     /// asking permission for it. What is left is the consequence and one piece
     /// of advice a teacher can act on.
+    ///
+    /// **"This happens now." was added in front of those two, and it is the
+    /// only thing this sentence says about TIME.** The two approval cards were
+    /// asymmetric exactly where a misroute lands: `schedule_deploy`'s names the
+    /// whole moment, and this one named no time at all — so a teacher who
+    /// asked for 6:30 tomorrow and was routed to an immediate deploy read a
+    /// card that was perfectly true and said nothing to contradict them
+    /// (measured: ten trials out of ten on the smaller assistant, issue #168).
+    /// It says WHEN rather than WHAT, so it does not reinstate the naming of
+    /// the act that was cut above, and it is first because the word that
+    /// contradicts the teacher has to be the one they read first.
+    ///
+    /// The property is pinned rather than the sentence:
+    /// `contracts/shared-rules.json` → `assistantConfirmation.`
+    /// `theImmediateDeployCardSaysItIsImmediate`, which asks only that the
+    /// sentence carry the word. This will be reworded again; the rule is meant
+    /// to outlive the wording.
     static let deployApproval: String =
-        "Students will see what is deployed. Be certain to review changes you have made."
+        "This happens now. Students will see what is deployed. "
+      + "Be certain to review changes you have made."
 
     /// The question under the deploy card. The act is named HERE, which is why
     /// the sentence above does not name it.
