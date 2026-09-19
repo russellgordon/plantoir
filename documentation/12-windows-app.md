@@ -1288,8 +1288,27 @@ looked for an inline comment with `IndexOf('#')`, so hiding a
 and `Block.Parse` demanded exactly `---` on line 0 while accepting `...` as a
 close, where python-frontmatter's boundary is `^-{3,}\s*$` for both — so a page
 fenced with `----` got a second block PREPENDED and the teacher's real
-frontmatter became body text on the student's site. One fence finder and one
-key matcher now serve the reader and every writer.
+frontmatter became body text on the student's site.
+
+One fence finder and one key matcher now serve the reader and every
+VISIBILITY writer — and that qualifier is load-bearing, because two other
+finders are still hand-rolled and were deliberately left alone:
+`CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
+#140, so a restore reaches different pages on the two platforms — that is
+[issue #177](https://github.com/russellgordon/plantoir/issues/177), a
+`decision`) and `SectionAdder.FrontmatterLines` (strict on BOTH platforms, so
+the section carry agrees with itself — parity, not a divergence, and
+documented rather than filed). Four finders, two unified. Check which one you
+are looking at before "tidying" any of them.
+
+A third fault is shared with the mac and was NOT fixed here, because fixing
+half of it would be a silent divergence in the one field the two apps must
+agree on: both writers replace a key's line and orphan an indented
+CONTINUATION line, so **hiding** a page whose value is a block scalar leaves
+it PUBLISHED — the failure that reports success, measured.
+[Issue #176](https://github.com/russellgordon/plantoir/issues/176) carries the
+table and names `setup_course.per_section_frontmatter`, which was fixed on
+2026-09-18, as the model.
 
 ## Two macOS mechanics NOT to port
 

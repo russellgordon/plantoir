@@ -346,9 +346,34 @@ separately from the reader:
   exactly `---` at line 0 decided a page fenced with `----` had no frontmatter
   and PREPENDED a block of its own, leaving the teacher's real frontmatter
   behind it as body text, printed to their students. One fence finder serves
-  reader and writers on both platforms. (`...` is not a closing fence:
-  python-frontmatter does not accept one, and Windows' `Block.Parse` did until
-  2026-09-19, which read a block as ending early.)
+  the reader and the VISIBILITY writers on both platforms. (`...` is not a
+  closing fence: python-frontmatter does not accept one, and Windows'
+  `Block.Parse` did until 2026-09-19, which read a block as ending early.)
+
+  **Two other finders are still hand-rolled, and knowing which is which
+  matters more than unifying them.** `SectionAdder`'s (`frontmatterLines` /
+  `FrontmatterLines`) is strict on BOTH platforms — the very first line
+  exactly `---` — so the section carry agrees with itself across the two apps;
+  that is parity, and it is recorded here rather than filed. `CourseRestorer`'s
+  is strict on Windows and, since the mac's `PageFrontmatter.block` was
+  loosened for the reason above, lenient on the mac — so a restore reaches
+  different pages on the two platforms, which is
+  [issue #177](https://github.com/russellgordon/plantoir/issues/177) and needs
+  a decision. The trap to avoid is reading "one fence finder" and making the
+  MAC strict, which puts the second-block bug straight back.
+
+* **A writer must take a value's CONTINUATION lines with the key**, and
+  neither app does. Replacing a key's line alone orphans the indented line
+  below it onto the new value, so `publish: >-` with `  false` under it,
+  asked to be HIDDEN, becomes the multi-line plain scalar `"false false"` —
+  a string that is not `"false"`, so the page is PUBLISHED while the teacher
+  is told it was hidden. Measured; the table is in
+  [issue #176](https://github.com/russellgordon/plantoir/issues/176).
+  `setup_course.per_section_frontmatter` was fixed on 2026-09-18 and is the
+  model: walk forward from the key taking every indented line with it,
+  stepping OVER blank lines and indented `# note`s rather than stopping at
+  them. Left unfixed on both apps on purpose — this is the one field where
+  half a fix is a silent divergence.
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a

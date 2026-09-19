@@ -110,4 +110,62 @@ public class SectionCarryVisibilityTests
         Assert.Null(Carry("publishForSection2: false"));
         Assert.Null(Carry("  publishForSection1: false"));   // indented: some other mapping's field
     }
+
+    // ---- And what the WRITER then does with what this generated ------------
+
+    /// <summary>
+    /// Adding a section, then hiding the page in it: end to end, because the
+    /// two halves were each right and the join was not.
+    /// </summary>
+    /// <remarks>
+    /// <para>Copying the emptiness of a null <c>publishForSection&lt;N&gt;</c>
+    /// is deliberate (a null publishes), so this generates
+    /// <c>publishForSection2:</c> with nothing after it — and
+    /// <c>ReplaceValue</c> used to keep the teacher's spacing, which for an
+    /// empty value is NO spacing, so hiding the page wrote
+    /// <c>publishForSection2:false</c>.</para>
+    ///
+    /// <para>That is not a key. YAML needs a space, a tab or the end of the
+    /// line after the colon, and measured with python-frontmatter 1.3.0 /
+    /// PyYAML 6.0.3 the line beside <c>createdSection2:</c> — which this same
+    /// method always writes next to it — is a <c>ScannerError</c> that stops
+    /// the whole build, while the app reports the page hidden. Plantoir
+    /// corrupting a page Plantoir generated, in two ordinary steps.</para>
+    /// </remarks>
+    [Fact]
+    public void TheEmptyCarryCanStillBeHiddenAfterwards()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "carry-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var course = SectionAdderTests.MakeCourse(root, "ICS3U",
+                """
+                {"course_code":"ICS3U","course_name":"Computer Science","section_numbers":[1],
+                 "per_section_folders":["All Classes"],"shared_folders":["Concepts"]}
+                """);
+            string page = Path.Combine(course.DirectoryPath, "Concepts", "Ohm's Law.md");
+            Directory.CreateDirectory(Path.GetDirectoryName(page)!);
+            File.WriteAllText(page,
+                "---\ntitle: Ohm's Law\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n" +
+                "publishForSection1:\n---\nThe lesson.\n");
+
+            SectionAdder.ExtendCourseLevelPages(course, 2, "2026-09-09T07:00:00.000-0400");
+
+            string generated = File.ReadAllText(page);
+            Assert.Contains("publishForSection2:\n", generated, StringComparison.Ordinal);
+            Assert.DoesNotContain("publishForSection2: \n", generated, StringComparison.Ordinal);
+            // A null publishes, so the new section says what the old one says.
+            Assert.Equal(PageVisibility.Visible, PageVisibilityReader.Answer(generated, 2));
+
+            var (hidden, edit) = PageFrontmatter.SetDraft(generated, "publishForSection2", draft: true, 2);
+
+            Assert.True(edit.Changed);
+            Assert.DoesNotContain("publishForSection2:false", hidden, StringComparison.Ordinal);
+            Assert.Contains("publishForSection2: false", hidden, StringComparison.Ordinal);
+            Assert.Equal(PageVisibility.Hidden, PageVisibilityReader.Answer(hidden, 2));
+            // And section 1 is none of that edit's business.
+            Assert.Equal(PageVisibility.Visible, PageVisibilityReader.Answer(hidden, 1));
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
 }

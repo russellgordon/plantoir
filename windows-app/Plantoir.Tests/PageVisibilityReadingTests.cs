@@ -441,6 +441,59 @@ public class PageVisibilityWritingTests
     }
 
     /// <summary>
+    /// A value is ALWAYS separated from its colon, because a colon with
+    /// nothing after it does not make a mapping.
+    /// </summary>
+    /// <remarks>
+    /// Measured with python-frontmatter 1.3.0 / PyYAML 6.0.3: <c>publish:false</c>
+    /// beside any other key is a <c>ScannerError</c> and STOPS THE BUILD, while
+    /// this app would have reported the page hidden. Two lines reached it —
+    /// a tab after the colon (perfectly good YAML, read as hidden today), and a
+    /// key with an empty value, which is the line <c>SectionAdder</c> itself
+    /// writes when it copies a null across to a new section.
+    /// </remarks>
+    [Theory]
+    [InlineData("---\npublish:\tfalse\ntitle: x\n---\nBody.\n", false, "---\npublish:\ttrue\ntitle: x\n---\nBody.\n")]
+    [InlineData("---\npublish:\ttrue\ntitle: x\n---\nBody.\n", true, "---\npublish:\tfalse\ntitle: x\n---\nBody.\n")]
+    [InlineData("---\npublish:\n---\nBody.\n", true, "---\npublish: false\n---\nBody.\n")]
+    [InlineData("---\npublish:   \ntitle: x\n---\nBody.\n", true, "---\npublish: false\ntitle: x\n---\nBody.\n")]
+    public void TheRewrittenValueIsNeverStuckToTheColon(string before, bool draft, string expected)
+    {
+        var (after, edit) = PageFrontmatter.SetDraft(before, "publish", draft, 1);
+        Assert.True(edit.Changed);
+        Assert.Equal(expected, after);
+        Assert.DoesNotContain("publish:false", after, StringComparison.Ordinal);
+        Assert.DoesNotContain("publish:true", after, StringComparison.Ordinal);
+        Assert.Equal(draft ? PageVisibility.Hidden : PageVisibility.Visible,
+                     PageVisibilityReader.Answer(after, 1));
+    }
+
+    /// <summary>
+    /// The head and the tail are split at the colon the READER's matcher found.
+    /// </summary>
+    /// <remarks>
+    /// The first colon on the line is the same one for every key this app
+    /// writes, so nothing was visibly broken — but the reader and the writer
+    /// agreeing by coincidence is how they come apart later, and every other
+    /// place they touch a line now goes through one matcher.
+    /// </remarks>
+    [Theory]
+    [InlineData("\"publish\": false")]
+    [InlineData("'publish': false")]
+    [InlineData("publish : false")]
+    [InlineData("publish:\tfalse")]
+    public void TheLineIsSplitWhereTheReaderSplitsIt(string frontmatter)
+    {
+        string before = $"---\n{frontmatter}\ntitle: x\n---\nBody.\n";
+        var (after, _) = PageFrontmatter.SetDraft(before, "publish", draft: false, 1);
+
+        Assert.Equal(PageVisibility.Visible, PageVisibilityReader.Answer(after, 1));
+        // The key's own spelling survives; only the value after its colon moved.
+        Assert.Equal(1, after.Split('\n').Count(l => l.Contains("publish", StringComparison.Ordinal)));
+        Assert.Contains("title: x", after, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// The gate reads all FOUR keys while the write goes to the one the page's
     /// folder decides on. A section-local page carrying a stray
     /// <c>publishForSection1</c> is what the build reads first, so "hide this"
