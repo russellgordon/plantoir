@@ -36,6 +36,56 @@ struct SectionDetailView: View {
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
 
+    /// The folder this view REGISTERED itself under in
+    /// `SectionWindowControllers`, and the only thing the unregister may read.
+    ///
+    /// Written in exactly one place — `.onAppear`, before the registration —
+    /// and read in exactly one place, the unregister in `onDisappear`. That
+    /// is what makes "a registration and its unregister name the same folder"
+    /// true by construction rather than by everything happening to line up,
+    /// and the registry has no other way to forget a key: nothing sweeps it,
+    /// so an entry unregistered under the wrong folder is stranded for the
+    /// life of the app.
+    ///
+    /// It is NOT `workspace.workspaceURL`, for the reason the piece was
+    /// written: choosing a different working folder clears the selection,
+    /// which tears this view down, and `onDisappear` runs on a later pass
+    /// with the window already pointing somewhere else.
+    ///
+    /// And it is not the same property as `folderThisSectionWorksIn` below,
+    /// which is the finding that split them. One property doing both jobs was
+    /// wrong for a window one render pass wide: between the selection being
+    /// cleared and `onDisappear` running, the assistant can still find this
+    /// controller registered under the OLD folder and press Deploy — and a
+    /// deploy notes the folder its work belongs to, which would have moved
+    /// the key the unregister then used.
+    @State var folderThisSectionRegisteredIn: URL?
+
+    /// The working folder the work in flight belongs to — and the folder
+    /// every stop and cancel must be aimed at, whatever the window points at
+    /// by the time the stop runs.
+    ///
+    /// Written where a piece of work's folder is DECIDED: `startPreview()`,
+    /// beside the lease, and `deployAndWait()`. Not on appearance, and not
+    /// from the model at the moment of stopping — the first would say nothing
+    /// about what is actually running, and the second is the bug: a stop read
+    /// from the model during teardown runs the NEW folder's `preview.sh` for
+    /// a section that folder may not even have, while the old folder's
+    /// container-side build or server keeps going (which matters when another
+    /// window still holds that folder — when the last one leaves, its
+    /// container is already being stopped). Writing it where the work starts
+    /// is what makes start and stop name one folder by construction.
+    ///
+    /// Nil means there is nothing to stop, and every reader is already
+    /// guarded by `previewRunner.isRunning` or `deployRunner.isRunning`.
+    ///
+    /// **One note serves both a preview and a deploy, deliberately.** They
+    /// never run at once for this section: `deployAndWait()` stops a running
+    /// preview and waits for it before it notes anything of its own, and the
+    /// Preview button is disabled while a deploy runs. Splitting this further
+    /// would be two names for one folder.
+    @State var folderThisSectionWorksIn: URL?
+
     /// Why a preview could not start, shown as an alert.
     @State var previewRefusal: String?
 
@@ -299,6 +349,10 @@ struct SectionDetailView: View {
             guard let folder = workspace.workspaceURL else {
                 return
             }
+            // The key this section is about to register under, noted while
+            // the window still points here — `onDisappear` runs when it may
+            // not. This is the property's ONLY write; see its comment.
+            folderThisSectionRegisteredIn = folder
             SectionWindowControllers.shared.register(
                 folderPath: folder.path,
                 courseCode: course.code,
@@ -342,7 +396,9 @@ struct SectionDetailView: View {
             }
         }
         .onDisappear {
-            if let folder = workspace.workspaceURL {
+            // The key this section registered under, never the folder its
+            // work belongs to and never the window's current one.
+            if let folder = folderThisSectionRegisteredIn {
                 SectionWindowControllers.shared.unregister(
                     folderPath: folder.path,
                     courseCode: course.code,
@@ -927,6 +983,15 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // The folder this preview belongs to, noted at the moment it is
+        // decided — which is HERE, not at the appearance. The appearance
+        // notes only the key this section registered under, and it can
+        // return without a folder at all while this function goes on
+        // working from the model — so a note made there would have let a
+        // preview start that no stop was ever aimed at. Every stop reads
+        // this, so writing it beside the lease is what makes start and
+        // stop name one folder.
+        folderThisSectionWorksIn = workspaceURL
         // Each preview runs on its own port, so several windows can show
         // sections side by side without taking each other down.
         let lease: PreviewLeases.Lease
@@ -1004,7 +1069,7 @@ struct SectionDetailView: View {
     func stopPreviewAndWait() async {
         let courseCode: String = course.code
         let section: Int = sectionNumber
-        let folder: URL? = workspace.workspaceURL
+        let folder: URL? = folderThisSectionWorksIn
         stopPreview()
         if let folder {
             await PreviewStopper.stopSectionProcessesAndWait(
@@ -1016,7 +1081,11 @@ struct SectionDetailView: View {
     func stopPreview() {
         // Ending the host-side script leaves the build or server inside
         // the container running; the launcher's stop mode reclaims them.
-        if previewRunner.isRunning, let workspaceURL = workspace.workspaceURL {
+        // Against the folder the work in flight belongs to — a preview's,
+        // or a deploy's build when a cancel reaches this way — never the one
+        // the window points at now. This also runs from `onDisappear`, which
+        // is after a folder change has already moved the window on.
+        if previewRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -1036,7 +1105,7 @@ struct SectionDetailView: View {
 
     /// Cancels the running preview from the progress view.
     func cancelPreview() {
-        if previewRunner.isRunning, let workspaceURL = workspace.workspaceURL {
+        if previewRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -1052,7 +1121,7 @@ struct SectionDetailView: View {
 
     /// Cancels the running deploy from the progress view.
     func cancelDeploy() {
-        if deployRunner.isRunning, let workspaceURL = workspace.workspaceURL {
+        if deployRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -1102,7 +1171,6 @@ struct SectionDetailView: View {
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
             )
         }
-
         // The toolbar button disables itself on `isPreparingDeploy`, but the
         // assistant reaches this function directly, with no button to have
         // disabled — guard here too, or two overlapping deploys can run at
@@ -1157,6 +1225,14 @@ struct SectionDetailView: View {
                 courseCode: course.code, sectionNumber: sectionNumber
             )
         }
+
+        // The note `startPreview()` makes, made here for the deploy —
+        // AFTER any running preview has been stopped, never before. A
+        // preview already running belongs to the folder IT started in, and
+        // writing this first would have pointed that preview's own stop,
+        // two lines up, at whatever the window happens to show now.
+        // `cancelDeploy()` reclaims the container-side build against it.
+        folderThisSectionWorksIn = workspaceURL
 
         // What the Deploy button's `disabled` says, said in words. The
         // assistant reaches this by pressing the button while a deploy is

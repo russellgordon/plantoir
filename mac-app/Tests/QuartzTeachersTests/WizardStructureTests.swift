@@ -1,0 +1,442 @@
+import XCTest
+@testable import QuartzTeachers
+
+/// The New Course wizard's structure editor shows what will actually be
+/// created, in BOTH directions: the skeleton toggle adopts a subject's
+/// folders and gives them up again.
+///
+/// The rule itself, and every case a teacher can reach, is
+/// `contracts/shared-rules.json` → `wizard.skeletonToggle`, run by
+/// `SharedRulesContractTests`. What is here is what the contract cannot
+/// carry: the pieces the rule is assembled from, and — because a control
+/// with no handler is invisible to a test that calls the handler itself —
+/// a scan proving the view is WIRED to it.
+@MainActor
+final class WizardStructureTests: XCTestCase {
+
+    // MARK: - The pieces the rule is assembled from
+
+    /// Adopting a family takes its four lists and the marks pool it
+    /// declares.
+    func testAdoptingAFamilyTakesItsOwnFiveLists() throws {
+        let science: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.family(forCode: "SNC4M"))
+        let adopted: WizardStructure.Lists = WizardStructure.adopting(science)
+
+        XCTAssertEqual(adopted.sharedFolders, science.sharedFolders)
+        XCTAssertEqual(adopted.sharedFiles, science.sharedFiles)
+        XCTAssertEqual(adopted.perSectionFolders, science.perSectionFolders)
+        XCTAssertEqual(adopted.perSectionFiles, science.perSectionFiles)
+        XCTAssertEqual(adopted.gradedFolders, science.gradedFolders,
+                       "A family that declares its own graded folders keeps them")
+    }
+
+    /// Every bundled family declares its own marks pool, and the adoption
+    /// takes it as declared.
+    ///
+    /// Written as its own check rather than as the `else` of the one below,
+    /// because that is what it really is: the generator writes
+    /// `graded_folders` for all fifty, so nothing in the bundle can exercise
+    /// the fallback and a test that walked them believing it did would be
+    /// reporting on a branch it never ran.
+    func testEveryBundledFamilyDeclaresItsOwnPoolAndKeepsIt() throws {
+        var familiesSeen: Int = 0
+        for name in SkeletonCatalog.everyFamilyName() {
+            let family: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.family(named: name))
+            familiesSeen += 1
+            XCTAssertFalse(
+                family.gradedFolders.isEmpty,
+                "\(name) declares no graded_folders. The fallback below would decide its marks "
+                + "pool instead — check that it says what the subject means."
+            )
+            XCTAssertEqual(SkeletonCatalog.adoptedGradedFolders(for: family), family.gradedFolders,
+                           "\(name)'s declared pool is what an adoption takes")
+        }
+        XCTAssertGreaterThan(familiesSeen, 40, "The bundled manifests were not found")
+    }
+
+    /// A family that declares no pool falls back to the rule the build
+    /// applied before the key existed.
+    ///
+    /// Run against a family built here, because no bundled one can reach it —
+    /// and the branch is still worth holding: a hand-written manifest, or a
+    /// generator change, brings it back, and the fallback is what stops such
+    /// a course opening with no marks at all.
+    func testAFamilyWithNoDeclaredPoolFallsBackToTheHistoricalRule() {
+        let family: SkeletonCatalog.Family = SkeletonCatalog.Family(
+            name: "improvised",
+            label: "Improvised",
+            sharedFolders: ["Concepts", "Thinking Tasks", "Curriculum"],
+            sharedFiles: ["Learning Goals.md"],
+            perSectionFolders: ["All Classes", "Group Tasks"],
+            perSectionFiles: ["Key Links.md"],
+            hidden: ["Curriculum"],
+            expandable: ["Concepts"],
+            curriculumFolder: "Curriculum",
+            gradedFolders: []
+        )
+
+        XCTAssertEqual(
+            SkeletonCatalog.adoptedGradedFolders(for: family),
+            ["Thinking Tasks", "Group Tasks"],
+            "Every folder whose name mentions tasks, shared and per-section alike"
+        )
+    }
+
+    /// The one rule the three surfaces that ask "what is this course
+    /// counting?" now share, including the de-duplication Windows' own
+    /// `InferredPool` does.
+    func testTheHistoricalRuleCountsTaskFoldersOnceEach() {
+        XCTAssertEqual(
+            GradedFolderRule.inferredPool(from: ["Concepts", "Tasks", "Thinking Tasks", "Setup"]),
+            ["Tasks", "Thinking Tasks"],
+            "Any folder whose name mentions tasks, case ignored"
+        )
+        XCTAssertEqual(
+            GradedFolderRule.inferredPool(from: ["Tasks", "All Classes", "Tasks"]),
+            ["Tasks"],
+            "A folder reaching the rule from two lists at once is still one folder"
+        )
+        XCTAssertEqual(
+            GradedFolderRule.inferredPool(from: ["tasks", "TASKS"]),
+            ["tasks", "TASKS"],
+            "Different spellings are different folders — the course's own capitalisation is kept"
+        )
+        XCTAssertEqual(GradedFolderRule.inferredPool(from: []), [])
+    }
+
+    // MARK: - Restoring, beyond what the contract's cases reach
+
+    /// Nothing adopted, nothing restored. Pinned here as well as in the
+    /// contract because it is the branch a caller is most likely to drop:
+    /// the view passes an optional straight through, so a restore with no
+    /// snapshot has to be safe rather than merely unreachable.
+    func testARestoreWithNoSnapshotChangesNothing() {
+        let editorsLists: WizardStructure.Lists = WizardStructure.Lists(
+            sharedFolders: ["Only", "Mine"],
+            sharedFiles: ["Notes.md"],
+            perSectionFolders: ["All Classes"],
+            perSectionFiles: ["Key Links.md"],
+            gradedFolders: []
+        )
+
+        XCTAssertEqual(
+            WizardStructure.restoringDefaults(
+                in: editorsLists, adopted: nil, usesLCSTerminology: false
+            ),
+            editorsLists
+        )
+        XCTAssertEqual(
+            WizardStructure.restoringDefaults(
+                in: editorsLists, adopted: nil, usesLCSTerminology: true
+            ),
+            editorsLists
+        )
+    }
+
+    /// The marks pool the teacher ticked themselves is theirs — but only as
+    /// far as the folders the course will actually have.
+    ///
+    /// Both halves matter, and the second was missed on the first attempt:
+    /// keeping `Investigations` here would write a `graded_folders` naming a
+    /// folder that has just left the editor, which the build counts and
+    /// never finds. `Tasks` survives because the factory list has one.
+    func testAMarksPoolTheTeacherChangedIsKeptButNarrowed() throws {
+        let science: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.family(forCode: "SNC4M"))
+        let adopted: WizardStructure.Lists = WizardStructure.adopting(science)
+        let withTheirOwnPool: WizardStructure.Lists = WizardStructure.Lists(
+            sharedFolders: adopted.sharedFolders,
+            sharedFiles: adopted.sharedFiles,
+            perSectionFolders: adopted.perSectionFolders,
+            perSectionFiles: adopted.perSectionFiles,
+            gradedFolders: ["Tasks", "Investigations"]
+        )
+
+        let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
+            in: withTheirOwnPool, adopted: adopted, usesLCSTerminology: false
+        )
+
+        XCTAssertEqual(restored.sharedFolders, WizardDefaults.sharedFolders,
+                       "The untouched folder lists still go back")
+        XCTAssertEqual(restored.gradedFolders, ["Tasks"],
+                       "Their own choice is kept where the folder survives the restore, and "
+                       + "dropped where it does not")
+    }
+
+    /// A pool narrowed to nothing is written as nothing — "asked, and nothing
+    /// counts" — rather than quietly naming folders that are gone.
+    func testAMarksPoolCanNarrowToNothing() throws {
+        let mathematics: SkeletonCatalog.Family = try XCTUnwrap(
+            SkeletonCatalog.family(forCode: "MPM1D")
+        )
+        let adopted: WizardStructure.Lists = WizardStructure.adopting(mathematics)
+        XCTAssertEqual(adopted.gradedFolders, ["Thinking Tasks", "Tasks"],
+                       "The one family that declares a pool other than [\"Tasks\"]")
+
+        let afterUntickingTasks: WizardStructure.Lists = WizardStructure.Lists(
+            sharedFolders: adopted.sharedFolders,
+            sharedFiles: adopted.sharedFiles,
+            perSectionFolders: adopted.perSectionFolders,
+            perSectionFiles: adopted.perSectionFiles,
+            gradedFolders: ["Thinking Tasks"]
+        )
+
+        let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
+            in: afterUntickingTasks, adopted: adopted, usesLCSTerminology: false
+        )
+        XCTAssertEqual(restored.gradedFolders, [],
+                       "Thinking Tasks left the editor with the rest of the skeleton")
+    }
+
+    // MARK: - The wizard's own two call sites
+
+    /// Adopting does nothing while the toggle is off.
+    ///
+    /// This runs on every change to the course code, so without the guard a
+    /// teacher who declined the skeleton and then corrected a typo in the
+    /// code would silently be given the skeleton's folders back — which is
+    /// the same bug as the one this work fixes, reached from the other end.
+    func testAdoptingIsGuardedByTheToggle() throws {
+        let source: String = try WizardStructureTests.wizardSource()
+        let adoptBody: String = try XCTUnwrap(
+            WizardStructureTests.body(ofFunction: "func adoptSkeletonStructure()", in: source),
+            "adoptSkeletonStructure() was not found in the wizard — this test cannot see what it guards"
+        )
+
+        XCTAssertTrue(
+            adoptBody.contains("guard startsFromSkeleton"),
+            "adoptSkeletonStructure() no longer checks the toggle before it adopts, so editing "
+            + "the course code with the skeleton declined puts the skeleton's folders back."
+        )
+    }
+
+    /// The toggle is WIRED to both directions.
+    ///
+    /// A control with no handler is exactly the bug this work fixes, and no
+    /// test that calls the handler itself can see it — so this reads the
+    /// view. The handler sits on the whole sheet rather than on the Toggle,
+    /// because the Toggle lives inside a branch SwiftUI rebuilds on every
+    /// keystroke in the course-code field.
+    func testTheToggleIsWiredToAdoptAndToRestore() throws {
+        let source: String = try WizardStructureTests.wizardSource()
+
+        // The handler's own body, not merely the handler: a test that asks
+        // whether the file mentions `restoreGenericStructure()` passes on the
+        // function's own declaration, with nothing calling it.
+        let handler: String = try XCTUnwrap(
+            WizardStructureTests.text(following: ".onChange(of: startsFromSkeleton)", in: source),
+            "Nothing in the wizard watches the skeleton toggle, so turning it off leaves the "
+            + "skeleton's folders in the structure editor for a course that will not have them "
+            + "(contracts/shared-rules.json → wizard.skeletonToggle)."
+        )
+        XCTAssertTrue(
+            handler.contains("adoptSkeletonStructure()"),
+            "The skeleton toggle no longer adopts when it goes on."
+        )
+        XCTAssertTrue(
+            handler.contains("restoreGenericStructure()"),
+            "The skeleton toggle no longer restores the generic structure when it goes off — "
+            + "see wizard.skeletonToggle."
+        )
+
+        // The snapshot is what tells an untouched list from an edited one, so
+        // an adoption that fails to record one, or a restore that fails to
+        // forget one, breaks the rule without breaking either function.
+        let adoptBody: String = try XCTUnwrap(
+            WizardStructureTests.body(ofFunction: "func adoptSkeletonStructure()", in: source)
+        )
+        XCTAssertTrue(
+            adoptBody.contains("adoptedStructure = adopted"),
+            "Adopting no longer records what it put in the editor, so a later restore has "
+            + "nothing to compare against and puts nothing back."
+        )
+        let restoreBody: String = try XCTUnwrap(
+            WizardStructureTests.body(ofFunction: "func restoreGenericStructure()", in: source)
+        )
+        XCTAssertTrue(
+            restoreBody.contains("adoptedStructure = nil"),
+            "Restoring no longer forgets the snapshot, so turning the toggle off twice would "
+            + "restore against an adoption that is no longer on screen."
+        )
+    }
+
+    /// The sentence a teacher reads while the toggle is off is drawn, not
+    /// merely declared. Windows shows it in the same situation.
+    func testTheOffCaptionIsDrawnWhileTheToggleIsOff() throws {
+        let source: String = try WizardStructureTests.wizardSource()
+
+        let branch: String = try XCTUnwrap(
+            WizardStructureTests.text(
+                // Short on purpose: the ELSE branch a few lines below shows the
+                // same note, and a window that reached it would pass while this
+                // branch showed anything at all.
+                following: "if !startsFromSkeleton {", in: source, charactersToRead: 120
+            ),
+            "The wizard no longer says anything while the skeleton is declined. A teacher who "
+            + "turns the toggle off is in exactly the situation "
+            + "WizardWording.noExampleContentNote describes, and both apps say so "
+            + "(contracts/shared-rules.json → wizard.whenTheNoteIsShown)."
+        )
+        XCTAssertTrue(
+            branch.contains("noExampleContentNote"),
+            "The branch that runs while the skeleton is declined shows something other than the "
+            + "note both apps show there."
+        )
+    }
+
+    /// What the wizard WRITES and what its editor SHOWS have to be the same
+    /// answer: a course created with the skeleton declined gets the factory
+    /// folders in `course_config.json` beside `use_skeleton: false`.
+    ///
+    /// Not a proof of the restore — the lists here were never adopted — but
+    /// the pin that stops the file and the editor being fixed apart.
+    func testDecliningTheSkeletonWritesTheFactoryStructure() {
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: "SNC4M", startsFromSkeleton: false
+        )
+        let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+            code: "SNC4M", name: "Science"
+        )
+
+        XCTAssertEqual(configuration["use_skeleton"] as? Bool, false)
+        XCTAssertEqual(configuration["shared_folders"] as? [String], WizardDefaults.sharedFolders)
+        XCTAssertEqual(configuration["per_section_files"] as? [String], WizardDefaults.perSectionFiles)
+    }
+
+    /// The same course code with the toggle left on still adopts, so the
+    /// guard has not cost the feature its point.
+    func testKeepingTheSkeletonStillWritesTheSubjectsStructure() throws {
+        let science: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.family(forCode: "SNC4M"))
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: "SNC4M", startsFromSkeleton: true
+        )
+        let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+            code: "SNC4M", name: "Science"
+        )
+
+        XCTAssertEqual(configuration["use_skeleton"] as? Bool, true)
+        XCTAssertEqual(configuration["shared_folders"] as? [String], science.sharedFolders)
+    }
+
+    /// The configuration adopts once more as it is built, whether or not the
+    /// code field's handler ever ran — and the marks pool goes with the four
+    /// lists. Windows sets all five in the same place.
+    ///
+    /// The pool is the half that was missed: the wizard's default is
+    /// `["Tasks"]`, and a mathematics course keeping it would count nothing
+    /// in `Thinking Tasks`, which is where its assessed work goes.
+    func testTheLateAdoptionCarriesTheSubjectsMarksPoolToo() {
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: "MPM1D", startsFromSkeleton: true
+        )
+        let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+            code: "MPM1D", name: "Mathematics"
+        )
+
+        XCTAssertEqual(configuration["graded_folders"] as? [String], ["Thinking Tasks", "Tasks"])
+        XCTAssertEqual(
+            (configuration["shared_folders"] as? [String])?.contains("Thinking Tasks"), true
+        )
+    }
+
+    /// What the wizard WRITES never names a folder the course will not have,
+    /// whatever route the pool took to get there.
+    ///
+    /// The route this closes is the terminology switch: turning LCS on,
+    /// ticking `College Board Curriculum` for marks and turning LCS off again
+    /// takes the folder out of the course and leaves the pool naming it —
+    /// that handler is the one place the editor changes a folder list without
+    /// narrowing the pool. Windows narrows as it writes
+    /// (`NewCourseDialog.BuildConfiguration`) and now so does this.
+    func testTheFileNeverNamesAFolderTheCourseWillNotHave() {
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: "SNC4M",
+            startsFromSkeleton: false,
+            gradedFolders: ["Tasks", "College Board Curriculum"]
+        )
+        let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+            code: "SNC4M", name: "Science"
+        )
+
+        XCTAssertEqual(
+            configuration["graded_folders"] as? [String], ["Tasks"],
+            "The LCS folder is not in this course's folder lists, so writing it into the "
+            + "marks pool would be a name that matches nothing on disk — and a different "
+            + "file from the one Windows writes for the same clicks."
+        )
+    }
+
+    /// A code with ready-made pages is offered no skeleton, so neither
+    /// direction may touch its lists.
+    func testACodeWithExampleContentIsNeverAdoptedOrRestored() throws {
+        let payloadCode: String = "ADA1O"
+        XCTAssertTrue(ExampleContentCatalog.hasContent(forCode: payloadCode))
+        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: payloadCode))
+
+        XCTAssertNil(
+            SkeletonCatalog.structureToAdopt(
+                forCode: payloadCode, currentSharedFolders: WizardDefaults.sharedFolders
+            ),
+            "The example content chooses the folders for a code that has it"
+        )
+
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: payloadCode, startsFromSkeleton: false
+        )
+        let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+            code: payloadCode, name: "Drama"
+        )
+        XCTAssertEqual(configuration["use_skeleton"] as? Bool, false)
+        XCTAssertEqual(configuration["shared_folders"] as? [String], WizardDefaults.sharedFolders)
+    }
+
+    // MARK: - Functions
+
+    /// The wizard's own source, read from the checkout so the scan works
+    /// wherever the repository lives.
+    static func wizardSource() throws -> String {
+        let viewURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QuartzTeachersTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // mac-app
+            .appendingPathComponent("QuartzTeachers/Views/Wizard/NewCourseWizardView.swift")
+        let source: String = try String(contentsOf: viewURL, encoding: .utf8)
+        XCTAssertGreaterThan(source.count, 1000,
+                             "The wizard's source was not found where this test expects it — the scans below would pass vacuously.")
+        return source
+    }
+
+    /// Everything between a function's opening line and the first line that
+    /// closes it at the function's own indentation, or nil when the
+    /// function is not there.
+    static func body(ofFunction declaration: String, in source: String) -> String? {
+        let lines: [String] = source.components(separatedBy: "\n")
+        var collected: [String] = []
+        var isInside: Bool = false
+        for line in lines {
+            if isInside {
+                if line == "    }" {
+                    return collected.joined(separator: "\n")
+                }
+                collected.append(line)
+            } else if line.contains(declaration) {
+                isInside = true
+            }
+        }
+        return nil
+    }
+
+    /// The few lines that follow a marker in a file, or nil when the marker
+    /// is not there — enough to see what a short branch or handler does.
+    ///
+    /// The window is generous on purpose: a scan that reaches exactly as far
+    /// as today's code starts failing on a renamed variable rather than on a
+    /// lost behaviour, which is the kind of test that gets deleted.
+    static func text(following marker: String, in source: String,
+                     charactersToRead: Int = 600) -> String? {
+        guard let found = source.range(of: marker) else {
+            return nil
+        }
+        let remainder: Substring = source[found.upperBound...]
+        return String(remainder.prefix(charactersToRead))
+    }
+}

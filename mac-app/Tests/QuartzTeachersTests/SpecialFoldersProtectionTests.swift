@@ -230,9 +230,14 @@ final class SpecialFoldersProtectionTests: XCTestCase {
     }
 
     func testWizardGradedFoldersIncludedInConfigWhenNotUsingExampleContent() {
+        // The folder lists carry both names, because what is written is now
+        // narrowed to the folders the course will actually have — a pool
+        // naming a folder nobody is creating is not a choice, it is a name
+        // that matches nothing (see GradedFolderRule.reconciled).
         let wizard: NewCourseWizardView = NewCourseWizardView(
             courseCode: "ICS3U",
             prepopulatesExampleContent: false,
+            sharedFolders: ["Concepts", "Tasks", "Projects"],
             gradedFolders: ["Tasks", "Projects"]
         )
 
