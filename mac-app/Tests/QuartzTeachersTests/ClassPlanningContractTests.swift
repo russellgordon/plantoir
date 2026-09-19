@@ -337,6 +337,29 @@ final class ClassPlanningContractTests: XCTestCase {
             AssistPageVisibility.answer(in: copy, forSection: 1), .hidden,
             "Hidden has to be CERTAIN here, not merely unsaid: \(copy)"
         )
+
+        // **And the copy can still be PUBLISHED.** Hiding it by writing a
+        // per-section key of its own would pass every assertion above and
+        // leave a page nobody can ever publish: the publish path picks its key
+        // from where the page LIVES, so it writes the plain one, and the
+        // per-section key goes on beating it — while the teacher is told
+        // "Published 1 page" every time they ask. A failure that reports
+        // success is worse than the one it replaced.
+        let said: String = await run(
+            made.runner, "publish_pages",
+            ["course": "ICS3U", "section": 1, "pages": ["Unit 1, Day 2"]]
+        )
+        let published: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course), encoding: .utf8
+        ))
+        XCTAssertTrue(
+            AssistPageVisibility.publishes(in: published, forSection: 1),
+            "The copy was hidden in a way that cannot be undone — \(said)\n\(published)"
+        )
+        XCTAssertFalse(
+            published.contains("publishForSection"),
+            "No per-section key belongs on a page inside one section's own folder: \(published)"
+        )
     }
 
     /// A lesson still sitting where the copy would go is never written over.
