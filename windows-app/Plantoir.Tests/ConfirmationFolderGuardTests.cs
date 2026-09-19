@@ -37,6 +37,14 @@ namespace Plantoir.Tests;
 /// <c>folder-check: not needed</c> comment saying why. That is the point — a
 /// new confirmation added without either fails, rather than being judged
 /// correct by a test that cannot judge.</para>
+///
+/// <para>And it sees DIALOGS only. A confirmation can wait on something that
+/// is not a dialog — the rename waits up to five seconds for Obsidian to quit,
+/// with nothing on screen at all — and
+/// <see cref="AWaitThatIsNotADialogIsCheckedToo"/> below is what covers those,
+/// with its own narrower limit stated there. Outside this file the same shape
+/// lives in <c>MainWindow.StopPreviewForAsync</c>, which now captures its
+/// folder before awaiting the stop; nothing scans for that.</para>
 /// </summary>
 public class ConfirmationFolderGuardTests
 {
@@ -51,7 +59,16 @@ public class ConfirmationFolderGuardTests
 
         // An awaited dialog: the pane's own helper, or a dialog type's
         // ShowAsync directly (the wizard and the Add Section dialog).
-        var site = new Regex(@"await\s+(ShowDialogSafelyAsync\(|\w+\.ShowAsync\(\))");
+        // ShowAsync takes an optional placement argument, so the parentheses
+        // must not be required empty — `await dialog.ShowAsync(
+        // ContentDialogPlacement.InPlace)` is the same site wearing a
+        // different spelling, and a scan that missed it would pass a
+        // confirmation nobody had guarded.
+        var site = new Regex(@"await\s+(ShowDialogSafelyAsync\(|\w+\.ShowAsync\()");
+
+        // Where the enclosing method ends, near enough: a line whose only
+        // content is a closing brace at method indentation.
+        var methodEnd = new Regex(@"^    \}\s*$");
 
         var unguarded = new System.Collections.Generic.List<string>();
         int found = 0;
@@ -61,19 +78,25 @@ public class ConfirmationFolderGuardTests
             if (!site.IsMatch(lines[i])) continue;
             found++;
 
-            // The check may sit a few lines later — a couple of these run
-            // through a catch block first — or the opt-out just above.
-            int from = Math.Max(0, i - 2);
-            int to = Math.Min(lines.Length - 1, i + 12);
-            bool answered = false;
-            for (int j = from; j <= to && !answered; j++)
-                answered = lines[j].Contains(Guard, StringComparison.Ordinal)
-                        || lines[j].Contains(OptOut, StringComparison.Ordinal);
+            // The check must fall between THIS await and the NEXT one (or the
+            // end of the method). A fixed window of lines is what lets a new
+            // confirmation added just below a guarded one borrow its
+            // neighbour's check and pass having none of its own.
+            bool answered = lines[i].Contains(OptOut, StringComparison.Ordinal)
+                         || (i > 0 && lines[i - 1].Contains(OptOut, StringComparison.Ordinal))
+                         || (i > 1 && lines[i - 2].Contains(OptOut, StringComparison.Ordinal));
+
+            for (int j = i + 1; j < lines.Length && !answered; j++)
+            {
+                if (lines[j].Contains(Guard, StringComparison.Ordinal)
+                    || lines[j].Contains(OptOut, StringComparison.Ordinal)) { answered = true; break; }
+                if (site.IsMatch(lines[j]) || methodEnd.IsMatch(lines[j])) break;
+            }
 
             if (!answered) unguarded.Add($"{path}:{i + 1}: {lines[i].Trim()}");
         }
 
-        Assert.True(found >= 12,
+        Assert.True(found >= 14,
             $"Only {found} awaited dialogs found in SidebarPane.xaml.cs — this scan has stopped " +
             "reading what it thinks it reads.");
 
@@ -83,6 +106,63 @@ public class ConfirmationFolderGuardTests
             $"is looking at:\n{string.Join("\n", unguarded)}\n" +
             $"Add `if ({Guard}askedIn)) return;` after the await, or say why not with a " +
             $"`// {OptOut} — …` comment.");
+    }
+
+    /// <summary>
+    /// A dialog is not the only thing a confirmation waits on, and the scan
+    /// above cannot see the others.
+    ///
+    /// <para>The rename path meets the widest window in the whole file:
+    /// <c>await FolderActions.QuitObsidianAndWait()</c> polls for up to five
+    /// seconds with NO dialog on screen at all, so the File menu and Ctrl+O
+    /// are both fully live — and everything after it reads the LIVE workspace,
+    /// down to setting the selection to the renamed code. A check before a
+    /// wait says nothing about what is true after it.</para>
+    ///
+    /// <para>So: in any method that captured a folder, a <c>Workspace.Reload()</c>
+    /// or a <c>Workspace.Selection =</c> that follows an <c>await</c> must have
+    /// the check between them. <b>Its limit</b>, said rather than implied: it
+    /// watches those two writes only, not every read of the workspace — a
+    /// lexical scan cannot tell a read inside a local function (which runs
+    /// BEFORE the await that appears above it) from one in the continuation,
+    /// and a scan that cried wolf there would be turned off. The two writes it
+    /// does watch are the ones that produced the reported defect.</para>
+    /// </summary>
+    [Fact]
+    public void AWaitThatIsNotADialogIsCheckedToo()
+    {
+        string path = Path.Combine(RepoRoot, "windows-app", "Plantoir", "Views", "SidebarPane.xaml.cs");
+        string[] lines = File.ReadAllLines(path);
+
+        var capture = new Regex(@"string\?\s+askedIn\s*=");
+        var anyAwait = new Regex(@"(^|[^\w.])await\s");
+        var stateWrite = new Regex(@"Workspace\.Reload\(\)|Workspace\.Selection\s*=");
+        var methodEnd = new Regex(@"^    \}\s*$");
+
+        var unguarded = new System.Collections.Generic.List<string>();
+        bool insideACapturingMethod = false;
+        bool awaitedSinceTheLastCheck = false;
+        int checks = 0;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            if (methodEnd.IsMatch(line)) { insideACapturingMethod = false; awaitedSinceTheLastCheck = false; continue; }
+            if (capture.IsMatch(line)) { insideACapturingMethod = true; awaitedSinceTheLastCheck = false; continue; }
+            if (!insideACapturingMethod) continue;
+
+            if (line.Contains(Guard, StringComparison.Ordinal)) { awaitedSinceTheLastCheck = false; checks++; continue; }
+            if (stateWrite.IsMatch(line) && awaitedSinceTheLastCheck)
+                unguarded.Add($"{path}:{i + 1}: {line.Trim()}");
+            if (anyAwait.IsMatch(line)) awaitedSinceTheLastCheck = true;
+        }
+
+        Assert.True(checks >= 11, $"Only {checks} folder checks found — this scan is no longer reading what it thinks.");
+
+        Assert.True(unguarded.Count == 0,
+            "These reload the courses or set the selection after waiting on something, without asking " +
+            "whether the window still shows the folder they were working in — so they land the old " +
+            $"folder's answer in the new folder's sidebar:\n{string.Join("\n", unguarded)}");
     }
 
     [Fact]

@@ -1379,8 +1379,17 @@ public sealed partial class SidebarPane : UserControl
             if (await ShowDialogSafelyAsync(obsidianDialog) != ContentDialogResult.Primary) return;
             if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
-
             await FolderActions.QuitObsidianAndWait();
+            // Asked AGAIN after the wait, and this is the WIDEST window in the
+            // whole rename: quitting Obsidian polls for up to five seconds
+            // with NO dialog on screen at all, so the File menu and Ctrl+O are
+            // both fully live. Everything below reads the LIVE workspace — the
+            // taken-codes list, the reload, and the selection it sets — so a
+            // folder chosen during those five seconds would have this rename
+            // select a course code in a folder that never had one, which is
+            // the "Course Not Found" #162 exists to remove. A check before a
+            // wait says nothing about what is true after it.
+            if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         }
 
         try

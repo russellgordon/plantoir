@@ -424,6 +424,14 @@ public sealed partial class MainWindow : Window
         var tcs = new TaskCompletionSource();
         DispatcherQueue.TryEnqueue(async () =>
         {
+            // The folder this stop is being asked to work in, taken BEFORE the
+            // awaits below. Stopping a preview can take ~20 seconds, and the
+            // teacher is free to change working folder while it runs; reading
+            // the window's folder afterwards would sweep the container and
+            // release the lease of the folder they have just arrived IN, which
+            // is another window's running preview of that course and section
+            // (#162 — the same defect SectionDetailView's own captures fix).
+            string? stoppingIn = Workspace.WorkspacePath;
             try
             {
                 if (DetailHost.Content is not SectionDetailView existing ||
@@ -438,7 +446,7 @@ public sealed partial class MainWindow : Window
                     await detail.StopPreviewIfRunningAsync();
                 }
 
-                if (Workspace.WorkspacePath is { } wp)
+                if (stoppingIn is { } wp)
                 {
                     await PreviewStopper.StopSectionProcessesAsync(wp, courseCode, section);
                     PreviewLeases.Release(wp, courseCode, section);
