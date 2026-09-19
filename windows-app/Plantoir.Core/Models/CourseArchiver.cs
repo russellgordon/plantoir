@@ -62,8 +62,18 @@ public static class CourseArchiver
     /// ONLY the assistant's own backups are pruned. A teacher's backup is a
     /// decision — deleting that on a schedule they never agreed to is the app
     /// overruling them about their own work.
+    ///
+    /// And only backups whose stamp COULD BE TRUE. See
+    /// <see cref="ArchiveStamp"/>: a zip carried in from a Mac that wrote its
+    /// own calendar into the name parses cleanly as a year like 2569, sorts
+    /// as the newest thing in the folder, and would take a real backup's
+    /// place among the five that are kept.
     /// </summary>
-    public static void PruneBackups(string courseCode, string coursesDirectory)
+    /// <param name="now">
+    /// The clock the plausibility check measures against; tests pass one so
+    /// the answer cannot change mid-run. Nothing in the app passes it.
+    /// </param>
+    public static void PruneBackups(string courseCode, string coursesDirectory, DateTime? now = null)
     {
         string backupsDir = BackupsDirectory(coursesDirectory, courseCode);
         if (!Directory.Exists(backupsDir)) return;
@@ -72,10 +82,16 @@ public static class CourseArchiver
         var assistantBackups = new List<BackupItem>();
         foreach (var file in entries)
         {
-            if (BackupItem.From(file, courseCode) is { } item && item.Maker is BackupMaker.Assistant)
-            {
-                assistantBackups.Add(item);
-            }
+            if (BackupItem.From(file, courseCode) is not { } item) continue;
+            if (item.Maker is not BackupMaker.Assistant) continue;
+            // A stamp that cannot be true is not allowed to decide what gets
+            // DELETED. The zip stays where it is and stays LISTED, so the
+            // teacher can restore it or delete it themselves; it is simply
+            // left out of the count and out of the sort, because its date is
+            // the one thing about it known to be wrong and this list is
+            // sorted by date before its tail is thrown away.
+            if (!ArchiveStamp.CouldHaveBeenStamped(item.BackedUpAt, now)) continue;
+            assistantBackups.Add(item);
         }
 
         if (assistantBackups.Count <= MostBackupsKept) return;
