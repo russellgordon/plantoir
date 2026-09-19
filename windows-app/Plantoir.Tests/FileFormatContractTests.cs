@@ -294,6 +294,19 @@ public sealed class FileFormatContractTests : IDisposable
                 "removed on the mac and this test is answering a question nobody asked.");
         }
 
+        // The same, for a rule whose assertions live in ANOTHER test. The
+        // pointer is a `nameof` rather than prose or a `<see cref>` because
+        // this project generates no documentation file, so an unresolved cref
+        // is not even a warning here — while a `nameof` naming a test that has
+        // been renamed does not compile. A rule marked answered by a test that
+        // no longer exists is a rule answered by nothing.
+        void AnsweredBy(string rule, string test)
+        {
+            Assert.True(unanswered.Remove(rule),
+                $"No rule in the contract reads \"{rule}\" any more — it has been renamed or " +
+                $"removed on the mac, and {test} is answering a question nobody asked.");
+        }
+
         // The first rule was this app's own behaviour before it was the
         // contract's: until 2026-09-07 the contract said the opposite (keep
         // the old key, inverted), this test held that rule in a
@@ -308,7 +321,9 @@ public sealed class FileFormatContractTests : IDisposable
         // line, the legacy key gone. Answered by the contract's own cases —
         // four of the ten are migrations, including the exception to rule 4 —
         // and no longer by a retyped copy of case 1 sitting here.
-        Answered("A page written in the old spelling is MIGRATED to the new key, and the legacy key removed, the first time something edits its visibility");
+        AnsweredBy(
+            "A page written in the old spelling is MIGRATED to the new key, and the legacy key removed, the first time something edits its visibility",
+            nameof(TheWritingCasesInTheContractAreFollowed));
 
         // Edit the LINE, never round-trip the YAML.
         string withComment =
