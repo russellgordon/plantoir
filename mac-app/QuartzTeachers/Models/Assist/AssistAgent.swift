@@ -263,10 +263,52 @@ final class AssistAgent {
                 messages: messages, tools: toolDefinitions
             )
             let reply: AssistMessage = answer.message
-            messages.append(reply)
+
+            // Recorded whatever happens to the turn below: the count of what
+            // the model wrote is the evidence that it ran away, and a turn
+            // thrown away is exactly the turn somebody reading a problem
+            // report needs to see.
             recordTurn(reply: answer, askedAt: askedAt)
 
+            // ABOVE the tool-call branch, because a reply the engine stopped
+            // part way is not an instruction and is not something to read out
+            // either.
+            //
+            // What the model was about to write next is unknowable, and for a
+            // tool that changes pages the difference between "the four pages
+            // you named" and the first four of forty is the whole of what was
+            // asked. **Parsing is not the check.** Measured on this Mac
+            // (llama.cpp b10435, the smaller assistant): the arguments object
+            // is closed before the `</tool_call>` wrapper, so there is a
+            // window one or two tokens wide where a generation was stopped
+            // short and its arguments nevertheless parse perfectly — a
+            // `deploy_section` call cut off at 28 tokens parsed as
+            // `{"course": "VVH2O", "section": 1}`. And `undo_last_change`
+            // takes no arguments at all, so a call to it cut off before it
+            // wrote anything is readable by any check and would simply RUN.
+            // The reason the turn ended is the only thing that catches those.
+            //
+            // The other branch matters just as much: cut off before the tool
+            // name was parseable, the same measurement put a raw
+            // `<tool_call>\n{\n"name": "publi` fragment in `content`, which
+            // the plain-text branch below would print into the transcript.
+            if answer.wasCutOff {
+                sayTheAnswerWasCutOff(tool: reply.toolCalls?.first?.function.name)
+                return
+            }
+
             if let calls = reply.toolCalls, let first = calls.first {
+                // Arguments that cannot be read, with the turn finishing
+                // normally: a small model writing bad JSON of its own accord.
+                // Same answer — running a call whose arguments were lost means
+                // running it against no course, which used to produce a
+                // refusal reading as though the teacher's sentence was the
+                // problem.
+                if !first.argumentsAreReadable {
+                    sayTheAnswerWasCutOff(tool: first.function.name)
+                    return
+                }
+                messages.append(reply)
                 // One tool at a time, on purpose: a model that batches has
                 // decided an order, and the order is exactly the reasoning
                 // we are trying not to leave with it.
@@ -274,6 +316,7 @@ final class AssistAgent {
                 return
             }
 
+            messages.append(reply)
             let text: String = (reply.content ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             entries.append(Entry(
                 speaker: .assistant, text: text.isEmpty ? AssistWording.nothingToDo : text
@@ -289,6 +332,33 @@ final class AssistAgent {
             )
             activity = .idle
         }
+    }
+
+    /// Throw an unfinished answer away, and say so.
+    ///
+    /// **The reply is deliberately NOT added to `messages`.** A cut-off reply
+    /// carrying a `tool_call` that no `tool` message ever answers is a
+    /// conversation some chat templates reject outright, and every later turn
+    /// would carry it. Dropping it leaves the history exactly as if the model
+    /// had not answered, which is the truth of what happened.
+    private func sayTheAnswerWasCutOff(tool: String?) {
+        entries.append(Entry(speaker: .assistant, text: AssistWording.answerWasCutOff))
+        // The tool it had BEGUN to name, in the words a teacher would
+        // recognise rather than the function's own: "it ran away trying to
+        // publish" and "it ran away trying to deploy" are different reports.
+        // Never what it had begun to WRITE — that is the teacher's page
+        // titles.
+        var what: String = "before it named a tool"
+        if let name = tool {
+            what = "part way through " + name.replacingOccurrences(of: "_", with: " ")
+        }
+        ActivityTrail.note(
+            .assistantAnswerWasCutOff,
+            "the assistant's answer was cut off " + what + " — nothing was run from it",
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
     }
 
     /// Keeps a note of what the model was asked and what it chose.

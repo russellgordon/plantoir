@@ -315,6 +315,103 @@ final class AppRulesContractTests: XCTestCase {
         }
     }
 
+    /// Asks the same list the other way round: **every** requirement in
+    /// `modelTiers.requirements` is either answered here or named as one no
+    /// test can execute.
+    ///
+    /// The mirror of Windows'
+    /// `EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable`,
+    /// and added when this section gained rules the mac must keep rather than
+    /// merely describe. The value is the FAILURE: a requirement added on
+    /// either side now fails this test by name on the other, instead of
+    /// sitting in the contract with nothing checking it. The test above
+    /// checks one requirement; this one checks that nothing was skipped.
+    func testEveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable() throws {
+        let section: [String: Any] = try XCTUnwrap(
+            (try AppRulesContractTests.readRules())["modelTiers"] as? [String: Any]
+        )
+        let requirements: [[String: Any]] = try XCTUnwrap(section["requirements"] as? [[String: Any]])
+        var unanswered: Set<String> = []
+        for requirement in requirements {
+            unanswered.insert(try XCTUnwrap(requirement["rule"] as? String))
+        }
+        XCTAssertFalse(unanswered.isEmpty)
+
+        func answer(_ rule: String) {
+            XCTAssertTrue(
+                unanswered.remove(rule) != nil,
+                "No requirement in the contract reads “\(rule)” any more."
+            )
+        }
+
+        // Two rungs, no more.
+        XCTAssertEqual(AssistModelTier.allCases.count, 2)
+        answer("Two rungs, no more")
+
+        // Chosen from the hardware: a small Mac and a large one reach
+        // different answers with nothing asked of the teacher in between.
+        XCTAssertEqual(AssistModelTier.forPhysicalMemory(bytes: 8 * 1_073_741_824), .small)
+        XCTAssertEqual(AssistModelTier.forPhysicalMemory(bytes: 64 * 1_073_741_824), .large)
+        answer("The rung is CHOSEN from the hardware, never asked")
+
+        // The names, which the test above checks in full.
+        var names: [String: String] = [:]
+        for requirement in requirements {
+            if let given = requirement["names"] as? [String: String] {
+                names = given
+            }
+        }
+        XCTAssertEqual(AssistModelTier.small.displayName, names["small"])
+        XCTAssertEqual(AssistModelTier.large.displayName, names["large"])
+        answer("The teacher never learns the model's name")
+
+        // On the HOST, with hardware acceleration — the GPU offload flag is
+        // the executable half, and `AssistModelTierTests` pins the rest of
+        // the line.
+        let arguments: [String] = AssistServerHost.serverArguments(
+            modelPath: "/tmp/model.gguf", port: 8080, tier: .small, threadCount: 4
+        )
+        XCTAssertTrue(arguments.contains("--n-gpu-layers"))
+        answer("The model runs on the HOST, with hardware acceleration")
+
+        // The cap, with the contract's own number rather than a copy of it:
+        // this is the assertion that stops the two apps drifting on a value
+        // neither interface shows.
+        var capInTheContract: Int?
+        for requirement in requirements {
+            if let cap = requirement["cap"] as? Int {
+                capInTheContract = cap
+            }
+        }
+        XCTAssertEqual(capInTheContract, AssistModelClient.mostTokensPerReply)
+        let body: [String: Any] = try AssistModelClient(
+            baseURL: try XCTUnwrap(URL(string: "http://127.0.0.1:1"))
+        ).requestBody(messages: [AssistMessage.user("Hello")], tools: [])
+        XCTAssertEqual(body["max_tokens"] as? Int, capInTheContract)
+        answer("Every request caps how much the model may write")
+
+        // And what happens when a reply stops at that cap. Executed in
+        // `AssistCutOffAnswerTests` against a stub engine, where a page on
+        // disk is the assertion; what belongs here is that the sentence the
+        // contract names exists and is the one the gate uses.
+        XCTAssertFalse(AssistWording.answerWasCutOff.isEmpty)
+        answer("A reply the engine stopped part way runs no tool and says so")
+
+        // The one that genuinely cannot be executed, named rather than
+        // dropped. A polarity veto is a rule about how a MODEL is chosen: it
+        // governs the routing suite in research/ai-assist/, measured by hand,
+        // and a test pretending otherwise would be green for the wrong reason.
+        XCTAssertTrue(
+            unanswered.remove("A model that inverts polarity is VETOED, whatever it scores") != nil,
+            "The polarity veto is recorded here as the one requirement no test can execute, and the contract no longer states it in those words."
+        )
+
+        XCTAssertEqual(
+            unanswered, [],
+            "contracts/app-rules.json requires things of the local assistant that no test here answers: \(unanswered.sorted()). The numbers in that section are not shared; the shape is."
+        )
+    }
+
     // MARK: - The flags the app passes the launcher
 
     /// Checks the LAUNCHER, not the app.

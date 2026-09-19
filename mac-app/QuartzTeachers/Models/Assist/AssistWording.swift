@@ -406,6 +406,39 @@ nonisolated enum AssistWording {
         "Right you are. I will not be able to date new classes until I have them — "
         + "say “I have a revised list of class dates” whenever you would like to give them."
 
+    // MARK: - When the answer did not finish
+
+    /// The engine stopped the assistant part way through its answer, so
+    /// whatever it had begun to ask for was thrown away unread.
+    ///
+    /// Three things it has to do, in this order. **Say the answer did not
+    /// finish**, because the teacher has just waited for one. **Say that
+    /// nothing changed**, which is the fact genuinely in doubt — the same
+    /// reasoning as `planWasCancelled`, and the opposite of
+    /// `deployWasCancelled`, where the teacher already knew. And **say
+    /// something they can act on**: the shape that causes this is a long
+    /// list, so "fewer pages at a time" addresses the cause rather than
+    /// shrugging politely.
+    ///
+    /// **"I haven't changed anything" is true on every path that can reach
+    /// this, and it was checked rather than assumed.** A turn only comes back
+    /// to the model for another lap when a tool said to
+    /// (`AssistToolOutcome.shouldContinue`), and that is true for exactly
+    /// three outcomes — `read`, `couldNotRead` and `planned`. Every write
+    /// answers `wrote` or `refused`, `read(` is built only by the tools that
+    /// read (listing pages, reading a page, explaining publishing, listing
+    /// courses, listing curriculum expectations), and a `planned` outcome is
+    /// held behind the approval card and never reaches a second lap. So an
+    /// answer cut off on a second lap follows a READ, and the sentence stays
+    /// true there too.
+    ///
+    /// Says nothing about why. A teacher cannot act on a limit they cannot
+    /// see, and naming it would be exactly the machinery rule 1 keeps out of
+    /// the interface.
+    static let answerWasCutOff: String =
+        "I didn't get to the end of that, so I haven't changed anything. Ask me again — "
+        + "a shorter sentence, or fewer pages at a time."
+
     // MARK: - Shared fragments
 
     /// One phrasing for "go and look at what happened", because it was two:
