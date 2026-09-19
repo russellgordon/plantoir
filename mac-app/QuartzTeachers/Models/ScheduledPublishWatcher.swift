@@ -300,6 +300,12 @@ final class ScheduledPublishWatcher {
         // record will ever produce, so a watch armed after it has landed waits
         // for ever. Arming first means the look below is the only other way the
         // completion can be discovered, and one of the two always sees it.
+        //
+        // Letting go of the stream when the record turns out to be readable
+        // costs nothing: measured, an `AsyncStream` that is never iterated runs
+        // its termination handler when it is released, which cancels the source
+        // and closes the descriptor. The caller says so on the counter a moment
+        // later, so nothing is lost by returning here in silence.
         let changes: AsyncStream<Change> = Self.changes(
             at: url, watching: [.write, .extend, .delete, .rename]
         )
