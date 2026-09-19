@@ -129,7 +129,9 @@ commit that moves the version line.
 For future-you, mid-school-year, who remembers nothing. The whys are below.
 
 1. **Everything merged and green?** Both sides on `main`; `dotnet test` passes
-   in `windows-app/`; the mac unit suite passes. Then **actually publish a
+   in `windows-app/`; the mac unit suite passes. **Then open
+   `windows-app/Plantoir.Tests/NamedGapLedger.cs`** — green can carry named
+   gaps, and step 2 says what to check in it. Then **actually publish a
    section from an app** — see step 2 for why that is not optional.
 2. **Check the version** in `windows-app/Plantoir/Plantoir.csproj` and
    `mac-app/project.yml`; they must match each other and the tag you are about
@@ -156,6 +158,18 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > `.\run-tests.ps1`, which reads it for you. `dotnet test` exits 1 for a
    > failing test, for a dead test host and for a project that did not compile,
    > and a release is exactly the moment that distinction gets waved through.
+
+   > **A green Windows suite can carry NAMED GAPS, so read the ledger too.**
+   > Since 2026-09-18, `windows-app/Plantoir.Tests/NamedGapLedger.cs` lets a
+   > contract key the Windows app has not built yet be held open by name
+   > instead of sitting red — each entry carrying the key, its GitHub issue and
+   > its MILESTONE. **Open that file before cutting and check every entry: its
+   > milestone must be LATER than the release you are cutting, and its issue
+   > must still be open.** An entry whose milestone IS this release means the
+   > work is owed NOW — build it, or move the issue to a later milestone as a
+   > deliberate decision. Never cut over one. The boundary and the reasoning
+   > are in `contracts/README.md` → "Named gaps"; the point of checking here is
+   > that this is the one moment the milestone on an entry means anything.
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries
    > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, `contracts/`,

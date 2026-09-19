@@ -498,6 +498,76 @@ than implying every line came off a run. **Nothing here has ever been seen to
 crash its host**; this exists so that if one ever does, it is read correctly
 the first time.
 
+### And when the failure IS real: a red contract test is a handover
+
+Everything above is about telling a genuine failure from a crash or an empty
+run. This is the case where the totals line is honest, the named test really
+did fail, and it is still not what it looks like.
+
+`AssistCardCommandTests`, `AssistSurfaceContractTests` and `ContractTests`
+deserialise `contracts/*.json` and run what they find. Those files are written
+on the mac, so **a failure in one of them usually means the mac moved and this
+side has not followed yet** — not that somebody broke something here this
+afternoon. The mac opens a GitHub issue labelled `windows` in the session it
+changes a contract (`CLAUDE.md` rule 3), so there is already a page naming what
+moved and what this app owes.
+
+**Read the open `windows` issues before filing a new one — and then check,
+because "usually" is not "always".** On 2026-09-09 a session mid-way through
+unrelated work met four of these and filed
+[#146](https://github.com/russellgordon/plantoir/issues/146) reporting them as
+one thing: a contract had moved with nobody told. They were four different
+things, and the run is worth knowing as a set.
+
+- **Two had an issue and an unreadable failure.**
+  [#70](https://github.com/russellgordon/plantoir/issues/70) had been open since
+  19:52 the previous evening, naming the phrasings and the failure itself —
+  *"Three more card phrasings will make your suite red"*, and separately the
+  parsed make-room family the second test actually failed on. The assertions
+  said `Assert.NotNull() Failure: Value is null` and gave the reader nothing to
+  search for. They name the phrasing, the tool and the handover now, which is
+  the durable half of the fix: a session that meets one is told where to look
+  without having to remember this page.
+- **One had a perfect failure and no issue at all.**
+  `AssistSurfaceContractTests` reported exactly that `back_up_course`'s
+  arguments had moved — *"must require exactly the arguments the contract says
+  it does"* — and nothing on either platform explained it. Not carelessness: the
+  tool was built matching this app's, a review fix twenty minutes later gave it
+  a `section`, and the issue written after that described the feature rather
+  than the fix. **So when you look and genuinely find nothing, you have found a
+  real gap**: say so, and open an issue labelled `mac`.
+- **One was this app's own** — a test that had retyped a contract value into a
+  literal, so it failed when the contract GREW. No issue elsewhere could have
+  named it.
+
+The fourth thing a red contract test can be is a case proposed FROM here, which
+turns the MAC's suite red on purpose and is a request rather than damage;
+[`contracts/README.md`](../contracts/README.md) covers both directions.
+
+**And a fifth: a handover that has arrived and whose fix is NOT in the release
+being cut.** Met 2026-09-18. The mac's unit-word rename moved
+`shared-rules.json` — one `activityTrail.mustRecord` event, one
+`specialNames.platformWording` key — and the Windows half is
+[#158](https://github.com/russellgordon/plantoir/issues/158), milestoned
+v1.3.0. `ContractTests.SharedRules_ActivityTrailEvents_Exist` and
+`SpecialFolderRenamerTests.EverySentenceTheContractCallsPlatformWordedSaysThisPc`
+were red with nothing anybody was meant to do about them yet, which makes
+"did anything break?" unanswerable for every other run in the meantime.
+
+Those two are now NAMED GAPS: `windows-app/Plantoir.Tests/NamedGapLedger.cs`
+holds one entry per key, carrying the key, the issue, the milestone and the
+reason. Everything else is asserted exactly as before, and the ledger fails
+both ways — if a ledgered thing starts existing here (saying to delete the
+entry) and if it stops being in the contract. **So a green totals line on this
+suite can mean "green, with two written debts"**, and the ledger file is the
+one place that says which. `contracts/README.md` → "Named gaps" carries the
+boundary: a named gap is allowed only while an open issue milestoned LATER
+than the release being cut owns the work, and never for a difference a teacher
+can see at the current milestone. Softening the contract instead — an
+`appliesOn: ["mac"]` that would be untrue and, having no mend-check, permanent
+— was rejected there and the reasoning is worth reading before proposing it
+again.
+
 ## Driving the real interface
 
 `run-ui-tests.ps1` launches the x64 Debug build and drives it with UI
