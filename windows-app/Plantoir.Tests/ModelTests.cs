@@ -750,12 +750,22 @@ public class CourseBackupTests
 
             Assert.True(File.Exists(ahead), "A stamp past the ceiling must never be deleted");
             Assert.Equal(CourseArchiver.MostBackupsKept, CountExisting(real));
+            Assert.False(File.Exists(real[0]), "The OLDEST real backup is the one that goes");
 
             // Move the clock past it. Nothing on disk changed; the answer does.
             CourseArchiver.PruneBackups("ICS3U", coursesDir, now + ArchiveStamp.FutureAllowance);
 
             Assert.True(File.Exists(ahead), "Now plausible, and the newest, so it is kept");
             Assert.Equal(CourseArchiver.MostBackupsKept - 1, CountExisting(real));
+
+            // WHICH one went, not merely how many are left: counting alone
+            // passes a sort that threw away a backup from the middle, and the
+            // whole point of the guard is which file the sort is allowed to
+            // reach. `real` is written oldest first, so the second prune takes
+            // the next-oldest and everything above it stays.
+            Assert.False(File.Exists(real[1]), "The next-oldest real backup is the one that goes next");
+            for (int i = 2; i < real.Count; i++)
+                Assert.True(File.Exists(real[i]), $"A real backup from the middle was deleted: {real[i]}");
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
     }
