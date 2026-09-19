@@ -104,8 +104,10 @@ enum GradedFolderChoices {
     /// to `i` where `lowercased(with: tr_TR)` gives `ı` — which is what
     /// Python's `str.lower()` and C#'s `OrdinalIgnoreCase` both do.
     /// `caseInsensitiveCompare` is locale-independent as well but folds
-    /// further than either: it calls `Straße` and `STRASSE` one name, and `Σ`
-    /// and `ς` one letter, where Python and C# call neither pair equal.
+    /// further than the build: it calls `Straße` and `STRASSE` one name, and `Σ`
+    /// and `ς` one letter, where Python's `str.lower()` — measured — calls
+    /// neither pair equal. (What C# answers for those two pairs was not
+    /// measured here; the build is the one this has to agree with.)
     ///
     /// **So this one is deliberately NOT the house idiom, and that is the
     /// point.** `caseInsensitiveCompare` is what mac model code asks folder-name

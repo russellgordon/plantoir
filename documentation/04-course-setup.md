@@ -736,7 +736,8 @@ what counts the folder:
   Turkish-locale Mac would disagree with the build about the plainest ASCII
   names.
 - **`caseInsensitiveCompare` is rejected**: locale-independent, but it folds
-  FURTHER than Python and C# — the two rows above.
+  FURTHER than Python, which is what the build uses — the two rows above.
+  (C#'s answer on those two pairs was not measured on this Mac.)
 - **`lowercased()` equality is chosen**: locale-independent (it folds `I` to
   `i` where `lowercased(with: tr_TR)` gives `ı`), the same fold `str.lower()`
   performs, and the same answer `OrdinalIgnoreCase` gives on ASCII. They are
@@ -763,7 +764,7 @@ keeps a pool entry whose folder has gone and Windows removes it. Both err
 safely — nothing counted is lost either way, and `site_health.py` raises
 `noGradedFolders` for a pool matching nothing published, on a course whose
 coverage map is on AND whose site has curriculum expectations (`site_health.py`
-:144: `coverage_wanted and curriculum_found and not graded_folders_found`) — so
+:145: `coverage_wanted and curriculum_found and not graded_folders_found`) — so
 it is left unpinned. The two halves are not free of each other,
 though: **the still-offered test must be at least as PERMISSIVE as the drop.**
 That is the mac's shape now (case-insensitive test, exact drop) and Windows'
