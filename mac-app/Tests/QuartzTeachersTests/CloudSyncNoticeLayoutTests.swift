@@ -9,6 +9,13 @@ import XCTest
 /// off the bottom of the screen: a responsive window with its bottom band
 /// blank, at every window height. Found by driving the real app; pinned
 /// here so it is found by the suite next time.
+///
+/// It was not found by the suite next time: the same fault shipped twice more
+/// in the same window and was caught by hand at the v1.2.0 release smoke
+/// (issue #211). `ProgressViewSizeTests` now carries the same measurement for
+/// the panels in the detail column, and the failure class is written up in
+/// `documentation/09-mac-app.md` → "A blank window: when a child claims a size
+/// the window cannot give".
 final class CloudSyncNoticeLayoutTests: XCTestCase {
 
     // MARK: - Functions

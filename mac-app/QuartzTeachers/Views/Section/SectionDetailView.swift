@@ -198,7 +198,12 @@ struct SectionDetailView: View {
             // window's toolbar when a preview was restarted.
             VStack(spacing: 0) {
                 if let stoppedScheduledPublish {
-                    stoppedPublishNotice(stoppedScheduledPublish)
+                    ScheduledPublishNoticeView(
+                        outcome: stoppedScheduledPublish,
+                        course: course.code,
+                        sectionNumber: sectionNumber,
+                        dismiss: dismissScheduledPublishNotice
+                    )
                 }
                 if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
                     consoleArea
@@ -832,55 +837,22 @@ struct SectionDetailView: View {
 
     // MARK: - A scheduled publish that stopped
 
-    /// What a teacher sees when an overnight publish did not get through.
+    /// Forget the notice a scheduled run left behind.
     ///
-    /// At the TOP of the section, above the console, because a teacher opening
-    /// a section after a failed overnight publish is looking for why their site
-    /// is out of date — and the console below is about what they are doing now,
-    /// not about what happened while they were asleep.
-    @ViewBuilder
-    func stoppedPublishNotice(_ stopped: ScheduledPublishOutcome.Stopped) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: stopped.kind.needsAttention
-                  ? "exclamationmark.triangle.fill"
-                  : "checkmark.circle.fill")
-                .foregroundStyle(stopped.kind.needsAttention ? .orange : .green)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(ScheduledPublishOutcome.sentence(
-                    for: stopped, course: course.code, section: sectionNumber
-                ))
-                .fixedSize(horizontal: false, vertical: true)
-                // The DATE as well as the day: a record can sit for a week
-                // if nobody dismisses it and no later run gets through, and
-                // "Tuesday 6:30 AM" with no date is a teacher wondering
-                // WHICH Tuesday.
-                Text(stopped.when, format: .dateTime.weekday(.wide).day().month().hour().minute())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            // Dismissing is the mac's own addition. Windows clears this only
-            // when a later scheduled run gets through, which leaves the message
-            // standing after a teacher has already fixed the problem by hand —
-            // and the next run that would clear it could be a week away.
-            Button("Dismiss") {
-                ScheduledPublishOutcome.clear(
-                    inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
-                    course: course.code,
-                    section: sectionNumber
-                )
-                stoppedScheduledPublish = nil
-                // The sidebar's badge is read during a row's render, so it
-                // needs telling that the answer changed — Dismiss happens
-                // here, in a different view with its own state.
-                workspace.stoppedPublishGeneration += 1
-            }
-            .accessibilityIdentifier("dismissStoppedPublish")
-        }
-        .padding(12)
-        .background((stopped.kind.needsAttention ? Color.orange : Color.green).opacity(0.12))
-        .accessibilityIdentifier("stoppedPublishNotice")
+    /// The notice itself is `ScheduledPublishNoticeView` — its own view, so
+    /// that a test can measure it; what stays here is the part that touches
+    /// this view's own state and the workspace.
+    func dismissScheduledPublishNotice() {
+        ScheduledPublishOutcome.clear(
+            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            course: course.code,
+            section: sectionNumber
+        )
+        stoppedScheduledPublish = nil
+        // The sidebar's badge is read during a row's render, so it
+        // needs telling that the answer changed — Dismiss happens
+        // here, in a different view with its own state.
+        workspace.stoppedPublishGeneration += 1
     }
 
     /// Look for a stopped run. READ ONLY — the trail line is written by the
