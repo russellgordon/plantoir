@@ -1,7 +1,8 @@
 import Foundation
 
 /// What happened to a publish that was set to happen on its own, kept where
-/// the app can find it the next time the teacher opens Plantoir.
+/// the app can find it — the moment it is written if the section is on screen,
+/// and whenever the teacher next opens that section otherwise.
 ///
 /// A scheduled publish runs at half six in the morning with the app closed.
 /// Until this existed, a run that did not get through said so in the section's
@@ -158,6 +159,39 @@ nonisolated enum ScheduledPublishOutcome {
             .appendingPathComponent("\(course)-section\(section).txt")
     }
 
+    /// Where a record is assembled before it is moved into place, so that it is
+    /// complete the instant it exists.
+    ///
+    /// **In the PARENT of the record folder, and that is measured rather than
+    /// tidy.** `ScheduledPublishWatcher` watches the record folder for entries
+    /// arriving, and what it sees depends entirely on how the wrapper writes:
+    ///
+    /// | how the record is written | events | first event readable |
+    /// |---|---|---|
+    /// | two `echo`s (what this used to do) | 1 | **0 of 40** |
+    /// | one `printf` of both lines | 1 | **0 of 40** |
+    /// | temp INSIDE the record folder, then `mv` | 3 | 2 of them carry no file |
+    /// | temp in the PARENT, then `mv` | **1** | **40 of 40** |
+    ///
+    /// (Measured 2026-09-19 on this Mac — Apple silicon, APFS — 40 trials each,
+    /// reading the record inside the event handler exactly as `record(at:)`
+    /// does. The rename-OVER-an-existing-record case is 40 of 40 too.)
+    ///
+    /// The reason all three of the losing shapes lose is the same: the event is
+    /// the directory entry being CREATED, which happens before any bytes are
+    /// written, and the write that finishes the file changes no directory entry,
+    /// so there is no second event to catch it with. `/bin/mv` within one
+    /// filesystem is `rename(2)`, and both paths are under Application Support
+    /// by construction, so the move is atomic and the entry appears whole.
+    ///
+    /// So: do NOT "tidy" this next to its target, and do not replace the move
+    /// with a single write however much shorter it looks.
+    static func partialRecordURL(inHomeFolder home: URL, course: String, section: Int) -> URL {
+        return directory(inHomeFolder: home)
+            .deletingLastPathComponent()
+            .appendingPathComponent("\(course)-section\(section).txt.partial")
+    }
+
     /// Write down that a scheduled publish stopped, unless one is already
     /// written for this section.
     ///
@@ -196,7 +230,18 @@ nonisolated enum ScheduledPublishOutcome {
     /// wrote its record, and reading it later must not re-date an overnight
     /// problem to the morning somebody noticed it.
     static func stopped(inHomeFolder home: URL, course: String, section: Int) -> Stopped? {
-        let url: URL = recordURL(inHomeFolder: home, course: course, section: section)
+        return record(at: recordURL(inHomeFolder: home, course: course, section: section))
+    }
+
+    /// The same read, of one record file, for a caller that has the path rather
+    /// than the course and section.
+    ///
+    /// `ScheduledPublishWatcher` uses it to tell a record that can be acted on
+    /// from one that is still being written: a half-written record — one line,
+    /// or a kind nobody recognises — reads as `nil` here rather than as a wrong
+    /// notice, which is why the watcher can watch a file until this stops
+    /// returning `nil` and be sure of what it then shows.
+    static func record(at url: URL) -> Stopped? {
         guard let body = try? String(contentsOf: url, encoding: .utf8) else {
             return nil
         }

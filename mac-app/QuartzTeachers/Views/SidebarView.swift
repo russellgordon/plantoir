@@ -99,11 +99,17 @@ struct SidebarView: View {
                                 // teacher who fixes the problem or dismisses
                                 // the notice should see the badge go without
                                 // the sidebar being rebuilt.
+                                //
+                                // The counter is the WATCHER's, which is what
+                                // makes this badge and the section's own band
+                                // move together in both directions: it moves
+                                // when a run finishes (the folder changed) as
+                                // well as when the teacher dismisses a notice.
                                 let stoppedPublish: ScheduledPublishOutcome.Stopped? =
                                     stoppedPublishBadge(
                                         courseCode: course.code,
                                         sectionNumber: sectionNumber,
-                                        generation: workspace.stoppedPublishGeneration
+                                        generation: ScheduledPublishWatcher.shared.generation
                                     )
                                 sectionRowLabel(
                                     sectionNumber: sectionNumber,
@@ -575,6 +581,13 @@ struct SidebarView: View {
                         .accessibilityIdentifier(
                             "stoppedPublishBadge-section\(sectionNumber)"
                         )
+                        // The same sentence twice, on purpose: hovering and
+                        // hearing the row should tell a teacher the same thing.
+                        // An orange triangle alone says "something", and a
+                        // teacher who cannot find out what without clicking is
+                        // being asked to guess.
+                        .help(SidebarView.stoppedPublishTooltip())
+                        .accessibilityLabel(Text(SidebarView.stoppedPublishTooltip()))
                 }
                 if let scheduledFor {
                     Image(systemName: "clock")
@@ -844,6 +857,22 @@ struct SidebarView: View {
     func scheduledDeployTime(courseCode: String, sectionNumber: Int, generation: Int) -> Date? {
         _ = generation
         return ScheduledDeploy.nextRun(courseCode: courseCode, sectionNumber: sectionNumber)
+    }
+
+    /// What the orange triangle beside a section means, said in full on hover
+    /// — and the same sentence again for anyone listening rather than looking.
+    ///
+    /// One sentence for all three ways a scheduled publish can stop: from the
+    /// sidebar they mean the same thing to a teacher, which is that the site
+    /// is not what they think it is. WHICH way it stopped, and when, is in the
+    /// section itself, which is where the sentence sends them.
+    ///
+    /// It names no date deliberately. The badge can stand for days if nobody
+    /// dismisses it, and a hover that said "on Tuesday" would have to be right
+    /// about WHICH Tuesday; the section's own notice carries the date in full.
+    static func stoppedPublishTooltip() -> String {
+        return "A publish that was set to happen on its own did not get through. "
+             + "Open this section to see what happened."
     }
 
     /// What the clock beside a section means, said in full on hover.

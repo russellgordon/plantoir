@@ -128,7 +128,7 @@ would look. That is what this section is for.
 
 ### How to test for it — and why the obvious test cannot
 
-Two measurements, and they answer different questions:
+Three measurements, and they answer different questions:
 
 ```swift
 // The IDEAL size: no width proposed, so nothing wraps.
@@ -154,6 +154,31 @@ The second is the one to write for a sentence. `ProgressViewSizeTests`'s
 `measuredHeight(of:width:height:)` are both this measurement; a bound of 300
 points is clear of every honest panel measured here (33–187) by a wide margin
 and nowhere near a rigid one (1,372–3,100).
+
+```swift
+// What it FILLS: a whole window proposed, and the height it claims of it.
+let controller = NSHostingController(rootView: AnyView(view))
+return controller.sizeThatFits(in: NSSize(width: 800, height: 720)).height
+```
+
+**The third catches the mirror image of this whole failure class**, added
+2026-09-19 with issue #216, and it belongs here because somebody meeting a
+panel in the wrong PLACE will read this page rather than the deployment one.
+A view that claims LESS height than it is offered is not blank and not clipped;
+it is centred, because the `ZStack` around the section's detail column centres a
+child that does not fill. That is how the scheduled-publish notice came to float
+in the middle of an empty window with nothing above it: measured at 800 × 720,
+the "No Preview Running" placeholder claimed 189 points and the layer carrying
+the notice 246, so 237 points of nothing sat above the band.
+`ProgressViewSizeTests`'s `heightClaimedOfAWholeWindow(of:width:height:)` is that
+measurement, asserted with `XCTAssertGreaterThanOrEqual(claimed, 719)`.
+
+The fix is a flexible `.frame(maxWidth: .infinity, maxHeight: .infinity)` and
+**never a fixed height** — which is why the third measurement is written BESIDE
+the second rather than instead of it: with no height proposed a flexible frame
+resolves to its ideal size, so the squeezed bound still catches a rigid one.
+The worked example is in `documentation/07-deployment.md` → "The notice has to
+arrive while the teacher is looking".
 
 **Measure the thing in the place it is HOSTED, not on its own.** Three views
 in the main window carry the modifier today and are all fine, and it is the

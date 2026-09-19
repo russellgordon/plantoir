@@ -626,8 +626,12 @@ own log and nowhere else, so it was indistinguishable from a run that was never
 scheduled. That is the shape of *"my site did not update on Tuesday and I do not
 know why"*, and it had no answer.
 
-**How the handover works.** The wrapper writes a small record, and the app
-reads it the next time the teacher opens that section. The trail line is a
+**How the handover works.** The wrapper writes a small record, and the app reads
+it — the moment it lands if the teacher is looking at that section, and
+otherwise the next time they open it. (Reading it only on opening was all this
+did until 2026-09-19; the sub-section "The notice has to arrive while the
+teacher is looking" below is what changed, and why it needed a change to the
+wrapper as well.) The trail line is a
 separate matter and is written by the RUN — see below; this paragraph used to
 say the wrapper "runs with nothing of ours loaded", and that was never true on
 this side. **The launchd agent runs Plantoir**, which runs the wrapper and then
@@ -636,7 +640,10 @@ does its own post-run work.
 - The launchd wrapper captures the BUILD's exit code and then each
   destination's. On a non-zero one it writes `~/Library/Application Support/
   Plantoir/scheduled/stopped/<CODE>-section<N>.txt` — first line the kind,
-  second the destination.
+  second the destination. It assembles both lines in
+  `…/scheduled/<CODE>-section<N>.txt.partial` and **moves** the finished file
+  into place; the sub-section below is the whole reason, and it is not a
+  tidiness preference.
 - **Exit 3 is tested before the general non-zero branch**, because it is also
   non-zero. Three means `NEEDS_AN_ANSWER` and nothing else; anything else is an
   ordinary failure.
@@ -687,7 +694,123 @@ the console — a teacher opening a section after a failed overnight publish is
 looking for why their site is out of date, and the console is about what they
 are doing now. A warning badge also appears beside that section in the sidebar,
 because **a teacher who does not know which section failed cannot open the right
-one**, and not knowing is the whole problem.
+one**, and not knowing is the whole problem. The sentence and the badge appear
+at the **same moment**, because since 2026-09-19 both follow one counter — the
+section's band is re-read and the sidebar row re-rendered off
+`ScheduledPublishWatcher.generation`, in both directions: a run finishing moves
+it, and so does the teacher dismissing the notice.
+
+### The notice has to arrive while the teacher is looking
+
+Added 2026-09-19 for [issue
+#216](https://github.com/russellgordon/plantoir/issues/216), found in Russell's
+hand smoke of the v1.2.0 build. Schedule a deploy a few minutes ahead, stay on
+that section, and watch the run finish: **nothing changed on screen** until you
+clicked up to the course and back down again. Both places that read the record
+read it only when they were built — the section's `.onAppear` and the sidebar
+row's own render — and the run is a separate process, so nothing told an open
+window that the file had changed. A teacher who stays put was never told.
+
+**The file is the event, so the file is what is watched.**
+`ScheduledPublishWatcher` opens one watch on the record folder and moves a
+single counter; every observer then re-reads its OWN record. One watcher for the
+whole app, not one per window: the folder hangs off the home folder alone, so a
+watcher per window would be several watchers and several counters for one global
+truth, and a second window's sidebar would go stale. The counter carries no
+payload on purpose — two sections finishing in the same millisecond produce one
+bump and two correct notices, and a coalesced event is therefore never a lost
+one. `workspace.stoppedPublishGeneration`, which until now only Dismiss moved,
+was retired into it.
+
+**The measurement that decided the shape of the wrapper.** A watch on a
+DIRECTORY fires when an entry is created, removed or renamed. It does *not* fire
+when a file that is already there grows. Measured on this Mac (Apple silicon,
+APFS, 2026-09-19), with a real vnode source reading the record inside the event
+handler exactly as the app does, 40 trials each:
+
+| how the wrapper writes the record | events | first event carried a readable record |
+|---|---|---|
+| two `echo`s — what it used to do | 1 | **0 of 40** |
+| one `printf` of both lines | 1 | **0 of 40** |
+| temporary file INSIDE the watched folder, then `mv` | 3 | 2 of the 3 carried nothing |
+| temporary file in the PARENT, then `mv` | **1** | **40 of 40** |
+
+The losing shapes lose for one reason: the event is the directory entry being
+created, which happens before any bytes are written, and the write that finishes
+the file changes no directory entry — so there is no second event to catch it
+with. **A watcher shipped against the old wrapper would not have been flaky; it
+would have done nothing, every time.** Hence `recordCompletionLines` in
+`ScheduledDeploy`, and `ScheduledPublishOutcome.partialRecordURL` beside the
+folder rather than in it. `/bin/mv` within one filesystem is `rename(2)`, and
+both paths are under Application Support by construction, so the move is atomic.
+Nothing about failure changed: the wrapper has no `set -e`, so a failed write
+leaves an empty temporary file which `mv` installs, and an empty record reads as
+no record — exactly what a failed `echo` produced before.
+
+**A job scheduled by an OLDER build still shows its notice live**, and this is
+the part that is easy to skip. The wrapper is written to disk when the section is
+scheduled and is not rewritten until it is scheduled again, so a job already
+installed keeps writing two `echo`s however this app now generates them. When a
+folder event turns up a record that is there but cannot be read yet, the watcher
+opens a second watch on **that file** — which does see the completing write —
+and closes it as soon as the record reads or goes away. An event, not a timer.
+**Rejected:** rewriting every pending job's wrapper at launch. It is more code,
+it edits files launchd is about to run — including, unavoidably, one that may be
+running at that moment — and it would only ever fix wrappers this app wrote,
+where the file watch covers any two-step writer, a record restored from a
+backup included.
+
+**Also rejected, and why:**
+
+- **Polling on a timer.** A guessed number either way: fast enough to feel live
+  is a filesystem read every second for ever, against an event that happens once
+  a day; slow enough to be polite is not "while the teacher is looking". The
+  thing being waited for is directly observable.
+- **A distributed notification from the run.** `runScheduled` *is* Plantoir and
+  could post one. It is a second channel that can disagree with the file, and it
+  covers only writers that are Plantoir — not a record removed by hand, not a
+  restore, not another window.
+- **`NSFilePresenter`/`NSFileCoordinator`.** It observes *coordinated* writes,
+  and a `mv` from `/bin/bash` is not one. It would never fire at all.
+- **FSEvents** needs a dispatch queue too, plus a C callback and an `Unmanaged`
+  context, and coalesces with a delay: more Dispatch, three times the code,
+  later events. **A raw `kevent()` loop** needs a thread of its own blocked in
+  the kernel.
+- **Widening the watch** to the findings sentinel beside the record. Genuinely
+  worth doing and not here: it raises whether an overnight folder problem should
+  throw a dialog at a teacher mid-lesson, which is a product decision.
+
+**The one use of Dispatch in this app**, and it is commented as such where it
+lives. `DispatchSource.makeFileSystemObjectSource` is the kernel's own
+file-system event source and takes a queue as a required parameter — the queue
+is a delivery channel, not somewhere work is thrown. Nothing is deferred,
+nothing waits, and the events are consumed with `for await` on the main actor.
+Both watches are armed *before* `start()` returns, which is what lets the tests
+be deterministic: `ScheduledPublishWatcherTests` has **no sleeps at all** — every
+wait is an expectation re-checked when the counter moves, and its seven cases run
+in under half a second.
+
+**A preview showing changes nothing about this.** The notice lives in the base
+layer of the section's `ZStack`, underneath the full-bleed web view, so a band
+arriving mid-preview does not shove the site around; it is there when the
+preview closes. Checked by hand on 2026-09-19 with a real preview on screen: the
+site did not move and the window survived, which is the corner #211 lived in.
+The same hand check, at the window's minimum height with nothing touched, saw
+the band come up flush under the toolbar and another section's sidebar warning
+appear at the same moment — and both go again when the records are removed.
+
+**And it now sits where it belongs.** In the same smoke Russell found the band
+floating in the MIDDLE of an empty window. The cause was that the base layer hugged
+its content: measured at 800 × 720, the "No Preview Running" placeholder claimed
+189 points and the layer with the notice 246, so the `ZStack` centred it and put
+237 points of nothing above the notice. The placeholder (now
+`NoPreviewPlaceholderView`) fills the height it is offered, which puts the notice
+flush under the toolbar and still centres the placeholder in what is left. **Not
+a fixed height** — a rigid height in that column is the failure class issue #211
+closed, and `ProgressViewSizeTests` measures both properties side by side. The
+console branch had always filled, by way of the `Spacer(minLength: 0)` at the
+bottom of `consoleArea`, which is why the notice sat correctly whenever anything
+was running and wrongly when nothing was.
 
 ### A build that stopped for a question is its own outcome
 
