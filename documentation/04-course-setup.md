@@ -1015,7 +1015,8 @@ each pinned by tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
   **The EXCLUSION was shared and the REACH was not** — and this needs saying
   carefully, because an earlier draft of this page called the whole thing
   parity. A class page never inherits a date on either platform
-  (`AssistWorkspace.cs:916`, and `contracts/class-planning.json` →
+  (`AssistWorkspace.cs:916`, `AssistPublishPlanner.dateMovesFollowingClasses`
+  in `AssistPublishPlan.swift`, and `contracts/class-planning.json` →
   `datingPagesAClassBrings`: "a class's date is its place in the schedule").
   But Windows' `continue` sits in front of its `queue.Enqueue(target)`, so it
   stopped the walk THERE, while the mac's date code reached its pages through
