@@ -3454,10 +3454,14 @@ signed in with a ChatGPT account. The Plantoir binary used was the DerivedData
 Debug bundle; the working folder was `~/Desktop/plantoir-overnight`, which is
 not a git repository.
 
-1. **`-c` can DEFINE a new MCP server for one invocation, and persists
-   nothing.** `codex -c 'mcp_servers.plantoir.command="…"' -c
+1. **`-c` can DEFINE a new MCP server for one invocation, and Plantoir
+   persists nothing.** `codex -c 'mcp_servers.plantoir.command="…"' -c
    'mcp_servers.plantoir.args=[…]' mcp list` listed `plantoir … enabled`, and no
-   `~/.codex/config.toml` existed afterwards. A path containing both a space
+   `~/.codex/config.toml` existed afterwards. (That file DID exist after the
+   interactive run in 3 — written by CODEX, not by Plantoir: it records the
+   teacher's own answer, `[projects."<folder>"] trust_level = "trusted"`,
+   and it is also where an "Always allow" answer is kept. Plantoir's server
+   is never written into it.) A path containing both a space
    and an apostrophe survived the two escaping layers. This was the design's one
    real unknown and it is settled: dotted overrides create the missing
    intermediate tables, and each value is parsed as TOML.
@@ -3471,9 +3475,11 @@ not a git repository.
    trusted directory and `--skip-git-repo-check` was not specified", exit in
    0.06 s), but the TUI — which is what the door launches — shows a trust
    prompt instead. **So no `--skip-git-repo-check` is needed**, and none is
-   passed. The decision is saved, so it is asked once per folder. A teacher who
-   answers "Quit" gets a window that closes while the trail already says a
-   session started; worth knowing when a report says "nothing happened".
+   passed. The decision is saved, so it is asked once per folder. (NOT measured,
+   but read off the code: the trail line is written before the terminal is
+   launched, so a teacher who answers "Quit" gets a window that closes while
+   the trail already says a session started — worth knowing when a report says
+   "nothing happened". The Claude door has always done the same.)
 4. **The positional greeting is taken as the first message.** Codex
    immediately called `plantoir.list_courses({})` and rendered both courses.
 5. **A WRITE is gated by Codex itself, with no approval flags from us.** Asked
@@ -3483,6 +3489,23 @@ not a git repository.
    **1. Allow / 2. Allow for this session / 3. Always allow / 4. Cancel**.
    Note the third: **"Always allow" persists the teacher's choice for future
    sessions**, which is a decision they make and Plantoir cannot see.
+
+6. **The two doors differ in WHEN the publishing explanation arrives, and
+   that is accepted.** Russell opened both doors on the same course from the
+   built feature (2026-09-19, a fresh non-git folder, ICS4U, one section). Same
+   greeting, same first call (`list_courses`), same promise to show the plan
+   and wait. But Claude made TWO Plantoir calls and relayed
+   `explain_publishing`'s text word for word at the greeting, while Codex made
+   one and did not. The cause is the tool's own description — "Call this
+   FIRST, before doing anything else with a section": Claude reads "first"
+   eagerly; Codex defers it until it is about to act on a section (in 5 it
+   called it unprompted immediately before the unpublish). The explanation
+   still reaches a teacher before any change. REJECTED: adding a sentence to
+   Codex's greeting to make the openings look alike — cosmetic, and it would
+   make the two greetings diverge. Also seen: asked about the teacher's
+   teaching style, both honestly said they did not know yet — neither had read
+   a page, and nothing Plantoir hands them says how the course is taught.
+   That is issue #209.
 
 Whole `exec` session including the model call: 15 s. MCP cold-start was not
 timed separately, and a signed-out launch was not measured (expected: Codex
