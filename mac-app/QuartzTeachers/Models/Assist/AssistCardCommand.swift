@@ -505,7 +505,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// in it to read out), and so does every sentence the hide frame beside it
     /// now tolerates: a courtesy word, a question mark, a doubled space, a
     /// stray comma. Verified by differential fuzz rather than by reading:
-    /// 13,464 generated sentences through this matcher and `dev`'s, **0
+    /// 36,864 generated sentences through this matcher and `dev`'s, **0
     /// matches gained and 0 lost on `publish_pages`**.
     ///
     /// The `.` and `!` a teacher types at the end are still accepted, because
