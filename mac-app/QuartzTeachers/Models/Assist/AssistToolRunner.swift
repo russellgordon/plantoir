@@ -3491,6 +3491,13 @@ final class AssistToolRunner {
     /// fixed phrasings send it; it is not RENAMED, because `AssistCardCommand`
     /// is generated into the contract and both suites assert that key.
     ///
+    /// **A MOMENT has its own settler beside this one**, added with the
+    /// deploy-at-a-time family: `settlingTheDeployMoment`, which reads the
+    /// tools that declare `when` and NOT `date`. The two divide the tool
+    /// surface between them by construction rather than by agreement — a tool
+    /// cannot be in both — so "which settler owns this argument" is answered by
+    /// the schema and never by memory.
+    ///
     /// A word this cannot read is left exactly as it arrived, so the sentence
     /// a teacher sees is still the runner's own refusal rather than a silent
     /// change of subject.
@@ -3526,6 +3533,225 @@ final class AssistToolRunner {
             settled[key] = day.text
         }
         return settled
+    }
+
+    /// The same arguments, with a bare clock time settled into the whole
+    /// moment it means.
+    ///
+    /// The twin of `settlingTheClassDay`, for the tools that take a MOMENT:
+    /// one that declares `when` and does not declare `date`. `schedule_deploy`
+    /// and its plan twin are those two today, so `publish_class_on`'s
+    /// day-shaped `when` is untouched by construction rather than by being
+    /// remembered.
+    ///
+    /// **Called ONCE, where the call is made**, for the same reason the day is
+    /// — the card holds these arguments while the teacher decides, and
+    /// `approvePending` hands the very same object to `execute`. A clock time
+    /// carried through would be read again against a clock that has moved, so
+    /// a card shown at 06:29 and agreed to at 06:31 would schedule a different
+    /// minute than the one it named. Settling here makes the moment on the
+    /// card and the moment in the plist the same by construction.
+    ///
+    /// **It is idempotent**, which is what lets the caller settle before
+    /// writing its trail line and then hand the settled call straight on:
+    /// `"2026-09-20 06:30"` is not a bare time, so it is handed back untouched.
+    ///
+    /// Anything this cannot read is left exactly as it arrived, so a teacher
+    /// still meets the runner's own refusal rather than a silent change of
+    /// subject. `AssistMCPServer` deliberately calls neither settler — see the
+    /// note above.
+    static func settlingTheDeployMoment(in arguments: [String: Any],
+                                        forTool definition: AssistToolDefinition,
+                                        today: CalendarDay,
+                                        now: Date,
+                                        timeZone: TimeZone = TimeZone.current) -> [String: Any] {
+        guard definition.parameters["when"] != nil, definition.parameters["date"] == nil else {
+            return arguments
+        }
+        let raw: String = AssistToolRunner.text("when", in: arguments)
+        if raw.isEmpty {
+            return arguments
+        }
+        guard let moment = AssistToolRunner.momentText(
+            forTimeOfDay: raw, today: today, now: now, timeZone: timeZone
+        ) else {
+            return arguments
+        }
+        var settled: [String: Any] = arguments
+        settled["when"] = moment
+        return settled
+    }
+
+    /// `"06:30"` → `"2026-09-20 06:30"`, and the same for `"today 06:30"` and
+    /// `"tomorrow 06:30"`. Nil for anything else, including a moment that is
+    /// already whole.
+    ///
+    /// **A bare time means the next such time, forwards, counting today while
+    /// it is still to come.** That is word for word the rule
+    /// `dayNamedByWeekday` already applies to a bare day word, one unit down,
+    /// and it is the reading a person gives it: asked at nine in the morning
+    /// for "6:30 am", a teacher means tomorrow.
+    ///
+    /// **The guess is never silent**, which is the reason it is allowed to be
+    /// a guess at all. `schedule_deploy` waits for a button, and its card names
+    /// the whole moment — weekday, date and time — before anything is written,
+    /// so a teacher who meant this morning reads the day and presses Cancel.
+    /// The alternative considered and rejected was "today at that time,
+    /// always", which invents no rule but answers the shelf's own card with a
+    /// refusal for most of the day.
+    ///
+    /// **An explicit day word is obeyed, even into the past.** "today 06:30"
+    /// said at nine stays on today and meets `ScheduledDeploy`'s existing
+    /// "…has already passed" refusal, in the teacher's own words. They named
+    /// the day; the app does not move it for them.
+    ///
+    /// **What comes back is always a real instant, written the way
+    /// `moment(named:)` reads it back** — see `text(ofMoment:timeZone:)`,
+    /// which is where that is made true rather than merely intended, and what
+    /// it costs on the morning the clocks go forward.
+    ///
+    /// The time zone is a parameter so a test can pin the answer; everything
+    /// in the app passes the machine's own, which is the zone
+    /// `moment(named:)` reads the settled text back in.
+    static func momentText(forTimeOfDay raw: String,
+                           today: CalendarDay,
+                           now: Date,
+                           timeZone: TimeZone = TimeZone.current) -> String? {
+        var words: [String] = []
+        for piece in raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            .split(separator: " ") {
+            words.append(String(piece))
+        }
+        var dayWord: String = ""
+        if words.count == 2 {
+            dayWord = words[0]
+            words.removeFirst()
+        }
+        guard words.count == 1, AssistToolRunner.isAClockReading(words[0]) else {
+            return nil
+        }
+        let time: String = words[0]
+
+        switch dayWord {
+        case "":
+            guard let todayAt = AssistToolRunner.moment(
+                on: today, atTimeOfDay: time, timeZone: timeZone
+            ) else {
+                return nil
+            }
+            if todayAt > now {
+                return AssistToolRunner.text(ofMoment: todayAt, timeZone: timeZone)
+            }
+            return AssistToolRunner.text(
+                ofTimeOfDay: time, onDayAfter: today, timeZone: timeZone
+            )
+        case "today":
+            guard let todayAt = AssistToolRunner.moment(
+                on: today, atTimeOfDay: time, timeZone: timeZone
+            ) else {
+                return nil
+            }
+            return AssistToolRunner.text(ofMoment: todayAt, timeZone: timeZone)
+        case "tomorrow":
+            return AssistToolRunner.text(
+                ofTimeOfDay: time, onDayAfter: today, timeZone: timeZone
+            )
+        default:
+            return nil
+        }
+    }
+
+    /// The same, on the day after the one given.
+    private static func text(ofTimeOfDay time: String,
+                             onDayAfter today: CalendarDay,
+                             timeZone: TimeZone) -> String? {
+        guard let tomorrow = AssistToolRunner.shifting(today, byDays: 1),
+              let moment = AssistToolRunner.moment(
+                  on: tomorrow, atTimeOfDay: time, timeZone: timeZone
+              ) else {
+            return nil
+        }
+        return AssistToolRunner.text(ofMoment: moment, timeZone: timeZone)
+    }
+
+    /// A real instant, written the way `moment(named:)` reads it back.
+    ///
+    /// **Built from the INSTANT rather than by joining a day to a time**, and
+    /// that is the whole of the difference on one night a year. On the morning
+    /// the clocks go forward, 02:30 does not happen: joining the strings would
+    /// hand back "2026-03-08 02:30", which is a wall time this Mac's calendar
+    /// has no instant for — so `moment(named:)`, three strict `DateFormatter`
+    /// patterns, reads it back as NOTHING. The consequences were all silent
+    /// and all wrong: the trail line would drop its moment, the approval card
+    /// would fall back to printing the raw text instead of "Sunday 8 March,
+    /// 2:30 AM", and approving it would fail with the app quoting its own
+    /// output back at the teacher as unreadable.
+    ///
+    /// `Calendar` moves a nonexistent wall time FORWARD to the instant the
+    /// clocks jump to, so a teacher who asks for half two on that night is
+    /// shown 3:30 AM on the card and can say no. That is the same standard the
+    /// rest of this feature is held to: the app may choose, as long as it
+    /// shows what it chose before anything happens.
+    ///
+    /// **Rejected: returning nil for a wall time that does not exist.** It is
+    /// one line and it keeps the invariant too, but it answers a teacher who
+    /// asked for a perfectly ordinary time with "I could not read that" — on
+    /// the one night when the reason is a fact about their clock rather than
+    /// about their sentence, and with nothing anywhere to explain it.
+    private static func text(ofMoment moment: Date, timeZone: TimeZone) -> String {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: moment)
+    }
+
+    /// Whether the text is exactly `HH:mm` on a 24-hour clock.
+    ///
+    /// Deliberately narrow: this reads what `AssistCardCommand` writes, and a
+    /// model that sends `"6:30"` still meets the runner's own refusal rather
+    /// than having a day guessed onto a time nobody could read.
+    static func isAClockReading(_ text: String) -> Bool {
+        guard text.count == 5 else {
+            return false
+        }
+        let characters: [Character] = Array(text)
+        for position in 0..<5 {
+            if position == 2 {
+                if characters[position] != ":" {
+                    return false
+                }
+            } else if !characters[position].isASCII || !characters[position].isNumber {
+                return false
+            }
+        }
+        guard let hour = Int(String(characters[0..<2])),
+              let minute = Int(String(characters[3..<5])),
+              hour <= 23, minute <= 59 else {
+            return false
+        }
+        return true
+    }
+
+    /// A day and a time of day, as one instant in a given time zone.
+    private static func moment(on day: CalendarDay,
+                               atTimeOfDay time: String,
+                               timeZone: TimeZone) -> Date? {
+        let characters: [Character] = Array(time)
+        guard AssistToolRunner.isAClockReading(time),
+              let hour = Int(String(characters[0..<2])),
+              let minute = Int(String(characters[3..<5])) else {
+            return nil
+        }
+        var calendar: Calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        var components: DateComponents = DateComponents()
+        components.year = day.year
+        components.month = day.month
+        components.day = day.day
+        components.hour = hour
+        components.minute = minute
+        return calendar.date(from: components)
     }
 
     /// A day the teacher named: `2026-09-15`, or the handful of words the

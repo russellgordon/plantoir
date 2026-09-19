@@ -62,6 +62,23 @@ nonisolated enum ActivityTrail {
         case assistantAsked = "assistant asked"
         case assistantChoseATool = "assistant chose a tool"
         case assistantCouldNotAnswer = "assistant could not answer"
+        /// The engine stopped the assistant part way through an answer, so
+        /// Plantoir threw the answer away rather than acting on a fragment.
+        ///
+        /// Exactly the line a problem report needs and could not have. From a
+        /// teacher's side this is a long wait followed by the assistant
+        /// declining, which is indistinguishable from a misroute — so a
+        /// report of "it thought for ages and then said no" had nothing to
+        /// look at. Carries the tool the model had BEGUN to name, because "it
+        /// ran away trying to publish" and "it ran away trying to deploy" are
+        /// different reports; never what it had begun to write, which is the
+        /// teacher's own page titles.
+        ///
+        /// Not folded into `assistantCouldNotAnswer`, which is for an engine
+        /// that FAILED: here the engine answered perfectly and the app
+        /// refused the answer, and a line saying it could not answer would
+        /// send whoever reads it looking for a crash that did not happen.
+        case assistantAnswerWasCutOff = "assistant answer was cut off"
         case assistantMatchedAFixedPhrase = "assistant matched a fixed phrase"
         case settingsPanelOpened = "app settings opened"
         case assistantModelChosen = "assistant model chosen"

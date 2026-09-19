@@ -74,6 +74,34 @@ final class AssistScenarioTests: XCTestCase {
             XCTAssertEqual(command.toolName, match["tool"] as? String, phrasing)
             XCTAssertEqual(command.arguments, match["arguments"] as? [String: String] ?? [:], phrasing)
         }
+
+        // The PARSED families too, both halves of each: the example must reach
+        // the tool the file names, and the near-miss must reach nothing.
+        //
+        // Windows has run these since the families were first described
+        // (`AssistCardCommandTests.cs`) and the mac never did — so a family
+        // whose example had stopped matching would have gone red on their
+        // machine, from a file generated on this one. Six families now; the
+        // deploy-at-a-time one also has a table of its own, in `deployAtATime`
+        // and run by `ScheduleDeployCardTests`, because one example cannot
+        // describe a grammar of times.
+        let parsed: [[String: Any]] = try XCTUnwrap(phrasings["parsed"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(parsed.count, 6, "The contract has lost a parsed family")
+        for family in parsed {
+            let example: String = try XCTUnwrap(family["example"] as? String)
+            let command: AssistCardCommand = try XCTUnwrap(
+                AssistCardCommand.matching(example),
+                "\"\(example)\" is the contract's example for a parsed family and matches nothing"
+            )
+            XCTAssertEqual(command.toolName, family["tool"] as? String, example)
+
+            let notThis: String = try XCTUnwrap(family["notThis"] as? String)
+            XCTAssertNil(
+                AssistCardCommand.matching(notThis),
+                "\"\(notThis)\" is the near miss the contract says this family must refuse"
+            )
+            XCTAssertNotNil(family["becauseNotThis"] as? String, notThis)
+        }
     }
 
     /// The arrow-key history, from the same contract.
