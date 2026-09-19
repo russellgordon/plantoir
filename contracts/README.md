@@ -219,8 +219,11 @@ Four ways out, and only the last is honest:
   `ItemExcluded`, `ItemReIncluded` and `RemovalBlocked` were declared with the
   site-health work for exactly this reason, and the comment beside them
   disclaims itself as precedent in as many words. Rejected here, and the
-  difference is not tidiness. Those three were days ahead of their call sites
-  inside one release; this is a whole feature a milestone away. And an event
+  difference is not tidiness — it was measured rather than remembered. All
+  three were declared in `a3144010` at 08:17 on 2026-08-25 and all three got
+  their first `ActivityTrail.Note` call in `a3c581fb` at 08:45 the same
+  morning: **28 minutes**, inside one piece of work. This is a whole feature a
+  milestone away. And an event
   that is named but never recorded tells the contract a line exists that no
   teacher's trail will ever carry — a green test asserting a trail that cannot
   happen, which is worse than a red one, because the next person asking "does
