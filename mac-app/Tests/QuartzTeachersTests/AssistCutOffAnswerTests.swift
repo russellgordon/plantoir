@@ -276,6 +276,45 @@ final class AssistCutOffAnswerTests: XCTestCase {
         XCTAssertEqual(toolResults(in: agent), [])
     }
 
+    /// The teacher hears the same sentence for both causes — from their side
+    /// an answer that ran out of room and one that came out garbled are the
+    /// same event. The TRAIL has to tell them apart, because whoever reads a
+    /// report cannot: one is a question about how much the model was asked to
+    /// write, the other about the model itself.
+    func testTheTrailTellsTheTwoCausesApart() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let folderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cut-off-trail-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: folderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: folderURL)
+        }
+
+        let engine: StubEngine = try StubEngine()
+        defer { engine.stop() }
+        engine.serve(Canned.finished(
+            tool: "publish_pages",
+            arguments: #"{"course": "ICS3U", "section": 1, "pages": "Unit 1, Day"#
+        ))
+
+        let agent: AssistAgent = AssistFixture.makeAgent(
+            tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
+        )
+        await agent.say("Publish tomorrow's class and everything it links to")
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("finished answering but what it wrote for publish pages could not be read"),
+            "The trail says the answer was cut off, when the engine did not cut it off:\n\(trail)"
+        )
+        XCTAssertTrue(trail.contains("nothing was run from it"), trail)
+    }
+
     /// A second lap can be cut off too, and the gate has to be in the loop
     /// rather than at its entrance: a read hands back to the model, and the
     /// model's next answer is a fresh chance to run away.
