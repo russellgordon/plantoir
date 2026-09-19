@@ -72,17 +72,32 @@ def read_scalar(raw_value, next_line=None):
     `was_quoted` matters: quotes stop PyYAML resolving `no` or `false` into a
     boolean, so they change the answer.
 
-    `next_line` is the first NON-BLANK line below the key, when the caller can
-    see it: a key with nothing after the colon takes its value from there, and
-    this reader does not follow it.
+    `next_line` is the first line below the key that could be a VALUE, when the
+    caller can see it. A value that CONTINUES onto that line is one this reader
+    will not follow, HOWEVER complete the key's own line looks.
     """
     value = trim(raw_value)
+
+    # A value CONTINUES onto the next line whenever the first line that could
+    # be one is INDENTED, whatever is on the key's own line.
+    #
+    # `publish:` alone is null, which publishes the page, unless the value is
+    # sitting below it. But so is `publish: false` with an indented `false`
+    # under it: YAML folds the two into the one plain scalar "false false", a
+    # STRING that is not "false", and the page is PUBLISHED. Measured
+    # 2026-09-19, python-frontmatter 1.3.0 / PyYAML 6.0.3 — `no`, `off` and
+    # `FALSE` behave the same way, and so does a blank line between the two.
+    #
+    # Reading the key's line alone called all of those pages hidden, and
+    # called it confidently, which is what let a writer's "already right,
+    # change nothing" gate turn "hide this page" into a no-op. Both apps
+    # answer `cannot tell` here, and this list is run against all three
+    # implementations.
+    if next_line is not None and next_line[:1] in (" ", "\t"):
+        return None
     if value == "":
-        # `publish:` on its own is null, which publishes the page — unless the
-        # value is sitting indented below it, which is a value this reader
-        # will not follow.
-        if next_line is not None and next_line[:1] in (" ", "\t"):
-            return None
+        # Nothing after the colon and nothing below it: a genuine null, and a
+        # null publishes the page.
         return ("", False)
     if value[0] in _REFUSED_FIRST_CHARACTERS:
         return None

@@ -1710,19 +1710,33 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
         # taken too: leaving them behind orphans an indented scalar under
         # whatever key happens to follow, which stops the build.
         #
-        # Blank lines and indented COMMENTS are stepped over rather than
+        # Blank lines and COMMENTS AT ANY INDENT are stepped over rather than
         # stopping the scan, because YAML steps over them: `draft:` then a
         # blank line then an indented `true` hides the page, measured, and a
         # scan that stopped at the blank called the key null and published it
         # into every section. A comment is not a value, so a complete value
         # followed by an indented `# note` does NOT continue — and the note
         # is the teacher's, so it stays where they wrote it.
+        #
+        # "At any indent" was `line_below[:1] in (" ", "\t") and
+        # is_comment(...)` until 2026-09-19, so a COLUMN-0 note between a key
+        # and its value ended the scan. Measured: `publish:` / `# note` /
+        # `  false` is HIDDEN before the split and VISIBLE in section 1 after
+        # it, and `publish: false` / `# note` / `  false` — a page that
+        # already does not build — is split into two that still do not. The
+        # reader (`page_visibility.read_scalar`, via `build_site`) and the mac
+        # and Windows writers all step over a comment at any indent; this was
+        # the fourth implementation and the odd one out. The consequence to
+        # know: a column-0 note BETWEEN a key and its value is now taken WITH
+        # the value, which is what the rule already said — a note with a real
+        # value under it goes with the value — while a note with nothing under
+        # it is still left exactly where the teacher wrote it.
         continues = False
         follow = index + 1
         last_value_line = index
         while follow < len(head_lines):
             line_below = head_lines[follow]
-            if trim(line_below) == "" or (line_below[:1] in (" ", "\t") and is_comment(line_below)):
+            if trim(line_below) == "" or is_comment(line_below):
                 follow += 1
                 continue
             if line_below[:1] not in (" ", "\t"):
