@@ -133,14 +133,53 @@ hashes the same as the copy taken from the live server before this change
 (SHA-256 of the sorted-key JSON, first 24 hex: e5aec1fdba82cea1d27a4c7d, both
 sides). Nothing the model is shown moved.
 
+CORRECTED ON REVIEW, BEFORE MERGE — THE PUBLISH ARM HAD WIDENED
+----------------------------------------------------------------
+The first version of the frame read the VERB after stripping "please" and a
+trailing question mark, which widened publish as a side effect. An adversarial
+differential fuzz across two compiled copies of the matcher — dev's and the
+candidate's, every verb/noun/number/tail/spacing combination — found 0 matches
+lost, 0 arguments changed, and **141 new publish_pages matches**, none of them
+asked for:
+
+  'please publish unit 4'   dev: NONE   candidate: MATCH publish_pages Unit 4
+  'publish unit 4 please'   dev: NONE   candidate: MATCH publish_pages Unit 4
+  'publish unit 4?'         dev: NONE   candidate: MATCH publish_pages Unit 4
+  'publish  unit 5'         dev: NONE   candidate: MATCH publish_pages Unit 5
+  'publish unit, 4'         dev: NONE   candidate: MATCH publish_pages Unit 4
+
+"publish unit 4?" is the case that decided it: a teacher typing a question mark
+is plausibly ASKING, and that sentence would have published a whole unit with
+no model in the loop — the same ambiguity this file uses to reject "show unit
+4". Publish is now a function of its own, unchanged from dev, and the tolerance
+belongs to hide/unpublish alone. Re-run on a wider sweep after the gate:
+
+  36,864 inputs, dev vs shipped:  0 matches LOST
+                                  0 arguments CHANGED
+                                  0 new publish_pages
+                                  2,850 new unpublish_pages
+
+Five of the 141 are pinned as refused rows in hideIsUnpublish, and the mac test
+now asserts the TOLERANCE as well as the reference — a test naming only
+"publish unit 4, day 3" did not catch this, which is the lesson.
+
 WHAT WAS CORRECTED IN THE SUITES
 ---------------------------------
   * trimmed-surface-suite.py — `intercepted()` now reads the widened family
     through `unit_or_class_page()`, and a new
     `assert_hide_is_unpublish_matches_contract()` checks that reading against
-    the contract's 13 accepted and 15 refused rows BEFORE any probe is sent,
+    the contract's 13 accepted and 20 refused rows BEFORE any probe is sent,
     the way the deploy-at-a-time guard already does. The run prints the row
     count it agreed with.
+  * trimmed-surface-suite.py's mirror was ALSO tightened after a measurement:
+    552 inputs through it and a compiled copy of the real matcher disagreed on
+    three shapes, all one-way (Python accepted, Swift did not) — a TAB between
+    words, an integer that overflows 64 bits, and non-ASCII digits. The mirror
+    now splits on the literal space, and reads a number the way Int(_:) does.
+    Re-checked over 2,410 inputs: 0 disagreements. None was reachable from a
+    contract row or a probe, so no number here was ever distorted — but a
+    mirror whose comment claims a spelling "cannot go unnoticed" had better not
+    have three of them.
   * shelf-phrasings-suite.py — its hand-copied "matched in code" column was
     corrected for TWO phrasings, both of which had gone stale without anyone
     noticing: "Deploy at 6:30 AM" (stale since #168) and "Unpublish Unit 2,

@@ -342,8 +342,9 @@ This is the same principle as the coarse tools: reasoning moved out of the
 model is reliability bought back. It is also the honest caveat on the 110/110
 in Part 5 — some of those are perfect because they are not questions.
 
-Two families joined the table on 2026-09-19, both for measured misroutes and
-both described below: "deploy at &lt;time&gt;" in "A time is a number, not a
+Two changes were made to the table on 2026-09-19, both for measured misroutes
+and both described below (one new family, one widened — the count of parsed
+families is still six): "deploy at &lt;time&gt;" in "A time is a number, not a
 judgement", and the widened hide/unpublish frame in "'Hide' is 'unpublish', and
 a reply that is the question again". The second one is also the answer to "what
 should the app SAY when the model hands the teacher their own sentence back?",
@@ -566,14 +567,34 @@ never drift apart:
 [please] publish unit <n> [please]
 ```
 
-**The day arm is gated on the VERB, and that asymmetry is the decision.**
-`hide` and `unpublish` take a whole unit or one class page; `publish` takes a
-whole unit only, so `publish unit 4, day 3` still goes to the model, exactly as
-it did before. Unpublishing errs safe — a page nobody can see — while
-publishing puts a page in front of students, and "Publish Unit 2, Day 3" is
-10/10 on this tier today, so there was nothing to buy by widening the dangerous
-direction on the same day. It is a `refused` row in the contract rather than a
-comment somebody deletes.
+**THE WHOLE VERB IS GATED, not only the day arm, and that asymmetry is the
+decision.** `hide` and `unpublish` take a whole unit or one class page and
+tolerate the spellings below; `publish` is read by a frame of its own that has
+not moved — the literal opening `publish unit ` and a bare number — so `publish
+unit 4, day 3` still goes to the model, and so do `publish unit 4?`, `please
+publish unit 4`, `publish unit 4 please`, `publish  unit 5` and `publish unit,
+4`.
+
+**That split was made deliberately rather than inherited, and it was got wrong
+first.** The original version read the verb AFTER stripping the courtesy words
+and the question mark, which widened publish as a side effect. An adversarial
+differential fuzz across the two compiled matchers — every
+verb/noun/number/tail/spacing combination — found 0 matches lost, 0 arguments
+changed and **141 new `publish_pages` matches**, none of them asked for.
+`publish unit 4?` is the case that decided it: a teacher typing a question mark
+is plausibly ASKING, and that sentence would have published a whole unit with no
+model in the loop — the same ambiguity used two paragraphs down to reject `show
+unit 4`. Re-run after the gate on a wider 36,864-input sweep: **0 lost, 0
+changed, 0 new `publish_pages`**, 2,850 new `unpublish_pages`. Five of the 141
+are pinned as `refused` rows so the gate is data rather than a comment, and
+`HideIsUnpublishCardTests.testPublishStillTakesAWholeUnitAndNoPage` asserts the
+TOLERANCE as well as the reference — a test naming only the reference did not
+catch it.
+
+The reason for the asymmetry, underneath all of that: unpublishing errs safe — a
+page nobody can see — while publishing puts a page in front of students, and
+"Publish Unit 2, Day 3" is 10/10 on this tier today, so there was nothing to
+buy by widening the dangerous direction on the same day.
 
 **What the frame tolerates was decided rather than left to taste**, because
 spellings are the whole question for a family like this — the same argument
@@ -581,7 +602,7 @@ spellings are the whole question for a family like this — the same argument
 words are counted (`makeRoom`'s reading), so `unit 4 , day 21` and `unit 4 day
 21` are the same request and odd spacing is read the same way; a trailing `?`
 comes off; `please` is courtesy at either end; and `day21` is refused, because
-that is not a word this frame has. 13 accepted and 15 refused rows are DATA, in
+that is not a word this frame has. 13 accepted and 20 refused rows are DATA, in
 `contracts/assist-cases.json` → `hideIsUnpublish`.
 
 **The refusals are the safety half, and one of them is load-bearing.**

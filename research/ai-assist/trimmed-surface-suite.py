@@ -546,9 +546,10 @@ def intercepted(message):
 
     Widened 2026-09-19 with issue #215: "hide" means what "unpublish" means and
     is answered in code, and both verbs take a class page as well as a whole
-    unit. The DAY arm is gated on the verb — `publish unit 4, day 3` still goes
-    to the model, which is the asymmetry the Swift argues for and the contract
-    carries as a refused row.
+    unit. The WHOLE VERB is gated, not only the day arm — publish keeps the
+    frame it shipped with, so `publish unit 4, day 3`, `publish unit 4?` and
+    `please publish unit 4` all still go to the model. That asymmetry is what
+    the Swift argues for and the contract carries as five refused rows.
     """
     with open(ROOT / "contracts" / "assist-cases.json", encoding="utf-8") as handle:
         phrasings = json.load(handle)["cardPhrasings"]["matches"]
@@ -579,38 +580,83 @@ def intercepted(message):
 def unit_or_class_page(tidied):
     """Which tool "hide unit 4, day 21" and its relatives are answered with.
 
-    Mirrors `AssistCardCommand.wholeUnitOrClassPage`. The comma is frame
-    punctuation and is dropped before the words are counted, a trailing
-    question mark comes off, and "please" is courtesy at either end — so
-    "day21" is refused, because it is not a word this frame has. The verb
-    decides both the tool and whether a DAY may follow.
+    Mirrors `AssistCardCommand.wholeUnitOrClassPage`, which is TWO frames read
+    by different rules — and the split is the part to keep. The hide/unpublish
+    arm drops commas before counting words, takes a trailing question mark off
+    and allows "please" at either end (so "day21" is refused, not being a word
+    this frame has). The PUBLISH arm gets none of that: a literal opening
+    `"publish unit "` and a bare number, exactly as it shipped, because
+    publishing is the direction that reaches students and "publish unit 4?" is
+    plausibly a teacher asking. Both are pinned by
+    `assert_hide_is_unpublish_matches_contract()` below, whose refused rows
+    include all five of the publish spellings.
     """
+    hidden = hide_or_unpublish(tidied)
+    if hidden:
+        return hidden
+    return whole_unit_to_publish(tidied)
+
+
+def whole_unit_to_publish(tidied):
+    """"publish unit 5", read the way it has been read since it shipped."""
+    opening = "publish unit "
+    if not tidied.startswith(opening):
+        return None
+    rest = tidied[len(opening):].strip(" \t")
+    if not rest or "," in rest or not swift_int(rest):
+        return None
+    return "publish_pages"
+
+
+def hide_or_unpublish(tidied):
+    """"hide unit 4, day 21" and "unpublish unit 4" — the widened arm."""
     frame = tidied.rstrip("?").strip()
-    words = frame.replace(",", " ").split()
+    # SPLIT ON THE LITERAL SPACE, not on any whitespace. The Swift uses
+    # `split(separator: " ")`, so "hide unit\t4" leaves it with a word
+    # "unit\t4" and no match; a bare `.split()` here would accept it and the
+    # mirror would be describing a matcher the app does not have. Measured:
+    # a tab was one of three shapes on which this mirror and the Swift
+    # disagreed before the reading was tightened.
+    words = [word for word in frame.replace(",", " ").split(" ") if word]
     if words[:1] == ["please"]:
         words = words[1:]
     if words[-1:] == ["please"]:
         words = words[:-1]
     if len(words) < 3 or words[1] != "unit":
         return None
-    if words[0] in ("hide", "unpublish"):
-        tool, may_name_a_day = "unpublish_pages", True
-    elif words[0] == "publish":
-        tool, may_name_a_day = "publish_pages", False
-    else:
+    if words[0] not in ("hide", "unpublish"):
         return None
-    # The Swift reads the number with `Int(...)`, which takes a leading sign;
-    # the guard does the same, so a spelling one accepts and the other does not
-    # cannot go unnoticed.
-    if not re.fullmatch(r"[+-]?\d+", words[2]):
+    if not swift_int(words[2]):
         return None
     if len(words) == 3:
-        return tool
-    if not may_name_a_day or len(words) != 5 or words[3] != "day":
+        return "unpublish_pages"
+    if len(words) != 5 or words[3] != "day":
         return None
-    if not re.fullmatch(r"[+-]?\d+", words[4]):
+    if not swift_int(words[4]):
         return None
-    return tool
+    return "unpublish_pages"
+
+
+def swift_int(text):
+    """Whether Swift's `Int(_:)` would read this, which is the acceptance test.
+
+    Narrower than `[+-]?\\d+` in two ways that were MEASURED as disagreements
+    rather than reasoned about — 552 inputs through this mirror and a compiled
+    copy of the real matcher, 7 one-way misses. `Int` is 64-bit, so
+    "unit 99999999999999999999" overflows and returns nil where a regex
+    matches; and `Int` reads ASCII digits only, while Python's `\\d` is
+    Unicode-aware and accepts "unit ٤" and "unit ４". Neither is reachable
+    from a contract row or a probe, so no number here was ever distorted —
+    but a mirror that claims a spelling cannot go unnoticed had better not
+    have three of them.
+    """
+    if not re.fullmatch(r"[+-]?[0-9]+", text):
+        return False
+    try:
+        value = int(text)
+    except ValueError:
+        return False
+    return -(2 ** 63) <= value <= (2 ** 63) - 1
 
 
 def deploy_at_a_time(tidied):
