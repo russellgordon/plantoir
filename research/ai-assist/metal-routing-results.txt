@@ -219,6 +219,15 @@ shift); the seven files that took a six-line note moved by 7, so
 after this line cites a SECTION or a quoted phrase instead, which does not
 rot.
 
+POST-HOC correction to the pre-registered HEADER above, left as written for
+the same reason: it says the 72% cluster was measured "on WINDOWS, in a
+container, against Qwen2.5-1.5B under Vulkan". "Under Vulkan" repeats issue
+#117's title and is contradicted by research/README.md, which classifies
+promise-card-results.txt as an in-container run — and a container has no GPU
+access. The native-Vulkan measurement is a different file,
+`conversational-residue-results.txt`. Everything the header rests on — Windows,
+in a container, 3 trials, 15 tools, 72% — is unaffected. See "AGAINST THE 72%".
+
 POST-HOC correction to the CONDITIONS note above, added rather than edited
 into it for the same reason: **the 1.5B is not only "what a Mac under 16 GB
 runs".** contracts/shared-rules.json → assistantModelChoice offers "The
@@ -253,13 +262,12 @@ probes, 10 trials, this Mac — scored 280/290 (97%) with the Windows-comparable
 the whole difference**: `read` (10/10 → 0-1/10) and `typos` (10/10 → 0/10),
 both identical in the shipped and the pre-tweak wording. On the 290-probe
 scale that is a 9-response drop; the 19 is on the Windows-comparable-18 scale,
-where both probes sit. That is on the
-tier every Mac with 16 GB or more runs, and it is the finding in this file
-most worth acting on.
+where both probes sit. That is on the tier every Mac with 16 GB or more runs,
+and it is the finding in this file most worth acting on.
 
 The run also found three things nobody was looking for: tool-call arguments
 arrive TRUNCATED often enough to count, and every suite in this folder that
-prints a `malformed tool calls: N` line has been reporting that as zero; one
+printed a `malformed tool calls: N` line had been reporting that as zero; one
 probe makes the small model generate for 41 seconds under the app's own
 request body; and the 2026-08-15 anchors cannot be reproduced probe-for-probe
 even at their own context size and thread count, because the harness that
@@ -521,16 +529,30 @@ all match. What does not: anchor 2's 42-probe harness **was never committed**
 dateline carries a different date; and the small model's unstable probes move
 by 3/10 between two runs of the same arm an hour apart. The lesson is the
 folder's own rule, learned again: **a results file is only reproducible if
-the harness that produced it is committed beside it.** The 29-probe suite is,
-which is why this file can be re-run.
+the harness that produced it is committed beside it.** This run's harness is
+committed beside this file, which is why this file can be re-run.
 
 AGAINST THE 72%
 ---------------
-promise-card-results.txt's 72% (63/87) is Windows-native under Vulkan, in the
-container era, 3 trials, FIFTEEN tools, a different llama.cpp build, and a
-system prompt that has changed twice since. Today's small tier reads 72%
-(63/87) on the headline arm and the 4B reads 93%. **The coincidence on the
-small tier is worth nothing** — its 63 correct answers are not the same 63,
+promise-card-results.txt's 72% (63/87) is a **Windows-side, IN-CONTAINER**
+run — that is how research/README.md's own index classifies it, and the file
+bears it out: its per-call latencies run from 1.0 s to 192 s with a median of
+13.9 s, which is a CPU profile, against 0.35 s median for the same model
+running natively on Metal today. It is 3 trials, FIFTEEN tools, a different
+llama.cpp build, and a system prompt that has changed twice since.
+
+**On the word "Vulkan", because two different runs are easily run together.**
+Issue #117's title calls this "a Windows/Vulkan number", and the header of
+this file repeats that. The folder's records do not support it for THIS run: a
+container has no GPU access, which is the whole reason both apps host the
+model natively. What WAS measured on Windows natively under Vulkan is the
+tweak's own before/after, `conversational-residue-results.txt`, whose header
+says so in as many words — so the 2026-08-24 change was measured natively
+while the 72% it set out to improve was not. Both are Windows numbers; only
+one of them is a Vulkan number.
+
+Today's small tier reads 72% (63/87) on the headline arm and the 4B reads
+93%. **The coincidence on the small tier is worth nothing** — its 63 correct answers are not the same 63,
 its card score is 27/33 where Windows' was five promises failing outright, and
 the surface differs by four tools. Quoted here only so that nobody has to go
 looking for whether it was ever compared.
@@ -761,19 +783,20 @@ by 5 trials in 10.
 **The prompt is not what needs attention now.** Three things do, and none of
 them is the wording:
 
-  - **`read` on the 4B.** 10/10 `read_page` in August on both the 15-tool and
-    the 13-tool surfaces; 0-1/10 today, choosing `check_section`, identically
+  - **`read` on the 4B — issue #167.** 10/10 `read_page` in August on both
+    the 15-tool and the 13-tool surfaces; 0-1/10 today, choosing `check_section`, identically
     in both prompt forms. With `typos` it accounts for the whole drop from
     280/290 to 271/290 — 9 responses there, 19 on the Windows-comparable-18
     scale — on the tier most teachers run. Nothing here
     explains it, and the tool-surface change that would explain `typos` does
     not cover it.
-  - **"Deploy at 6:30 AM", the mac's own shelf card, on the small tier.**
+  - **"Deploy at 6:30 AM", the mac's own shelf card, on the small tier —
+    issue #168.**
     0/10 and 0/3: it deploys NOW. Three of the shelf's four model-routed
     promises are kept; this one is not, and it is the one that reaches
     students.
-  - **A missing token cap.** `AssistModelClient` sends no `max_tokens` where
-    Windows sends 512, so a degenerate generation runs until the context is
+  - **A missing token cap — issue #166.** `AssistModelClient` sends no
+    `max_tokens` where Windows sends 512, so a degenerate generation runs until the context is
     full: 41 seconds on the small tier, and on the large tier a bound of
     roughly 16k tokens at ~63 tok/s, which is past the client's own
     180-second timeout.
@@ -785,5 +808,31 @@ committed. Commit the harness beside the results.
 
 No row was added to `GUI-IMPROVEMENTS.md`, and that is a decision rather than
 an omission: nothing a teacher can see changed. The three things a teacher
-WOULD notice are named above and are tracked as their own issues, which is
-where a row will belong when one of them is fixed.
+WOULD notice are named above and are tracked as issues #166, #167 and #168,
+which is where a row will belong when one of them is fixed.
+
+HOW THIS FILE WAS CHECKED
+-------------------------
+Implementation and corrections by Claude Opus. Three reviews, each by Claude
+Opus in a fresh context:
+
+  - **The PLAN**, before a single arm was run. It established the two things
+    that shaped everything after: that this is a RE-measurement of a fault
+    never observed on this hardware, and that this Mac ships the LARGE tier —
+    so a run of the 1.5B alone would have measured a model most teachers here
+    do not use.
+  - **The RESULTS**, once they existed. It re-parsed the raw rows and every
+    total reproduced. What it changed was the reading: it found the most
+    comparable prior 4B run uncited (the `qwen3-4b-nothink` anchor, and with
+    it the regression that is now the headline finding), and the "promise
+    card" misattributed to this app when it is Windows' `ExampleRequests` —
+    which is why the post-hoc mac-shelf arm exists at all.
+  - **The CORRECTIONS.** It re-derived all 2,741 rows, confirmed the
+    Deploy-at-6:30 finding independently from the code, and caught threshold 2
+    contradicting its own rule by calling 6/10 a trip under "≤5/10".
+
+Then one final pre-merge sweep by Claude Fable 5.1, over the whole change as
+it would be merged. It found three things, none of them a number: the 72%
+run's provenance contradicting itself between the header and the comparison
+section, an orphaned sentence fragment, and three findings described without
+the issue numbers they now have.

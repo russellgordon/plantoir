@@ -638,7 +638,11 @@ one was removed for exactly that reason.
 ### Re-measured on Metal after the system prompt changed
 
 The system prompt gained two sentences on 2026-08-24 (`b77b91bd`) on the
-strength of numbers taken on **Windows, in a container, under Vulkan**. Issue
+strength of numbers taken on **Windows, in a container** — the folder's index
+classifies that run so, and its 1-192 s per-call latencies are a CPU profile,
+so the "Vulkan" in issue #117's title belongs to the tweak's own before/after
+(`conversational-residue-results.txt`, Windows NATIVE) and not to the 72% it
+set out to improve. Issue
 #117 re-measured it here. Full conditions, thresholds and per-probe tables in
 `research/ai-assist/metal-routing-results.txt`; the summary, 29 probes on the
 shipping 13-tool surface, M4 Pro, llama.cpp b10435 native with Metal, each
@@ -653,9 +657,14 @@ tier at its own context size:
 | Tool calls whose arguments were truncated (suite body, `max_tokens` 256) | **0** | 12-19 per 290 |
 | The same under the app's own body (no cap) | **0** | 3 per 87 |
 
-Three things to take from it. **The 2026-08-24 change is neutral on the tier
-this Mac runs** — 28 of the 29 probes give the identical tool with the old
-wording and the new one — and the cluster it was written for was never present
+Three things to take from it — and one that is not in the table: on this same
+suite the 4B scored **280/290 with the Windows-comparable 18 at 180/180** in
+August, and the whole difference is two probes, one of which (`read`, answered
+with `check_section` where it used to answer `read_page`) is unexplained by
+anything measured here. That is issue #167.
+
+**The 2026-08-24 change is neutral on the tier this Mac runs** — 28 of the 29
+probes give the identical tool with the old wording and the new one — and the cluster it was written for was never present
 here: "I posted Unit 2, Day 3 by mistake. Make it a draft again." is
 `unpublish_pages` 10/10 in every arm of both models, before the tweak and
 after it. **On the small tier it did buy something**: the older wording let
@@ -670,8 +679,8 @@ of physical memory — picking it raises no caution at all. The small one is
 solidly right on 19 of 29 probes and solidly wrong on 7, including every way
 of asking for a deploy at a time — the mac's own shelf card "Deploy at 6:30
 AM" routes to `deploy_section`, deploying immediately, 10/10 on the small tier
-while the 4B gets it right 10/10. Confirmation before acting does not turn
-that into a safe failure by itself: `assistantAsksBeforeChanging` is ONE
+while the 4B gets it right 10/10 (issue #168). Confirmation before acting does
+not turn that into a safe failure by itself: `assistantAsksBeforeChanging` is ONE
 setting for both tiers and defaults on for both (`AssistantSettingsTests`
 asserts it on a 48 GB machine), approval is per TOOL — `needsApproval: true`
 on `deploy_section` and `schedule_deploy` and nothing else — and the tier only
@@ -698,7 +707,7 @@ never made the false claim — it simply has no count of the other kind.)
 
 The mac is the platform EXPOSED to the underlying fault, because
 `AssistModelClient` sends no `max_tokens` at all where Windows' `LocalModel`
-sends 512, so a runaway here runs until the context is full.
+sends 512, so a runaway here runs until the context is full — issue #166.
 
 The figures above are not a failure rate. The suite runs at temperature 0.1
 (0 in the arms that copy the app's own request), which is near-greedy: ten
