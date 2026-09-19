@@ -630,6 +630,47 @@ nonisolated enum AssistWording {
         "I didn't get to the end of that, so I haven't changed anything. Ask me again — "
         + "a shorter sentence, or fewer pages at a time."
 
+    // MARK: - When the answer was the question again
+
+    /// The assistant's whole reply was the teacher's own sentence, handed
+    /// back.
+    ///
+    /// **Measured, twice over** (issue #215, 2026-09-19). Asked to "hide unit
+    /// 4, day 21", the smaller assistant chose no tool and replied with the
+    /// sentence it had just been given, date line and all — five phrasings out
+    /// of five. Worse: that reply was kept in the conversation, and the model
+    /// then copied the pattern it could see. "Unpublish Unit 4, Day 20", a
+    /// sentence it gets right every time in a fresh conversation, came
+    /// straight back as an echo too. One unrecognised phrase made the window
+    /// useless until it was closed and opened again.
+    ///
+    /// Three things this sentence has to do, and they are the three
+    /// `answerWasCutOff` does. **Say it did not follow**, because the teacher
+    /// is looking at a reply that said nothing. **Say nothing changed**, which
+    /// is the fact genuinely in doubt — and which is true on every path that
+    /// can reach here, by the same walk `answerWasCutOff` records: a turn only
+    /// comes back for another lap when a tool said to, and no write ever does.
+    /// And **say something followable**.
+    ///
+    /// **Deliberately general, and that is the whole of the second sentence.**
+    /// An earlier draft offered three verbs to start with — publish, unpublish
+    /// or hide — and named the page. That is wrong advice for most of the
+    /// sentences this fires on: the guard catches an echo of ANY request the
+    /// model answers with plain words, including a deploy, a request to make
+    /// room for a class, and a question about dates, none of which begin with
+    /// a verb about publishing or name a page at all. A sentence that will be
+    /// believed and is false in a whole class of cases is worse than a vaguer
+    /// true one. The working phrasings belong in
+    /// `documentation/10-local-ai-assistant.md`, not in a sentence said to
+    /// everybody.
+    ///
+    /// **Never the echoed text.** Handing a teacher their own sentence back is
+    /// the fault being fixed; repeating it inside an apology would be the same
+    /// fault, politely.
+    static let didNotFollowThat: String =
+        "I didn't follow that, so I haven't changed anything. Try saying it again in "
+        + "different words."
+
     // MARK: - A request that named another course
 
     /// The model filled in a COURSE that is not the one this window is for,
