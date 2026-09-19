@@ -114,6 +114,7 @@ enum AssistContract {
             "previewDidNotBuild": AssistWording.previewDidNotBuild(course: course, section: section),
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
+            "answerWasCutOff": AssistWording.answerWasCutOff,
             // Taking something back. The placeholder stands in for the change's
             // own past-tense clause — "unpublished Unit 4, Day 23" — which is
             // what makes these sentences rather than slots: the undo used to

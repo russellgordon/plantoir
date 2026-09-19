@@ -91,6 +91,11 @@
         "why": "The failure that leaves nothing else behind: no tool, no turn, no output. Without this line 'I asked it something and nothing happened' is unfalsifiable."
       },
       {
+        "carries": "course, section, and which tool the model had BEGUN to name when there was one - never what it had begun to write",
+        "event": "assistant answer was cut off",
+        "why": "A model can write until it is stopped, and what it has half-written is not an instruction: the app throws it away, runs nothing and says so. Without this line the teacher's side of that - a long wait and then the assistant declining - is indistinguishable from a misroute, so a report of 'it thought for ages and then said no' has nothing to look at. Separate from 'assistant could not answer', which is for an engine that FAILED; here the engine answered perfectly and the app refused the answer. The tool it had begun to name is carried because 'it ran away trying to publish' and 'it ran away trying to deploy' are different reports; what it had begun to WRITE is not carried, because that is the teacher's page titles."
+      },
+      {
         "carries": "which assistant the teacher is set to use",
         "event": "app settings opened",
         "why": "The settings panel is where a teacher changes how much of their Mac the assistant may take, and 'it got slow last week' is a report about a change nobody else can date. Recording the state on the way IN also means a trail shows what the setting was even when the teacher looked and changed nothing."

@@ -77,6 +77,26 @@ struct AssistToolCall: Codable, Equatable, Sendable, Identifiable {
         let parsed: Any? = try? JSONSerialization.jsonObject(with: data)
         return (parsed as? [String: Any]) ?? [:]
     }
+
+    /// Whether the arguments are readable at all.
+    ///
+    /// `argumentValues` answers `[:]` for two different things — a tool that
+    /// takes no arguments, and a generation that stopped in the middle of
+    /// writing some — and every caller was treating them as the same. They
+    /// are not: the first is an answer and the second is a fragment. An empty
+    /// string and `{}` are readable, because `undo_last_change` genuinely
+    /// takes nothing; a non-empty string that is not a JSON object is not.
+    var argumentsAreReadable: Bool {
+        let written: String = function.arguments.trimmingCharacters(in: .whitespacesAndNewlines)
+        if written.isEmpty {
+            return true
+        }
+        guard let data = written.data(using: .utf8) else {
+            return false
+        }
+        let parsed: Any? = try? JSONSerialization.jsonObject(with: data)
+        return (parsed as? [String: Any]) != nil
+    }
 }
 
 /// Talks to the local `llama-server`.
@@ -90,6 +110,39 @@ struct AssistModelClient: Sendable {
     // MARK: - Stored properties
 
     let baseURL: URL
+
+    /// The most the model may write in one reply.
+    ///
+    /// **Not a tuning knob — a bound on how long a teacher waits.** Without
+    /// one, a reply is bounded only by the context. Measured on this Mac with
+    /// the smaller assistant (M4 Pro, llama.cpp b10435 on Metal,
+    /// Qwen2.5-1.5B Q4_K_M at a context of 8,192): the ordinary request
+    /// "Publish tomorrow's class for VVH2O section 1, and make sure every page
+    /// it links to is published rather than left as a draft" produced 5,435
+    /// tokens of a page list that went on until the context was full, took
+    /// **42 seconds**, three trials in three — and what arrived was unusable.
+    /// 2,757 prompt + 5,435 written = 8,192 exactly, so the only thing
+    /// bounding it was the context. On the larger assistant the same shape
+    /// would run about 216 seconds at that tier's measured 63.2 tokens a
+    /// second, past this client's own 180-second timeout, so it would fail
+    /// rather than answer.
+    ///
+    /// **512, which is the number Windows already sends** (`LocalModel.Ask`),
+    /// so the two apps cannot drift on a value neither interface shows. It is
+    /// roomy: measured against this model's own tokenizer, an ordinary tool
+    /// call is 16 to 60 tokens, twenty page titles is 203, twenty-four long
+    /// real-world titles is 384, and fifty-eight short titles is 545. So the
+    /// only legitimate shape it cuts is an explicit list of about fifty-five
+    /// or more class pages — and `publish_pages` already takes `onOrAfter` and
+    /// `before`, which asks for any number of classes in about sixty tokens.
+    /// (The two-lap shape — `list_pages` handing back up to
+    /// `AssistToolRunner.mostPagesListed` relative paths, then "publish all of
+    /// those" — has NOT been measured against the tokenizer yet; it is the one
+    /// shape this headroom argument does not cover.)
+    ///
+    /// The rule is in `contracts/app-rules.json` → `modelTiers.requirements`
+    /// so that neither app can move it alone.
+    static let mostTokensPerReply: Int = 512
 
     // MARK: - Functions
 
@@ -114,15 +167,7 @@ struct AssistModelClient: Sendable {
     /// app the problem report is the only place it can be seen.
     func reply(messages: [AssistMessage],
                tools: [AssistToolDefinition]) async throws -> AssistReply {
-        var body: [String: Any] = [
-            "messages": try encodeMessages(messages),
-            "temperature": 0,
-            "stream": false,
-        ]
-        if !tools.isEmpty {
-            body["tools"] = try encodeTools(tools)
-            body["tool_choice"] = "auto"
-        }
+        let body: [String: Any] = try requestBody(messages: messages, tools: tools)
 
         var request: URLRequest = URLRequest(url: baseURL.appendingPathComponent("v1/chat/completions"))
         request.httpMethod = "POST"
@@ -142,6 +187,28 @@ struct AssistModelClient: Sendable {
     }
 
     // MARK: - Encoding
+
+    /// Everything the server is asked for, in one place a test can read.
+    ///
+    /// Separated from `reply` for exactly the reason
+    /// `AssistServerHost.serverArguments` is separated from `start()`: a field
+    /// that only exists inside the function that makes the request cannot be
+    /// checked without making one, and the cap is a field that must never
+    /// quietly go missing.
+    func requestBody(messages: [AssistMessage],
+                     tools: [AssistToolDefinition]) throws -> [String: Any] {
+        var body: [String: Any] = [
+            "messages": try encodeMessages(messages),
+            "temperature": 0,
+            "stream": false,
+            "max_tokens": AssistModelClient.mostTokensPerReply,
+        ]
+        if !tools.isEmpty {
+            body["tools"] = try encodeTools(tools)
+            body["tool_choice"] = "auto"
+        }
+        return body
+    }
 
     private func encodeMessages(_ messages: [AssistMessage]) throws -> [[String: Any]] {
         var encoded: [[String: Any]] = []
@@ -195,6 +262,12 @@ struct AssistModelClient: Sendable {
             throw AssistModelError.unreadableReply
         }
 
+        // WHY the turn stopped, which is a different question from what it
+        // said. "length" means the engine cut the model off part way: what it
+        // was about to write next is unknowable, so nothing it had begun can
+        // be acted on. See `AssistAgent.think`.
+        let stoppedBecause: String = (first["finish_reason"] as? String) ?? ""
+
         let content: String? = message["content"] as? String
         var calls: [AssistToolCall] = []
         if let rawCalls = message["tool_calls"] as? [[String: Any]] {
@@ -232,7 +305,8 @@ struct AssistModelClient: Sendable {
                 content: content,
                 toolCalls: calls.isEmpty ? nil : calls
             ),
-            completionTokens: usage?["completion_tokens"] as? Int
+            completionTokens: usage?["completion_tokens"] as? Int,
+            wasCutOff: stoppedBecause == "length"
         )
     }
 }
@@ -246,6 +320,18 @@ struct AssistReply: Sendable {
 
     /// How many tokens the model wrote, when the engine reported it.
     let completionTokens: Int?
+
+    /// Whether the engine stopped the model part way rather than the model
+    /// finishing what it was saying.
+    ///
+    /// Named for what happened rather than for the field it is read from:
+    /// everything that reads this does one thing with it — refuse to act —
+    /// and `finishReason == "length"` at a call site is a fact about a wire
+    /// format in the middle of a sentence about a teacher's turn.
+    /// No default, on purpose: there is one place a reply is built, and a
+    /// reply built without saying whether it finished is the bug this whole
+    /// piece exists to stop.
+    let wasCutOff: Bool
 }
 
 /// What can go wrong talking to the engine.
