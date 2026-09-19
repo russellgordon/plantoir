@@ -461,7 +461,16 @@ the engine stopped the model part way rather than the model finishing, and
 off` line naming the tool the model had begun to name, and the half-written
 reply is not added to the conversation. A small model that emits arguments
 which do not parse, with the turn finishing normally, is refused the same way
-and for the same reason. (Until #166 neither was true: `finish_reason` was
+and for the same reason.
+
+The teacher hears the same sentence for both, because from their side the two
+are one event and both are mended by asking again. **The trail tells them
+apart**, because whoever reads a problem report cannot: *"the assistant's
+answer was cut off part way through publish pages"* is a question about how
+much the model was asked to write, and *"the assistant finished answering but
+what it wrote for publish pages could not be read"* is a question about the
+model itself. One event (`assistant answer was cut off`), two sentences.
+(Until #166 neither was true: `finish_reason` was
 never read, the unparseable arguments were silently replaced with `{}`, and
 the tool RAN — against no course, producing "There is no course called "" in
 this working folder", which reads to a teacher as a complaint about what they

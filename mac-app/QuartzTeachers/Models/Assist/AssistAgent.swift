@@ -293,7 +293,9 @@ final class AssistAgent {
             // `<tool_call>\n{\n"name": "publi` fragment in `content`, which
             // the plain-text branch below would print into the transcript.
             if answer.wasCutOff {
-                sayTheAnswerWasCutOff(tool: reply.toolCalls?.first?.function.name)
+                sayTheAnswerDidNotFinish(
+                    tool: reply.toolCalls?.first?.function.name, stoppedByTheEngine: true
+                )
                 return
             }
 
@@ -305,7 +307,9 @@ final class AssistAgent {
                 // refusal reading as though the teacher's sentence was the
                 // problem.
                 if !first.argumentsAreReadable {
-                    sayTheAnswerWasCutOff(tool: first.function.name)
+                    sayTheAnswerDidNotFinish(
+                        tool: first.function.name, stoppedByTheEngine: false
+                    )
                     return
                 }
                 messages.append(reply)
@@ -341,24 +345,44 @@ final class AssistAgent {
     /// conversation some chat templates reject outright, and every later turn
     /// would carry it. Dropping it leaves the history exactly as if the model
     /// had not answered, which is the truth of what happened.
-    private func sayTheAnswerWasCutOff(tool: String?) {
+    ///
+    /// The TEACHER is told the same thing either way — from their side an
+    /// answer that ran out of room and one that came out garbled are the same
+    /// event, and both are mended by asking again. The TRAIL tells them apart,
+    /// because whoever reads a report cannot: an answer stopped at the cap is
+    /// a question about how much the model was asked to write, and a finished
+    /// answer whose arguments will not parse is a question about the model
+    /// itself. Same event, different sentence.
+    private func sayTheAnswerDidNotFinish(tool: String?, stoppedByTheEngine: Bool) {
         entries.append(Entry(speaker: .assistant, text: AssistWording.answerWasCutOff))
         // The tool it had BEGUN to name, in the words a teacher would
         // recognise rather than the function's own: "it ran away trying to
         // publish" and "it ran away trying to deploy" are different reports.
         // Never what it had begun to WRITE — that is the teacher's page
         // titles.
-        var what: String = "before it named a tool"
-        if let name = tool {
-            what = "part way through " + name.replacingOccurrences(of: "_", with: " ")
+        var said: String = "the assistant's answer was cut off"
+        if stoppedByTheEngine {
+            if let name = tool {
+                said += " part way through " + AssistAgent.inWords(name)
+            } else {
+                said += " before it named a tool"
+            }
+        } else {
+            said = "the assistant finished answering but what it wrote for "
+                + AssistAgent.inWords(tool ?? "that") + " could not be read"
         }
         ActivityTrail.note(
             .assistantAnswerWasCutOff,
-            "the assistant's answer was cut off " + what + " — nothing was run from it",
+            said + " — nothing was run from it",
             course: courseCode,
             section: sectionNumber
         )
         activity = .idle
+    }
+
+    /// A tool's name as somebody reading the trail would say it.
+    private static func inWords(_ toolName: String) -> String {
+        return toolName.replacingOccurrences(of: "_", with: " ")
     }
 
     /// Keeps a note of what the model was asked and what it chose.
