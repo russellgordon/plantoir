@@ -195,7 +195,8 @@ public class GradedFolderChoicesTests : IDisposable
     /// <c>Tasks</c> out of the pool anyway, and <c>build_site.py</c> — which
     /// lowercases both sides — would go on counting that folder. Marks off the
     /// coverage map because of a capital letter. Proposed to the mac as a
-    /// contract case by issue #163.</para>
+    /// contract case by issue #172, which carries the case ready to paste and
+    /// the one line the mac would change.</para>
     /// </summary>
     [Fact]
     public void ANameStillOfferedInANOTHERCasingKeepsItsPlaceInThePool()
