@@ -99,6 +99,23 @@ Strings are accepted as well as booleans, because YAML quoting varies and a
 quoted `"false"` plainly means false. `patches/filters-index.ts` exports it
 alongside the stock filters.
 
+**The expression is `!(flag === false || flag === "false")`, and every word of
+it is load-bearing.** The string comparison is EXACT, so `publish: "False"` is
+a page students can see — one capital letter away from one they cannot. That is
+not an oversight to tidy up, because of what feeds this filter: Quartz v4.5.0's
+`FrontMatter` transformer parses with `gray-matter` using **`js-yaml` on
+`JSON_SCHEMA`** (`quartz/plugins/transformers/frontmatter.ts`), a schema that
+resolves only lowercase `true`/`false` and leaves everything else a string —
+and the page reaching it has already been round-tripped through PyYAML by
+`build_site.process_frontmatter`, which turns every real boolean into lowercase
+`false`. So a value that is still mixed-case by the time this filter sees it is
+one PyYAML declined to resolve, i.e. genuinely a string, i.e. not a flag. A
+case-insensitive compare here would hide pages the build publishes, and both
+apps' readers are written against this exact expression: see
+[08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page).
+`scripts/check_visibility_against_the_site.py`, run by `verify.sh`, fails if
+either this expression or that schema changes.
+
 Forgetting the flag therefore leaves a page visible, which is a far kinder
 mistake than a page disappearing without anybody noticing. The switch itself
 is C1-13 — the image carries the filter, the build points the config at it.

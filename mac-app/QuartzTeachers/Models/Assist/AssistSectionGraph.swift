@@ -34,7 +34,22 @@ struct AssistSectionPage {
     let isSectionLocal: Bool
 
     /// True when students meet this page as things stand.
+    ///
+    /// Read the way the BUILT SITE reads it, and when the page's flag is one
+    /// this app will not guess at, this says VISIBLE — the mild mistake of the
+    /// two, since calling a page hidden while students are reading it is the
+    /// failure that reports success. `visibilityIsCertain` is how anything
+    /// that WRITES tells the two apart.
     let isVisibleToStudents: Bool
+
+    /// False when the page's flag is a form this app will not read — a value
+    /// on the line below the key, a tag, a block scalar, an anchor.
+    ///
+    /// Anything deciding a page is "already the way you asked" must require
+    /// this. Without it, "publish this page" on such a page answered that it
+    /// was already published and wrote nothing, while the build was holding it
+    /// back — the exact failure this whole reader exists to remove.
+    let visibilityIsCertain: Bool
 
     /// The day the page's frontmatter puts it on, or nil when it has none.
     let date: CalendarDay?
@@ -170,15 +185,17 @@ struct AssistSectionGraph {
             let dateKey: String = PageFrontmatter.createdKey(
                 forSection: sectionNumber, isSectionLocal: isSectionLocal
             )
+            let visibility: PageVisibilityAnswer = AssistPageVisibility.answer(
+                in: text, forSection: sectionNumber
+            )
             pages.append(AssistSectionPage(
                 title: pageURL.deletingPathExtension().lastPathComponent,
                 displayTitle: displayName(forPageAt: pageURL, in: text),
                 fileURL: pageURL,
                 relativePath: relativePath(of: pageURL, workspaceURL: workspaceURL),
                 isSectionLocal: isSectionLocal,
-                isVisibleToStudents: AssistPageVisibility.publishes(
-                    in: text, forSection: sectionNumber, isSectionLocal: isSectionLocal
-                ),
+                isVisibleToStudents: visibility != .hidden,
+                visibilityIsCertain: visibility != .cannotTell,
                 date: PageFrontmatter.createdDay(in: text, key: dateKey),
                 linkedTitles: linkTargets(in: text),
                 classFolderNames: ClassFolder.names(for: course),

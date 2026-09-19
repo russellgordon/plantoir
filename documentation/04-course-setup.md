@@ -325,6 +325,22 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > what any existing section publishes. A page with
 > **no** publication key at all is visible, so forgetting the key leaves work
 > showing rather than making it disappear unnoticed.
+>
+> **And a note on the VALUES, added 2026-09-18.** Neither wizard ever writes
+> anything but `true` or `false`, but a teacher typing in Obsidian can write
+> what they like, and what the built site makes of it is not what reading the
+> line suggests: `publish: no` HIDES a page, `publish: true # covered Tuesday`
+> and `publish: maybe` PUBLISH one, and `publish: "False"` is visible while
+> `publish: FALSE` is not. The reason is the YAML round trip in the build
+> ([05](05-build-pipeline.md#frontmatter-processing)), and the measured table
+> both apps are written against is
+> [08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page).
+> It matters HERE because the course installer splits a course-level page's
+> one flag into one per section (`setup_course.per_section_frontmatter`): a
+> `publish:` value is copied character for character, and a legacy `draft:`
+> value is turned round with the build's own rule rather than by comparing it
+> with the literal text `"true"` — which used to publish a `draft: yes` page
+> into every section while the build went on hiding the unsplit original.
 
 For each **section**: `section<N>/` with an `index.md` (site home page —
 its stored title is only a starting value: the build recomputes the
