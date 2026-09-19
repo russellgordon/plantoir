@@ -20,11 +20,14 @@ said plainly that he does not want to be asked for permission step by step.
 **On the rhythm of the work — `CLAUDE.md` rule 11, and it governs both jobs
 below** (in B it applies from the moment you start implementing, at B.3). Implement with the strongest model available (Opus in Claude Code).
 Have each logical chunk reviewed by something that is not the thing that wrote
-it (Fable in Claude Code) — the PLAN first, then the implementation, then the
+it (Opus in Claude Code) — the PLAN first, then the implementation, then the
 fixes, because a review of the finished thing arrives too late to change its
 shape. Write it up for Windows AS YOU GO rather than from memory at the end.
-And **finish with a documentation pass before you say it is ready**, which is
-step 7 below.
+**Finish with a documentation pass before you say it is ready**, which is
+step 7 below — and then, last of all, ONE sweep of the whole finished piece on
+Fable (standing order 2026-09-10: Opus for every chunk review, Fable only for
+that final pre-merge sweep). Nothing else should still be changing when it
+runs.
 
 ---
 

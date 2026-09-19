@@ -19,12 +19,36 @@ enum AssistFixture {
     /// around and a four-part tuple in a parameter list is unreadable.
     typealias Made = (root: URL, course: Course, runner: AssistToolRunner, siteWork: StubSiteWork)
 
+    /// A clock a test can MOVE, so one conversation can be asked the same
+    /// thing on two different days.
+    ///
+    /// The runner reads its day through a function rather than storing a date
+    /// (issue #143: a window left open across midnight resolved "tomorrow"
+    /// against the day it opened). A test that pins the day passes nothing and
+    /// gets 2026-09-08, the day every assist test is written against; a test
+    /// about the midnight crossing itself makes one of these, hands it in, and
+    /// turns the page mid-test.
+    final class TestClock {
+
+        // MARK: - Stored properties
+
+        /// The day this clock currently reads.
+        var day: CalendarDay
+
+        // MARK: - Initializer
+
+        init(_ day: CalendarDay) {
+            self.day = day
+        }
+    }
+
 
 
 
     @MainActor
     static func makeRunner(hasDeployedBefore: Bool = false,
                             registeringPreview: Bool = false,
+                            clock: TestClock? = nil,
                             openMainWindow: (@MainActor () -> Void)? = nil) throws
         -> (root: URL, course: Course, runner: AssistToolRunner, siteWork: StubSiteWork) {
         let fileManager: FileManager = FileManager.default
@@ -74,10 +98,13 @@ enum AssistFixture {
         let course: Course = try XCTUnwrap(workspace.courses.first)
 
         let siteWork: StubSiteWork = StubSiteWork()
+        // Pinned to 2026-09-08 unless a test hands in a clock of its own: a
+        // test must not be a different test depending on when it runs.
+        let reading: TestClock = clock ?? TestClock(CalendarDay(year: 2026, month: 9, day: 8)!)
         let runner: AssistToolRunner = AssistToolRunner(
             workspace: workspace,
             siteWork: siteWork,
-            today: CalendarDay(year: 2026, month: 9, day: 8)!,
+            today: { return reading.day },
             launchControl: SilentLaunchControl(),
             openMainWindow: openMainWindow
         )

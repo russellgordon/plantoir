@@ -193,6 +193,16 @@ nonisolated enum ActivityTrail {
         /// different question: a folder appearing in a teacher's vault that
         /// they did not make in Obsidian is otherwise unexplained.
         case folderCreated = "folder created"
+        /// A course's word for a unit was renamed from inside Plantoir —
+        /// every class page in every section, its title, and the links that
+        /// pointed at it. Recorded because afterwards a course that says
+        /// "Module 2, Day 3" looks exactly like one that always did, and
+        /// "when did these pages stop being Units?" — the first question when
+        /// the next-class button or the curriculum map starts counting the
+        /// wrong pages — has no other answer. Carries the course code, the
+        /// old and new words, how many pages and links changed, and the
+        /// backup's file name. Never anything from inside a page.
+        case unitWordRenamed = "word for a unit renamed"
         /// The working folder just opened is kept in sync by a cloud service
         /// (iCloud Drive, Dropbox, OneDrive, Google Drive…), and the teacher
         /// had not yet been told about this folder. Carries the service's
