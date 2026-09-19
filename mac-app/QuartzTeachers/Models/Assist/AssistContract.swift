@@ -170,6 +170,14 @@ enum AssistContract {
                     page: copyPlaceholder,
                     backupNamed: "{course}_backup_2026-09-08_190000.zip"
                 ),
+            "theCopyCouldNotBeMadeHidden": AssistWording.theCopyCouldNotBeMadeHidden(
+                page: pagePlaceholder, as: copyPlaceholder, backupNamed: nil
+            ),
+            "theCopyCouldNotBeMadeHiddenNamingTheBackup":
+                AssistWording.theCopyCouldNotBeMadeHidden(
+                    page: pagePlaceholder, as: copyPlaceholder,
+                    backupNamed: "{course}_backup_2026-09-08_190000.zip"
+                ),
         ]
         return [
             "note": "Generated from mac-app AssistWording by `Plantoir --write-contracts`. "

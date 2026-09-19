@@ -463,6 +463,38 @@ nonisolated enum AssistWording {
              + "have moved. \(wayBack) Look the section over in Plantoir."
     }
 
+    /// The copy could not be made certainly hidden, so it was not made at all.
+    ///
+    /// **Reachable, and only where the page being copied is one this app
+    /// cannot read well enough to answer about** — a tab used as indentation
+    /// in the settings at the top of the page, or a value that runs on below
+    /// its own line. Measured: both are pages the BUILD refuses too, so the
+    /// honest answer is to stop rather than to guess, and a copy of a lesson
+    /// students can already see is the one thing that must not be guessed at.
+    ///
+    /// Said after the room has been made, like its sibling
+    /// `thePlaceForTheCopyIsStillTaken`, so it carries the same two facts that
+    /// sentence carries and one of its own: other classes may already have
+    /// moved, the backup is the way back — and a blank class page is standing
+    /// on the day the copy was meant to have, because the planner wrote it
+    /// before any of this was known. Leaving that unsaid would let a teacher
+    /// read "was not copied" as "nothing happened", twice over.
+    static func theCopyCouldNotBeMadeHidden(
+        page: String, as copy: String, backupNamed name: String?
+    ) -> String {
+        var wayBack: String = "The copy of the course made before any of this is "
+        if let name {
+            wayBack += "\(name), in Plantoir's Backups list."
+        } else {
+            wayBack += "in Plantoir's Backups list."
+        }
+        return "“\(page)” was not copied — I could not be certain the copy would start hidden, "
+             + "and a lesson students can already see must not turn up somewhere new where they "
+             + "can read it. A blank class page called “\(copy)” is waiting on that day instead, "
+             + "and it is hidden. Other classes may already have moved. \(wayBack) "
+             + "Look the section over in Plantoir."
+    }
+
     // MARK: - What publishing means here
 
     /// The two acts, in a teacher's words, said once.
