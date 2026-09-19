@@ -10,7 +10,10 @@ import SwiftUI
 /// word per line and becomes hundreds of points tall — which is what pushed
 /// the window's path bar off the bottom of the screen the first time this
 /// notice was shown. The texts take the width they are given and wrap in it;
-/// `CloudSyncNoticeLayoutTests` measures the result.
+/// `CloudSyncNoticeLayoutTests` measures the result. The whole failure class,
+/// its four occurrences and the fixes that do NOT work are written up in
+/// `documentation/09-mac-app.md` → "A blank window: when a child claims a size
+/// the window cannot give".
 struct CloudSyncExplanationView: View {
 
     // MARK: - Stored properties
