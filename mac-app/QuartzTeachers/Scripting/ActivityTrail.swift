@@ -79,6 +79,27 @@ nonisolated enum ActivityTrail {
         /// refused the answer, and a line saying it could not answer would
         /// send whoever reads it looking for a crash that did not happen.
         case assistantAnswerWasCutOff = "assistant answer was cut off"
+        /// The model filled in a COURSE that is not the one the window is
+        /// for, so the turn was refused and nothing ran.
+        ///
+        /// Carries this window's course and section, the course the model
+        /// named, and the tool it had chosen — never the teacher's sentence
+        /// and never the argument VALUES, which are their page titles.
+        ///
+        /// Both course codes, because the pair IS the evidence. A teacher's
+        /// side of this is the assistant declining something they thought
+        /// they had asked for plainly, which is indistinguishable from a
+        /// misroute, and the pair is the only thing that tells the two apart:
+        /// the guard doing its job, or a model slip being refused at the
+        /// teacher's expense. The tool name is carried for the same reason
+        /// `assistantAnswerWasCutOff` carries one — "it would not publish"
+        /// and "it would not read a page" are different reports.
+        ///
+        /// Not folded into `assistantChoseATool`, which records argument
+        /// NAMES and never values, so it cannot say WHICH course was named;
+        /// nor into the cut-off line, where the answer was never finished. The
+        /// answer here was perfect and the app refused it.
+        case assistantWasAskedAboutAnotherCourse = "assistant was asked about another course"
         case assistantMatchedAFixedPhrase = "assistant matched a fixed phrase"
         case settingsPanelOpened = "app settings opened"
         case assistantModelChosen = "assistant model chosen"
