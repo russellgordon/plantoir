@@ -422,7 +422,7 @@ struct CourseSettingsView: View {
     /// build has been told to exclude — with two conditions, both of which
     /// exist to stop a removal quietly taking marks OFF the coverage map.
     ///
-    /// The rule and its six cases are `contracts/shared-rules.json` →
+    /// The rule and its seven cases are `contracts/shared-rules.json` →
     /// `gradedFolders.removingAFolder`. Called after the name has already left
     /// its list and been written into `excluded_items`, which is what makes
     /// `gradedFolderChoices` the right question to ask here.
@@ -432,7 +432,14 @@ struct CourseSettingsView: View {
         // and the pool entry still names work the build publishes. Dropping it
         // would stop counting a folder nobody removed, and the checklist would
         // go on showing an untickable row for it.
-        if gradedFolderChoices.contains(name) {
+        //
+        // Asked CASE-INSENSITIVELY, because the walk returns on-disk spellings:
+        // `Portfolios/tasks` is offered as `tasks`, and an exact test would
+        // read that as "no longer offered" while `build_site.py` goes on
+        // counting the folder. Seventh case of `gradedFolders.removingAFolder`,
+        // raised from Windows as issue #172; the comparison itself, and what
+        // was measured to choose it, are in `GradedFolderChoices.stillOffers`.
+        if GradedFolderChoices.stillOffers(gradedFolderChoices, aFolderNamed: name) {
             return
         }
         // A course that has NEVER been asked is left unasked, rather than
@@ -441,6 +448,28 @@ struct CourseSettingsView: View {
         // `[]` — asked and answered, nothing counting for marks ever again,
         // from a gesture the teacher was told would take one folder out of the
         // pool. An absent key keeps the historical rule running instead.
+        //
+        // **This guard is not what makes the never-asked cases pass today, and
+        // it must not be "simplified" away.** The post-exclusion walk is: the
+        // historical rule only ever names folders drawn FROM the choices
+        // (`GradedFolderRule.inferredPool(from:)` reads that list), so a name
+        // the still-offered test has just rejected cannot be in a materialised
+        // pool either. That redundancy holds only while the DROP below is no
+        // more permissive than the still-offered test above — which is this
+        // file's shape (a case-insensitive test over an exact drop) and
+        // Windows' shape (one comparer for both). Reverse it — an exact test
+        // over a case-insensitive drop — and this guard is the only thing left
+        // standing.
+        //
+        // Measured ON WINDOWS 2026-09-18, on code whose drop is
+        // `OrdinalIgnoreCase`: with an exact still-offered test and this guard
+        // replaced by the materialised pool, a never-asked course that removes
+        // a top-level `Tasks` while `Portfolios/tasks` survives writes
+        // `graded_folders: []` — the #142 damage, back. The mac's own drop is
+        // exact, so that mutation stops one line lower instead, at
+        // `!currentGraded.contains(name)`: the materialised pool is `["tasks"]`
+        // and the name is `"Tasks"`. Do not read the `[]` as a mac number, and
+        // do not conclude from a green suite that the guard is dead.
         guard let currentGraded = course.configuration.gradedFolders else {
             return
         }

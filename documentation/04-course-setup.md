@@ -317,7 +317,7 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > kept the old key inverted until 2026-09-09, when it adopted this too —
 > issue #107; `contracts/file-formats.json` → `pageVisibility.writingRules`
 > carries the rule and the reasoning, and `writingCases` beside it is the
-> same list as data — ten whole files, each given to the writer with the
+> same list as data — thirteen whole files, each given to the writer with the
 > visibility it should be asked for and the exact text it must come back as.
 > **Both suites run that list**: the mac since 2026-09-09 with issue #107,
 > and Windows since 2026-09-19 with
@@ -325,8 +325,12 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > replaced five of the cases retyped into that test file. Three of the other
 > five were already asserted elsewhere in the Windows suite in its own words
 > (one in that file, two in `PageVisibilityReadingTests.cs`); what running the
-> list adds is that all ten are read from the FILE and so cannot drift from
-> it, and that two of them are covered on Windows for the first time.)
+> list adds is that every case is read from the FILE and so cannot drift from
+> it, and that two of them are covered on Windows for the first time. The
+> three most recent — a value's CONTINUATION lines going with its key, and an
+> indented `# note` after a complete value staying where the teacher wrote it
+> — arrived on 2026-09-19 with issue #176, which is why the list is thirteen
+> rather than the ten it was when both suites started running it.)
 > Two things are
 > deliberately NOT migrations: restoring a backup puts back the spelling the
 > backup held, because a restore is not an edit; and adding a section writes
@@ -635,7 +639,7 @@ nothing published reports that no folder counts for marks exactly as an empty
 pool would.
 
 **And a consequence of that filter, which is a rule in its own right** —
-`gradedFolders.removingAFolder`, six cases. Removing a folder takes its name out
+`gradedFolders.removingAFolder`, seven cases. Removing a folder takes its name out
 of the marks pool, with two exceptions, and both exist to stop a removal quietly
 taking marks OFF the map:
 
@@ -653,8 +657,9 @@ taking marks OFF the map:
   entry naming published work is worth more than a sentence read to the letter.
 
 Both fall out of one instruction: recompute what the checklist offers AFTER the
-removal is recorded, and drop the name only if it is no longer among them AND
-the course had already been asked.
+removal is recorded, and drop the name only if it is no longer among them —
+asked the way the BUILD asks it, case ignored — AND the course had already been
+asked.
 
 Two edges of that, recorded rather than left to be met. The second exception
 says "still OFFERED", not "still counts": the checklist sees four levels and the
@@ -702,29 +707,91 @@ genuinely damaged course is not left with nothing: `site_health.py` raises
 `noGradedFolders` for an empty pool exactly as it does for a pool matching
 nothing published.
 
-**One thing the contract's six cases cannot see**, and Windows differs there on
-purpose: matching CASE. The walk returns names as they are spelled on disk, so
-removing a top-level `Tasks` while `Portfolios/tasks` survives offers `tasks` —
-and an exact "still offered" test reads that as "no longer offered", drops
-`Tasks` from the pool, and leaves `build_site.py`, which lowercases both sides,
-still counting that folder. Marks off the coverage map because of a capital
-letter. Windows asks the question case-insensitively and pins it with a
-Windows-only test; the case is PROPOSED to the mac as [issue
-#172](https://github.com/russellgordon/plantoir/issues/172) rather than added
-here, because a contract case landing unannounced turns the other suite red and
-reads as damage.
+**The STILL-OFFERED half is asked CASE-INSENSITIVELY, and the seventh case
+pins it** — added 2026-09-19 from [issue
+#172](https://github.com/russellgordon/plantoir/issues/172), which was raised
+from Windows. The walk returns names as they are spelled on disk, so removing a
+top-level `Tasks` while `Portfolios/tasks` survives offers `tasks`; an exact
+"still offered" test reads that as "no longer offered", drops `Tasks` from the
+pool, and leaves `build_site.py` — which lowercases both sides in
+`_is_graded_path` — still counting that folder. Marks off the coverage map
+because of a capital letter. Windows has asked case-insensitively since
+2026-09-18 and proposed the case rather than committing it; on the mac it was
+RED until `CourseSettingsView.dropFromMarksPool` stopped asking with `contains`,
+and cases 1-6 stayed green throughout, which is the measurement Windows
+reported — the six all use one spelling and cannot see the difference.
 
-**Whichever way #172 settles, keep the never-asked guard.** It looks dead: with
-the walk taken after the exclusion, replacing it with the materialised pool
-leaves all six cases green, because the historical rule only ever names folders
-drawn FROM the choices — the copy lists plus the walk — so a name no longer
-among them cannot be in the materialised pool either. That redundancy depends
-on the still-offered test and the drop asking with the SAME comparer, which is
-exactly what #172 is about. Measured 2026-09-18: with an exact still-offered
-test, and the guard replaced the same way, a never-asked course removing a
-top-level `Tasks` while `Portfolios/tasks` survives writes `graded_folders: []`
-— nothing counting for marks, permanently. The #142 damage itself, brought back
-by tidying away a check that looked redundant.
+**Which case-insensitive comparison, measured rather than picked** (2026-09-19,
+this Mac; `GradedFolderChoices.stillOffers` carries the same table in short).
+The question has to be answered the way PYTHON answers it, because Python is
+what counts the folder:
+
+| pair | Swift `lowercased()==` | Swift `caseInsensitiveCompare` | Python `str.lower()==` |
+|---|---|---|---|
+| `Tasks` / `tasks` | true | true | true |
+| `Straße` / `STRASSE` | false | **true** | false |
+| `Σ` / `ς` | false | **true** | false |
+
+- **`localizedCaseInsensitiveCompare` is rejected**: it reads the CURRENT
+  locale, and it is the one comparison with no column in that table because the
+  table's answers do not depend on the machine and its do. Measured:
+  `compare("I", "i", options: [.caseInsensitive], locale: tr_TR)` answers NOT
+  EQUAL where the same call with `locale: nil` answers EQUAL, so a
+  Turkish-locale Mac would disagree with the build about the plainest ASCII
+  names.
+- **`caseInsensitiveCompare` is rejected**: locale-independent, but it folds
+  FURTHER than Python, which is what the build uses — the two rows above.
+  (C#'s answer on those two pairs was not measured on this Mac.)
+- **`lowercased()` equality is chosen**: locale-independent (it folds `I` to
+  `i` where `lowercased(with: tr_TR)` gives `ı`), the same fold `str.lower()`
+  performs, and the same answer `OrdinalIgnoreCase` gives on ASCII. They are
+  not one fold beyond it: `U+212A KELVIN SIGN` against `k` is true for
+  `lowercased()` and for `str.lower()` (both measured here) where
+  `OrdinalIgnoreCase` should answer false, since it upper-cases and
+  `ToUpperInvariant('k')` is `K` — read off the spec rather than measured,
+  there being no `dotnet` on this Mac. Nothing is pinned there. Note also that
+  this is deliberately
+  NOT the house idiom: `caseInsensitiveCompare` is what mac model code asks
+  folder-name questions with elsewhere, because those are questions only the app
+  answers.
+
+Non-ASCII is where all three stop agreeing and nothing pins them: `İ` (U+0130)
+lowercases to `i` plus a combining dot in Swift AND in Python, matching neither
+`i` nor `I`, and Swift's `==` treats a decomposed `Café` as equal to a
+precomposed one where Python's does not — which errs toward KEEPING a pool
+entry, the direction this whole rule errs in.
+
+**What is still NOT pinned is the DROP's own comparison.** The mac takes the
+name out of the pool exactly; Windows uses `OrdinalIgnoreCase`. It shows only on
+a course whose pool and whose folder spell one name two ways, where the mac
+keeps a pool entry whose folder has gone and Windows removes it. Both err
+safely — nothing counted is lost either way, and `site_health.py` raises
+`noGradedFolders` for a pool matching nothing published, on a course whose
+coverage map is on AND whose site has curriculum expectations (`site_health.py`
+:145: `coverage_wanted and curriculum_found and not graded_folders_found`) — so
+it is left unpinned. The two halves are not free of each other,
+though: **the still-offered test must be at least as PERMISSIVE as the drop.**
+That is the mac's shape now (case-insensitive test, exact drop) and Windows'
+(one comparer for both). Reverse it and a name can be judged absent and then
+removed anyway.
+
+**Keep the never-asked guard.** It looks dead: with the walk taken after the
+exclusion, replacing it with the materialised pool leaves every case green,
+because the historical rule only ever names folders drawn FROM the choices — the
+copy lists plus the walk — so a name the still-offered test has just rejected
+cannot be in the materialised pool either. That redundancy holds only while the
+drop is no more permissive than the still-offered test, which is the constraint
+above. **Measured ON WINDOWS, 2026-09-18, on code whose drop is
+`OrdinalIgnoreCase`**: with an exact still-offered test and the guard replaced
+that way, a never-asked course removing a top-level `Tasks` while
+`Portfolios/tasks` survives writes `graded_folders: []` — nothing counting for
+marks, permanently. The #142 damage itself, brought back by tidying away a check
+that looked redundant. **That `[]` is a Windows number and must not be read as a
+mac one**: the same mutation on the mac stops one line lower, at
+`!currentGraded.contains(name)`, because the drop here is exact — the
+materialised pool is `["tasks"]` and the name is `"Tasks"`, so the course stays
+unasked. A mac reader who tries the stated mutation and sees the suite stay
+green must not conclude the guard is dead.
 
 Nothing new is written to the activity trail for any of this. The removal
 already leaves its own line (`item excluded`), and what changed is only which
