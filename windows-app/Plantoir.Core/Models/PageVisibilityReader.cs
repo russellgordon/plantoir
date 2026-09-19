@@ -272,16 +272,30 @@ internal static class PageVisibilityReader
     {
         string value = TrimYamlSpaces(rawValue);
 
-        if (value.Length == 0)
-        {
-            // `publish:` on its own is null, and null publishes the page —
-            // UNLESS the value is below it, indented under the key, which this
-            // reader does not follow. Measured: `publish:` then a blank line
-            // then an indented `false` hides the page.
-            if (nextLine is not null && (nextLine.StartsWith(' ') || nextLine.StartsWith('\t')))
-                return null;
-            return new ScalarReading("", false);
-        }
+        // A value CONTINUES onto the next line whenever the next line that
+        // could be one is indented — and that is true however complete the
+        // key's own line looks.
+        //
+        // `publish:` on its own is null, and null publishes the page, UNLESS
+        // the value is sitting below it. But so is `publish: false` with an
+        // indented `false` under it: YAML folds the two into the one plain
+        // scalar "false false", a STRING that is not "false", and the page is
+        // PUBLISHED. Measured, python-frontmatter 1.3.0 / PyYAML 6.0.3 —
+        // `false`, `no`, `off` and `FALSE` all behave that way.
+        //
+        // Reading the key's line alone therefore called such a page HIDDEN,
+        // confidently, while students could read it. Confidently is the part
+        // that bit: the writer's "already right, change nothing" gate believed
+        // it, so asking to hide the page changed nothing at all and the
+        // teacher was told it was already hidden. That is the dangerous
+        // direction — this reader will not guess at it. `nextLine` is the
+        // first line below that could be a VALUE, so blank lines and comments
+        // have already been stepped over and cannot trigger this.
+        bool continuesBelow = nextLine is not null
+            && (nextLine.StartsWith(' ') || nextLine.StartsWith('\t'));
+        if (continuesBelow) return null;
+
+        if (value.Length == 0) return new ScalarReading("", false);
 
         // A tag (`!!str false`), an anchor (`&flag false`), an alias (`*flag`)
         // or a block scalar (`>-` and the value on the next line) all change

@@ -459,13 +459,20 @@ public class PageVisibilityWritingTests
     /// publish:    / "  false"     False   HIDDEN 'false false'  -> PUBLISHED
     /// publish: |- / "  false"     'false' HIDDEN 'false false'  -> PUBLISHED
     /// publish:    / "  a: 1"      {a:1} published ScannerError  -> BUILD STOPS
-    /// publish: false / "  false"  'false false' PUBLISHED (the reader says Hidden — see below)
+    /// publish: / "# note" / "  false"  False HIDDEN  ParserError -> BUILD STOPS
+    /// publish: / "- a"            ['a'] published    ParserError -> BUILD STOPS
     /// </code>
     ///
     /// <para>Every one of those lands <c>False -&gt; HIDDEN</c> with the sweep.
     /// The teacher asked for the page to be taken down and was told it had
     /// been; without this they could still read it. Issue #176 — the mac still
     /// owes the same fix.</para>
+    ///
+    /// <para>A complete-LOOKING value with an indented one below it —
+    /// <c>publish: false</c> over <c>  false</c> — is the same family and is
+    /// covered by <see cref="AValueBelowACompleteLookingOneIsStillAValueBelow"/>,
+    /// because the sweep alone does not save it: the READER has to refuse it
+    /// first or the writer never runs.</para>
     /// </remarks>
     [Theory]
     // The value is a folded or literal block scalar.
@@ -484,6 +491,14 @@ public class PageVisibilityWritingTests
     [InlineData("publish: true\npublish: >-\n  false\ntitle: x", true, "publish: true\npublish: false\ntitle: x")]
     // The legacy spelling, migrating: the old key's continuation goes too.
     [InlineData("draft: >-\n  true\ntitle: x", true, "publish: false\ntitle: x")]
+    // A COLUMN-0 comment between the key and its value. The reader steps over
+    // a comment at any indent, so the sweeper must too: stopping at this one
+    // left the `  false` orphaned and the build stopped.
+    [InlineData("publish:\n# note\n  false\ntitle: x", true, "publish: false\ntitle: x")]
+    // A COLUMN-0 sequence is a legal continuation of a key with no value.
+    [InlineData("publish:\n- a\ntitle: x", true, "publish: false\ntitle: x")]
+    [InlineData("publish:\n- a\n- b\ntitle: x", true, "publish: false\ntitle: x")]
+    [InlineData("draft:\n- a\ntitle: x", true, "publish: false\ntitle: x")]
     public void AValuesContinuationLinesGoWithIt(string frontmatter, bool draft, string expected)
     {
         string before = $"---\n{frontmatter}\n---\nBody.\n";
@@ -493,6 +508,55 @@ public class PageVisibilityWritingTests
         Assert.Equal($"---\n{expected}\n---\nBody.\n", after);
         Assert.Equal(draft ? PageVisibility.Hidden : PageVisibility.Visible,
                      PageVisibilityReader.Answer(after, 1));
+    }
+
+    /// <summary>
+    /// A value below a key is a value below a key however complete the key's
+    /// own line looks — and this one is the dangerous direction.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Measured</b> (python-frontmatter 1.3.0 / PyYAML 6.0.3 /
+    /// CPython 3.11.9): YAML folds a key's line and the indented line below it
+    /// into ONE plain scalar, so <c>publish: false</c> over <c>  false</c> is
+    /// the STRING <c>'false false'</c> — not the boolean, not <c>"false"</c> —
+    /// and the page is <b>PUBLISHED</b>. Same for <c>no</c>, <c>off</c> and
+    /// <c>FALSE</c>: <c>'no false'</c>, <c>'off false'</c>,
+    /// <c>'FALSE false'</c>.</para>
+    ///
+    /// <para>Reading the key's line alone called every one of those HIDDEN,
+    /// and <i>confidently</i>. Confidently is what bit: <c>SetDraft</c>'s
+    /// "already right, change nothing" gate returns before the writer or its
+    /// continuation sweep ever run, so "hide this page" was a NO-OP — the file
+    /// untouched, the teacher told it was already hidden, and students still
+    /// reading it. The sweep cannot save a page the writer is never asked to
+    /// write; the reader has to refuse it first.</para>
+    ///
+    /// <para>The three-way answer is <c>CannotTell</c>, so REPORTING says
+    /// visible — which is what the site does — and any writer writes the flag
+    /// out in full. Measured after that write: <c>False -&gt; HIDDEN</c>.
+    /// Changes none of the 54 shared <c>readingCases</c>. The mac reads these
+    /// as <c>hidden</c> and is wrong; that is on issue #176 with the case
+    /// proposed for <c>contracts/file-formats.json</c>.</para>
+    /// </remarks>
+    [Theory]
+    [InlineData("false")]
+    [InlineData("no")]
+    [InlineData("off")]
+    [InlineData("FALSE")]
+    [InlineData("true")]
+    [InlineData("maybe")]
+    public void AValueBelowACompleteLookingOneIsStillAValueBelow(string value)
+    {
+        string page = $"---\npublish: {value}\n  false\ntitle: x\n---\nBody.\n";
+
+        Assert.Equal(PageVisibility.CannotTell, PageVisibilityReader.Answer(page, 1));
+        // Reporting collapses to visible, which is what the site does here.
+        Assert.False(PageFrontmatter.IsDraft(page, 1));
+
+        var (hidden, edit) = PageFrontmatter.SetDraft(page, "publish", draft: true, 1);
+        Assert.True(edit.Changed);   // NOT "already hidden"
+        Assert.Equal("---\npublish: false\ntitle: x\n---\nBody.\n", hidden);
+        Assert.Equal(PageVisibility.Hidden, PageVisibilityReader.Answer(hidden, 1));
     }
 
     /// <summary>
@@ -518,6 +582,33 @@ public class PageVisibilityWritingTests
         var (nulled, _) = PageFrontmatter.SetDraft(
             "---\npublish:\n  # mine\ntitle: x\n---\nBody.\n", "publish", draft: true, 1);
         Assert.Equal("---\npublish: false\n  # mine\ntitle: x\n---\nBody.\n", nulled);
+
+        // A COLUMN-0 comment with no value under it is somebody's note about
+        // the next key. Stepping over comments must not eat it — the walk
+        // takes nothing, because it found no value line below it. Measured:
+        // the result builds and is HIDDEN.
+        var (topLevel, _) = PageFrontmatter.SetDraft(
+            "---\npublish: true\n# a note about title\ntitle: x\n---\nBody.\n", "publish", draft: true, 1);
+        Assert.Equal("---\npublish: false\n# a note about title\ntitle: x\n---\nBody.\n", topLevel);
+        Assert.Equal(PageVisibility.Hidden, PageVisibilityReader.Answer(topLevel, 1));
+    }
+
+    /// <summary>
+    /// A column-0 sequence belongs to the key above it only when that key has
+    /// no value of its own — so a key that HAS one leaves it alone.
+    /// </summary>
+    /// <remarks>
+    /// Measured: <c>publish: true</c> with <c>- a</c> under it is a
+    /// <c>ParserError</c> before anything is written — a page that does not
+    /// build either way — so there is nothing here for a writer to rescue, and
+    /// sweeping a teacher's list on that guess would be the larger mistake.
+    /// </remarks>
+    [Fact]
+    public void AColumn0SequenceUnderAKeyThatHasAValueIsNotSwept()
+    {
+        var (after, _) = PageFrontmatter.SetDraft(
+            "---\npublish: true\n- a\ntitle: x\n---\nBody.\n", "publish", draft: true, 1);
+        Assert.Equal("---\npublish: false\n- a\ntitle: x\n---\nBody.\n", after);
     }
 
     /// <summary>A CRLF file keeps its line endings through the sweep.</summary>
