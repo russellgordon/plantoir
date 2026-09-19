@@ -754,15 +754,16 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private static readonly HashSet<string> _syncNoticedThisProcess = new(StringComparer.OrdinalIgnoreCase);
 
-    private static string ResolvedFolder(string path)
-    {
-        try { return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
-        catch { return path; }
-    }
+    // Both of these used to be this window's own private idea of folder
+    // sameness, and the view model had a second, ORDINAL one. Two notions of
+    // "the same folder" is one too many: re-choosing the open folder answered
+    // "yes, the same" here and "no, a change" there, and the change path
+    // stopped the container of the folder still on screen (#162). One rule,
+    // in Plantoir.Core.Models.WorkingFolder, and everything asks it.
+    private static string ResolvedFolder(string path) => WorkingFolder.Resolved(path);
 
     private bool IsTheOpenFolder(string path) =>
-        Workspace.WorkspacePath is { } open &&
-        string.Equals(ResolvedFolder(open), ResolvedFolder(path), StringComparison.OrdinalIgnoreCase);
+        WorkingFolder.IsTheSame(Workspace.WorkspacePath, path);
 
     /// <summary>
     /// The service to name, or null when there is nothing to say: the folder
