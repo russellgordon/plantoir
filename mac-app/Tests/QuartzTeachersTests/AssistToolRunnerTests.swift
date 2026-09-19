@@ -2609,6 +2609,60 @@ final class AssistToolRunnerTests: XCTestCase {
         }
     }
 
+    /// A flag the teacher annotated, or typed a word into, still PUBLISHES
+    /// the page — the build strips a comment before Quartz sees it, and makes
+    /// a string of anything it cannot read as a boolean, and a string that is
+    /// not "false" is published.
+    ///
+    /// So asking for such a page to be published is asking for what is already
+    /// there: four words back, and the file left exactly as the teacher wrote
+    /// it. Rewriting the flag to a tidy `true` would be an edit nobody asked
+    /// for, in a file Obsidian very likely has open, and it would throw away
+    /// whatever the word meant to them. Until 2026-09-18 Plantoir read all
+    /// three of these as HIDDEN and offered to publish a page students were
+    /// already reading (issue #140).
+    @MainActor
+    func testAFlagTheTeacherAnnotatedIsAlreadyPublished() async throws {
+        for value in ["true # covered Tuesday", "on", "maybe"] {
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            try write(page: "Unit 4, Day 23", publish: value, date: "2026-09-08",
+                      body: "Nothing linked.", in: made.course)
+            let url: URL = pageURL(of: "Unit 4, Day 23", in: made.course)
+            let before: String = try String(contentsOf: url, encoding: .utf8)
+
+            let outcome: AssistToolOutcome = await made.runner.run(call: call(
+                "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+            ))
+            XCTAssertEqual(outcome.summary, "It's already been published.", "publish: \(value)")
+            XCTAssertEqual(
+                try String(contentsOf: url, encoding: .utf8), before,
+                "publish: \(value) — the teacher's own line is left alone"
+            )
+        }
+    }
+
+    /// And the same page asked to be HIDDEN does change, because the only way
+    /// to say the opposite of what it says is to say it plainly.
+    @MainActor
+    func testTheSameAnnotatedFlagStillHidesWhenAsked() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 23", publish: "true # covered Tuesday", date: "2026-09-08",
+                  body: "Nothing linked.", in: made.course)
+
+        _ = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+        ))
+        let after: String = try String(
+            contentsOf: pageURL(of: "Unit 4, Day 23", in: made.course), encoding: .utf8
+        )
+        XCTAssertTrue(after.contains("publish: false"))
+        XCTAssertFalse(after.contains("# covered Tuesday"))
+    }
+
     /// And the mirror, for hiding.
     @MainActor
     func testUnpublishingAPageThatIsAlreadyHiddenSaysSo() async throws {

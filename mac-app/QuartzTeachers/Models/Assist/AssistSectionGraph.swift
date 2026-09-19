@@ -177,7 +177,7 @@ struct AssistSectionGraph {
                 relativePath: relativePath(of: pageURL, workspaceURL: workspaceURL),
                 isSectionLocal: isSectionLocal,
                 isVisibleToStudents: AssistPageVisibility.publishes(
-                    in: text, forSection: sectionNumber, isSectionLocal: isSectionLocal
+                    in: text, forSection: sectionNumber
                 ),
                 date: PageFrontmatter.createdDay(in: text, key: dateKey),
                 linkedTitles: linkTargets(in: text),

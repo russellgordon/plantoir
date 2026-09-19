@@ -9,6 +9,7 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import class_pages
+import page_visibility
 import toolchain_paths
 import re
 import sys
@@ -1655,6 +1656,20 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     `draft:` that came out unsplit would silently share one publish state
     across every section, which is the bug this function exists to prevent.
 
+    A `publish:` value is COPIED, character for character, comment and quotes
+    and all: whatever the build makes of `publish: oN`, it makes the same
+    thing of `publishForSection1: oN`, so no reader standing between the two
+    can invert it. A `draft:` value cannot be copied — it has to be turned
+    round — so it is read with the build's own rule (`page_visibility`), which
+    until 2026-09-18 was `value.strip().lower() == "true"` here and so
+    PUBLISHED a `draft: yes` or `draft: On` page into every section while the
+    build went on hiding the unsplit original.
+
+    A value this cannot read — one that runs onto the next line, or a draft
+    flag written as a tag or an alias — is written as HELD BACK. A page
+    wrongly held back is one a teacher notices and fixes; a page wrongly
+    published is one nobody notices at all.
+
     Only the frontmatter block is touched — a `draft: true` shown inside a
     fenced code block on a tutorial page is documentation, not metadata.
     """
@@ -1675,9 +1690,13 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
         return text
 
     if "publish" in values:
-        publish = values["publish"]
+        if page_visibility.is_complete_on_its_own_line(values["publish"]):
+            publish = values["publish"].strip()
+        else:
+            publish = "false"
     elif "draft" in values:
-        publish = "false" if values["draft"].strip().lower() == "true" else "true"
+        draft_answer = page_visibility.draft_family_answer(values["draft"])
+        publish = "true" if draft_answer == page_visibility.VISIBLE else "false"
     else:
         publish = None
 

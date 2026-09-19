@@ -358,20 +358,48 @@ enum SectionAdder {
 
     /// Whether a section publishes this page, as the string to write back.
     ///
-    /// Visibility is `publishForSectionN`. `draftSectionN` is the older
-    /// spelling with the OPPOSITE polarity, so a course written before the
-    /// rename is read and inverted — carrying it across unchanged would
-    /// publish a page the teacher had held back.
+    /// The current key's value is COPIED, character for character, comment and
+    /// quotes and all. That is what makes the copy safe: whatever the build
+    /// makes of `publishForSection1: oN`, it makes the same thing of
+    /// `publishForSection2: oN`, so no reader standing between the two can
+    /// invert it by misreading it. The one value that cannot be copied is one
+    /// that runs onto the NEXT line — a block scalar, or a key with the value
+    /// indented beneath it — because the copy would be a key with nothing
+    /// after it. Those are written as held back, for the reason below.
+    ///
+    /// `draftSectionN` is the older spelling with the OPPOSITE polarity, so a
+    /// course written before the rename is read and inverted — carrying it
+    /// across unchanged would publish a page the teacher had held back. That
+    /// inversion is the build's own rule, read by `PageVisibilityReader`:
+    /// until 2026-09-18 it was `value == "true"`, which quietly PUBLISHED a
+    /// `draftSection1: yes` or `draftSection1: On` page into the new section
+    /// while the build went on hiding the original.
+    ///
+    /// A draft value this app cannot read is written as held back. A page
+    /// wrongly held back is one a teacher notices and fixes; a page wrongly
+    /// published is one nobody notices at all.
     static func publishValue(forSection sectionNumber: Int, in lines: [String]) -> String? {
         let publishPrefix: String = "publishForSection\(sectionNumber):"
         for line in lines where line.hasPrefix(publishPrefix) {
-            return String(line.dropFirst(publishPrefix.count)).trimmingCharacters(in: .whitespaces)
+            let raw: String = String(line.dropFirst(publishPrefix.count))
+            if !PageVisibilityReader.isCompleteOnItsOwnLine(raw) {
+                return "false"
+            }
+            return raw.trimmingCharacters(in: .whitespaces)
         }
 
         let draftPrefix: String = "draftSection\(sectionNumber):"
         for line in lines where line.hasPrefix(draftPrefix) {
-            let value: String = String(line.dropFirst(draftPrefix.count)).trimmingCharacters(in: .whitespaces)
-            return value.lowercased() == "true" ? "false" : "true"
+            let raw: String = String(line.dropFirst(draftPrefix.count))
+            let scalar: PageVisibilityReader.ScalarReading = PageVisibilityReader.reading(
+                ofValue: raw, followedBy: nil
+            )
+            switch PageVisibilityReader.answerFromDraftFamily(scalar) {
+            case .visible:
+                return "true"
+            case .hidden, .cannotTell, .saysNothing:
+                return "false"
+            }
         }
         return nil
     }
