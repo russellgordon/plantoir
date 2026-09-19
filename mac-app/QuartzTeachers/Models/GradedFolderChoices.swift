@@ -81,6 +81,58 @@ enum GradedFolderChoices {
         return true
     }
 
+    /// Whether the checklist STILL OFFERS a folder of this name — asked the way
+    /// the BUILD asks it: a whole name, case ignored, never a substring.
+    ///
+    /// The walk returns names as they are spelled ON DISK, so a course that
+    /// keeps `Portfolios/tasks` after its top-level `Tasks` is removed offers
+    /// `tasks`. An exact test reads that as "no longer offered", the pooled
+    /// `Tasks` is dropped, and `build_site.py`'s `_is_graded_path` — which
+    /// lowercases both sides — goes on counting that folder: marks off the
+    /// Curriculum Coverage map because of a capital letter. Pinned as the
+    /// seventh case of `contracts/shared-rules.json` →
+    /// `gradedFolders.removingAFolder`, raised from Windows as issue #172,
+    /// where `FolderRemoval.RemoveFolderFromCourse` has asked with
+    /// `OrdinalIgnoreCase` since 2026-09-18.
+    ///
+    /// **`lowercased()` equality, and the alternatives were measured
+    /// (2026-09-19, this Mac) rather than weighed.**
+    /// `localizedCaseInsensitiveCompare` reads the CURRENT locale:
+    /// `compare("I", "i", options: [.caseInsensitive], locale: tr_TR)` answers
+    /// NOT EQUAL, so a Turkish-locale Mac would disagree with the build about
+    /// `Tasks` and `tasks`. `lowercased()` is locale-independent — it folds `I`
+    /// to `i` where `lowercased(with: tr_TR)` gives `ı` — which is what
+    /// Python's `str.lower()` and C#'s `OrdinalIgnoreCase` both do.
+    /// `caseInsensitiveCompare` is locale-independent as well but folds
+    /// further than the build: it calls `Straße` and `STRASSE` one name, and `Σ`
+    /// and `ς` one letter, where Python's `str.lower()` — measured — calls
+    /// neither pair equal. (What C# answers for those two pairs was not
+    /// measured here; the build is the one this has to agree with.)
+    ///
+    /// **So this one is deliberately NOT the house idiom, and that is the
+    /// point.** `caseInsensitiveCompare` is what mac model code asks folder-name
+    /// questions with — `SpecialFolderRenamer`, `ClassFolder`,
+    /// `FolderPathRewriter`, `StringListEditorView` — because those are
+    /// questions only this app answers. This one is answered by Python as well,
+    /// and it has to give Python's answer; do not "make it consistent" with its
+    /// neighbours.
+    ///
+    /// Non-ASCII is where all three stop agreeing, and nothing here promises
+    /// otherwise: `İ` (U+0130) lowercases to `i` plus a combining dot in Swift
+    /// AND in Python, matching neither `i` nor `I`; and Swift's `==` treats a
+    /// decomposed `Café` as equal to a precomposed one where Python's does not
+    /// — which errs toward KEEPING a pooled name, the direction this whole rule
+    /// errs in.
+    nonisolated static func stillOffers(_ choices: [String], aFolderNamed name: String) -> Bool {
+        let wanted: String = name.lowercased()
+        for offered in choices {
+            if offered.lowercased() == wanted {
+                return true
+            }
+        }
+        return false
+    }
+
     /// Everything the Marks checklist offers: the course's shared folders, then
     /// its per-section folders, then what is on disk — in that order,
     /// de-duplicated by exact name.
