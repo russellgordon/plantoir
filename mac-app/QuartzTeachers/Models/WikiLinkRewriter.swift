@@ -30,7 +30,10 @@ import Foundation
 /// understands those, so a vault switched to Markdown links has larger problems
 /// than this one — but it is a real gap, and it is written down here rather
 /// than left to be discovered by whoever hits it.
-enum WikiLinkRewriter {
+///
+/// `nonisolated`: pure over its arguments, and run off the main actor by the
+/// unit-word rename, which rewrites every page of a course.
+nonisolated enum WikiLinkRewriter {
 
     // MARK: - Stored properties
 

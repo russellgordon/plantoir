@@ -72,20 +72,119 @@ final class PathBarWidthTests: XCTestCase {
         )
     }
 
-    /// A path too long for the space still takes the whole space — that is
-    /// the scrolling form doing its job, and the rule the trailing anchor
-    /// exists for. Without this, "ask for less" could be satisfied by a bar
-    /// that never scrolls and clips instead.
+    /// Too long for the space, and the bar does what FINDER does: the
+    /// ancestors lose their NAMES, not the path its end, and nothing is
+    /// replaced by an ellipsis.
+    ///
+    /// The check is indirect on purpose, and stronger for it: a row that
+    /// draws no ancestor names cannot change width when those names change
+    /// length. Two paths of the same depth, one with very long ancestor
+    /// names and one with short, must collapse to the SAME width while their
+    /// full rows differ — which no amount of truncating or ellipsising would
+    /// satisfy, since a truncated name still occupies the room it was given.
     @MainActor
-    func testALongPathStillFillsTheSpaceItIsGiven() {
-        let longPath: String = "/Users/teacher/Library/Mobile Documents/com~apple~CloudDocs/Teaching/Course Notes/Semester Two"
-        let bar: FinderPathBarView = FinderPathBarView(folderURL: URL(fileURLWithPath: longPath))
-        let measured: CGFloat = measuredWidth(of: bar, proposing: 320)
+    func testCollapsingDropsTheAncestorsNamesRatherThanShorteningThem() {
+        let shortNames: FinderPathBarView = FinderPathBarView(
+            folderURL: URL(fileURLWithPath: "/a/b/c/Folder")
+        )
+        let longNames: FinderPathBarView = FinderPathBarView(
+            folderURL: URL(fileURLWithPath: "/an extremely long ancestor name/another very long one/a third long one/Folder")
+        )
+
+        let shortFull: CGFloat = measuredWidth(of: shortNames.pathRow, proposing: 4000)
+        let longFull: CGFloat = measuredWidth(of: longNames.pathRow, proposing: 4000)
+        XCTAssertGreaterThan(
+            longFull, shortFull,
+            "The two full rows should differ — if they do not, this test proves nothing below."
+        )
+
+        let shortCollapsed: CGFloat = measuredWidth(of: shortNames.collapsedRow, proposing: 4000)
+        let longCollapsed: CGFloat = measuredWidth(of: longNames.collapsedRow, proposing: 4000)
+        XCTAssertEqual(
+            shortCollapsed, longCollapsed, accuracy: 1,
+            "Collapsed, a path with long ancestor names claimed \(longCollapsed) against "
+            + "\(shortCollapsed) for short ones — so the ancestors' names are still being "
+            + "drawn in some shortened form rather than dropped, which is the ellipsis "
+            + "behaviour this deliberately does not have."
+        )
+    }
+
+    /// And the folder's own name survives the collapse: it is the one crumb
+    /// that differs between a teacher's folders.
+    @MainActor
+    func testTheFolderItselfKeepsItsNameWhenTheAncestorsLoseTheirs() {
+        let bar: FinderPathBarView = FinderPathBarView(
+            folderURL: URL(fileURLWithPath: "/a/b/c/A Distinctly Long Folder Name")
+        )
+        let shorterName: FinderPathBarView = FinderPathBarView(
+            folderURL: URL(fileURLWithPath: "/a/b/c/X")
+        )
+
+        XCTAssertGreaterThan(
+            measuredWidth(of: bar.collapsedRow, proposing: 4000),
+            measuredWidth(of: shorterName.collapsedRow, proposing: 4000),
+            "The collapsed row is the same width whatever the folder is called, so the "
+            + "folder's own name is not being drawn either."
+        )
+    }
+
+    /// The middle form is actually REACHED: offered a width between the two,
+    /// the bar collapses rather than jumping straight to scrolling.
+    @MainActor
+    func testAPathThatFitsOnlyCollapsedIsDrawnCollapsed() {
+        let bar: FinderPathBarView = FinderPathBarView(
+            folderURL: URL(fileURLWithPath: "/Users/teacher/Library/Mobile Documents/com~apple~CloudDocs/Teaching/Course Notes")
+        )
+        let fullWidth: CGFloat = measuredWidth(of: bar.pathRow, proposing: 4000)
+        let collapsedWidth: CGFloat = measuredWidth(of: bar.collapsedRow, proposing: 4000)
+        XCTAssertGreaterThan(
+            fullWidth, collapsedWidth + 10,
+            "This path is not long enough for the two forms to differ meaningfully."
+        )
+
+        // Half way between the two: too narrow for every name, wide enough
+        // for icons, chevrons and the folder's own name.
+        let between: CGFloat = (fullWidth + collapsedWidth) / 2
+        let measured: CGFloat = measuredWidth(of: bar, proposing: between)
 
         XCTAssertEqual(
+            measured, collapsedWidth, accuracy: 1,
+            "Offered \(between) points — between the full row's \(fullWidth) and the "
+            + "collapsed row's \(collapsedWidth) — the bar claimed \(measured). It should "
+            + "draw the collapsed row at its own width, not fall through to the scrolling "
+            + "form and take everything offered."
+        )
+    }
+
+    /// A path too long even to COLLAPSE still takes the whole space — that
+    /// is the scrolling form doing its job, and the rule the trailing anchor
+    /// exists for. Without this, "ask for less" could be satisfied by a bar
+    /// that never scrolls and clips instead.
+    ///
+    /// The precondition is not decoration. This test was written when the
+    /// form that had to overflow was the FULL row, hundreds of points over
+    /// 320; the collapsed row added for issue #148 is much narrower, so the
+    /// margin is now small enough that a change in icon or chevron metrics
+    /// could let it fit — at which point `ViewThatFits` would rightly draw
+    /// the collapsed row, this would fail, and the failure would read as a
+    /// product bug rather than as a fixture that had gone stale.
+    @MainActor
+    func testAPathTooLongEvenToCollapseStillFillsTheSpaceItIsGiven() {
+        let longPath: String = "/Users/teacher/Library/Mobile Documents/com~apple~CloudDocs/Teaching/Course Notes/Semester Two"
+        let bar: FinderPathBarView = FinderPathBarView(folderURL: URL(fileURLWithPath: longPath))
+
+        XCTAssertGreaterThan(
+            measuredWidth(of: bar.collapsedRow, proposing: 4000), 320,
+            "This fixture now COLLAPSES into 320 points, so it no longer reaches the "
+            + "scrolling form and the assertion below would be testing the wrong form. "
+            + "Deepen the path rather than relaxing the check."
+        )
+
+        let measured: CGFloat = measuredWidth(of: bar, proposing: 320)
+        XCTAssertEqual(
             measured, 320, accuracy: 1,
-            "Squeezed to 320 points, a long path claimed \(measured) — it should take the "
-            + "space it is given and scroll inside it, showing its END."
+            "Squeezed to 320 points, a path too long even to collapse claimed \(measured) — "
+            + "it should take the space it is given and scroll inside it, showing its END."
         )
     }
 }

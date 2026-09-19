@@ -34,7 +34,7 @@ vetoed and for what, and what the flags cost.
 | `reasoning-flag-measurement.txt` | Why thinking must be turned off with **two** flags, and why the fault hid for days: llama.cpp parses the thinking out of the reply, so only the token count and the clock show it. |
 | `tools-from-contract.py` | **Start here for a new measurement.** Writes the tool surface the suites take as input, read from `contracts/assist-cases.json` — which is generated from the app, so a run cannot be against a surface that does not ship. `local` (13 tools) is what the on-device model sees; `mcp` (32) is Claude Code's. |
 | `thirteen-tool-surface-results.txt` | The **current** shipping surface, 42 probes × 10 trials on both tiers. Also records the description-steer regression: fixing one probe in a tool description broke three others. |
-| `shelf-phrasings-results.txt` | **Every phrasing the assistant window offers**, word for word, 14 × 10 trials — the evidence the shelf is allowed to promise them. Also records a harness fault worth more than the result: measured without `AssistAgent.dateline()`, "Publish the class on Monday" resolved to a date a month away 10/10 and nearly cost a good card. |
+| `shelf-phrasings-results.txt` | **Every phrasing the assistant window offers**, word for word, 14 × 10 trials — the evidence the shelf is allowed to promise them. Also records a harness fault worth more than the result: measured without `AssistAgent.dateline(on:)`, "Publish the class on Monday" resolved to a date a month away 10/10 and nearly cost a good card. |
 
 **Earlier runs, superseded but kept**
 

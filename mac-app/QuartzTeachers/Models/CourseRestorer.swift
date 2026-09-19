@@ -113,6 +113,14 @@ enum CourseRestorer {
         let fileManager: FileManager = FileManager.default
         let destination: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
 
+        // The records of renames under way go with the pages they described:
+        // a record left standing would open the next Course Settings with
+        // "did not finish — press Rename to finish" about a rename the
+        // restore has just undone. Cleared first, so a restore that then
+        // fails cannot leave a record about pages that are no longer there.
+        UnitWordRenamer.clearRenameRecord(courseDirectory: destination)
+        SpecialFolderRenamer.clearRenameRecord(courseDirectory: destination)
+
         if !fileManager.fileExists(atPath: destination.path) {
             try extract(item.fileURL, named: item.courseCode, into: coursesDirectoryURL)
             return

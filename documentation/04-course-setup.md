@@ -278,8 +278,12 @@ than renamed afterwards: `install_payload_file` rewrites the text and
 `renamed_for_unit_word` renames the file. **It is asked only when the course
 has no saved configuration** — changing it on a re-run would rewrite the
 configuration and rename nothing, leaving pages the build no longer recognises.
-An absent key means "Unit", so every course made before this existed is
-untouched. "Day" is deliberately fixed.
+A course already in use changes its word from the app's Course Settings
+instead, which renames the class pages and follows the links before writing
+the key ([09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a
+unit"); the launcher says so and leaves the word alone. An absent key means
+"Unit", so every course made before this existed is untouched. "Day" is
+deliberately fixed.
 
 **`class_folder`** — which per-section folder holds the class pages. Recorded
 rather than guessed from the word "class", because the guess quietly decided

@@ -1714,14 +1714,17 @@ def prompt_unit_word(saved_config: dict, has_been_set_up_before: bool) -> str:
     rewrite the configuration and rename nothing: the pages would still say
     "Unit 2, Day 3" and the build would have stopped recognising them —
     "built, and then recognised by nothing", the exact state this whole piece
-    exists to prevent. Renaming an existing course's word is deliberately not
-    on offer anywhere; it is in TODO.md with the reasons.
+    exists to prevent. Renaming a course already in use is the app's job
+    (Course Settings → Rename…, since 2026-09-10): it renames every class
+    page, retitles it and follows the links, with a backup first. This
+    launcher only says where to go.
     """
     current = class_pages.word_from_config(saved_config)
     if has_been_set_up_before:
         if current != class_pages.DEFAULT_UNIT_WORD:
-            print(f"\n📘 This course calls its units “{current}”. Changing that now would "
-                  f"rename nothing, so it is not offered.")
+            print(f"\n📘 This course calls its units “{current}”. To change that, use "
+                  f"Rename… beside the word in Plantoir's Course Settings, which renames "
+                  f"the class pages too.")
         return current
     print("\nClass pages are named like “Unit 1, Day 1”.")
     print("Some teachers organise by Module or Thread instead.")
@@ -1770,9 +1773,9 @@ def install_payload_file(source: Path, destination: Path, now_str: str,
 
     `unit_word` is the teacher's word for a unit. A course that says "Module"
     gets its pages named, titled and linked "Module 2, Day 3" as they are
-    poured, which is the whole reason the choice is offered at setup and not
-    afterwards: renaming three thousand pages and their wikilinks in a course
-    already in use is a different and far more dangerous piece of work.
+    poured, so nothing needs renaming afterwards. Changing the word once the
+    course is in use is Plantoir's Course Settings → Rename…, which renames
+    the class pages and follows the links; it is not this launcher's job.
     """
     if destination.exists():
         return False
@@ -2193,10 +2196,9 @@ def setup_course(no_backup: bool = False):
 
     # ---------- What this course calls a unit -------------------------------
     # Asked of EVERY course, ready-made or not: the payload is poured in the
-    # teacher's own word rather than renamed afterwards, and the choice is
-    # offered here rather than in Settings because renaming three thousand
-    # pages and their wikilinks in a course already in use is a different and
-    # far more dangerous piece of work.
+    # teacher's own word rather than renamed afterwards. Changing it on a
+    # course already in use is the app's Course Settings → Rename…, which
+    # renames the class pages and follows the links (since 2026-09-10).
     # Whether this course has been set up BEFORE — which is not the same as
     # whether its folder exists. `course_path.mkdir` runs a couple of hundred
     # lines above, so testing the folder made the answer always "yes" and a

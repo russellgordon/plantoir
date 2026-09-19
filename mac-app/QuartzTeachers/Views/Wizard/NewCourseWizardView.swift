@@ -16,10 +16,10 @@ struct NewCourseWizardView: View {
     @State var courseName: String = ""
 
     /// What this course calls a unit — "Unit 2, Day 3", or "Module 2, Day 3".
-    /// Asked here rather than in Settings because the ready-made pages are
-    /// poured in this word: renaming three thousand pages and their wikilinks
-    /// in a course already in use is a different and far more dangerous piece
-    /// of work, and is deliberately not offered.
+    /// Asked here because the ready-made pages are poured in this word, so
+    /// nothing needs renaming afterwards. A course already in use changes it
+    /// from Course Settings → Rename… (`UnitWordRenamer`), which renames the
+    /// class pages and follows the links.
     @State var unitWord: String = ClassPageTerm.standard
 
     /// The province the course-code picker is currently browsing —
