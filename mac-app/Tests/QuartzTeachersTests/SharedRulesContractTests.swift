@@ -1900,27 +1900,39 @@ final class SharedRulesContractTests: XCTestCase {
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
         XCTAssertFalse(cases.isEmpty, "shared-rules.json carries no workingFolderSelection cases")
 
-        var foldersByLabel: [String: URL] = [:]
+        // Every folder made here, so the clean-up can find them all however
+        // many a case asked for.
+        var everyFolderMade: [URL] = []
         defer {
-            for (_, folder) in foldersByLabel {
+            for folder in everyFolderMade {
                 try? FileManager.default.removeItem(at: folder)
             }
-        }
-        func folder(labelled label: String) throws -> URL {
-            if let existing = foldersByLabel[label] {
-                return existing
-            }
-            let made: URL = try FixtureWorkspace.materialize()
-            if label == "folderBEmpty" {
-                try FileManager.default.removeItem(at: try courseDirectory(in: made))
-            }
-            foldersByLabel[label] = made
-            return made
         }
 
         for oneCase in cases {
             let name: String = try XCTUnwrap(oneCase["name"] as? String)
             XCTAssertNotNil(oneCase["why"] as? String, "\(name) does not say why it exists")
+
+            // Fresh folders for EVERY case, never shared across the loop.
+            // One of these cases deletes a course from the folder it starts
+            // in, and a cache would hand the damaged folder to whatever ran
+            // next — so the data file would be silently order-dependent, and
+            // would pass only for as long as the destructive case stayed
+            // last. Materialising is a copy of three stub launchers and one
+            // config file; correctness is worth far more than that.
+            var foldersByLabel: [String: URL] = [:]
+            func folder(labelled label: String) throws -> URL {
+                if let existing = foldersByLabel[label] {
+                    return existing
+                }
+                let made: URL = try FixtureWorkspace.materialize()
+                everyFolderMade.append(made)
+                if label == "folderBEmpty" {
+                    try FileManager.default.removeItem(at: try courseDirectory(in: made))
+                }
+                foldersByLabel[label] = made
+                return made
+            }
 
             let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
             workspace.chooseWorkspace(

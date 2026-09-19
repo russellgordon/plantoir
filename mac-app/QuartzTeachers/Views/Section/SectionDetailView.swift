@@ -36,9 +36,9 @@ struct SectionDetailView: View {
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
 
-    /// The working folder this section appeared in — and the folder its
-    /// preview must be stopped against, whatever the window points at by the
-    /// time the stop runs.
+    /// The working folder this section's work belongs to — and the folder
+    /// every stop must be aimed at, whatever the window points at by the time
+    /// the stop runs.
     ///
     /// Not `workspace.workspaceURL`, and the difference is the whole reason
     /// this exists. Choosing a different working folder clears the selection,
@@ -46,11 +46,20 @@ struct SectionDetailView: View {
     /// ALREADY pointing at the new folder. A stop read from the model at that
     /// moment runs the new folder's `preview.sh` — for a section that folder
     /// may not even have — while the old folder's container-side build or
-    /// server keeps going, unreclaimed and invisible. The same mistake left a
-    /// stale entry behind in `SectionWindowControllers`, which is keyed by
-    /// folder path: registered under the old folder, unregistered under the
-    /// new one, so the old key was never removed.
-    @State var folderThisSectionOpenedIn: URL?
+    /// server keeps going. The same mistake left a stale entry behind in
+    /// `SectionWindowControllers`, which is keyed by folder path: registered
+    /// under the old folder, unregistered under the new one, so the old key
+    /// was never removed.
+    ///
+    /// **Written wherever a folder is DECIDED, not only on appearance.**
+    /// `.onAppear` notes it for the unregister — but only when the window had
+    /// a folder to note, and `startPreview()` and `deployAndWait()` each
+    /// resolve one for themselves. Left to the appearance alone, a section
+    /// that appeared with no folder would leave this nil while a preview
+    /// started from the model perfectly happily, and nothing would ever
+    /// reclaim it. Writing it at each of the three moments makes start and
+    /// stop name one folder by construction rather than by coincidence.
+    @State var folderThisSectionWorksIn: URL?
 
     /// Why a preview could not start, shown as an alert.
     @State var previewRefusal: String?
@@ -318,7 +327,7 @@ struct SectionDetailView: View {
             // Noted while the window still points here, because everything
             // this view unwinds on the way out has to be aimed at THIS
             // folder — see the property's own comment.
-            folderThisSectionOpenedIn = folder
+            folderThisSectionWorksIn = folder
             SectionWindowControllers.shared.register(
                 folderPath: folder.path,
                 courseCode: course.code,
@@ -362,7 +371,7 @@ struct SectionDetailView: View {
             }
         }
         .onDisappear {
-            if let folder = folderThisSectionOpenedIn {
+            if let folder = folderThisSectionWorksIn {
                 SectionWindowControllers.shared.unregister(
                     folderPath: folder.path,
                     courseCode: course.code,
@@ -947,6 +956,14 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // The folder this preview belongs to, noted at the moment it is
+        // decided — which is HERE, not at the appearance. The appearance
+        // notes the same folder when it has one, but it can return without
+        // one while this function goes on working from the model, and then
+        // a preview could start that no stop would ever be aimed at. Every
+        // stop reads this, so writing it beside the lease is what makes
+        // start and stop name one folder.
+        folderThisSectionWorksIn = workspaceURL
         // Each preview runs on its own port, so several windows can show
         // sections side by side without taking each other down.
         let lease: PreviewLeases.Lease
@@ -1024,7 +1041,7 @@ struct SectionDetailView: View {
     func stopPreviewAndWait() async {
         let courseCode: String = course.code
         let section: Int = sectionNumber
-        let folder: URL? = folderThisSectionOpenedIn
+        let folder: URL? = folderThisSectionWorksIn
         stopPreview()
         if let folder {
             await PreviewStopper.stopSectionProcessesAndWait(
@@ -1039,7 +1056,7 @@ struct SectionDetailView: View {
         // Against the folder this section OPENED in, never the one the
         // window points at now — this also runs from `onDisappear`, which
         // is after a folder change has already moved the window on.
-        if previewRunner.isRunning, let workspaceURL = folderThisSectionOpenedIn {
+        if previewRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -1059,7 +1076,7 @@ struct SectionDetailView: View {
 
     /// Cancels the running preview from the progress view.
     func cancelPreview() {
-        if previewRunner.isRunning, let workspaceURL = folderThisSectionOpenedIn {
+        if previewRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -1075,7 +1092,7 @@ struct SectionDetailView: View {
 
     /// Cancels the running deploy from the progress view.
     func cancelDeploy() {
-        if deployRunner.isRunning, let workspaceURL = folderThisSectionOpenedIn {
+        if deployRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -1125,6 +1142,10 @@ struct SectionDetailView: View {
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
             )
         }
+        // The same note `startPreview()` makes, for the same reason: this is
+        // where a deploy's folder is decided, and `cancelDeploy()` reclaims
+        // the container-side build against whatever was noted here.
+        folderThisSectionWorksIn = workspaceURL
 
         // The toolbar button disables itself on `isPreparingDeploy`, but the
         // assistant reaches this function directly, with no button to have
