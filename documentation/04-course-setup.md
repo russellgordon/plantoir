@@ -744,10 +744,6 @@ implements that rule, so neither suite runs them) and `gradedFolders.choices`
 
 ## “Where do the class pages live?” had four answers
 
-*(The Windows half of this is [issue
-#115](https://github.com/russellgordon/plantoir/issues/115): the C# below was
-written on the mac, which has no `dotnet`, so it has compiled nowhere.)*
-
 A teacher whose class folder is not called "All Classes" — "Class Pages", say —
 used to get a different answer from each of four places:
 
@@ -813,25 +809,119 @@ folder must not be mistaken for where its lessons live.
   method that returns a PATH, and two things with one name returning different
   kinds of answer is how the next bug gets written;
 - `AssistWorkspace.Plan` now calls
-  `ClassFolderRule.IsClassPage(Relative(pagePath), ClassFolderRule.Names(...))`
-  — note `Relative(...)`, which is the fix for the `Classroom` bug. **The rule
-  is a pure segment matcher and cannot tell an absolute path from a relative
-  one**, so `Relative(...)` is the whole protection: if you ever call
-  `IsClassPage` from somewhere else, pass a relative path or you reintroduce
-  the bug. The mac learned this the same way — its own `AssistSectionPage` had
-  to gain a `pathWithinSection` because `relativePath` is the FULL ABSOLUTE
-  PATH whenever `workspaceURL` is nil;
+  `ClassFolderRule.IsClassPage(PathWithinSection(...), ClassFolderRule.Names(...))`
+  — it passed `Relative(pagePath)` first, which is what fixed the `Classroom`
+  bug, and was narrowed again to the SECTION on 2026-09-19 (the section below).
+  **The rule is a pure segment matcher and cannot tell an absolute path from a
+  relative one**, so what is passed IN is the whole protection: if you ever call
+  `IsClassPage` from somewhere else, pass a section-relative path or you
+  reintroduce the bug. The mac learned this the same way — its own
+  `AssistSectionPage` had to gain a `pathWithinSection` because `relativePath`
+  is the FULL ABSOLUTE PATH whenever `workspaceURL` is nil;
 - `ClassFolderRule.Name`/`Names` skip null and empty entries: these lists come
   from JSON, including the contract's own case data, and unguarded LINQ threw
   where Swift and Python coerce;
 - `AssistWorkspace.ClassFolder(course, section)` delegates its naming half;
-- new `Plantoir.Tests/ClassFolderContractTests.cs`, deserialising the same 5 + 9
-  cases the mac suite and `scripts/test_class_folder.py` run.
+- new `Plantoir.Tests/ClassFolderContractTests.cs`, deserialising the same
+  naming, membership and `isClassPage` cases the mac suite and
+  `scripts/test_class_folder.py` run — 10, 7 and 12 of them as this is written,
+  counted rather than fixed, since each suite guards only a `>=` floor so a
+  case added from either platform cannot break the others by arriving.
 
 **Rejected:** unifying on "contains class" everywhere. It reads well and it
 reclassifies real shipped pages — see the payload examples above. Segment
 EQUALITY for pages, substring only for the configured list, is the distinction
 that makes the rule safe.
+
+### Two things ABOVE or BESIDE the class folder were still deciding class-ness
+
+The C# above was written on the mac and had compiled nowhere, which is what
+[issue #115](https://github.com/russellgordon/plantoir/issues/115) was for. It
+was built and run on Windows on 2026-09-19, and the headline defect — a working
+folder called `C:\Users\x\Classroom` making every page in every course a class
+page — was already closed by `Plan()` passing `Relative(pagePath)`. Two members
+of the same family were not, and both were Windows-only divergences from the
+rule the mac and `build_site.py` apply:
+
+**Membership was the whole folder LIST, in two places.**
+`AssistWorkspace.ClassPages` and `ScheduledDeploy.UnpublishedClassesIn` walked
+every `per_section_folder`, where the membership rule counts the folders that
+mention classes. A course configured `["All Classes","Handouts"]` counted its
+handouts as days of teaching here and nowhere else — in the dated class lists,
+in "publish every class from the 15th", in the next-class numbering, in the
+list of classes a scheduled deploy says students cannot see yet.
+`UnpublishedClassesIn`'s comment claimed it "walks the same folders
+`AssistWorkspace.ClassPages` walks", which was false between the two of them;
+a test now pins them together on one fixture, because a comment claiming
+agreement is exactly what stops anybody checking.
+
+**The path reached above the section.** `Relative()` is relative to the WORKING
+folder, so the segments handed to the rule still included `courses`, the course
+code and `sectionN`. That was enough for the `Classroom` bug and not enough for
+the rest: a course-level SHARED folder a teacher called "All Classes" made every
+page under it a lesson — of every section at once, since shared pages belong to
+all of them. `AssistWorkspace.PathWithinSection` now narrows the path to the
+section folder, mirroring the mac's `AssistSectionGraph.pathWithinSection`.
+Mirror its CODE, not its comment: it returns `url.lastPathComponent` for a page
+outside the section, while its own header comment still says "last two
+components" and is stale — the mac changed the code after review, precisely
+because the last two components put the immediate parent's name back in front
+of the rule, which is the discredited "does the parent mention classes" sniff.
+
+**Two changes a teacher can see**, neither of them a new invention — both are
+the shared rule arriving on a platform that had its own — and both pinned by
+tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
+
+- **Membership can SHRINK.** The rule falls back to ONE folder when no folder
+  name mentions classes, so a course whose folders are `["Lessons","Labs"]` had
+  both walked before and has only "Lessons" after: the Labs pages leave the
+  dated class lists, date-range publishing, the scheduled-deploy list and the
+  class numbering. The mirror of it WIDENS: a course with no per-section
+  folders at all had no class pages here, because there was no folder to walk,
+  and now falls back to "All Classes". Exposure is narrow and was counted
+  rather than guessed — all 38 example payloads and all 50 skeleton manifests
+  configure exactly `["All Classes"]`, so only a teacher who both renamed the
+  class folder away from anything containing "class" AND added a second
+  per-section folder is affected.
+- **Publish plans GROW.** Link-following deliberately stops at class pages — a
+  class is published because the teacher asked for it, not because another
+  class linked to it — so a shared page the old wide path called a class was
+  silently skipped. Demoted to what it is, it is followed, and "publish Day 1
+  and everything it links to" now reaches it. The "introducing class" credit
+  changes hands with it: an undated page inherits the date of the earliest
+  class linking to it and the teacher is told which class brought it in, and a
+  shared page in a folder named like the class folder used to win that credit
+  (a course-level folder sorts before `section1`), so the teacher was told a
+  page they never taught from was what introduced it.
+
+**Rejected: keeping Windows' wider membership.** It is the more generous
+reading — everything the teacher put in a per-section folder is a class — and
+it would have avoided both behaviour changes above. It was rejected because a
+Windows-only answer to a shared question is a difference nobody chose, and
+because the wider reading is the one that produces a wrong map that reports
+success: the coverage map, the dated lists and the numbering would count
+handouts as teaching while the BUILD that renders the site would not. Matching
+the shared rule is the point of having one.
+
+**Also rejected: narrowing `Plan()` by resolving a shared page's own folder.**
+Returning the last two path components for a page outside the section keeps the
+immediate parent's name, which is enough for a course-level "All Classes"
+folder to go on making lessons — the very bug being closed, wearing a shorter
+path. A shared page is not a class page; say so plainly rather than guess from
+a fragment of path.
+
+Nothing is written to the activity trail for any of this. All the events in
+`shared-rules.json` → `activityTrail.mustRecord` were checked: none records
+what counts as a class page, and no existing line becomes untrue — the lines
+name what a teacher DID, and this changes which pages a request resolves to,
+not what the request was.
+
+Measured by mutation on 2026-09-19, each revert run against the whole suite:
+`ClassPages` back to `PerSectionFolders` turns 4 tests red;
+`UnpublishedClassesIn` back to it turns 1; `Plan()` back to
+`Relative(pagePath)` turns exactly the 3 narrowing tests red. The
+`Classroom`-working-folder test stays green under all three, which is why it is
+labelled a GUARD in the file rather than evidence of a fix.
 
 ## A cloud-synced working folder: explain it, never refuse it
 
