@@ -334,7 +334,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         string classes = "")
         => Guarded(() =>
         {
-            if (!DateTime.TryParse(when, out var moment))
+            // ScheduledDeploy.ReadTheMoment, not DateTime.TryParse: the string
+            // is normally one Plantoir wrote invariantly a moment earlier, and
+            // a bare parse reads its year in the MACHINE's calendar — measured
+            // as 1483-09-20 for "2026-09-20 06:30" on a Thai-locale machine,
+            // which is in the past, so the deploy was refused outright while
+            // the card said tomorrow. Issue #144's family, read end.
+            if (ScheduledDeploy.ReadTheMoment(when) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
             return Proposing(workspace.PlanScheduledDeploy(course, section, moment,
                 classes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -355,7 +361,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description(WhenHelp)] string when)
         => Guarded(() =>
         {
-            if (!DateTime.TryParse(when, out var moment))
+            // ScheduledDeploy.ReadTheMoment, not DateTime.TryParse: the string
+            // is normally one Plantoir wrote invariantly a moment earlier, and
+            // a bare parse reads its year in the MACHINE's calendar — measured
+            // as 1483-09-20 for "2026-09-20 06:30" on a Thai-locale machine,
+            // which is in the past, so the deploy was refused outright while
+            // the card said tomorrow. Issue #144's family, read end.
+            if (ScheduledDeploy.ReadTheMoment(when) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
             var plan = workspace.PlanScheduledDeploy(course, section, moment);

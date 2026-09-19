@@ -851,46 +851,17 @@ public sealed class AssistAgent
 
         var arguments = ArgumentsOf(call);
         string when = arguments["when"]?.GetValue<string>() ?? "";
-        string moment = ReadTheMoment(when) is { } parsed
+        // ONE reader, shared with the server that actually schedules it —
+        // see ScheduledDeploy.ReadTheMoment. This card and that tool read
+        // the same string, and a card that names a different moment than
+        // the thing it authorises is worse than a card that says nothing.
+        string moment = ScheduledDeploy.ReadTheMoment(when) is { } parsed
             ? parsed.ToString("dddd d MMMM, h:mm tt")
             : when;
         string destination = DestinationProvider?.Invoke() ?? "the web";
         return $"Set this computer to deploy {_courseCode} Section {_section} to {destination} at {moment}. " +
                "It has to be on and awake then — plugged in if it is a laptop, lid open. " +
                "Plantoir cannot wake it up.";
-    }
-
-    /// <summary>
-    /// The moment a scheduled deploy's <c>when</c> names, or null when it
-    /// names none.
-    /// </summary>
-    /// <remarks>
-    /// <para>The form the APP writes — <c>yyyy-MM-dd HH:mm</c>, built
-    /// invariantly a few hundred lines above — is read back invariantly, and
-    /// that is not symmetry for its own sake. A plain
-    /// <c>DateTime.TryParse</c> reads the year in the machine's DEFAULT
-    /// CALENDAR, so on a Thai-locale machine the string this app had just
-    /// written as 2026 came back as Buddhist 2026, which is 1483, and the
-    /// approval card named a weekday five centuries out while the deploy
-    /// itself fired on the right day. A card that misdescribes what the
-    /// button does is worse than one that says nothing. Same family as the
-    /// writer sites in
-    /// <see href="https://github.com/russellgordon/plantoir/issues/144">issue
-    /// #144</see>, met from the READING end.</para>
-    ///
-    /// <para>Anything else — a shape a model invented — keeps the lenient
-    /// parse it has always had, since there is no fixed form to pin it to.
-    /// The DISPLAY stays cultural on purpose: the sentence under it is the
-    /// teacher's, not a wire format.</para>
-    /// </remarks>
-    private static DateTime? ReadTheMoment(string when)
-    {
-        if (DateTime.TryParseExact(when, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture,
-                                   DateTimeStyles.None, out var written))
-        {
-            return written;
-        }
-        return DateTime.TryParse(when, out var parsed) ? parsed : null;
     }
 
     /// <summary>A tool call's arguments, which arrive as a JSON string.</summary>
