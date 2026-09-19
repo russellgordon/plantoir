@@ -246,9 +246,18 @@ final class GradedFolderChoicesTests: XCTestCase {
 
     /// The still-offered question itself, asked the way the BUILD asks it.
     ///
-    /// The contract's seventh case proves the rule end to end; this proves the
-    /// comparison, so that a later tidy cannot swap `lowercased()` equality for
-    /// a substring test or a locale-aware compare and stay green.
+    /// The contract's seventh case proves the rule end to end; this pins two
+    /// properties of the comparison itself — that case is IGNORED and that a
+    /// WHOLE name is matched — so an exact test or a substring test cannot be
+    /// put back and stay green.
+    ///
+    /// **It does not pin WHICH case-insensitive fold**, and no test here does:
+    /// the pairs that separate `lowercased()` from `caseInsensitiveCompare`
+    /// and `localizedCaseInsensitiveCompare` are non-ASCII (`Straße`/`STRASSE`,
+    /// `Σ`/`ς`) or need a Turkish-locale machine, and this rule deliberately
+    /// promises nothing about either. The fold is held by the measured argument
+    /// in `GradedFolderChoices.stillOffers` — read it before swapping one in,
+    /// because a green run here is not permission.
     func testStillOfferedIgnoresCaseAndMatchesWholeNames() {
         XCTAssertTrue(
             GradedFolderChoices.stillOffers(["Concepts", "Portfolios", "tasks"], aFolderNamed: "Tasks")
