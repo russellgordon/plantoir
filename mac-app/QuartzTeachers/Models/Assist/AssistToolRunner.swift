@@ -177,6 +177,29 @@ final class AssistToolRunner {
         return nil
     }
 
+    /// Whether the working folder holds a course with this code.
+    ///
+    /// **A READING, not a guard.** It refuses nothing, changes nothing and is
+    /// asked by nobody here: the one caller is `AssistAgent`, which has to
+    /// choose between two sentences — one that ends "open that course in
+    /// Plantoir" and one that says there is no such course to open. The rule
+    /// about which courses a window may act on lives in the AGENT and must
+    /// stay there, because this runner also answers Claude Code over
+    /// `--mcp-stdio`, where the course genuinely is the caller's to choose.
+    /// Deleting this in the belief that it is the guard would take away the
+    /// question and leave the guard where it is.
+    ///
+    /// Compared the way `locate` compares, and for that reason: two answers
+    /// to "is this the same course" is one more than a working folder can
+    /// afford.
+    func knowsACourse(called code: String) -> Bool {
+        let wanted: String = code.trimmingCharacters(in: .whitespaces).lowercased()
+        for candidate in workspace.courses where candidate.code.lowercased() == wanted {
+            return true
+        }
+        return false
+    }
+
     /// What pressing the button would do, for the two acts that ask for one.
     ///
     /// Said in the teacher's terms and naming the real destination: "publishes

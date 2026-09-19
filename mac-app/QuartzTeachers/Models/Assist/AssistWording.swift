@@ -630,6 +630,69 @@ nonisolated enum AssistWording {
         "I didn't get to the end of that, so I haven't changed anything. Ask me again — "
         + "a shorter sentence, or fewer pages at a time."
 
+    // MARK: - A request that named another course
+
+    /// The model filled in a COURSE that is not the one this window is for,
+    /// and that course is here in the working folder.
+    ///
+    /// The window is opened for one section of one course, and the section is
+    /// simply taken back from whatever the model answered — a fact the app
+    /// already knows is not worth asking a model for. The COURSE is not, and
+    /// the difference is the whole of this sentence: taking the course back
+    /// too means "publish MCV4U's class", typed in an ICS3U window, quietly
+    /// succeeding on ICS3U. A failure that reports success is the one failure
+    /// a teacher cannot catch, so the request is refused and nothing runs.
+    ///
+    /// Three things it has to do. **Say which course this window is for**,
+    /// because the teacher is looking at one window among several and the
+    /// answer is not otherwise in front of them. **Say that nothing was
+    /// done** — the fact genuinely in doubt, by the same test
+    /// `planWasCancelled` passes and `deployWasCancelled` fails: somebody who
+    /// asked for a publish and was refused does not know whether something
+    /// happened in the wrong place. "Nothing was DONE" rather than "nothing
+    /// was CHANGED", deliberately: the refusal fires on the four reading
+    /// tools as well, and "I haven't changed anything" answers a question
+    /// nobody asked of "what pages does MCV4U have?". And **say what to do
+    /// next**, which is followable here precisely because that course is in
+    /// this working folder — see `askedAboutACourseThatIsNotHere` for the
+    /// case where it is not, and where this sentence would be a lie.
+    ///
+    /// Windows refuses the same request today from an inline literal of its
+    /// own (`AssistWorkspace.cs`), whose session is locked to one course.
+    /// That literal says "Start again from {wanted} in Plantoir", and it is
+    /// replaced by this key so the two apps say the same thing about the same
+    /// refusal. "Session" and "can't be reached from here" are dropped on the
+    /// way across: rule 1, plain words about courses and windows rather than
+    /// about how the assistant is wired.
+    static func askedAboutAnotherCourse(course: String, otherCourse: String) -> String {
+        return "This window is for \(course), so nothing was done for \(otherCourse). "
+             + "Open \(otherCourse)'s section in Plantoir and ask me there."
+    }
+
+    /// The model filled in a course code that names NO course in this working
+    /// folder — a typo, or a code it invented.
+    ///
+    /// A separate sentence rather than a second use of the one above, because
+    /// that one ends by telling the teacher to open the course, and a teacher
+    /// cannot open a course that is not there. Advice that cannot be followed
+    /// is worse than no advice: it sends somebody looking in the sidebar for
+    /// something they will not find.
+    ///
+    /// **Refused rather than bound to this window**, which is the decision
+    /// worth writing down, because binding it is what the old code did and it
+    /// looks harmless: a code matching nothing cannot reach another course.
+    /// But "publish MCV4U's class" mistyped in an ICS3U window would then
+    /// publish an ICS3U class and say it had — the very fault this change
+    /// exists to fix, arriving through the one door left open. The measured
+    /// cost of refusing instead is negligible: with the real course code
+    /// written into the tool descriptions, which is what the app always does,
+    /// the model wrote a course that was not this window's **0 times in 634
+    /// recorded responses** (`research/ai-assist/`, per-file tally).
+    static func askedAboutACourseThatIsNotHere(course: String, otherCourse: String) -> String {
+        return "There is no course called \(otherCourse) in this working folder, so nothing "
+             + "was done. This window is for \(course)."
+    }
+
     // MARK: - Shared fragments
 
     /// One phrasing for "go and look at what happened", because it was two:
