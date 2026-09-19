@@ -2030,10 +2030,27 @@ nothing at all.
 honest delivery of `alsoCleared` here. Every confirmation in `SidebarPane`
 captures the working folder BEFORE its dialog goes up and, after the await,
 does nothing at all if `WorkingFolder.IsTheSame(captured, live)` is false —
-`TheFolderMovedUnderThisConfirmation`, one helper so the eleven sites read
-identically. Silently void, like the mac's cleared confirmation: no sentence,
-because a teacher who has just moved to another folder is not waiting to hear
-about the one they left.
+`TheFolderMovedUnderThisConfirmation`, one helper so the **twelve** check sites
+read identically. Silently void, like the mac's cleared confirmation: no
+sentence, because a teacher who has just moved to another folder is not waiting
+to hear about the one they left.
+
+Eleven of the twelve follow a dialog. **The twelfth follows a wait that is not
+a dialog at all**, and it is the widest window in the file: inside the rename,
+`FolderActions.QuitObsidianAndWait` polls for up to five seconds (50 × 100 ms)
+with nothing on screen, so the File menu and Ctrl+O are both fully live — and
+everything after it reads the LIVE workspace, down to setting the selection to
+the renamed code. A check before a wait says nothing about what is true after
+it.
+
+**What the void path leaves behind, decided rather than overlooked:** Obsidian
+has been quit by then and is not reopened, and nothing tells the teacher so.
+Nothing on disk is half-done — the rename does not run at all — so the cost is
+an editor to open again. Reopening it was rejected because the vault to reopen
+is in the folder they have just LEFT: Plantoir would pull them back to a folder
+they deliberately moved away from, and the folder they are now in may have no
+vault of that name. Saying it was rejected for the same reason the whole rule
+exists — a sentence about the old folder is what `alsoCleared` forbids.
 
 What that prevents is specific rather than theoretical. Each confirmation names
 its course, archive or backup by a path taken before the dialog, and finishes
@@ -2044,18 +2061,81 @@ code is archived and overwritten from a backup belonging to a folder nobody is
 looking at, and it reports success and shows the result. The two deletes remove
 the old folder's file while the window shows the new one.
 
-`Plantoir.Tests/ConfirmationFolderGuardTests` gates it by scanning
-`SidebarPane.xaml.cs`: every awaited dialog must be followed by the check, or
-carry a `// folder-check: not needed — …` comment saying why (three do: the
-helper itself, the error reporter, and the "is backed up" notice). A NEW
-confirmation added with neither fails the suite. **What the scan cannot see**
-is written in its own comment and repeated here, because a guard believed to
-cover more than it does is worse than none: it reads ONE file.
-`CourseSettingsView`'s folder-rename sheet finishes inside a `Closing` deferral
-against a course captured at construction, so it acts on the right folder's
-files — a milder case of the same thing, left alone; `TaskProgressView`'s
-runner questions belong to a task rather than a folder; `MainWindow`'s own
-dialogs act on no course.
+`Plantoir.Tests/ConfirmationFolderGuardTests` gates this with **two** scans of
+`SidebarPane.xaml.cs`. The first: every awaited dialog must be followed by the
+check before the next await or the end of the method, or carry a
+`// folder-check: not needed — …` comment saying why (three do: the helper
+itself, the error reporter, and the "is backed up" notice). The second covers
+waits that are not dialogs — in a method that captured a folder, a
+`Workspace.Reload()` or a `Workspace.Selection =` after any `await` must have
+the check between them. A new confirmation written with neither fails.
+
+**What the scans cannot see** is written in their own comments and repeated
+here, because a guard believed to cover more than it does is worse than none.
+
+- **They read ONE file.** `CourseSettingsView`'s folder-rename sheet finishes
+  inside a `Closing` deferral against a course captured at construction, so it
+  acts on the right folder's files — a milder case, left alone;
+  `TaskProgressView`'s runner questions belong to a task rather than a folder;
+  `MainWindow`'s own dialogs act on no course.
+- **Nothing scans `MainWindow`'s hand-backs at all.** `StopPreviewFor`,
+  `StopPreviewForAsync` and `MainWindowForBuilds` take the SECTION's folder
+  from the assistant window that asked, rather than reading the main window's —
+  see "The assistant's hand-backs name a section, not a window" below. That is
+  held by reading, not by a test.
+- **The dialog scan is LINEAR, not brace-aware.** A confirmation in an `if`
+  branch is satisfied by a check sitting in the `else` branch below it, and the
+  forward search stops at the first closing brace at method indentation, so an
+  unusually shaped method ends it early. An opt-out is read on the site line or
+  the two above it, so write one ON the site line — a comment two lines up is
+  one reflow away from being out of reach.
+- **The non-dialog scan watches two writes only**, sees only methods spelling
+  `string? askedIn =`, matches the word `await` lexically (so one in a comment
+  arms it), and reads a write inside a lambda declared after an await as a
+  write in the continuation. Those failures all point toward crying wolf rather
+  than toward silence, which is the right way round.
+
+A C# parser inside a test was rejected for both: what actually happens is a new
+confirmation written with no check at all, and both scans catch that.
+
+### The assistant's hand-backs name a section, not a window
+
+`AssistWindow` hands building, deploying and stopping back to the main window's
+own controls rather than running them again behind the chat — the design
+Windows led on. Each hand-back knew a course code and a section number, and
+found the window to use as `_main`, the window the conversation was opened
+beside.
+
+**That window can move.** Nothing closes an assistant window when the main
+window is pointed at a different working folder, so `_main` outlives the folder
+it was opened for, and every hand-back then acts in a window showing something
+else: the stop swept the container and released the lease of the folder the
+teacher had just arrived IN — another window's running preview of that course
+and section — while the section's own preview leaked; and it selected a course
+code into a sidebar that had never had one, which is this issue's own defect
+arriving by a side door. Worse than the dialog case, because the assistant is
+where a teacher is *least* watching the main window.
+
+So every hand-back now names `_folder`, the section's own:
+
+- `StopPreviewFor` / `StopPreviewForAsync` take it as an argument. The sweep
+  and the lease release always run against it, so the section's preview is
+  reclaimed either way; the parts that touch the WINDOW — selecting the
+  section, and stopping the detail pane's preview — run only while that window
+  is still showing that folder.
+- `MainWindowForBuilds` now prefers `_main` only while it still shows
+  `_folder`, falling back to `App.WindowFor(_folder)` and then to opening one.
+  A build or a deploy therefore always happens in a window showing the
+  section's folder, so no sentence had to be invented for a hand-back that
+  could not find its window — it can.
+- `SectionIsBusy` asks a window showing that folder, because "busy" is read off
+  a detail pane and another folder's pane answers about another folder's
+  section.
+- `App.WindowFor` compares with `WorkingFolder.IsTheSame` like everything else,
+  rather than its own `Path.GetFullPath` spelling.
+
+The capture cannot be taken at the top of the dispatcher lambda either: the
+lambda runs when the dispatcher reaches it, not when the assistant asked.
 
 ### Which folder a teardown names
 

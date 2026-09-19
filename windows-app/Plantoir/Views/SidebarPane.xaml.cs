@@ -1194,9 +1194,7 @@ public sealed partial class SidebarPane : UserControl
             dialog.XamlRoot = root;
             try
             {
-                // folder-check: not needed — this IS the helper every
-                // confirmation is shown through; its callers hold the check.
-                return await dialog.ShowAsync();
+                return await dialog.ShowAsync();   // folder-check: not needed — this IS the helper every confirmation is shown through; its callers hold the check.
             }
             catch (Exception ex)
             {
@@ -1389,6 +1387,19 @@ public sealed partial class SidebarPane : UserControl
             // select a course code in a folder that never had one, which is
             // the "Course Not Found" #162 exists to remove. A check before a
             // wait says nothing about what is true after it.
+            //
+            // What this leaves the teacher with, decided rather than
+            // overlooked: Obsidian has been QUIT and is not reopened, and
+            // nothing says so. Nothing on disk is half-done — the rename has
+            // not run at all — so the cost is an editor they have to open
+            // again. Reopening it here was rejected: the vault to reopen is
+            // the one in the folder they have just left, so Plantoir would
+            // pull them back to a folder they deliberately moved away from,
+            // and the folder they ARE in may have no vault of that name at
+            // all. Saying it was rejected too — the contract's rule is that a
+            // confirmation about a folder the window has left is silently void
+            // (workingFolderSelection.alsoCleared), and a sentence about the
+            // old folder is exactly what it forbids.
             if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         }
 

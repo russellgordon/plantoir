@@ -43,8 +43,20 @@ namespace Plantoir.Tests;
 /// with nothing on screen at all — and
 /// <see cref="AWaitThatIsNotADialogIsCheckedToo"/> below is what covers those,
 /// with its own narrower limit stated there. Outside this file the same shape
-/// lives in <c>MainWindow.StopPreviewForAsync</c>, which now captures its
-/// folder before awaiting the stop; nothing scans for that.</para>
+/// lives in <c>MainWindow.StopPreviewFor</c> and <c>StopPreviewForAsync</c>,
+/// which take the SECTION's folder from the assistant window that called them
+/// rather than reading this window's; nothing scans for that.</para>
+///
+/// <para><b>It is LINEAR, not brace-aware</b>, and that has two consequences
+/// worth knowing before trusting it. A confirmation inside an <c>if</c> branch
+/// is satisfied by a check that happens to sit in the <c>else</c> branch below
+/// it, because the scan only sees lines in order. And the forward search stops
+/// at the next dialog site or at the first line that is a closing brace at
+/// method indentation, so a method shaped unusually — a local function with a
+/// four-space closing brace, say — ends the search early and can pass a site
+/// whose check is further down. Both were accepted rather than answered with a
+/// C# parser in a test: this catches the case that actually happens, which is
+/// a new confirmation written with no check at all.</para>
 /// </summary>
 public class ConfirmationFolderGuardTests
 {
@@ -82,6 +94,11 @@ public class ConfirmationFolderGuardTests
             // end of the method). A fixed window of lines is what lets a new
             // confirmation added just below a guarded one borrow its
             // neighbour's check and pass having none of its own.
+            //
+            // An opt-out is read on the site's own line or the two above it.
+            // Prefer the SITE LINE when writing one: a comment two lines up is
+            // a reflow away from being out of reach, which is why the helper's
+            // own opt-out was moved down onto its line.
             bool answered = lines[i].Contains(OptOut, StringComparison.Ordinal)
                          || (i > 0 && lines[i - 1].Contains(OptOut, StringComparison.Ordinal))
                          || (i > 1 && lines[i - 2].Contains(OptOut, StringComparison.Ordinal));
@@ -127,6 +144,17 @@ public class ConfirmationFolderGuardTests
     /// BEFORE the await that appears above it) from one in the continuation,
     /// and a scan that cried wolf there would be turned off. The two writes it
     /// does watch are the ones that produced the reported defect.</para>
+    ///
+    /// <para><b>Three more limits, so nobody reads it as more than it is.</b>
+    /// It only considers methods that spell <c>string? askedIn =</c>, so a
+    /// confirmation that captures its folder under another name is invisible
+    /// to it. It matches the word <c>await</c> lexically, so an <c>await</c>
+    /// inside a comment arms it and a write further down would be reported
+    /// that is perfectly safe. And a write inside a LAMBDA written after an
+    /// await — which may run at any time, or never — reads to it as a write in
+    /// the continuation. All three fail toward crying wolf rather than toward
+    /// silence, which is the right way round for a guard nobody will re-derive
+    /// when it fires.</para>
     /// </summary>
     [Fact]
     public void AWaitThatIsNotADialogIsCheckedToo()
