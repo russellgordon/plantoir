@@ -764,9 +764,15 @@ SYSTEM = system_prompt(PROMPT_FORM, COURSE, SECTION)
 
 right = total = malformed = type_problems = wrong_writes = 0
 inversions, narrow_inversions, fabricated, wrong_courses = [], [], [], []
-# What `boundToThisSection` and `withTheDaySettled` would have put right
-# before the call ran — counted apart, because a suite that reports them as
-# faults is stricter than the product a teacher uses.
+# What the app would have dealt with before the call ran — counted apart,
+# because a suite that reports them as faults is stricter than the product a
+# teacher uses. `boundToThisSection` takes the SECTION back and
+# `withTheDaySettled` settles a relative date, so those never reach a tool.
+# A wrong COURSE is no longer put right: since 2026-09-19 (issue #202) the
+# agent REFUSES that turn and says so, because rewriting it published this
+# window's class and reported success. It is still counted here rather than
+# with the faults, for the same reason as the others — nothing runs — but the
+# teacher sees a refusal rather than the request they meant.
 app_corrected = []
 # A call whose arguments JSON did not parse, and a turn the server stopped
 # because it ran out of room rather than because the model had finished.
@@ -823,7 +829,7 @@ for acceptable, prompt, probe, needs_date in CASES:
                 fabricated.append((probe, said))
         if "course" in arguments and arguments["course"] != COURSE:
             wrong_courses.append((probe, arguments["course"]))
-            app_corrected.append((probe, "course %r rewritten by the app" % arguments["course"]))
+            app_corrected.append((probe, "course %r refused by the app" % arguments["course"]))
         for key, value in arguments.items():
             if key == "section" and not isinstance(value, int):
                 type_problems += 1

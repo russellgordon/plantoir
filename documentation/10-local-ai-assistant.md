@@ -401,7 +401,9 @@ while the other platform, implementing from the accepted rows, would refuse it
 weekday, a condition or a second request all fall through — the window is
 scoped to ONE section and binds it whatever the sentence said, so a card
 appearing to honour another section would answer a different question with
-total confidence.
+total confidence. (That is about the SECTION, and about a card. A course code
+the MODEL writes is a different matter entirely — it is guarded rather than
+bound; see "Never ask the model for something the window already knows".)
 
 Every accepted and refused spelling is DATA, in `contracts/assist-cases.json`
 → `deployAtATime` (23 accepted, 25 refused, 11 resolving rows), authored rather
@@ -425,7 +427,10 @@ weekday and date included, before anything is written.
 `AssistAgent.settled(_:)` binds the section, settles a relative DAY
 (`withTheDaySettled`, below) and then settles a bare clock time
 (`withTheMomentSettled`) — once, where the call is created, reading `Date()` in
-exactly one place. `AssistAgent.say` then builds the call, settles it, writes
+exactly one place. Nothing there decides whether a call may run at all: a model
+call naming a course that is not this window's is refused in `think()`, above
+the line that reaches any of this, so a settled call is one that was already
+allowed. `AssistAgent.say` then builds the call, settles it, writes
 its trail line FROM THE SETTLED ARGUMENTS, and hands the same call to
 `run(settledCall:)` without settling it again. That order is the fix to a real
 problem rather than tidiness: the matcher is clock-free, so the day a bare time
@@ -1288,17 +1293,126 @@ name that begins with a number, and one that no amount of describing the
 argument would prevent on the next page name that does. It happened more than
 once before it was fixed.
 
-So the agent overwrites both arguments with the window's own before anything
-runs. It cannot cost routing accuracy, because it changes nothing the model
-reads — only what is done with what it said.
+So the agent takes the SECTION back before anything runs. It cannot cost
+routing accuracy, because it changes nothing the model reads — only what is
+done with what it said.
+
+**The COURSE is a different question, and answering it the same way was a
+mistake that shipped from v1.1.0 to 2026-09-19** (issue #202, the mac half of
+#180). Overwriting the course too meant that "publish MCV4U's class", typed in
+a VVH2O window, published a VVH2O class and told the teacher it had. **A
+failure that reports success is the one kind a teacher cannot catch**, and it
+is worse than the lost turn the binding was invented to prevent. Windows never
+had it: each of its assistant sessions is locked to one course
+(`AssistWorkspace.Course` throws an `AssistRefusal`), and Russell decided on
+2026-09-19 that Windows' answer is the one both apps should have.
+
+**What is BOUND, and what is GUARDED.**
+
+- **The section is bound**, always, to this window's — whether the model named
+  one, named the wrong one, or left it out. An absent one counts because no
+  tool reads an omission as "every section": all twelve local tools that take a
+  section require it, so a call that left it out used to reach the runner with
+  nothing to locate and come back with `There is no course called ""`, a
+  complaint that reads as though the teacher's sentence were the problem.
+- **The course is guarded.** Absent, it is filled in with this window's.
+  Matching case-insensitively, it runs — and it runs in the WINDOW's spelling,
+  because `AssistToolRunner.explain(call:)` prints the code verbatim on
+  `schedule_deploy`'s approval card, so keeping the model's casing would put
+  "deploy ics3u Section 1" in front of a teacher about to press Go. Anything
+  else and **the turn is refused**: `AssistAgent.think()` returns before
+  `messages.append(reply)`, which is above everything that could act — no
+  settling, no plan twin, no approval card, no tool. "Nothing ran" is true by
+  construction there rather than by inspection.
+- **Both are gated on the tool's OWN SCHEMA** declaring the argument, never on
+  a list of tool names. Today the two would agree — twelve of the thirteen
+  local tools declare `course` and `section`, and `undo_last_change` declares
+  neither — which is exactly when a hand-kept list looks harmless and starts
+  rotting. `undo_last_change` is untouched by all of this BECAUSE the gate
+  reads the schema.
+- **The refused turn is wound back** out of the conversation sent to the model,
+  through the same `windTheTurnBack()` the cut-off gate uses (#166). The model
+  runs at temperature 0, so a sentence left in front of it produces the same
+  refusal on the next turn, and an assistant that reliably repeats its own
+  refusal is worse than the fault it replaced. What the teacher SEES keeps
+  their sentence, as on every path.
+
+**Two sentences, not one**, in `AssistWording`: `askedAboutAnotherCourse` when
+that course is in this working folder, and `askedAboutACourseThatIsNotHere`
+when it is not. The first ends by telling the teacher to open that course's
+section in Plantoir; the second cannot, because there is nothing to open, and
+advice that cannot be followed is worse than none. Both say **nothing was
+DONE** rather than nothing was CHANGED — the refusal fires on the four reading
+tools as well, and "I haven't changed anything" answers a question nobody asked
+of "what pages does MCV4U have?". The trail line is
+`assistant was asked about another course`, carrying both course codes and the
+tool, never the argument values.
 
 **Do this in the agent, not in the tool.** The same tools answer Claude Code
 over MCP, where the course and section genuinely ARE the caller's to choose.
 It is the window that is about one section, so the window is what binds them.
+The runner gained one READING for this — `knowsACourse(called:)`, which answers
+the one question the two sentences turn on — and it is not the guard: it
+refuses nothing and is asked by nobody but the agent.
 
-Worth a sweep of your own surface for the same shape: any argument the
-surrounding context already determines should be overwritten on the way in
-rather than described more carefully in a schema.
+**What was REJECTED.**
+
+- **Overwriting the course**, as above: the fault being fixed.
+- **Refusing only when the named course EXISTS in this folder**, and binding a
+  code that names nothing to this window as a model slip. Tempting, because a
+  code matching nothing cannot reach another course — and it leaves the door
+  open on exactly the fault being closed: "publish MCV4's class" mistyped in an
+  ICS3U window would publish an ICS3U class and report success. **The measured
+  cost of refusing instead is negligible.** `research/ai-assist/`, counted
+  per FILE rather than by arm (one line of Python over `*results*.txt`, so it
+  can be re-run): `trimmed-surface-results.txt` holds the only wrong course
+  values anywhere — 16 `ICS3U` and 3 `ICS2O` against 118 correct — and its arms
+  1–2 are the ones run WITHOUT `--real-course`, so the model was shown a
+  placeholder code in the schema and echoed it. Everywhere else the value is
+  always that arm's own course: `conversational-residue` 228,
+  `macos-native` 358, `promise-card` 73, `shipped-surface` 27 — **686
+  responses, 0 wrong course codes.** (#202's plan and its review quote the same
+  fact with arm attribution instead: 634 responses taken with `--real-course`,
+  0 wrong.) The
+  app is always in that configuration: `AssistAgent.toolDefinitions` maps
+  `namingTheRealCourse(courseCode)` over every definition, so the local model
+  never sees a placeholder. (The tally script left in the scratchpad for #202,
+  `p202_tally2.py`, cannot be cited for this: its `course=([A-Z0-9]+)` regex
+  captures `T`/`F` out of `real-course=True` and reports the arm as course
+  "T". Count per file.)
+- **Allowing READS of another course.** Four of the thirteen local tools read
+  (`list_pages`, `read_page`, `check_section`, `read_remembered_timetable`), and
+  a rule that held only for writes is one a teacher cannot predict, because
+  they cannot tell which tool the model picked. Windows' course lock applies to
+  everything; so does this.
+- **Refusing when the TEACHER'S OWN TEXT names another section** ("…in section
+  2", typed in section 1's window). Considered on Windows for #180 and dropped
+  there. The brief for v1.2.0 is to converge, not to invent; the section is
+  simply bound.
+- **`appliesOn: ["mac"]` on the new trail event**, which would have kept the
+  Windows suite green. The filter exists, and using it here would bless exactly
+  the gap rule 5 was written for: Windows refuses this request today and writes
+  no line at all.
+
+**No routing re-measurement is owed, and that is evidence rather than an
+argument.** The model reads exactly two things — `AssistAgent.systemPrompt` and
+`toolDefinitions` — and all of this happens after it has answered. Three
+commands come back empty on this change: `git diff` over
+`AssistToolSurface.swift`, `git diff` over `AssistToolDefinition.swift`, and,
+after `--write-contracts`, any change under `tools` or `toolSchemas` in
+`contracts/assist-cases.json` — that last one being a byte-level readout of the
+surface each client really sends.
+
+The rule as DATA is `contracts/assist-cases.json` → `windowBinding`: a window,
+the arguments the model wrote, and either the arguments that run or the
+refusal. AUTHORED, preserved across `--write-contracts`, and run on the mac by
+`AssistWindowBindingTests`.
+
+Worth a sweep of your own surface for the same shape — with the correction this
+change is: any argument the surrounding context already determines should be
+taken back on the way in rather than described more carefully in a schema,
+**unless getting it wrong would act on something else entirely**, in which case
+the answer is to refuse and say so.
 
 #### A corollary, learned the expensive way: do not fix routing with words
 
@@ -3125,7 +3239,8 @@ was raised as a decision rather than as a defect with an obvious fix.
 
 - `AssistAgent.withTheDaySettled(_:)` turns the word into the date it means at
   the moment the call is created, beside the existing `boundToThisSection(_:)`
-  rewrite. Everything downstream — the approval card, the plan twin, and
+  binding (which rewrote the course as well until #202, and now takes back only
+  the section). Everything downstream — the approval card, the plan twin, and
   `approvePending` handing the very same call to `execute` — then carries an
   absolute date, so the plan and the act agree BY CONSTRUCTION rather than by
   a frozen clock. It covers the model-routed path as well as the card's, which

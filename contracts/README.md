@@ -39,7 +39,7 @@ the boundary is a TOP-LEVEL key — the file names them under `generated.keys`:
 | `cardPhrasings` | `AssistCardCommand.fixedShapes` |
 | `tools` | `AssistToolRunner.tools` / `.localTools` / `.mcpOnlyTools`, and each definition's `needsApproval` and `planTwinName` |
 | `toolSchemas` | `AssistToolRunner.localTools` and `.mcpTools`, emitted as each client really sends them — every argument, every description. **This row was missing until 2026-09-10**; what its absence cost is under "Reading a red suite" below. |
-| `nearMisses`, `scenarios`, `promptHistory`, `deployAtATime` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and a decision lives in the `documentation/` page that owns its subject, with a GitHub issue pointing at it when the other platform owes work — the handoff documents that used to hold them were retired on 2026-09-08. |
+| `nearMisses`, `scenarios`, `promptHistory`, `deployAtATime`, `windowBinding` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and a decision lives in the `documentation/` page that owns its subject, with a GitHub issue pointing at it when the other platform owes work — the handoff documents that used to hold them were retired on 2026-09-08. |
 
 In `app-rules.json` the same split applies: `milestones` is a readout of
 `TaskMilestones` and `credentialRequests` a readout of `CredentialRequest` —
@@ -118,7 +118,7 @@ it in both places, on both platforms.
 The generator runs on the **mac** — `Plantoir --write-contracts` — so Windows
 cannot regenerate the derived halves. The AUTHORED halves are a different
 matter and can be proposed from either side: `scenarios`, `nearMisses`,
-`promptHistory`, `deployAtATime`, and every case list in the other four files
+`promptHistory`, `deployAtATime`, `windowBinding`, and every case list in the other four files
 survive a mac regeneration untouched.
 
 **Both directions work the same way, and the rule is one rule.** A change
@@ -387,6 +387,7 @@ recounted 2026-09-07.
 | What publishing and unpublishing do to linked pages, and what is never swept | `shared-rules.json` → `followingLinks` | SharedRulesContract (3), AssistToolRunner (9). Its `stopsAtAClassPage.cases` (3) arrived 2026-09-19 with [#173](https://github.com/russellgordon/plantoir/issues/173) and has **no Windows reader** — see the census table below. The three `publishing` booleans stay TRUE and both suites assert them: the walk is still transitive, it has one stop |
 | Whether the assistant asks before changing anything, and when it says so | `shared-rules.json` → `assistantConfirmation` | SharedRulesContract (1), AssistPlanMode (6), AssistantSettings (6) |
 | Phrasings matched in code, including the six PARSED families | `assist-cases.json` → `cardPhrasings` | AssistContract (1), AssistPromptShelf (2), AssistToolRunner (4), AssistScenario (1, walking `parsed`) |
+| What a section's assistant window does with the `course` and `section` the MODEL filled in: which arguments run, and which turns are refused | `assist-cases.json` → `windowBinding` | AssistWindowBinding (1 test walking all 7 cases, plus 9 of its own) on the mac. AUTHORED, arrived 2026-09-19 with [#202](https://github.com/russellgordon/plantoir/issues/202) — the mac half of [#180](https://github.com/russellgordon/plantoir/issues/180) — and has **no Windows reader**: their scenario grammar cannot script a model's tool call, so this is unrun rather than red there. See the census table below. The rule in one sentence: the SECTION is always the window's, the COURSE is the window's or the turn is refused, and both are gated on the tool's own schema declaring the argument |
 | The spellings of "deploy at &lt;time&gt;" that are answered in code, the ones that go to the model, and which day a bare time means | `assist-cases.json` → `deployAtATime` | ScheduleDeployCard (10), and `research/ai-assist/trimmed-surface-suite.py`, whose own interception guard is checked against these rows before it measures anything — a guard that went one family stale scores a routing result for a sentence the app never routes. AUTHORED, and the one `cardPhrasings.parsed` cannot carry: a family whose variable part is a TIME needs its spellings written out, or one example becomes one spelling |
 | That the card for an IMMEDIATE deploy says it is immediate | `shared-rules.json` → `assistantConfirmation.theImmediateDeployCardSaysItIsImmediate` | SharedRulesContract (1). A property of `wording.deployApproval` rather than the sentence, so it outlives the next rewording |
 | The New Course wizard's affirmative button | `shared-rules.json` → `wizard` | SharedRulesContract (1). On Windows the label is asserted only in `Plantoir.UiTests/NewCourseWizardUiTests`, which carries `[UiFact]` and runs only under `PLANTOIR_UI_TESTS=1` — so it is part of no gate there ([issue #119](https://github.com/russellgordon/plantoir/issues/119)) |
@@ -476,8 +477,8 @@ The 2026-09-06 audit was a count; this is the same question asked of the file
 as it stands, and it is the milestone's "definition of done" for
 [#138](https://github.com/russellgordon/plantoir/issues/138): **every case list
 in every `contracts/*.json` is either run by a Windows gate, or owned by an
-open issue, or exempt for a reason written down here.** **117 case lists; 102
-have a reader here.** The other fifteen are below. (It was 100 of 111 when this
+open issue, or exempt for a reason written down here.** **118 case lists; 102
+have a reader here.** The other sixteen are below. (It was 100 of 111 when this
 paragraph was first written; `workingFolderSelection.cases` and `.rejected`
 have a Windows reader since [#162](https://github.com/russellgordon/plantoir/issues/162)
 landed, and the count was RE-TAKEN with the walker below rather than adjusted
@@ -489,7 +490,10 @@ The walker read **115** at `origin/dev` where this paragraph said 114:
 `zipNames.couldHaveBeenStamped.cases` arrived with the archive-stamp work and
 nobody re-took the count. It is in the table below now.
 [#173](https://github.com/russellgordon/plantoir/issues/173) then added two
-more, which is how the number reached 117. **This is the failure mode the
+more, which is how the number reached 117 — and
+[#202](https://github.com/russellgordon/plantoir/issues/202)'s `windowBinding`
+made it **118**, re-taken with the walker on the day it landed rather than
+added to in somebody's head. **This is the failure mode the
 "re-take it" instruction below exists for**, met within a fortnight of being
 written: three lists in, and the only reason it was caught is that somebody
 ran the walker instead of adding to the number in their head.
@@ -531,6 +535,7 @@ subtraction.
 | `shared-rules.json` → `stopPreview.identity.evidences`, `.notShared` | 3 + 4 | **Exempt: prose with fields.** The behaviour they describe is exercised through `stopPreview.cases`, and those 23 are gated TWICE here — `scripts/test_stop_preview.py` through `PythonToolchainTests`, and `windows-app/test_stop_preview.ps1` through `TheLauncherMatcherAnswersTheContract`, which asserts "0 failed" so a runner that skipped everything cannot pass. |
 | `assist-cases.json` → `deployAtATime.accepted`, `.refused`, `.resolving` | 23 + 25 + 11 | **Owed**, [#193](https://github.com/russellgordon/plantoir/issues/193), the `windows` issue opened from [#168](https://github.com/russellgordon/plantoir/issues/168) — the whole family is theirs to implement, and these rows ARE the specification: one example in `cardPhrasings.parsed` cannot describe a grammar of times. `CardPhrasings_AllParsedExamplesFromContract_Pass` will go red on the sixth family the moment the contract lands, so the work is visible there; what these three add is every spelling and the day rule. |
 | `shared-rules.json` → `followingLinks.stopsAtAClassPage.cases` | 3 | **Owed**, the `windows` issue opened from [#173](https://github.com/russellgordon/plantoir/issues/173) ([#203](https://github.com/russellgordon/plantoir/issues/203), v1.3.0). **Green by BEHAVIOUR, unrun by their SUITE**, which is the quiet kind of gap: `AssistWorkspace.cs:730` already guards both the add and the enqueue on `!targetPage.IsClassPage`, so all three cases would pass today — but `SharedRules_FollowingLinks_MatchesContract` asserts named booleans and walks no `cases` array, so nothing there runs them and nothing there goes red. What they owe is the loop, and the SENTENCE (`wording.linkedClassWasLeftAlone` / `…ClassesWereLeftAlone`), which is the one behaviour they do not have. The rule deliberately did NOT go into `neverTakenDownByFollowingLinks`, which `ContractTests.cs:295` asserts is exactly three. |
+| `assist-cases.json` → `windowBinding.cases` | 7 | **Owed**, the `windows` issue opened from [#202](https://github.com/russellgordon/plantoir/issues/202) (**TODO: put its number here**), the mac half of [#180](https://github.com/russellgordon/plantoir/issues/180). **Unrun there, and it cannot be red**: nothing on that side enumerates the top-level keys of `assist-cases.json` — every access is by name — and their scenario grammar (`AssistScenarioTests.cs`, whose `given` keys are `previewRunning`, `sectionWindowOpen`, `sectionBusy`, `pending`, `saying`) cannot script a model's TOOL CALL at all, which is what every case here starts from. What they owe is a seam that can, plus the two wording keys the refusals name. Their own behaviour is already close: `AssistWorkspace.Course` refuses any course but the session's, which is where the mac's rule came from. |
 | `class-planning.json` → `datingPagesAClassBrings.reachStopsAtAClassPage.cases` | 2 | **Owed**, the same `windows` issue as the row above. Green by behaviour for the same reason — their date walk stops on `classPaths` at `AssistWorkspace.cs:927`, before the enqueue at `:928`, and the backwards earliest-class walk does not pass through a class either — and unrun for the same reason. |
 | `course-management.json` → `zipNames.couldHaveBeenStamped.cases` | 3 | **Owed**, [#161](https://github.com/russellgordon/plantoir/issues/161) part 2. Windows holds the two bounds as literals in `ModelTests.CouldHaveBeenStamped_BoundsAreTheOnesTheMacUses`, whose own summary says it is replaced by the contract loop once this block reaches `dev` — which it now has. Arrived after the census was taken and was missed by it; see the re-take note above. |
 | `toolchain.json` → `rules` | 3 | **Read by NOBODY, on either platform** — the one list in the census with no reader anywhere and no issue, and it is left that way deliberately. It is reasoning rather than cases: the image tag being a hash of the build context, building with BuildKit, and revalidating Quartz before chasing a newer CLI. All three are held by the launchers and by `verify.sh`, which does not run on Windows at all. The other three `rules` arrays ARE read — `buildFreshness.rules` by `BuildOutputLocationTests`, `example-content.rules` and `courseConfigKeys.rules` by `SharedRuleContractTests`. |
