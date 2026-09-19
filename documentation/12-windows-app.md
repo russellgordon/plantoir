@@ -846,10 +846,15 @@ as work happens:
 - **The embedded preview** — WebView2, and the `127.0.0.1` question that was
   measured and found to be a no-op here.
 - **The assistant's own window**, the model running natively with Vulkan, and
-  the second door: `ClaudeCodeLauncher` writes an MCP configuration and starts
+  the OUTSIDE doors: `ClaudeCodeLauncher` writes an MCP configuration and starts
   `claude` with `--strict-mcp-config`, so a teacher's own servers are neither
-  used nor disturbed. See [the assistant](10-local-ai-assistant.md) for what
-  the assistant IS.
+  used nor disturbed. There are TWO of those doors on the mac since 2026-09-19
+  — "Revise with Claude…" and "Revise with Codex…" — and this app has only the
+  first; both are described as data in `contracts/app-rules.json` →
+  `outsideAgents`, which nothing here reads yet. See
+  [the assistant](10-local-ai-assistant.md) for what the assistant IS, and
+  [its "other doors" section](10-local-ai-assistant.md#the-other-doors-handing-a-course-to-an-assistant-the-teacher-already-has)
+  for what each door launches, what was measured and what was rejected.
 - **Window and state restoration**, archived courses, problem reporting, and
   the `WorkLease` protocol that keeps two windows from building the same
   section at once.
