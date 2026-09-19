@@ -39,11 +39,20 @@ namespace Plantoir.UiTests;
 /// is worse than none.</b> Restoring the pre-fix body in full — the walk taken
 /// before the exclusion, materialised over, then <c>RemoveAll</c> — fails this
 /// test with <c>graded_folders: ["Thinking Tasks"]</c> written to the file,
-/// which is the teacher-visible damage itself. Worth knowing for anyone
-/// tempted to simplify it: the old POOL SEMANTICS alone, over a correct
-/// post-exclusion walk, leave it GREEN, because `InferredPool` then no longer
-/// contains the removed name. What this test guards is the ORDER reaching the
-/// file, not the arithmetic.</para>
+/// which is the teacher-visible damage itself. What this test guards is
+/// therefore the ORDER reaching the file, not the pool arithmetic: the old
+/// arithmetic ALONE, over a correct post-exclusion walk, leaves it green,
+/// because <c>InferredPool</c> then returns no name that is no longer among
+/// the choices.</para>
+///
+/// <para><b>That is a limit of this test, not permission to simplify the
+/// code.</b> Read <c>FolderRemoval.RemoveFolderFromCourse</c>'s comment on the
+/// never-asked guard before touching either half: the guard looks redundant
+/// only while the still-offered test and the drop ask with the SAME comparer,
+/// and settling <see href="https://github.com/russellgordon/plantoir/issues/172">issue
+/// #172</see> the mac's way would make it the only thing standing between a
+/// never-asked course and a frozen empty pool. Neither this test nor the
+/// contract's six cases would notice.</para>
 ///
 /// <para>Serialised with the other suites that drive the app: two at once would
 /// fight over the foreground window.</para>
