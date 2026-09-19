@@ -199,7 +199,10 @@ in `windows-app/Plantoir.Core/Models/` (which `PageFrontmatter.IsDraft`,
 `StoredDraft` and `Visibility` are collapses of), and `page_visibility.py` in
 the shared Python — answers **three ways**: `visible`, `hidden`, and
 `cannotTell` for a handful of forms it will not guess at (a value on the line
-BELOW the key — over a blank line as happily as not — a tag such as
+BELOW the key — over a blank line as happily as not, and **whatever is on the
+key's own line**; see "A writer must take a value's CONTINUATION lines with the
+key" below for why the second half of that sentence is the dangerous one — a
+tag such as
 `!!str false`, a block scalar, an anchor or alias, a flow collection, an escape
 inside double quotes, an indented key, a value that starts with a character
 YAML reserves (`%`, `@`, a backtick, `- `) or carries its own `key: value`, and
@@ -291,6 +294,18 @@ on Windows), not in the shared contract. A shared case says what the SITE does;
 writing `expectVisible: true` for a form the site HIDES would oblige the other
 platform to be wrong in the same direction rather than merely allow it.
 
+**With one deliberate exception, added 2026-09-19 with issue #176.** The test
+is not "can the reader read it" but "does the REPORTING answer match the site",
+and for two continuation forms it does: `publish: false` with an indented
+`false` under it, with or without a blank line between them, is PUBLISHED by
+the site — the fold is the string `"false false"`, which is not `"false"` —
+and both readers answer `cannotTell`, which reporting collapses to visible.
+Those two are in `readingCases`, and they earn the place because the reader
+that got them wrong got them wrong CONFIDENTLY, which is what let a writer's
+already-right gate turn "hide this page" into a no-op. The polarity siblings
+(`no`, `off`, `FALSE`, `true`, `maybe` with a value below) are equally honest
+and add nothing the two do not, so they stay in each platform's own tests.
+
 ### What a WRITER does with an odd value
 
 Four rules, all deliberate. The first two are about the VALUE; the last two are
@@ -319,6 +334,20 @@ separately from the reader:
   keeps it a null rather than deciding for the teacher. A page wrongly held back is
   one a teacher notices and fixes; a page wrongly published is one nobody
   notices at all.
+
+  **The carry asks the one reader, so correcting the reader moved it** (issue
+  #176, 2026-09-19). `SectionAdder.publishValue` / `PublishValue` now reads a
+  legacy `draftSection1: false` or `: no` with a line under it as `cannot tell`
+  rather than off the key's own line, so both are carried HELD BACK where the
+  mac used to carry them as published; Windows had already moved. Measured,
+  **neither app reproduces the site here and neither is trying to.** The site
+  PUBLISHES `draftSection1: false`, `: no`, `: true` and `: yes` each with an
+  indented `x` under them — the fold is `"false x"`, `"no x"` and so on, which
+  `_as_bool` cannot make a boolean of, so `process_frontmatter` writes
+  `publish: true` — while `draftSection1:` over an indented `true` is the
+  boolean and the page is HIDDEN. Both apps err HELD BACK on all five; the mac
+  in four rows now, as Windows does. Uniformly held back is the documented
+  preference and it is what `setup_course.per_section_frontmatter` writes.
 * **A writer takes the LAST line naming a key, because the reader does and the
   build does.** PyYAML keeps the last of two identical keys. A writer that set
   the first left `publish: true` above a `publish: false` the build still
@@ -373,13 +402,25 @@ separately from the reader:
   The rule is `setup_course.per_section_frontmatter`'s, which has done this
   since 2026-09-18, and it is the same stepping the reader's
   `firstNonBlankLine` does: walk forward from the key, STEP OVER blank lines
-  and indented `# note`s rather than stopping at them, stop at the first line
-  that is not indented, and take everything up to the last indented line that
-  was not a comment. So a complete value followed by an indented note keeps
-  the note — nothing is taken, because no value line was found below it —
+  and `# note`s **at any indent** rather than stopping at them, stop at the
+  first line that is not indented, and take everything up to the last indented
+  line that was not a comment. So a complete value followed by an indented note
+  keeps the note — nothing is taken, because no value line was found below it —
   while a note with a real value under it goes with the value, which is what
   the reader sees through it anyway. Do not try to PARSE the block scalar;
   only find where the value ends.
+
+  **"At any indent" is the half that drifts, and it has drifted twice.**
+  Windows' first `ContinuationLines` stepped over a comment only when it was
+  indented, and `setup_course.per_section_frontmatter` did the same until
+  2026-09-19 — so a note at COLUMN 0 between a key and its value ended the
+  walk. Measured for the splitter: `publish:` / `# note` / `  false` is HIDDEN
+  before the split and **VISIBLE in section 1** after it (section 2 gets the
+  value and is hidden), and with a single section it happens to survive, which
+  is why nothing noticed. On the mac the two halves now share one predicate,
+  `PageVisibilityReader.isSteppedOverLookingForAValue`, used by
+  `firstNonBlankLine` and by `continuationLineIndices`, precisely so a reader
+  and a writer cannot step differently again.
 
   **A value below a key is a value below a key however complete the key's own
   line looks — and the READER has to be the one that says so.** Measured,
@@ -394,11 +435,11 @@ separately from the reader:
   reading it. **The sweep cannot save a page the writer is never asked to
   write.**
 
-  So `ReadScalar` answers `cannot tell` whenever the first line that could be
+  So the reader answers `cannot tell` whenever the first line that could be
   a value is indented, whatever is on the key's own line. Reporting then says
   visible — which is what the site does — and the writer writes the flag out
   in full and sweeps. Measured after that write: `False` → HIDDEN. It changes
-  none of the 54 shared `readingCases`.
+  none of the 54 shared `readingCases` that existed before it.
 
   **Windows fixed all of this on 2026-09-19** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
@@ -406,13 +447,18 @@ separately from the reader:
   `PageVisibilityReadingTests` →
   `AValuesContinuationLinesGoWithIt` (14 rows),
   `AValueBelowACompleteLookingOneIsStillAValueBelow` (6) and the two beside
-  them. **The mac still owes both halves** — it reads these as `hidden` and
-  `AssistPageVisibility.setting:152-159` / `:160-169` replace one line and
-  nothing else — and that is
-  [issue #176](https://github.com/russellgordon/plantoir/issues/176), which
-  carries the proposed shared reading case. **The two apps therefore disagree
-  at the three-way level until it lands**, deliberately: the mac is the one
-  that differs from the site.
+  them. **The mac followed the same day**, issue
+  [#176](https://github.com/russellgordon/plantoir/issues/176), implementing
+  Windows' design unchanged:
+  `PageVisibilityReader.reading(ofValue:followedBy:)` for the reading,
+  `PageVisibilityReader.continuationLineIndices` for the sweep, called from
+  both branches of `AssistPageVisibility.setting`, with the stepping shared
+  through `isSteppedOverLookingForAValue`. Tests:
+  `PageVisibilityReadingTests.testAValuesContinuationLinesGoWithIt` (16 rows —
+  Windows' 14 plus two of the mac's own),
+  `testAValueBelowACompleteLookingOneIsStillAValueBelow` (6),
+  `testABlankLineDoesNotEndAValueEither`, the two guards and the CRLF test.
+  The two apps agree at the three-way level again.
 
   Two continuations are not indented and are swept anyway, both measured, both
   a stopped build if left: a column-0 `# note` between a key and its value
@@ -421,7 +467,66 @@ separately from the reader:
   (`publish:` over `- a` is the list `['a']`). A sequence under a key that
   HAS a value is left alone — that page is a `ParserError` before anything is
   written, so there is nothing to rescue and sweeping a teacher's list on that
-  guess would be the larger mistake.
+  guess would be the larger mistake. `keyValueWasEmpty` is therefore asked
+  BEFORE the key's line is rewritten: the rewrite always puts a value there,
+  so asking afterwards always answers false and the sequence is never swept.
+
+  **What was REJECTED, with the reasons, so they are not proposed again.**
+
+  * *Gating the sweep on `isCompleteOnItsOwnLine`* — the obvious shape, and
+    it is wrong: it would leave `publish: false` / `  false` published after a
+    hide, which is the dangerous row.
+  * *Fixing the sweep and leaving the reader* — the fix the first Windows
+    round made, and it buys nothing on the dangerous path, because `setting`'s
+    "already right" gate returns BEFORE the writer runs. The generalisable
+    lesson: when a reader and a writer are fixed in the same piece, check
+    which of the two the early return lives in.
+  * *Tidying `build_site._first_non_blank` to step over comments too* — it
+    steps over blank lines but not comments, unlike every other stepping in
+    this family. Measured consequence: `publish: false` / `# note` /
+    `  false` is a page the build cannot parse, and `_is_draft` calls it
+    hidden. **Left alone deliberately.** It is not unreachable —
+    `process_frontmatter` CATCHES the YAML error, prints `⚠️ Could not read
+    frontmatter from …` and leaves the file byte-identical
+    (`build_site.py:1976-1979`), so such a page reaches the merged tree with
+    its comments intact and `_is_draft` reads raw text. But every page that
+    can reach it is a page that stops the Quartz build anyway, so the gap has
+    no teacher behind it; and `scripts/build_site.py` is inside
+    `.githooks/pre-commit`'s publishing closure, which engages `RELEASING.md`'s
+    rule that a release changing the publishing path needs a full
+    `verify-deploy` run. Twenty minutes and three credentials for a two-line
+    tidy in a function production never reaches. If it is ever changed, change
+    it with something else in that file.
+  * *Putting the sweeper in `PageFrontmatter`, where Windows keeps theirs* —
+    on the mac `PageFrontmatter` is the date and title writer and
+    `PageVisibilityReader` is "the one place that knows the rule". Finding
+    where a value ENDS is reading, and it has to step identically to
+    `firstNonBlankLine` two functions above it.
+
+  **`verify-deploy.sh` is NOT owed for this change, and the argument is a
+  measurement rather than a file list.** `scripts/page_visibility.py` is
+  imported by `scripts/build_site.py`, which IS in the publishing closure, and
+  the hook matches literal paths — so "nothing in the closure changed" is a
+  fact about a list, not a reason. What was measured, over every shipped page
+  in `support/example_content` and `support/skeletons`: **9,553 pages; 387
+  hidden before the change and 387 after; 0 `publish` lines followed by an
+  indented line; 0 coverage-map verdicts moved.** And over the same trees for
+  the splitter change: **11,891 pages, 0 whose split output moves.** Nothing
+  the build does changes.
+
+  **Two of this app's own writers still orphan a continuation**, and they are
+  named here rather than left to be discovered: `SectionAdder
+  .extendFrontmatter` inserts the new section's `createdSection<N>` /
+  `publishForSection<N>` pair after the last per-section KEY LINE, so on a page
+  whose value continues below it the pair lands between the key and its value
+  — measured, a page HIDDEN in section 1 becomes VISIBLE in both sections; and
+  `CourseRestorer.settingPerSectionKeys` swaps this section's key line for the
+  backup's without either side's continuation lines — measured, a live
+  `publishForSection1:` / `  a: 1` whose backup had no such key is left as
+  `  a: 1` alone and the build stops. Both are pre-existing, both are shared
+  with Windows, and neither is reached by the fixed reader or writer (neither
+  calls `setting`). They have issues of their own; the rule above is the app's
+  rule, and those two are where it is not yet kept.
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a
@@ -493,14 +598,21 @@ own expression. Not reasoned: this issue was once opened on a claim about
 `publish: no` that was read off two plausible-looking files and never run, and
 the claim was backwards.
 
-`contracts/file-formats.json` → `pageVisibility.readingCases` carries 54 of
-those measurements as the list both app suites run, and
+`contracts/file-formats.json` → `pageVisibility.readingCases` carries **56** of
+those measurements as the list both app suites run (54 until 2026-09-19, when
+issue #176 added the two continuation forms the site publishes), and
 `scripts/check_visibility_against_the_site.py` re-runs every one of them down
-the real chain on each `verify.sh` — along with twenty-three more it carries
+the real chain on each `verify.sh` — along with **25** more it carries
 itself, the forms each reader REFUSES to answer about. Those cannot be shared
 cases (a shared case states what the SITE does, and both readers report these
 as visible whatever it does) but the refusals are only justified while the
-measurement holds, so the measurement is pinned where it can fail. That check also asserts that Quartz still
+measurement holds, so the measurement is pinned where it can fail. Since
+2026-09-19 it also carries `CONTINUATIONS_A_WRITER_MUST_SWEEP` — **9** rows,
+three pages each: the page before the write, the page it becomes if the value's
+lines are LEFT, and the page it becomes when they go with the key. That list
+pins the ARGUMENT for the sweep, not the sweep itself: nothing in `verify.sh`
+runs Swift or C#, so deleting `continuationLineIndices` leaves every row green
+and only the app suites go red. Its own comment says so. That check also asserts that Quartz still
 parses with `JSON_SCHEMA` and that `publish.ts` still compares against `false`
 and `"false"` — because if either moves, the whole table moves with it and
 every suite would otherwise stay green.
