@@ -169,6 +169,12 @@ nonisolated final class StubEngine: @unchecked Sendable {
 
     func stop() {
         permissionToAnswer.signal()
+        // `shutdown` FIRST, and it is not decoration: the serve loop is
+        // usually parked in `accept`, and closing a socket from another
+        // thread is not guaranteed to wake a pending `accept` on Darwin.
+        // Without this, every engine in the suite leaves a thread and a
+        // socket parked for the life of the test process.
+        shutdown(listener, SHUT_RDWR)
         close(listener)
     }
 
