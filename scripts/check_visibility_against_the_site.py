@@ -71,6 +71,49 @@ FORMS_THE_CONTRACT_CANNOT_CARRY = [
     ("publish: `x", "stops"),
     ("publish: false: true", "stops"),
     ("title: x\npublish:false", "stops"),
+    # Added 2026-09-19 with issue #176. Each is a CONTINUATION form where the
+    # reader's refusal is justified and the site's answer is not "visible", so
+    # a shared case would oblige the other platform to be wrong. (The two
+    # continuation forms the site PUBLISHES are shared cases now — they are in
+    # `readingCases`, because there the reporting answer and the site agree.)
+    ("publish:\n# note\n  false", "hidden"),
+    ("publish: false\n  # note\n  false", "stops"),
+    ("publish: false # why\n  false", "stops"),
+]
+
+# What a WRITER's continuation sweep is justified by — the page BEFORE the
+# write, the page it becomes if the key's line is replaced and the lines below
+# are LEFT, and the page it becomes when they go with the key.
+#
+# The sweep's whole argument is that the second column is not the first: a
+# teacher asking for one of these pages to be HIDDEN was told it had been while
+# students went on reading it, or the page stopped building. If the library
+# ever stops folding these, the argument has changed and this is where that
+# shows up.
+#
+# **What this does NOT pin is the sweep itself.** Nothing in `verify.sh` runs
+# Swift or C#: delete `PageVisibilityReader.continuationLineIndices` and every
+# row here still passes, because each column is a measurement of the BUILD
+# rather than of an app. The apps are pinned by their own suites
+# (`PageVisibilityReadingTests` on the mac, `PageVisibilityReadingTests.cs` on
+# Windows) and by `pageVisibility.writingCases`, which both of them run. This
+# list is the guard on the reasoning underneath them — a PyYAML or Quartz bump
+# that made the sweep pointless, or wrong.
+#
+# Measured 2026-09-19, python-frontmatter 1.3.0 / PyYAML 6.0.3.
+CONTINUATIONS_A_WRITER_MUST_SWEEP = [
+    # before,                        before,    left behind,                        left,      swept,            swept
+    ("publish: >-\n  false", "hidden", "publish: false\n  false", "visible", "publish: false", "hidden"),
+    ("publish: |-\n  false", "hidden", "publish: false\n  false", "visible", "publish: false", "hidden"),
+    ("publish:\n  false", "hidden", "publish: false\n  false", "visible", "publish: false", "hidden"),
+    ("publish:\n  a: 1", "visible", "publish: false\n  a: 1", "stops", "publish: false", "hidden"),
+    ("publish:\n# note\n  false", "hidden", "publish: false\n# note\n  false", "stops", "publish: false", "hidden"),
+    ("publish:\n- a", "visible", "publish: false\n- a", "stops", "publish: false", "hidden"),
+    ("publish: false\n  false", "visible", "publish: false\n  false", "visible", "publish: false", "hidden"),
+    ("publish: false\n\n  false", "visible", "publish: false\n\n  false", "visible", "publish: false", "hidden"),
+    # The guard: a note with no value under it is NOT a continuation, and the
+    # page is hidden either way.
+    ("publish: false\n  # note", "hidden", "publish: false\n  # note", "hidden", "publish: false\n  # note", "hidden"),
 ]
 
 # The one answer both readers knowingly get WRONG, pinned so it cannot quietly
@@ -170,6 +213,12 @@ def main():
     differ = work / "differ"
     differ.mkdir()
     processed += judge(differ, [(fragment, 1) for fragment, _, _ in KNOWN_TO_DIFFER])
+    sweeps = work / "sweeps"
+    sweeps.mkdir()
+    sweep_fragments = []
+    for before, _, left, _, swept, _ in CONTINUATIONS_A_WRITER_MUST_SWEEP:
+        sweep_fragments += [(before, 1), (left, 1), (swept, 1)]
+    processed += judge(sweeps, sweep_fragments)
 
     pages_json = work / "pages.json"
     pages_json.write_text(json.dumps(processed), encoding="utf-8")
@@ -210,6 +259,29 @@ def main():
                 f"they are allowed to has changed."
             )
 
+    sweep_start = (
+        len(cases) + len(FORMS_THE_CONTRACT_CANNOT_CARRY) + len(KNOWN_TO_DIFFER)
+    )
+    sweep_verdicts = verdicts[sweep_start:]
+    for position, row in enumerate(CONTINUATIONS_A_WRITER_MUST_SWEEP):
+        before, before_says, left, left_says, swept, swept_says = row
+        for offset, (fragment, expected) in enumerate(
+            ((before, before_says), (left, left_says), (swept, swept_says))
+        ):
+            verdict = sweep_verdicts[position * 3 + offset]
+            actual = "stops" if verdict["error"] is not None else (
+                "visible" if verdict["visible"] else "hidden"
+            )
+            if actual != expected:
+                failures.append(
+                    f"{fragment!r}: measured as {expected} and the build now says {actual}. "
+                    f"This is one of the three columns a WRITER's continuation sweep is "
+                    f"justified by — the sweep's argument is that leaving a value's lines "
+                    f"behind changes what students see. Re-read "
+                    f"documentation/08-course-config-reference.md before changing either "
+                    f"writer."
+                )
+
     for case, after, verdict in zip(cases, processed, verdicts):
         wanted = case["expectVisible"]
         if verdict["error"] is not None:
@@ -237,7 +309,9 @@ def main():
     print(
         f"Ran {len(cases)} reading cases and "
         f"{len(FORMS_THE_CONTRACT_CANNOT_CARRY)} refused forms and "
-        f"{len(KNOWN_TO_DIFFER)} knowingly-different forms down the real chain."
+        f"{len(KNOWN_TO_DIFFER)} knowingly-different forms and "
+        f"{len(CONTINUATIONS_A_WRITER_MUST_SWEEP)} continuations a writer must sweep "
+        f"(three pages each) down the real chain."
     )
     if failures:
         for line in failures:

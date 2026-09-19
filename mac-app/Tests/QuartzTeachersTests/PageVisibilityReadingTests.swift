@@ -390,6 +390,269 @@ final class PageVisibilityReadingTests: XCTestCase {
                        "Migrating takes the last legacy line and removes the earlier ones")
     }
 
+    // MARK: - A value that lives on the lines BELOW its key
+
+    /// A whole page from a frontmatter fragment, written the way a teacher's
+    /// file really is — one trailing newline, and body text under the block.
+    private func file(_ frontmatter: String) -> String {
+        return "---\n" + frontmatter + "\n---\nBody.\n"
+    }
+
+    /// A key's value can live on the lines below it, and those lines go
+    /// wherever the key's line goes.
+    ///
+    /// **Leaving them behind is the failure that reports success.** Measured
+    /// 2026-09-19 through the real image — python-frontmatter 1.3.0 / PyYAML
+    /// 6.0.3 / CPython 3.11.15, then gray-matter with js-yaml on
+    /// `JSON_SCHEMA`, then `patches/publish.ts`'s own expression — for every
+    /// row below, three times over: the page before the write, the page it
+    /// becomes if the key's line is replaced and the lines under it are LEFT,
+    /// and the page it becomes when they go with the key.
+    ///
+    /// * Rows 1, 2, 4, 5, 10, 15: HIDDEN before, **VISIBLE** if the
+    ///   continuation is left behind (PyYAML folds the two lines into one
+    ///   plain scalar — `"false false"`, a string that is not `"false"`),
+    ///   HIDDEN when it is swept. A teacher asking for such a page to be
+    ///   hidden was told it had been, and students went on reading it.
+    /// * Rows 6, 7, 11, 12, 13, 14, 16: the orphan is a mapping, a column-0
+    ///   comment or a column-0 sequence, and the page STOPS BUILDING instead
+    ///   — `bad indentation of a mapping entry`, or `end of the stream or a
+    ///   document separator is expected`. Swept, every one of them is HIDDEN.
+    /// * Rows 15 and 16 are pages the build could not read BEFORE the write
+    ///   either; the sweep repairs them.
+    ///
+    /// The mirror of Windows' `AValuesContinuationLinesGoWithIt`, whose 14
+    /// rows are all here. Rows 15 and 16 are the mac's own: row 15 cannot be
+    /// a shared contract case, because Windows' `ReplaceValue` keeps the
+    /// inline `# why` where this app's whole-line rebuild drops it (both land
+    /// HIDDEN, and only the bytes differ).
+    func testAValuesContinuationLinesGoWithIt() {
+        let rows: [(frontmatter: String, publish: Bool, expected: String)] = [
+            ("publish: >-\n  false\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish: |-\n  false\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish: >-\n  false\ntitle: x", true, "publish: true\ntitle: x"),
+            ("publish:\n  false\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish:\n\n  false\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish:\n  # n\n  false\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish:\n  a: 1\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish: >-\n  false", false, "publish: false"),
+            (
+                "publish: true\npublish: >-\n  false\ntitle: x", false,
+                "publish: true\npublish: false\ntitle: x"
+            ),
+            ("draft: >-\n  true\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish:\n# note\n  false\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish:\n- a\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish:\n- a\n- b\ntitle: x", false, "publish: false\ntitle: x"),
+            ("draft:\n- a\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish: false # why\n  false\ntitle: x", false, "publish: false\ntitle: x"),
+            ("publish: false\n  # note\n  false\ntitle: x", false, "publish: false\ntitle: x"),
+        ]
+
+        for row in rows {
+            let result = AssistPageVisibility.setting(
+                published: row.publish, in: file(row.frontmatter), forSection: 1,
+                isSectionLocal: true
+            )
+            XCTAssertTrue(result.changed, row.frontmatter)
+            XCTAssertEqual(result.text, file(row.expected), row.frontmatter)
+            XCTAssertEqual(
+                PageVisibilityReader.answer(in: result.text, forSection: 1),
+                row.publish ? .visible : .hidden,
+                "\(row.frontmatter) — the page has to READ the way it was asked to"
+            )
+        }
+    }
+
+    /// A key's line can LOOK complete and still have its value continue below
+    /// it — and this is the row that bit, because the old reader answered
+    /// `hidden` about it CONFIDENTLY.
+    ///
+    /// Measured 2026-09-19: every one of these six pages is PUBLISHED by the
+    /// site. YAML folds the key's line and the line below into one plain
+    /// scalar — `"false false"`, `"no false"`, `"maybe false"` — and a string
+    /// that is not `"false"` publishes.
+    ///
+    /// So the writer's "already right, change nothing" gate believed the
+    /// reader, returned before the writer or its continuation sweep ran at
+    /// all, and "hide this page" was a NO-OP: the file untouched, the teacher
+    /// told it was already hidden, and students still reading it. A sweep in
+    /// the writer cannot save a page the writer is never asked to write.
+    func testAValueBelowACompleteLookingOneIsStillAValueBelow() {
+        for value in ["false", "no", "off", "FALSE", "true", "maybe"] {
+            let frontmatter: String = "publish: \(value)\n  false\ntitle: x"
+            let pageText: String = file(frontmatter)
+
+            XCTAssertEqual(
+                PageVisibilityReader.answer(in: pageText, forSection: 1), .cannotTell,
+                "publish: \(value) with a value under it is not a value this app can read"
+            )
+            XCTAssertTrue(
+                AssistPageVisibility.publishes(in: pageText, forSection: 1),
+                "Reporting collapses it to visible — and here that is what the site does"
+            )
+
+            let hidden = AssistPageVisibility.setting(
+                published: false, in: pageText, forSection: 1, isSectionLocal: true
+            )
+            XCTAssertTrue(
+                hidden.changed,
+                "publish: \(value) — asking to hide this page must not be a no-op"
+            )
+            XCTAssertEqual(hidden.text, file("publish: false\ntitle: x"), value)
+            XCTAssertEqual(
+                PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden, value
+            )
+        }
+    }
+
+    /// And a BLANK LINE does not end a value either — the row a reader that
+    /// looked only at the next physical line would miss.
+    ///
+    /// Measured: the fold is `"false\nfalse"`, still a string that is not
+    /// `"false"`, so the site PUBLISHES the page.
+    func testABlankLineDoesNotEndAValueEither() {
+        let pageText: String = file("publish: false\n\n  false\ntitle: x")
+        XCTAssertEqual(PageVisibilityReader.answer(in: pageText, forSection: 1), .cannotTell)
+        XCTAssertTrue(AssistPageVisibility.publishes(in: pageText, forSection: 1))
+
+        let hidden = AssistPageVisibility.setting(
+            published: false, in: pageText, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.text, file("publish: false\ntitle: x"))
+        XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden)
+    }
+
+    /// The other side of the same rule, and the guard that stops the sweep
+    /// over-reaching: a `# note` with no value under it is the teacher's, and
+    /// it stays exactly where they wrote it.
+    ///
+    /// Measured: PyYAML ignores each of these lines entirely — the page is
+    /// published before the write and HIDDEN after it, note and all.
+    func testAnIndentedNoteAfterACompleteValueIsLeftAlone() {
+        let rows: [(frontmatter: String, expected: String)] = [
+            (
+                "publish: true\n  # the teacher's note\ntitle: x",
+                "publish: false\n  # the teacher's note\ntitle: x"
+            ),
+            ("publish:\n  # mine\ntitle: x", "publish: false\n  # mine\ntitle: x"),
+            (
+                "publish: true\n# a note about title\ntitle: x",
+                "publish: false\n# a note about title\ntitle: x"
+            ),
+        ]
+        for row in rows {
+            let hidden = AssistPageVisibility.setting(
+                published: false, in: file(row.frontmatter), forSection: 1, isSectionLocal: true
+            )
+            XCTAssertTrue(hidden.changed, row.frontmatter)
+            XCTAssertEqual(hidden.text, file(row.expected), row.frontmatter)
+            XCTAssertEqual(
+                PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden,
+                row.frontmatter
+            )
+        }
+    }
+
+    /// And the second guard: a column-0 sequence is only a key's value when
+    /// the key's own value is EMPTY.
+    ///
+    /// Measured: `publish: true` with `- a` under it does not build either way
+    /// — `end of the stream or a document separator is expected` — so there is
+    /// nothing to rescue, and sweeping a teacher's list on that guess would be
+    /// the larger mistake. The key's line is corrected and nothing else moves.
+    func testAColumn0SequenceUnderAKeyThatHasAValueIsNotSwept() {
+        let hidden = AssistPageVisibility.setting(
+            published: false, in: file("publish: true\n- a\ntitle: x"), forSection: 1,
+            isSectionLocal: true
+        )
+        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.text, file("publish: false\n- a\ntitle: x"))
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden,
+            "The line the build would read says false — the page's own YAML is what stops it"
+        )
+    }
+
+    /// A file written on Windows keeps its line endings, including on the
+    /// lines the sweep removes.
+    ///
+    /// Measured: the swept CRLF page is HIDDEN on the site.
+    func testSweepingAContinuationOutOfACrlfFileLeavesCrlfBehind() {
+        let windowsWritten: String = "---\r\npublish: >-\r\n  false\r\ntitle: x\r\n---\r\nBody.\r\n"
+        let hidden = AssistPageVisibility.setting(
+            published: false, in: windowsWritten, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertTrue(hidden.changed)
+        XCTAssertEqual(hidden.text, "---\r\npublish: false\r\ntitle: x\r\n---\r\nBody.\r\n")
+        XCTAssertEqual(PageVisibilityReader.answer(in: hidden.text, forSection: 1), .hidden)
+    }
+
+    // MARK: - What the corrected reading changes for a teacher
+
+    /// A re-date that runs off the end of the timetable now HIDES such a page,
+    /// where before it left it alone.
+    ///
+    /// This is the second teacher-visible consequence of the reader change,
+    /// and it is a WRITE rather than a sentence: `SectionReDatePlanner` asks
+    /// `unpublishes = isOverflow && page.isVisibleToStudents`, and a page whose
+    /// flag reads `cannotTell` is now visible-and-uncertain where it used to be
+    /// hidden-and-certain. It is the right direction — measured, the site
+    /// PUBLISHES this page, so a class pushed past the last day of the
+    /// timetable really was still in front of students.
+    ///
+    /// (The first consequence has no test of its own because it is an absence:
+    /// such a page stops appearing in `ScheduledDeploy`'s "classes students
+    /// cannot see yet" list, for the same reason and in the same direction.)
+    @MainActor
+    func testARedateThatOverflowsNowHidesAPageWhoseValueContinues() throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08"], source: "timetable.xlsx, block H", forSection: 1,
+            in: made.course
+        )
+        try SectionTimetableStore.applyRememberTimetable(plan)
+        try AssistFixture.write(
+            page: "Unit 1, Day 1", publish: "false", date: "2026-09-08", body: "one",
+            in: made.course
+        )
+        // The whole point: a key line that LOOKS complete, with its value
+        // continuing below it. The site publishes this page.
+        try AssistFixture.write(
+            page: "Unit 1, Day 2", publish: "false\n  false", date: "2026-09-10", body: "two",
+            in: made.course
+        )
+
+        let overflowURL: URL = AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course)
+        XCTAssertEqual(
+            PageVisibilityReader.answer(
+                in: try String(contentsOf: overflowURL, encoding: .utf8), forSection: 1
+            ),
+            .cannotTell
+        )
+
+        let reDate: SectionReDatePlan = try SectionReDatePlanner.plan(
+            forSection: 1, in: made.course, workspaceURL: made.root
+        )
+        var overflowMove: ReDatedPage? = nil
+        for move in reDate.moves where move.title == "Unit 1, Day 2" {
+            overflowMove = move
+        }
+        XCTAssertEqual(
+            try XCTUnwrap(overflowMove).unpublishes, true,
+            "A class past the last day of the timetable is one students can still see"
+        )
+
+        _ = try SectionReDatePlanner.apply(reDate, forSection: 1, in: made.course)
+        let after: String = try String(contentsOf: overflowURL, encoding: .utf8)
+        XCTAssertTrue(after.contains("publish: false\n"), after)
+        XCTAssertFalse(after.contains("\n  false"), "The continuation went with the key")
+        XCTAssertEqual(PageVisibilityReader.answer(in: after, forSection: 1), .hidden)
+    }
+
     /// Reading does not depend on where the page lives — the build consults
     /// all four keys on every page it copies. This was the mac's own blind
     /// spot until 2026-09-18.
