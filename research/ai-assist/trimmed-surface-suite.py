@@ -45,6 +45,11 @@ AssistAgent does (Say appends the date; NarrowToLocal rewrites examples).
                      repeated trials near-deterministic, so a trial count is
                      not a failure rate — see the note in the report.
   --intercept-only   Run the interception guard and stop. No server needed.
+  --mac-shelf        Measure the MAC's shelf (AssistSupportingViews.swift)
+                     instead of the 29 probes. The eleven "promise card"
+                     probes in the default set are WINDOWS'
+                     `AssistAgent.ExampleRequests` and are worded differently;
+                     see the comment on PROMISED.
 
 Usage:
   python trimmed-surface-suite.py TOOLS.json [trials] [--date-appended]
@@ -89,6 +94,8 @@ if APP_BODY:
     # AssistModelClient.reply: temperature 0, tool_choice auto, no max_tokens.
     TEMPERATURE = 0.0
 INTERCEPT_ONLY = "--intercept-only" in args
+# The MAC's shelf instead of Windows' ExampleRequests — see MAC_SHELF below.
+MAC_SHELF_ONLY = "--mac-shelf" in args
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 AGENT_SWIFT = "mac-app/QuartzTeachers/Models/Assist/AssistAgent.swift"
@@ -232,12 +239,23 @@ PUBLISHERS = {"publish_class_on", "plan_publish_class_on", "publish_pages", "pla
 # None in the tuple means declining is acceptable. "EXC2O" in a prompt is
 # replaced by --course at run time.
 #
-# THE PROMISE CARD, verbatim. These eleven are what the assistant window
-# tells a teacher it is good at (AssistAgent.ExampleRequests), so they are
-# measured exactly as written — no course named, because the window names
-# it in the system prompt. "Rebuild the preview" never reaches the model in
-# the app (the fast path answers it); it is measured anyway for the
-# bring-your-own-assistant path.
+# THE PROMISE CARD, verbatim — **WINDOWS'**, and that is not a detail.
+# These eleven are `AssistAgent.ExampleRequests` in the C#, which is the
+# Windows window's list. The MAC's shelf is
+# `mac-app/QuartzTeachers/Views/Assist/AssistSupportingViews.swift` and it is
+# a DIFFERENT list, worded differently: it offers "Deploy at 6:30 AM" where
+# this says "Deploy tomorrow's class at 6:30 AM", and "Publish Unit 2, Day 3"
+# where this says "Publish Unit 2, Day 3, and everything it links to".
+# Correcting a claim that stood here from 2026-08-14 and was quoted as a mac
+# figure in three places: a score on this list is a score on WINDOWS'
+# promises. Use --mac-shelf for the mac's own, which is measured in
+# metal-routing-results.txt and, at temperature 0, in shelf-phrasings-results.txt.
+#
+# Kept as the Windows list rather than replaced, because every comparable
+# figure in this folder was taken against it. No course is named in any of
+# them, because the window names it in the system prompt. Five of them never
+# reach the model in the app; they are measured anyway, for the
+# bring-your-own-assistant path, and the run reports them separately.
 PROMISED = [
     (("plan_publish_pages", "publish_pages"),
      "Publish Unit 2, Day 3, and everything it links to",
@@ -355,6 +373,58 @@ CASES = PROMISED + [
      "publsh tomorows class for exc2o sec 1 and the stuff it links to",
      "typos", True),
 ]
+
+# THE MAC'S OWN SHELF, verbatim from AssistSupportingViews.swift, in the order
+# the window lists it. Added 2026-09-18 (#117) because the eleven above are
+# WINDOWS' promises and had been quoted as the mac's.
+#
+# Most of these are answered in code — the interception guard marks which, and
+# it is the guard rather than this list that decides, so a shape moved into or
+# out of AssistCardCommand changes the answer here by itself. The four that
+# reach the model are the ones this list is evidence about; `re_date_classes`
+# and the rest are not even ON the local surface, so a model could not choose
+# them if it were asked.
+MAC_SHELF = [
+    (("plan_publish_pages", "publish_pages"), "Publish Unit 2, Day 3",
+     "shelf: publish by name", False),
+    (("plan_publish_class_on", "publish_class_on"), "Publish tomorrow's class",
+     "shelf: publish tomorrow", True),
+    (("plan_publish_class_on", "publish_class_on"), "Publish Monday's class",
+     "shelf: publish Monday", False),
+    (("plan_publish_pages", "publish_pages"), "Publish Unit 5",
+     "shelf: publish a unit", False),
+    (("plan_unpublish_pages", "unpublish_pages"), "Unpublish Unit 2, Day 3",
+     "shelf: unpublish by name", False),
+    (("plan_unpublish_pages", "unpublish_pages"), "Unpublish Unit 4",
+     "shelf: unpublish a unit", False),
+    (("undo_last_change",), "Undo that", "shelf: undo", False),
+    (("check_section",), "What would students see in this section right now?",
+     "shelf: check the section", False),
+    (("rebuild_preview",), "Preview", "shelf: preview", False),
+    (("add_next_class",), "Add the next class page", "shelf: add next class", False),
+    (("add_next_class",), "Start a new unit for the next class",
+     "shelf: start a new unit", False),
+    (("add_next_class",), "Add five more days to Unit 4", "shelf: more days", False),
+    (("add_next_class",), "Duplicate Unit 3, Day 2 as my next class",
+     "shelf: duplicate a class", False),
+    (("read_remembered_timetable",), "When are my next classes?",
+     "shelf: when are my classes", False),
+    (("read_remembered_timetable",), "I have a revised list of class dates",
+     "shelf: revised dates", False),
+    (("re_date_classes",), "Re-date my classes", "shelf: re-date", False),
+    (("deploy_section",), "Deploy now", "shelf: deploy now", False),
+    # The one that matters: not intercepted, and it carries a TIME for the
+    # model to read out, which is why it was left to the model in the first
+    # place.
+    (("plan_scheduled_deploy", "schedule_deploy"), "Deploy at 6:30 AM",
+     "shelf: deploy at 6:30", False),
+    (("cancel_scheduled_deploy",), "Cancel scheduled deploy",
+     "shelf: cancel the deploy", False),
+]
+
+if MAC_SHELF_ONLY:
+    CASES = MAC_SHELF
+    PROMISED = []
 
 
 def intercepted(message):
@@ -545,12 +615,19 @@ cards_seen = [probe for probe in CARD_LABELS if probe not in INTERCEPTED]
 
 print("all probes:            %s (%.0f%%)" % (
     subtotal(list(scored)), 100.0 * right / total))
-print("the %d the model SEES:  %s (%.0f%%)   — the rest are answered in code" % (
-    len(seen_by_model), subtotal(seen_by_model),
-    100.0 * sum(scored[p] for p in seen_by_model) / (len(seen_by_model) * TRIALS)))
-print("Windows-comparable 18: %s" % subtotal(windows_18))
-print("promise-card 11:       %s" % subtotal(CARD_LABELS))
-print("promise-card, the %d the model sees: %s" % (len(cards_seen), subtotal(cards_seen)))
+if seen_by_model:
+    print("the %d the model SEES:  %s (%.0f%%)   — the rest are answered in code" % (
+        len(seen_by_model), subtotal(seen_by_model),
+        100.0 * sum(scored[p] for p in seen_by_model) / (len(seen_by_model) * TRIALS)))
+if MAC_SHELF_ONLY:
+    # Neither subtotal means anything here: both are defined against WINDOWS'
+    # eleven, and this run is the mac's own shelf.
+    print("(mac shelf run — the Windows-comparable and promise-card subtotals "
+          "do not apply and are not printed)")
+else:
+    print("Windows-comparable 18: %s" % subtotal(windows_18))
+    print("promise-card 11 (WINDOWS' ExampleRequests): %s" % subtotal(CARD_LABELS))
+    print("promise-card, the %d the model sees: %s" % (len(cards_seen), subtotal(cards_seen)))
 print("polarity inversions (all polarity probes, incl. plan_*): %d" % len(inversions))
 for probe, name, arguments in inversions:
     print("   %s -> %s %s" % (probe, name, json.dumps(arguments)))

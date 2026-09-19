@@ -34,7 +34,7 @@ vetoed and for what, and what the flags cost.
 | `reasoning-flag-measurement.txt` | Why thinking must be turned off with **two** flags, and why the fault hid for days: llama.cpp parses the thinking out of the reply, so only the token count and the clock show it. |
 | `tools-from-contract.py` | **Start here for a new measurement.** Writes the tool surface the suites take as input, read from `contracts/assist-cases.json` — which is generated from the app, so a run cannot be against a surface that does not ship. `local` (13 tools) is what the on-device model sees; `mcp` (32) is Claude Code's. |
 | `thirteen-tool-surface-results.txt` | The **current** shipping surface, 42 probes × 10 trials on both tiers. Also records the description-steer regression: fixing one probe in a tool description broke three others. Its 42-probe harness was never committed, so it cannot be re-run — see the row below. |
-| `metal-routing-results.txt` | **Routing on the hardware that ships, after the 2026-08-24 prompt change** (issue #117). Both tiers, three system-prompt forms including the one before the change, and the app's own request body. The answer: neutral on the 4B, 27 of 29 probes identical either way. Also the file to read before quoting any "malformed tool calls: 0" in this folder — that counter was only ever counting HTTP errors, and truncated tool-call arguments went through it. Pre-registered: its thresholds were committed before the first model call. |
+| `metal-routing-results.txt` | **Routing on the hardware that ships, after the 2026-08-24 prompt change** (issue #117). Both tiers, three system-prompt forms including the one before the change, the app's own request body, and the mac's OWN shelf — the "promise card" in every other file here is Windows' `ExampleRequests`, not this app's. The answer on the prompt: neutral on the 4B (28 of 29 probes identical either way), and worth 5 trials in 10 on one hide request on the 1.5B. The findings that matter are elsewhere in it: `read` on the 4B has gone from 10/10 to 0-1/10 since August, the mac shelf's "Deploy at 6:30 AM" deploys NOW on the small tier, and the app sends no `max_tokens`. Also the file to read before quoting any "malformed tool calls: 0" in this folder. Pre-registered: its thresholds were committed before the first model call. |
 | `shelf-phrasings-results.txt` | **Every phrasing the assistant window offers**, word for word, 14 × 10 trials — the evidence the shelf is allowed to promise them. Also records a harness fault worth more than the result: measured without `AssistAgent.dateline(on:)`, "Publish the class on Monday" resolved to a date a month away 10/10 and nearly cost a good card. |
 
 **Earlier runs, superseded but kept**
@@ -51,8 +51,13 @@ with),
 `teachers-say-suite.py` (**Windows**, 25 probes: what the `TEACHERS SAY:`
 clauses on two tools are worth, before and after, with fifteen controls for
 the collateral damage a description change has caused before),
-`routing-suite.py`, `adversarial-suite.py`, `narrow-tools.py` (a hand copy of
-the real narrowing code, so a surface under test is the shipped one),
+`routing-suite.py`, `adversarial-suite.py` (**cannot be run as committed**: it
+does `sys.path.insert(0, "/root")` and then `from suite import TOOLS, SYSTEM`,
+and no `suite.py` is in this repository — it was a file on the machine it ran
+on. Its probes also expect `set_draft`, a tool that no longer exists. Read it
+as a record of what was asked, not as something to re-run), `narrow-tools.py`
+(a hand copy of the real narrowing code, so a surface under test is the
+shipped one),
 `shipped-surface-suite.py` (**historical** — its probes accept `publish_class`
 and `hide_class`, tools that no longer exist, so every probe in it now misses
 by construction; two files used to point a new measurement at it and were

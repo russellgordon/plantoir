@@ -1,3 +1,10 @@
+# [NOTE ADDED 2026-09-18, #117 — nothing below is changed.]
+# "malformed tool calls: 0" in this file means "no HTTP errors". The harness
+# recorded a tool call whose argument JSON was TRUNCATED as a call with no
+# arguments, so truncation could not reach that line. Counted properly on an
+# M4 Pro with the same weights, Qwen2.5-1.5B truncates 12-19 arguments per 290
+# responses and Qwen3-4B none — see metal-routing-results.txt.
+#
 # ⚠️ SUPERSEDED (2026-08-15) by thirteen-tool-surface-results.txt — this run measured
 # the 20-tool surface, which is what an MCP client sees; the local model is shown 13.
 # Kept because it is what separates 'more tools' from 'changed schemas' as a cause.
