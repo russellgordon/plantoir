@@ -432,20 +432,32 @@ assistant. Which model depends on the machine:
 Routing accuracy is reported against the suite it was measured on rather than
 as one headline number, because both the suite and the tool surface have
 grown. On the shipping 13-tool surface, over 42 phrasings × 10 trials: the 4B
-routes every one of the window's own suggestions correctly (110/110) and 94%
+routes every one of the eleven promise-card probes correctly (110/110) and 94%
 of the like-for-like Windows probe set; the 1.5B manages 77% and 67% of the
-same two. Neither inverted polarity once in 840 replies. The model-selection
-table below is from the earlier 29-probe suite, which is what the choice of
-model was actually made on.
+same two. Neither inverted polarity once in 840 replies. **Those eleven are
+`AssistAgent.ExampleRequests` in the WINDOWS app, not this window's shelf** —
+a different list, differently worded, and the distinction went unstated here
+until 2026-09-18. The model-selection table below is from the earlier 29-probe
+suite, which is what the choice of model was actually made on.
 
 Re-measured on 2026-09-18 (issue #117) after the system prompt changed on
 Windows' numbers, this time with each tier at ITS OWN context size and the
-request body the app really sends: the 4B holds 110/110 on the window's
-suggestions and 93% overall, the 1.5B 72%, and neither inverted polarity in
-2,494 replies. The older wording of the prompt scores the same on the 4B, so
-the change is neutral here. Conditions, thresholds and per-probe tables are in
-`research/ai-assist/metal-routing-results.txt`, which is also the file to read
-before quoting any "0 malformed calls" from this folder.
+request body the app really sends: the 4B holds 110/110 on Windows'
+`ExampleRequests` probes and 93% overall, the 1.5B 72%, and neither inverted
+polarity in 2,494 replies across the 29-probe arms plus 247 in the shelf arm
+below. The prompt change is **neutral on the 4B** — 28 of 29 probes give the
+identical tool with the old wording and the new — and on the 1.5B it bought
+one real thing: the older wording let the model DECLINE a plain hide request
+6 times in 10 where the current one declines once.
+
+**This window's own shelf was measured for the first time** in the same run,
+on the smaller assistant. Of its 19 cards, 15 are answered in code by
+`AssistCardCommand` and 4 reach the model; of those four, three are routed
+correctly every trial and **"Deploy at 6:30 AM" is not — it is answered by
+`deploy_section`, an immediate deploy, 10 trials out of 10.** The same card is
+correct 10/10 on the larger assistant. Conditions, thresholds and per-probe
+tables are in `research/ai-assist/metal-routing-results.txt`, which is also
+the file to read before quoting any "0 malformed calls" from that folder.
 
 Replies take about 0.5 s once the conversation is warm. The first reply is
 the one-off read of the tool definitions, which the window warms in the

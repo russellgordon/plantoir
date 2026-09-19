@@ -662,7 +662,11 @@ after it. **On the small tier it did buy something**: the older wording let
 the model DECLINE a plain hide request 6 times in 10, where the current one
 declines once.
 
-And **the two tiers are not two grades of the same thing**: the small one is
+And **the two tiers are not two grades of the same thing**. This matters more
+widely than "old Macs": the smaller assistant is a CHOICE any teacher can make
+on any machine (`contracts/shared-rules.json` → `assistantModelChoice`), and
+because it is comfortable on essentially every Mac — 1.75 GB against a third
+of physical memory — picking it raises no caution at all. The small one is
 solidly right on 19 of 29 probes and solidly wrong on 7, including every way
 of asking for a deploy at a time — the mac's own shelf card "Deploy at 6:30
 AM" routes to `deploy_section`, deploying immediately, 10/10 on the small tier
@@ -676,18 +680,25 @@ changes the CAUTION a teacher is shown when they turn confirmation off
 the small tier confirms and the large one does not; it never has.
 
 **Something both platforms must know before quoting a zero.** Every suite in
-`research/ai-assist/` that PRINTS a `malformed tool calls: N` line parses a
-tool call's arguments as `try: json.loads(...) except: args = {}`, so a call
-whose argument JSON was cut off short has always been recorded as a call with
-no arguments, and never as a malformed one. `trimmed-surface-suite.py` counts
-it now; `teachers-say-suite.py` still does not, so a "0 malformed" from it
-means "no HTTP errors". (`routing-suite.py` is the exception worth naming: it
-keeps the raw string as `{"__unparseable__": …}` and labels its own line
-"runtime rejected", so it does not make the false claim — it simply has no
-count of the other kind.) It is not a Windows bug to fix on a deadline: the
-mac is the platform EXPOSED to it, because `AssistModelClient` sends no
-`max_tokens` at all where Windows' `LocalModel` sends 512, so a runaway here
-runs until the context is full.
+`research/ai-assist/` that printed a `malformed tool calls: N` line USED TO
+parse a tool call's arguments as `try: json.loads(...) except: args = {}`, so
+a call whose argument JSON was cut off short was recorded as a call with no
+arguments and never as a malformed one. Both suites that are run today —
+`trimmed-surface-suite.py` and `teachers-say-suite.py`, the Windows-side one —
+count it properly as of 2026-09-18, in shared Python, so a re-run of either
+counts honestly. **What Windows must know is about results already taken:
+every "malformed tool calls: 0" in the `teachers-say-results.txt` numbers, and
+in the seven other older files, means "no HTTP errors" and nothing more.** All
+nine carry a dated note saying so. `shipped-surface-suite.py` still has the
+old shape and is left alone deliberately — it is marked HISTORICAL and cannot
+be meaningfully re-run, because its probes name tools the app no longer has.
+(`routing-suite.py` is the exception worth naming: it keeps the raw string as
+`{"__unparseable__": …}` and labels its own line "runtime rejected", so it
+never made the false claim — it simply has no count of the other kind.)
+
+The mac is the platform EXPOSED to the underlying fault, because
+`AssistModelClient` sends no `max_tokens` at all where Windows' `LocalModel`
+sends 512, so a runaway here runs until the context is full.
 
 The figures above are not a failure rate. The suite runs at temperature 0.1
 (0 in the arms that copy the app's own request), which is near-greedy: ten
