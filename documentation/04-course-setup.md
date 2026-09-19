@@ -990,19 +990,21 @@ each pinned by tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
   for it, not because another class linked to it — so a shared page the old
   wide path called a class was silently skipped. Demoted to what it is, it is
   followed, and "publish Day 1 and everything it links to" now reaches it.
-  **That guard is WINDOWS-ONLY, and this is where it was found.** The mac's
-  `AssistSectionGraph.linkedPages(from:)` (`:256-281`) has no class-page test
-  at all, and `AssistPublishPlan.swift:434,449` publishes every page it
-  returns, so on the mac a publish follows links INTO class pages too. The
-  outcome of this particular change converges — the demoted shared page was
-  already non-class on the mac, so its links were already followed — but the
-  rule underneath does not, and the difference is nobody's decision:
-  [issue #173](https://github.com/russellgordon/plantoir/issues/173) carries
-  it, with the teacher-visible case (publishing Unit 2, Day 3, which links to
-  Unit 2, Day 4 — Day 4 goes up on the mac and does not on Windows) and the
-  note that `documentation/10-local-ai-assistant.md` states the mac's rule as
-  though it were shared. Deliberately NOT changed here: how far a publish
-  reaches is a different question from which folders hold classes.
+  **That guard was WINDOWS-ONLY when this was written, and this is where it was
+  found — it is now SHARED.** The mac's `AssistSectionGraph.linkedPages(from:)`
+  had no class-page test at all, so a publish there followed links INTO class
+  pages too. The outcome of this particular change converged either way — the
+  demoted shared page was already non-class on the mac, so its links were
+  already followed — but the rule underneath did not, and the difference was
+  nobody's decision until
+  [issue #173](https://github.com/russellgordon/plantoir/issues/173) settled it
+  on 2026-09-19: **Windows' answer, for both rules.** The mac now stops there
+  too, in `reachFollowingLinks(from:)`; the rule, what was rejected and what a
+  teacher is told are in `documentation/10-local-ai-assistant.md` → "The walk
+  stops at a class page", and it is pinned by `contracts/shared-rules.json` →
+  `followingLinks.stopsAtAClassPage`. Deliberately NOT changed here: how far a
+  publish reaches is a different question from which folders hold classes, and
+  it was answered separately.
 - **The "introducing class" credit changes hands.** An undated page inherits
   the date of the earliest class linking to it and the teacher is told which
   class brought it in (`AssistWorkspace.cs:777` finds that class here). A
@@ -1010,22 +1012,27 @@ each pinned by tests in `Plantoir.Tests/ClassFolderMembershipTests.cs`:
   (a course-level folder sorts before `section1`), so the teacher was told a
   page they never taught from was what introduced it.
 
-  **The EXCLUSION is shared; the REACH is not** — and this needs saying
+  **The EXCLUSION was shared and the REACH was not** — and this needs saying
   carefully, because an earlier draft of this page called the whole thing
   parity. A class page never inherits a date on either platform
-  (`AssistWorkspace.cs:916`, `AssistPublishPlan.swift:871`, and
-  `contracts/class-planning.json` → `datingPagesAClassBrings`: "a class's date
-  is its place in the schedule"). But Windows' `continue` at `:916` sits in
-  front of `queue.Enqueue(target)` at `:917`, so it stops the walk THERE,
-  while the mac's date code reaches its pages through
-  `graph.linkedPages(from:)` (`AssistPublishPlan.swift:862`), which traverses
-  straight through class pages and only filters them out of the move list
-  afterwards. So a page reachable ONLY by way of another class page — Day 3
-  links to Day 4, Day 4 links to a new worksheet nothing else points at — is
-  re-dated on the mac and is not on Windows. That is the same divergence as
-  the publish-following one above, inside the very rule that looked like the
-  settled ground, and [#173](https://github.com/russellgordon/plantoir/issues/173)
-  covers both reaches rather than only the publish one.
+  (`AssistWorkspace.cs:916`, and `contracts/class-planning.json` →
+  `datingPagesAClassBrings`: "a class's date is its place in the schedule").
+  But Windows' `continue` sits in front of its `queue.Enqueue(target)`, so it
+  stopped the walk THERE, while the mac's date code reached its pages through
+  `graph.linkedPages(from:)`, which traversed straight through class pages and
+  only filtered them out of the move list afterwards. So a page reachable ONLY
+  by way of another class page — Day 3 links to Day 4, Day 4 links to a new
+  worksheet nothing else points at — was re-dated on the mac and was not on
+  Windows. That was the same divergence as the publish-following one above,
+  inside the very rule that looked like the settled ground, and
+  [#173](https://github.com/russellgordon/plantoir/issues/173) covered both
+  reaches rather than only the publish one. **Both are closed as of
+  2026-09-19**: the mac's date walk goes through `reachFollowingLinks(from:)`
+  now and stops where Windows stops, pinned by `class-planning.json` →
+  `datingPagesAClassBrings.reachStopsAtAClassPage`. Unpublish reach is the one
+  half still open —
+  [#201](https://github.com/russellgordon/plantoir/issues/201), v1.3.0 — and
+  neither platform stops there today.
 
 **Rejected: keeping Windows' wider membership.** It is the more generous
 reading — everything the teacher put in a per-section folder is a class — and
