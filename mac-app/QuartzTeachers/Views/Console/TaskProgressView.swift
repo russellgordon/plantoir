@@ -238,10 +238,26 @@ struct TaskProgressView: View {
                         } else if !runner.wasCancelled, exitCode == 0, let folderURL = runner.publishedFolderURL {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Your website was deployed to a folder — upload it to your web host whenever you're ready.")
+                                // No `fixedSize` on this note, on purpose —
+                                // the rule `CloudSyncNoticeView` and
+                                // `WebPreviewView.sizeThatFits` already state:
+                                // never make a wrapping text's height RIGID
+                                // inside a view a split-view column can
+                                // measure. A text told to keep its vertical
+                                // size answers with the lines it needs at the
+                                // width it is PROPOSED, and the split view
+                                // measures a column by proposing next to no
+                                // width at all — where this sentence wraps to
+                                // a character per line and claims 1,907
+                                // points. The column took that as its height,
+                                // the window's content grew past the window,
+                                // and the whole interface — sidebar included —
+                                // slid out of the visible band the moment a
+                                // folder publish said "Done". Measured, and
+                                // pinned by `ProgressViewSizeTests`.
                                 Text("One thing to know: the pages won’t look right if you open them straight from the folder — your website only displays properly once it’s on your web host.")
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
                                     .accessibilityIdentifier("publishedFolderRenderNote")
                                 Button("Show in Finder", systemImage: "finder") {
                                     NSWorkspace.shared.activateFileViewerSelecting([folderURL])

@@ -77,6 +77,154 @@ Beyond the actions, the app owns delivery and resources:
   launchers are the other, for a teacher at the command line and for a
   publish scheduled with launchd.
 
+## A blank window: when a child claims a size the window cannot give
+
+**The rule, first, because it is the whole section:** never make a wrapping
+`Text`'s height RIGID inside anything a split-view column can measure. In
+practice that means no `.fixedSize(horizontal: false, vertical: true)` on a
+sentence in the sidebar, in the detail column, or in any view either of them
+puts on screen. Panels in a sheet, in the Settings window, in the assistant
+window or in a popover are a different matter — they are hosted at a width
+somebody chose, and they may keep the modifier.
+
+### The shape of the fault
+
+It is always the same shape, and the symptom is always the same: a window
+that is **responsive and blank**. The toolbar still draws, because it is
+AppKit rather than SwiftUI content; everything else — the sidebar's rows, the
+result panel, the working-folder bar — is somewhere outside the visible band.
+Nothing recovers it, because nothing re-measures. Changing the selection does,
+which makes it look intermittent to whoever reports it.
+
+A container measures a child by proposing it next to nothing: a narrow or zero
+width, and **no height**. A well-behaved child answers with the smallest size
+it could live in. A child that answers with a size it will not give back —
+because it is a scroll view reporting its whole content, a representable
+reporting an intrinsic size, or a text whose height has been made rigid —
+hands the split view a number far larger than the window. The hosting view
+centres content taller than the window inside the window's band, so the top
+and the bottom both fall outside it.
+
+`.fixedSize(horizontal: false, vertical: true)` is the one that keeps coming
+back, because it is harmless-looking and usually right. It means "ignore the
+height you are proposed and take the height you need **at the width you are
+proposed**". At a proposed width of zero or one point, a 153-character
+sentence needs about one line per character.
+
+### It has happened four times
+
+| when | where | what it claimed | the fix |
+|---|---|---|---|
+| 2026-08-09 | the details console (`TaskConsoleView`) | a scroll view's ideal size is its whole content — a long transcript demanded tens of thousands of points | `.frame(minHeight: 200, idealHeight: 260, maxHeight: .infinity)`, an IDEAL bound, which is what an ideal-size resolution needs |
+| 2026-08 | the embedded preview (`WebPreviewView`) | the web view's document height, reported as an intrinsic size | `sizeThatFits` overridden to never dictate a size |
+| 2026-09-05 | the synced-folder notice (`CloudSyncNoticeView`) | 1,548 points, and the same 1,548 whether 700 points or nothing was proposed | the `fixedSize` deleted; `CloudSyncNoticeLayoutTests` written |
+| 2026-09-19 | the folder-publish Done panel and the scheduled-publish notice (issue #211) | **1,980**, **3,100** and **1,372** points | the `fixedSize` deleted; seven cases added to `ProgressViewSizeTests` |
+
+The fourth is the one to learn from, because the third had already produced a
+rule, a comment and a test file, and the fault still shipped twice more in the
+same window. The comment lived on the view it was written for; the test file
+was named after that view; and neither of them was anywhere the next person
+would look. That is what this section is for.
+
+### How to test for it — and why the obvious test cannot
+
+Two measurements, and they answer different questions:
+
+```swift
+// The IDEAL size: no width proposed, so nothing wraps.
+let hostingView = NSHostingView(rootView: AnyView(view))
+hostingView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+hostingView.layoutSubtreeIfNeeded()
+return hostingView.fittingSize.height
+
+// The MINIMUM size, the way a split view asks for it: a narrow width,
+// and NO height.
+let controller = NSHostingController(rootView: AnyView(view))
+return controller.sizeThatFits(in: NSSize(width: 1, height: 0)).height
+```
+
+The first catches an ideal-size blow-up — a scroll view claiming its content.
+**It cannot catch a rigid text at all**, because it proposes no width, so no
+sentence ever wraps. That is not a theory: the folder-publish panel passed
+every case in `ProgressViewSizeTests` for two releases while blanking the
+window every single time a teacher published to a folder.
+
+The second is the one to write for a sentence. `ProgressViewSizeTests`'s
+`heightClaimedWhenSqueezed(of:width:)` and `CloudSyncNoticeLayoutTests`'s
+`measuredHeight(of:width:height:)` are both this measurement; a bound of 300
+points is clear of every honest panel measured here (33–187) by a wide margin
+and nowhere near a rigid one (1,372–3,100).
+
+**Measure the thing in the place it is HOSTED, not on its own.** Three views
+in the main window carry the modifier today and are all fine, and it is the
+host that makes them fine, which no amount of reading the view would tell
+you:
+
+| view | alone | in its host | what bounds it |
+|---|---|---|---|
+| `SidebarView` → `CourseCodeField`'s rename problem | 310 | **0** | the sidebar's `List` is a scroll view: it answers a squeeze with 0 whatever its rows claim |
+| `CourseSettingsView`'s unit-word notice, and `EmojiChoiceField` | — | **33** | the grouped `Form`, for the same reason |
+| `WhyTakingLongView`'s explanation rows | 316 at every proposed width | — | its own `.frame(width: 380)`, and it is shown in a `.popover` — a separate window, which a split-view column never measures |
+
+A corollary worth stating: **a test that measures one of those inside its
+`List` or `Form` proves nothing**, because the scroll view answers 0 before
+the row is ever built. There is no cheap guard for them; what protects them
+is the host, and a change that takes a row out of a `List` is the change to
+look at twice.
+
+### What was rejected, and why
+
+For the rigid-text version, all four measured rather than argued (issue #211,
+2026-09-19):
+
+- **`.lineLimit(3)`, keeping `fixedSize`.** Bounds the window. Truncates the
+  sentence at narrow widths, and half a sentence with an ellipsis explains
+  nothing. Two tests now assert the opposite — that the narrow measure is
+  TALLER than the wide one — so this cannot be reintroduced quietly.
+- **`.frame(maxWidth: 520)` around the note.** Still 1,999 points. A maximum
+  width does not stop a narrow proposal.
+- **A bounded `idealHeight`, the 2026-08-09 console fix.** Does not apply.
+  That fault was an ideal-size resolution; this one is a rigid size, and an
+  ideal bound is simply ignored. The two fixes are not interchangeable, which
+  is the single most useful thing in this section.
+- **`.frame(maxHeight:)` on the console area.** Clamps the symptom, clips the
+  note, and hides the fault from the test meant to catch it.
+- **`.frame(minWidth: 320)` with `fixedSize` kept.** Bounds it, but forces a
+  horizontal minimum on a column that is allowed to be narrow, in order to fix
+  a vertical problem.
+
+And the one that is never the answer here: **a delay.** Nothing in this
+failure is a race. The wrong size is stable, and a `Task.sleep` waiting for
+layout to "settle" would be waiting for something that has already finished.
+
+### Nothing a teacher sees changes when the modifier goes
+
+Measured on 2026-09-19, rendered height with a whole window's height on offer,
+identical with the modifier and without it:
+
+| view | 420 wide | 700 | 900 | 1300 |
+|---|---|---|---|---|
+| the folder-publish Done panel | 187 | 156 | 141 | 141 |
+| the scheduled-publish notice | 137 | — | 73 | 73 |
+
+`fixedSize` only changes anything when a parent proposes a too-small HEIGHT,
+and neither of these sits under one: both are above a `Spacer(minLength: 0)`
+with the window's height available. That is the general case in this app's
+main window, which is why the modifier buys nothing there and costs this.
+
+**One exception was measured by the fix's reviewer, and it is the right way
+round.** With the scheduled-publish notice showing AND "Show details" expanded
+AND the window at or near its minimum height (620×548, 760×548, 500×600 in a
+replica), the folder render note gives up a line — 14.5 pt, one truncated
+line, where the rigid version got 30. The contest is with the details
+console's `.frame(minHeight: 200, idealHeight: 260, maxHeight: .infinity)`.
+In that same corner the old code blanked the whole window, so the note losing
+a line is strictly better than the window losing its sidebar. `.layoutPriority(1)`
+was MEASURED and does not help (on the Text, or on the whole result stack), and
+the `…StillWrapsInFullAtRealWidths` tests host the view alone, so they prove
+"not line-limited", not "never truncated". Issue #213; never answer it by
+putting the modifier back.
+
 ## What a window lets go of when it changes working folder
 
 The defect, reported as [issue
