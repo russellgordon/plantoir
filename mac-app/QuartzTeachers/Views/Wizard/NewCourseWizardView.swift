@@ -125,6 +125,12 @@ struct NewCourseWizardView: View {
     @State var perSectionFiles: [String] = WizardDefaults.perSectionFiles
     @State var gradedFolders: [String] = ["Tasks"]
 
+    /// What the last adoption put into the five lists above, so that turning
+    /// the skeleton toggle off can put the defaults back for exactly the
+    /// lists the teacher has NOT edited since. Nil until a skeleton is
+    /// adopted, and nil again the moment one is given up.
+    @State var adoptedStructure: WizardStructure.Lists?
+
     @State var validationProblem: String?
     @State var hasStarted: Bool = false
 
@@ -165,6 +171,17 @@ struct NewCourseWizardView: View {
     }
 
     // MARK: - Computed properties
+
+    /// The five lists as the structure editor is showing them now.
+    var currentStructure: WizardStructure.Lists {
+        return WizardStructure.Lists(
+            sharedFolders: sharedFolders,
+            sharedFiles: sharedFiles,
+            perSectionFolders: perSectionFolders,
+            perSectionFiles: perSectionFiles,
+            gradedFolders: gradedFolders
+        )
+    }
 
     /// The teacher's Cloudflare Account ID, which belongs to the person
     /// rather than to this new course — so it is read from and written
@@ -373,6 +390,18 @@ struct NewCourseWizardView: View {
         return CurriculumFolderRule.resolvedCurriculumFolder(configured: declared, in: sharedFolders)
     }
 
+    /// What a teacher is told when this course will start with nothing in
+    /// it — either because no ready-made pages exist for the code and no
+    /// skeleton does either, or because they have turned the skeleton down.
+    /// Both are the same situation, so both say the same sentence
+    /// (`WizardWording.noExampleContentNote`, pinned by the contract).
+    var noExampleContentNote: some View {
+        Text(WizardWording.noExampleContentNote)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("noExampleContentNote")
+    }
+
     /// Offered above the form: someone who has never built a course learns
     /// far more from opening a finished one than from an empty form.
     var exampleCourseInvitation: some View {
@@ -432,6 +461,25 @@ struct NewCourseWizardView: View {
                 // moved or gone, so Return would take something the
                 // teacher never looked at.
                 highlightedCourseCode = nil
+            }
+            // The structure editor must show what will actually be
+            // created, in both directions — so the toggle adopts and
+            // gives up, rather than only adopting.
+            //
+            // Attached HERE, to the whole sheet, rather than to the
+            // Toggle itself: the Toggle lives inside an `else if let
+            // skeleton` branch of the Starting Content section, and that
+            // branch LEAVES the hierarchy the moment the typed code stops
+            // having a skeleton — a handler that is not there cannot fire.
+            // (Re-evaluating a body does not cost a handler: the LCS
+            // switch's own `.onChange` sits inside a branch and works.
+            // Disappearing is the case this avoids.)
+            .onChange(of: startsFromSkeleton) { _, startsFromASkeletonNow in
+                if startsFromASkeletonNow {
+                    adoptSkeletonStructure()
+                } else {
+                    restoreGenericStructure()
+                }
             }
             .overlayPreferenceValue(CourseCodeFieldAnchorKey.self) { anchor in
                 GeometryReader { proxy in
@@ -771,12 +819,19 @@ struct NewCourseWizardView: View {
                         Toggle("Start from a \(skeleton.label.lowercased()) skeleton", isOn: $startsFromSkeleton)
                             .accessibilityIdentifier("skeletonToggle")
                         ExampleCaption("There is no ready-made course for this code, but there is a starting point shaped for the subject: folders that suit it, four units of class pages to rename, a page explaining what the site can do, and placeholders saying what belongs where.")
+                        // With the toggle off the teacher is in exactly
+                        // the situation the no-content note below
+                        // describes, so it says so — the same sentence,
+                        // not a third one. Sharing its accessibility
+                        // identifier is safe because the two are branches
+                        // of the same `if`, so they are never on screen
+                        // at once.
+                        if !startsFromSkeleton {
+                            noExampleContentNote
+                        }
                     }
                 } else {
-                    Text("Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("noExampleContentNote")
+                    noExampleContentNote
                 }
             } header: {
                 FormSectionHeader("Starting Content")
@@ -1046,37 +1101,56 @@ struct NewCourseWizardView: View {
     /// chemistry course with Investigations and Safety in the Lab. The
     /// lists stay editable; a list the teacher has already changed is left
     /// alone (see `SkeletonCatalog.structureToAdopt`).
+    ///
+    /// Does nothing while the toggle is OFF, which is not a detail: this
+    /// runs on every change to the course code, so without the guard a
+    /// teacher who declined the skeleton and then corrected a typo in the
+    /// code would silently be given the skeleton's folders back.
     func adoptSkeletonStructure() {
+        guard startsFromSkeleton else {
+            return
+        }
         guard let skeleton = SkeletonCatalog.structureToAdopt(
             forCode: courseCode, currentSharedFolders: sharedFolders
         ) else {
             return
         }
-        sharedFolders = skeleton.sharedFolders
-        sharedFiles = skeleton.sharedFiles
-        perSectionFolders = skeleton.perSectionFolders
-        perSectionFiles = skeleton.perSectionFiles
-        if !skeleton.gradedFolders.isEmpty {
-            gradedFolders = skeleton.gradedFolders
-        } else {
-            var counted: [String] = []
-            for folder in skeleton.sharedFolders + skeleton.perSectionFolders {
-                if folder.lowercased().contains("task") {
-                    counted.append(folder)
-                }
-            }
-            gradedFolders = counted
-        }
+        let adopted: WizardStructure.Lists = WizardStructure.adopting(skeleton)
+        putIntoEditor(adopted)
+        // Recorded so that turning the toggle off can tell a list the teacher
+        // has edited since from one they never touched.
+        adoptedStructure = adopted
     }
 
+    /// The toggle went off: the skeleton's folders leave the editor and the
+    /// generic defaults come back, list by list against what the adoption put
+    /// there. The rule — and what it deliberately costs — is in
+    /// `WizardStructure.restoringDefaults(in:adopted:usesLCSTerminology:)`.
+    func restoreGenericStructure() {
+        let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
+            in: currentStructure,
+            adopted: adoptedStructure,
+            usesLCSTerminology: usesLCSTerminology
+        )
+        putIntoEditor(restored)
+        adoptedStructure = nil
+    }
+
+    /// Puts a set of lists into the structure editor.
+    func putIntoEditor(_ lists: WizardStructure.Lists) {
+        sharedFolders = lists.sharedFolders
+        sharedFiles = lists.sharedFiles
+        perSectionFolders = lists.perSectionFolders
+        perSectionFiles = lists.perSectionFiles
+        gradedFolders = lists.gradedFolders
+    }
+
+    /// The marks pool narrowed to the folders this course will actually have.
+    /// The rule itself is `GradedFolderRule.reconciled(_:toFolders:)`, which
+    /// says how it differs from Windows' and why; this stays as the name the
+    /// call sites and their tests already use.
     static func reconciledGradedFolders(from gradedFolders: [String], validChoices: [String]) -> [String] {
-        var result: [String] = []
-        for folder in gradedFolders {
-            if validChoices.contains(folder) {
-                result.append(folder)
-            }
-        }
-        return result
+        return GradedFolderRule.reconciled(gradedFolders, toFolders: validChoices)
     }
 
     func reconcileGradedFolders() {
@@ -1281,16 +1355,24 @@ struct NewCourseWizardView: View {
         var chosenSharedFiles: [String] = sharedFiles
         var chosenPerSectionFolders: [String] = perSectionFolders
         var chosenPerSectionFiles: [String] = perSectionFiles
+        var chosenGradedFolders: [String] = gradedFolders
         var skeleton: SkeletonCatalog.Family? = nil
         if startsFromSkeleton && SkeletonCatalog.hasSkeleton(forCode: code) {
             skeleton = SkeletonCatalog.family(forCode: code)
             if let adopted = SkeletonCatalog.structureToAdopt(
                 forCode: code, currentSharedFolders: sharedFolders
             ) {
-                chosenSharedFolders = adopted.sharedFolders
-                chosenSharedFiles = adopted.sharedFiles
-                chosenPerSectionFolders = adopted.perSectionFolders
-                chosenPerSectionFiles = adopted.perSectionFiles
+                let lateAdoption: WizardStructure.Lists = WizardStructure.adopting(adopted)
+                chosenSharedFolders = lateAdoption.sharedFolders
+                chosenSharedFiles = lateAdoption.sharedFiles
+                chosenPerSectionFolders = lateAdoption.perSectionFolders
+                chosenPerSectionFiles = lateAdoption.perSectionFiles
+                // The marks pool comes with them. Leaving it behind wrote the
+                // wizard's default ["Tasks"] beside the mathematics
+                // skeleton's folders, whose assessed work is in Thinking
+                // Tasks — the same silent loss row 359 exists about. Windows
+                // sets all five here too (NewCourseDialog.BuildConfiguration).
+                chosenGradedFolders = lateAdoption.gradedFolders
             }
         }
 
@@ -1423,7 +1505,19 @@ struct NewCourseWizardView: View {
         let structureFromExample: Bool = prepopulatesExampleContent
             && ExampleContentCatalog.hasContent(forCode: code)
         if !structureFromExample {
-            config["graded_folders"] = gradedFolders
+            // Narrowed once more as the file is written, the way Windows does
+            // it (NewCourseDialog.BuildConfiguration). The editor narrows the
+            // pool wherever it changes the folder lists — a removal, a
+            // skeleton given up — but the terminology switch does not, so a
+            // teacher who ticked College Board Curriculum and then turned LCS
+            // off would otherwise have that folder written into a course that
+            // has no such folder. `setup_course.py` reconciles the key again
+            // when it reads it, so this is the second net rather than the
+            // only one; what it buys is that both apps write the same file.
+            config["graded_folders"] = GradedFolderRule.reconciled(
+                chosenGradedFolders,
+                toFolders: chosenSharedFolders + chosenPerSectionFolders
+            )
         }
 
         return config

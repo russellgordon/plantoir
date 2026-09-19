@@ -1176,9 +1176,188 @@
   "wizard": {
     "note": "What the New Course wizard says. AUTHORED rather than generated, and that is the whole point of the entry: a generated readout cannot fail when the code it reads changes, so a button label written by the generator would simply be rewritten to match whatever the button now says. Written by hand, each platform asserts its own constant against it and a drift goes red. Same reasoning as app-rules.json's split between milestones (a readout) and deployArguments (an expectation).",
     "createCourseButton": "Create Course",
+    "noExampleContentNote": "Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.",
+    "whenTheNoteIsShown": "Under Starting Content, in TWO situations that are one situation for a teacher: the typed code has neither ready-made pages nor a skeleton, and the typed code has a skeleton the teacher has turned DOWN. Either way the course starts with empty folders, so either way they read this — neither platform invents a second sentence for the second case. The mac reads it from WizardWording.noExampleContentNote, Windows from NewCourseDialog.NoExampleContentNote(); the two branches are never on screen at once, so both platforms give them the same accessibility identifier (noExampleContentNote). Windows has shown it while the toggle is off since 2026-09-07; the mac showed it only for a code with no skeleton at all until 2026-09-18 (issue #77), which is the drift this key exists to stop.",
     "whereItIsRendered": "The mac reads it from WizardWording.createCourseButton and renders it in NewCourseWizardView; Windows renders it in NewCourseDialog. Named in prose rather than as a structured key, the way buildOutputLocation names its sources, because nothing reads such a key and a rename would rot it silently.",
     "whyThisOneString": "It is the first thing a teacher presses in this app. Both platforms have said Create Course since the wizard existed and nothing pinned it until 2026-09-08 — Windows asserted it only in NewCourseWizardUiTests, which is opt-in behind PLANTOIR_UI_TESTS=1 and part of no gate, and the mac asserted it nowhere. Two apps agreeing by habit is not two apps agreeing on purpose; the first notice of a drift would have been a teacher reading a different button from the one in the other platform's screenshots.",
-    "gatedTests": "Each platform's GATED test compares its constant to this key, which pins the constant rather than the rendered button. Only the UI suites see the button itself, and both are opt-in and part of no gate — QuartzTeachersUITests on the mac, [UiFact] under PLANTOIR_UI_TESTS=1 on Windows. Said plainly because the first version of this entry called Windows' arrangement the weakest place a shared sentence can live while the mac had the same arrangement and one fewer test."
+    "gatedTests": "Each platform's GATED test compares its constant to this key, which pins the constant rather than the rendered button. Only the UI suites see the button itself, and both are opt-in and part of no gate — QuartzTeachersUITests on the mac, [UiFact] under PLANTOIR_UI_TESTS=1 on Windows. Said plainly because the first version of this entry called Windows' arrangement the weakest place a shared sentence can live while the mac had the same arrangement and one fewer test.",
+    "skeletonToggle": {
+      "rule": "The structure editor must show what will actually be created, in BOTH directions. Turning \"Start from a <subject> skeleton\" ON adopts that subject's five lists. Turning it OFF puts the defaults back — the LCS variants for the two SHARED lists when the terminology switch is on, the plain defaults for the two per-section lists, which have no LCS variant — for each list still EQUAL to what the adoption put there, and leaves every other list exactly as the teacher left it. The marks pool is the one exception to that last clause, and why is in (4) below: a pool the teacher ticked is kept, but narrowed to the folders the course will actually have, since a pool naming a folder that has just left the editor is a silent loss of marks rather than a choice. With no adoption to compare against, nothing changes at all.",
+      "why": "Russell's decision for Windows, 2026-09-06, copied to the mac 2026-09-18 (issue #77). A one-way adoption was this feature's bug in miniature: a teacher who typed SNC4M, watched Investigations and Concepts appear and then turned the toggle off was shown — and got — the science skeleton's folders with none of its pages, while the file said use_skeleton: false. A wizard that lies about what it is about to make is a worse product than one that never asked.\n\nFour consequences, each deliberate. (1) A list is recognised as untouched by VALUE, not by a dirty flag: a list edited and then edited BACK to exactly what the adoption set is restored along with the untouched ones, and that is intended — a teacher cannot see the difference between a list they never touched and one they have put back, so neither can the rule. (2) The LCS switch REWRITES the two shared lists, so flipping it after an adoption leaves them unequal to the snapshot and they stay as the switch left them, while the per-section lists still go back. (3) With no snapshot — the toggle turned off before any code was typed, or on a code whose skeleton was never adopted — NOTHING changes, rather than the defaults being forced over lists the teacher may have edited first. (4) The marks pool can never name a folder that has just left the editor, and that takes TWO rules rather than one: a pool still equal to the adoption's is RE-INFERRED over the restored folders, and a pool the teacher has ticked themselves is kept but NARROWED to the folders the course will actually have. Miss the second and a teacher who adopted the mathematics skeleton, unticked Tasks and then declined the skeleton is shown a checklist with nothing ticked while the wizard writes graded_folders naming Thinking Tasks, a folder the course does not have — and the two apps then write DIFFERENT files for the same clicks, which is what this contract exists to stop. (setup_course.py reconciles the key again when it reads it, so no teacher ends up with a broken course; that is a second net, not a reason for either wizard to write something untrue.) The two apps reach the same answer from opposite ends: the mac narrows the pool inside the restore, Windows leaves it and narrows on every read (CurrentGradedFolders) and again when the file is written.\n\nRejected: tracking a dirty flag per list (a flag has to be got right in every editing path, and gets one wrong the first time a list is changed from somewhere new, where value equality cannot); and a further rule for the narrow hole value equality leaves, which would have made the two apps differ for a case no teacher can tell apart.",
+      "whoRunsIt": "The mac runs every case below in SharedRulesContractTests as of 2026-09-18; WizardStructureTests covers what the cases cannot reach — the pieces the rule is assembled from, and a scan proving the toggle is WIRED, since a control with no handler was the original bug and no test that calls the handler itself can see one. Nothing on Windows reads this key yet — their suite stays GREEN until it is wired in, because their behaviour is already the one described here; what they owe is the test, and the seam to run it against (their restore lives inside the private NewCourseDialog.RestoreGenericStructure).",
+      "courseCode": "SNC4M",
+      "otherCourseCode": "AMU3M",
+      "lists": {
+        "note": "Two of the five slots cannot tell one answer from another for most codes, which is worth knowing before reading a green run as coverage: every bundled family ships per_section_folders of exactly [\"All Classes\"], which is also the factory default, so only perSectionFILES proves the per-section half of a restore; and every family declares graded_folders of [\"Tasks\"] except MATHEMATICS ([\"Thinking Tasks\", \"Tasks\"]), so a marks-pool expectation means nothing unless its case uses a mathematics code. The cases below that carry courseCode MPM1D are there for exactly that reason. A third thing not to read as coverage: in a runner that resolves the skeleton symbol through the same catalog an adoption copies from, a turnOn case's four list expectations prove that the adoption FIRED rather than what it copied — which is why the MPM1D adoption case spells its marks pool out. The factory values of the five lists follow, so a case can say \"the defaults\" without either app retyping them. BOTH suites must assert these arrays EQUAL their own WizardDefaults constants — that is what stops the vocabulary drifting away from the thing it names, and without it a case could pass against a contract that no longer describes the product. The per-section lists have NO LCS variant, the terminology switch rewriting only the two shared ones, so \"lcs\" carries two arrays rather than four. scripts/setup_course.py keeps its own copies for the command-line wizard and they are deliberately NOT pinned here: the Python's shared-folder lists also carry \"Media\", which both apps leave out because the toolchain manages that folder itself, so an equality test would be asserting a difference that is correct.",
+        "factory": {
+          "sharedFolders": ["Concepts", "Discussions", "Examples", "Exercises", "Ontario Curriculum", "Portfolios", "Recaps", "Setup", "Style", "Tasks", "Tutorials"],
+          "sharedFiles": ["Extra Help.md", "Learning Goals.md"],
+          "perSectionFolders": ["All Classes"],
+          "perSectionFiles": ["Private Notes.md", "Scratch Page.md", "Key Links.md"]
+        },
+        "lcs": {
+          "sharedFolders": ["Concepts", "Discussions", "Examples", "Exercises", "Ontario Curriculum", "College Board Curriculum", "Portfolios", "Recaps", "Setup", "Style", "Tasks", "Tutorials"],
+          "sharedFiles": ["SIC Drop-In Sessions.md", "Grove Time.md", "Learning Goals.md"]
+        }
+      },
+      "symbols": {
+        "note": "What a list value in a case's given or expect means. A literal array means itself — used for a teacher's own edit, which belongs to nobody's constants.",
+        "factory": "The lists.factory array for that slot.",
+        "lcs": "The lists.lcs array for that slot. Valid for the two SHARED lists only.",
+        "skeleton": "The family's own array for that slot, resolved through each app's SkeletonCatalog from support/skeletons/<family>/manifest.json for courseCode — NEVER a literal copy here, because the skeletons are GENERATED (.claude/skills/example-content/generate_skeletons.py writes ~1,950 pages across 50 families) and a copy would be a fixture nobody regenerates. In the gradedFolders slot it means what an adoption sets: the manifest's own graded_folders where it names any, and otherwise the historical rule over the family's own folders — SkeletonCatalog.adoptedGradedFolders on the mac, SkeletonCatalog.AdoptedGradedFolders on Windows.",
+        "skeletonReversed": "The same family array, reversed. Stands for a list a teacher emptied and typed back in a different order: the same names, so a dirty flag would call it untouched, and a different value, so this rule leaves it alone.",
+        "lcsFlippedFromSkeleton": "What the terminology switch leaves behind when it is flipped ON over the family's own list — switchingFactoryItems(in: skeleton, toFactory: lcs, fromFactory: factory) on the mac, SwitchingFactoryItems on Windows. Valid for the two SHARED lists only. Computed rather than written out, so a change to a generated skeleton cannot rot the case."
+      },
+      "howToRunACase": "Start with given.lists, a snapshot of what an adoption of given.courseCode (or the courseCode above) would set when given.hasSnapshot is true and no snapshot otherwise, the terminology switch at given.usesLCSTerminology, and the toggle itself ON, which is where a new wizard opens. Apply each step in order, each step regardless of what the one before it left the toggle at — a case may open with turnOn on a fixture that has no snapshot, which is a state a real wizard reaches only by other means and is written this way to say what an adoption does from the factory defaults. turnOn adopts unless the teacher's shared folders say the list has been edited (SkeletonCatalog.structureToAdopt / StructureToAdopt, which is the rule that predates this one), recording a fresh snapshot when it does. turnOff restores as the rule above says and then forgets the snapshot. typeAnotherCode is the teacher editing the course-code field to otherCourseCode — a code in a different family — which adopts only while the toggle is ON: the guard in adoptSkeletonStructure / AdoptSkeletonStructure, without which a teacher who declined the skeleton and then corrected a typo in the code is given it back. Be honest about what that case proves: a runner implements the guard itself, so the case pins the RULE and not your app's wiring — deleting the guard from the product leaves it green. Each platform owes its own check that its real adopt entry point reads the toggle (the mac's is a source scan in WizardStructureTests). A case whose courseCode has ready-made pages still resolves a family by prefix, since the prefix map knows nothing about payloads; nothing is adopted for it, which is the case itself. Compare all five lists with expect. Build each case's fixture on its own: a cache shared between cases would let one case's adoption answer another's.",
+      "cases": [
+        {
+          "name": "off, with nothing touched since the adoption",
+          "given": {
+            "hasSnapshot": true,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
+          },
+          "steps": ["turnOff"],
+          "expect": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "The plain case, and the one the bug got wrong. The marks pool is the historical rule read off the restored folders, which is what a brand-new course has always opened with. This is also the case a list edited and edited BACK exactly lands in — the data cannot carry that history, and that is the point: the rule asks what is on screen, not what happened to it."
+        },
+        {
+          "name": "off, with the terminology switch on",
+          "given": {
+            "hasSnapshot": true,
+            "usesLCSTerminology": true,
+            "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
+          },
+          "steps": ["turnOff"],
+          "expect": {"sharedFolders": "lcs", "sharedFiles": "lcs", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "Restoring means restoring what a new course would have opened with NOW, which for a teacher who turned the terminology switch on before typing a code is the LCS set. The two per-section lists have no LCS variant and go back to the plain defaults, which is the half most easily missed."
+        },
+        {
+          "name": "off, after the shared folders were edited",
+          "given": {
+            "hasSnapshot": true,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
+          },
+          "steps": ["turnOff"],
+          "expect": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "List by list, not all-or-nothing. An earlier version of this on Windows asked one question of the shared folders and replaced all five lists on the answer, which discarded an edited file list. The marks pool is re-inferred over what the editor actually ends up with — the teacher's own folders plus the restored per-section ones — so it cannot name a folder that is no longer there."
+        },
+        {
+          "name": "off, after the terminology switch was flipped",
+          "given": {
+            "hasSnapshot": true,
+            "usesLCSTerminology": true,
+            "lists": {"sharedFolders": "lcsFlippedFromSkeleton", "sharedFiles": "lcsFlippedFromSkeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
+          },
+          "steps": ["turnOff"],
+          "expect": {"sharedFolders": "lcsFlippedFromSkeleton", "sharedFiles": "lcsFlippedFromSkeleton", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "The trap worth knowing: the switch rewrote the two shared lists, so they no longer equal the snapshot and the restore must leave them exactly as they are — including the skeleton's own folders that the switch carried across. The per-section lists it never touched still go back. An implementation that re-snapshotted on the terminology flip would silently restore these two as well, and the teacher would watch their College Board folder disappear."
+        },
+        {
+          "name": "off, with a list put back in a different order",
+          "given": {
+            "hasSnapshot": true,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": "skeletonReversed", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
+          },
+          "steps": ["turnOff"],
+          "expect": {"sharedFolders": "skeletonReversed", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "Value equality compares ORDER too, and the order a teacher put their folders in is a choice — a course whose Tasks folder sits at the top of the sidebar was arranged that way on purpose. So the same names in a different order is an edit, and is left alone."
+        },
+        {
+          "name": "off, with nothing ever adopted",
+          "given": {
+            "hasSnapshot": false,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
+          },
+          "steps": ["turnOff"],
+          "expect": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "Nothing to recognise as untouched, so nothing is touched. A restore that ran anyway would overwrite the lists of a teacher who turned the toggle off before typing a code — work they did with no skeleton anywhere in sight."
+        },
+        {
+          "name": "on, from the factory defaults",
+          "given": {
+            "hasSnapshot": false,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
+          },
+          "steps": ["turnOn"],
+          "expect": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"},
+          "why": "The other direction, and the reason the marks pool is part of this rule rather than left to be worked out later: the mathematics family ships Thinking Tasks rather than Tasks, and a course that adopted its folders without its declared pool would lose those marks with nothing said."
+        },
+        {
+          "name": "on, over lists the teacher has edited",
+          "given": {
+            "hasSnapshot": false,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
+          },
+          "steps": ["turnOn"],
+          "expect": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "The adoption rule that predates this one still holds in both directions: a folder list the teacher has changed is never overwritten, whether the change comes from a new course code or from this toggle."
+        },
+        {
+          "name": "off, then on, then off again",
+          "given": {
+            "hasSnapshot": true,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
+          },
+          "steps": ["turnOff", "turnOn", "turnOff"],
+          "expect": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "A teacher changing their mind twice must end where they would have ended changing it once. This is the case that catches a snapshot forgotten on the way out or kept on the way back in: the second turnOn has to take a FRESH snapshot, or the last turnOff restores against a stale one and leaves the skeleton's folders on screen — the original bug, reached by a longer road."
+        },
+        {
+          "name": "on, for a subject that names its own marks folders",
+          "given": {
+            "courseCode": "MPM1D",
+            "hasSnapshot": false,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
+          },
+          "steps": ["turnOn"],
+          "expect": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": ["Thinking Tasks", "Tasks"]},
+          "why": "The only family whose marks pool is not [\"Tasks\"], and therefore the only code that can prove an adoption carries the pool at all. The wizard's own default is [\"Tasks\"]; a mathematics course that kept it would count nothing in Thinking Tasks, which is where its assessed work goes, and say nothing about it."
+        },
+        {
+          "name": "off, after unticking one of a subject's own marks folders",
+          "given": {
+            "courseCode": "MPM1D",
+            "hasSnapshot": true,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": ["Thinking Tasks"]}
+          },
+          "steps": ["turnOff"],
+          "expect": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": []},
+          "why": "The pool is the teacher's — they unticked Tasks themselves — so it is not re-inferred; but Thinking Tasks has just left the editor with the rest of the skeleton, so what is left is nothing, and \"asked, and nothing counts\" is the honest answer. An implementation that only re-infers an UNTOUCHED pool writes graded_folders: [\"Thinking Tasks\"] here, against a course that has no such folder — a different file from the other app's for the same clicks. The expectation on this slot is written out as a LITERAL rather than as the skeleton symbol, which is the one place this list copies a generated value deliberately: the symbol would make the adoption case a tautology, so a change to support/skeletons/mathematics/manifest.json must be reflected here by hand."
+        },
+        {
+          "name": "off, then a different course code typed",
+          "given": {
+            "hasSnapshot": true,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
+          },
+          "steps": ["turnOff", "typeAnotherCode"],
+          "expect": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "The half of the fix that is not the toggle. Adoption runs on every change to the course code, so a teacher who declines the skeleton and then corrects a typo — or changes their mind about which course they are making — must not have it handed back to them. Both apps guard the adoption on the toggle for this; nothing else in this list reaches that guard."
+        },
+        {
+          "name": "a course code with ready-made pages",
+          "given": {
+            "courseCode": "ADA1O",
+            "hasSnapshot": false,
+            "usesLCSTerminology": false,
+            "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
+          },
+          "steps": ["turnOn", "turnOff"],
+          "expect": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
+          "why": "Example content beats a skeleton, so a code that has real pages is offered no skeleton and this toggle is not even shown for it. Neither direction may touch the lists — a code with a payload that somehow reached this rule must come out of it unchanged."
+        }
+      ]
+    }
   },
   "workingFolderPathBar": {
     "actions": [
@@ -1274,6 +1453,81 @@
       "why": "Not decoration: a teacher recognises their Desktop or their iCloud Drive by its icon before reading the word. Optional if the platform makes it expensive — say so rather than dropping it silently."
     },
     "note": "The 'Working folder:' bar under the sidebar. Modelled on the host file manager's own path bar — Finder's on the mac — because a teacher who has seen one knows what it does without being told. Reported missing on Windows 2026-08-16, in use: the context menu is not there. The LABELS are per platform ('Finder' against 'File Explorer'); the actions, the gestures and the crumb list are not."
+  },
+  "workingFolderSelection": {
+    "note": "What a window lets go of when it is pointed at a DIFFERENT working folder. From GitHub issue #93, seen 2026-09-05: with a course selected, choosing another folder left the selection pointing at a course that folder had never had, so the detail pane greeted the teacher with 'Course Not Found' about a folder they had only just arrived in.",
+    "rule": "When a window changes working folder, it lets go of anything that names a course, an archive or a backup in the folder being left — and chooses nothing in its place. Re-choosing the folder the window already shows is not a change and costs the teacher nothing.",
+    "why": "Two failures, and one rule closes both. A selection carried across describes the OLD folder while the new one is on screen, which is the reported defect; and a pending confirmation carried across would ACT there — a restore or a delete still holding the file it was asked about, in a folder nobody is looking at any more. Nothing is chosen in the new folder to replace it, because the empty state already says what to do and picking for the teacher would be a guess.",
+    "sameCodeIsADifferentCourse": "A course in the new folder wearing the same code as the one that was selected is a DIFFERENT course, and the selection is cleared just the same. Landing on it would be a guess dressed up as a memory — and it is the case that separates this rule from the obvious alternative below, which cannot see it at all.",
+    "alsoCleared": "Everything else holding one of those things: the course whose code is being edited in place, every confirmation waiting on an answer about an archive, a backup or a rename, and the alerts describing what just happened in the folder being left. A sentence naming a course the window no longer shows is worse than no sentence, because it will be read as being about the folder now on screen.",
+    "kept": "The sidebar's filter text, and its disclosure state (which courses are unfolded, whether Archived and Backups are open). The filter is a way of LOOKING rather than a thing named — a teacher who typed '3U' to narrow one folder is usually after the same courses in the next. Disclosure state is the sidebar's SHAPE: a code left open that this folder does not have draws nothing at all, and no action hangs off a disclosure triangle for it to aim at the wrong folder.",
+    "rejected": [
+      {
+        "instead": "Check the selection against the courses just loaded, inside the reload that follows every folder change.",
+        "why": "Rejected on three counts. It would erase the legitimately RIGHT 'Course Not Found' — the one a teacher sees after deleting a course in Finder while its window is open, where the sentence is true and useful. It would make what a teacher sees depend on when some unrelated reload next happened to run, since courses are reloaded after every rename, backup, restore and archive. And it would still land on the wrong course when the new folder has one wearing the same code, which is the case the rule above exists to answer."
+      },
+      {
+        "instead": "Clear the selection from a property observer on the folder itself.",
+        "why": "Rejected: it fires for every write, including the one a window makes while restoring, and hides a rule a reader has to find. The clearing belongs to the one function BOTH ways of adopting a folder go through, so neither route can gain it while the other quietly keeps the old folder's selection."
+      }
+    ],
+    "howToRunACase": "Each case names the folders it needs by label; a suite materialises a real working folder for each. 'folderA' holds one course with two sections; 'folderBEmpty' is a working folder whose courses folder is empty; 'folderBSameCode' holds a course whose CODE is the same as folderA's and is otherwise a different folder. A selection is written structurally — its kind, the folder whose course it names, and a section number where one applies — rather than as any stored string, because the storage spelling is one platform's and this rule is not about it. Give each case its OWN folders rather than sharing them across the list: one case DELETES a course from the folder it starts in, and a shared fixture would hand the damaged folder to whatever ran next, making this list silently order-dependent. `then.pointAt` names the folder to point the window at next - the ordinary folder change. `then.removeTheSelectedCourseAndReload` instead deletes the selected course's folder from the working folder the window is ALREADY in and reloads the courses, which is a teacher deleting a course in the file manager with its window open: the folder has not changed, so nothing is let go of. `expect` is 'cleared' (no selection) or 'unchanged' (the same selection the case made). `expectNamesALoadedCourse`, present only where it matters, says whether that selection still names a course that LOADED - false is how the right 'Course Not Found' is pinned, and is what separates keeping a selection from keeping a working one.",
+    "cases": [
+      {
+        "name": "a different folder clears the selection",
+        "why": "The reported defect. The new folder has no courses at all, so the pane should show the empty state rather than a sentence about a course that was never here.",
+        "startIn": "folderA",
+        "select": {
+          "kind": "section",
+          "courseIn": "folderA",
+          "section": 1
+        },
+        "then": {
+          "pointAt": "folderBEmpty"
+        },
+        "expect": "cleared"
+      },
+      {
+        "name": "the same folder chosen again keeps the selection",
+        "why": "The picker is reachable while a folder is open, and re-choosing what is already shown is not a change of folder. A teacher who does it must not lose their place.",
+        "startIn": "folderA",
+        "select": {
+          "kind": "course",
+          "courseIn": "folderA"
+        },
+        "then": {
+          "pointAt": "folderA"
+        },
+        "expect": "unchanged"
+      },
+      {
+        "name": "a different folder with the same course code clears it too",
+        "why": "A course wearing the same code is a different course. This is the case a selection validated against the loaded courses would get wrong, silently, by landing on it.",
+        "startIn": "folderA",
+        "select": {
+          "kind": "course",
+          "courseIn": "folderA"
+        },
+        "then": {
+          "pointAt": "folderBSameCode"
+        },
+        "expect": "cleared"
+      },
+      {
+        "name": "a course that vanishes from the folder still in use keeps the selection",
+        "why": "'Course Not Found' is the right answer here and must survive: the teacher deleted the course themselves, in the folder they are still working in, and the sentence tells them so. Nothing about the folder changed, so nothing is let go of.",
+        "startIn": "folderA",
+        "select": {
+          "kind": "course",
+          "courseIn": "folderA"
+        },
+        "then": {
+          "removeTheSelectedCourseAndReload": true
+        },
+        "expect": "unchanged",
+        "expectNamesALoadedCourse": false
+      }
+    ]
   },
   "buildOutputLocation": {
     "note": "Where a section's BUILT WEBSITE is kept, and why it is not inside the working folder. Decided 2026-09-05; Windows had already done its half in row 290. The rule is implemented twice on the mac on purpose — in the app (BuildOutputLocation.swift, when a working folder's courses are read) and in the launchers (preview.sh and deploy.sh before they build, setup.sh for every course once the wizard has finished) — because a teacher at the command line and a publish scheduled with launchd have no app to do it for them, and if the two built into different places every build would read as stale.",
@@ -1718,7 +1972,7 @@
       "mac": "on your Mac",
       "windows": "on this PC",
       "note": "These sentences name the machine — four since 2026-09-10, when renameUnitWord.explanation joined the three the rest of this note was written about — and the two apps deliberately say it differently — the same choice already recorded for the launcher markers in app-rules.json → markerOrigins.knownDivergence. The contract stores the MAC spelling because the contract is written here; Windows says 'on this PC' and is not drifting by doing so. There are THREE, and which record missed which is worth being exact about, because two passes at this paragraph got it wrong in opposite directions. Issue #102 named two of them — renameFolder.explanation and doneNothingWasThere — and not removeLeavesTheFolderOnDisk.message. The mac's OWN log had all three from 2026-09-01 (GUI-IMPROVEMENTS.md rows 388 and 389, which name explanation with removeLeavesTheFolderOnDisk and then doneNothingWasThere), six days before Windows' FolderRenameApplyTests began substituting on the third. So nothing here was behind the code: one Windows-authored issue body was incomplete, and this block is simply the first place all three are named together as a rule rather than as log entries.",
-      "whyThisIsHere": "Two failures, both already met elsewhere in these contracts — app-rules.json → markerOrigins.knownDivergence records exactly this kind of deliberate platform difference, and is READ by MilestoneContractTests on Windows rather than merely written down. Without a record, the next reader compares the two apps, finds a difference, concludes one of them drifted, and 'fixes' it. And a contract-driven test asserting the stored sentence verbatim would put the word Mac in front of a Windows teacher — a test enforcing a bug, which is the one outcome nobody wants. A suite asserting these keys must compare everything EXCEPT the platform word, or assert its own platform's spelling. That is a proven pattern rather than a proposal: SpecialFolderRenamerTests.TheTwoPlatformWordedSentencesSayThisPcRatherThanYourMac and FolderRenameApplyTests both do it on Windows, comparing against this file with .Replace(\"on your Mac\", \"on this PC\"). On the mac, SharedRulesContractTests.testPlatformWordedKeysAreComplete pins the keys list itself: a fourth specialNames sentence containing the mac's platform word cannot be added without this record going red. It pins the RECORD rather than the behaviour. Windows has read the list since 2026-09-09 (SpecialFolderRenamerTests.EverySentenceTheContractCallsPlatformWordedSaysThisPc drives itself off `keys`), so a new key reds BOTH suites: the mac until the list names it, Windows until its substitution map carries it — which is what happened with renameUnitWord.explanation on 2026-09-10, and is the list being load-bearing rather than a fault."
+      "whyThisIsHere": "Two failures, both already met elsewhere in these contracts — app-rules.json → markerOrigins.knownDivergence records exactly this kind of deliberate platform difference, and is READ by MilestoneContractTests on Windows rather than merely written down. Without a record, the next reader compares the two apps, finds a difference, concludes one of them drifted, and 'fixes' it. And a contract-driven test asserting the stored sentence verbatim would put the word Mac in front of a Windows teacher — a test enforcing a bug, which is the one outcome nobody wants. A suite asserting these keys must compare everything EXCEPT the platform word, or assert its own platform's spelling. That is a proven pattern rather than a proposal: SpecialFolderRenamerTests.TheTwoPlatformWordedSentencesSayThisPcRatherThanYourMac and FolderRenameApplyTests both do it on Windows, comparing against this file with .Replace(\"on your Mac\", \"on this PC\"). On the mac, SharedRulesContractTests.testPlatformWordedKeysAreComplete pins the keys list itself: a fourth specialNames sentence containing the mac's platform word cannot be added without this record going red. It pins the RECORD rather than the behaviour. Windows has read the list since 2026-09-09 (SpecialFolderRenamerTests.EverySentenceTheContractCallsPlatformWordedSaysThisPc drives itself off `keys`), so a new key reds BOTH suites: the mac until the list names it, Windows until its substitution map carries it — which is what happened with renameUnitWord.explanation on 2026-09-10, and is the list being load-bearing rather than a fault. ONE SANCTIONED EXCEPTION to 'a new key reds BOTH suites until it is implemented', added 2026-09-18 and changing nothing in this file: when the feature a key belongs to is owned by an OPEN issue milestoned for a LATER release than the one being cut, the side that owes it may hold the key open in a NAMED GAP on its own side. windows-app/Plantoir.Tests/NamedGapLedger.cs does exactly that for renameUnitWord.explanation against GitHub issue #158 (v1.3.0), so the v1.2.0 gate is green with this list untouched and the mac still asserting all of it. It is not a softening: the ledger entry FAILS on Windows the moment the sentence starts existing there, and FAILS if this list stops naming it, so it cannot outlive either the fix or the requirement. What was REJECTED is doing it in this file — dropping the key from the list, or (for the matching activityTrail.mustRecord event) writing appliesOn: [mac] on it. Both would be false, since Windows owes both at v1.3.0, and appliesOn has no mend-check, so the day Windows built them both suites would have stayed green and nothing would have noticed. contracts/README.md, under 'Named gaps', says when a named gap is allowed and when it is not: never for a difference a teacher can see at the current milestone."
     },
     "excludedFolderIndexNote": {
       "noteBody": "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings.",

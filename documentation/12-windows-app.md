@@ -498,6 +498,76 @@ than implying every line came off a run. **Nothing here has ever been seen to
 crash its host**; this exists so that if one ever does, it is read correctly
 the first time.
 
+### And when the failure IS real: a red contract test is a handover
+
+Everything above is about telling a genuine failure from a crash or an empty
+run. This is the case where the totals line is honest, the named test really
+did fail, and it is still not what it looks like.
+
+`AssistCardCommandTests`, `AssistSurfaceContractTests` and `ContractTests`
+deserialise `contracts/*.json` and run what they find. Those files are written
+on the mac, so **a failure in one of them usually means the mac moved and this
+side has not followed yet** — not that somebody broke something here this
+afternoon. The mac opens a GitHub issue labelled `windows` in the session it
+changes a contract (`CLAUDE.md` rule 3), so there is already a page naming what
+moved and what this app owes.
+
+**Read the open `windows` issues before filing a new one — and then check,
+because "usually" is not "always".** On 2026-09-09 a session mid-way through
+unrelated work met four of these and filed
+[#146](https://github.com/russellgordon/plantoir/issues/146) reporting them as
+one thing: a contract had moved with nobody told. They were four different
+things, and the run is worth knowing as a set.
+
+- **Two had an issue and an unreadable failure.**
+  [#70](https://github.com/russellgordon/plantoir/issues/70) had been open since
+  19:52 the previous evening, naming the phrasings and the failure itself —
+  *"Three more card phrasings will make your suite red"*, and separately the
+  parsed make-room family the second test actually failed on. The assertions
+  said `Assert.NotNull() Failure: Value is null` and gave the reader nothing to
+  search for. They name the phrasing, the tool and the handover now, which is
+  the durable half of the fix: a session that meets one is told where to look
+  without having to remember this page.
+- **One had a perfect failure and no issue at all.**
+  `AssistSurfaceContractTests` reported exactly that `back_up_course`'s
+  arguments had moved — *"must require exactly the arguments the contract says
+  it does"* — and nothing on either platform explained it. Not carelessness: the
+  tool was built matching this app's, a review fix twenty minutes later gave it
+  a `section`, and the issue written after that described the feature rather
+  than the fix. **So when you look and genuinely find nothing, you have found a
+  real gap**: say so, and open an issue labelled `mac`.
+- **One was this app's own** — a test that had retyped a contract value into a
+  literal, so it failed when the contract GREW. No issue elsewhere could have
+  named it.
+
+The fourth thing a red contract test can be is a case proposed FROM here, which
+turns the MAC's suite red on purpose and is a request rather than damage;
+[`contracts/README.md`](../contracts/README.md) covers both directions.
+
+**And a fifth: a handover that has arrived and whose fix is NOT in the release
+being cut.** Met 2026-09-18. The mac's unit-word rename moved
+`shared-rules.json` — one `activityTrail.mustRecord` event, one
+`specialNames.platformWording` key — and the Windows half is
+[#158](https://github.com/russellgordon/plantoir/issues/158), milestoned
+v1.3.0. `ContractTests.SharedRules_ActivityTrailEvents_Exist` and
+`SpecialFolderRenamerTests.EverySentenceTheContractCallsPlatformWordedSaysThisPc`
+were red with nothing anybody was meant to do about them yet, which makes
+"did anything break?" unanswerable for every other run in the meantime.
+
+Those two are now NAMED GAPS: `windows-app/Plantoir.Tests/NamedGapLedger.cs`
+holds one entry per key, carrying the key, the issue, the milestone and the
+reason. Everything else is asserted exactly as before, and the ledger fails
+both ways — if a ledgered thing starts existing here (saying to delete the
+entry) and if it stops being in the contract. **So a green totals line on this
+suite can mean "green, with two written debts"**, and the ledger file is the
+one place that says which. `contracts/README.md` → "Named gaps" carries the
+boundary: a named gap is allowed only while an open issue milestoned LATER
+than the release being cut owns the work, and never for a difference a teacher
+can see at the current milestone. Softening the contract instead — an
+`appliesOn: ["mac"]` that would be untrue and, having no mend-check, permanent
+— was rejected there and the reasoning is worth reading before proposing it
+again.
+
 ## Driving the real interface
 
 `run-ui-tests.ps1` launches the x64 Debug build and drives it with UI
@@ -957,7 +1027,15 @@ as history, not as what Windows does today.
   way: resolve claims on the platform's restoration-complete signal
   rather than polling, and while a claim may still arrive show a quiet
   loading state, never the folder picker the claim is about to replace.
-  The scenario test suite in the macOS app is the porting spec.
+  The scenario test suite in the macOS app is the porting spec. **The
+  other half of that — what a window lets GO of when it is pointed at a
+  different folder** — is `contracts/shared-rules.json` →
+  `workingFolderSelection`, new on 2026-09-18 and not deserialised here
+  yet, so this suite stays green while `ChooseWorkspace` and
+  `AdoptRestoredPath` still leave `Selection` pointing into the folder
+  that was left. The reasoning is in
+  [`09-mac-app.md`](09-mac-app.md) → "What a window lets go of when it
+  changes working folder".
 - **New windows** (entry 84): inherit the folder of the window that was
   key when the command ran; with no windows open, show the folder picker.
   Decide the folder BEFORE first paint or the picker flashes.
@@ -1522,17 +1600,38 @@ over it would collide with a real file. The logic already existed inside
 divergence issue #70 described, in the direction it suggested: an argument
 nobody can get wrong beats one with a sensible default.
 
-### The check that found the one still open
+### The check that found the one still open — and how it was closed
 
 `TheCardsArgumentsReachTheToolThatReadsThem` walked only `cardPhrasings.matches`
 — the LITERAL phrasings. It now walks `cardPhrasings.parsed` as well, which is
 the half where an argument is most easily misnamed, because it is built in code
 from a number rather than written out beside the sentence. It found a live
-defect on its first run: `add_next_class` declares no `duplicate` parameter, so
+defect on its first run: `add_next_class` declared no `duplicate` parameter, so
 "duplicate Unit 3, Day 2 as my next class" — a sentence `AssistPromptShelf`
-OFFERS — has the argument dropped by the binder and quietly makes a **blank**
-page. Recorded in `KnownToBeDropped` naming issue #149, the way #116 was
-carried there until it was fixed.
+OFFERS — had the argument dropped by the binder and quietly made a **blank**
+page. It was recorded in `KnownToBeDropped` naming issue #149, the way #116
+was carried there until it was fixed.
+
+**Fixed 2026-09-18, and the entry is gone** — the mend-check at the bottom of
+that test fails on a pair that is listed and has started arriving, so deleting
+it is not optional. Both halves of `add_next_class` now declare `duplicate`;
+the pair moved to `agreedExtras` with the binder reason, since the mac needs
+no such argument (its card and tool runner share a process). What the feature
+does, and the two places it is deliberately stricter than the mac, is in
+[`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "Which tools record an
+undo entry, and which deliberately do not".
+
+**One thing to know before adding another card-only argument.**
+`add_next_class` IS one of the thirteen tools the local model routes to, so an
+argument on its schema is an argument the router can invent — here, a page
+title for a request that named none. `AssistAgent.CardOnlyArguments` strips it
+from `properties` and `required` in the narrowed schema, and
+`NarrowToolsMirrorTests` pins that `research/ai-assist/narrow-tools.py` strips
+it too, because a routing score measured through a surface the app does not
+ship is worse than no score. The alternative — leaving it visible and writing
+a sentence in the description telling the model not to use it — is the thing
+CLAUDE.md warns about: one clarifying sentence in `publish_pages`' description
+once took a probe suite from 110/110 to 90/110.
 
 **The general lesson**: a silent drop is invisible to any test that does not go
 looking, and "the tool ran and returned something sensible" is exactly what it

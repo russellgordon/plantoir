@@ -108,6 +108,38 @@ public sealed class AssistAgent
     };
 
     /// <summary>
+    /// Arguments the SERVER declares and the local model must not be shown,
+    /// as <c>tool.argument</c>.
+    ///
+    /// <para><b>Why a tool can have an argument its own model may not see.</b>
+    /// <c>duplicate</c> exists because Plantoir's window sends the card's
+    /// arguments to this server over JSON-RPC and the binder DROPS a key the
+    /// method does not declare — so "duplicate Unit 3, Day 2 as my next class"
+    /// silently made a blank page until the parameter was added (issue #149).
+    /// It is filled by <see cref="AssistCardCommand"/>, in code, from a
+    /// sentence matched in code. No model fills it, and no model should:
+    /// <c>add_next_class</c> IS one of the thirteen tools the local model
+    /// routes to, and every extra argument on a tool it already picks is a
+    /// chance to invent a page title for a request that named none.</para>
+    ///
+    /// <para>The mac has the same aim and reaches it differently, which is
+    /// worth knowing before "fixing" either: there the card and the tool
+    /// runner share a process, so no binder stands between them and
+    /// <c>duplicate</c> is simply absent from the published schema. There is
+    /// no schema to narrow because there is no schema.</para>
+    ///
+    /// <para>MIRRORED in <c>research/ai-assist/narrow-tools.py</c> and pinned
+    /// by <c>NarrowToolsMirrorTests</c>, for the reason the tool list is: a
+    /// routing score measured through a surface the app does not ship is worse
+    /// than no score.</para>
+    /// </summary>
+    internal static readonly HashSet<string> CardOnlyArguments = new(StringComparer.Ordinal)
+    {
+        "add_next_class.duplicate",
+        "plan_add_next_class.duplicate",
+    };
+
+    /// <summary>
     /// Narrow a tool list to what the local model should see.
     ///
     /// A tool NOT in the set is not hidden from the teacher — they can ask for
@@ -135,9 +167,38 @@ public sealed class AssistAgent
             if (copy["function"]?["description"]?.GetValue<string>() is { } description)
                 copy["function"]!["description"] = Briefly(description).Replace(ExampleCourse, courseCode);
             MakeExamplesReal(copy["function"]?["parameters"], courseCode);
+            HideCardOnlyArguments(copy["function"]?["parameters"], name);
             kept.Add(copy);
         }
         return kept;
+    }
+
+    /// <summary>
+    /// Take the card-only arguments out of one tool's schema — from
+    /// <c>properties</c> AND from <c>required</c>, since a required key that
+    /// is not described is a schema no model can satisfy.
+    /// </summary>
+    private static void HideCardOnlyArguments(JsonNode? parameters, string toolName)
+    {
+        if (parameters is not JsonObject schema) return;
+
+        foreach (string pair in CardOnlyArguments)
+        {
+            int dot = pair.IndexOf('.');
+            if (dot < 0) continue;
+            // Case-insensitively, because ForTheLocalModel matches tool names
+            // that way and two answers to "is this that tool" is how an
+            // argument stays visible to the router by accident.
+            if (!string.Equals(pair[..dot], toolName, StringComparison.OrdinalIgnoreCase)) continue;
+            string argument = pair[(dot + 1)..];
+
+            if (schema["properties"] is JsonObject properties) properties.Remove(argument);
+            if (schema["required"] is JsonArray required)
+            {
+                for (int i = required.Count - 1; i >= 0; i--)
+                    if (required[i]?.GetValue<string>() == argument) required.RemoveAt(i);
+            }
+        }
     }
 
     /// <summary>The course code the server's schemas use in their examples.</summary>

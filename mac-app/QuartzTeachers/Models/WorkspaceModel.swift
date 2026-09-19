@@ -436,14 +436,13 @@ class WorkspaceModel {
     /// Adopts a new working folder, validates it, and remembers it.
     func chooseWorkspace(at url: URL) {
         let previousPath: String? = workspaceURL?.path
-        workspaceURL = url
         ActivityTrail.note(.workingFolderOpened, "opened the working folder " + url.path)
         if canRememberChoice {
             // Remembered app-wide so a NEW window opens where the last one
             // left off; each window then keeps its own choice in its scene.
             defaults.set(url.path, forKey: WorkspaceModel.storedPathKey)
         }
-        reloadCourses()
+        pointAtFolder(url)
         // Choosing the folder this window already shows is not a new
         // choice — a teacher who does that with the notice showing would
         // otherwise find their courses hidden behind the picker.
@@ -451,6 +450,89 @@ class WorkspaceModel {
         if let previousPath, previousPath != url.path {
             WorkspaceModel.releaseFolderIfUnused(previousPath)
         }
+    }
+
+    /// Points this window at a working folder and reads what is in it.
+    ///
+    /// The one way a folder is adopted, so that neither route can gain the
+    /// letting-go below while the other quietly keeps the old folder's
+    /// selection. What each CALLER owns stays with the caller — the trail
+    /// line, the remembered path, releasing the folder being left — because
+    /// those differ between a folder a teacher chose and one a window
+    /// restored, and moving them here would give a restored window a trail
+    /// line saying the teacher had opened something.
+    private func pointAtFolder(_ url: URL) {
+        // Plain `.path`, which is the same comparison `chooseWorkspace`
+        // already makes to decide whether the cloud-sync note is a question
+        // or a notice and whether the folder being left may rest. Two
+        // spellings of one folder would read as DIFFERENT and merely
+        // over-clear — a selection that could have stayed is dropped, and
+        // the teacher is looking at the sidebar either way. The reverse,
+        // two different folders reading as the same, cannot happen.
+        let isADifferentFolder: Bool = workspaceURL?.path != url.path
+        if isADifferentFolder {
+            forgetWhatBelongedToTheOldFolder()
+        }
+        workspaceURL = url
+        reloadCourses()
+    }
+
+    /// What this window lets go of when it points at a different folder.
+    ///
+    /// ONE rule, so that nothing has to be argued item by item: **anything
+    /// that names a course, an archive or a backup in the folder being
+    /// left.** Those are the things that would otherwise either describe
+    /// the old folder — the detail pane reading "Course Not Found" for a
+    /// course that was never in the folder now shown, which is the defect
+    /// this fixes — or ACT on it, a confirmation still holding the file URL
+    /// of an archive in a folder this window has left.
+    ///
+    /// A course in the new folder wearing the SAME code is cleared along
+    /// with the rest. It is a different course; landing on it would be a
+    /// guess dressed up as a memory. Nothing is selected in its place
+    /// either: the empty state already says what to do, and choosing for
+    /// the teacher would be the same guess made twice.
+    ///
+    /// Two things deliberately stay, and they are the rule's edge rather
+    /// than exceptions to it:
+    ///
+    /// - `filterText` is a way of LOOKING, not a thing named. A teacher who
+    ///   typed "3U" to narrow one folder is usually after the same courses
+    ///   in the next, and the field is in front of them either way.
+    /// - `expandedCourseCodes`, `isShowingArchived` and `isShowingBackups`
+    ///   are the sidebar's SHAPE. A code left in the set that this folder
+    ///   does not have draws nothing at all, and no action hangs off a
+    ///   disclosure triangle for it to aim at the wrong folder — so
+    ///   clearing them would buy nothing, while leaving them means a
+    ///   teacher who keeps two folders of the same courses finds the
+    ///   sidebar arranged as they left it.
+    ///
+    /// Deliberately NOT done inside `reloadCourses()`, which is the other
+    /// place that could have held it: a selection checked against the
+    /// courses just loaded would also erase the legitimately right "Course
+    /// Not Found" for a course deleted from disk in the folder still in
+    /// use, would make what a teacher sees depend on when some unrelated
+    /// reload next happened to run, and would still land on the wrong
+    /// course when the new folder has one with the same code.
+    private func forgetWhatBelongedToTheOldFolder() {
+        selection = nil
+        renamingCourseCode = nil
+        // Confirmations waiting on an answer about a particular archive,
+        // backup or course. Each holds something from the old folder, so
+        // answering one after the window has moved would act there.
+        restoreRequest = nil
+        archiveDeleteRequest = nil
+        backupRestoreRequest = nil
+        backupDeleteRequest = nil
+        obsidianRenameRequest = nil
+        // Alerts about what just happened in the folder being left. A
+        // sentence naming a course this window no longer shows is worse
+        // than no sentence, because it will be read as being about the
+        // folder now on screen.
+        renameProblem = nil
+        renameNotice = nil
+        restoreProblem = nil
+        backupProblem = nil
     }
 
     // MARK: - A folder a cloud service keeps in sync
@@ -557,8 +639,15 @@ class WorkspaceModel {
         if workspaceURL?.path == path {
             return
         }
-        workspaceURL = URL(fileURLWithPath: path)
-        reloadCourses()
+        // The same funnel the picker goes through, so the letting-go cannot
+        // belong to one route and not the other. Here it is DEFENSIVE: every
+        // caller in the product reaches this with no folder yet — a window
+        // being restored, a window opened mid-session, the assistant and the
+        // MCP server each on a model of their own — and the guard above
+        // turns away the one path that would arrive with the same folder
+        // already set. It stays because "no caller does that today" is a
+        // fact about today.
+        pointAtFolder(URL(fileURLWithPath: path))
         noticeCloudSync(folderWasChosen: false)
     }
 

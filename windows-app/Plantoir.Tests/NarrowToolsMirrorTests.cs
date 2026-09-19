@@ -69,6 +69,63 @@ public class NarrowToolsMirrorTests
             + "Update FOR_THE_LOCAL_MODEL in that file, and re-run any measurement that predates the change.");
     }
 
+    /// <summary>
+    /// The script hides the same card-only arguments the app does.
+    ///
+    /// <para>Same reasoning as the tool list, one level down. <c>duplicate</c>
+    /// is on <c>add_next_class</c>' published schema — it has to be, or the MCP
+    /// binder drops it and "duplicate Unit 3, Day 2 as my next class" makes a
+    /// blank page — and <c>add_next_class</c> is one of the thirteen tools the
+    /// local model routes to. A surface measured WITH that argument is a
+    /// surface offering the router a page title to invent, which the app never
+    /// shows it.</para>
+    /// </summary>
+    [Fact]
+    public void TheMeasurementScriptHidesTheSameCardOnlyArgumentsTheAppDoes()
+    {
+        var mirrored = NamesIn(NarrowToolsSource, "CARD_ONLY_ARGUMENTS");
+
+        var missing = AssistAgent.CardOnlyArguments.Except(mirrored, StringComparer.Ordinal).Order().ToList();
+        var extra = mirrored.Except(AssistAgent.CardOnlyArguments, StringComparer.Ordinal).Order().ToList();
+
+        Assert.True(missing.Count == 0 && extra.Count == 0,
+            "research/ai-assist/narrow-tools.py no longer mirrors AssistAgent.CardOnlyArguments.\n"
+            + (missing.Count > 0 ? $"  hidden by the app but NOT by the script: {string.Join(", ", missing)}\n" : "")
+            + (extra.Count > 0 ? $"  hidden by the script but NOT by the app: {string.Join(", ", extra)}\n" : "")
+            + "A routing score measured through it is a score for a surface the app does not ship.");
+
+        // And the app really does take it out, rather than merely listing it.
+        var tools = new JsonArray
+        {
+            new JsonObject
+            {
+                ["type"] = "function",
+                ["function"] = new JsonObject
+                {
+                    ["name"] = "add_next_class",
+                    ["description"] = "TEACHERS SAY: \"add the next class\". Creates it.",
+                    ["parameters"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["course"] = new JsonObject { ["type"] = "string" },
+                            ["duplicate"] = new JsonObject { ["type"] = "string" },
+                        },
+                        ["required"] = new JsonArray("course", "duplicate"),
+                    },
+                },
+            },
+        };
+
+        var narrowed = AssistAgent.NarrowToLocal(tools, "ICS3U");
+        var parameters = narrowed[0]!["function"]!["parameters"]!;
+
+        Assert.Null(parameters["properties"]!["duplicate"]);
+        Assert.NotNull(parameters["properties"]!["course"]);
+        Assert.DoesNotContain(parameters["required"]!.AsArray(), n => n!.GetValue<string>() == "duplicate");
+    }
+
     [Fact]
     public void TheMeasurementScriptRewritesTheSameExampleCourseTheAppDoes()
     {

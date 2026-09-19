@@ -23,7 +23,7 @@ mechanics, a measurement taken on one machine: not.
 | [`toolchain.json`](toolchain.json) | The image both platforms build from the same recipe: the four pins with the REASON each sits where it does, and what each of the seven Quartz patches changes and why it cannot be dropped. |
 | [`example-content.json`](example-content.json) | The ready-made courses: how a payload is discovered, the manifest's keys, and the allow-list rule that decides what actually installs. |
 | [`file-formats.json`](file-formats.json) | **The two files both apps WRITE and the Python then reads**: every `course_config.json` key with its type and default, and the frontmatter that decides whether students see a page — including the legacy `draft:` spelling, which means the opposite. |
-| [`shared-rules.json`](shared-rules.json) | Twenty rule sets on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks, and which a teacher is OFFERED when they are asked**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**, and **what the New Course wizard's affirmative button says**. |
+| [`shared-rules.json`](shared-rules.json) | Twenty-two rule sets (counted 2026-09-18, by counting the file's top-level keys other than `note` — the number said "Twenty" from before four of them existed) on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks, and which a teacher is OFFERED when they are asked**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**, and **what the New Course wizard's affirmative button says, what it tells a teacher whose course will start empty, and what its skeleton toggle does to the structure editor in BOTH directions**, and **what a window lets go of when it is pointed at a different working folder**. |
 | [`course-management.json`](course-management.json) | The names the three kinds of zip carry and how they are told apart, what section number is offered next and which entries are refused in whose words, and the grade a course code names. |
 | [`class-planning.json`](class-planning.json) | Which page titles carry numbers, what "the next class" would be called, and — the highest-stakes data here — the ORDER renames must run in when room is made for a class. |
 | [`schedule-rules.json`](schedule-rules.json) | How a teacher's own list of class dates is read: every accepted date form, how an ambiguous `08/09/2026` column is settled or asked about, what a pasted Google Sheet address becomes, and — `relativeDays` — which day a word like “tomorrow” or “Monday” names. |
@@ -38,6 +38,7 @@ the boundary is a TOP-LEVEL key — the file names them under `generated.keys`:
 |---|---|
 | `cardPhrasings` | `AssistCardCommand.fixedShapes` |
 | `tools` | `AssistToolRunner.tools` / `.localTools` / `.mcpOnlyTools`, and each definition's `needsApproval` and `planTwinName` |
+| `toolSchemas` | `AssistToolRunner.localTools` and `.mcpTools`, emitted as each client really sends them — every argument, every description. **This row was missing until 2026-09-10**; what its absence cost is under "Reading a red suite" below. |
 | `nearMisses`, `scenarios` | **Hand-written intent.** The generator preserves them; nothing in the code says what a near miss is, or what ORDER events must happen in — those are decisions, and a decision lives in the `documentation/` page that owns its subject, with a GitHub issue pointing at it when the other platform owes work — the handoff documents that used to hold them were retired on 2026-09-08. |
 
 In `app-rules.json` the same split applies: `milestones` is a readout of
@@ -112,13 +113,147 @@ invisible, because Swift cannot enumerate an enum's static properties at
 runtime. Windows' `AllLists` has the identical gap. Adding a task means adding
 it in both places, on both platforms.
 
-## Proposing a case from the Windows side
+## A change here is a handover, in whichever direction it travels
 
 The generator runs on the **mac** — `Plantoir --write-contracts` — so Windows
 cannot regenerate the derived halves. The AUTHORED halves are a different
 matter and can be proposed from either side: `scenarios`, `nearMisses`,
 `promptHistory`, and every case list in the other four files survive a mac
 regeneration untouched.
+
+**Both directions work the same way, and the rule is one rule.** A change
+committed to this folder makes the OTHER app's suite go red, because the other
+app deserialises these files and runs them. That is the mechanism, and it is
+the reason these files exist. But a red suite says only that something moved —
+it cannot say who moved it, why, or what the other side is expected to build.
+So the commit that changes a contract owes a GitHub issue labelled for the
+other platform, opened in the same session, naming what changed and what they
+have to do. `CLAUDE.md` rule 3 requires it going one way and rule 4 the other;
+neither is optional, and neither is satisfied by committing the diff.
+
+### Reading a red suite: four failures, three different causes
+
+Worth walking through, because on 2026-09-09 a Windows session part-way
+through unrelated work ran `dotnet test`, found four failures, and filed
+[#146](https://github.com/russellgordon/plantoir/issues/146) reporting them as
+one thing: the contract had moved with nobody told. They were not one thing.
+Half of that report was wrong and half was right, and the useful lesson is in
+which half was which.
+
+**Two of them had an issue, and an unreadable failure.**
+[#70](https://github.com/russellgordon/plantoir/issues/70) was open, labelled
+`windows`, and named the card phrasings with the failure spelled out — *"Three
+more card phrasings will make your suite red"*, and separately *"Your
+`AssistCardCommandTests` will go red until the phrasing exists on your side"*
+of the parsed `make room for ... at Unit 3, Day 4` family, which is what the
+second of the two tests actually failed on. Rule 3 was followed exactly. But
+both tests said `Assert.NotNull() Failure: Value is null` and nothing else, so
+nobody meeting them had a phrasing, a tool or a term to search for. Those
+assertions now name all three, and say that an unmatched contract phrasing is a
+handover to look up rather than a bug to file.
+
+**One had a perfect failure and no issue at all, and this is the half #146 got
+right.** `AssistSurfaceContractTests` said as clearly as a test can that
+`back_up_course`'s arguments had moved — *"must require exactly the arguments
+the contract says it does. Contract: [course, section]; here: [course]"*. The
+reader knew precisely what had changed, went looking for the issue explaining
+it, and there was none.
+
+The sequence is worth having exactly, because it is not the careless one it
+looks like:
+
+| When (local) | What |
+|---|---|
+| 18:54 | `0f34c54d` builds `back_up_course` on the mac, requiring `[course]` — the same shape Windows had had since 2026-08-13. Nothing diverges. |
+| 19:14 | `b0913344` fixes a real defect in it: the copy was filed as the TEACHER's, so the Backups list credited them with a copy they never made and `pruneBackups` — which skips anything not the assistant's — would have kept every one for ever. The fix takes a `section` and attributes the copy. The schema moves. |
+| 19:52 | #70 is opened. It names `back_up_course`, its plan twin and its briefing persistence. It does not mention the argument. |
+
+So the thing that travelled unannounced was **a defect fix**, which is the
+worst kind to travel unannounced: Windows had the identical defect, and found
+it only because the contract went red and somebody chased it
+(`GUI-IMPROVEMENTS.md` row 478). **The lesson is not "open an issue" — one was
+open. It is that a fix made after the feature, in a separate commit, moves the
+contract too, and the issue written afterwards describes the feature.**
+`git diff contracts/` before writing it, and let the diff say what to list. It
+did not help that no prose anywhere listed `toolSchemas` as a generated key;
+the table above has it now.
+
+**One belonged to nobody but this app** — a Windows test that had retyped a
+contract value into a literal, so it failed when the contract GREW. No issue on
+either platform could have named that, and `CLAUDE.md`'s "deserialise, don't
+retype" is the whole of its diagnosis.
+
+So, both ways round: **a red contract test mid-task is usually a handover, and
+the open issues are the index — read them before writing a new one.** And when
+you are the side that moved the contract, name every key that moved, because
+the one you did not think worth mentioning is the one that arrives with no
+explanation attached.
+
+#### Named gaps: the handover whose fix belongs to a LATER release
+
+The two shapes above both end in work: implement it, or fix the test that
+retyped a value. There is a third, met on 2026-09-18 while getting `dev` green
+for the v1.2.0 cut. The mac's unit-word rename ([#100](https://github.com/russellgordon/plantoir/issues/100))
+had moved `shared-rules.json` — one new `activityTrail.mustRecord` event, one
+new `specialNames.platformWording` key — and the Windows half is
+[#158](https://github.com/russellgordon/plantoir/issues/158), milestoned
+**v1.3.0**. So the handover had arrived, the issue naming it was open and
+correct, and the work was deliberately NOT in the release being cut. Two tests
+were red with nothing anybody was supposed to do about them yet.
+
+Four ways out, and only the last is honest:
+
+- **Soften the contract** — write `appliesOn: ["mac"]` on the event. This is
+  the tempting one, because the machinery is already there and
+  `ContractTests.SharedRules_ActivityTrailEvents_Exist` honours it. It is
+  wrong twice. It is a LIE: `appliesOn` means a difference that is deliberate
+  and permanent ("built site moved out of the working folder" is mac-only
+  because Windows has never built inside the working folder, so there is no
+  moment to record), and Windows owes this one. And it is a PERMANENT lie:
+  `appliesOn` has no mend-check, so the day Windows built the event, the
+  contract would still say it was none of its business, both suites would stay
+  green, and nothing anywhere would notice. A contract softened to quiet a
+  suite has given up the signal it exists to give.
+- **Declare the thing and leave it empty** — on Windows, add the
+  `ActivityTrail.Event` value with no call site. There is a precedent:
+  `ItemExcluded`, `ItemReIncluded` and `RemovalBlocked` were declared with the
+  site-health work for exactly this reason, and the comment beside them
+  disclaims itself as precedent in as many words. Rejected here, and the
+  difference is not tidiness — it was measured rather than remembered. All
+  three were declared in `a3144010` at 08:17 on 2026-08-25 and all three got
+  their first `ActivityTrail.Note` call in `a3c581fb` at 08:45 the same
+  morning: **28 minutes**, inside one piece of work. This is a whole feature a
+  milestone away. And an event
+  that is named but never recorded tells the contract a line exists that no
+  teacher's trail will ever carry — a green test asserting a trail that cannot
+  happen, which is worse than a red one, because the next person asking "does
+  Windows record this?" is told yes. `FolderProblemFound` sat dead for months
+  that way.
+- **Leave it red.** Then "did anything break?" stops having an answer, which
+  is how four failures sat unnoticed on `dev` long enough to become #146.
+- **Name the gap on the side that owes it.** `windows-app/Plantoir.Tests/NamedGapLedger.cs`
+  holds one entry per key: the key, the issue, the MILESTONE, and the reason.
+  Everything not in the ledger is asserted exactly as before. The ledger fails
+  if a ledgered thing has started existing on Windows — saying to delete the
+  entry — so it cannot outlive the fix; and fails if it names something the
+  contract no longer carries, so it cannot outlive the requirement either.
+  Modelled on `KnownToBeDropped` in `AssistSurfaceContractTests`, mend-check
+  and all. Proved by mutation in the session that wrote it, three ways round.
+
+**The boundary matters more than the mechanism.** An entry is allowed ONLY
+when an open issue, milestoned LATER than the release being cut, owns the work.
+Never for a difference a teacher can see at the current milestone — that is a
+defect to fix or a release to hold, and a ledger entry there is a way of
+shipping it quietly. Never instead of the issue, either: the entry names the
+issue and the issue is where the work lives. If the issue closes, or gets
+pulled into the release being cut, the entry goes and the full assertion comes
+back on its own.
+
+The ledger lives on Windows because that is the side that currently owes
+something; there is no mac equivalent and none is needed until the mac is the
+side behind. The same shape would work there.
+
+## Proposing a case from the Windows side
 
 So a behaviour invented on Windows can be written here as a case, and **the
 mac suite will then fail until the mac implements it.** That is the mechanism
@@ -134,9 +269,22 @@ Two things make that failure read as a request instead of as damage:
   that arrived from Windows, and it is what turns a red suite over there into a
   request. (Until 2026-09-08 this said to write it into `MAC-HANDOFF.md` under
   "Contract cases waiting on the mac"; that section no longer exists.)
-- **Do not touch the generated keys** (`cardPhrasings`, `tools`, `milestones`).
-  Those are readouts of mac code; an edit there is overwritten on the next
-  regeneration and the diff looks like vandalism.
+- **Do not touch the generated keys.** Those are readouts of mac code; an edit
+  there is overwritten on the next regeneration and the diff looks like
+  vandalism. **Which keys those are is written in each file's own
+  `generated.keys`, and that is the copy to read** — a list typed into prose is
+  the one that stops being true. Three places said "`cardPhrasings`, `tools`,
+  `milestones`" until 2026-09-10: two keys of one file plus one key of another,
+  missing both `toolSchemas` (where a tool's arguments live) and
+  `credentialRequests`.
+
+  **Only the two MIXED files carry that key**, because it exists to mark a
+  boundary: `assist-cases.json` and `app-rules.json` are part generated and
+  part authored, so they say where the line falls. `assist-wording.json` has no
+  `generated` block because it is generated in FULL and says so in its `note`;
+  the seven authored files have none because there is no generated half to
+  mark. So the question "is this key generated?" is answered by
+  `generated.keys` in exactly the two files where it can be asked.
 
 ## Regenerating
 
@@ -150,6 +298,11 @@ generator in-process and fails when what is committed no longer matches, naming
 that command. **So a changed sentence fails on the mac first**, in the same run
 that changed it, and arrives on the Windows side as a diff in this folder
 rather than as a bug report from a teacher.
+
+That diff is how the change TRAVELS, and the issue is how the other side finds
+out — see "A change here is a handover" above. Committing one without opening
+the other leaves a suite that goes red for reasons its reader has no way to
+look up.
 
 ## Why these are not in `support/`
 
@@ -209,7 +362,7 @@ recounted 2026-09-07.
 | Which of a course's OWN folders the build treats specially, and what the sheet says about each | `shared-rules.json` → `specialFoldersHelp` | SpecialFoldersHelpContract (5) on Windows, SpecialFoldersHelpTests (5) on the mac — both sides adopted 2026-09-06 |
 | Which folder holds class pages, and which count | `class-planning.json` → `classFolder` | ClassFolderContractTests (6), and `scripts/test_class_folder.py` |
 | What a course calls a unit | `class-planning.json` → `pageNaming` (the `term` field) and `file-formats.json` → `unit_word` | ClassPageTerm (11), and `scripts/test_class_pages.py` |
-| Renaming that word after the course is in use: which pages move, what refuses it, how links follow, and the order it happens in | `class-planning.json` → `renamingTheUnitWord`; the sentences in `shared-rules.json` → `specialNames.renameUnitWord`; the trail line in `activityTrail.mustRecord` | ClassPlanningContractTests (3), SharedRulesContractTests (1), UnitWordRenamerTests (19) on the mac — added 2026-09-10, [#100](https://github.com/russellgordon/plantoir/issues/100); Windows goes red until it implements them |
+| Renaming that word after the course is in use: which pages move, what refuses it, how links follow, and the order it happens in | `class-planning.json` → `renamingTheUnitWord`; the sentences in `shared-rules.json` → `specialNames.renameUnitWord`; the trail line in `activityTrail.mustRecord` | ClassPlanningContractTests (3), SharedRulesContractTests (1), UnitWordRenamerTests (19) on the mac — added 2026-09-10, [#100](https://github.com/russellgordon/plantoir/issues/100). **Windows runs none of it today**, and the three places differ: the trail event and `renameUnitWord.explanation` were red there and are now NAMED GAPS ledgered to [#158](https://github.com/russellgordon/plantoir/issues/158), v1.3.0 (`windows-app/Plantoir.Tests/NamedGapLedger.cs` — see "Named gaps: the handover whose fix belongs to a LATER release" above); `renamingTheUnitWord.cases` (seven) and `linkCases` (three) were never red there because **nothing on that side runs them at all** — there is no Windows counterpart of `ClassPlanningContractTests.testRenamingTheUnitWordCases`, so those ten cases are unrun rather than failing, and they are owed under #158 with the renamer itself. Deliberately not pinned by a test counting them: a count asserted where the cases are not run would guard the number instead of the behaviour |
 | Whether a deploy must build first | `app-rules.json` → `buildFreshness` | BuildFreshness (6) |
 | Preview ports and the websocket offset | `app-rules.json` → `previewPorts` | PreviewLease (7) |
 | The browser-safe address | `app-rules.json` → `linkRules` | BrowserSafeURL (2) |
@@ -235,14 +388,17 @@ recounted 2026-09-07.
 | Whether the assistant asks before changing anything, and when it says so | `shared-rules.json` → `assistantConfirmation` | SharedRulesContract (1), AssistPlanMode (6), AssistantSettings (6) |
 | Phrasings matched in code, including the four PARSED families | `assist-cases.json` → `cardPhrasings` | AssistContract (1), AssistPromptShelf (2), AssistToolRunner (4) |
 | The New Course wizard's affirmative button | `shared-rules.json` → `wizard` | SharedRulesContract (1). On Windows the label is asserted only in `Plantoir.UiTests/NewCourseWizardUiTests`, which carries `[UiFact]` and runs only under `PLANTOIR_UI_TESTS=1` — so it is part of no gate there ([issue #119](https://github.com/russellgordon/plantoir/issues/119)) |
+| What the wizard's skeleton toggle does to the structure editor, both ways, and what a teacher whose course will start empty is told | `shared-rules.json` → `wizard.skeletonToggle`, `wizard.noExampleContentNote` | SharedRulesContract (3, including the thirteen cases and the vocabulary pinned against `WizardDefaults`), WizardStructure (15). Proposed FROM the mac 2026-09-18 ([#77](https://github.com/russellgordon/plantoir/issues/77)), copying behaviour Windows shipped 2026-09-07 — so this is the rare case where the contract arrives AFTER both apps agree, and **the Windows suite stays green rather than going red**: nothing there deserialises the key yet, and what they owe is the test plus a seam to run it against (their restore is private to `NewCourseDialog`). Whether a teacher can SEE it is the mac's `QuartzTeachersUITests.testDecliningTheSkeletonPutsTheDefaultFoldersBack`, which drives the real toggle and is part of no gate |
 | Backup, archive and wizard zip names | `course-management.json` → `zipNames` | BackupItem, ArchivedItem (18) |
 | Adding a section: suggestion, refusals, wording | `course-management.json` → `sectionNumbers` | SectionAdder, SectionNumbersValidation (21) |
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
+| Duplicating a lesson as the next class: where the copy lands, what else moves, whether undo is offered, and that the copy starts hidden | `class-planning.json` → `duplication` | **Windows only today**: `ClassPlanningContractTests.Duplication_MatchesContract` runs all three cases plus `forcedUnpublished`. Proposed FROM Windows 2026-09-18 ([#149](https://github.com/russellgordon/plantoir/issues/149)); the mac has no runner yet and the second case — “a later unit re-dated is enough to withhold the undo, even with nothing renamed” — is expected to FAIL there when it writes one, because `AssistToolRunner` keys the duplicate's undo on `renames.isEmpty` alone. That is the handover working rather than damage: [#163](https://github.com/russellgordon/plantoir/issues/163) says so, and `undoRule` carries the reasoning. |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders.cases` | `scripts/test_graded_folders.py` in the image. **The mac runs this list nowhere and cannot**: it stores `graded_folders` and never asks whether a given PAGE counts, which is the build's question. It does run three other lists under `gradedFolders` — see the rows below; this row said "runs no case list yet" of the whole key until 2026-09-09, by which time that was true only of `.cases`. |
 | What a removal does to the marks pool | `shared-rules.json` → `gradedFolders.removingAFolder` | `GradedFolderChoices` (6 cases), played through Course Settings in the order it really happens. Proposed FROM the mac 2026-09-09 and **run nowhere else yet**: Windows deserialises only `gradedFolders.choices`, so its suite stays GREEN rather than going red, and wiring this list is part of what [#142](https://github.com/russellgordon/plantoir/issues/142) asks for. Four of the six fail there as the code stands. |
 | What a teacher reads on the Marks control — its title and the caption below it | `shared-rules.json` → `gradedFolders.wording` | `SharedRulesContract` (4). Proposed from Windows 2026-09-08 and adopted here 2026-09-09 ([#71](https://github.com/russellgordon/plantoir/issues/71)); the mac’s TITLE won unchanged, so only the caption moved. **Not in `GradedFolderChoicesTests` with the other `gradedFolders` rows**, which is scoped to what the checklist OFFERS and builds a fixture tree in `setUp` these have no use for. Three of the four go beyond the strings: the caption may name no action this control lacks (whole words — "addresses" is not a use of "add"), both views must draw from the one constant with no third copy anywhere in the product source, and the caption must be drawn BELOW its list, which is what `wording.rule` requires by name. Each was measured by mutation rather than assumed. |
 | Which folders the marks checklist OFFERS | `shared-rules.json` → `gradedFolders.choices` | `GradedFolderChoices` (14 cases, the depth cap and the skip list), against real directory trees — a walk over a fixture is not a walk. Proposed from Windows 2026-09-06 and run on the mac since 2026-09-09 (issues [#79](https://github.com/russellgordon/plantoir/issues/79) and [#112](https://github.com/russellgordon/plantoir/issues/112)); both platforms now go red for it. |
+| What a window lets go of when it is pointed at a different working folder | `shared-rules.json` → `workingFolderSelection` | `SharedRulesContract` (1, running all four cases), `WorkingFolderSelection` (8), `WindowRestorationScenario` (2 of its 8). Added from the mac 2026-09-18 ([#93](https://github.com/russellgordon/plantoir/issues/93), handed over as [#162](https://github.com/russellgordon/plantoir/issues/162)) and **RUN ON THE MAC ONLY SO FAR**: `windows-app/Plantoir.Tests/SharedRuleContractTests.cs` deserialises `shared-rules.json` by NAMED key, so a key nobody has asked for is silently ignored and the Windows suite stays GREEN rather than going red — the same precedent as `gradedFolders.removingAFolder` above. Windows has the identical defect (`WorkspaceViewModel.ChooseWorkspace` and `.AdoptRestoredPath` never clear `Selection`), so wiring the key in is part of the work rather than a check on it. Read `howToRunACase` before writing the runner: each case needs its OWN folders (one of them deletes a course), and `then.removeTheSelectedCourseAndReload` and `expectNamesALoadedCourse` are what pin the “Course Not Found” that must SURVIVE. |
 | What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (25), and `scripts/test_site_health.py` |
 
 ### Which of these the WINDOWS suite runs
@@ -296,6 +452,18 @@ home. [`documentation/04-course-setup.md`](../documentation/04-course-setup.md) 
 refuse rather than clear the way" has the detail for the refusal; for the
 repair's own shape, the contract key and
 `windows-app/Plantoir.Tests` are now the record.
+
+**And one list added after that audit is NOT wired here, deliberately.**
+`class-planning.json` → `renamingTheUnitWord` (seven `cases`, three
+`linkCases`, added on the mac 2026-09-10 with [#100](https://github.com/russellgordon/plantoir/issues/100))
+has no Windows runner, because Windows cannot rename a course's word for a
+unit at all yet — [#158](https://github.com/russellgordon/plantoir/issues/158),
+milestoned v1.3.0. Worth saying out loud because it is the quiet kind of gap:
+those ten cases are UNRUN rather than failing, so no Windows gate mentions
+them and nothing goes red. The two places that DID go red — the trail event
+and `renameUnitWord.explanation` — are named in
+`windows-app/Plantoir.Tests/NamedGapLedger.cs` and will fail the moment either
+is built or withdrawn. The ten cases have no such guard; #158 carries them.
 
 **Three habits came out of that work and are worth copying on either side.**
 

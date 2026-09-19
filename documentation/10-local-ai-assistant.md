@@ -649,6 +649,99 @@ reached, so the wording change cannot cost a misroute. A card offering
 something the model is unreliable at would be worse than no card at all, so
 one was removed for exactly that reason.
 
+### Re-measured on Metal after the system prompt changed
+
+The system prompt gained two sentences on 2026-08-24 (`b77b91bd`) on the
+strength of numbers taken on **Windows, in a container** — the folder's index
+classifies that run so, and its 1-192 s per-call latencies are a CPU profile,
+so the "Vulkan" in issue #117's title belongs to the tweak's own before/after
+(`conversational-residue-results.txt`, Windows NATIVE) and not to the 72% it
+set out to improve. Issue
+#117 re-measured it here. Full conditions, thresholds and per-probe tables in
+`research/ai-assist/metal-routing-results.txt`; the summary, 29 probes on the
+shipping 13-tool surface, M4 Pro, llama.cpp b10435 native with Metal, each
+tier at its own context size:
+
+| | Qwen3 4B (`.large`) | Qwen2.5 1.5B (`.small`) |
+|---|---|---|
+| All 29 probes, shipped prompt | **271 / 290 (93%)** | 208 / 290 (72%) |
+| The same, with the pre-2026-08-24 prompt | 270 / 290 (93%) | 199 / 290 (69%) |
+| The eleven promise-card probes (**Windows'** `ExampleRequests`, not this app's shelf) | **110 / 110** | 90 / 110 |
+| Polarity inversions | **0** | **0** |
+| Tool calls whose arguments were truncated (suite body, `max_tokens` 256) | **0** | 12-19 per 290 |
+| The same under the app's own body (no cap) | **0** | 3 per 87 |
+
+Three things to take from it — and one that is not in the table: on this same
+suite the 4B scored **280/290 with the Windows-comparable 18 at 180/180** in
+August, and the whole difference is two probes, one of which (`read`, answered
+with `check_section` where it used to answer `read_page`) is unexplained by
+anything measured here. That is issue #167.
+
+**The 2026-08-24 change is neutral on the tier this Mac runs** — 28 of the 29
+probes give the identical tool with the old wording and the new one — and the cluster it was written for was never present
+here: "I posted Unit 2, Day 3 by mistake. Make it a draft again." is
+`unpublish_pages` 10/10 in every arm of both models, before the tweak and
+after it. **On the small tier it did buy something**: the older wording let
+the model DECLINE a plain hide request 6 times in 10, where the current one
+declines once.
+
+And **the two tiers are not two grades of the same thing**. This matters more
+widely than "old Macs": the smaller assistant is a CHOICE any teacher can make
+on any machine (`contracts/shared-rules.json` → `assistantModelChoice`), and
+because it is comfortable on essentially every Mac — 1.75 GB against a third
+of physical memory — picking it raises no caution at all. The small one is
+solidly right on 19 of 29 probes and solidly wrong on 7, including every way
+of asking for a deploy at a time — the mac's own shelf card "Deploy at 6:30
+AM" routes to `deploy_section`, deploying immediately, 10/10 on the small tier
+while the 4B gets it right 10/10 (issue #168). Confirmation before acting does
+not turn that into a safe failure by itself: `assistantAsksBeforeChanging` is ONE
+setting for both tiers and defaults on for both (`AssistantSettingsTests`
+asserts it on a 48 GB machine), approval is per TOOL — `needsApproval: true`
+on `deploy_section` and `schedule_deploy` and nothing else — and the tier only
+changes the CAUTION a teacher is shown when they turn confirmation off
+(`AssistModelLibrary.confirmationCaution`). A sentence here previously claimed
+the small tier confirms and the large one does not; it never has.
+
+**Something both platforms must know before quoting a zero.** Every suite in
+`research/ai-assist/` that printed a `malformed tool calls: N` line USED TO
+parse a tool call's arguments as `try: json.loads(...) except: args = {}`, so
+a call whose argument JSON was cut off short was recorded as a call with no
+arguments and never as a malformed one. Both suites that are run today —
+`trimmed-surface-suite.py` and `teachers-say-suite.py`, the Windows-side one —
+count it properly as of 2026-09-18, in shared Python, so a re-run of either
+counts honestly. **What Windows must know is about results already taken:
+every "malformed tool calls: 0" in the `teachers-say-results.txt` numbers, and
+in the seven other older files, means "no HTTP errors" and nothing more.** All
+nine carry a dated note saying so. `shipped-surface-suite.py` still has the
+old shape and is left alone deliberately — it is marked HISTORICAL and cannot
+be meaningfully re-run, because its probes name tools the app no longer has.
+(`routing-suite.py` is the exception worth naming: it keeps the raw string as
+`{"__unparseable__": …}` and labels its own line "runtime rejected", so it
+never made the false claim — it simply has no count of the other kind.)
+
+The mac is the platform EXPOSED to the underlying fault, because
+`AssistModelClient` sends no `max_tokens` at all where Windows' `LocalModel`
+sends 512, so a runaway here runs until the context is full — issue #166.
+
+The figures above are not a failure rate. The suite runs at temperature 0.1
+(0 in the arms that copy the app's own request), which is near-greedy: ten
+trials tell you whether a model systematically mishandles a sentence, not how
+often a teacher would be misrouted. Re-running an identical arm an hour later
+moved the total by 3-5 responses in 290.
+
+**A harness divergence worth knowing, for whoever measures next.** The suite's
+system-prompt constant writes ASCII hyphens where `AssistAgent.swift` — and
+`AssistAgent.cs` — write em-dashes. Six characters, the only difference, and
+every routing number in `research/` before 2026-09-18 was taken against the
+hyphen form rather than the shipped string. Measured both ways on the same
+server the same evening: 204/290 against 208/290, no stable probe moving by
+more than 3/10, which is inside this suite's own run-to-run wobble. **So the
+older numbers stand**, and neither app owes the other a change. The suite now
+keeps `--prompt hyphen` as its default for comparability, offers
+`--prompt shipped` which READS the literal out of the Swift, and asserts on
+every run that the two differ by exactly those six characters — because the
+comment that used to hold them together said "keep this in sync by hand".
+
 ---
 
 ## Part 6 — The design in full, and the reasoning behind it
@@ -1169,11 +1262,44 @@ run that changed it, and reaches you as a **diff in `contracts/`** in the same
 commit as the Swift. Verified by breaking a sentence on purpose: the suite
 failed naming the key and the command to regenerate.
 
-**Four things to know before you use them.**
+**The diff is how it travels; it is not how you FIND OUT.** Nobody reads a
+folder of JSON for changes, so what you actually meet is your own suite going
+red, days later and part-way through something else. The mac therefore opens a
+`windows` issue in the same session (`CLAUDE.md` rule 3), and that issue — not
+the diff — is the handover. Read it that way round: a red contract test means
+go and look for the issue, and issue #146 exists because four of them were met
+mid-task and read as nobody having said anything at all, while #70 sat open
+naming every phrasing.
 
-- **Never hand-edit the GENERATED keys** — `cardPhrasings`, `tools`,
-  `milestones`. Those are readouts of mac code; the next regeneration
-  overwrites your edit and the diff looks like vandalism.
+**What to know before you use them.**
+
+- **Never hand-edit the GENERATED keys.** Those are readouts of mac code; the
+  next regeneration overwrites your edit and the diff looks like vandalism.
+  **`assist-cases.json` and `app-rules.json` each declare their own under
+  `generated.keys`, and that is the list to read** — those two are the MIXED
+  files, and the key marks where the generated half ends.
+  `assist-wording.json` has none because it is generated in FULL and says so in
+  its `note`; the seven authored files have none because there is no generated
+  half to mark. This passage named `cardPhrasings`, `tools` and `milestones`
+  until 2026-09-10, which was two keys of `assist-cases.json` plus one of
+  `app-rules.json`, and left out both `toolSchemas` — the key carrying every
+  tool's arguments, and therefore the one that moved when `back_up_course`'s
+  signature changed — and `credentialRequests`. Two other places said the same
+  three; a list of generated keys typed into prose is exactly the copy this
+  whole folder exists to stop.
+- **Name every key a regeneration moved when you write the `windows` issue —
+  including the ones your REVIEW FIXES moved.** Learned from the same failure,
+  and the timing is the whole lesson. `back_up_course` was built at 18:54 on
+  2026-09-08 requiring `[course]`, exactly matching the tool Windows had had
+  since August. Twenty minutes later a review fix (`b0913344`) gave it a
+  `section`, because it had been filing the copy as the TEACHER's and
+  `pruneBackups` would have kept every one for ever. #70 was opened at 19:52
+  and described the FEATURE — the tool, its plan twin, its briefing
+  persistence — which is what anyone writing up an afternoon remembers. The
+  argument was not mentioned. Windows had the identical defect and found it
+  only because the contract went red and somebody chased it, so what travelled
+  unannounced was a defect FIX, which is the worst kind. Run `git diff
+  contracts/` before writing the issue rather than working from memory.
 - **Write it to the template.** `CLAUDE.md` rule 4 says what a `mac` issue
   carries — title and source, what it fixed and WHY (including what
   was rejected), numbers with the hardware they came from, the file and test
@@ -1344,10 +1470,16 @@ routing, `add_classes` and `make_room_for_classes` as WIDENINGS of something
 that already ships rather than new features (`add_next_class` already calls
 `PlaceholderClassPlanner.apply`, and a `duplicate` key on the same call
 already reaches `ClassInsertionPlanner.plan(count: 1)` — so the ENGINES are
-both wired up already). Note the limit: `duplicate` is not on
-`add_next_class`' published schema at all, only on the hardcoded card phrasing
-`AssistCardCommand.swift:85`, so no model and no MCP client can reach it — the
-mac needs a schema argument, not just a bigger count. And `roll_over_section`
+both wired up already). Note the limit, **which since 2026-09-18 is the
+mac's alone**: `duplicate` is not on the mac's `add_next_class` published
+schema at all, only on the hardcoded card phrasing `AssistCardCommand.swift:85`,
+so no model and no MCP client can reach it there — the mac needs a schema
+argument, not just a bigger count. Windows now declares it on both halves of
+`add_next_class` (issue #149), because it had to: the card reaches the tool
+through an MCP binder that DROPS an undeclared key, so the sentence was
+making a blank page. The mac's card and tool runner share a process, so the
+absence costs it nothing except that Claude Code cannot ask for a duplicate.
+And `roll_over_section`
 because of the defect in item 41's first open part. Two are
 Windows-shaped and stay there: `read_timetable`, because the mac puts
 spreadsheet reading behind its schedule sheet on purpose and has no file-path
@@ -1646,6 +1778,112 @@ It has one property worth copying exactly: before restoring a file it
 compares what is on disk to what it wrote, and **skips anything the teacher
 has edited since**. Publishing a class, then spending ten minutes writing it
 in Obsidian, then saying "undo that" must not cost those ten minutes.
+
+### Which tools record an undo entry, and which deliberately do not
+
+**A tool records an entry only when taking it back is WHOLE.** Written down
+2026-09-18, after Windows found that three tools —
+`add_curriculum_mentions`, `make_room_for_classes` and
+`add_classes`/`add_next_class` — opened an entry and never closed it
+(`UndoHistory.Begin` … no `End`), and that the other five closed theirs only
+on the path where nothing threw. The consequence was two-sided and entirely
+silent, which is why it lived so long: the tool recorded NO entry at all, so
+"undo that" answered that nothing had been changed — while `add_next_class`'s
+own reply promised the page could be taken back — and the still-open entry
+then swallowed the NEXT operation's files and committed them under the
+earlier description. A teacher who made room, published a class and said
+"undo that" was told they had made room, and had the publish taken back with
+it.
+
+**The pairing is no longer something to remember.** Every recording site is
+now `using var recording = UndoHistory.Record(_undo, "…");` with
+`recording.Done()` where the operation finishes. Leaving the scope any other
+way — a throw, or a `return` added years later by somebody who never read
+this — abandons. An inner scope is a no-op, so the outermost call still owns
+the entry and a tool that calls another tool records one operation rather
+than two. The five older sites each wrapped their individual file writes in
+`try`/`catch` and nothing else, so a `ReadAllText` outside those — a page
+Obsidian deleted between the plan and the Go — escaped the method with the
+entry still open, and it was still open when the teacher asked for the next
+thing.
+
+**Where that exception then goes differs by tool, and the difference matters
+more than it looks.** Re-dating, syncing dates, curriculum, making room and
+duplicating are called through `PlantoirTools.Guarded`, which catches
+`IOException` and `UnauthorizedAccessException` and turns them into an ANSWER
+the teacher reads. **Publishing and unpublishing are not**:
+`PlantoirTools.Act` catches only `AssistRefusal` and
+`OperationCanceledException`, so anything else leaves the tool altogether —
+no answer is built, `CarryingTheConversationBackup` never stamps the result,
+and the teacher gets a protocol-level failure naming no backup at all. The
+undo entry is abandoned either way, which is this section's subject; the
+reply is worse on the publish path than on any other, and that gap is
+[issue #165](https://github.com/russellgordon/plantoir/issues/165) rather
+than something fixed in passing.
+
+**Abandon on a throw, rather than committing what was written — and this was
+a decision, not a default.** The case to think about is a publish of five
+pages that writes three and then throws. Committing the entry (an `End` in a
+`finally`) would make those three undoable, which sounds strictly kinder. It
+was rejected because **the description is written at `Begin`, from the
+PLAN**: the entry would say "published “A”, “B”, “C”, “D” and “E”", and
+`AssistWording.Undid` reads that clause straight back to the teacher — "Earlier,
+you published A, B, C, D and E" — at the one moment they are checking that
+the right thing was put back. A truthful file list under a false sentence is
+the failure rule 5 of `CLAUDE.md` names: a line describing what did not
+happen is worse than no line, because it will be believed. The mac reaches
+the same place from the other end — `AssistToolRunner` records a whole
+`AssistChange` only after the operation returns, so a throw records nothing
+(its whole-unit publish answers "was only partly published: …" and calls
+`history.record` never) — so abandoning is also what matches.
+
+**The cost is real, and on one path it is not yet covered.** The conversation
+backup is taken before the first write and is the way back for everything
+here. On the tools that go through `Guarded` the teacher reads a sentence and
+can be pointed at it. On the PUBLISH path they currently cannot: the
+exception leaves the tool, so no reply is built and no backup is named, and
+they are left with a failure and a half-published section. The mac says
+something there — that inline "was only partly published: …" — and Windows
+says nothing; matching it is not a wording decision this side may take alone,
+since the sentence is an inline mac literal rather than an `AssistWording`
+key, so it is written down as [issue
+#165](https://github.com/russellgordon/plantoir/issues/165) instead of
+improvised.
+
+The rule both apps now follow, tool by tool:
+
+| Tool | Records undo? | Why |
+|---|---|---|
+| publish / unpublish, re-date, sync dates, rollover | yes | Files edited in place, nothing renamed. |
+| `add_classes` / `add_next_class` | yes | Created pages are recorded with no "before", so undo deletes them. |
+| `add_curriculum_mentions` | yes | One page, one block, edited in place. |
+| `make_room_for_classes` | **no** | Renames later days, re-dates every class after the insertion point, rewrites the links that pointed at the old names. |
+| duplicate as next class | **only when nothing else moved** | The common case moves nothing; the rest is a make-room. |
+
+**What was rejected, and why it matters more than what was chosen.** The
+obvious fix for make-room was to record the whole thing and let undo put it
+all back. It was rejected because undo is not a transaction: it restores
+files whose contents still match what was written and SKIPS the rest, so a
+teacher who touched one page in Obsidian gets a half-undone shuffle — some
+classes renamed, some not, links pointing at both. A partial undo of a
+rename is worse than no undo, because nothing tells the teacher which half
+happened. So the way back for anything that shuffled is the backup taken
+before it, and the reply NAMES that file
+(`ClassChangeWording.OtherClassesMoved`). The mac reached the same answer
+first and Windows mirrored it rather than improving on it.
+
+**The condition is renames OR date moves, and this is the one place Windows
+is stricter than the mac.** `AssistToolRunner` keys the duplicate's undo on
+`renames.isEmpty` alone. Renames happen only WITHIN the unit being changed,
+so duplicating the LAST day of a unit renames nothing and re-dates every
+class of every later unit — and the mac offers an undo there that takes back
+the copy and leaves the rest of the year moved. Windows counts both lists
+(`DuplicateClassPlan.MovesOtherClasses`), and the same count is what the
+plan tells the teacher before they agree, so an approved plan is never silent
+about a re-dated later unit. Both halves are contract data now:
+`contracts/class-planning.json` → `duplication`, with `undoRule` and three
+cases; the mac owes a runner, and the second case is expected to fail there
+until its gate widens.
 
 ### Back up once per conversation, not once per command
 
@@ -2368,12 +2606,38 @@ rather than by writing the code.
    without it would have handed the phrasings credit for work the app was
    already doing. `trimmed-surface-results.txt` had already recorded the same
    line being worth fifteen points when prepended instead.
-3. **There are THREE interception layers before the model, not one:**
-   `PreviewAskedForPlainly` (thirteen exact sentences),
-   `AssistCardCommand.Matching` (`FixedShapes` plus its three parsers), and
-   four inline regexes in `AssistAgent.CardCommand` itself. Three controls
-   were sentences the app answers WITHOUT the model, so they measured
-   nothing. The mac's `AssistCardCommand.swift` has the same shape.
+3. **There are THREE interception layers before the model on WINDOWS, and
+   ONE on the mac** — the trap is the same, the count is not, and the
+   sentence here used to say "the mac's `AssistCardCommand.swift` has the
+   same shape", which is false. On Windows: `PreviewAskedForPlainly`
+   (thirteen exact sentences), `AssistCardCommand.Matching` (`FixedShapes`
+   plus its parsers), and four inline regexes in `AssistAgent.CardCommand`
+   itself. Three controls were sentences the app answers WITHOUT the model,
+   so they measured nothing.
+
+   **On the mac there is one layer and it is reached once**, at
+   `AssistAgent.swift:172` — `AssistCardCommand.matching(trimmed)`, on the
+   text BEFORE the dateline is appended, tidied by trimming whitespace,
+   stripping leading and trailing `.` and `!`, and lower-casing, then
+   compared by EQUALITY (never substring), followed by four parsed families.
+   The plain-preview sentences are not a second layer here: "preview" and
+   "rebuild the preview" are entries in `fixedShapes` like everything else.
+   Corrected 2026-09-18 while measuring #117, which counted them rather than
+   assuming: of the 29 probes in `trimmed-surface-suite.py`, exactly **five**
+   are answered in code and never routed —
+
+       card: publish tomorrow   -> publish_class_on
+       card: check the section  -> check_section
+       card: rebuild preview    -> rebuild_preview
+       card: undo               -> undo_last_change
+       card: deploy now         -> deploy_section
+
+   all five of them promise-card phrasings. The suite now reports both totals
+   (all 29 and the 24 a model actually sees) and finds that list from
+   `contracts/assist-cases.json` rather than from a hand copy, so a phrasing
+   added to the card table shows up in the next measurement by itself. They
+   are still measured, because Claude Code over MCP has no interception layer
+   in front of it and does route them.
 4. **Making a research script stricter can delete a control.** Requiring the
    course code in `narrow-tools.py` read as a tightening and would have
    silently turned `trimmed-surface-suite.py --real-course` into a no-op,
