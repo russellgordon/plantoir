@@ -832,21 +832,13 @@ implemented in Swift, inside the tool, where they always apply.
 
 The clearest example is what happens to linked pages:
 
-- **Publishing** a page always publishes what it links to. There is no
-  `includeLinked` flag for the model to decide about, because a class page
-  whose linked notes are invisible is broken, always.
+- **Publishing** a page publishes what it links to, **and stops where a link
+  lands on another class page**. There is no `includeLinked` flag for the model
+  to decide about, because a class page whose linked notes are invisible is
+  broken, always — and no flag for the stop either, for the same reason.
 
-  **That sentence describes the MAC, and the two platforms differ — undecided,
-  [issue #173](https://github.com/russellgordon/plantoir/issues/173).** Windows
-  stops at class pages: a link that lands on another class publishes nothing
-  and is not followed through (`AssistWorkspace.cs:724`), where the mac's
-  `linkedPages(from:)` has no such test. The same split is in the date rule
-  beside it — a class page never INHERITS a date on either platform, but
-  Windows also stops the walk there (`:916` before `:917`) while the mac
-  traverses through. Found on Windows during
-  [#115](https://github.com/russellgordon/plantoir/issues/115) and left alone
-  deliberately; #173 asks which answer is right and says to write the winner
-  into `contracts/` and correct this page.
+  See ["The walk stops at a class page"](#the-walk-stops-at-a-class-page)
+  below for the decision, what was rejected, and what a teacher is told.
 - **Unpublishing** is deliberately *not* the mirror image. A linked page comes
   down only when the pages being taken down are the **only** ones that link to
   it — otherwise hiding this week's lesson would strip a page last week's
@@ -854,6 +846,17 @@ The clearest example is what happens to linked pages:
   whatever the link count: a folder's landing page, anything in the section's
   Key Links, and any curriculum page, each of which is reached from somewhere
   other than a lesson.
+
+  **Its reach does NOT stop at a class page**, on either platform, and that is
+  the sibling decision rather than an oversight:
+  [issue #201](https://github.com/russellgordon/plantoir/issues/201), held for
+  v1.3.0 because it is the one half Windows does not already behave that way,
+  and folding it into #173 would have put a red shared case into the v1.2.0
+  contract. Until it lands, an unpublish that takes a class down leaves that
+  class NOT coming back when its referrer is republished — publishing stops
+  there now. That exception is written into the code comment it belongs to
+  (`AssistPublishPlan.pageStillLinking`), and it is the strongest argument in
+  #201.
 
 That asymmetry is genuinely subtle. It is exactly the kind of thing a small
 model would get wrong under pressure, and exactly the kind of thing a
@@ -877,6 +880,102 @@ refusal changes nothing the model reads, so it cannot cost accuracy, and
 because the refusal comes back as ordinary text the model gets to correct
 itself on the next turn. **Prompt text is a gamble that has to be
 re-measured; a conditional is not.**
+
+### The walk stops at a class page
+
+Decided 2026-09-19,
+[issue #173](https://github.com/russellgordon/plantoir/issues/173), after the
+two apps were found to disagree: **Windows stopped at a class page and the mac
+walked through it.** Windows' answer is the one that shipped, for BOTH rules
+that follow links outwards — what a publish takes, and which pages inherit a
+class's date.
+
+**The rule.** A class goes up when the teacher names THAT class. A link that
+lands on another class page publishes nothing and is not followed through, so
+material reachable only *through* another class belongs to that class and goes
+up with it. The rule is about pages REACHED, never about pages named: naming
+two classes makes both of them starting points, and publishing a whole unit
+names every class in it (one plan per class), so nothing is lost by asking for
+more.
+
+**What was REJECTED, and why it is the tempting one.** The middle position —
+do not publish the linked class, but walk *past* it to the material beyond —
+reads as the careful compromise and is wrong on two counts at once. Asked to
+publish Unit 2, Day 3, it would publish Day 4's worksheet, which puts it in
+front of students a day early, and re-date it to Day 3's day, which is the
+wrong lesson. Material behind a class is that class's material.
+
+**How often a teacher meets it — measured, not assumed.** A class page has to
+link to another class page for any of this to fire, and the shipped content
+never does: **0** class→class links across **3,172** class pages and **7,930**
+wikilinks in the 38 example payloads, and **0** across **600** class pages and
+**2,008** wikilinks in the 50 skeletons. Every `[[Unit x, Day y]]` link in
+`support/` comes from somewhere that is not a class page — 88 from
+`per_section/index.md`'s "Most Recent Class" transclusion, 6 from
+`shared/Style/What This Site Can Do.md`. So this fires only on a class→class
+link a teacher wrote themselves, which is a natural thing to write and which
+nothing discourages. That is an argument about PRIORITY, not about whether to
+settle it.
+
+**The section index was deliberately NOT exempted.** `WikiLinkRewriter`'s
+pattern counts an EMBED as a link, so `![[Unit 4, Day 23]]` on a section's
+landing page is a link onto a class page — and publishing the index therefore
+now publishes only the index and its non-class material. Measured before
+deciding to leave it: **38 of 38** payload `per_section/index.md` embed a
+class, and in **38 of 38** that class ships `publish: true`; **50 of 594**
+skeleton index files embed a class, and **50 of 50** of those are published.
+So a new section, and a deploy straight after setup, cannot produce a home page
+pointing at a class students cannot see. The invariant is held by REPOINTING
+rather than by link reach in any case: `SectionIndexPointer.repointIndex` runs
+on every apply (`AssistPublishPlan.apply`, `SectionReDatePlanner.apply`) and
+repoints the index at the most recent class students CAN see. Nobody publishes
+a section by naming its index page, whose title is `Section <N>`.
+
+**Two consequences worth writing down before somebody finds them.**
+
+- **Re-dating a whole section claims material differently.** In
+  `SectionReDatePlanner`, classes are walked earliest-first and the first to
+  reach a page locks its claim, so Day 3's walk used to reach a worksheet
+  *through* Day 4 and give it Day 3's new day. Day 4's own walk claims it now.
+  Strictly better, and exactly the decision's own words.
+- **Material behind an UNNUMBERED class page stops being re-dated by a
+  whole-section re-date at all.** `SectionReDatePlanner` walks
+  `ClassInsertionPlanner.numberedClasses`, so a teacher's `Exam Review.md`
+  sitting in All Classes is not itself a walk root — and it is now a stop, so
+  nothing behind it is reached either, where before it took the date of
+  whichever numbered class could see it through that page. Measured: **0 of
+  3,172** class-folder pages in the 38 payloads are unnumbered, so this is
+  teacher-authored content only. It is the decision working rather than a
+  regression; it is written here so it is not discovered as one.
+
+**What the teacher is told.** The plan and the reply name the linked classes
+that were left alone (`AssistWording.linkedClassesWereLeftAlone`, said once via
+`AssistPublishPlan.describe()`, which is the text both surfaces use). Windows
+says nothing today, and that silence is the one part of its answer worth
+improving on: a teacher who is not told reads a plan quietly smaller than the
+one they pictured, with no way to tell "it decided" from "it missed it". **Only
+about a class students cannot already see** — "publish it when you get to that
+class" is false about a class that is already published, and the sentence
+exists to explain a link students cannot follow *yet*.
+
+**The tool description was deliberately left alone.** `publish_pages` still
+says it makes pages visible "along with every page they link to". A description
+edit is a ROUTING change, measured in this repository at 110/110 → 90/110 for
+one added sentence (see the worked example above); the description's job is to
+make the model pick the right VERB, and reach is settled in code by design. The
+exception is stated where a teacher can act on it — in the plan and the reply —
+and where an implementer reads it, in `contracts/`. Changing it is a
+MEASUREMENT, not an edit: re-run `research/ai-assist/trimmed-surface-suite.py`
+before and after.
+
+**Where it lives.** `AssistSectionGraph.reachFollowingLinks(from:)`, which
+replaced `linkedPages(from:)` — renamed rather than edited in place so the
+compiler handed over all three callers to be read again, since a silently
+widened method is how the divergence happened at all. The contract is
+`contracts/shared-rules.json` → `followingLinks.stopsAtAClassPage` and
+`contracts/class-planning.json` → `datingPagesAClassBrings.reachStopsAtAClassPage`.
+The three `followingLinks.publishing` booleans stay TRUE: the walk is still
+transitive and still takes what a page links to; it has one stop.
 
 ### No booleans, and separate verbs
 
