@@ -3369,6 +3369,254 @@ reasoning. The published date is in what the teacher was told instead
 ("Published the class on 2026-09-09."), which is why that sentence names the
 day it settled on rather than the word it was sent.
 
+## The other doors: handing a course to an assistant the teacher already has
+
+Written 2026-09-19 with [issue #205](https://github.com/russellgordon/plantoir/issues/205),
+which added the second of them. **This feature had never been written down
+anywhere** — a year after the first door shipped there was no section, no
+contract data and no reasoning on record, only 231 lines of Swift and nine
+lines of SwiftUI. That is what made adding a second one the moment to stop.
+
+Everything above this point is about the assistant Plantoir *carries*: a model
+running on the teacher's own Mac with no account, opened from a window of its
+own, bound to one section. These are different. A teacher who already has
+**Claude Code** or **Codex** on their Mac gets a menu item that hands the whole
+course to it — a real terminal session, with Plantoir's tools already
+connected and an opening message already sent. Nothing is typed by them.
+
+| | Revise with Claude… | Revise with Codex… |
+|---|---|---|
+| Tool looked for | `claude` | `codex` |
+| Server handed over as | a configuration file, `--mcp-config` | inline configuration, four `-c` overrides |
+| Written for the connection | `mcp-<CODE>.json` | **nothing** |
+| Script the mac hands to a terminal | `launch-<CODE>.command` | `launch-<CODE>-codex.command` |
+| A teacher's own MCP servers | not loaded (`--strict-mcp-config`) | **loaded beside Plantoir's** |
+| Sandbox / approval flags passed | none | none |
+| Trail line | `started Claude Code for <CODE>` | `started Codex for <CODE>` |
+
+Both doors are described as data in
+[`contracts/app-rules.json`](../contracts/app-rules.json) → `outsideAgents`,
+and a mac test walks both. The sentences live there, not in this page: naming
+them rather than quoting them is what keeps a document from going quietly out
+of date.
+
+### The shape, which is the same for both
+
+Find the tool; write an executable `.command` script into the app's own data
+directory; hand that script to iTerm if it is already running, else Terminal,
+through LaunchServices rather than AppleScript so no Automation permission is
+asked for. The teacher watches a real session.
+
+Three properties matter more than the mechanism:
+
+- **Nothing lands in the teacher's folder.** Everything is in
+  `~/Library/Application Support/Plantoir/assist/`, never in the vault Obsidian
+  is watching. Neither door writes a `CLAUDE.md`, an `AGENTS.md` or a
+  `.mcp.json` — Codex's `AGENTS.md` convention costs nothing and gains nothing
+  here, because there is no such file for either agent to read and the whole
+  instruction set is the one-paragraph greeting passed as an argument.
+- **The item is hidden when the tool is not installed**, and hidden
+  independently per door. Not greyed out: a menu that teaches teachers to stop
+  reading it is worse than a shorter menu.
+- **Plantoir never installs one, and never offers to.** These are developer
+  tools with accounts and their own update paths. A teacher who wants one
+  installs it themselves and Plantoir finds it.
+
+**The course reaches the session through the GREETING, and nowhere else.** The
+server is given the WORKING FOLDER (`--mcp-stdio <folder>`), so every course in
+it is reachable from either door. The class comment on `ClaudeCodeLauncher`
+claimed the opposite for a year — that the session was "locked to the course …
+passed to the server rather than asked for in a prompt" — and it was never
+true; it was corrected with this work, because a reader who believed it would
+have given Codex a narrowing that neither door has. The assistant Plantoir
+carries itself *is* bound (`contracts/assist-cases.json` → `windowBinding`);
+an outside door is not.
+
+**The search list does nearly all of the work, and it is the first thing
+somebody will simplify away.** An app launched from the Dock inherits launchd's
+minimal PATH, so `onPath` usually finds nothing even on a Mac where the
+teacher's own shell finds the tool at once. PATH is tried first, then
+`~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, `~/.npm-global/bin`,
+`~/.bun/bin` and every `~/.nvm/versions/node/*/bin`. The same list serves both
+doors with only the name changed: Codex's own installer script sets
+`BIN_DIR="${CODEX_INSTALL_DIR:-$HOME/.local/bin}"`, which is already the first
+place looked.
+
+**Being findable is not being signed in**, and the door does not try to find
+out — that would mean running the tool while a context menu is being drawn. A
+teacher who is signed out meets their assistant's own sign-in step in the
+terminal.
+
+### What was MEASURED for the Codex door
+
+On Russell's Mac, 2026-09-19, **codex-cli 0.155.1** installed with Homebrew and
+signed in with a ChatGPT account. The Plantoir binary used was the DerivedData
+Debug bundle; the working folder was `~/Desktop/plantoir-overnight`, which is
+not a git repository.
+
+1. **`-c` can DEFINE a new MCP server for one invocation, and Plantoir
+   persists nothing.** `codex -c 'mcp_servers.plantoir.command="…"' -c
+   'mcp_servers.plantoir.args=[…]' mcp list` listed `plantoir … enabled`, and no
+   `~/.codex/config.toml` existed afterwards. (That file DID exist after the
+   interactive run in 3 — written by CODEX, not by Plantoir: it records the
+   teacher's own answer, `[projects."<folder>"] trust_level = "trusted"`,
+   and it is also where an "Always allow" answer is kept. Plantoir's server
+   is never written into it.) A path containing both a space
+   and an apostrophe survived the two escaping layers. This was the design's one
+   real unknown and it is settled: dotted overrides create the missing
+   intermediate tables, and each value is parsed as TOML.
+2. **Plantoir's server starts inside Codex's startup window, and a READ tool
+   runs unprompted.** `mcp: plantoir/list_courses started` → `(completed)`,
+   returning both courses of the folder. Under `codex exec` this happened with
+   the sandbox at `read-only` and approvals at `never`.
+3. **The interactive TUI asks once whether to trust the folder, and then
+   proceeds.** A teacher's working folder is not a git repository, and this
+   matters: `codex exec` REFUSES a non-git directory outright ("Not inside a
+   trusted directory and `--skip-git-repo-check` was not specified", exit in
+   0.06 s), but the TUI — which is what the door launches — shows a trust
+   prompt instead. **So no `--skip-git-repo-check` is needed**, and none is
+   passed. The decision is saved, so it is asked once per folder. (NOT measured,
+   but read off the code: the trail line is written before the terminal is
+   launched, so a teacher who answers "Quit" gets a window that closes while
+   the trail already says a session started — worth knowing when a report says
+   "nothing happened". The Claude door has always done the same.)
+4. **The positional greeting is taken as the first message.** Codex
+   immediately called `plantoir.list_courses({})` and rendered both courses.
+5. **A WRITE is gated by Codex itself, with no approval flags from us.** Asked
+   to unpublish a page, it first called `plantoir.explain_publishing` unprompted
+   and quoted it, then stopped at *"Allow the plantoir MCP server to run tool
+   'unpublish_pages'?"*, showing the course, the pages and the section, with
+   **1. Allow / 2. Allow for this session / 3. Always allow / 4. Cancel**.
+   Note the third: **"Always allow" persists the teacher's choice for future
+   sessions**, which is a decision they make and Plantoir cannot see.
+
+6. **The two doors differ in WHEN the publishing explanation arrives, and
+   that is accepted.** Russell opened both doors on the same course from the
+   built feature (2026-09-19, a fresh non-git folder, ICS4U, one section). Same
+   greeting, same first call (`list_courses`), same promise to show the plan
+   and wait. But Claude made TWO Plantoir calls and relayed
+   `explain_publishing`'s text word for word at the greeting, while Codex made
+   one and did not. The cause is the tool's own description — "Call this
+   FIRST, before doing anything else with a section": Claude reads "first"
+   eagerly; Codex defers it until it is about to act on a section (in 5 it
+   called it unprompted immediately before the unpublish). The explanation
+   still reaches a teacher before any change. REJECTED: adding a sentence to
+   Codex's greeting to make the openings look alike — cosmetic, and it would
+   make the two greetings diverge. Also seen: asked about the teacher's
+   teaching style, both honestly said they did not know yet — neither had read
+   a page, and nothing Plantoir hands them says how the course is taught.
+   That is issue #209.
+
+Whole `exec` session including the model call: 15 s. MCP cold-start was not
+timed separately, and a signed-out launch was not measured (expected: Codex
+asks them to sign in).
+
+### The two timeouts, and why they are passed rather than trusted
+
+```
+-c 'mcp_servers.plantoir.startup_timeout_sec=60'
+-c 'mcp_servers.plantoir.tool_timeout_sec=1800'
+```
+
+Codex's own defaults **disagree between its source and its published
+reference** — `DEFAULT_STARTUP_TIMEOUT` 30 s and `DEFAULT_TOOL_TIMEOUT` 300 s in
+`codex-rs/codex-mcp/src/rmcp_client.rs`, against 10 s and 60 s in the
+configuration reference — so the effective value is version-dependent on a
+teacher's machine. Both tool figures are too short whichever is in force:
+`AssistToolRunner.deploySection` **awaits** the deploy, and a first publish
+builds the image and uploads through wrangler, which is minutes. The startup
+figure is cheap insurance: the server is a whole app binary starting cold, and
+the difference is a door that opens against one that says it timed out.
+
+A future reader who deletes these two as redundant meets
+`CodexLauncherTests.testBothTimeoutsArePassed`.
+
+### The escaping is TWO layers, and the inner one fails quietly
+
+Each value sits inside a **TOML basic string** inside a **shell-single-quoted
+argument**:
+
+```
+-c 'mcp_servers.plantoir.args=["--mcp-stdio","/Users/r/Russell'\''s Courses"]'
+```
+
+`escapeForTOMLString` is applied first (`\` → `\\`, `"` → `\"`, control
+characters as TOML escapes; an apostrophe needs nothing here, and UTF-8 above
+U+007F is legal in TOML and is left alone), then `escapeForShell` wraps the
+whole argument.
+
+**Getting the inner layer wrong does not produce an error.** Codex's
+`parse_toml_value` falls back to treating an unparseable value as a raw string,
+so a working folder whose name contains a double quote turns `args` from a
+`Vec<String>` into one `String` — and the teacher meets a door that greets them
+warmly and then cannot start its server, with nothing on screen naming the
+cause. That is why this is a function with six golden fixtures (a plain path, a
+space, an apostrophe, a double quote, a backslash, unicode) **and** an argv
+round-trip test that runs the written script against a stub `codex` and reads
+back what actually arrived.
+
+Dotted keys were chosen over one inline table
+(`-c 'mcp_servers.plantoir={command=…,args=[…]}'`). Both work. The inline form
+halves the escaping surface, which is the argument for it; the dotted form
+merges into a teacher's configuration one key at a time and is what the
+published documentation shows, so a reader can check it. The escaping is
+tested; matching the documentation is not.
+
+### The one divergence that cannot be fixed from here
+
+**Codex has no `--strict-mcp-config`, so a teacher's own MCP servers load
+beside Plantoir's.** This is structural rather than an omission in the
+documentation: the CLI overrides layer is MERGED with the user's configuration
+by a recursive table merge, and
+[openai/codex#16045](https://github.com/openai/codex/issues/16045) records that
+even `-c 'mcp_servers={}'` cannot clear what is already there. The Claude door
+isolates; the Codex door cannot. Said plainly here rather than hidden in a
+comment, because it is a real reduction against the older door and somebody
+will eventually ask why the two are not the same.
+
+### What was REJECTED
+
+- **`CODEX_HOME=<a Plantoir directory>`** — a perfect `--strict-mcp-config`
+  equivalent, and it **logs the teacher out**. It relocates *everything*:
+  `config.toml`, `auth.json`, `history.jsonl`, the state database. The teacher
+  would meet a sign-in screen they did not ask for, in a session Plantoir
+  started for them.
+- **A project `.codex/config.toml` in the working folder.** Inside the
+  teacher's folder but in a dotfolder Obsidian ignores, so that part is fine.
+  It is rejected because it is **loaded but disabled when the directory is
+  untrusted**, silently — the untrusted-folder screen says "Config, hooks, and
+  exec policies from untrusted folders stay disabled". A route that fails by
+  doing nothing and saying nothing is worse than one that fails loudly. The
+  `-c` layer is applied unconditionally, before any project layer, which is a
+  second and independent reason it wins.
+- **A global `codex mcp add plantoir -- …`.** It writes user scope only —
+  `$CODEX_HOME/config.toml`, no `--scope` flag — so it edits something OUTSIDE
+  the teacher's folder, which is the one thing the Claude door has always
+  refused to do. It is also wrong on its own terms: the `args` name ONE working
+  folder, and a teacher with two would have a global entry pointing at whichever
+  they opened last.
+- **`--profile`** — same objection; a profile is a file in the teacher's Codex
+  home.
+- **Any `--sandbox` or `--ask-for-approval` flag, and
+  `mcp_servers.plantoir.default_tools_approval_mode`.** Measurement 5 shows
+  Codex already asks before a write, which is exactly the behaviour the greeting
+  requests. Passing a flag would quietly widen permissions the teacher set for
+  themselves. The last one is named because it is the lever somebody will
+  propose the first time a teacher finds the prompting tedious.
+- **`--cd <folder>`** — unnecessary; the script already `cd`s, and the server is
+  given the folder as an argument.
+- **Auto-installing Codex, or offering to.** See above.
+- **Writing an `AGENTS.md` into the teacher's vault.** A developer-looking file
+  in the folder Obsidian watches, to say what the greeting already says.
+- **The `OutsideAgent` / `OutsideAgentLauncher` extraction**, on the day of a
+  release. The helpers were lifted (one directory search parameterised by name,
+  one support directory, one terminal launch, one greeting) and nothing is
+  duplicated, but the two doors remain two types and `SidebarView` builds its
+  items at two call sites. Windows already learned that drifts. The golden tests
+  that pin the Claude door's greeting, script and configuration **to the byte**
+  were added FIRST, before anything was touched, precisely so the extraction can
+  be done later and proved not to have moved anything.
+
 ## Further reading in this repository
 
 - [`09-mac-app.md`](09-mac-app.md) — the app the assistant lives in
