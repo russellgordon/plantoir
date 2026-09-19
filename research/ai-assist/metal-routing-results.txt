@@ -206,5 +206,333 @@ layer in front of it and does route them.
 
 RESULTS
 -------
-(To be appended. Nothing above this line was written after the first model
-call.)
+Nothing above this line was written after the first model call.
+
+THE ANSWER, IN ONE PARAGRAPH
+----------------------------
+**On the tier this Mac actually ships, the 2026-08-24 change bought nothing
+and cost nothing.** Qwen3-4B answered 27 of the 29 probes identically with the
+shipped prompt and with the pre-tweak prompt — 271/290 against 270/290, the
+one-response difference being a probe that is noise in both — and the promise
+card is 110/110 either way. On the small tier the shipped prompt is slightly
+BETTER than the pre-tweak one (208/290 against 199/290), which is the opposite
+direction from the worry, so nothing is owed back to Windows on the wording.
+The run found three things nobody was looking for, and they matter more than
+the headline: tool-call arguments arrive TRUNCATED often enough to count
+(19 of 290 responses on the small tier, and every "malformed tool calls: 0" in
+this folder was measuring only HTTP errors); one probe makes the small model
+generate for 41 seconds under the app's own request body; and the two
+2026-08-15 anchors cannot be reproduced probe-for-probe even at their own
+context size and thread count, because the harness that produced the newer one
+was never committed.
+
+EVERY ARM
+---------
+"card 11" is the promise card; "sees" is the 24 probes the app actually sends
+to a model (the other five are answered in code). "Truncated" is tool calls
+whose argument JSON did not parse.
+
+  arm                                  all       %    W-18     card 11  inv  writes  trunc
+  ---------------------------------------------------------------------------------------
+  Qwen2.5-1.5B, ctx 8192, threads 4
+  A1 hyphen        temp 0.1, 10x     204/290   70%   116/180   88/110    0     55     19
+  A2 shipped       temp 0.1, 10x     208/290   72%   118/180   90/110    0     51     12
+  A3 pre-tweak     temp 0.1, 10x     199/290   69%   110/180   89/110    0     56     13
+  H  shipped       temp 0,    3x      63/87    72%    36/54    27/33     0     15      3
+  Hpre pre-tweak   temp 0,    3x      61/87    70%    34/54    27/33     0     15      3
+  H  shipped       temp 0, cold 1x    21/29    72%    12/18     9/11     0      5      1
+  Hpre pre-tweak   temp 0, cold 1x    21/29    72%    12/18     9/11     0      5      1
+
+  Qwen2.5-1.5B, ctx 16384, threads 6 — the ANCHORS' conditions, added after
+  the fact as a control (see "The anchors do not reproduce", below)
+  shipped          temp 0.1, 10x     207/290   71%   120/180   87/110    0     50     14
+  pre-tweak        temp 0.1, 10x     198/290   68%   115/180   83/110    0     60     16
+
+  Qwen3-4B, ctx 16384, threads 4 — THIS MAC'S OWN TIER
+  A2 shipped       temp 0.1, 10x     271/290   93%   161/180  110/110    0     10      0
+  A3 pre-tweak     temp 0.1, 10x     270/290   93%   160/180  110/110    0     10      0
+  H  shipped       temp 0,    3x      81/87    93%    48/54    33/33     0      3      0
+  Hpre pre-tweak   temp 0,    3x      81/87    93%    48/54    33/33     0      3      0
+  H  shipped       temp 0, cold 1x    27/29    93%    16/18    11/11     0      1      0
+  Hpre pre-tweak   temp 0, cold 1x    27/29    93%    16/18    11/11     0      1      0
+
+Thinking is OFF and the token counts prove it, which is the only proof there
+is: 4B median 41 completion tokens, max 73 — tens, not the hundreds a <think>
+block costs. For the 1.5B the check is a control rather than a test (Qwen2.5
+is not a thinking model) and it reads the same: median 39-41.
+
+**Determinism.** The headline arms are greedy (temperature 0) and they behave
+that way: H(shipped) gave 63/87 on two separate runs, and the cold pass
+reproduced it exactly (21/29 × 3 = 63). **n is not a failure rate**; three
+trials at temperature 0 is a check that the answer is stable, not a sample.
+At temperature 0.1 the wobble is real and worth knowing: the three 10-trial
+1.5B arms were re-run start to finish and moved by 207→204, 207→208 and
+199→199 out of 290, with individual probes moving by as much as 3/10. Any
+1.5B probe below is therefore worth reading as "stable" or "not", never as a
+percentage.
+
+PER-PROBE — Qwen2.5-1.5B (the .small tier, an 8 GB Mac)
+-------------------------------------------------------
+  probe                          A1 hyp  A2 ship  A3 pre  H ship  Hpre  16k ship  16k pre
+  ----------------------------------------------------------------------------------------
+  card: publish by name           10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  card: publish tomorrow  [code]  10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  card: unpublish by name         10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  card: unpublish, mistake        10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  card: plan a publish            10/10   10/10    9/10    3/3    3/3    10/10     3/10
+  card: check the section [code]  10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  card: rebuild preview   [code]  10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  card: undo              [code]   8/10   10/10   10/10    3/3    3/3     7/10    10/10
+  card: deploy now        [code]   0/10    0/10    0/10    0/3    0/3     0/10     0/10
+  card: schedule a deploy          0/10    0/10    0/10    0/3    0/3     0/10     0/10
+  card: cancel the deploy         10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  publish tomorrow, with links     0/10    0/10    0/10    0/3    0/3     0/10     0/10
+  publish by name, informal       10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  HIDE - the inversion case       10/10    9/10    4/10    3/3    1/3    10/10     6/10
+  hide, informal (verbatim cue)   10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  hide, phrased as a mistake      10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  list pages                      10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  read                             0/10    0/10    1/10    0/3    0/3     0/10     2/10
+  check section                   10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  rebuild preview                 10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  undo                            10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  schedule a deploy                0/10    0/10    0/10    0/3    0/3     0/10     0/10
+  deploy now                       0/10    0/10    0/10    0/3    0/3     0/10     0/10
+  cancel scheduled deploy         10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  no course named: publish         0/10    0/10    0/10    0/3    0/3     0/10     0/10
+  no course named: hide           10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  deletion - no such tool          0/10    0/10    0/10    0/3    0/3     0/10     0/10
+  out of scope                    10/10   10/10   10/10    3/3    3/3    10/10    10/10
+  typos                            6/10    9/10    5/10    3/3    3/3    10/10     7/10
+
+  [code] = answered by AssistCardCommand in the app; the model never sees it.
+
+  What the misses actually chose, in A2 (the shipped prompt, ctx 8192):
+    card: schedule a deploy      10x deploy_section — deploys NOW instead of
+                                 at 6:30 tomorrow. A write, and the worst
+                                 miss on the small tier.
+    publish tomorrow, with links 10x publish_pages, every one of them a
+                                 runaway (see below)
+    read                         10x check_section
+    schedule a deploy            10x deploy_section
+    deploy now                   9x publish_class_on, 1x publish_pages
+    no course named: publish     10x publish_pages
+    deletion - no such tool      10x rebuild_preview
+    card: deploy now             10x declined — but the app answers this one
+                                 in code, so no teacher meets it
+
+  Classification: 19 probes stable-pass in every 1.5B arm, 7 stable-fail in
+  every arm (card: deploy now, card: schedule a deploy, publish tomorrow with
+  links, schedule a deploy, deploy now, no course named: publish, deletion),
+  and 3 unstable (card: undo, HIDE, typos — and "read", which is 0-2/10 and
+  is a stable-fail in everything but name). Every threshold below is read
+  against that classification.
+
+PER-PROBE — Qwen3-4B (the .large tier, which is what THIS Mac runs)
+-------------------------------------------------------------------
+Identical in the two prompt forms except on `read`, so one table with the
+difference called out:
+
+  27 of 29 probes: 10/10 with the shipped prompt AND 10/10 with the pre-tweak
+  prompt, the same tool every time. That includes all eleven promise-card
+  phrasings, all six polarity probes, both no-course-named probes, and the
+  deletion probe DECLINED 10/10.
+
+  read    shipped 1/10 (9x check_section, 1x read_page)
+          pre-tweak 0/10 (10x check_section)                      [MISS]
+  typos   shipped 0/10, pre-tweak 0/10 (10x publish_pages)        [MISS]
+
+AGAINST THE TWO ANCHORS
+-----------------------
+**Anchor 1 — macos-native-10-trial-comparison.txt:193-250** (2026-08-15,
+1.5B): 203/290 (70%), W-18 143/180, card 60/110, 0 inversions, 40 write-
+misses. NOT comparable on three counts, all of which move the number: it used
+FIFTEEN tools (four `plan_` twins the app no longer shows, which is why its
+card score is so much lower — the plan twins were acceptable answers there),
+ctx 16384 against 8192, 6 threads against 4, and it predates the tweak so its
+wording is A3's, not A2's. The overall figures happen to land within 5/290 of
+each other (203 vs A1's 204) and that is a coincidence of two different
+distributions of right and wrong answers, not a reproduction.
+
+**Anchor 2 — thirteen-tool-surface-results.txt** (2026-08-15, same day, 13
+tools): 1.5B 298/420 (71%), W-18 121/180, card 85/110; 4B 380/420 (90%), W-18
+170/180, card 110/110. This is the like-for-like one on the surface — same 13
+tools — and it is still not like-for-like on ctx (16384), threads (6), prompt
+(pre-tweak) or probe set (a 42-probe superset). Restricted to the 29 shared
+probes its 1.5B column is 48 write-misses, and its 4B column is 10.
+
+**The anchors do not reproduce, and that is a finding about the FOLDER.**
+A control arm was added after the fact — 1.5B, ctx 16384, threads 6, the
+pre-tweak prompt, the same 13 tools, which is anchor 2's configuration in
+everything the harness can control — and it still disagrees probe by probe:
+
+  probe                    anchor 2 (2026-08-15)      this Mac, same config
+  read                     9/10  read_page            2/10  (8x check_section)
+  card: plan a publish     9/10  publish_pages        3/10  (7x publish_class_on)
+  card: undo               6/10  undo_last_change     10/10
+  HIDE - the inversion     0/10  (declined)           6/10  unpublish_pages
+  no course named: publish 4/10                       0/10
+  deploy now               0/10  9x publish_class_on  0/10  5x/5x split
+
+The engine build, the weights, the flags, the surface text and the probe text
+all match. What does not: anchor 2's 42-probe harness **was never committed**
+(research/README.md says so), so its probe text cannot be verified; the
+dateline carries a different date; and the small model's unstable probes move
+by 3/10 between two runs of the same arm an hour apart. The lesson is the
+folder's own rule, learned again: **a results file is only reproducible if
+the harness that produced it is committed beside it.** The 29-probe suite is,
+which is why this file can be re-run.
+
+AGAINST THE 72%
+---------------
+promise-card-results.txt's 72% (63/87) is Windows-native under Vulkan, in the
+container era, 3 trials, FIFTEEN tools, a different llama.cpp build, and a
+system prompt that has changed twice since. Today's small tier reads 72%
+(63/87) on the headline arm and the 4B reads 93%. **The coincidence on the
+small tier is worth nothing** — its 63 correct answers are not the same 63,
+its card score is 27/33 where Windows' was five promises failing outright, and
+the surface differs by four tools. Quoted here only so that nobody has to go
+looking for whether it was ever compared.
+
+THE DELETION PROBE — "Delete the Unit 1 folder in VVH2O."
+---------------------------------------------------------
+Tracked by name since #95(c). There is no delete tool, so declining is the
+only right answer.
+
+  Windows, in-container, 1.5B         cancel_scheduled_deploy
+  Metal 2026-08-15, 15 tools, 1.5B    3/10 declined, 7x plan_unpublish_pages
+  Metal 2026-08-15, 13 tools, 1.5B    0/10, 10x rebuild_preview
+  Metal 2026-08-15, 13 tools, 4B      10/10 declined
+  ------------------------------------------------------------------
+  TODAY, 1.5B, shipped prompt         0/10, 10x rebuild_preview
+  TODAY, 1.5B, hyphen prompt          0/10, 9x rebuild_preview,
+                                      1x unpublish_pages (see threshold 5)
+  TODAY, 1.5B, pre-tweak prompt       0/10, 9x check_section, 1x rebuild_preview
+  TODAY, 4B, both prompts             10/10 DECLINED
+
+So the sentence "There is no tool to delete, remove or rename a page or a
+folder" does not fix this on the small model — it moves the wrong answer
+around (check_section without it, rebuild_preview with it) without ever
+producing a decline. On the tier this Mac ships it was already right and
+still is. The wording fix that was tried and rejected is in
+conversational-residue-results.txt ~:59-71 and was not retried here.
+
+THRESHOLD VERDICTS
+------------------
+1. ANY polarity inversion — **NOT TRIPPED.** Zero, in every arm, on both
+   models: 2,494 responses in total, no hide request answered with a publish
+   tool. Worth more than it looks, because the counter was WIDENED for this
+   run: the old one matched probe labels and could not see "card: unpublish
+   by name" or "no course named: hide" invert. It now covers all six polarity
+   probes, and they are 10/10 correct in every 1.5B arm and every 4B arm.
+
+2. A probe that was 10/10 in EITHER anchor now ≤5/10 — **TRIPPED**, four
+   probes, none of them the prompt's doing:
+     1.5B  publish tomorrow, with links   anchor 1 10/10 → 0/10
+     1.5B  deploy now                     anchor 1 10/10 → 0/10
+     1.5B  no course named: publish       anchor 1 10/10 → 0/10
+     4B    read                           anchor 2 10/10 → 0-1/10
+   The first three were ALREADY 0/10, 0/10 and 4/10 in anchor 2, taken the
+   same day: they are the price of the 15→13 tool trim, paid in August and
+   visible in the file that recorded it. The fourth is new, is identical in
+   both prompt forms, and appears on both tiers. Follow-up drafted.
+
+3. "hide, phrased as a mistake" — **NOT TRIPPED, and this is the answer #117
+   asked for.** 10/10 unpublish_pages in every 1.5B arm, 10/10 in every 4B
+   arm, and 0/10 undo_last_change anywhere. The cluster the tweak was written
+   for does not exist on Metal, with the tweak or without it: the pre-tweak
+   arms score the same 10/10.
+
+4. Pre-tweak beating shipped by ≥5/10 on a probe stable in both —
+   **NOT TRIPPED.** No probe moves that way at all. The differences run the
+   other direction (HIDE 9/10 shipped against 4/10 pre-tweak at ctx 8192,
+   10/10 against 6/10 at ctx 16384; typos 9/10 against 5/10), and both probes
+   are unstable, so the honest reading is "no evidence the wording hurts
+   here" rather than "the wording helps". No `decision` issue is owed.
+
+5. The deletion probe routing to a real WRITE — **TRIPPED, once.** One trial
+   in 290 (A1, hyphen prompt) answered it with `unpublish_pages`, which is on
+   the write list; the other 289 gave rebuild_preview or check_section, which
+   are the known logged answers and are excluded by the threshold's own
+   wording. The one write arrived with TRUNCATED arguments, so in the app it
+   would have reached `unpublishPages` with an empty dictionary, no course,
+   and been refused for not naming one — but a write tool chosen for a
+   deletion request is what the threshold is about, and it is recorded here
+   rather than explained away.
+
+6. Write-misses above anchor 2's rate on the same probes — **TRIPPED on the
+   small tier, not on the large.** Anchor 2's 1.5B column is 48 write-misses
+   over the 29 shared probes; today's arms are 50-60. The difference is not a
+   new failure but more of an old one: `no course named: publish` went from
+   6 to 10 wrong publishes and `typos` from 2 to 4. On the 4B it is 10 today
+   against 10 in the anchor — identical, and all ten are the `typos` probe
+   choosing publish_pages.
+
+7. A fabricated date, a malformed call, or a type coercion — **TRIPPED, on
+   malformed calls, and this is the most useful thing the run found.** Zero
+   fabricated dates (every "tomorrow" resolved to 2026-09-19), zero type
+   coercions, zero HTTP errors — but 12 to 19 responses per 1.5B arm arrived
+   as a tool call whose arguments were cut off mid-JSON. See below. The 4B
+   produced none.
+
+8. The em-dash arm differing from the hyphen arm by ≥5/10 on a stable probe —
+   **NOT TRIPPED.** A1 and A2 differ on three probes (card: undo 8 vs 10,
+   HIDE 10 vs 9, typos 6 vs 9), all three unstable, none by 5. The totals
+   differ by 4/290, which is inside the 3-5/290 this suite moves when the
+   same arm is simply run twice. **So Windows owes nothing here** — its
+   AssistAgent.cs em-dashes are fine, and the finding is documentation, not
+   an obligation. It is still worth writing down, because until this run
+   nobody knew the suite had been measuring a different string from the one
+   both apps ship.
+
+WHAT THE RUN FOUND THAT NOBODY WAS LOOKING FOR
+-----------------------------------------------
+**1. Tool-call arguments arrive truncated, and every file in this folder has
+been reporting that as zero.** The suite did `except: arguments = {}`, so a
+call whose argument JSON was cut off counted as a call with no arguments, and
+the line "malformed tool calls: 0" was only ever counting HTTP failures. With
+that fixed (commit in this branch), the small tier produces 12-19 truncated
+calls per 290 responses — `publish tomorrow, with links` every single trial,
+plus `typos`, `no course named: publish` and `deploy now` — and the 4B
+produces none. **Read every "malformed tool calls: 0" in the older files as
+"no HTTP errors".**
+
+**2. Under the app's own request body, one sentence makes the small model
+generate for 41 seconds.** The suite's historic body caps generation at 256
+tokens; AssistModelClient sends no cap at all. With no cap, "Publish
+tomorrow's class for VVH2O section 1, and make sure every page it links to is
+published rather than left as a draft." makes Qwen2.5-1.5B emit a
+`publish_pages` call enumerating "Unit 2, Day 3; Unit 2, Day 4; … Unit 2, Day
+58; …" until the context runs out — 5,435 completion tokens, finish_reason
+`length`, **40.9 seconds**, 3/3 trials, reproduced on a cold server. The
+teacher waits three quarters of a minute and gets an unusable call. The 4B
+never does this (max 73 tokens). The app's 180-second timeout means it
+completes rather than failing, which is arguably worse.
+
+**3. The small tier's real shape.** 19 of 29 probes are rock solid, 7 are
+solidly wrong, and the rest wobble. The seven include three the assistant
+window PROMISES ("Deploy tomorrow's class at 6:30 AM" → deploys now, twice
+over) and one that a teacher would phrase naturally ("Publish tomorrow's
+class, and everything it links to" with no course named → publish_pages). The
+4B gets all of them right, every trial, both prompts. The gap between the
+tiers on this surface is 93% against 72%, and it is not evenly spread — it is
+concentrated in exactly the sentences a teacher is most likely to type.
+
+CONCLUSION, IN PLAIN WORDS
+--------------------------
+The 2026-08-24 system-prompt change bought the mac nothing and cost it
+nothing. On the model this Mac runs, the two prompts are the same prompt as
+far as routing is concerned — 27 of 29 probes identical, the promise card
+perfect either way, the deletion probe declined either way. On the small
+model the shipped wording is a few points ahead of the one it replaced, so
+there is no case for reverting it and no `decision` to put to anybody. #117's
+specific question — "is undo over-salience fixed on Metal?" — has the answer
+that the fault was never present here: the probe was 10/10 correct before the
+tweak and is 10/10 correct after it.
+
+What is worth acting on came out of the measurement rather than out of its
+hypothesis: a counter that has been reporting zero while truncated calls went
+through, a 41-second turn on a sentence the assistant invites, a `read` probe
+that both tiers now get wrong, and three promises the small tier cannot keep.
+Those are drafted as separate issues rather than folded in here.
+
