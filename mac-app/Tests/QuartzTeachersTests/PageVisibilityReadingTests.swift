@@ -9,14 +9,27 @@ import XCTest
 /// the forms where this app says `cannotTell`, and the corners it handles
 /// rather than refusing.
 ///
-/// The shared list cannot carry the `cannotTell` forms, because a case there
-/// states what the SITE does and this app's reporting answer is `visible`
-/// whatever the site does. Pinning `expectVisible: true` for a form the site
-/// HIDES — a value on the line below the key, say — would oblige Windows to be
-/// wrong in the same direction rather than merely allow it. So they are pinned
-/// here, at the level where the answer is honest: `cannotTell` is its own
-/// answer, reporting collapses it to visible, and nothing that writes to a
-/// teacher's file is allowed to collapse it at all.
+/// The shared list mostly cannot carry the `cannotTell` forms, because a case
+/// there states what the SITE does and this app's reporting answer is
+/// `visible` whatever the site does. Pinning `expectVisible: true` for a form
+/// the site HIDES — a value on the line below an EMPTY key, say — would oblige
+/// Windows to be wrong in the same direction rather than merely allow it. So
+/// they are pinned here, at the level where the answer is honest: `cannotTell`
+/// is its own answer, reporting collapses it to visible, and nothing that
+/// writes to a teacher's file is allowed to collapse it at all.
+///
+/// **With one deliberate exception since 2026-09-19** (issue #176), in the
+/// contract note's own words: where the REPORTING answer and the site agree, a
+/// shared case obliges nobody to be wrong. The test is not "can the reader
+/// read it" but "does the reporting answer match the site" — and for two
+/// continuation forms it does, because the site PUBLISHES them. So
+/// `publish: false` over an indented `false`, with and without a blank line
+/// between, ARE in `readingCases`, and they earn the place because the reader
+/// that got them wrong got them wrong CONFIDENTLY, which is what let a
+/// writer's already-right gate turn "hide this page" into a no-op. Their
+/// polarity siblings (`no`, `off`, `FALSE`, `true`, `maybe` with a value
+/// below) are equally honest and add nothing those two do not, so they stay
+/// here — see `testAValueBelowACompleteLookingOneIsStillAValueBelow`.
 ///
 /// Everything asserted here about what the BUILD does was measured on
 /// 2026-09-18 by running the form through the real image — python-frontmatter

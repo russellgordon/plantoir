@@ -607,11 +607,23 @@ nonisolated enum PageVisibilityReader {
 
     /// Is this line one of the fences around a page's frontmatter?
     ///
-    /// Three dashes OR MORE, with nothing after them but spaces and tabs —
-    /// which is python-frontmatter's own boundary (`^-{3,}\s*$`), and
-    /// therefore the build's. A page fenced with `----` really does have
-    /// frontmatter, and reading it as an ordinary page said a hidden page was
-    /// visible.
+    /// Three dashes OR MORE, with nothing after them but spaces and tabs.
+    /// That is python-frontmatter's own boundary, `^-{3,}\s*$`, and therefore
+    /// the build's. A page fenced with `----` really does have frontmatter,
+    /// and reading it as an ordinary page said a hidden page was visible.
+    ///
+    /// **It is not quite that regex, in one measured way**: this trims
+    /// LEADING spaces and tabs before testing, and `^-{3,}\s*$` allows none —
+    /// so a line of INDENTED dashes is a closing fence here and part of the
+    /// value to the build. Measured: `publish: false` over `  ---` is the
+    /// plain scalar `"false ---"` and the site PUBLISHES the page, while this
+    /// reader ends the block at the `  ---`, sees a complete `false`, and
+    /// answers `hidden` — confidently, so a writer's already-right gate makes
+    /// "hide this page" a no-op. Pre-existing, shared with Windows, and NOT
+    /// changed with issue #176 on purpose: four callers share this finder —
+    /// the reader, both visibility writers and `PageFrontmatter` — so it is
+    /// its own piece.
+    /// [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
     static func isFence(_ line: String) -> Bool {
         let bare: String = trimmingYAMLSpaces(line)
         if bare.count < 3 {

@@ -441,6 +441,26 @@ separately from the reader:
   in full and sweeps. Measured after that write: `False` → HIDDEN. It changes
   none of the 54 shared `readingCases` that existed before it.
 
+  **"Whatever is on the key's own line" is closed; "the first line that could
+  be a value" has one pre-existing exception, and it is the one that reaches
+  this same fault.** A line of INDENTED DASHES — `publish: false` over
+  `  ---` — never reaches the rule above, because `isFence` trims leading
+  whitespace before testing for dashes and so takes `  ---` for the CLOSING
+  fence. python-frontmatter's own boundary is `^-{3,}\s*$`, which allows no
+  leading whitespace at all, so the build reads that line as part of the value
+  and the site PUBLISHES the page (`"false ---"`), while the reader says
+  `hidden` — confidently — and "hide this page" is a no-op, exactly the shape
+  this section exists to close. `publish: no` over `  ---` behaves the same;
+  `publish: >-` and `publish:` over `  ---` are written but the `  ---` is
+  left behind, because `continuationLineIndices` is bounded by
+  `block.closeIndex`, which is the fake fence. All measured; `origin/dev` and
+  Windows produce byte-identical output on every row, so this is pre-existing
+  and shared rather than anything this piece introduced. It is NOT fixed here
+  on purpose: `isFence` is the fence finder that the reader, both visibility
+  writers and `PageFrontmatter` all share, so changing it is its own piece
+  rather than a ride-along.
+  [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
+
   **Windows fixed all of this on 2026-09-19** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
   sweep, used by both of `SetDraft`'s branches; tests in
@@ -514,19 +534,35 @@ separately from the reader:
   the splitter change: **11,891 pages, 0 whose split output moves.** Nothing
   the build does changes.
 
-  **Two of this app's own writers still orphan a continuation**, and they are
-  named here rather than left to be discovered: `SectionAdder
-  .extendFrontmatter` inserts the new section's `createdSection<N>` /
-  `publishForSection<N>` pair after the last per-section KEY LINE, so on a page
-  whose value continues below it the pair lands between the key and its value
-  — measured, a page HIDDEN in section 1 becomes VISIBLE in both sections; and
-  `CourseRestorer.settingPerSectionKeys` swaps this section's key line for the
-  backup's without either side's continuation lines — measured, a live
-  `publishForSection1:` / `  a: 1` whose backup had no such key is left as
-  `  a: 1` alone and the build stops. Both are pre-existing, both are shared
-  with Windows, and neither is reached by the fixed reader or writer (neither
-  calls `setting`). They have issues of their own; the rule above is the app's
-  rule, and those two are where it is not yet kept.
+  **Three of this app's own write paths still orphan a continuation**, and
+  they are named here rather than left to be discovered:
+
+  * `SectionAdder.extendFrontmatter` inserts the new section's
+    `createdSection<N>` / `publishForSection<N>` pair after the last
+    per-section KEY LINE, so on a page whose value continues below it the pair
+    lands between the key and its value — measured, a page HIDDEN in section 1
+    becomes VISIBLE in both sections.
+    [Issue #181](https://github.com/russellgordon/plantoir/issues/181).
+  * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
+    the backup's without either side's continuation lines — measured, a live
+    `publishForSection1:` / `  a: 1` whose backup had no such key is left as
+    `  a: 1` alone and the build stops.
+    [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
+  * **`setting`'s own INSERT branch** — the third branch of the very function
+    the sweep was added to, and the surprising one. It CREATES an orphan
+    rather than leaving one: a block whose first line is indented gets the new
+    key inserted above it at `openIndex + 1`, and that indented line becomes
+    the new key's value. Measured, `---` / `  a: 1` / `---` is VISIBLE (no
+    flag at all) and after a hide it STOPS the build — `bad indentation of a
+    mapping entry (3:4)`. There is nothing to SWEEP there; the fix is where to
+    insert, which is a decision about a teacher's hand-edited YAML rather than
+    a mechanical one.
+    [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
+
+  All three are pre-existing, all three are shared with Windows (which inserts
+  at `open + 1` too), and none is worsened by this piece. The first two are not
+  reached by the fixed reader or writer at all — neither calls `setting`. The
+  rule above is the app's rule; these three are where it is not yet kept.
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a
