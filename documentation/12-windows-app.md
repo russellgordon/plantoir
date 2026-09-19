@@ -1815,9 +1815,20 @@ side changed it — so the two still match, and this is a shared decision rather
 than something each platform finds separately. Changing it would mean saying
 "unless its date is implausible" to a teacher who has no idea their folder came
 from a Thai Mac, which is rule 1's problem rather than a fix.
-`documentation/10-local-ai-assistant.md` → "Prune only the ASSISTANT's own
-backups" is *more* true after this change, not less: keeping the five most
-recent is precisely what the 2569 zip was preventing.
+**The same is true of one sentence in `documentation/10-local-ai-assistant.md`,
+and it is NOT left alone — it is fixed on the mac's branch.** "Prune only the
+ASSISTANT's own backups, keeping its five most recent per course" is now
+approximately false in exactly the way `KeptDescription` is: the five kept are
+the five most recent PLAUSIBLE ones, and an implausible zip is kept beside them
+for ever. (It would be fair to say the guard makes the sentence's INTENT truer
+— a 2569 zip was stealing one of the five — but the sentence as written still
+describes something the code no longer does, and that is the kind of
+almost-right line that gets believed.) It is not corrected here, because 10 is a
+shared page and `origin/issue/160-archive-stamp-calendar` already rewrites that
+bullet with the caveat and a pointer to `09-mac-app.md` for what it costs;
+editing it from this side would conflict with that branch for no gain. **When
+#160 merges, check that bullet reads correctly for both platforms** — the mac's
+wording says "since 2026-09-10", which is its date, not this one's.
 
 **Tests** are in `CourseBackupTests` (`ModelTests.cs`) — a plain temp-folder
 class, nothing process-wide, so it stays out of `SharedActivityState`. The one
@@ -1825,9 +1836,18 @@ worth copying is `PruneBackups_ABackupWhoseStampCannotBeTrue_IsNeitherCountedNor
 it asserts the number of surviving REAL backups, not merely that the 2569 zip is
 still there, because a guard that worked by refusing to PARSE the name would
 pass the weaker assertion while still deleting two real copies instead of one.
-Both mutations were run: removing the `continue` reddens that test and the
-below-floor one; making either bound exclusive reddens
-`CouldHaveBeenStamped_IsInclusiveAtBothBounds`.
+`PruneBackups_AStampPastTheCeiling_CountsOnceTheClockCatchesUp` is the reason
+`PruneBackups` takes a `now`: the ceiling is half the rule and nothing on disk
+exercises it, since whether a stamp is past it depends on when the suite runs.
+It asks about ONE file twice with the clock in two places — three days ahead of
+`now` it is uncounted and undeleted; with `now` moved forward two days it is
+counted, and being the newest it keeps its place while the oldest real backup
+goes. Without that test the parameter was dead plumbing described by a comment
+that was not true, which a review caught.
+Three mutations were run: removing the `continue` reddens the 2569 and
+below-floor tests; making either bound exclusive reddens
+`CouldHaveBeenStamped_IsInclusiveAtBothBounds`; dropping `, now` where
+`PruneBackups` calls the guard reddens the ceiling test.
 
 **Part 2 of #161 is deliberately not done, and the issue stays open.** The mac
 turned these bounds into contract data — `contracts/course-management.json` →

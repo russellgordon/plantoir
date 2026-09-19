@@ -70,8 +70,12 @@ public static class CourseArchiver
     /// place among the five that are kept.
     /// </summary>
     /// <param name="now">
-    /// The clock the plausibility check measures against; tests pass one so
-    /// the answer cannot change mid-run. Nothing in the app passes it.
+    /// The clock the plausibility check measures against. Nothing in the app
+    /// passes it; tests do, because the CEILING is the half of the rule
+    /// nothing on disk can exercise on its own — a stamp is past it or not
+    /// depending only on when the suite happens to run. See
+    /// <c>PruneBackups_AStampPastTheCeiling_CountsOnceTheClockCatchesUp</c>,
+    /// which asks about one file twice with the clock in two places.
     /// </param>
     public static void PruneBackups(string courseCode, string coursesDirectory, DateTime? now = null)
     {
