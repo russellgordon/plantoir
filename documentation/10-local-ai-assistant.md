@@ -1886,22 +1886,155 @@ teacher who touched one page in Obsidian gets a half-undone shuffle — some
 classes renamed, some not, links pointing at both. A partial undo of a
 rename is worse than no undo, because nothing tells the teacher which half
 happened. So the way back for anything that shuffled is the backup taken
-before it, and the reply NAMES that file
-(`ClassChangeWording.OtherClassesMoved`). The mac reached the same answer
+before it, and the reply says so — `AssistWording.otherClassesMoved` on the
+mac since 2026-09-19, `ClassChangeWording.OtherClassesMoved` on Windows,
+which has a second form naming the backup's FILE and asserts its
+no-file-name form against the contract key. The mac reached the same answer
 first and Windows mirrored it rather than improving on it.
 
-**The condition is renames OR date moves, and this is the one place Windows
-is stricter than the mac.** `AssistToolRunner` keys the duplicate's undo on
-`renames.isEmpty` alone. Renames happen only WITHIN the unit being changed,
-so duplicating the LAST day of a unit renames nothing and re-dates every
-class of every later unit — and the mac offers an undo there that takes back
-the copy and leaves the rest of the year moved. Windows counts both lists
-(`DuplicateClassPlan.MovesOtherClasses`), and the same count is what the
-plan tells the teacher before they agree, so an approved plan is never silent
-about a re-dated later unit. Both halves are contract data now:
-`contracts/class-planning.json` → `duplication`, with `undoRule` and three
-cases; the mac owes a runner, and the second case is expected to fail there
-until its gate widens.
+**The condition is renames OR date moves, and the duplicate path was the one
+caller that never got wired to it.** `ClassInsertionPlan` carries two lists —
+`renames`, only ever WITHIN the unit being changed, and `moves`, every class
+of every LATER unit, re-dated and never renumbered — and
+`ClassInsertionPlan.movesAnythingElse` has answered about both since
+make-room was written. Keyed on `renames.isEmpty` alone, duplicating the LAST
+day of a unit renamed nothing, re-dated every class of every later unit, and
+offered an undo that took back the copy and left the rest of the year moved
+with nothing said about it. Windows found it while building its own
+duplicate ([#149](https://github.com/russellgordon/plantoir/issues/149)) and
+proposed the case; the mac widened its gate in
+[#163](https://github.com/russellgordon/plantoir/issues/163).
+
+Both halves are contract data: `contracts/class-planning.json` →
+`duplication`, with `undoRule`, `forcedUnpublished` and three cases, run by
+`ClassPlanningContractTests.Duplication_MatchesContract` on Windows and
+`ClassPlanningContractTests.testDuplicatingMatchesTheContract` on the mac.
+**Case 2 was RED on the mac the first time its runner ran**, which is the
+handover working rather than damage, and it is written down here because a
+case nobody remembers catching anything is a case somebody eventually
+simplifies away.
+
+**The plan card counts the UNION of the two lists, not either one.**
+`ClassInsertionPlan.otherClassesMoving` (Windows:
+`DuplicateClassPlan.OtherClassesMoving`) dedupes case-insensitively on the
+page TITLE, which works because `moves` carries each page under the name it
+will HAVE. Adding the two counts instead would say 5 where three pages move;
+counting renames alone printed no line at all in exactly the shape that
+re-dates a teacher's whole year, and that is the card they agree to. The
+number is `expectOtherClassesMoving` in each contract case.
+
+#### Three things the duplicate did that nothing was watching
+
+All three were found from the Windows side and closed on the mac in #163.
+
+**1. A copy could arrive already visible to students.** The copy is given a
+plain `publish: false`, but the build consults `publishForSection<N>` FIRST —
+and the page a teacher names can itself be a course-level shared page, since
+`AssistSectionGraph.read` walks the whole course directory. Every
+`_DUPLICATE ME.md` in the shipped example content carries that key. Measured
+in the real toolchain image (`teaching-quartz:src-0b2b2e9c`, CPython 3.11.15,
+PyYAML 6.0.3, python-frontmatter 1.3.0), calling the build's own
+`process_frontmatter` and then applying `patches/publish.ts`'s rule:
+
+| the copy's frontmatter, for section 1 | after the build | the site |
+|---|---|---|
+| `publish: false` + `publishForSection1: true` | `publish: True` | **VISIBLE TO STUDENTS** |
+| `publishForSection1: true`, `publish: false` inserted at the top of the block (what `AssistPageVisibility.setting` writes) | `publish: True` | **VISIBLE TO STUDENTS** |
+| `publish: false` + `publishForSection1: false` (what the fix writes) | `publish: False` | HIDDEN |
+| `publish: false` (control) | `publish: False` | HIDDEN |
+| `publish: false` + `draftSection1: false` | `publish: False` | HIDDEN |
+| `publish: false` + `publishForSection2: true` (another section's key) | `publish: False` | HIDDEN |
+
+The FILE says `publish: false` and the site shows the page, which is the
+worst available shape: the teacher's own page looks hidden. Only THIS
+section's per-section publish key can beat the plain one — a key naming
+another section is deleted unread — so one extra write closes it.
+
+The guard is **broad**: the copy is read back through
+`AssistPageVisibility.answer` and the flag written out in full whenever the
+answer is anything other than a confident `hidden`. What was REJECTED is the
+narrow form, "only when a top-level `publishForSection<N>` line is present".
+It looks tighter and is wrong: `cannotTell` is not a shrug, it is a value
+this app will not guess at, and after
+[#176](https://github.com/russellgordon/plantoir/issues/176) the important
+`cannotTell` shapes PUBLISH — a key whose value continues on an indented
+line reaches the site as the string `'false false'`. A copy the reader cannot
+vouch for is exactly the copy to write the flag onto, so the guard firing
+there is the guard working. Writing through `AssistPageVisibility.setting`
+rather than hand-rolling the line is what makes it safe: the copy inherits
+#176's continuation sweep and the legacy-key migration for free, and no line
+of `AssistPageVisibility` needed changing to get them.
+
+**2. A lesson still sitting where the copy would go was written over.**
+`ClassInsertionPlanner.apply` SKIPS a rename whose destination already exists
+or whose source it cannot read, which is right in itself and leaves the page
+the copy was meant to BECOME holding somebody's real class; the copy was then
+written there unconditionally. Deterministic construction, which is also the
+mac's test:
+
+- unit 1, days 1–6, duplicate `Unit 1, Day 2` (so the destination is
+  `Unit 1, Day 3`)
+- `Unit 1, Day 3` is a real lesson whose body links to `[[Unit 1, Day 6]]`
+- `Unit 1, Day 5` is invalid UTF-8
+
+In rename order, highest day first: `Day 6 → Day 7` succeeds; `Day 5 → Day 6`
+is skipped because the source cannot be read; `Day 4 → Day 5` is skipped
+because its destination is still there; `Day 3 → Day 4` likewise. The lesson
+is still at `Unit 1, Day 3` when the copy is written to it.
+
+Two guards were REJECTED before the one that shipped:
+
+- **Comparing the destination's TEXT** before and after — "is this still the
+  page that was in the way?" This is what Windows does
+  (`AssistWorkspace.cs`, the `File.ReadAllText(newPath) == occupying` test)
+  and the construction above defeats it: a rename DID happen, so the planner
+  rewrites wikilinks in every page of the section including this one,
+  `[[Unit 1, Day 6]]` becomes `[[Unit 1, Day 7]]`, the texts differ, and the
+  lesson is taken with the guard in place and a comment saying it is handled.
+- **A pre-check before `apply`.** It cannot work, and the reason is sharper
+  than "it would refuse every ordinary duplicate": when the destination exists
+  at plan time it is ALWAYS in `plan.renames`, because it is a numbered page
+  at or after the insertion point. Nothing before the shuffle can tell the
+  dangerous case from the ordinary one.
+
+What shipped asks the PLANNER what it did.
+`ClassChangeOutcome.created` has carried the URLs a change wrote since it was
+written, `PlaceholderClassPlanner` fills it, and `ClassInsertionPlanner` was
+dropping it on the floor; now it fills it too, and the duplicate refuses when
+the destination held a page and is not among them. Content-free, so link
+rewriting and date moves cannot defeat it.
+
+The refusal is `AssistWording.thePlaceForTheCopyIsStillTaken`, and it is the
+only sentence in that table answered after a change has BEGUN: the room has
+been made by the time it fires, so it says other classes may already have
+moved rather than only "nothing was copied", which would be true and would
+leave a teacher believing nothing happened. It leaves a line on the trail —
+`ActivityTrail.Event.classCopyNotMade`, `contracts/shared-rules.json` →
+`activityTrail.mustRecord` → `class copy not made` — because "I duplicated a
+class, my classes moved and no copy appeared" is otherwise unanswerable: the
+trail records the tool that ran and not what it concluded. The other refusals
+on that path record nothing, deliberately, because they answer before
+anything is touched.
+
+**3. The undo of a duplicate put a BLANK class page back.** `before` was read
+after `apply`, so it was the skeleton the planner had just written, and
+"Undo that" restored a blank page while answering `AssistWording.undid`. Past
+the guard above it is provably `nil` — either the destination did not exist,
+or it existed, was vacated by a rename and the blank standing there is the
+planner's — and the recording branch only runs when nothing was renamed or
+re-dated at all, where a page there could not have existed. So the undo takes
+the copy away, which is what `AssistWording.aCreatedPageCanBeTakenBack` has
+said all along.
+
+**The eight duplicate sentences are now `AssistWording` keys.** They were
+inline on the mac and gathered in Windows' `ClassChangeWording` — which could
+not make contract keys, the generator being the mac's — so both apps said
+nearly the same eight sentences with nothing holding them together. Two
+render as two contract keys each, because one rendering cannot show both
+branches of a sentence that has two. The date is a LITERAL in the generated
+file rather than a placeholder: Windows formats a real date before its own
+sentence sees it, so `{date}` is a shape that side cannot produce, and
+`backedUpCourse` set the precedent with a real file name.
 
 ### Back up once per conversation, not once per command
 
