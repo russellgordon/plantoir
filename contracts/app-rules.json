@@ -1084,10 +1084,10 @@
         "isolatesTheTeachersOwnServers" : true,
         "isolationNote" : "--strict-mcp-config means only the server in that file is loaded, so a teacher's own MCP servers are neither used nor disturbed.",
         "key" : "claude",
+        "macHandsOverWith" : "launch-{course}.command",
         "menuItem" : "Revise with Claude…",
         "trailLine" : "started Claude Code for {course}",
-        "writes" : [
-          "launch-{course}.command",
+        "writesForTheConnection" : [
           "mcp-{course}.json"
         ],
         "writesNothingElse" : "Both files are in the app's own data directory. Nothing is written into the teacher's working folder, and nothing global is touched."
@@ -1112,13 +1112,14 @@
         "isolatesTheTeachersOwnServers" : false,
         "isolationNote" : "Codex has no equivalent of --strict-mcp-config, and the command-line layer is MERGED with the teacher's own configuration rather than replacing it, so their own MCP servers load beside Plantoir's. This is structural rather than an omission in the documentation and cannot be fixed from Plantoir's side.",
         "key" : "codex",
+        "macHandsOverWith" : "launch-{course}-codex.command",
         "menuItem" : "Revise with Codex…",
         "scriptNameCarriesTheAgentWhy" : "The second door's script is named after the agent as well as the course. The script is read by the terminal AFTER Plantoir has handed it over, so two doors sharing one name would let a second launch seconds later reach the first window with the wrong command line - which is the same race the per-course naming already exists to stop.",
         "timeoutsAreOverriddenWhy" : "Codex's own defaults are version-dependent - 30s startup and 300s per tool in its current source, 10s and 60s in its published reference - and both tool figures are too short, because a publish is awaited and a first one builds the image and uploads, which takes minutes. 60s and 1800s are passed rather than trusted.",
         "trailLine" : "started Codex for {course}",
         "valuesAreEscapedTwice" : "Each value sits inside a TOML basic string inside a shell-single-quoted argument, so it is escaped for TOML first (backslash, double quote and control characters) and for the shell second. Getting the inner layer wrong fails QUIETLY: an unparseable value is not rejected, it is treated as a raw string, so args stops being a list and the door greets the teacher and then cannot start its server.",
-        "writes" : [
-          "launch-{course}-codex.command"
+        "writesForTheConnection" : [
+
         ],
         "writesNothingElse" : "No configuration file exists for this door: the server is described in the arguments. Nothing is written into the teacher's working folder, and nothing is added to or read from their own Codex configuration."
       }
@@ -1132,6 +1133,7 @@
       "that the session should start by listing the course's sections",
       "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to"
     ],
+    "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file: it hands the command line straight to `wt.exe -d <folder> cmd /k …`, or to cmd when Windows Terminal is absent. The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
     "hiddenWhenNotInstalled" : true,
     "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown the menu item at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: with one installed a teacher sees one item, with both they see both, with neither they see no sign that either exists.",
     "neverInstalled" : "Plantoir never installs an outside assistant and never offers to. These are developer tools with accounts, sign-ins and their own update paths; an app that puts one onto a teacher's machine has taken on a support surface nobody wants, and the teacher has not agreed to it. The door opens onto something they chose to install themselves.",
@@ -1153,7 +1155,7 @@
     ],
     "serverIsThePlantoirBinary" : "The MCP server is the Plantoir binary itself answering --mcp-stdio, so there is no second executable to find, sign or forget. On Windows it is plantoir-mcp.exe, which is the one part of this block that differs by platform.",
     "serverName" : "plantoir",
-    "whatADoorIs" : "Plantoir finds the assistant's command-line tool, writes a throwaway .command script into its OWN data directory, and hands that script to a terminal. The teacher watches a real session in a real terminal window. Nothing is typed by them, and nothing is left in the folder Obsidian is watching."
+    "whatADoorIs" : "Plantoir finds the assistant's command-line tool and starts it in a terminal, in the teacher's working folder, with Plantoir's MCP server already connected and an opening message already sent. The teacher types no command and watches a real session in a real terminal window. Nothing is left in the folder Obsidian is watching, and nothing global is touched."
   },
   "previewPorts" : {
     "containerPorts" : [
