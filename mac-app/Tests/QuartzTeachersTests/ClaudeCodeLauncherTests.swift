@@ -105,4 +105,78 @@ final class ClaudeCodeLauncherTests: XCTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: server))
         }
     }
+
+    // MARK: - The golden tests: what this door writes, to the byte
+
+    /// The three tests above this mark ask whether the script CONTAINS the
+    /// right fragments, which is not enough to notice a line being added,
+    /// dropped or reordered around them. These three pin the whole thing.
+    ///
+    /// They exist because a second door was added beside this one, and
+    /// "nothing about the Claude session changed" has to be a measurement
+    /// rather than a claim: the greeting, the script and the configuration
+    /// file are compared against literals, so any edit to the shared helpers
+    /// that moves a single byte of what a teacher's Claude session receives
+    /// fails here by name.
+    func testTheGreetingIsExactlyThis() {
+        let text: String = ClaudeCodeLauncher.greeting(courseCode: "ICS3U", courseName: "Grade 11 Computer Science")
+        XCTAssertEqual(
+            text,
+            "I'm a teacher working on ICS3U (Grade 11 Computer Science) in Plantoir. "
+                + "Use the plantoir tools for anything to do with this course. "
+                + "Start by listing its sections so we both know what's there. "
+                + "Before changing anything, use the matching plan tool first and show me what it says, "
+                + "in plain words, and wait for me to agree."
+        )
+    }
+
+    func testTheLauncherScriptIsExactlyThis() throws {
+        let scriptPath: String = try ClaudeCodeLauncher.writeLauncherScript(
+            workspacePath: "/Users/teacher/Teaching",
+            courseCode: "ICS3U_GOLDEN",
+            claudePath: "/usr/local/bin/claude",
+            configPath: "/Users/teacher/Library/Application Support/Plantoir/assist/mcp-ICS3U_GOLDEN.json",
+            prompt: "I'm a teacher working on ICS3U in Plantoir."
+        )
+        defer {
+            try? FileManager.default.removeItem(atPath: scriptPath)
+        }
+
+        let written: String = try String(contentsOfFile: scriptPath, encoding: .utf8)
+        let expected: String = """
+        #!/bin/bash
+        cd '/Users/teacher/Teaching' || exit 1
+        '/usr/local/bin/claude' --mcp-config '/Users/teacher/Library/Application Support/Plantoir/assist/mcp-ICS3U_GOLDEN.json' --strict-mcp-config 'I'\\''m a teacher working on ICS3U in Plantoir.'
+        """
+        XCTAssertEqual(written, expected)
+        XCTAssertTrue(scriptPath.hasSuffix("/launch-ICS3U_GOLDEN.command"), scriptPath)
+    }
+
+    func testTheConfigurationFileIsExactlyTheseBytes() throws {
+        let configPath: String = try ClaudeCodeLauncher.writeConfig(
+            workspacePath: "/Users/teacher/Teaching",
+            courseCode: "ICS3U_GOLDEN",
+            serverPath: "/Applications/Plantoir.app/Contents/MacOS/Plantoir"
+        )
+        defer {
+            try? FileManager.default.removeItem(atPath: configPath)
+        }
+
+        let written: Data = try Data(contentsOf: URL(fileURLWithPath: configPath))
+        let expected: String = """
+        {
+          "mcpServers" : {
+            "plantoir" : {
+              "args" : [
+                "--mcp-stdio",
+                "\\/Users\\/teacher\\/Teaching"
+              ],
+              "command" : "\\/Applications\\/Plantoir.app\\/Contents\\/MacOS\\/Plantoir"
+            }
+          }
+        }
+        """
+        XCTAssertEqual(written, Data(expected.utf8))
+        XCTAssertTrue(configPath.hasSuffix("/mcp-ICS3U_GOLDEN.json"), configPath)
+    }
 }
