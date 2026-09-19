@@ -16,7 +16,7 @@ metal-routing-results.txt, the post-hoc mac-shelf arm (see its lines about
 
 Nothing about that has been re-run and nothing about it has changed. The
 smaller assistant still answers that sentence with an immediate deploy when it
-is asked. Anyone re-running the suite should expect the same numbers.
+is asked. Anyone putting that sentence to the MODEL should expect the same numbers — but the suite itself no longer does: since this change its interception guard answers the sentence in code, as the app does, so a re-run of the mac-shelf arm probes three cards rather than four and never sends this one.
 
 WHAT CHANGED, 2026-09-19 (issue #168)
 -------------------------------------
