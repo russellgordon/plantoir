@@ -168,10 +168,19 @@ A view that claims LESS height than it is offered is not blank and not clipped;
 it is centred, because the `ZStack` around the section's detail column centres a
 child that does not fill. That is how the scheduled-publish notice came to float
 in the middle of an empty window with nothing above it: measured at 800 × 720,
-the "No Preview Running" placeholder claimed 189 points and the layer carrying
+the "No Preview Running" placeholder claimed 189 points and the column carrying
 the notice 246, so 237 points of nothing sat above the band.
 `ProgressViewSizeTests`'s `heightClaimedOfAWholeWindow(of:width:height:)` is that
 measurement, asserted with `XCTAssertGreaterThanOrEqual(claimed, 719)`.
+
+**Where the notice sits now**, since issue #219 a day later: ABOVE that stack
+rather than inside its base layer, because beneath a full-bleed web view it was
+invisible to a teacher with a preview showing. The 189/246 above is the history
+of #216 and still the reason the placeholder must FILL — a placeholder that hugs
+makes the column above the stack hug too, and the band floats again. What
+changed is which container the notice is in, not the measurement that keeps it
+where it belongs. `documentation/07-deployment.md` → "The notice has to arrive
+while the teacher is looking" carries that piece and its own numbers.
 
 The fix is a flexible `.frame(maxWidth: .infinity, maxHeight: .infinity)` and
 **never a fixed height** — which is why the third measurement is written BESIDE
