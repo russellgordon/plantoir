@@ -300,7 +300,17 @@ Neither app contains toolchain logic of its own: they write the same
    among others). Never `colima stop` unless `docker ps -q` comes back empty.
    The app's quit path and the scripts already enforce this; keep it that way.
    The Colima VM only mounts `$HOME`, so a working folder outside the home
-   directory bind-mounts as an empty folder inside the container.
+   directory cannot be handed to the container at all: since 2026-09-19 the
+   launchers name their mounts in a form that REFUSES a source the VM cannot
+   see (exit 125, `bind source path does not exist`), and the teacher is told
+   to keep the folder inside their home folder — GitHub issue #221,
+   `documentation/03-launcher-scripts.md`. Under the old `-v` form it mounted
+   as an EMPTY folder at exit 0 and the build silently produced nothing, which
+   is still what a container created the old way does until it is recreated.
+   If you ever re-measure this, use a path the VM has never been given: `-v`
+   CREATES its source inside the VM, so running it first makes the next
+   `--mount` to the same path succeed, and that is how the first measurement
+   of this came out backwards.
 8. **Swift follows the project style rules; the C# deliberately does not.**
    The Swift in `mac-app/` avoids `map`/`filter`/`reduce`, uses `@Observable`
    (never `ObservableObject`) and `// MARK: -` sections, and prefers clarity
