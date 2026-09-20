@@ -101,6 +101,90 @@ final class QuitConfirmationTests: XCTestCase {
         XCTAssertTrue(went.contains("quit anyway"))
     }
 
+    /// Keep Working is the DEFAULT button, and the contract says so rather
+    /// than the code saying so alone. A teacher who presses Return without
+    /// reading keeps their work; making Quit Anyway the default would be a
+    /// one-line change with nothing to stop it.
+    func testTheSafeAnswerIsTheDefaultOne() throws {
+        let section: [String: Any] = try QuitConfirmationTests.section("quittingWhileWorkIsUnderWay")
+        let buttons: [String: Any] = try XCTUnwrap(section["buttons"] as? [String: Any])
+        XCTAssertEqual(buttons["default"] as? String, "keepWorking")
+        XCTAssertEqual(QuitConfirmation.Choice.keepWorking.rawValue, buttons["default"] as? String)
+        XCTAssertNotNil(buttons["keepWorking"] as? String)
+        XCTAssertNotNil(buttons["quitAnyway"] as? String)
+    }
+
+    // MARK: - What quitting stops, and what it deliberately does not
+
+    /// Quitting ends a live PREVIEW the way the Stop button does, and leaves
+    /// a PUBLISH alone — which is what the teacher was just told would
+    /// happen. Without the first half the launcher outlives the app (a child
+    /// on a pseudo-terminal is reparented, not killed), the quit script's
+    /// host-side check sees it, and the quit frees nothing at all.
+    ///
+    /// Run against REAL launchers that sit there doing nothing, because the
+    /// question is about runs that are actually in flight: a filter asserted
+    /// against four runners that had already exited would pass saying
+    /// nothing.
+    func testQuittingEndsPreviewsAndLeavesPublishesAlone() async throws {
+        let folder: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("quit-runner-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        for name in ["preview.sh", "deploy.sh"] {
+            try Data("sleep 30\n".utf8).write(to: folder.appendingPathComponent(name))
+        }
+
+        let preview: ScriptRunner = ScriptRunner()
+        let build: ScriptRunner = ScriptRunner()
+        let publish: ScriptRunner = ScriptRunner()
+        let stopping: ScriptRunner = ScriptRunner()
+        XCTAssertFalse(preview.isALivePreview, "A runner that has run nothing is not a live preview")
+
+        preview.run(scriptNamed: "preview.sh", arguments: ["ADA1O", "1"], workingDirectory: folder)
+        build.run(
+            scriptNamed: "preview.sh",
+            arguments: ["ADA1O", "1", "--build-only"],
+            workingDirectory: folder
+        )
+        publish.run(scriptNamed: "deploy.sh", arguments: ["ADA1O", "1"], workingDirectory: folder)
+        stopping.run(
+            scriptNamed: "preview.sh",
+            arguments: ["ADA1O", "1", "--stop"],
+            workingDirectory: folder
+        )
+        defer {
+            preview.terminate()
+            build.terminate()
+            publish.terminate()
+            stopping.terminate()
+        }
+
+        XCTAssertTrue(preview.isRunning, "The stand-in launcher did not start")
+        XCTAssertTrue(preview.isALivePreview)
+        XCTAssertFalse(
+            build.isALivePreview,
+            "A publish's own build wears preview.sh's name and must not be ended at quit"
+        )
+        XCTAssertFalse(publish.isALivePreview)
+        XCTAssertFalse(stopping.isALivePreview, "A stop is the thing being asked for")
+
+        var held: Int = 0
+        for runner in ScriptRunner.runsInFlight where runner === preview || runner === publish {
+            held += 1
+        }
+        XCTAssertEqual(held, 2, "A run in flight must be reachable from outside the window that started it")
+
+        ScriptRunner.stopEveryLivePreview()
+        var waitsLeft: Int = 100
+        while preview.isRunning && waitsLeft > 0 {
+            try await Task.sleep(for: .milliseconds(50))
+            waitsLeft -= 1
+        }
+        XCTAssertFalse(preview.isRunning, "The preview was not ended")
+        XCTAssertTrue(publish.isRunning, "The publish was ended, and the teacher was told it would not be")
+    }
+
     // MARK: - The Mac logging out
 
     /// A modal in the quit handler blocks a log out until macOS gives up and

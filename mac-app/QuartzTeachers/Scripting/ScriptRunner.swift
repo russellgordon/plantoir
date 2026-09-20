@@ -126,6 +126,71 @@ class ScriptRunner {
         return false
     }
 
+    // MARK: - Every run in flight, across every window
+
+    /// The runners with a script actually running, in any window.
+    ///
+    /// A runner is `@State` on the view that started it, so nothing outside
+    /// that view can reach one — which was fine until quitting needed to end
+    /// a preview the way the Stop button does. Registered here for the whole
+    /// life of a run and taken out again when it finishes, so nothing has to
+    /// be reset between tests either.
+    private(set) static var runsInFlight: [ScriptRunner] = []
+
+    /// Ends every live PREVIEW, host side, the way the Stop button does.
+    ///
+    /// Called at quit, and deliberately narrow. A preview server's launcher
+    /// keeps running for as long as the preview is up, and — measured — a
+    /// child on a pseudo-terminal is reparented rather than killed when the
+    /// app goes, so without this the launcher can outlive the app, the quit
+    /// script's host-side check sees it, and the quit frees neither the
+    /// container nor the machine under it. That is the common case, not a
+    /// corner of one.
+    ///
+    /// A publish is NOT ended here, which is the whole reason this filters
+    /// rather than terminating everything: the teacher was asked about a
+    /// publish and told it would carry on (`QuitConfirmation`), so killing it
+    /// would make that sentence a lie. `--build-only` is excluded for the
+    /// same reason — it is a publish's own build — and `--stop` because a
+    /// stop is the thing being asked for.
+    static func stopEveryLivePreview() {
+        for runner in runsInFlight {
+            if runner.isALivePreview {
+                runner.stopByUser()
+            }
+        }
+    }
+
+    /// Adds a runner to the list, once.
+    private static func rememberInFlight(_ runner: ScriptRunner) {
+        for existing in runsInFlight where existing === runner {
+            return
+        }
+        runsInFlight.append(runner)
+    }
+
+    /// Takes a runner out of the list when its script has finished.
+    private static func forgetInFlight(_ runner: ScriptRunner) {
+        var remaining: [ScriptRunner] = []
+        for existing in runsInFlight where existing !== runner {
+            remaining.append(existing)
+        }
+        runsInFlight = remaining
+    }
+
+    /// Whether this run is a preview server rather than a build or a publish.
+    var isALivePreview: Bool {
+        if runScriptName != "preview.sh" {
+            return false
+        }
+        for argument in runArguments {
+            if argument == "--stop" || argument == "--build-only" {
+                return false
+            }
+        }
+        return isRunning
+    }
+
     // MARK: - Functions
 
     /// Starts a script (e.g. "preview.sh") from the working folder.
@@ -238,6 +303,7 @@ class ScriptRunner {
         runScriptName = scriptName
         runArguments = arguments
         runWorkingFolderPath = workingDirectory.path
+        ScriptRunner.rememberInFlight(self)
         // Redacted even here. The arguments carry a Cloudflare Account ID
         // and a folder path with the teacher's account name in it, and
         // `.public` in a Logger means exactly that — written out in full,
@@ -1125,6 +1191,7 @@ class ScriptRunner {
         AppLog.output.info("Finished with exit code \(exitCode), transcript \(self.transcript.lines.count) lines")
         lastExitCode = exitCode
         isRunning = false
+        ScriptRunner.forgetInFlight(self)
         terminal?.masterHandle.readabilityHandler = nil
         process = nil
         terminal = nil

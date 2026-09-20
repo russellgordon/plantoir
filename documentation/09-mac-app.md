@@ -506,27 +506,48 @@ a helper handed a stripped environment cannot reach the engine — and under the
 rules below, a question that could not be asked means "stop nothing", so the
 symptom would be the same silent no-op.
 
-It replaced **three** hand-maintained PATH strings — `ScriptRunner.start`,
-`ScheduledDeploy.propertyList`'s launchd plist, and the quit path's absence of
-one — none of which named the tools folder. The scheduled publish worked only
-because the launcher re-exports that folder from inside itself.
+It replaced **two** hand-maintained PATH strings — `ScriptRunner.start` and
+`ScheduledDeploy.propertyList`'s launchd plist, neither of which named the
+tools folder — and gave one to the quit path, which had none at all. The
+scheduled publish worked only because the launcher re-exports that folder from
+inside itself.
 
 ### What the quit path now refuses to do
 
 The generated script is `/bin/sh`, never `/bin/zsh -l`, with all three handles
-on `FileHandle.nullDevice` and a 120-second deadline it cannot outlive. It is
+on `FileHandle.nullDevice` and a deadline it cannot outlive. The deadline GROWS
+with the work — one folder's wait per folder, plus an allowance for the stops
+themselves — because a fixed two minutes was the first shape and it was wrong:
+six folders each waiting twenty seconds is already two minutes, so the sixth
+would be killed mid-way and the teacher told nothing about any of them. **The
+deadline writes its own line before it fires**, since the one ending that
+reports nothing is the fault this whole piece is about. Its honest limit: the
+`kill -9` does not take a wedged `docker` grandchild with it — measured, one
+stuck on a dead socket was still there afterwards. What the deadline buys is
+that Plantoir's own shell goes away and says so. It is
 detached and survives the app: measured, an 18-second job finished well after
 its parent had gone, so a 10–20 second `colima stop` will finish too. `&!` is a
 zsh-ism and is gone.
+
+**A stop that FAILED is never written down as a stop.** `docker stop` and
+`colima stop` are both asked for their exit status, and a refusal gets its own
+sentence. A script that does not look cannot tell a stop that worked from one
+that was refused, and "the memory it was holding is back" on a day it is not is
+issue #220 one level down — a line that will be believed.
 
 **A folder's container** is stopped only when, for up to 20 seconds:
 
 1. no launcher for THAT folder is running on the host — `ps -Ao args=` plus
    `grep -F "<folder>/preview.sh"` (and `deploy.sh`, `setup.sh`); and
-2. the container is idle — `docker top <name> | tail -n +2 | wc -l` is 1 or
-   less. An idle Plantoir container runs exactly one process, `tail -f
-   /dev/null`; a build, a preview server and a wrangler upload all show up as
-   extra ones.
+2. the container is idle — `docker top <name>`, header dropped, non-empty
+   lines counted, 1 or less. An idle Plantoir container runs exactly one
+   process, `tail -f /dev/null`; a build, a preview server and a wrangler
+   upload all show up as extra ones. The count is `grep -c .` rather than
+   `wc -l`: `wc` pads its answer with leading blanks, which `[ -gt ]` happens
+   to tolerate and a later reader would not, and `grep -c .` also refuses to
+   count the blank line a trailing newline leaves behind. **If `docker top`
+   FAILS the container counts as busy**, because "I could not ask" must never
+   mean "nobody is using it".
 
 Check 1 exists because check 2 is **blind to the long windows**. A launcher
 that has to build the image, start Colima or download the pinned tools does all
@@ -571,13 +592,33 @@ answer from the wrong engine.
 **Previews are stopped first, or the piece delivers nothing in the common
 case.** A live preview keeps the container busy; a busy container is left
 running; a running container of ours makes `docker ps -q` non-empty, so the VM
-is never stopped either. So quitting fires `PreviewStopper` for every live lease
-before the script starts, and the script's wait-for-idle loop covers the gap.
-That loop is a wait on an OBSERVABLE CONDITION — the container going idle — not
-a settle delay.
+is never stopped either. So quitting does what the Stop button does, in the
+same order and for every live lease: `PreviewStopper` reaches into the
+container, then the host-side launcher is terminated. The script's
+wait-for-idle loop covers the gap. That loop is a wait on an OBSERVABLE
+CONDITION — the container going idle — not a settle delay.
 
-**Every ending leaves a line**, written by the script itself rather than by the
-app, because the app is gone before the answer is known. That is the launchers'
+**Both halves, and the second one is easy to leave out.** A `ScriptRunner`
+lives as `@State` on the section view, so nothing outside that view could reach
+one; `ScriptRunner.runsInFlight` now registers every run for its lifetime so
+`applicationShouldTerminate` can. Ending only the container-side half would
+leave a `preview.sh` the app no longer owns — a child on a pseudo-terminal is
+reparented rather than killed when its parent goes, measured — and the quit
+script's own host-side check would then see it and refuse to stop anything for
+the full length of its wait. The filter is deliberately narrow:
+`preview.sh` with neither `--stop` nor `--build-only`. A publish is NOT ended,
+because the teacher was told it would carry on, and `--build-only` is a
+publish's own build wearing `preview.sh`'s name.
+
+**Every ending that did something, or refused to, leaves a line** — written by
+the script itself rather than by the app, because the app is gone before the
+answer is known. A container that was not running at all says nothing: a line
+every quit reporting that there was nothing to stop would bury the one quit
+where something happened. A stop that was asked for and FAILED does leave a
+line, and that is not the same thing at all — `docker stop` succeeding and
+`docker stop` being refused look identical to a script that does not check, and
+writing "the memory is back" on a day it is not would be the same fault as
+#220, one level down. That is the launchers'
 own arrangement (`preview.sh`'s `note_on_the_trail`). The sentences are built in
 Swift (`FolderContainers.sentence(for:occasion:…)`) and carried into the script
 already formed, so they can be pinned by a test; the script appends directly, so
@@ -654,7 +695,8 @@ putting a figure anywhere.
 
 ### What is still owed, and what was rejected
 
-**Owed, as its own issue:** the launchers print "🐳 Setting up this Mac — a
+**Owed, and NOT yet opened as an issue when this was written — open one:** the
+launchers print "🐳 Setting up this Mac — a
 one-time step that runs on its own…" and "▶️  Starting Colima…"
 (`setup.sh:466/476`, `preview.sh:691/701`, `deploy.sh:1158/1168`). Now that
 quitting really stops the machine, the first is untrue — it happens every

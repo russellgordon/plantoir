@@ -131,6 +131,15 @@ final class QuitScriptTests: XCTestCase {
             inHomeFolder: QuitScriptTests.pretendHome
         )
         XCTAssertTrue(script.contains("docker stop -t 2"))
+        // The folder the app is releasing must be THIS folder's container.
+        // Pinning only "docker stop -t 2" would pass on a wrong hash, and a
+        // wrong hash stops somebody else's folder and leaves this one up.
+        XCTAssertTrue(
+            script.contains(HelperPrograms.shellQuoted(
+                FolderContainers.containerName(forFolder: QuitScriptTests.pretendFolder)
+            )),
+            "The script does not name this folder's own container"
+        )
         XCTAssertTrue(script.contains("docker ps -q"), "The emptiness check is the safety: Colima is shared")
         XCTAssertTrue(script.contains("colima stop"))
         let releaseIndex = script.range(of: "release ")!.lowerBound
@@ -185,6 +194,49 @@ final class QuitScriptTests: XCTestCase {
             "The app's own preview stops run a launcher too; counting them would make every quit-with-a-preview free nothing"
         )
         XCTAssertTrue(script.contains("docker top"), "A build inside the container is work too")
+    }
+
+    /// A stop that was asked for and REFUSED must not be written down as a
+    /// stop. It is issue #220 one level down: `docker stop` succeeding and
+    /// `docker stop` being refused look identical to a script that does not
+    /// check, and "the memory it was holding is back" on a day it is not is a
+    /// line that will be believed.
+    @MainActor
+    func testAStopThatFailedIsNotWrittenDownAsAStop() {
+        let script: String = FolderContainers.quitScript(
+            folderPaths: [QuitScriptTests.pretendFolder],
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
+        XCTAssertTrue(script.contains("if docker stop -t 2 \"$2\"; then")
+            || script.contains("if docker stop -t 2 \"$2\" >/dev/null 2>&1; then"))
+        XCTAssertTrue(script.contains("if colima stop >/dev/null 2>&1; then"))
+        XCTAssertTrue(script.contains("and it would not stop"))
+    }
+
+    /// The whole script's deadline has to GROW with the number of folders, or
+    /// it becomes the thing that stops the work: six folders each waiting
+    /// twenty seconds is already two minutes, and a fixed two minutes would
+    /// kill the sixth mid-way and tell the teacher nothing about any of them.
+    @MainActor
+    func testTheDeadlineGrowsWithTheWork() {
+        XCTAssertGreaterThan(
+            FolderContainers.secondsBeforeGivingUp(folderCount: 6, secondsToWaitForWork: 20),
+            6 * 20,
+            "Six busy folders would be killed before the last one had its turn"
+        )
+        XCTAssertGreaterThan(
+            FolderContainers.secondsBeforeGivingUp(folderCount: 0, secondsToWaitForWork: 20),
+            0,
+            "A quit with no folders open still has a shared machine to ask about"
+        )
+        let script: String = FolderContainers.quitScript(
+            folderPaths: [QuitScriptTests.pretendFolder],
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
+        XCTAssertTrue(
+            script.contains("stopped waiting for an answer"),
+            "The one ending that reported nothing is the fault this piece exists to fix"
+        )
     }
 
     @MainActor
@@ -258,15 +310,10 @@ final class QuitScriptTests: XCTestCase {
     /// says something a teacher would recognise rather than naming a program.
     @MainActor
     func testEveryEndingSaysSomethingATeacherWouldRecognise() {
-        let outcomes: [FolderContainers.Outcome] = [
-            .stoppedAFoldersBuilder,
-            .leftAFoldersBuilderRunning,
-            .stoppedTheSharedSetup,
-            .leftTheSharedSetupRunning,
-            .couldNotFindThePrograms,
-            .couldNotAskWhatElseIsRunning
-        ]
-        for outcome in outcomes {
+        // `allCases`, not a hand-written list: a seventh ending added
+        // without a sentence would otherwise be covered by nothing.
+        XCTAssertGreaterThan(FolderContainers.Outcome.allCases.count, 5)
+        for outcome in FolderContainers.Outcome.allCases {
             let sentence: String = FolderContainers.sentence(
                 for: outcome,
                 occasion: .quitting,
