@@ -589,6 +589,14 @@ once: `colima` can be found; the socket Colima owns is there
 (`~/.colima/default/docker.sock`); asking THAT socket **succeeded** and came
 back empty; and no launcher for any folder is running on the host.
 
+**The ORDER the refusals are tested in is load-bearing, and the obvious order
+is wrong.** A builder the step above has just decided to leave running is
+itself in `docker ps -q`'s answer — so asking "is anything in there?" first
+reports a teacher's own unfinished publish as "other software on this Mac", on
+a Mac that has no other software in there at all, which is every teacher's.
+Ours first, then any launcher on the host, then everything else; each branch's
+sentence is then true of the thing that actually caused it.
+
 The old line was `[ -z "$(docker ps -q 2>/dev/null)" ]`, and it could not tell
 "nothing is running" from "I could not ask". Measured:
 
@@ -623,16 +631,19 @@ leave a `preview.sh` the app no longer owns — a child on a pseudo-terminal is
 reparented rather than killed when its parent goes, measured — and the quit
 script's own host-side check would then see it and refuse to stop anything for
 the full length of its wait. The filter is deliberately narrow:
-`preview.sh` with neither `--stop` nor `--build-only`. A publish is NOT ended,
-because the teacher was told it would carry on, and `--build-only` is a
+`preview.sh` with neither `--stop` nor `--build-only`. A publish is NOT ended —
+the app should not be the thing that kills a teacher's publish, and "Quit
+Anyway" below says what actually becomes of it — and `--build-only` is a
 publish's own build wearing `preview.sh`'s name.
 
 **Every ending that did something, or refused to, leaves a line** — written by
 the script itself rather than by the app, because the app is gone before the
 answer is known. A container that was not running at all says nothing: a line
 every quit reporting that there was nothing to stop would bury the one quit
-where something happened. A stop that was asked for and FAILED does leave a
-line, and that is not the same thing at all — `docker stop` succeeding and
+where something happened. A quit with NO folder open, on a Mac that has no `docker` at
+all — a teacher in their first week, before any setup — says nothing either,
+for the same reason: nothing was asked of anything. A stop that was asked for
+and FAILED does leave a line, and that is not the same thing at all — `docker stop` succeeding and
 `docker stop` being refused look identical to a script that does not check, and
 writing "the memory is back" on a day it is not would be the same fault as
 #220, one level down. That is the launchers'
@@ -682,12 +693,30 @@ apart is the `kAEQuitReason` attribute on the Apple event being handled
 (`kAELogOut`, `kAEReallyLogOut`, `kAEShowRestartDialog`, `kAERestart`,
 `kAEShowShutdownDialog`, `kAEShutDown`). The DECISION is tested, not the dialog.
 
-**"Quit Anyway" does not kill the publish**, and the wording says "could leave
-it unfinished" rather than "would stop it" for that reason. A publish is a
-separate program on a pseudo-terminal; measured, a child of that shape is
-reparented and carries on after its parent exits. What the teacher loses is the
-watching — the console is gone, a question the publish asks is asked of nobody
-— and the folder's container is then left running for as long as it lasts.
+**"Quit Anyway" does not END the publish — and the publish will very likely
+stop anyway, which is why the sentence promises neither.** Plantoir passes it
+over deliberately (`ScriptRunner.stopEveryLivePreview` filters to previews):
+the app should not be the thing that kills a teacher's publish. But it is a
+program writing to a pseudo-terminal the APP owned, and `deploy.sh` runs under
+`set -euo pipefail` (line 3), so when the app goes its next line of output
+fails and it stops there.
+
+**Measured twice, independently, because the first measurement was made on the
+wrong shape and said the opposite.** Two children of identical shape orphaned
+on a pty whose master had just closed — one plain, one with `set -euo
+pipefail`:
+
+```
+plain                 ran to the end       (tick 7, "done" marker written)
+set -euo pipefail     DIED at its next echo, three ticks in, no marker
+```
+
+So "could leave it unfinished, with the class website part way updated" is the
+honest sentence, and both "would be stopped" and "carries on" are wrong. What
+the teacher loses either way is the watching — the console is gone and a
+question the publish asks is asked of nobody. Whatever is left, the quit script
+handles safely: a builder still working is left running and the trail says so,
+an idle one is stopped.
 
 ### Measured
 

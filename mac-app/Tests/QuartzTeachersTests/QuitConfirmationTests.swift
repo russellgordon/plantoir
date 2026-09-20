@@ -204,7 +204,10 @@ final class QuitConfirmationTests: XCTestCase {
             waitsLeft -= 1
         }
         XCTAssertFalse(preview.isRunning, "The preview was not ended")
-        XCTAssertTrue(publish.isRunning, "The publish was ended, and the teacher was told it would not be")
+        XCTAssertTrue(
+            publish.isRunning,
+            "Plantoir ended the teacher's publish. It may well stop on its own once the app's terminal goes — deploy.sh runs under set -euo pipefail — but the app must not be the thing that kills it."
+        )
     }
 
     // MARK: - The Mac logging out

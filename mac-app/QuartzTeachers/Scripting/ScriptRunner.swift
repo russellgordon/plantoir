@@ -147,12 +147,16 @@ class ScriptRunner {
     /// container nor the machine under it. That is the common case, not a
     /// corner of one.
     ///
-    /// A publish is NOT ended here, which is the whole reason this filters
-    /// rather than terminating everything: the teacher was asked about a
-    /// publish and told it would carry on (`QuitConfirmation`), so killing it
-    /// would make that sentence a lie. `--build-only` is excluded for the
-    /// same reason — it is a publish's own build — and `--stop` because a
-    /// stop is the thing being asked for.
+    /// A publish is NOT ended here, and that is a decision rather than an
+    /// oversight: the teacher was asked and chose to quit anyway, and
+    /// Plantoir should not then be the thing that kills their publish. It
+    /// will very likely stop on its own regardless — `deploy.sh` runs under
+    /// `set -euo pipefail` and its pseudo-terminal goes with the app, so its
+    /// next line of output fails (measured) — which is why the question says
+    /// quitting "could leave it unfinished" rather than promising either
+    /// outcome. `--build-only` is excluded for the same reason, being a
+    /// publish's own build, and `--stop` because a stop is the thing being
+    /// asked for.
     static func stopEveryLivePreview() {
         for runner in runsInFlight {
             if runner.isALivePreview {
