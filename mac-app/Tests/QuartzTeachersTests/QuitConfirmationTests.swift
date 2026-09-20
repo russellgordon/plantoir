@@ -102,16 +102,35 @@ final class QuitConfirmationTests: XCTestCase {
     }
 
     /// Keep Working is the DEFAULT button, and the contract says so rather
-    /// than the code saying so alone. A teacher who presses Return without
-    /// reading keeps their work; making Quit Anyway the default would be a
-    /// one-line change with nothing to stop it.
+    /// than the code saying so alone.
+    ///
+    /// **The ORDER is what this pins, not a spelling.** `NSAlert` reports a
+    /// POSITION — `.alertFirstButtonReturn` for whichever title went in
+    /// first — so putting the two titles up as two separate lines meant a
+    /// one-line reorder could swap what each answer MEANS and make Keep
+    /// Working quit, with nothing red anywhere. Title and meaning now travel
+    /// together in one ordered list that the alert builds itself from, and
+    /// this reads the same list.
     func testTheSafeAnswerIsTheDefaultOne() throws {
         let section: [String: Any] = try QuitConfirmationTests.section("quittingWhileWorkIsUnderWay")
         let buttons: [String: Any] = try XCTUnwrap(section["buttons"] as? [String: Any])
-        XCTAssertEqual(buttons["default"] as? String, "keepWorking")
-        XCTAssertEqual(QuitConfirmation.Choice.keepWorking.rawValue, buttons["default"] as? String)
+        let defaultChoice: String = try XCTUnwrap(buttons["default"] as? String)
+        XCTAssertEqual(defaultChoice, "keepWorking")
         XCTAssertNotNil(buttons["keepWorking"] as? String)
         XCTAssertNotNil(buttons["quitAnyway"] as? String)
+
+        XCTAssertEqual(QuitConfirmation.buttonsInOrder.count, 2)
+        XCTAssertEqual(
+            QuitConfirmation.buttonsInOrder.first?.choice.rawValue, defaultChoice,
+            "The first button is the default one, and the contract says which answer that has to be"
+        )
+        XCTAssertEqual(QuitConfirmation.buttonsInOrder.first?.title, QuitConfirmation.keepWorkingButton)
+        XCTAssertEqual(QuitConfirmation.choice(atButtonIndex: 0), .keepWorking)
+        XCTAssertEqual(QuitConfirmation.choice(atButtonIndex: 1), .quitAnyway)
+        XCTAssertEqual(
+            QuitConfirmation.choice(atButtonIndex: 7), .keepWorking,
+            "An answer nobody recognises must be the safe one"
+        )
     }
 
     // MARK: - What quitting stops, and what it deliberately does not
@@ -132,7 +151,10 @@ final class QuitConfirmationTests: XCTestCase {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         for name in ["preview.sh", "deploy.sh"] {
-            try Data("sleep 30\n".utf8).write(to: folder.appendingPathComponent(name))
+            // `exec`, so terminating the launcher terminates the sleep with
+            // it. Without it bash exits in 0.06s and its foreground sleep is
+            // reparented to launchd, leaving four strays per suite run.
+            try Data("exec sleep 20\n".utf8).write(to: folder.appendingPathComponent(name))
         }
 
         let preview: ScriptRunner = ScriptRunner()
