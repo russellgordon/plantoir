@@ -327,6 +327,83 @@ nonisolated enum ActivityTrail {
         /// server — a real change in what a teacher can lose, which had no
         /// line describing it.
         case sectionProcessesReclaimed = "section processes reclaimed"
+        /// A preview said its website was up and then never appeared, and
+        /// Plantoir stopped waiting for it. Carries the course, the section,
+        /// how long it had been saying nothing, and WHICH of the three things
+        /// was true: the website builder was serving the site and this Mac
+        /// could not reach it, nothing was serving it at all, or the builder
+        /// could not be asked and Plantoir does not know.
+        ///
+        /// This is the line whose absence produced the report it exists for
+        /// (issue #225). A teacher built three previews in four minutes, none
+        /// appeared, and the trail said only that a task had started and been
+        /// stopped on purpose — so the record of the evening read as somebody
+        /// changing their mind three times. Which of the two it was is the
+        /// whole value of the line: one of them is their pages and one of
+        /// them is their Mac, and they are one sentence apart when a teacher
+        /// describes it.
+        case previewNeverAppeared = "preview did not appear"
+        /// The memory came back: a working folder's website builder was
+        /// stopped, or — when nothing else on the Mac was using it — the
+        /// shared setup underneath them all was stopped too.
+        ///
+        /// On the trail because until 2026-09-19 it never happened. The app
+        /// asked for it at every quit and the request went to programs it had
+        /// not told itself where to find, with the answer sent to the null
+        /// device, so a teacher whose Mac stayed slow all day had nothing to
+        /// show anyone (issue #220). A line saying it happened is what turns
+        /// "quitting does not seem to free anything" from a feeling into a
+        /// report. Carries the working folder's NAME — never its path, and
+        /// never anything from inside it.
+        ///
+        /// **Two occasions file here, and the name says neither**, on
+        /// purpose: quitting, and the last window on a folder closing. They
+        /// are the same act on the same container under the same conditions,
+        /// and the sentence written says which one it was. An event called
+        /// "…at quit" would have been a lie on every window close, which is
+        /// the commoner of the two.
+        case websiteBuilderStopped = "website builder stopped"
+        /// Something was deliberately left running, and why.
+        ///
+        /// The companion to the line above, and the one support will read
+        /// more often, because "quitting did not free anything" is the report
+        /// and this is the only thing that can answer it. Two different
+        /// reasons file here: a publish or preview for that folder was still
+        /// going, so stopping it would have broken work the teacher could not
+        /// see; or other software on the Mac shares the same setup, which
+        /// rule 7 says is never stopped out from under anybody. Both are
+        /// deliberate, and without the line they look identical to the fault
+        /// they replaced.
+        case websiteBuilderLeftRunning = "website builder left running"
+        /// Plantoir could not stop a website builder, and says so rather than
+        /// saying nothing.
+        ///
+        /// Issue #220 was a fault that REPORTED NOTHING: the quit script could
+        /// not find the programs it needed, exited 0, and left a teacher with
+        /// no evidence at all. This is the line that makes the same failure
+        /// visible the next time. Four ways file here: the programs cannot be
+        /// found; the shared setup cannot be asked what is running in it; the
+        /// stop was asked for and REFUSED; and the whole attempt ran out of
+        /// time. That last pair matter most, because each of them would
+        /// otherwise be written down as a success — `docker stop` failing and
+        /// `docker stop` working are indistinguishable to a script that does
+        /// not look.
+        ///
+        /// Separate from `websiteBuilderLeftRunning` because that one says a
+        /// deliberate choice was made, and a choice nobody was able to make is
+        /// a different fact.
+        case websiteBuilderCouldNotBeStopped = "website builder could not be stopped"
+        /// ⌘Q landed while this app was publishing, the teacher was asked
+        /// whether to quit anyway, and this is what they chose.
+        ///
+        /// BOTH answers are recorded, and the "keep working" one matters most:
+        /// a teacher who says "I pressed Quit and it would not quit" is
+        /// describing that branch, and nothing else would explain it. The
+        /// other branch explains a publish that stopped part way through with
+        /// no error anywhere — the teacher was told and went ahead, which is a
+        /// completely different report from a publish that died on its own.
+        /// Carries what was under way, in the words the teacher was shown.
+        case quitAskedAboutWorkUnderWay = "quit asked about work under way"
     }
 
     // MARK: - Stored properties

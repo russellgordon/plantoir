@@ -128,6 +128,39 @@ final class ScheduledDeployTests: XCTestCase {
 
     // MARK: - The plist
 
+    /// A publish that runs at half six has to find the same programs the app
+    /// does, and the list it was given left out the only place they exist on
+    /// a Mac that has never had Homebrew.
+    ///
+    /// This was `"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"`
+    /// — three copies of the same hand-maintained list lived in this app, and
+    /// not one of them named `~/Library/Application Support/Plantoir/tools/bin`,
+    /// which is where the launchers download the pinned `docker` and `colima`
+    /// into. The scheduled publish survived only because the launcher exports
+    /// that folder again from inside itself; the quit path, which runs no
+    /// launcher, did not (issue #220).
+    func testTheScheduledJobCanFindTheProgramsPlantoirDownloaded() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let plist: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: course.code,
+            sectionNumber: 1,
+            when: sixThirtyTomorrow(),
+            workspaceURL: workspaceURL,
+            deployArguments: []
+        )
+        let environment: [String: String] = try XCTUnwrap(
+            plist["EnvironmentVariables"] as? [String: String]
+        )
+        let path: String = try XCTUnwrap(environment["PATH"])
+        XCTAssertEqual(
+            path.components(separatedBy: ":").first,
+            HelperPrograms.binDirectory(),
+            "The scheduled publish is looking everywhere except where Plantoir put the programs"
+        )
+        XCTAssertEqual(path, HelperPrograms.pathValue(inheriting: nil))
+    }
+
     func testThePlistNamesTheLauncherAndItsArguments() throws {
         try prepare()
         let course: Course = try makeCourse()
