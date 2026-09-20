@@ -645,6 +645,20 @@ Bound the wait (we allow 120 seconds) so a Quartz that never prints the line
 cannot leave a teacher watching a spinner: show the preview anyway, and that
 is exactly the case the conditional reload covers.
 
+**And bound the SILENCE after the server line, which is a different wait
+entirely** — added 2026-09-20 for
+[issue #225](https://github.com/russellgordon/plantoir/issues/225). Waiting for
+the built page to change answers "has this build landed?"; it says nothing
+about whether the teacher's machine can reach the site, and on a Mac that
+could not, the app waited ten minutes and then said nothing. So on the mac
+this wait now also ends early when the run has announced its server and then
+gone quiet for 45 seconds — it hands on to the polling below rather than
+failing there, since a site that is answering should still be shown. The rule,
+the measurements and what was rejected are in
+[`09-mac-app.md`](09-mac-app.md) → "A preview that never appears"; the numbers
+and sentences are in `contracts/app-rules.json` →
+`previewPorts.whenThePreviewNeverAppears`.
+
 ## The “ — Edited” marker: knowing a section has changed since it published
 
 Russell asked for the thing Pages does — `Untitled 3 — Edited` in the title
