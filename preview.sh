@@ -513,25 +513,51 @@ bind_mount_argument() {
   printf '%s' "type=bind,\"source=${quoted_source}\",\"target=${quoted_target}\""
 }
 
-# What a teacher is told when the workspace could not be made at all.
+# What a teacher is told when the workspace could not be made. TWO sentences,
+# because there are two different situations here and only one of them is
+# about something that happened to the folder recently.
 #
-# The same words the app says for the same trouble — contracts/app-rules.json
-# -> failureExplanations, the case matched on "bind source path does not
-# exist" — so one sentence covers a teacher in Plantoir and a teacher at the
-# command line, and there is one string to keep in step.
-# scripts/test_container_mount.sh checks these lines against that case.
-#
-# It exists because a refusal otherwise says nothing a teacher can use.
+# These exist because a refusal otherwise says nothing a teacher can use.
 # setup.sh and deploy.sh run under `set -e`, so the script ends there with the
 # daemon's own sentence as the last thing on screen — exactly what the teacher
 # in issue #221 was left with. preview.sh has NO `set -e` (measured
 # 2026-09-19 while proving this, and the opposite of what the plan for it
 # assumed), so it did something worse: it carried straight on past the
 # refusal, said "No such container" twice, announced that it was building,
-# and produced nothing. Both roads want the same sentence and a stop.
-say_this_folder_could_not_be_opened() {
+# and produced nothing. Both roads want a sentence and a stop.
+
+# (1) The folder is not on this Mac where it was. Nothing to reach, so
+# nothing to explain about reaching it.
+say_this_folder_is_not_there() {
   echo "❌ Plantoir could not get this folder ready for building."
   echo "   Check that it has not been moved or renamed, then try again."
+}
+
+# (2) The folder IS on this Mac and the builder still could not be given it.
+# The commonest way to arrange that is to keep the working folder somewhere
+# the builder cannot see: it can only reach the home folder, so an external
+# drive, a second volume or /Users/Shared cannot be handed over at all.
+#
+# MEASURED 2026-09-19 (virtiofs, fresh paths the virtual machine had never
+# been given, three of three, plus /Users/Shared): this form refuses such a
+# path with "bind source path does not exist". `-v` did NOT — it created the
+# folder inside the virtual machine and started, so the build ran against an
+# EMPTY folder, said it had succeeded and produced nothing. Loud beats
+# silent, and the sentence can now name the rule because something finally
+# enforces it. (A path the VM has already been handed by an earlier `-v` run
+# succeeds and still mounts empty, which is what made an earlier measurement
+# of this read the wrong way round: test it with a path nothing has used.)
+#
+# The same words the app says for the same trouble — contracts/app-rules.json
+# -> failureExplanations, the case matched on "bind source path does not
+# exist" — so one sentence covers a teacher in Plantoir and a teacher at the
+# command line, and there is one string to keep in step.
+# scripts/test_container_mount.sh checks these lines against that case.
+say_this_folder_cannot_be_reached() {
+  echo "❌ Plantoir could not get this folder ready for building."
+  echo "   Check that it is inside your home folder — on your Desktop or in"
+  echo "   Documents, for example — and not on an external drive or in a"
+  echo "   shared location, then try again."
 }
 # <<< CONTAINER MOUNT BLOCK <<<
 PREVIEW_PORT_RANGE="8081-8084"
@@ -949,7 +975,7 @@ run_container_with_mount() {
   # folder: setup.sh makes it itself, and preview.sh and deploy.sh have both
   # already refused, for better reasons, when the course is not there.
   if [ ! -d "$HOST_COURSES" ]; then
-    say_this_folder_could_not_be_opened
+    say_this_folder_is_not_there
     exit 1
   fi
   if ! docker run -dit \
@@ -960,7 +986,7 @@ run_container_with_mount() {
       -p $((HOST_BASE + 1000))-$((HOST_BASE + 1003)):9081-9084 \
       "$IMAGE" \
       tail -f /dev/null; then
-    say_this_folder_could_not_be_opened
+    say_this_folder_cannot_be_reached
     exit 1
   fi
 }
