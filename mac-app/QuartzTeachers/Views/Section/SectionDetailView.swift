@@ -190,40 +190,63 @@ struct SectionDetailView: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack {
-            // Base layer: always laid out in the normal, safe-area
-            // respecting flow. Keeping it mounted means its geometry is
-            // never inherited from the full-bleed web view above it —
-            // which is what dragged the progress header under the
-            // window's toolbar when a preview was restarted.
-            VStack(spacing: 0) {
-                if let stoppedScheduledPublish {
-                    ScheduledPublishNoticeView(
-                        outcome: stoppedScheduledPublish,
-                        course: course.code,
-                        sectionNumber: sectionNumber,
-                        dismiss: dismissScheduledPublishNotice
-                    )
-                }
-                if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
-                    consoleArea
-                } else {
-                    // Fills the height it is offered, which is what keeps the
-                    // notice above it flush under the toolbar: a base layer
-                    // that claims less than the ZStack offers is CENTRED by it,
-                    // and the notice floated mid-window. See the view's own
-                    // comment for the measurement.
-                    NoPreviewPlaceholderView(
-                        deploysToLocalFolder: course.configuration.deploysToLocalFolder
-                    )
-                }
+        // The notice is ABOVE everything this section can show, including the
+        // site — one band, in one place, in every state.
+        //
+        // It used to sit in the base layer of the ZStack below, under the
+        // full-bleed web view: with a preview showing (the commonest state) a
+        // teacher saw nothing but a green tint bleeding through the toolbar,
+        // which is issue #219. Putting the band in the layer ABOVE the site
+        // would have meant writing it twice — once for each state — so it is
+        // here instead, outside the stack altogether. The site takes the room
+        // that is left and gets it back the moment the notice is dismissed.
+        //
+        // REJECTED: `.safeAreaInset(edge: .top)` on the web view, and a second
+        // copy of the band inside a cover-layer `VStack`. Both put the band
+        // inside the branch that exists only while a preview is up, so the
+        // no-preview case needs its own copy — two places to keep in step for
+        // one sentence — and both move the band between containers as previews
+        // start and stop.
+        VStack(spacing: 0) {
+            if let stoppedScheduledPublish {
+                ScheduledPublishNoticeView(
+                    outcome: stoppedScheduledPublish,
+                    course: course.code,
+                    sectionNumber: sectionNumber,
+                    dismiss: dismissScheduledPublishNotice
+                )
             }
+            ZStack {
+                // Base layer: always laid out in the normal, safe-area
+                // respecting flow. Keeping it mounted means its geometry is
+                // never inherited from the full-bleed web view above it —
+                // which is what dragged the progress header under the
+                // window's toolbar when a preview was restarted.
+                VStack(spacing: 0) {
+                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
+                        consoleArea
+                    } else {
+                        // Fills the height it is offered, which is what keeps
+                        // the notice above it flush under the toolbar: a layer
+                        // that claims less than the stack offers is CENTRED by
+                        // it, and the notice floated mid-window. See the view's
+                        // own comment for the measurement.
+                        NoPreviewPlaceholderView(
+                            deploysToLocalFolder: course.configuration.deploysToLocalFolder
+                        )
+                    }
+                }
 
-            // Cover layer: the site itself, deliberately full-bleed.
-            if let previewURL {
-                WebPreviewView(controller: previewController, url: previewURL)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityIdentifier("previewWebView")
+                // Cover layer: the site itself, full-bleed within whatever
+                // room the notice leaves. It stays in this one branch however
+                // the notice comes and goes — the web view is a live WKWebView
+                // with a page scrolled to where the teacher left it, and
+                // moving it between containers is how that gets thrown away.
+                if let previewURL {
+                    WebPreviewView(controller: previewController, url: previewURL)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .accessibilityIdentifier("previewWebView")
+                }
             }
         }
         .navigationTitle(titleText)
