@@ -39,7 +39,7 @@ final class QuitScriptRunsTests: XCTestCase {
         let trail: String = try run(in: scratch, includingTheSharedSetup: false)
 
         XCTAssertTrue(
-            callsMade(in: scratch).contains(where: { $0.hasPrefix("stop -t 2 teaching-quartz-") }),
+            callsMade(in: scratch).contains(where: { call in call.hasPrefix("stop -t 2 teaching-quartz-") }),
             "Nothing was stopped. What was asked:\n\(callsMade(in: scratch).joined(separator: "\n"))"
         )
         XCTAssertTrue(
@@ -59,7 +59,7 @@ final class QuitScriptRunsTests: XCTestCase {
         let trail: String = try run(in: scratch, includingTheSharedSetup: false, secondsToWaitForWork: 2)
 
         XCTAssertFalse(
-            callsMade(in: scratch).contains(where: { $0.hasPrefix("stop ") }),
+            callsMade(in: scratch).contains(where: { call in call.hasPrefix("stop ") }),
             "A publish was running inside it and it was stopped anyway"
         )
         XCTAssertTrue(trail.contains("left the website builder for “"), "The trail says: \(trail)")
@@ -77,7 +77,7 @@ final class QuitScriptRunsTests: XCTestCase {
 
         let trail: String = try run(in: scratch, includingTheSharedSetup: false)
 
-        XCTAssertFalse(callsMade(in: scratch).contains(where: { $0.hasPrefix("stop ") }))
+        XCTAssertFalse(callsMade(in: scratch).contains(where: { call in call.hasPrefix("stop ") }))
         XCTAssertEqual(trail.trimmingCharacters(in: .whitespacesAndNewlines), "")
     }
 
@@ -96,7 +96,7 @@ final class QuitScriptRunsTests: XCTestCase {
         let trail: String = try run(in: scratch, includingTheSharedSetup: false)
 
         XCTAssertTrue(
-            callsMade(in: scratch).contains(where: { $0.hasPrefix("stop -t 2 ") }),
+            callsMade(in: scratch).contains(where: { call in call.hasPrefix("stop -t 2 ") }),
             "The stop was never even attempted"
         )
         XCTAssertFalse(
@@ -172,13 +172,153 @@ final class QuitScriptRunsTests: XCTestCase {
 
         XCTAssertFalse(callsMade(in: scratch).contains("colima stop"))
         XCTAssertTrue(
-            trail.contains("this folder’s own website builder is still working"),
+            trail.contains("this folder’s own website builder is still running"),
             "The trail says: \(trail)"
         )
         XCTAssertFalse(
             trail.contains("other software on this Mac"),
             "A teacher's own unfinished publish was reported as somebody else's software: \(trail)"
         )
+    }
+
+    /// A stop that was REFUSED leaves our own builder running, and the
+    /// shared-machine question must not then call it somebody else's
+    /// software.
+    ///
+    /// The same falsehood `testOurOwnBuilderIsNotReportedAsSomebodyElses
+    /// Software` exists to prevent, reached through the other door: the
+    /// builder is still in the emptiness check's answer whether it was left
+    /// alone deliberately or refused to stop, and only the first of those two
+    /// used to tell the shared-machine question about itself.
+    @MainActor
+    func testARefusedStopStillCountsAsOurOwnBuilder() throws {
+        let scratch: Scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.root) }
+        try writeDockerStandIn(
+            in: scratch, running: true, processesInside: 1, psExitCode: 0,
+            psPrints: "abc123deadbeef", stopExitCode: 1
+        )
+        try writeColimaStandIn(in: scratch)
+        try makeSocket(at: colimaSocketPath(in: scratch))
+
+        let trail: String = try run(in: scratch, includingTheSharedSetup: true)
+
+        XCTAssertFalse(callsMade(in: scratch).contains("colima stop"))
+        XCTAssertTrue(trail.contains("it would not stop"), "The trail says: \(trail)")
+        XCTAssertFalse(
+            trail.contains("other software on this Mac"),
+            "A builder of the teacher's own that refused to stop was reported as somebody else's software: \(trail)"
+        )
+        XCTAssertTrue(
+            trail.contains("this folder’s own website builder is still running"),
+            "The trail says: \(trail)"
+        )
+    }
+
+    // MARK: - A launcher running on this Mac
+
+    /// The most dangerous rule in the piece, RUN rather than read off the
+    /// script's text: never stop a folder's builder while a launcher for that
+    /// folder is running on this Mac.
+    ///
+    /// Real launchers, started by this test in the scratch folder, so their
+    /// `ps` lines carry exactly the absolute paths `ScriptRunner` and a
+    /// scheduled publish produce. Three folders at once, because the two ways
+    /// this can go wrong are opposites: a launcher that is NOT matched (the
+    /// gate fails open and a publish is stopped mid-flight), and one matched
+    /// too eagerly — `Teach` is a prefix of `Teach 2`, and a neighbour's
+    /// launcher must not hold a folder that has none. Nothing here needs
+    /// Docker or Colima; the stand-ins are the only ones reachable.
+    @MainActor
+    func testNothingIsStoppedWhileThatFoldersLauncherIsRunning() throws {
+        let scratch: Scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.root) }
+        try writeDockerStandIn(in: scratch, running: true, processesInside: 1, psExitCode: 0)
+        try writeColimaStandIn(in: scratch)
+        try makeSocket(at: colimaSocketPath(in: scratch))
+
+        let desktop: URL = scratch.home.appendingPathComponent("Desktop", isDirectory: true)
+        let busy: URL = desktop.appendingPathComponent("Teach 2", isDirectory: true)
+        let quiet: URL = desktop.appendingPathComponent("Teach", isDirectory: true)
+        let stopping: URL = desktop.appendingPathComponent("O'Brien's Class", isDirectory: true)
+        for folder in [busy, quiet, stopping] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for name in ["preview.sh", "deploy.sh"] {
+                let script: URL = folder.appendingPathComponent(name)
+                // NOT `exec`: that replaces the process image, and with it
+                // the very `ps` line the quit script matches on. The trap
+                // takes the sleep with it so nothing is orphaned.
+                try Data(
+                    "sleep 25 &\nchild=$!\ntrap 'kill $child 2>/dev/null; exit 0' TERM\nwait $child\n".utf8
+                ).write(to: script)
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o755], ofItemAtPath: script.path
+                )
+            }
+        }
+
+        // A publish for "Teach 2", and a STOP for the apostrophe folder —
+        // which must not count, or the app's own preview stops would make
+        // every quit-with-a-preview free nothing at all.
+        let publishing: Process = launcher(
+            at: busy.appendingPathComponent("deploy.sh"), arguments: ["COMP", "1"]
+        )
+        let stoppingRun: Process = launcher(
+            at: stopping.appendingPathComponent("preview.sh"), arguments: ["COMP", "2", "--stop"]
+        )
+        defer {
+            publishing.terminate()
+            stoppingRun.terminate()
+        }
+        try publishing.run()
+        try stoppingRun.run()
+        XCTAssertTrue(publishing.isRunning && stoppingRun.isRunning, "The stand-in launchers did not start")
+
+        let trail: String = try run(
+            in: scratch,
+            includingTheSharedSetup: true,
+            secondsToWaitForWork: 2,
+            folderPaths: [busy.path, quiet.path, stopping.path]
+        )
+
+        var stopped: [String] = []
+        for call in callsMade(in: scratch) where call.hasPrefix("stop -t 2 ") {
+            stopped.append(String(call.dropFirst("stop -t 2 ".count)))
+        }
+        XCTAssertFalse(
+            stopped.contains(FolderContainers.containerName(forFolder: busy.path)),
+            "A folder with a publish running on this Mac had its builder stopped. Stopped: \(stopped)"
+        )
+        XCTAssertTrue(
+            stopped.contains(FolderContainers.containerName(forFolder: quiet.path)),
+            "“Teach” has no launcher of its own — only its neighbour “Teach 2” does — and was held anyway. Stopped: \(stopped)"
+        )
+        XCTAssertTrue(
+            stopped.contains(FolderContainers.containerName(forFolder: stopping.path)),
+            "A --stop run held the folder. Stopped: \(stopped)"
+        )
+        XCTAssertFalse(
+            callsMade(in: scratch).contains("colima stop"),
+            "The shared machine was stopped while a publish was running on this Mac"
+        )
+        XCTAssertTrue(trail.contains("left the website builder for “Teach 2”"), "The trail says: \(trail)")
+    }
+
+    /// A stand-in launcher, run exactly the way the app runs a real one: by
+    /// absolute path, through `/bin/bash`, so its `ps` line is the shape the
+    /// quit script looks for.
+    private func launcher(at scriptURL: URL, arguments: [String]) -> Process {
+        let process: Process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        var fullArguments: [String] = [scriptURL.path]
+        for argument in arguments {
+            fullArguments.append(argument)
+        }
+        process.arguments = fullArguments
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        return process
     }
 
     /// No socket belonging to the shared machine, nothing touched — which is
@@ -261,10 +401,11 @@ final class QuitScriptRunsTests: XCTestCase {
     private func run(
         in scratch: Scratch,
         includingTheSharedSetup: Bool,
-        secondsToWaitForWork: Int = 20
+        secondsToWaitForWork: Int = 20,
+        folderPaths: [String]? = nil
     ) throws -> String {
         let script: String = FolderContainers.quitScript(
-            folderPaths: [scratch.workingFolder.path],
+            folderPaths: folderPaths ?? [scratch.workingFolder.path],
             includingTheSharedSetup: includingTheSharedSetup,
             secondsToWaitForWork: secondsToWaitForWork,
             inHomeFolder: scratch.home

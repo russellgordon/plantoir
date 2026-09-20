@@ -595,7 +595,12 @@ itself in `docker ps -q`'s answer — so asking "is anything in there?" first
 reports a teacher's own unfinished publish as "other software on this Mac", on
 a Mac that has no other software in there at all, which is every teacher's.
 Ours first, then any launcher on the host, then everything else; each branch's
-sentence is then true of the thing that actually caused it.
+sentence is then true of the thing that actually caused it. **A stop that was
+REFUSED counts as ours too**, and that is the same falsehood through the other
+door: the container is in `docker ps -q` whether we left it alone on purpose or
+asked it to stop and were told no, so `release` reports both back to the
+question below it. Hence "this folder's own website builder is still RUNNING"
+rather than "working" — only one of the two is working.
 
 The old line was `[ -z "$(docker ps -q 2>/dev/null)" ]`, and it could not tell
 "nothing is running" from "I could not ask". Measured:

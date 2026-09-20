@@ -99,7 +99,32 @@ enum QuitConfirmation {
 
     /// What this app is in the middle of, in the words the teacher is shown —
     /// or nil when it is in the middle of nothing.
-    static func workUnderWay(publishes: [CourseActivity.PublishRecord]) -> String? {
+    ///
+    /// **Reads its own facts, and that is the point.** It used to be handed
+    /// `CourseActivity.activePublishes` by the delegate, which left the one
+    /// decision worth pinning — publishes count, previews do not — outside
+    /// anything a test could reach: the contract's "a preview is open" case
+    /// passed for every implementation, and swapping `activePublishes` for
+    /// `courseIsBusy` at the call site left the whole suite green. Now the
+    /// choice of source is inside the function the contract cases run.
+    static func workUnderWay() -> String? {
+        return workUnderWay(publishes: CourseActivity.activePublishes, previews: PreviewLeases.active)
+    }
+
+    /// The same decision with both facts handed in, for a test that wants to
+    /// build them rather than install them.
+    ///
+    /// `previews` is taken and deliberately NOT used — a parameter that
+    /// exists to say so out loud. A lease is held for as long as a preview is
+    /// OPEN, so it cannot tell a section still building from one that
+    /// finished twenty minutes ago; asking on every lease would mean asking
+    /// almost every quit, and the question exists for the publish. Quitting
+    /// deals with previews by stopping them, not by asking about them.
+    static func workUnderWay(
+        publishes: [CourseActivity.PublishRecord],
+        previews: [PreviewLeases.Lease]
+    ) -> String? {
+        _ = previews
         if publishes.isEmpty {
             return nil
         }

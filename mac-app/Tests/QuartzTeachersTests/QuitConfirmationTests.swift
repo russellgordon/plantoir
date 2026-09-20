@@ -47,9 +47,12 @@ final class QuitConfirmationTests: XCTestCase {
                 )
             }
 
-            let underWay: String? = QuitConfirmation.workUnderWay(
-                publishes: CourseActivity.activePublishes
-            )
+            // The no-argument form, on purpose: it is the one the delegate
+            // calls and the one that chooses its own sources, so the case
+            // below with previews open and nothing publishing can actually
+            // fail. Handing it `activePublishes` here would make that case
+            // pass for any implementation.
+            let underWay: String? = QuitConfirmation.workUnderWay()
             XCTAssertEqual(
                 QuitConfirmation.shouldAsk(reason: reason, workUnderWay: underWay),
                 expectAsk,
@@ -65,16 +68,16 @@ final class QuitConfirmationTests: XCTestCase {
     func testTheQuestionSaysWhatIsHappening() throws {
         let one: String = try XCTUnwrap(QuitConfirmation.workUnderWay(publishes: [
             CourseActivity.PublishRecord(folderPath: "/p", courseCode: "ADA1O", sectionNumber: 2)
-        ]))
+        ], previews: []))
         XCTAssertEqual(one, "publishing Section 2 of ADA1O")
 
         let several: String = try XCTUnwrap(QuitConfirmation.workUnderWay(publishes: [
             CourseActivity.PublishRecord(folderPath: "/p", courseCode: "ADA1O", sectionNumber: 1),
             CourseActivity.PublishRecord(folderPath: "/p", courseCode: "ICS3U", sectionNumber: 1)
-        ]))
+        ], previews: []))
         XCTAssertEqual(several, "publishing 2 sections")
 
-        XCTAssertNil(QuitConfirmation.workUnderWay(publishes: []))
+        XCTAssertNil(QuitConfirmation.workUnderWay(publishes: [], previews: []))
 
         let shown: String = QuitConfirmation.question(about: one)
             + " " + QuitConfirmation.explanation()
