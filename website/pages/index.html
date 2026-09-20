@@ -30,14 +30,20 @@ body_class: home
          whose asset is missing from the newest release. If a platform ever
          lags a tag again: pin its card to the last release that HAS the
          asset, say so on the card, and un-pin it the moment the platform
-         catches up — see RELEASING.md, "Two platforms, one version series". -->
+         catches up — see RELEASING.md, "Two platforms, one version series".
+
+         The WINDOWS card is PINNED to v1.1.0 as of 2026-09-19: v1.2.0 went up
+         carrying the macOS DMG only, so the evergreen URL would 404 for
+         PlantoirSetup.exe. When the Windows installer joins v1.2.0, put this
+         card back on releases/latest/download/ and delete "version 1.1.0"
+         from its meta line. -->
     <a class="dl" href="{{repo_url}}/releases/latest/download/Plantoir-macOS.dmg">
       <span class="platform">macOS</span>
       <span class="meta">macOS 15 or later, Apple silicon</span>
     </a>
-    <a class="dl" href="{{repo_url}}/releases/latest/download/PlantoirSetup.exe">
+    <a class="dl" href="{{repo_url}}/releases/download/v1.1.0/PlantoirSetup.exe">
       <span class="platform">Windows</span>
-      <span class="meta">Windows 10 or 11, 64-bit</span>
+      <span class="meta">Windows 10 or 11, 64-bit &middot; version 1.1.0</span>
     </a>
   </div>
   <!-- AUTO-UPDATED when a release is cut: the version and date come from
