@@ -1010,6 +1010,207 @@ changing `BuildFreshness`, which the Deploy button uses too, so it is its own
 piece of work with its own measurement; giving the rebuild its own exit code
 was rejected as a launcher contract change Windows shares.
 
+## A scheduled deploy that outlived its course
+
+Added 2026-09-20, [issue #236](https://github.com/russellgordon/plantoir/issues/236).
+The rule and its case lists are `contracts/shared-rules.json` →
+`scheduledDeployCancellation`; this is the reasoning behind them, and the
+measurements.
+
+**Two faults, and they are independent.**
+
+| | Fault | Reachable how |
+|---|---|---|
+| **A** | A job survives the removal of its course or section and fires once on its date, against whatever is in the folder by then. | The sidebar's **Remove**. |
+| **B** | A job that NEVER RAN — the Mac was off at the moment — stays on disk and comes due again a YEAR later, because `StartCalendarInterval` carries a month, a day, an hour and a minute and no year. | Any Mac that is off at half six. Independent of A. |
+
+Fault B is what makes A perennial rather than a one-off, which is why closing B
+is the load-bearing half.
+
+### Which direction fault A errs in — measured, and worse than it looked
+
+The issue said the dangerous edge was "a teacher who publishes to a folder".
+Measured on 2026-09-20 against `deploy.py`, it is two of the three destinations:
+
+- **Netlify refuses.** `publish_to_netlify` reaches `refuse_to_ask` and exits 3,
+  because the site marker lives INSIDE the course folder
+  (`.netlify_sites/section<N>.json`) and went with it. Litter and a puzzling
+  record; nothing published.
+- **Cloudflare Pages does NOT refuse.** `publish_to_cloudflare` contains no
+  `refuse_to_ask` at all. The one thing it would have to ask for is the
+  teacher's surname, and that is read from `courses/.internal/profile.json` —
+  the **working folder**, not the course folder — so it survives the removal;
+  `suggest_pages_name` is deterministic from code, section, year and surname,
+  and `ensure_pages_project` creates or reuses a project. So an orphan builds
+  THIS year's course, publishes it, exits 0 and records success, at a public
+  address the teacher never chose.
+- **A folder destination does not refuse either**, because a folder destination
+  asks nothing ever.
+
+So "the failure that reports success" is not a rare edge for somebody with a
+school network share — it is every folder course and every Cloudflare course.
+The plan for this piece said Cloudflare refused; that was wrong, and correcting
+it is why the severity went up rather than down.
+
+### The lateness check, and why it is not a calendar
+
+`runScheduled` re-checks its own moment before anything else happens.
+`ScheduledDeployLateness.mayStillRun` compares `abs(now − intended)` against the
+window on **absolute instants** — no `Calendar`, no `TimeZone`, no daylight
+saving anywhere. Measured (`swiftc -O`, this Mac, 2026-09-20), against the
+"same calendar day" rule first proposed:
+
+| what happened | same calendar day | elapsed time |
+|---|---|---|
+| a 23:50 job, Mac woken 00:05 — the coalesced wake `man launchd.plist` documents | refuses | **runs** |
+| 06:30 job, Mac woken 09:00 the same morning | runs | **runs** |
+| 06:30 job, Mac off overnight, opened 17:00 the next day | refuses | **runs** |
+| scheduled in Toronto, fires at 06:30 local in Tokyo (13 h EARLY) | runs | **runs** |
+| the same date a YEAR later | refuses | **stands down** |
+
+Row one is why the calendar rule was rejected: a fifteen-minute delay turning
+into a silent non-deploy is the precise harm this whole piece exists to prevent.
+Row four is why the comparison is `abs` rather than one-sided — after a
+time-zone move the job fires BEFORE the instant that was recorded.
+
+**It fails open.** A moment that cannot be read means RUN. Fail-closed would
+turn one unparseable stamp into every scheduled deploy silently not happening,
+which is worse than the fault being fixed.
+
+**It reaches jobs already on disk**, and that is the reason it, rather than any
+sweep, is what closes fault B for teachers who already have an orphan: every
+released plist's `ProgramArguments[0]` is the app's own binary
+(`Bundle.main.executableURL?.path`, true in v1.0.0 through v1.2.1), so an
+upgraded app at the same path runs the NEW check for an OLD job the moment it
+next tries to fire.
+
+### The window is the teacher's, per course
+
+Russell's decision, 2026-09-20. The default is **a week**, not the twenty-four
+hours first proposed: a teacher away sick opens the laptop twenty-six hours late
+and still wants the site updated, and a laptop closed over a weekend is
+ordinary. The fault being closed is about eleven months late, so the window only
+has to sit far below that.
+
+The choice is `scheduled_deploy_may_run_late_days` in `course_config.json` — 1,
+3, 7 or 14 — offered in Course Settings under Deploying. **There is deliberately
+no "always"**: that is the annual recurrence, handed back to the teacher as a
+preference. Anything stored that is not one of the four reads as the default, so
+a hand-edited `0` cannot stand every scheduled deploy down.
+
+It is read **at the moment the deploy fires**, out of the course's own settings
+file in the working folder the job named, by a process with no app around it —
+so changing the setting after scheduling changes what a job already on disk will
+do. The folder-open sweep asks the same question through the same function; two
+answers to "how late is too late for this course" is one more than anybody can
+keep in step.
+
+### What a stand-down does, in order
+
+The order is the wrapper's own, for the wrapper's own reasons:
+
+1. **The plist first**, so a Mac that restarts in the middle comes back with
+   nothing pending. The label comes from the wrapper SCRIPT's path — the
+   basename is the label — rather than from a course code and section, because
+   a plist written before v1.2.0 carries neither, and those are exactly the jobs
+   that have been waiting to fire a year late.
+2. **The wrapper**, so a job that is off leaves no runnable copy of itself.
+3. **The teacher's note and the trail line**, through the machinery that already
+   exists for a scheduled publish that did not get through — a
+   `ScheduledPublishOutcome` record the section shows, and one trail line.
+4. **`launchctl bootout` LAST**, because booting the job out ends this very
+   process. Then `exit(0)`: nothing went wrong, and a non-zero exit would land
+   in the section's log as an error nobody can act on.
+
+**A new outcome kind, `tooLateToRun`**, rather than filing it under
+`didNotFinish`. That was weighed and the existing kinds genuinely cannot carry
+it: `didNotFinish`'s own sentence names a DESTINATION that stopped, and here
+there was none — filling that slot in is the exact mistake
+`buildNeededAnAnswer` was created to stop being made, recorded as REJECTED in
+the contract in as many words. It is also not a failure: nothing was attempted
+and nothing went wrong, and the sentence has to say so or a teacher goes looking
+for a fault there was not.
+
+### Everything is scoped to ONE working folder
+
+An agent's label is the course code and the section number and nothing else, so
+`~/Library/LaunchAgents/<label>.plist` names **one file per code and section for
+the whole Mac**. A teacher holding last year's working folder and this year's,
+both with ICS3U section 1, has one alarm between them.
+
+So the removal cancel, the sweep, `CourseRenamer.sectionsWithAScheduledPublish`,
+the sidebar's clock and the assistant's tidy-up cancel all read the plist's
+`WorkingDirectory` and leave alone anything belonging to another folder. Paths
+are compared with **POSIX `realpath`, never Foundation's
+`resolvingSymlinksInPath()`** — the same trap the container naming met: the
+latter strips `/private` where the former keeps it, and two spellings of one
+folder comparing as DIFFERENT would scope every job out silently, so nothing
+would be cancelled or shown at all.
+
+That two working folders share one alarm at all is a separate fault with its own
+issue. A folder-scoped label would orphan every plist a teacher already holds,
+which is its own migration.
+
+### What was rejected
+
+**A sweep for jobs whose COURSE no longer exists**, at folder-open and at course
+creation. It was in the plan and it is not here. It is the only code in this
+piece that DELETES something a teacher set on purpose, and every way it can be
+wrong is silent:
+
+- `FileManager.contentsOfDirectory` on an existing-but-EMPTY `courses/`
+  succeeds and returns `[]` — a volume that is not mounted, a synced folder
+  mid-materialisation — and every plist naming that folder then reads as an
+  orphan. That is CLAUDE.md rule 7's lesson verbatim: `docker ps -q` exits 1 and
+  prints nothing, and so does a daemon that did not answer.
+- A course code recovered from a LABEL is `sanitizedCode` and lossy, and the
+  failure direction of a mismatch is "this course does not exist" → cancel.
+- What it actually buys, once the lateness check exists, is ONE residue: a
+  still-future job whose course was removed BEFORE the teacher upgraded and
+  whose code is recreated before its date. That is not worth the family of ways
+  it can destroy a live deploy.
+
+The **overdue-only** sweep is kept, and it is provably harmless in a way the
+course-absence one is not: a job that far past its moment would stand itself
+down the next time it tried to fire, so removing it destroys nothing that could
+have run. It is one-sided on purpose — it asks only whether the moment has
+PASSED, so a deploy set three weeks ahead is never touched — and it leaves alone
+any job with no recorded moment, because the run fails open on one of those.
+
+**"The same calendar day" as the lateness rule** — measured above.
+
+**A fixed twenty-four hour window for everybody** — see "The window is the
+teacher's".
+
+**Cancelling inside `CourseArchiver`.** `CourseArchiverTests` and
+`CourseRestorerTests` build an **ICS3U** fixture — "a course a teacher plausibly
+has" — and set no `launchAgentsDirectoryOverride`, so a cancel inside the
+archiver with the real `LaunchControl` as its default would boot out and delete
+a real ICS3U schedule on the machine running the suite. The orchestration went
+into `ScheduledDeployCleanup` instead, which takes the runner explicitly.
+Putting it in `SidebarView.performRemoval` was rejected for the opposite reason:
+nothing in the suite constructs that view — every reference to it is to a static
+member — so the wiring could not be pinned, and a later edit that dropped the
+call would leave the suite green. `LaunchControl.run` now also refuses outright
+while the override is set, so the rule is structural rather than written down.
+
+**Cancelling on a restore.** Restoring a backup replaces a course's CONTENTS in
+place: the course and its sections are still there, its site marker comes back
+with it, and the schedule still means what it meant. Restoring an ARCHIVE adds,
+and a section restored after its deploy was cancelled comes back with nothing
+scheduled, which is the safe direction. Both are pinned as cases in the
+contract, by a scan of the file that must not have learned to cancel.
+
+### The one claim no unit test can reach, and how it was measured
+
+`launchAgentsDirectoryOverride` moves where the app WRITES; launchd only ever
+reads the real folder, so nothing in the suite can prove that launchd hands
+`PLANTOIR_SCHEDULED_FOR` to the process it starts — and the whole lateness check
+rests on it. It was measured by hand on 2026-09-20: three real launchd jobs, in
+a throwaway working folder inside `$HOME`, under course codes no teacher can
+have, with a stand-in wrapper in place of a real Quartz build. The numbers and
+what each job proved are in `GUI-IMPROVEMENTS.md`'s row for this change.
+
 ---
 
 [◀ Previous: Quartz Customizations](06-quartz-customizations.md) · [Back to index](README.md) · [Next: course_config.json Reference ▶](08-course-config-reference.md)

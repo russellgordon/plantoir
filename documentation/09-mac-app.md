@@ -1280,6 +1280,35 @@ The command-line launcher does not rename: `setup_course.py`'s
 where to go. Nothing in the build changes — it reads the word from the
 configuration on every run.
 
+## Removing a course: where the cancel lives, and why not in `CourseArchiver`
+
+The sidebar's **Remove** goes through `ScheduledDeployCleanup.removeCourse` /
+`.removeSection`, not straight to `CourseArchiver`. Those turn the course's
+scheduled deploys off FIRST and archive second, and a cancel that fails stops
+the removal. The whole rule, its cases and what was rejected are in
+[`07-deployment.md`](07-deployment.md) → "A scheduled deploy that outlived its
+course"; only the placement is a mac-app fact, and it is worth having here
+because the obvious home is wrong twice over:
+
+- **Not inside `CourseArchiver`.** `CourseArchiverTests` and
+  `CourseRestorerTests` build an **ICS3U** fixture and set no
+  `ScheduledDeploy.launchAgentsDirectoryOverride`. A cancel in the archiver,
+  with the real `LaunchControl` as its default argument, would boot out and
+  delete a real ICS3U schedule on the machine running the suite — and ICS3U is
+  a course a teacher plausibly has. `LaunchControl.run` now refuses outright
+  while that override is set, so the rule is structural rather than a note to
+  whoever writes the eleventh test; `ScheduledDeployCleanupTests` pins the
+  refusal.
+- **Not inside `SidebarView.performRemoval` either**, which is where it started.
+  Nothing in the suite constructs that view — every reference to it is to a
+  static member — so a cancel living there could be proved only by proving the
+  helper it calls, and a later edit that dropped the call would leave the suite
+  green.
+
+**One model function per removal kind**, deliberately, so a later piece adding a
+step to a removal adds it there rather than in the view. The view keeps one
+call, the confirmation's extra sentence and the "Could not remove" alert.
+
 ## What an archive or a backup is CALLED, and the calendar it is stamped in
 
 Three kinds of zip share `courses/_backups/<CODE>/` and are told apart only by
