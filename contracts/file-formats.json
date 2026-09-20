@@ -154,6 +154,17 @@
         "key": "show_section_marker",
         "type": "per-section map of booleans",
         "why": "Absent means TRUE — the 'S1' marker shows unless a teacher turns it off."
+      },
+      {
+        "default": false,
+        "key": "kept_for_reference",
+        "type": "boolean",
+        "why": "TRUE marks a REFERENCE COURSE: last year's course, or a course full of example content, kept in this year's sidebar to be read and never deployed. ABSENT MEANS FALSE, which is what every course written before this key existed says, and it is the only safe direction — a course that forgot to say it is ordinary is one a teacher can still deploy, while the reverse would make a live course silently undeployable. The marker is NOT the defence on its own, and that is the part worth carrying: a reference course is ALSO left with nowhere to deploy to (deploy_target 'local_folder' with an empty deploy_folder_path, no additional_deploy_targets, no custom_domains, and its .netlify_sites/.cloudflare_sites markers renamed aside), so an OLDER copy of either app sharing the same folder over iCloud Drive — one that has never heard of this key — refuses the deploy too, in sentences it already ships. Measured on a real previous-generation working folder: those configs carry no deploy_target at all, and an absent deploy_target reads as 'netlify', so a plain copy really would arrive with a working Deploy button aimed at last year's live class site. The refusal itself is shared-rules.json → referenceCourses."
+      },
+      {
+        "key": "reference_school_year",
+        "type": "integer or null",
+        "why": "Which school year a reference course was taught in, as the calendar year it STARTED in: 2025 means 2025–26. Only meaningful beside kept_for_reference. The LABEL is derived rather than stored — 'Other' for absent or null, otherwise SchoolYear's rule — so the en dash in '2025–26' never reaches this file and the two apps cannot render the same year two ways. Absent, null, or anything that is not a whole number within the offered range reads as 'Other', which is the safe direction: a course lands in a group the teacher can see and can change, rather than inventing a group labelled '0000–01' out of a value that coerced to zero. A year ABOVE the range today (a Mac with a wrong clock) joins its own group on the day that year arrives, because the range only ever grows at the top. Nil CLEARS the key rather than writing null, so a course nobody has filed under a year writes the same file it always did."
       }
     ],
     "note": "`courses/<CODE>/course_config.json`. Written by the wizard and the settings form, read by both apps AND by `scripts/*.py` — so a key spelled differently on one platform is not a disagreement between two apps, it is a setting the site build silently ignores. Nested keys are per-section maps: `{\"sections\": {\"section1\": <value>}}`. The keys fall into TWO groups, and a first draft of this contract only had the first: the settings form round-trips most of them, while a handful are written ONCE by the wizard and read back by `setup_course.py` as the defaults for its own questions. Missing the second group means a teacher on one platform is asked a question the other platform answers for them.",
