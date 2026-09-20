@@ -107,47 +107,144 @@ final class PreviewReachabilityTests: XCTestCase {
         )
     }
 
-    /// Only a 200 is the site answering itself. Everything else — a curl that
-    /// timed out, a container that is not there, nothing at all — is not.
-    func testOnlyAnAnsweringSiteCounts() {
-        XCTAssertTrue(PreviewReachability.theBuilderCanSeeItsOwnSite(fromAnswer: "200"))
-        XCTAssertTrue(PreviewReachability.theBuilderCanSeeItsOwnSite(fromAnswer: "200\n"))
-        XCTAssertFalse(PreviewReachability.theBuilderCanSeeItsOwnSite(fromAnswer: "000"))
-        XCTAssertFalse(PreviewReachability.theBuilderCanSeeItsOwnSite(fromAnswer: "404"))
-        XCTAssertFalse(PreviewReachability.theBuilderCanSeeItsOwnSite(fromAnswer: ""))
+    /// Three answers, not two — and the third is the one that was missing.
+    /// MEASURED with the generated script: a served site prints `200`, a port
+    /// with nothing on it prints `000`, and a container that is not there
+    /// prints nothing at all (its complaint goes to the error channel, which
+    /// is discarded), which is also what a ten-second watchdog leaves behind.
+    func testTheThreeAnswersAreToldApart() {
+        XCTAssertEqual(PreviewReachability.answer(from: "200"), .theSiteAnswered)
+        XCTAssertEqual(PreviewReachability.answer(from: "200\n"), .theSiteAnswered)
+        XCTAssertEqual(PreviewReachability.answer(from: "000"), .nothingAnsweredInside)
+        XCTAssertEqual(PreviewReachability.answer(from: "404"), .nothingAnsweredInside)
+        XCTAssertEqual(PreviewReachability.answer(from: ""), .couldNotFindOut)
+        XCTAssertEqual(PreviewReachability.answer(from: "\n"), .couldNotFindOut)
+        XCTAssertEqual(
+            PreviewReachability.answer(from: "Error response from daemon: No such container"),
+            .couldNotFindOut
+        )
+    }
+
+    /// An answer that never arrived must not be reported as "your website did
+    /// not come up": the teacher can read `Started a Quartz server listening
+    /// at …` in the console directly above the sentence.
+    func testNotFindingOutIsNeverReportedAsAFailedWebsite() {
+        XCTAssertEqual(
+            PreviewReachability.verdict(for: .couldNotFindOut), .plantoirCouldNotTell
+        )
+        XCTAssertNotEqual(
+            PreviewReachability.sentence(for: .plantoirCouldNotTell),
+            PreviewReachability.sentence(for: .theSiteNeverAnswered)
+        )
+        XCTAssertFalse(
+            PreviewReachability.sentence(for: .plantoirCouldNotTell)
+                .contains("did not come up"),
+            "It did not find out whether the website came up, so it must not say it did not."
+        )
+    }
+
+    /// An answer that arrives after the teacher has stopped the preview, or
+    /// closed the window, or started another one, belongs to nothing that is
+    /// still on screen — no alert about it, no line on the trail.
+    func testAnAnswerAboutAFinishedRunIsNotActedOn() {
+        let ranFrom: Date = start
+        XCTAssertTrue(PreviewReachability.isStillTheSameWait(
+            startedAt: ranFrom, theRunNowStartedAt: ranFrom,
+            theTeacherStoppedIt: false, theRunIsStillGoing: true
+        ))
+        XCTAssertFalse(PreviewReachability.isStillTheSameWait(
+            startedAt: ranFrom, theRunNowStartedAt: ranFrom,
+            theTeacherStoppedIt: true, theRunIsStillGoing: false
+        ), "The teacher pressed Stop while the builder was being asked.")
+        XCTAssertFalse(PreviewReachability.isStillTheSameWait(
+            startedAt: ranFrom, theRunNowStartedAt: ranFrom,
+            theTeacherStoppedIt: false, theRunIsStillGoing: false
+        ), "The run ended by itself while the builder was being asked.")
+        XCTAssertFalse(PreviewReachability.isStillTheSameWait(
+            startedAt: ranFrom, theRunNowStartedAt: start.addingTimeInterval(5),
+            theTeacherStoppedIt: false, theRunIsStillGoing: true
+        ), "A DIFFERENT preview is running now — it is running, and nobody stopped it.")
+    }
+
+    /// And the view really consults that before it says or records anything.
+    /// A source read, because the order inside one function is the thing
+    /// being pinned and nothing else can see it.
+    func testTheViewChecksTheRunIsStillTheOneItAskedAbout() throws {
+        let function: String = try PreviewReachabilityTests.givingUpFunction()
+        let asking: Int = try XCTUnwrap(
+            function.range(of: "PreviewReachability.askTheBuilder(")
+        ).lowerBound.utf16Offset(in: function)
+        let checking: Int = try XCTUnwrap(
+            function.range(of: "PreviewReachability.isStillTheSameWait("),
+            "Nothing re-checks the run after the question — a Stop pressed during it "
+            + "leaves the teacher an alert about a preview they have already ended."
+        ).lowerBound.utf16Offset(in: function)
+        let recording: Int = try XCTUnwrap(
+            function.range(of: "ActivityTrail.note(")
+        ).lowerBound.utf16Offset(in: function)
+        XCTAssertLessThan(asking, checking)
+        XCTAssertLessThan(checking, recording)
     }
 
     // MARK: - Which sentence a teacher gets
 
     func testTheBuilderAnsweringMeansThisMacCannotReachIt() {
         XCTAssertEqual(
-            PreviewReachability.verdict(theBuilderCanSeeItsOwnSite: true),
-            .thisMacCannotReachIt
+            PreviewReachability.verdict(for: .theSiteAnswered), .thisMacCannotReachIt
         )
         XCTAssertEqual(
-            PreviewReachability.verdict(theBuilderCanSeeItsOwnSite: false),
-            .theSiteNeverAnswered
+            PreviewReachability.verdict(for: .nothingAnsweredInside), .theSiteNeverAnswered
         )
     }
 
-    /// Rule 1: the machinery is never named to a teacher. This is the
-    /// sentence most at risk of it, because the fault IS the machinery.
-    func testNeitherSentenceNamesTheMachinery() {
-        let forbidden: [String] = [
-            "port", "container", "Docker", "docker", "virtual machine", "VM",
-            "forward", "localhost", "127.0.0.1", "Colima", "Lima", "curl"
+    /// Rule 1: the machinery is never named to a teacher. These are the
+    /// sentences most at risk of it, because the fault IS the machinery.
+    ///
+    /// WORDS, not substrings: "Report a Problem…" contains "port", and a test
+    /// that cannot tell those apart is one that gets weakened rather than
+    /// obeyed the first time it is wrong.
+    func testNoneOfTheSentencesNamesTheMachinery() {
+        let forbiddenWords: [String] = [
+            "port", "ports", "container", "containers", "docker", "vm", "forward",
+            "forwarding", "localhost", "colima", "lima", "curl", "terminal"
         ]
-        for verdict in [PreviewReachability.Verdict.thisMacCannotReachIt, .theSiteNeverAnswered] {
+        let forbiddenPhrases: [String] = ["virtual machine", "127.0.0.1"]
+        for verdict in [
+            PreviewReachability.Verdict.thisMacCannotReachIt,
+            .theSiteNeverAnswered,
+            .plantoirCouldNotTell
+        ] {
             let sentence: String = PreviewReachability.sentence(for: verdict)
-            for word in forbidden {
+            var words: Set<String> = []
+            var word: String = ""
+            for character in sentence.lowercased() {
+                if character.isLetter || character.isNumber {
+                    word.append(character)
+                } else {
+                    if !word.isEmpty {
+                        words.insert(word)
+                    }
+                    word = ""
+                }
+            }
+            if !word.isEmpty {
+                words.insert(word)
+            }
+            for forbidden in forbiddenWords {
                 XCTAssertFalse(
-                    sentence.contains(word),
-                    "The sentence for \(verdict) names the machinery: \"\(word)\"."
+                    words.contains(forbidden),
+                    "The sentence for \(verdict) names the machinery: \"\(forbidden)\"."
+                )
+            }
+            for forbidden in forbiddenPhrases {
+                XCTAssertFalse(
+                    sentence.lowercased().contains(forbidden),
+                    "The sentence for \(verdict) names the machinery: \"\(forbidden)\"."
                 )
             }
             XCTAssertTrue(
-                sentence.contains("Mac"),
-                "Both sentences say what to do with the teacher's Mac."
+                sentence.contains("Restarting your Mac") || sentence.contains("Press Preview"),
+                "Every one of them ends with something the teacher can do."
             )
         }
     }
@@ -155,18 +252,23 @@ final class PreviewReachabilityTests: XCTestCase {
     /// The two are told apart on the trail, and the seconds travel with them:
     /// "it sat there" and "it took a while" are one sentence from a teacher
     /// and two different faults.
-    func testTheTrailLineSaysWhichOfTheTwoAndForHowLong() {
+    func testTheTrailLineSaysWhichOfTheThreeAndForHowLong() {
         let unreachable: String = PreviewReachability.trailLine(
             for: .thisMacCannotReachIt, secondsOfSilence: 45
         )
         let neverServed: String = PreviewReachability.trailLine(
             for: .theSiteNeverAnswered, secondsOfSilence: 45
         )
-        XCTAssertNotEqual(unreachable, neverServed)
-        XCTAssertTrue(unreachable.contains("45 seconds"), unreachable)
-        XCTAssertTrue(neverServed.contains("45 seconds"), neverServed)
+        let couldNotTell: String = PreviewReachability.trailLine(
+            for: .plantoirCouldNotTell, secondsOfSilence: 45
+        )
+        XCTAssertEqual(Set([unreachable, neverServed, couldNotTell]).count, 3)
+        for line in [unreachable, neverServed, couldNotTell] {
+            XCTAssertTrue(line.contains("45 seconds"), line)
+        }
         XCTAssertTrue(unreachable.contains("could not reach"), unreachable)
         XCTAssertTrue(neverServed.contains("nothing was serving"), neverServed)
+        XCTAssertTrue(couldNotTell.contains("could not be asked"), couldNotTell)
     }
 
     // MARK: - Seeing the fault on purpose
@@ -228,16 +330,30 @@ final class PreviewReachabilityTests: XCTestCase {
             PreviewReachability.theBuilderSaysItsServerStarted,
             try XCTUnwrap(rule["theClockStartsAt"] as? String)
         )
+        XCTAssertEqual(
+            PreviewReachability.alertTitle, try XCTUnwrap(rule["alertTitle"] as? String)
+        )
 
-        let sentences: [String: String] = try XCTUnwrap(rule["sentences"] as? [String: String])
-        XCTAssertEqual(
-            PreviewReachability.sentence(for: .thisMacCannotReachIt),
-            try XCTUnwrap(sentences["thisMacCannotReachIt"])
-        )
-        XCTAssertEqual(
-            PreviewReachability.sentence(for: .theSiteNeverAnswered),
-            try XCTUnwrap(sentences["theSiteNeverAnswered"])
-        )
+        // All THREE outcomes, table-driven off the contract: a fourth verdict
+        // with no case here, or a case with no verdict, fails rather than
+        // being noticed later.
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        var sentences: [String: String] = [:]
+        for entry in cases {
+            let verdict: String = try XCTUnwrap(entry["verdict"] as? String)
+            sentences[verdict] = try XCTUnwrap(entry["sentence"] as? String)
+        }
+        let everyVerdict: [PreviewReachability.Verdict] = [
+            .thisMacCannotReachIt, .theSiteNeverAnswered, .plantoirCouldNotTell
+        ]
+        XCTAssertEqual(sentences.count, everyVerdict.count)
+        for verdict in everyVerdict {
+            XCTAssertEqual(
+                PreviewReachability.sentence(for: verdict),
+                try XCTUnwrap(sentences[String(describing: verdict)]),
+                "The sentence for \(verdict) and the contract's have drifted apart."
+            )
+        }
     }
 
     /// The line the clock starts at is Quartz's own, so it is checked against
@@ -262,15 +378,7 @@ final class PreviewReachabilityTests: XCTestCase {
     /// "nothing is serving it" every time — and tells a teacher whose website
     /// was fine that it never came up.
     func testTheBuilderIsAskedBeforeThePreviewIsStopped() throws {
-        let source: String = try String(
-            contentsOf: PreviewReachabilityTests.repositoryRoot()
-                .appendingPathComponent("mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"),
-            encoding: .utf8
-        )
-        let function: String = try XCTUnwrap(
-            source.components(separatedBy: "func stopWaitingForThePreview").last,
-            "stopWaitingForThePreview has been renamed — this order still has to hold."
-        )
+        let function: String = try PreviewReachabilityTests.givingUpFunction()
         let asking: Int = try XCTUnwrap(
             function.range(of: "PreviewReachability.askTheBuilder(")
         ).lowerBound.utf16Offset(in: function)
@@ -284,6 +392,20 @@ final class PreviewReachabilityTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// The body of the one function whose ORDER matters and which nothing
+    /// else can watch.
+    private static func givingUpFunction() throws -> String {
+        let source: String = try String(
+            contentsOf: repositoryRoot()
+                .appendingPathComponent("mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"),
+            encoding: .utf8
+        )
+        return try XCTUnwrap(
+            source.components(separatedBy: "func stopWaitingForThePreview").last,
+            "stopWaitingForThePreview has been renamed — these orders still have to hold."
+        )
+    }
 
     private static func repositoryRoot() -> URL {
         return URL(fileURLWithPath: #filePath)

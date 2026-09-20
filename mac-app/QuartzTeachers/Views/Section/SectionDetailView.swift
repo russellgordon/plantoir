@@ -86,8 +86,22 @@ struct SectionDetailView: View {
     /// would be two names for one folder.
     @State var folderThisSectionWorksIn: URL?
 
-    /// Why a preview could not start, shown as an alert.
+    /// Why a preview could not start, or did not appear, shown as an alert.
     @State var previewRefusal: String?
+
+    /// What that alert is CALLED, because two different things now arrive in
+    /// it and one title cannot be true of both.
+    ///
+    /// "Cannot Preview Yet" is right for a refusal to start — another window
+    /// holds the section, so wait and it will work. It is wrong in front of a
+    /// preview that built, was served, and could not be reached: there the
+    /// remedy is restarting the Mac and "Yet" quietly says otherwise. A
+    /// SECOND `.alert` modifier was the obvious alternative and is the one
+    /// thing this view must not have — four alerts on it segfaulted SwiftUI's
+    /// bridge, which is why the folder dialogs share one.
+    ///
+    /// Every write of `previewRefusal` sets this beside it.
+    @State var previewRefusalTitle: String = "Cannot Preview Yet"
 
     /// A publish that was set to happen on its own and did not get through.
     ///
@@ -448,7 +462,7 @@ struct SectionDetailView: View {
             }
             stopPreview()
         }
-        .alert("Cannot Preview Yet", isPresented: previewRefusalBinding) {
+        .alert(previewRefusalTitle, isPresented: previewRefusalBinding) {
             Button("OK") {
                 previewRefusal = nil
             }
@@ -1021,6 +1035,7 @@ struct SectionDetailView: View {
                 sectionNumber: sectionNumber
             )
         } catch {
+            previewRefusalTitle = "Cannot Preview Yet"
             previewRefusal = error.localizedDescription
             return
         }
@@ -1407,9 +1422,14 @@ struct SectionDetailView: View {
         /// How much has been said, and when — which starts the clock at the
         /// builder's line and restarts it every time more arrives.
         ///
-        /// `utf8.count` rather than `count`: it is O(1) on a native string
-        /// (the transcript caches its joined text), and the only question
-        /// here is whether MORE has been said than last time.
+        /// `utf8.count` rather than `count`, because the only question here is
+        /// whether MORE has been said than last time and counting graphemes
+        /// to answer it would be waste. Reading `displayText` at all is not
+        /// free: the transcript caches its joined text but throws the cache
+        /// away on every chunk of output, so a noisy run re-joins its lines
+        /// here once a second. Phases 1 and 2 already read it every second for
+        /// their own reasons; this adds that cost to phase 3, on a string of
+        /// at most 4,000 lines, once a second.
         func noticeWhatTheRunIsSaying() {
             let saidSoFar: String = previewRunner.transcript.displayText
             if silence == nil {
@@ -1618,18 +1638,33 @@ struct SectionDetailView: View {
     /// for ever. And the port goes back through the one path that hands it
     /// back, rather than being freed under a server that still holds it.
     func stopWaitingForThePreview(portInsideTheBuilder: Int, secondsOfSilence: Int) async {
-        var theBuilderCanSeeItsOwnSite: Bool = false
+        // Which run this is about, noted before the question rather than
+        // assumed after it — see `isStillTheSameWait`.
+        let theRunThisIsAbout: Date? = previewRunner.startedAt
+
+        var answer: PreviewReachability.Answer = .couldNotFindOut
         if let folder = folderThisSectionWorksIn {
-            theBuilderCanSeeItsOwnSite = await PreviewReachability.askTheBuilder(
+            answer = await PreviewReachability.askTheBuilder(
                 PreviewReachability.askTheBuilderCommand(
                     containerName: FolderContainers.containerName(forFolder: folder.path),
                     portInsideTheBuilder: portInsideTheBuilder
                 )
             )
         }
-        let verdict: PreviewReachability.Verdict = PreviewReachability.verdict(
-            theBuilderCanSeeItsOwnSite: theBuilderCanSeeItsOwnSite
-        )
+        // The teacher may have pressed Stop, or closed the window, while the
+        // question was being asked. Then there is nothing left to say: an
+        // alert about a preview they have already ended, and a trail line
+        // saying it never appeared, would both be about a run that stopped
+        // because they wanted it to.
+        if !PreviewReachability.isStillTheSameWait(
+            startedAt: theRunThisIsAbout,
+            theRunNowStartedAt: previewRunner.startedAt,
+            theTeacherStoppedIt: previewRunner.wasStoppedByUser,
+            theRunIsStillGoing: previewRunner.isRunning
+        ) {
+            return
+        }
+        let verdict: PreviewReachability.Verdict = PreviewReachability.verdict(for: answer)
         ActivityTrail.note(
             .previewNeverAppeared,
             PreviewReachability.trailLine(for: verdict, secondsOfSilence: secondsOfSilence),
@@ -1637,6 +1672,7 @@ struct SectionDetailView: View {
             section: sectionNumber
         )
         stopPreview()
+        previewRefusalTitle = PreviewReachability.alertTitle
         previewRefusal = PreviewReachability.sentence(for: verdict)
     }
 }
