@@ -28,8 +28,14 @@ The app also owns delivery and resources: it mirrors the full toolchain
 recipe into each working folder's `.toolchain/` (refreshing stale
 launchers from its bundle), self-installs missing host tools to
 `~/Library/Application Support/Plantoir/tools`, runs one container per
-working folder (stopped when the folder's last window closes and at
-quit), and stops Colima at quit only when nothing else runs in it.
+working folder (stopped when the folder's last window closes and at quit,
+but only once nothing is using it), and stops Colima at quit only when it
+can be ASKED what is running in it, the answer comes back empty, and no
+launcher is running anywhere on the Mac. None of that reached a teacher's
+Mac until 2026-09-19 — the conditions, the measurements and what was
+rejected are in
+[`documentation/09-mac-app.md`](../documentation/09-mac-app.md) →
+"Quitting: what it frees, what it refuses to free, and why".
 Additional actions: Add Section (course context menu), Open in Obsidian
 (vault registration included), an Archived sidebar group with restore,
 per-section settings for grade-in-title (with a repetition warning) and a

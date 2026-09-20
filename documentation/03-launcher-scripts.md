@@ -77,8 +77,12 @@ and a terminal teacher should open. The old shared `teaching-quartz`
 container is retired automatically the first time a per-folder container is
 created. The macOS app stops a folder's container (a fast `docker stop`,
 not a removal) when the last window using that folder closes, and on quit —
-the container holds no content, and restarts in about a second on the next
-preview.
+but only once nothing is using it: no launcher for that folder running on the
+host, and no process inside the container beyond its idle `tail`. The
+container holds no content and restarts in about a second on the next preview.
+The conditions, and what happens when they are not met, are in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "Quitting: what it frees, what
+it refuses to free, and why".
 - `--context NAME` (setup only) — select a Docker context.
 - `--image REF` — use a specific already-built image instead of resolving
   one from the recipe (how `verify.sh` points the launchers at its
@@ -166,6 +170,23 @@ take down containers other tools are using. A VM that is already big enough
 is left completely alone. A teacher who wants a different size still sets it
 by hand with `colima stop && colima start --cpu N --memory M`, and the
 launchers will respect anything at or above their own figure.
+
+**The APP does stop it, and a reader will take the paragraph above for the
+whole product if this is not said beside it.** The launchers never shut Colima
+down as an ORDINARY act — the force-restart above is the exception, and it
+fires only when the daemon is already dead. Plantoir's quit path stops it as an
+ordinary act, under four conditions at once — `colima` can
+be found, the socket Colima owns is there, asking THAT socket what is running
+SUCCEEDED and came back empty, and no launcher for any folder is running on the
+host. An empty answer that came from a FAILED question does not count, which is
+the part the old check got wrong: `DOCKER_CONTEXT=default docker ps -q` exits 1
+and prints nothing, and so does a daemon that did not answer. Until 2026-09-19
+none of this ever ran on a teacher's Mac at all — the quit path looked for
+`docker` and `colima` without saying where, and they are not on any shell's
+PATH there. The whole rule, what it refuses to do and what was rejected is in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "Quitting: what it frees, what
+it refuses to free, and why"; the standing prohibition it implements is
+`CLAUDE.md` rule 7.
 
 **Windows: Docker Engine inside WSL2.** Colima does not support Windows, but
 it is not needed there — WSL2 is itself a lightweight, Microsoft-supplied

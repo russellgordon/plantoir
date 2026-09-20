@@ -28,6 +28,34 @@ enum PreviewStopper {
 
     // MARK: - Functions
 
+    /// What running the launcher's stop mode would mean — as a value, so a
+    /// test can read the environment it is handed without starting anything.
+    ///
+    /// **The environment is the whole point of this being a value.** This
+    /// call site set none at all, so on an app opened from the Dock the
+    /// launcher started from `PATH=/usr/bin:/bin:/usr/sbin:/sbin` plus its own
+    /// `$TOOLS_DIR/bin` export — fine on a teacher's Mac, where the tools
+    /// folder has the pinned programs in it, and BROKEN on a Mac whose only
+    /// `docker` is Homebrew's, where `preview.sh` then prints "Nothing to
+    /// stop — the website builder isn't running", exits 0, and leaves a
+    /// mid-flight build burning CPU inside the container. That is the mirror
+    /// image of issue #220 and it is fixed by the same one definition.
+    static func stopCommand(
+        courseCode: String,
+        sectionNumber: Int,
+        workspaceURL: URL,
+        inheriting inherited: [String: String] = ProcessInfo.processInfo.environment,
+        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> HelperPrograms.Command {
+        let scriptURL: URL = workspaceURL.appendingPathComponent("preview.sh")
+        return HelperPrograms.Command(
+            executablePath: "/bin/bash",
+            arguments: [scriptURL.path, courseCode, String(sectionNumber), "--stop"],
+            environment: HelperPrograms.environment(basedOn: inherited, inHomeFolder: homeFolder),
+            currentDirectoryPath: workspaceURL.path
+        )
+    }
+
     /// Fire-and-forget: asks the launcher to stop the section's
     /// container-side processes. Quiet by design — this runs behind
     /// actions that already have their own feedback, and if it cannot
@@ -38,9 +66,13 @@ enum PreviewStopper {
             return
         }
 
+        let command: HelperPrograms.Command = stopCommand(
+            courseCode: courseCode, sectionNumber: sectionNumber, workspaceURL: workspaceURL
+        )
         let process: Process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [scriptURL.path, courseCode, String(sectionNumber), "--stop"]
+        process.executableURL = URL(fileURLWithPath: command.executablePath)
+        process.arguments = command.arguments
+        process.environment = command.environment
         process.currentDirectoryURL = workspaceURL
         // The launcher prints how many processes it ended, and this used to
         // send that straight to the null device. The number is the one thing
@@ -80,6 +112,43 @@ enum PreviewStopper {
         } catch {
             // Could not start: nothing held, nothing to clean up.
         }
+    }
+
+    /// The same stop, for a Plantoir that is quitting.
+    ///
+    /// **Separate from `stopSectionProcesses` because of the pipe.** That one
+    /// reads the launcher's "Stopped N" out of a `Pipe` so the count reaches
+    /// the trail — and a pipe whose READER has gone gives the writer a
+    /// `SIGPIPE`, so the same call made on the way out would risk killing the
+    /// stop part way through the job it was started to do. Here nothing is
+    /// read: the app will not be alive to record anything, and the container
+    /// the quit script is about to look at tells the same story by being
+    /// idle.
+    ///
+    /// Called for every live preview BEFORE the quit script starts, because
+    /// otherwise quitting with a preview open frees nothing at all: the
+    /// preview keeps the container busy, a busy container is left running,
+    /// and a running container of ours keeps the shared virtual machine —
+    /// which is the memory a teacher actually notices — up as well.
+    static func stopSectionProcessesOnTheWayOut(
+        courseCode: String, sectionNumber: Int, workspaceURL: URL
+    ) {
+        let scriptURL: URL = workspaceURL.appendingPathComponent("preview.sh")
+        if !FileManager.default.fileExists(atPath: scriptURL.path) {
+            return
+        }
+        let command: HelperPrograms.Command = stopCommand(
+            courseCode: courseCode, sectionNumber: sectionNumber, workspaceURL: workspaceURL
+        )
+        let process: Process = Process()
+        process.executableURL = URL(fileURLWithPath: command.executablePath)
+        process.arguments = command.arguments
+        process.environment = command.environment
+        process.currentDirectoryURL = workspaceURL
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
     }
 
     /// How many processes the launcher said it ended, or nil when it said

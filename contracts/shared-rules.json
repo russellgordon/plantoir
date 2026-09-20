@@ -258,6 +258,42 @@
         "carries": "the course code and the section number",
         "event": "section kept its website",
         "why": "The OTHER answer, and the one a problem report is more likely to be about: a teacher writing in weeks later to say last year's class site was replaced is describing this branch. A trail recording only the cut-loose could not answer the question it would actually be read for. Both answers are recorded because the question is asked every time and neither answer is a default."
+      },
+      {
+        "carries": "the working folder's NAME - never its path - and which of the two occasions it was; or, for the setup shared by every folder, nothing but the fact that it stopped",
+        "event": "website builder stopped",
+        "why": "Until 2026-09-19 this never happened. The app asked for it at every quit and asked programs it had never told itself where to find, with the answer sent to the null device: a fault that reported nothing, and a teacher whose Mac stayed slow all day had nothing to show anybody (issue #220). The line is what turns 'quitting does not seem to free anything' from a feeling into a report. Written by the detached script rather than by the app, because the app is gone before the answer is known - the same arrangement the launchers already use for their own trail lines. TWO occasions file here and the event name says neither, on purpose: quitting, and the last window on a folder closing. They are the same act on the same builder under the same conditions, and the SENTENCE says which one it was; an event called \"...at quit\" would be a lie on every window close, which is the commoner of the two. A builder that was not running at all records NOTHING - a line every time saying there was nothing to stop would bury the one time something happened.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT and deliberate, which is what appliesOn is for - the same case as \"built site moved out of the working folder\" above, and NOT the softening that contracts/README.md rejects. Windows ships a native toolchain: no image, no container, no virtual machine, nothing for the app to stop when it quits. Their FolderContainers.StopContainer and .ReleaseEverythingAtQuit both open with `if (Scripting.NativeRuntime.Directory is not null) return;`, and documentation/12-windows-app.md says the WSL2 engine path they guard \"is gone; do not build toward it\". An event cannot be recorded where the moment it describes does not exist. If that ever changes - a Windows build with no native runtime, falling back to WSL - drop the appliesOn rather than adding a windows twin."
+      },
+      {
+        "carries": "which folder was left alone and WHY - a publish or preview for that folder still going, this folder's own builder still running when the shared setup was asked about - whether it was left alone deliberately or refused to stop, or other software on this Mac sharing the same setup",
+        "event": "website builder left running",
+        "why": "The companion line, and the one support will read more often, because 'quitting did not free anything' is the report and this is the only thing that can answer it. Three different deliberate refusals file here. One: a publish or preview for that folder is still running, on the host or inside the builder, so stopping it would break work the teacher cannot see - a scheduled publish, an assistant working over a connection, a second window. Two: the shared setup was asked about and THIS teacher's own builder is the thing still in it, either because it was deliberately left alone or because it REFUSED to stop - both reach this line, because either way our container is in the emptiness check's answer - which must be said in those words, because a builder just left running is itself in the emptiness check's answer, and calling it \"other software\" on a Mac that has no other software in there would be false every time. Three: other software on this Mac genuinely does share the same setup, which is never stopped out from under anybody. Without the line, a deliberate refusal is indistinguishable from the fault it replaced.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "Permanent for the same reason as its companion above: a native Windows toolchain has no builder to leave running and no shared machine to leave alone."
+      },
+      {
+        "carries": "that nothing was stopped, and which of the FOUR ways it failed - the programs could not be found, the shared setup could not be asked what was running in it, the stop was asked for and refused, or the whole attempt ran out of time",
+        "event": "website builder could not be stopped",
+        "why": "Issue #220 was a fault that REPORTED NOTHING: the quit path could not find the programs it needed, exited 0, and left no evidence anywhere. This is the line that makes the same failure visible the next time it happens rather than a year later. The two that matter most are the ones that would otherwise be written down as SUCCESSES: a `stop` that was asked for and refused looks identical to one that worked unless somebody checks the answer, and an attempt killed at its own deadline says nothing at all unless the deadline writes a line before it fires. Deliberately SEPARATE from 'website builder left running': that one says a choice was made and names it, and a choice nobody was able to make is a different fact - filing them together would make the trail say a refusal was deliberate when nothing was refused at all.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "Permanent for the same reason as the two above: there is no stop to fail where there is nothing to stop."
+      },
+      {
+        "carries": "what was under way, in the words the teacher was shown, and which of the two buttons they pressed",
+        "event": "quit asked about work under way",
+        "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "NOT permanent, and this one is an acknowledged exception rather than the ordinary use - read contracts/README.md's \"Four ways out\" passage, which rejects exactly this move, and its Named gaps section, which records why it was taken here anyway. Windows could ask the same question: it has publishes and it has a quit. The honest alternative reddens their ContractTests with a failure only they can mend (a NamedGapLedger entry is theirs to write), on a release where nobody is on that side. The cost is real and is stated rather than hidden: appliesOn has NO mend-check, so the day Windows implements this, nothing anywhere goes red to say the contract is now lying. What points at it instead is this sentence, the README's Named-gaps entry, and the windows issue that carries the work. Adopt the rule (quittingWhileWorkIsUnderWay, below) and this line together, or neither - a line saying a teacher was asked, in an app that asks nothing, would be worse than no line - and delete both appliesOn keys when you do."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -3043,5 +3079,74 @@
         ]
       }
     ]
+  },
+  "quittingWhileWorkIsUnderWay": {
+    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing, and never asks when the Mac itself is logging out, restarting or shutting down.",
+    "why": "Quitting used to be free, because it could not reach anything: the path that stops a working folder's website builder looked for programs it had never told itself where to find, so on an ordinary teacher's Mac it did nothing at all and there was nothing to interrupt (issue #220, 2026-09-19). Making it work means a quit can now genuinely land on work in flight, and the one case where that hurts is the one the teacher cannot see happening.",
+    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does.",
+    "whatDoesNotCount": "A preview. A preview is known by the port it holds, and that is held for as long as the preview is OPEN - it cannot tell a section still building from one that finished twenty minutes ago and is being read. Asking on every open preview would mean asking almost every quit, which teaches a teacher to dismiss the question unread, and the question exists for the publish. Previews are not abandoned either: quitting stops this app's own previews deliberately, the way the Stop button does, before anything else is asked to rest.",
+    "whatIsNeverAskedAbout": "Work belonging to another process - a publish set to happen on its own, an assistant driving the app over a connection, or a teacher's own command line. None of them is visible from here, so none of them is asked about; they are protected instead by the quit path refusing to stop anything while a launcher for that folder is running on the machine.",
+    "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
+    "buttons": {
+      "default": "keepWorking",
+      "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
+      "keepWorking": "the app stays open and nothing is stopped or released",
+      "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped."
+    },
+    "cases": [
+      {
+        "name": "nothing is happening",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": false,
+        "why": "The ordinary quit, and it must stay silent. A confirmation a teacher meets every time is one they stop reading."
+      },
+      {
+        "name": "one section is publishing",
+        "given": {
+          "publishesUnderWay": 1,
+          "previewsOpen": 0,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "why": "The case this exists for."
+      },
+      {
+        "name": "several sections are publishing",
+        "given": {
+          "publishesUnderWay": 3,
+          "previewsOpen": 0,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true
+      },
+      {
+        "name": "a preview is open and nothing is publishing",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 2,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": false,
+        "why": "The decision this case exists to pin. A preview that is merely open is not work under way, and an app that cannot tell a building preview from a finished one must not guess."
+      },
+      {
+        "name": "the Mac is logging out while a section is publishing",
+        "given": {
+          "publishesUnderWay": 1,
+          "previewsOpen": 0,
+          "quitReason": "theMacIsLoggingOutOrShuttingDown"
+        },
+        "expectAsk": false,
+        "why": "The rule that must never bend. A modal here holds up the log out, and a teacher whose Mac will not log out has a worse problem than a publish that did not finish."
+      }
+    ],
+    "appliesOn": [
+      "mac"
+    ],
+    "appliesOnWhy": "Written on the mac 2026-09-19 with the quit-path fix it belongs to. An acknowledged EXCEPTION, not a permanent difference: Windows could ask the same question, and contracts/README.md's \"Four ways out\" passage rejects softening a contract this way. Taken here because the alternative reddens a suite nobody is watching with a failure only Windows can mend, and recorded in the README's Named gaps section so the file does not argue both sides. Two honest costs: appliesOn has no mend-check, so nothing will go red when Windows adopts this; and the block-level appliesOn KEY ITSELF is read by no test on either platform, so that key is documentation rather than a gate. The block's own cases are run on the mac (QuitConfirmationTests) and by nothing on Windows. The SHAPE is portable - what counts as under way, what never counts, and when never to ask are all platform-neutral; only the signal that says the system is logging out differs (kAEQuitReason here, WM_QUERYENDSESSION there). Adopt this and the \"quit asked about work under way\" trail line together, or neither, and delete both appliesOn keys when you do."
   }
 }

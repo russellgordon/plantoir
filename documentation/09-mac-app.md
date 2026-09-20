@@ -49,9 +49,14 @@ Beyond the actions, the app owns delivery and resources:
   belongs to the window's folder** and is let go of when the window is
   pointed at a different one — see "What a window lets go of when it
   changes working folder" below.
-- **Resources are freed.** Each working folder has its own container,
-  stopped when the folder's last window closes and at quit; Colima itself
-  is stopped at quit only when nothing else is running in it.
+- **Resources are freed, and the conditions are strict.** Each working
+  folder has its own container, stopped when the folder's last window
+  closes and at quit — but only once nothing is using it; Colima itself is
+  stopped at quit only when it can be ASKED what is running in it, the
+  answer comes back empty, and no launcher is running anywhere on the Mac.
+  Every ending leaves a line on the trail. This sentence was false on a
+  teacher's Mac until 2026-09-19 — see "Quitting: what it frees, what it
+  refuses to free, and why" below.
 - **A folder a cloud service keeps in sync is explained, never refused.**
   A working folder in iCloud Drive, Dropbox, OneDrive, Google Drive or Box
   is recognised from the markers macOS exposes (`~/Library/Mobile Documents`,
@@ -415,6 +420,383 @@ half that is easy to leave out, and leaving it out would be worse than no
 guard: delete a capture and every stop reads a permanently nil property and
 does nothing at all, wearing the shape of the fix working. The behaviour itself
 was verified by reading the teardown path.
+
+## Quitting: what it frees, what it refuses to free, and why
+
+Added 2026-09-19 with [issue #220](https://github.com/russellgordon/plantoir/issues/220).
+
+### The fault, and why nobody saw it
+
+`FolderContainers.releaseEverythingAtQuit` and `.stopContainer` shelled out
+through `/bin/zsh -l -c "docker stop …; if command -v colima …"`. The comment
+said a login shell was used "so docker is on PATH wherever it was installed".
+On a teacher's Mac that is not true of any shell: the only `docker` and
+`colima` are the pinned copies the launchers download into `~/Library/
+Application Support/Plantoir/tools/bin`, and **nothing puts that folder on a
+login shell's PATH** — only `setup.sh` and its siblings export it, from inside
+the launcher, and no launcher writes a shell profile. Measured on 2026-09-19
+with a login shell whose user profile was emptied (`ZDOTDIR` pointed at an
+empty directory, which keeps `/etc/zprofile` — a teacher has that — and drops
+Homebrew, which a teacher does not):
+
+```
+$ env -i HOME=$HOME ZDOTDIR=<empty> /bin/zsh -l -c '<the old quit script>'
+zsh:1: command not found: docker
+exit=0
+```
+
+`colima stop` was never even attempted, and **the script exited 0**, so a
+caller that checked would have been told it worked. Output went to the null
+device. A fault that reports nothing.
+
+What it cost: the VM's memory lives in the `com.apple.Virtualization.VirtualMachine`
+XPC service, **6.23 GB resident** on the 48 GB Mac this was measured on (anyone
+who checks `limactl` and concludes the VM is cheap is reading the wrong
+process — the hostagent is 104 MB). On the 16 GB Mac in that evening's problem
+report the VM is sized 5 CPU / 5 GB, about a third of the machine, held until
+logout every day. And a VM that is never stopped accumulates uptime: a
+six-week-old one had stopped forwarding newly published ports (`ssh -O forward`
+→ exit 255, logged by Lima as "negligible") and a preview never appeared.
+
+### Two more faults wearing the same coat
+
+**The quit shell could hang before it ran anything.** Two `/bin/zsh -l -c
+( docker stop … )` processes on this Mac had been asleep for **27 days**.
+`sample` showed why:
+
+```
+872 zsh_main (in zsh) + 932
+  872 init_io (in zsh) + 228
+    872 open (in libsystem_kernel.dylib) + 64
+```
+
+Blocked in `open()` inside `init_io` — zsh's terminal setup, which runs
+**before** it reads the `-c` string at all. Opening a pty slave whose master
+has gone blocks indefinitely and `zsh` does exactly that at startup; `sh` does
+not. An app launched from the Dock hands its children `/dev/null`, so this is a
+developer-machine symptom — but it is Plantoir's own pty (`ScriptRunner`'s
+`PseudoTerminal`) that creates it, and it leaked a process per quit on the
+machine Plantoir is developed on. Reproduced from scratch: `zsh -l` on an
+orphaned tty still running after 5 s; `zsh -l` with `/dev/null` exited in
+0.11 s; `sh -c` in 0.10 s.
+
+**`PreviewStopper` had the mirror of #220.** It set no environment at all, so
+a Dock-launched app gave the launcher `PATH=/usr/bin:/bin:/usr/sbin:/sbin` plus
+the launcher's own tools export. That is fine on a teacher's Mac, where the
+tools folder is populated — and broken on a Mac whose only `docker` is
+Homebrew's, where `preview.sh --stop` hits its own `command -v docker` guard,
+prints "Nothing to stop — the website builder isn't running", exits 0, and
+leaves a mid-flight build burning CPU inside the container. Nothing reached the
+trail either, because the count it reads is never printed.
+
+### One definition: `HelperPrograms`
+
+`mac-app/QuartzTeachers/Scripting/HelperPrograms.swift` answers two questions
+once — where the helper programs are, and what environment a helper is handed.
+The order is the launchers' order: the pinned copies FIRST (`setup.sh:426` is
+`export PATH="$TOOLS_DIR/bin:$PATH"`), then `/opt/homebrew/bin`, then
+`/usr/local/bin`, then whatever was inherited. **The app agrees with the
+launcher rather than the other way round**, because the launcher is what
+actually built the container; `HelperProgramsTests` reads `setup.sh` and turns
+red if that export is reordered, so the two cannot drift silently.
+
+`HOME` and everything else are preserved. That is not tidiness: `docker` keeps
+its context store in `~/.docker` and `colima` its whole state in `~/.colima`, so
+a helper handed a stripped environment cannot reach the engine — and under the
+rules below, a question that could not be asked means "stop nothing", so the
+symptom would be the same silent no-op.
+
+It replaced **two** hand-maintained PATH strings — one inside
+`ScriptRunner.run(scriptNamed:arguments:workingDirectory:)` and one in
+`ScheduledDeploy.propertyList`'s launchd plist, neither of which named the
+tools folder — and gave one to the quit path, which had none at all. The
+scheduled publish worked only because the launcher re-exports that folder from
+inside itself.
+
+### What the quit path now refuses to do
+
+The generated script is `/bin/sh`, never `/bin/zsh -l`, with all three handles
+on `FileHandle.nullDevice` and a deadline it cannot outlive. The deadline GROWS
+with the work — one folder's wait per folder, plus an allowance for the stops
+themselves — because a fixed two minutes was the first shape and it was wrong:
+six folders each waiting twenty seconds is already two minutes, so the sixth
+would be killed mid-way and the teacher told nothing about any of them. **The
+deadline writes its own line before it fires**, since the one ending that
+reports nothing is the fault this whole piece is about.
+
+Two honest limits, both measured rather than assumed. The `kill -9` does not
+take a wedged `docker` grandchild with it — one stuck on a dead socket was
+still there afterwards — so what the deadline buys is that PLANTOIR's own shell
+goes away and says so; a hung `docker` is the engine's problem and killing it
+would unwedge nothing. And because the guard cannot see what it killed, a
+`colima stop` that was merely SLOW can succeed after the guard has already
+written "anything still running was left alone", leaving that line standing and
+the success line never written. At sixty seconds of slack that is unlikely, and
+it errs the safe way round — the trail understates what was freed rather than
+overstating it.
+
+**The allowance is not as generous as it sounds**, and the arithmetic is worth
+having before anybody trims it: the per-folder wait counts loop ITERATIONS, and
+each iteration also runs a real `ps -Ao args=` (25 ms measured) and a
+`docker top` (about 37 ms). Six busy folders come to roughly 128 s of loop, 12 s
+of `docker stop` grace and 10–20 s of `colima stop` — about 160 s against a
+180 s deadline. It is
+detached and survives the app: measured, an 18-second job finished well after
+its parent had gone, so a 10–20 second `colima stop` will finish too. `&!` is a
+zsh-ism and is gone.
+
+**A stop that FAILED is never written down as a stop.** `docker stop` and
+`colima stop` are both asked for their exit status, and a refusal gets its own
+sentence. A script that does not look cannot tell a stop that worked from one
+that was refused, and "the memory it was holding is back" on a day it is not is
+issue #220 one level down — a line that will be believed.
+
+**A folder's container** is stopped only when, for up to 20 seconds:
+
+1. no launcher for THAT folder is running on the host — `ps -Ao args=` plus
+   `grep -F "<folder>/preview.sh"` (and `deploy.sh`, `setup.sh`); and
+2. the container is idle — `docker top <name>`, header dropped, non-empty
+   lines counted, 1 or less. An idle Plantoir container runs exactly one
+   process, `tail -f /dev/null`; a build, a preview server and a wrangler
+   upload all show up as extra ones. The count is `grep -c .` rather than
+   `wc -l`: `wc` pads its answer with leading blanks, which `[ -gt ]` happens
+   to tolerate and a later reader would not, and `grep -c .` also refuses to
+   count the blank line a trailing newline leaves behind. **If `docker top`
+   FAILS the container counts as busy**, because "I could not ask" must never
+   mean "nobody is using it".
+
+Check 1 exists because check 2 is **blind to the long windows**. A launcher
+that has to build the image, start Colima or download the pinned tools does all
+of that with no container of ours running at all — measured, `docker buildx
+build` adds nothing to `docker ps` for its whole 36 seconds, and a teacher's own
+first-run log shows `colima start` taking 40 seconds. On a teacher's Mac, where
+Plantoir's is the only container, a scheduled publish or an assistant-driven
+deploy spends minutes in a state where the container check sees nothing to
+protect.
+
+`grep -F`, never `pgrep -f`: `pgrep` takes a REGULAR EXPRESSION, a folder
+called `C++ 26(27)` would need escaping, and getting that wrong fails OPEN —
+which here means stopping something mid-publish. Its known limit, stated rather
+than hidden: a teacher who types `./preview.sh` in Terminal is not matched,
+because the relative path never appears in the command line. The idle check
+covers that one while a build is actually inside the container. A `--stop` run
+is deliberately excluded, because quitting fires the app's own `preview.sh …
+--stop` a moment earlier and counting it would make every quit-with-a-preview
+free nothing at all.
+
+**The shared virtual machine** is stopped only when four things are true at
+once: `colima` can be found; the socket Colima owns is there
+(`~/.colima/default/docker.sock`); asking THAT socket **succeeded** and came
+back empty; and no launcher for any folder is running on the host.
+
+**The ORDER the refusals are tested in is load-bearing, and the obvious order
+is wrong.** A builder the step above has just decided to leave running is
+itself in `docker ps -q`'s answer — so asking "is anything in there?" first
+reports a teacher's own unfinished publish as "other software on this Mac", on
+a Mac that has no other software in there at all, which is every teacher's.
+Ours first, then any launcher on the host, then everything else; each branch's
+sentence is then true of the thing that actually caused it. **A stop that was
+REFUSED counts as ours too**, and that is the same falsehood through the other
+door: the container is in `docker ps -q` whether we left it alone on purpose or
+asked it to stop and were told no, so `release` reports both back to the
+question below it. Hence "this folder's own website builder is still RUNNING"
+rather than "working" — only one of the two is working.
+
+The old line was `[ -z "$(docker ps -q 2>/dev/null)" ]`, and it could not tell
+"nothing is running" from "I could not ask". Measured:
+
+```
+$ DOCKER_CONTEXT=default docker ps -q 2>/dev/null ; echo exit=$?
+exit=1                       # and nothing on stdout
+$ DOCKER_HOST="unix://$HOME/.colima/default/docker.sock" docker ps -q | wc -l
+      15                     # exit 0
+```
+
+Both produce an empty string from the old expression's point of view. This is
+rule 7 — Colima is shared, and on the Mac this was written on it held 15
+containers, 13 of them another project's database stack (twelve
+`canopylocal-supabase-*` and its realtime companion) and two Plantoir's own. A
+teacher with Docker Desktop current while Colima holds containers gets the same
+empty, exit-0 answer from the wrong engine.
+
+**Previews are stopped first, or the piece delivers nothing in the common
+case.** A live preview keeps the container busy; a busy container is left
+running; a running container of ours makes `docker ps -q` non-empty, so the VM
+is never stopped either. So quitting does what the Stop button does, in the
+same order and for every live lease: `PreviewStopper` reaches into the
+container, then the host-side launcher is terminated. The script's
+wait-for-idle loop covers the gap. That loop is a wait on an OBSERVABLE
+CONDITION — the container going idle — not a settle delay.
+
+**Both halves, and the second one is easy to leave out.** A `ScriptRunner`
+lives as `@State` on the section view, so nothing outside that view could reach
+one; `ScriptRunner.runsInFlight` now registers every run for its lifetime so
+`applicationShouldTerminate` can. Ending only the container-side half would
+leave a `preview.sh` the app no longer owns — a child on a pseudo-terminal is
+reparented rather than killed when its parent goes, measured — and the quit
+script's own host-side check would then see it and refuse to stop anything for
+the full length of its wait. The filter is deliberately narrow:
+`preview.sh` with neither `--stop` nor `--build-only`. A publish is NOT ended —
+the app should not be the thing that kills a teacher's publish, and "Quit
+Anyway" below says what actually becomes of it — and `--build-only` is a
+publish's own build wearing `preview.sh`'s name.
+
+**Every ending that did something, or refused to, leaves a line** — written by
+the script itself rather than by the app, because the app is gone before the
+answer is known. A container that was not running at all says nothing: a line
+every quit reporting that there was nothing to stop would bury the one quit
+where something happened. A quit with NO folder open, on a Mac that has no `docker` at
+all — a teacher in their first week, before any setup — says nothing either,
+for the same reason: nothing was asked of anything. A stop that was asked for
+and FAILED does leave a line, and that is not the same thing at all — `docker stop` succeeding and
+`docker stop` being refused look identical to a script that does not check, and
+writing "the memory is back" on a day it is not would be the same fault as
+#220, one level down. That is the launchers'
+own arrangement (`preview.sh`'s `note_on_the_trail`). The sentences are built in
+Swift (`FolderContainers.sentence(for:occasion:…)`) and carried into the script
+already formed, so they can be pinned by a test; the script appends directly, so
+`LogRedactor` never sees them and they must carry nothing that would need
+redacting — the working folder's LAST COMPONENT, never its path.
+
+### ⌘Q while something is under way
+
+`applicationShouldTerminate` used to return `.terminateNow` unconditionally.
+It now asks first when this app is publishing, and the rule is
+`contracts/shared-rules.json` → `quittingWhileWorkIsUnderWay`, with five cases
+both suites can run.
+
+**What counts as under way: a publish, and not a preview.** `CourseActivity.
+activePublishes` is process-wide and lasts exactly as long as the publish does,
+so it means what it says. A preview is known through `PreviewLeases`, and a
+lease is held for as long as the preview is OPEN — it cannot tell a section
+still building from one that finished twenty minutes ago and is being read.
+Asking on every lease would mean asking almost every quit, which teaches a
+teacher to dismiss the question unread. `CourseActivity.courseIsBusy` folds the
+two together; that is right for greying out a menu item and wrong here, and
+asking the wrong one of those two questions has already produced a bug in this
+app (the repair dialog's "Preview Again" refused whenever a preview was
+running, which is every time it is offered).
+
+**REJECTED: adding a process-wide record of a preview BUILD.** The honest
+signal — `previewRunner.previewAddress` becoming non-nil when the server
+announces itself — lives in `SectionDetailView`'s `@State` and is not visible
+from the delegate. Making it visible means new cross-window state during a fix
+meant to be small and shippable; and a preview that is lost costs a rebuild,
+while a publish that is lost costs a half-updated class website. Previews are
+not abandoned either — they are stopped cleanly on the way out.
+
+The same reasoning covers the assistant's own rebuild of a preview
+(`AssistSiteWork.rebuildPreview`, a `--build-only` run): it is work under way
+that the question does not ask about, and what is lost by quitting through it
+is a rebuild, never a page a student can see. Russell's ruling named "a
+publish or preview"; asking about a preview BUILD as well is tracked as its
+own issue rather than widened into this fix.
+
+**What is never asked about**, because it cannot be seen from here: a scheduled
+publish (launchd runs a SECOND Plantoir process with its own statics), an
+assistant driving Plantoir over MCP (another process again — two of Russell's
+were running while this was written), and a teacher's own Terminal run. Those
+are protected by the host-side check above, not by a question.
+
+**Never on a log out.** A modal in `applicationShouldTerminate` also fires on
+log out, restart and shut down, where it blocks the Mac until macOS times the
+app out and names it as the one that would not quit. The signal that tells them
+apart is the `kAEQuitReason` attribute on the Apple event being handled
+(`kAELogOut`, `kAEReallyLogOut`, `kAEShowRestartDialog`, `kAERestart`,
+`kAEShowShutdownDialog`, `kAEShutDown`). The DECISION is tested, not the dialog.
+
+**"Quit Anyway" does not END the publish — and the publish will very likely
+stop anyway, which is why the sentence promises neither.** Plantoir passes it
+over deliberately (`ScriptRunner.stopEveryLivePreview` filters to previews):
+the app should not be the thing that kills a teacher's publish. But it is a
+program writing to a pseudo-terminal the APP owned, and `deploy.sh` runs under
+`set -euo pipefail` (line 3), so when the app goes its next line of output
+fails and it stops there.
+
+**Measured twice, independently, because the first measurement was made on the
+wrong shape and said the opposite.** Two children of identical shape orphaned
+on a pty whose master had just closed — one plain, one with `set -euo
+pipefail`:
+
+```
+plain                 ran to the end       (tick 7, "done" marker written)
+set -euo pipefail     DIED at its next echo, three ticks in, no marker
+```
+
+So "could leave it unfinished, with the class website part way updated" is the
+honest sentence, and both "would be stopped" and "carries on" are wrong. What
+the teacher loses either way is the watching — the console is gone and a
+question the publish asks is asked of nobody. Whatever is left, the quit script
+handles safely: a builder still working is left running and the trail says so,
+an idle one is stopped.
+
+### Measured
+
+All on the 48 GB Apple-silicon Mac this was written on, 2026-09-19, with 15
+containers of another project's running throughout and Colima never stopped.
+Every figure was RE-TAKEN against the final script, after the reviews changed
+it — a measurement of an earlier draft is a measurement of something that no
+longer exists:
+
+| What | Result |
+|---|---|
+| The real generated script, login-less `/bin/sh`, `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, an EMPTY tools folder, Homebrew's two directories stood down | exit 0 in **0.013 s**, trail line "could not find the programs that run your website builder, so nothing was stopped when Plantoir quit" — the fault now REPORTS |
+| The same script in this Mac's real environment, against a throwaway container of my own named as a working folder's would be | **2.175 s**, my container stopped, the other 15 untouched, Colima untouched |
+| The real VM gate with a stand-in `colima` first on PATH | `colima stop` never reached; trail line "left this Mac's website-building setup running because other software on this Mac is still using it" |
+| A stand-in launcher with the exact command line `ScriptRunner` produces (`/bin/bash <folder>/preview.sh ADA1O 1`) | container left UP after a 3.2 s wait; trail line "…because a publish or preview for that folder is still going" |
+| The same, with ` --stop` on the end | container stopped in 2.2 s — the app's own preview stop does not count as work |
+
+**UNMEASURED, and do not quote a number for it:** how long a warm `colima
+start` takes end to end. 5.0 s from the hostagent to the host-side docker
+socket on an existing VM, but `docker info` readiness is later, and measuring it
+means stopping the shared VM (rule 7). The launcher polls `docker info` for up
+to 30 s and then force-cycles. Measure it on a spare Mac with `time (colima stop
+&& colima start && until docker info >/dev/null 2>&1; do :; done)` before
+putting a figure anywhere.
+
+### What is still owed, and what was rejected
+
+**Owed, and NOT yet opened as an issue when this was written — open one:** the
+launchers print "🐳 Setting up this Mac — a
+one-time step that runs on its own…" and "▶️  Starting Colima…"
+(`setup.sh:563/573`, `preview.sh:788/798`, `deploy.sh:1255/1265`). Now that
+quitting really stops the machine, the first is untrue — it happens every
+morning — and the second names the machinery (rule 1). **Whatever replaces them
+must keep the substring "Setting up this Mac"**: the app matches the milestone
+on it (`contracts/app-rules.json` → `milestones`, `markerOrigins`), and a
+rewrite that drops those four words stops the progress bar moving with no other
+symptom. Not taken here because it is a launcher change, which drags in a
+foreground `verify.sh` and the whole toolchain travel chain.
+
+**REJECTED — write the tools folder into `~/.zprofile` at install.** Plantoir
+editing a teacher's shell profile is exactly the machinery the product hides, it
+cannot be undone cleanly, and it would leak Plantoir's pinned `docker` into every
+terminal the teacher opens, including other projects'.
+
+**REJECTED — keep `/bin/zsh -l` and merely add the tools folder.** The login
+shell can hang before the script runs at all (above), and it runs the teacher's
+whole profile — on this Mac `~/.zshenv` shells out to `/usr/libexec/java_home`
+on every `zsh` — to decide a two-line script.
+
+**REJECTED — detect a running scheduled publish with `launchctl list <label>`.**
+It would work, but it needs the label set enumerated at quit, it is macOS-only,
+and it sees only launchd — not an MCP session, not a second window, not a
+teacher's terminal. `ps -Ao args=` answers the actual question for every caller
+at once.
+
+**REJECTED — a lease file under `courses/.internal/activity/`, the way Windows
+does it.** Right idea, wrong piece: the mac has no cross-process state of that
+kind today (`CourseActivity` and `PreviewLeases` are in-process statics), so it
+would mean inventing some during a fix meant to be small. If the host-side check
+is ever not enough, this is the next step.
+
+**REJECTED — blocking the quit until the containers have stopped.** Quitting
+must not wait on Docker; a teacher whose engine is wedged would get an app that
+will not close.
+
+**REJECTED — a per-app Colima profile (`colima -p plantoir`).** A private VM
+would rot from uptime in exactly the same way unless the quit path works, so
+fixing the quit path is the prerequisite either way rather than the alternative.
 
 ## Which folders Plantoir uses
 
