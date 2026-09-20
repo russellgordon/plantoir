@@ -94,7 +94,7 @@ Found while qualifying the mac for v1.1.0. The Windows bundle should adopt
 the same number as its version's fourth field when convenient (its trail
 currently prints the patch digit, which conflates two ideas).
 
-## Landed since v1.2.0 — ships in the next release
+## Landed since v1.2.1 — ships in the next release
 
 Features that are **complete, merged to `dev`, and waiting only for a tag**.
 This is a reading aid, not a source of truth: the release notes are drafted
@@ -107,10 +107,6 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Log |
 |---|---|---|---|
-| 2026-09-20 | **A working folder with a slash in its name works.** A folder called "Comm Tech 26/27" used to stop first-run setup at its very last step with an error nobody could read; it now sets up, previews and publishes like any other. | macOS (Windows unaffected: its launchers never create the builder this way) | 506, #221 |
-| 2026-09-20 | **Quitting Plantoir really frees your Mac.** On a Mac without developer tools, quitting never stopped the website builder or the virtual machine under it — several gigabytes of memory stayed reserved until log out. It now stops them, unless something else is still using them, and ⌘Q during a publish asks first. | macOS (Windows: #231) | 507, #220 |
-| 2026-09-20 | **A preview that cannot appear says so.** If your website is built but this Mac cannot reach it, Plantoir used to wait in silence for ten minutes. It now stops after a short quiet spell, says which of three things happened, and what to do. | macOS (Windows owes the same: see the issue opened from #225) | 508, #225 |
-| 2026-09-20 | **macOS's "would like to access files" prompt explains itself.** The sheet that asks about your Desktop, Documents, Downloads or a synced folder now carries one plain sentence saying why. | macOS only | 509, #226 |
 
 ## Warnings the release notes MUST carry
 
@@ -124,8 +120,6 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
-| 2026-09-20 | **Keep your working folder inside your home folder — on the Desktop or in Documents, for example.** A working folder on an external drive, a second volume or a shared location is now REFUSED, with a sentence saying so. Before this version such a folder appeared to work and built an empty website. If yours is somewhere like that, move it into your home folder before updating. | #221 changed how the launchers hand a folder to the builder; the old form silently mounted an empty folder, the new one refuses. A teacher in that position goes from "nothing appears" to a refusal, and the notes are the only place they are told why BEFORE they meet it. |
-| 2026-09-20 | **The first preview of the day may take a little longer to start.** Quitting Plantoir now really shuts down what it uses in the background, so the next morning's first preview starts it again. | #220: the warm start time could not be measured on the development Mac (its virtual machine is shared and must not be stopped); a teacher who notices the change should find it explained. |
 
 ## The short version
 
