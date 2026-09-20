@@ -267,8 +267,14 @@ final class QuitScriptRunsTests: XCTestCase {
             at: stopping.appendingPathComponent("preview.sh"), arguments: ["COMP", "2", "--stop"]
         )
         defer {
-            publishing.terminate()
-            stoppingRun.terminate()
+            // `terminate()` on a Process that never launched raises, and that
+            // takes the whole test host down rather than failing one test.
+            if publishing.isRunning {
+                publishing.terminate()
+            }
+            if stoppingRun.isRunning {
+                stoppingRun.terminate()
+            }
         }
         try publishing.run()
         try stoppingRun.run()
