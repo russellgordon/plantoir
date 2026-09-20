@@ -1031,6 +1031,12 @@ class WorkspaceModel {
             return firstCourse.code < secondCourse.code
         }
         courses = loadedCourses
+        // A reference course says it is frozen; this is what makes that still
+        // true after a restore, after a second Mac has had the folder, or
+        // after somebody marked a course by hand. Quiet and cheap when there
+        // is nothing to do, which is every ordinary folder — it walks only
+        // the courses that claim to be kept for reference.
+        ReferenceCourseUpkeep.bringUpToDate(loadedCourses, inWorkingFolder: workspaceURL)
         placeBuiltSitesOutsideTheFolder(for: loadedCourses, everythingIn: entryURLs)
         archivedItems = WorkspaceModel.findArchivedItems(in: coursesDirectoryURL)
         backupItems = WorkspaceModel.findBackupItems(in: coursesDirectoryURL)

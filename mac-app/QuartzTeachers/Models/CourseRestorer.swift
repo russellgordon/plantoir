@@ -62,11 +62,46 @@ enum CourseRestorer {
         )
     }
 
+    /// Unlocks a course that is kept for reference, so a restore can write
+    /// over it — a locked tree refuses `removeItem` outright.
+    ///
+    /// Reads the marker off DISK rather than from a loaded `Course`, because
+    /// two of the three callers here have a folder and not a course.
+    private static func unlockIfKeptForReference(courseAt courseURL: URL) {
+        guard let configuration = try? CourseConfiguration(
+            contentsOf: courseURL.appendingPathComponent("course_config.json")
+        ), configuration.keptForReference else {
+            return
+        }
+        ReferenceLock.unlock(courseDirectory: courseURL)
+    }
+
+    /// Locks a restored course again when what came back says it is kept for
+    /// reference.
+    ///
+    /// **A zip does not carry the flag, and that is measured**: `zip` and
+    /// `unzip` round-trip the MODE and lose `uchg` entirely, so a restored
+    /// reference course arrives thawed. The marker travels in the config, so
+    /// the marker is what puts the lock back. Asked of the config as it is
+    /// NOW, after the restore, which is the only honest question: a backup
+    /// made before the course was kept for reference restores a course that
+    /// is not one.
+    private static func lockIfKeptForReference(courseAt courseURL: URL) {
+        guard let configuration = try? CourseConfiguration(
+            contentsOf: courseURL.appendingPathComponent("course_config.json")
+        ), configuration.keptForReference else {
+            return
+        }
+        ReferenceLock.lock(courseDirectory: courseURL)
+    }
+
     /// Restores one archived item, then removes the archive — the content is
     /// live again, and a list of archived things should not include it.
     static func restore(_ item: ArchivedItem, coursesDirectoryURL: URL, courses: [Course]) throws {
         let fileManager: FileManager = FileManager.default
         let courseURL: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
+        unlockIfKeptForReference(courseAt: courseURL)
+        defer { lockIfKeptForReference(courseAt: courseURL) }
 
         if let sectionNumber = item.sectionNumber {
             var matchingCourse: Course?
@@ -120,6 +155,9 @@ enum CourseRestorer {
         // fails cannot leave a record about pages that are no longer there.
         UnitWordRenamer.clearRenameRecord(courseDirectory: destination)
         SpecialFolderRenamer.clearRenameRecord(courseDirectory: destination)
+
+        unlockIfKeptForReference(courseAt: destination)
+        defer { lockIfKeptForReference(courseAt: destination) }
 
         if !fileManager.fileExists(atPath: destination.path) {
             try extract(item.fileURL, named: item.courseCode, into: coursesDirectoryURL)
@@ -186,6 +224,8 @@ enum CourseRestorer {
         if !fileManager.fileExists(atPath: courseURL.path) {
             throw Problem.courseMissing(item.courseCode)
         }
+        unlockIfKeptForReference(courseAt: courseURL)
+        defer { lockIfKeptForReference(courseAt: courseURL) }
 
         let staging: URL = fileManager.temporaryDirectory.appendingPathComponent("restore-" + UUID().uuidString)
         try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)

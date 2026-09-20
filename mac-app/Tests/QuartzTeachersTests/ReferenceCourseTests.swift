@@ -263,6 +263,57 @@ final class ReferenceCourseTests: XCTestCase {
         XCTAssertEqual(configuration.allDeployDestinations.count, 1)
     }
 
+    // MARK: - The sentences, and what is never locked
+
+    func testTheSentenceIsTheContractsSentence() throws {
+        let rules: [String: Any] = try ReferenceCourseTests.rules()
+        let wording: [String: Any] = try XCTUnwrap(rules["wording"] as? [String: Any])
+        let template: String = try XCTUnwrap(wording["staysAsItIs"] as? String)
+        XCTAssertEqual(
+            ReferenceWording.staysAsItIs(course: "{course}"), template,
+            "The app and the contract have to say the same sentence, or Windows implements a different one."
+        )
+    }
+
+    /// Rule 1, asked of the sentences themselves: nothing a teacher reads
+    /// names the machinery. "Locked" is allowed — it is Finder's own word for
+    /// what they will see on the file.
+    func testNoSentenceNamesTheMachinery() throws {
+        let rules: [String: Any] = try ReferenceCourseTests.rules()
+        let wording: [String: Any] = try XCTUnwrap(rules["wording"] as? [String: Any])
+        let forbidden: [String] = [
+            "chflags", "immutable", "flag", "permission", "chmod", "symlink",
+            "container", "script", "toolchain", "docker", "launchd", "plist",
+        ]
+        for (key, value) in wording {
+            guard let sentence = value as? String, key != "machineryCheck", key != "rule" else {
+                continue
+            }
+            for word in forbidden {
+                XCTAssertFalse(
+                    sentence.lowercased().contains(word),
+                    "referenceCourses.wording.\(key) says “\(word)”: \(sentence)"
+                )
+            }
+        }
+    }
+
+    func testWhatIsNeverLockedIsWhatTheContractNames() throws {
+        let rules: [String: Any] = try ReferenceCourseTests.rules()
+        let frozen: [String: Any] = try XCTUnwrap(rules["frozen"] as? [String: Any])
+        var named: Set<String> = []
+        for entry in try XCTUnwrap(frozen["neverLocked"] as? [[String: Any]]) {
+            let name: String = try XCTUnwrap(entry["name"] as? String)
+            XCTAssertNotNil(entry["why"] as? String, "\(name) is left writable for a reason; say it.")
+            named.insert(name)
+        }
+        XCTAssertEqual(
+            named, ReferenceLock.neverLocked,
+            "Every name here is something that has to be WRITTEN while the course is open — a locked "
+            + "copy of any of them breaks something a reference course is promised to do."
+        )
+    }
+
     // MARK: - Helpers
 
     private static func rules() throws -> [String: Any] {

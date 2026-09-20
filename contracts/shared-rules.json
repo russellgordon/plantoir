@@ -304,6 +304,16 @@
         "carries": "the course, the section, and WHY - which of the three things that turn one off without being asked did it",
         "event": "scheduled deploy turned off",
         "why": "A deploy the teacher set to happen on its own was turned off by something other than them asking for it: the course was removed, the section was removed, or the day it was set for had gone by. Without this line a teacher whose site stopped updating has nothing anywhere explaining it - the alarm simply is not there any more, which reads exactly like one that was never set, and that is the same silence 'scheduled publish needed an answer' exists to break, one step further back. ONE event with three reasons rather than three events: somebody reading the trail wants to know their overnight deploy was turned off and by what, and the difference between two ways of removing something means nothing to them. It says DEPLOY where its three neighbours say publish, because a site is deployed and a page is published (Russell, 2026-09-20); the shipped names are left alone rather than renamed here, since a NEW name carrying the old vocabulary is the expensive mistake - this list pins it on both platforms. NOT written by the teacher's own Cancel item, nor by the assistant's cancel_scheduled_deploy: those are the teacher asking, and the trail already carries what they asked for. No appliesOn, deliberately - Windows cancels on removing a SECTION and not on removing a COURSE (Plantoir.Core/Models/CourseArchiver.cs), so two of the three reasons are theirs whatever they decide about the third."
+      },
+      {
+        "carries": "the folder it was given, the code and school year it shows, how many sections came across, and which course it was copied from",
+        "event": "course kept for reference",
+        "why": "A reference course is a course that appeared in the sidebar without the teacher creating one, and which can never be deployed. Without this line a report of 'where did ICS3U-2025 come from' or 'why will this one not publish' has nothing anywhere behind it. It names the FOLDER and the displayed code separately because they deliberately differ, and that difference is the first thing somebody reading a report will want to check. The source path never appears raw - a course is named, not a path - and the contents of a page never appear at all."
+      },
+      {
+        "carries": "the course, how many pages had to be locked again, and how many would not stay locked",
+        "event": "reference course pages locked again",
+        "why": "Written ONLY when a pass actually did something, so a folder in a steady state leaves no lines at all. It is the answer to the one report this feature can produce that would otherwise be unexplainable: 'my reference course let me edit a page'. A count of 37 after a restore is a backup coming back unlocked, because a zip carries the mode and not the flag; a handful that would not stay locked, over and over, is a folder kept in a cloud drive whose file provider clears the locked bit while a file uploads. Neither is a failure to put in front of the teacher, and neither is retried after a delay - the next pass is the mechanism."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -993,6 +1003,12 @@
     "order": "CANCEL FIRST, then archive and remove - and this is the opposite of a RENAME's order, deliberately. A rename that cancelled before a failed move would silently drop a deploy for a course still sitting there under its old name, so it archives first; a REMOVAL that archived before a failed cancel would leave the very thing this rule exists to prevent, a course that is gone with a live alarm still addressed to it. So: a cancel that FAILS stops the removal, and the teacher is told in a plain sentence. If the removal then fails, the deploy stays cancelled and the sentence says so.",
     "scopedToOneWorkingFolder": "Everything that cancels, lists or SHOWS a scheduled deploy asks the plist which working folder it belongs to, and leaves alone anything belonging to another. Paths compared with POSIX realpath, never Foundation's resolvingSymlinksInPath - the latter strips /private where the former keeps it, and two spellings of one folder comparing as DIFFERENT would scope every job out silently. The reason is not hypothetical: an agent's label is the course code and the section number and nothing else, so a teacher holding last year's working folder and this year's, both with ICS3U section 1, has ONE alarm between them; without this, removing the course in the folder that does not own it would cancel the other folder's live deploy and report success. That the two folders share one alarm at all is a separate fault with its own issue - a folder-scoped label would orphan every plist a teacher already holds.",
     "cases": [
+      {
+        "act": "a course kept for reference is met when the working folder is read",
+        "cancels": "everyAlarmThisFolderHasForTheCourse",
+        "provedBy": "run",
+        "why": "A reference course is never deployed, so an alarm still addressed to one is a deploy that will be refused at half six with nobody there to read the refusal. Reached when the folder is READ rather than only when a course is made one, because the marker can also arrive by hand in an editor, or from another Mac - and the course that owns the alarm is the one that was live yesterday. Scoped to THIS working folder like every other case here."
+      },
       {
         "act": "remove one section of a course that has more than one",
         "cancels": "thatSectionOnly",
@@ -3581,6 +3597,66 @@
       ],
       "alsoRenamedAside": ".netlify_sites/section<N>.json and .cloudflare_sites/section<N>.json become the frozen previous-marker name (file-formats.json → firstDeployMarkers). Renamed rather than deleted: the file holds the site id and the admin address, which a teacher may still want. Two fail-safes fall out of one rename — a deploy that somehow ran would make a NEW site rather than overwrite last year's live one, and a section that has never deployed cannot be scheduled.",
       "kept": "Per-page visibility frontmatter is KEPT exactly as it is: it is last year's record of what students actually saw, and it is what makes a preview of a reference course show a sensible site rather than everything."
+    },
+    "wording": {
+      "staysAsItIs": "{course} is kept for reference, so it stays as it is.",
+      "rule": "{course} is the code a TEACHER reads - ICS3U, never the folder name. The register is calm: a teacher who kept a course for reference asked for this, so being told about it reads as a fact rather than a warning. No 'cannot', no 'error', no icon, and never a word about how it is done. Said by the app when an act that would change the course is not available; the sentence does NOT tell the teacher to copy anything, because in this release nothing in Plantoir copies pages between courses and a page taken out by hand arrives locked.",
+      "machineryCheck": "No 'lock flag', 'immutable', 'permission', 'chflags', 'script' or 'container' in any sentence here. 'Locked' on its own is allowed: it is the word Finder and Get Info already use, and it is what a teacher sees on the file."
+    },
+    "frozen": {
+      "rule": "The pages of a reference course are LOCKED ON DISK - Finder's Locked, the user-immutable flag - on every content FILE and on no directory. Plantoir itself offers nothing that changes a page, a setting or the shape of the course.",
+      "mechanism": "chflags uchg, and only that. Modes are left exactly as they are.",
+      "whyNotPermissions": "Measured twice over. (1) chmod a-w does not stop a RENAME-OVER, which is how every serious editor saves: the measurement replaced a page's contents at exit 0, and rm -f deleted it. The immutable flag refuses both, and refuses a rename and a delete as well. (2) Mode 444 BREAKS THE PREVIEW BUILD, which is the finding that settled it: build_site.py copies each page into the build tree with shutil.copy2 (mode and flags travel), then rewrites the copy's frontmatter, which is where draft: true becomes publish: false. The build tree is a host bind mount, where the container's root does NOT get its usual permission override - measured inside the real image - so the rewrite fails with one warning per page, the copy keeps draft: true and gains no publish key, and the Explorer publishes anything that does not say publish: false. Every page the teacher had HIDDEN would have appeared in the preview of their frozen course. With the flag alone and the mode left at 644, the same build writes publish: false correctly AND the source is still refused even to container root.",
+      "whyNotDirectories": "Measured: with the course folder locked, creating the .merged_output symlink inside it fails - and BuildOutputLocation has to create that link on every reload, as do the launchers before every build. Locking the folders would kill the preview a reference course exists to give.",
+      "neverLocked": [
+        {
+          "name": "course_config.json",
+          "why": "The school year can be changed later, and the build's own preflight rewrites this file whenever a folder list changes."
+        },
+        {
+          "name": "course_config.backup.json",
+          "why": "Written beside it by that same preflight, with shutil.copy2, which raises on a locked destination."
+        },
+        {
+          "name": ".obsidian",
+          "why": "Obsidian writes workspace.json the moment a vault is opened, and opening the course in Obsidian is the whole point of keeping it. The folder and everything under it - plugins, themes, snippets - are outside the lock."
+        },
+        {
+          "name": ".merged_output",
+          "why": "The built website. A symlink out of the folder, rebuilt rather than kept, and never locked through the link."
+        },
+        {
+          "name": ".DS_Store",
+          "why": "Finder's own bookkeeping. Nothing a teacher wrote."
+        }
+      ],
+      "whatPlantoirStillWrites": [
+        {
+          "what": "the .merged_output link",
+          "why": "Created or repaired on every read of the folder, and by the launchers before every build. Inside the course folder, which is why the directories stay unlocked."
+        },
+        {
+          "what": "course_config.json, by the build's preflight",
+          "why": "Folder and file discovery reconciles the lists whenever the teacher's folders and the config disagree. Bookkeeping about what is there, not a change to a page."
+        },
+        {
+          "what": ".obsidian/, by Obsidian",
+          "why": "On open. Outside the lock deliberately."
+        },
+        {
+          "what": "an exclusion note inside a folder's index.md",
+          "why": "The one writer that CAN meet a locked file. It returns without writing when the note already matches, and it catches the write failure, so on a reference course it is a warning line at worst - not a failed build. Named here so neither platform reads it as a bug."
+        }
+      ],
+      "removing": {
+        "aWholeCourse": "Allowed, and it unlocks first. Measured: FileManager.removeItem and rm -rf both refuse a locked tree. The unlock happens after the scheduled-deploy cancel and before the archive, so the one thing that can stop a removal is still the cancel. The teacher is told nothing about the lock - a delete confirmation that mentioned it would be the app talking about its own plumbing.",
+        "oneSection": "REFUSED, with wording.staysAsItIs. Removing a section changes the course, so 'frozen' already requires it. The sidebar does not offer the item; the refusal exists so no other caller can get past it, and so what a teacher reads is a sentence rather than the file system's own words about an operation not being permitted.",
+        "theOnlySection": "The sidebar turns that into removing the whole COURSE, so it takes the unlock-then-remove path above."
+      },
+      "restoring": "A zip round trip carries the MODE and loses the flag - measured - so a restored reference course arrives thawed. The marker travels in the config, so the marker is what puts the lock back: every restore path unlocks what it is about to write over and locks again afterwards, asked of the config as it is AFTER the restore. A backup made before the course was kept for reference therefore restores a course that is not one, which is right.",
+      "copyingOut": "The flag TRAVELS. FileManager.copyItem, cp -p, ditto and shutil.copy2 all carry it; only a plain cp -R or a zip round trip loses it. So anything copied out of a reference course arrives locked unless it is cleared, and a page a teacher cannot edit with no explanation reads as 'the app is broken'. Whatever copies pages between courses must clear it.",
+      "reAsserted": "The lock is asserted, VERIFIED by reading the flag back, and re-asserted. Setting it without checking is not enough: in a cloud-synced folder the file provider models the locked bit itself, does not store it, and clears it locally about a second after an upload starts - no error, no log line. So the lock is per-Mac, a folder that has been on a second Mac comes back unlocked, and the re-assertion points are when the folder is read and when the teacher acts on the course. Files that did not take are left for the next pass and COUNTED on the trail. Never a timer and never a sleep: a delay chosen to let something settle is a guess that stops working on a slower machine.",
+      "honestLimits": "Stated plainly in the documentation and NEVER in the GUI. With the directories unlocked a new file can still be ADDED to one. Anybody who means to can clear the flag. The lock is per-Mac, and an edit arriving from another device is not blocked by it. What the lock does stop is every ordinary edit, save, rename and delete of the material that is there, which is what a teacher will meet - it is a statement of intent, not a security boundary. The refusal to deploy does NOT depend on it in any way: an entirely unlocked reference course is refused at every door just the same."
     },
     "rejected": [
       {
