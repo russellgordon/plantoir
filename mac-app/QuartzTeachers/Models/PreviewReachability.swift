@@ -234,8 +234,9 @@ nonisolated enum PreviewReachability {
     /// `/bin/sh`, with `HelperPrograms.environment()` for the same reason
     /// every other helper here has it: an app opened from the Dock has no
     /// `docker` on its path at all (issue #220), so a question asked without
-    /// it is answered "no" on every teacher's Mac — and "no" here is a
-    /// sentence blaming the wrong thing.
+    /// it could never be PUT on a teacher's Mac — every teacher would get the
+    /// "could not tell" sentence, and the one case Plantoir can actually
+    /// prove would never be reached.
     static func askTheBuilderCommand(
         containerName: String,
         portInsideTheBuilder: Int,
