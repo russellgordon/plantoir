@@ -857,7 +857,8 @@ silence thirteen times later.
 Two things a teacher cannot tell apart produce the same complaint — "the
 preview never came up" — and they are a world apart in what to do about them:
 the site was never served, or the site is being served and this Mac cannot
-reach it. One is their pages; one is their Mac.
+reach it. One is their pages; one is their Mac. (There is a third thing,
+below, and it is neither: not knowing.)
 
 The builder can be asked directly, and its answer is proof rather than
 inference: `docker exec <container> curl …` against the port INSIDE the
@@ -877,6 +878,33 @@ The question carries its own deadline in the shell, the way
 already waiting, so an engine that never answers must not become the new way of
 saying nothing.
 
+**There are THREE answers, not two, and the third is the one the first version
+of this got wrong.** It read everything that was not a site as "nothing is
+serving it" — the programs not being found, the builder no longer being there,
+an engine that never replied inside that ten-second deadline — and so asserted
+"Your website did not come up" about a run whose console says
+`Started a Quartz server listening at …` two lines above the alert. A sentence
+a teacher can see is false costs more than saying nothing. The discriminator is
+MEASURED and cheap: a served site prints `200`, a port with nothing on it
+prints `000` (that is what `curl` writes when nothing replied), and a question
+that could not be put prints nothing at all, because the complaint goes to the
+error channel and that is discarded. So a three-digit reply is the builder
+speaking and an empty one is Plantoir not knowing — `PreviewReachability.Answer`,
+and the third case gets a sentence that says it could not tell and points at
+"Report a Problem…".
+
+**And the answer has to still belong to the run it was found out about.** The
+question takes about a tenth of a second and can take ten, and a teacher can
+press Stop or close the window inside that. Without a re-check they get an
+alert about a preview they have already ended, and the trail gets
+`preview did not appear` for a run that stopped because they asked it to —
+which is the misreading this line was added to prevent, arriving from the other
+direction. The run is identified by WHEN IT STARTED (`ScriptRunner.startedAt`)
+rather than by whether something is running now, because stopping this preview
+and starting another leaves a runner that is running, that nobody stopped, and
+that is a different run. `isStillTheSameWait`, checked after the `await` and
+before anything is said or recorded.
+
 ### What is left behind
 
 The run is **stopped**, the way the Stop Preview button stops it. Three things
@@ -889,9 +917,13 @@ on a timed-out wait still HOLDING its port was corrected in the same edit — it
 is now true of one path (the outer ten-minute bound, a run that never announced
 a server) rather than of every timeout.
 
-The teacher gets one of two sentences and the trail gets one line,
-`preview did not appear`, carrying the course, the section, the seconds and
-which of the two it was. The sentences are in
+The teacher gets one of three sentences, under a title that is true of all
+three — "Cannot Preview Yet" reads as "wait and it will work" in front of a
+remedy that is restarting the Mac, and a second `.alert` modifier on this view
+is the one thing it must not have (four of them segfaulted SwiftUI's bridge),
+so the shared alert carries its title in state beside its message. The trail
+gets one line, `preview did not appear`, carrying the course, the section, the
+seconds and which of the three it was. The sentences are in
 `contracts/app-rules.json` → `previewPorts.whenThePreviewNeverAppears`, so
 Windows can match the behaviour rather than re-derive it.
 

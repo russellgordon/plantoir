@@ -27,7 +27,32 @@ nonisolated enum PreviewReachability {
 
     // MARK: - Types
 
-    /// Which of the two things happened, once the waiting has stopped.
+    /// What came back when the builder was asked, which is not the same
+    /// question as what to tell the teacher.
+    ///
+    /// **The third case is the one that was missing**, and leaving it out
+    /// made the app assert something it had not found out. Everything that is
+    /// not a site answering — the programs not being where they were looked
+    /// for, the builder no longer being there, an engine that never replied
+    /// inside the question's own deadline — came back as "your website did
+    /// not come up", which a teacher can read as false with their own eyes:
+    /// `Started a Quartz server listening at …` is in the console directly
+    /// above the sentence.
+    enum Answer {
+
+        /// The site answered inside the builder.
+        case theSiteAnswered
+
+        /// The question was asked and got a reply, and the reply was not a
+        /// site: nothing is serving it in there.
+        case nothingAnsweredInside
+
+        /// The question could not be put, or nothing came back from putting
+        /// it. Plantoir does not know, and says so.
+        case couldNotFindOut
+    }
+
+    /// Which of the three things happened, once the waiting has stopped.
     enum Verdict {
 
         /// The website builder is serving the site and this Mac cannot reach
@@ -37,6 +62,10 @@ nonisolated enum PreviewReachability {
         /// Nothing answered anywhere — inside the builder either. The site
         /// was never served, so there was nothing to reach.
         case theSiteNeverAnswered
+
+        /// Plantoir stopped waiting and could not find out which of the two
+        /// it was.
+        case plantoirCouldNotTell
     }
 
     /// How long a run has been saying nothing.
@@ -126,9 +155,10 @@ nonisolated enum PreviewReachability {
     ///
     /// **It cannot be reached by accident, twice over.** It is compiled into
     /// debug builds only, so no teacher's copy contains it at all; and an app
-    /// opened from the Dock or from Finder inherits no environment, so even a
-    /// debug build only sees it when somebody starts the binary from a
-    /// terminal with the variable set:
+    /// opened from the Dock or from Finder normally inherits no such variable
+    /// (one would have to be put there deliberately with `launchctl setenv`),
+    /// so even a debug build only sees it when somebody starts the binary
+    /// from a terminal with the variable set:
     ///
     /// ```
     /// PLANTOIR_PRETEND_THIS_MAC_CANNOT_REACH_THE_PREVIEW=1 \
@@ -223,9 +253,32 @@ nonisolated enum PreviewReachability {
         )
     }
 
-    /// What the builder's answer means: `200` is the site answering itself.
-    static func theBuilderCanSeeItsOwnSite(fromAnswer answer: String) -> Bool {
-        return answer.trimmingCharacters(in: .whitespacesAndNewlines) == "200"
+    /// What came back, read as one of the three things it can mean.
+    ///
+    /// MEASURED, 2026-09-20, with the generated script against real
+    /// containers: a site being served prints `200` (0.03 s); a port with
+    /// nothing on it prints `000` (0.04 s), because that is what `curl`
+    /// writes when nothing replied; and a container that is not there prints
+    /// NOTHING at all, its complaint going to the error channel, which is
+    /// discarded. An engine that never answers is the same empty answer,
+    /// arriving at the question's own deadline (10.05 s, measured by the
+    /// reviewer against a stub). So an empty or unrecognisable answer is
+    /// "could not find out" and a three-digit reply is the builder speaking.
+    static func answer(from printed: String) -> Answer {
+        let trimmed: String = printed.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "200" {
+            return .theSiteAnswered
+        }
+        var digits: Int = 0
+        for character in trimmed {
+            if character.isNumber {
+                digits += 1
+            }
+        }
+        if digits == 3 && digits == trimmed.count {
+            return .nothingAnsweredInside
+        }
+        return .couldNotFindOut
     }
 
     /// Puts the question to the builder and waits for the answer.
@@ -233,7 +286,7 @@ nonisolated enum PreviewReachability {
     /// Off the main actor, because it runs a program and reads its output —
     /// the same `Task.detached` the rest of the app uses for work that
     /// blocks. The script's own watchdog is what guarantees this returns.
-    static func askTheBuilder(_ command: HelperPrograms.Command) async -> Bool {
+    static func askTheBuilder(_ command: HelperPrograms.Command) async -> Answer {
         let answer: String = await Task.detached(priority: .userInitiated) {
             let process: Process = Process()
             process.executableURL = URL(fileURLWithPath: command.executablePath)
@@ -252,15 +305,46 @@ nonisolated enum PreviewReachability {
             process.waitUntilExit()
             return String(data: printed, encoding: .utf8) ?? ""
         }.value
-        return theBuilderCanSeeItsOwnSite(fromAnswer: answer)
+        return PreviewReachability.answer(from: answer)
     }
 
-    /// Which of the two things happened.
-    static func verdict(theBuilderCanSeeItsOwnSite: Bool) -> Verdict {
-        if theBuilderCanSeeItsOwnSite {
+    /// Which of the three things happened.
+    static func verdict(for answer: Answer) -> Verdict {
+        switch answer {
+        case .theSiteAnswered:
             return .thisMacCannotReachIt
+        case .nothingAnsweredInside:
+            return .theSiteNeverAnswered
+        case .couldNotFindOut:
+            return .plantoirCouldNotTell
         }
-        return .theSiteNeverAnswered
+    }
+
+    /// Whether what was just found out still belongs to the run it was found
+    /// out about.
+    ///
+    /// The question takes a moment (0.1 s normally, up to its own ten-second
+    /// deadline when nothing replies), and a teacher can press Stop or close
+    /// the window inside it. Without this the app puts an alert in front of
+    /// them about a preview they have already ended, and writes a line on the
+    /// trail for a run that stopped because they asked it to — which is
+    /// exactly the misreading the trail line was added to prevent, arriving
+    /// from the other direction.
+    ///
+    /// The run is identified by WHEN IT STARTED, not by whether something is
+    /// running now: stopping this preview and starting another leaves a
+    /// runner that is running, was not stopped by anybody, and is a different
+    /// run.
+    static func isStillTheSameWait(
+        startedAt: Date?,
+        theRunNowStartedAt: Date?,
+        theTeacherStoppedIt: Bool,
+        theRunIsStillGoing: Bool
+    ) -> Bool {
+        if theTeacherStoppedIt || !theRunIsStillGoing {
+            return false
+        }
+        return startedAt == theRunNowStartedAt
     }
 
     /// What the teacher is told.
@@ -291,12 +375,25 @@ nonisolated enum PreviewReachability {
             return "Your website did not come up, so Plantoir stopped waiting for it.\n\n"
                  + "Nothing has been lost. Press Preview to try again — and if it "
                  + "happens again, restarting your Mac usually puts it right."
+        case .plantoirCouldNotTell:
+            return "Plantoir could not get your website to appear, and could not tell why.\n\n"
+                 + "Nothing has been lost. Press Preview to try again — and if it happens "
+                 + "again, choose “Report a Problem…” from the Help menu so somebody can "
+                 + "see what happened."
         }
     }
 
+    /// What the alert above the sentence is called.
+    ///
+    /// True of all three outcomes, and it does not promise that waiting will
+    /// help: the shared "Cannot Preview Yet" title this used to borrow reads
+    /// as "wait and it will work" in front of a sentence whose remedy is
+    /// restarting the Mac.
+    static let alertTitle: String = "Your Preview Did Not Appear"
+
     /// The line the trail gets: a sentence a teacher would recognise as what
     /// just happened to them, with the thing support needs to know — WHICH of
-    /// the two it was, and how long was spent finding out.
+    /// the three it was, and how long was spent finding out.
     static func trailLine(for verdict: Verdict, secondsOfSilence: Int) -> String {
         let waited: String = "after \(secondsOfSilence) seconds of nothing happening"
         switch verdict {
@@ -305,6 +402,9 @@ nonisolated enum PreviewReachability {
                  + "serving the site and this Mac could not reach it"
         case .theSiteNeverAnswered:
             return "the preview never appeared \(waited) — nothing was serving the site"
+        case .plantoirCouldNotTell:
+            return "the preview never appeared \(waited) — and the website builder could "
+                 + "not be asked whether it was serving the site"
         }
     }
 }

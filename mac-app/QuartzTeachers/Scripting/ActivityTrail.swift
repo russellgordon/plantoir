@@ -329,9 +329,10 @@ nonisolated enum ActivityTrail {
         case sectionProcessesReclaimed = "section processes reclaimed"
         /// A preview said its website was up and then never appeared, and
         /// Plantoir stopped waiting for it. Carries the course, the section,
-        /// how long it had been saying nothing, and WHICH of the two things
+        /// how long it had been saying nothing, and WHICH of the three things
         /// was true: the website builder was serving the site and this Mac
-        /// could not reach it, or nothing was serving it at all.
+        /// could not reach it, nothing was serving it at all, or the builder
+        /// could not be asked and Plantoir does not know.
         ///
         /// This is the line whose absence produced the report it exists for
         /// (issue #225). A teacher built three previews in four minutes, none

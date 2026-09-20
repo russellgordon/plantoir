@@ -1178,16 +1178,33 @@
     "note" : "Several previews run at once, one per working folder, and they must not collide. These numbers are the toolchain's, not either app's: the container publishes fixed ports and the host side probes a block.",
     "websocketOffset" : 1000,
     "whenThePreviewNeverAppears" : {
+      "alertTitle" : "Your Preview Did Not Appear",
+      "cases" : [
+        {
+          "answer" : "the site answered inside the builder",
+          "sentence" : "Your website is built, and your website builder is serving it — but this Mac cannot reach it.\n\nNothing is wrong with your pages. Something on this Mac that other apps use too has stopped passing your website through. Restarting your Mac puts it right.",
+          "verdict" : "thisMacCannotReachIt",
+          "why" : "The site answering inside while this Mac cannot reach the same site is PROOF rather than inference, and it is the only one of the three that can say what to do: restarting the Mac is the remedy that was watched working on the machine that met this."
+        },
+        {
+          "answer" : "the builder replied and nothing was serving the site inside it",
+          "sentence" : "Your website did not come up, so Plantoir stopped waiting for it.\n\nNothing has been lost. Press Preview to try again — and if it happens again, restarting your Mac usually puts it right.",
+          "verdict" : "theSiteNeverAnswered",
+          "why" : "The builder was reached and answered about a port with nothing on it, so the site really was not being served. Only a REPLY counts here - an answer that never arrived is the third case, not this one."
+        },
+        {
+          "answer" : "the question could not be put, or nothing came back from putting it",
+          "sentence" : "Plantoir could not get your website to appear, and could not tell why.\n\nNothing has been lost. Press Preview to try again — and if it happens again, choose “Report a Problem…” from the Help menu so somebody can see what happened.",
+          "verdict" : "plantoirCouldNotTell",
+          "why" : "Added after review, because the first version asserted 'your website did not come up' for every answer that was not a site - the programs not being found, the builder gone, an engine that never replied inside the question's own deadline. A teacher can read `Started a Quartz server listening at …` in the console directly above that sentence, so it contradicts what is on their screen. An app that does not know says so, and points at the one thing that lets somebody else find out."
+        }
+      ],
       "measured" : "On the development Mac, 2026-09-20: a site that answers inside the builder answers out here 0.026 s later, and one question put to the builder costs 0.03 s (five runs). On the Mac that met the fault, 2026-09-19: a first setup took 132.0 s and a first preview 109.3 s — which is why the RUN is never what is bounded.",
       "rejected" : "Bounding the whole run (a first preview legitimately takes minutes, so any bound short enough to help would refuse every teacher's first five minutes). Offering to restart the website builder from inside the app (another window, another copy of Plantoir or an outside assistant can be publishing in the same builder unseen, and the remedy was never measured to work). Believing what the builder says about which addresses it has published: it reports what it asked for, not what this Mac can reach, which is exactly how the fault stayed invisible.",
       "secondsOfSilenceAllowed" : 45,
-      "sentences" : {
-        "theSiteNeverAnswered" : "Your website did not come up, so Plantoir stopped waiting for it.\n\nNothing has been lost. Press Preview to try again — and if it happens again, restarting your Mac usually puts it right.",
-        "thisMacCannotReachIt" : "Your website is built, and your website builder is serving it — but this Mac cannot reach it.\n\nNothing is wrong with your pages. Something on this Mac that other apps use too has stopped passing your website through. Restarting your Mac puts it right."
-      },
       "theClockStartsAt" : "Started a Quartz server",
-      "whatIsAskedAtTheEnd" : "The builder is asked whether the site answers INSIDE it, before anything is stopped — stopping ends the server the question is about. It answering while this Mac cannot reach the same site is the proof that the pages are fine and the Mac is not; nothing answering anywhere is the other sentence. On the mac that question is a request made inside the container; a platform whose preview does not run in one has no counterpart to build and should send only the first sentence's half it can prove.",
       "whatHappensToTheRun" : "It is STOPPED, the way the teacher's own Stop button stops it, and the port goes back through that path. Three things follow and all three are wanted: nothing is left serving a website nobody can see; the section stops reporting itself as building, which a wait that merely gave up would have said for ever; and the port is never handed to another preview while a live server still holds it.",
+      "whatIsAskedAtTheEnd" : "The builder is asked whether the site answers INSIDE it, before anything is stopped — stopping ends the server the question is about. It answering while this Mac cannot reach the same site is the proof that the pages are fine and the Mac is not. There are THREE answers and not two, and the third is the one an implementation will forget: asked and answered (a site, or nothing), and not answered at all — the programs not found, the builder gone, an engine that never replied inside the question's own deadline. The third must never be reported as the second; see cases. On the mac that question is a request made inside the container; a platform whose preview does not run in one has no counterpart to build and should send only the first sentence's half it can prove.",
       "whatIsBounded" : "The QUIET, not the run: no new output AND no answer, counted from the moment the builder says its server has started, and restarted every time more output arrives. A preview that is still printing is not stalled however long it has been going.",
       "why" : "GitHub issue #225. A teacher pressed Preview, the progress bar filled, the builder said its server was listening, and the app then waited ten minutes and said nothing at all — no sentence, no line on the trail, the section still reporting itself as building. The website was built and was being served the whole time; that Mac had stopped passing new addresses through. Every part of this rule exists because of one half of that: the bound is on the quiet because the run was not slow, the question is put to the builder because guessing between the two causes would have told a teacher their pages were broken when they were not, and the run is stopped because leaving it holding a port while saying nothing is the state the report was made about."
     },
