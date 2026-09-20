@@ -299,6 +299,11 @@
           "mac"
         ],
         "appliesOnWhy": "NOT permanent, and this one is an acknowledged exception rather than the ordinary use - read contracts/README.md's \"Four ways out\" passage, which rejects exactly this move, and its Named gaps section, which records why it was taken here anyway. Windows could ask the same question: it has publishes and it has a quit. The honest alternative reddens their ContractTests with a failure only they can mend (a NamedGapLedger entry is theirs to write), on a release where nobody is on that side. The cost is real and is stated rather than hidden: appliesOn has NO mend-check, so the day Windows implements this, nothing anywhere goes red to say the contract is now lying. What points at it instead is this sentence, the README's Named-gaps entry, and the windows issue that carries the work. Adopt the rule (quittingWhileWorkIsUnderWay, below) and this line together, or neither - a line saying a teacher was asked, in an app that asks nothing, would be worse than no line - and delete both appliesOn keys when you do."
+      },
+      {
+        "carries": "the course, the section, and WHY - which of the three things that turn one off without being asked did it",
+        "event": "scheduled deploy turned off",
+        "why": "A deploy the teacher set to happen on its own was turned off by something other than them asking for it: the course was removed, the section was removed, or the day it was set for had gone by. Without this line a teacher whose site stopped updating has nothing anywhere explaining it - the alarm simply is not there any more, which reads exactly like one that was never set, and that is the same silence 'scheduled publish needed an answer' exists to break, one step further back. ONE event with three reasons rather than three events: somebody reading the trail wants to know their overnight deploy was turned off and by what, and the difference between two ways of removing something means nothing to them. It says DEPLOY where its three neighbours say publish, because a site is deployed and a page is published (Russell, 2026-09-20); the shipped names are left alone rather than renamed here, since a NEW name carrying the old vocabulary is the expensive mistake - this list pins it on both platforms. NOT written by the teacher's own Cancel item, nor by the assistant's cancel_scheduled_deploy: those are the teacher asking, and the trail already carries what they asked for. No appliesOn, deliberately - Windows cancels on removing a SECTION and not on removing a COURSE (Plantoir.Core/Models/CourseArchiver.cs), so two of the three reasons are theirs whatever they decide about the third."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -960,18 +965,20 @@
       "neededAnAnswer": "The launcher exited 3: a question was put to nobody. deploy.py's NEEDS_AN_ANSWER, distinct from 1 precisely so a caller can tell the two apart and say something useful.",
       "buildNeededAnAnswer": "The BUILD stopped for a question, before any destination was reached. PROPOSED FROM WINDOWS 2026-09-09 (GitHub issue #132) and adopted on the mac the same day; the mac's suite was red on this key until it was, which is the mechanism working rather than damage. A scheduled publish builds before it publishes, and the build launcher asks questions of its own \u2014 the 'Open' course-code guard on both platforms, plus a section-not-listed warning that only preview.ps1 has \u2014 so under --non-interactive it refuses with the same exit 3 having contacted nothing. It is a SEPARATE kind rather than neededAnAnswer with an empty destination because the sentence differs: there is no destination to name, and telling a teacher that publishing to Netlify needed an answer when Netlify was never reached sends them to look in the wrong place. REJECTED: filling the destination slot with the section's first configured destination, which reads correctly and is false.",
       "didNotFinish": "Any other non-zero exit \u2014 a revoked token, a network that was down, a build that failed.",
-      "succeeded": "It worked. Recorded for the same reason the failures are: a scheduled publish that leaves no trace cannot be told from one that never happened, so without it the trail can answer \u201cwhy did my site not update?\u201d and cannot answer \u201cdid it?\u201d"
+      "succeeded": "It worked. Recorded for the same reason the failures are: a scheduled publish that leaves no trace cannot be told from one that never happened, so without it the trail can answer \u201cwhy did my site not update?\u201d and cannot answer \u201cdid it?\u201d",
+      "tooLateToRun": "The day it was set for had gone by, by more than the course allows (scheduledDeployCancellation.howLateIsTooLate), so the run STOOD DOWN: it deployed nothing, cleared the job away, and said so. Added on the mac 2026-09-20 with the fix for a scheduled deploy outliving its course. It is a SEPARATE kind for the reason buildNeededAnAnswer is one, and the reason is already recorded there: didNotFinish's sentence names a DESTINATION that stopped, and here there was none, so filling that slot in would read correctly and be false. It is not a failure either - nothing was attempted and nothing went wrong - and the sentence has to say that, or a teacher goes looking for a fault there was not. WINDOWS MAY NOT NEED IT: their task is created with /SC ONCE, which has no annual recurrence to close, so this kind is owed there only if their task is set to run after a MISSED start. Say which, rather than adopting or declining it silently."
     },
     "sentences": {
       "neededAnAnswer": "{course} Section {section} was set to publish on its own, and it stopped because publishing to {destination} needed an answer nobody was there to give. Publish this section once yourself, answer the question, and it can publish on its own after that.",
       "buildNeededAnAnswer": "{course} Section {section} was set to publish on its own, and it stopped before it started, because building the pages needed an answer nobody was there to give. Preview this section once yourself, answer the question, and it can publish on its own after that.",
       "didNotFinish": "{course} Section {section} was set to publish on its own, and it did not finish \u2014 publishing to {destination} stopped, so nothing went up there. Publish it yourself to see what happens.",
-      "succeeded": "{course} Section {section} published on its own to {destination}. Your students have the new pages."
+      "succeeded": "{course} Section {section} published on its own to {destination}. Your students have the new pages.",
+      "tooLateToRun": "{course} Section {section} was set to deploy on its own at a time that is too far from now, so Plantoir left it alone rather than putting up a site you set up for a different day. Deploy it yourself whenever you are ready, and schedule the next one from the section’s menu."
     },
     "firstDestinationWins": "The record is per SECTION and keeps the FIRST destination that stopped. A course can publish to several places and only one may have gone wrong, so \"it published to the folder and not to Netlify\" is the shape of the report; overwriting would tell the teacher about the last thing that went wrong rather than the first.",
-    "attention": "Every FAILURE asks for the teacher's attention and gets a warning beside their section in the list as well as the sentence inside it \u2014 a teacher who does not know WHICH section failed cannot open the right one. A SUCCESS is news rather than a problem: it gets the sentence and no badge, because a badge on every section that published fine overnight is a badge nobody reads by Wednesday.",
+    "attention": "Every FAILURE asks for the teacher's attention and gets a warning beside their section in the list as well as the sentence inside it \u2014 a teacher who does not know WHICH section failed cannot open the right one. So does a run that STOOD DOWN (tooLateToRun), which is not a failure at all: nothing was attempted and nothing went wrong, and it still deserves the badge, because the site the teacher was expecting is not there either way and silence is what this whole key exists to break. The test is not \"did something break\" but \"is the site other than the teacher expects\". A SUCCESS is news rather than a problem: it gets the sentence and no badge, because a badge on every section that published fine overnight is a badge nobody reads by Wednesday.",
     "clearedBy": "A scheduled run that got ALL the way through \u2014 every destination, exit zero \u2014 OR the teacher dismissing it. Both, and the second is a decision rather than a convenience: clearing only on a successful run leaves the message standing after somebody has already fixed the problem by hand, and the next scheduled run that would clear it could be a week away.",
-    "trail": "One line per RUN, dated to when the RUN wrote its record rather than to when the app read it — or an overnight problem is filed under the morning somebody noticed it. There are THREE events, one per outcome (activityTrail.mustRecord: scheduled publish needed an answer, did not finish, finished); a build that stopped for a question files under the first, because a question going unasked is what happened and a fourth event would put a distinction on the trail that means nothing to the person reading it. The line carries the course, the section, and which destination stopped — or, for a run that got through, where it WENT. NEVER the question's own text: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail. An earlier draft had the app note the line when a teacher opened the section and mark the record as noted; rewriting the record changed its modification date, which is what the notice shows, so the teacher saw the morning they looked rather than the half six the run stopped at — and a teacher who never opened that section, who is exactly the one who reports that their site did not update, got no line at all. WHO writes it is platform-local and cannot be otherwise: see platformDifferences.",
+    "trail": "One line per RUN, dated to when the RUN wrote its record rather than to when the app read it — or an overnight problem is filed under the morning somebody noticed it. There are FOUR events, and not one per kind: the three outcomes of a run that HAPPENED share three of them (activityTrail.mustRecord: scheduled publish needed an answer, did not finish, finished), and a build that stopped for a question files under the first, because a question going unasked is what happened and an event of its own would put a distinction on the trail that means nothing to the person reading it. The fourth belongs to the kind where the run did not happen at all: tooLateToRun writes `scheduled deploy turned off`, the same event and the same words a REMOVAL writes, because the same thing happened to the teacher's alarm and the reason is what differs. (This said THREE events until 2026-09-20.) The line carries the course, the section, and which destination stopped — or, for a run that got through, where it WENT. NEVER the question's own text: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail. An earlier draft had the app note the line when a teacher opened the section and mark the record as noted; rewriting the record changed its modification date, which is what the notice shows, so the teacher saw the morning they looked rather than the half six the run stopped at — and a teacher who never opened that section, who is exactly the one who reports that their site did not update, got no line at all. WHO writes it is platform-local and cannot be otherwise: see platformDifferences.",
     "platformDifferences": {
       "asOf": "2026-09-09",
       "windows": "Records EVERY outcome \u2014 all four kinds \u2014 and can be dismissed by the teacher, both as of 2026-09-09 (GitHub issue #130). ScheduledPublishOutcome, plus the readout in SectionDetailView.",
@@ -979,6 +986,235 @@
       "owed": "NOTHING is owed on what is recorded or how it clears: both widenings and the buildNeededAnAnswer kind are on both platforms as of 2026-09-09, which is why this key no longer lists them. ONE difference remains and it is deliberate, because it cannot be otherwise: WHO writes the trail line. The mac's launchd agent runs Plantoir, so the RUN writes it as the trail key describes, while Windows' Task Scheduler runs plain PowerShell with no app process alive \u2014 so that side sweeps every record when the app next opens, dating each line from the record rather than from the reading. Writing it from the wrapper's own shell was REJECTED there: it would put the trail's line format in a second home, in generated PowerShell, where nothing tests it and the redaction rules do not reach. The property the contract actually asks for is kept either way \u2014 a teacher who never opens the failed section still gets the line, and that teacher is precisely the one who writes in to say their site did not update."
     },
     "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because that side records more than unanswered questions; Windows records more than that too and KEPT the old name deliberately, because a task scheduled before 2026-09-09 points at a wrapper script already on disk that writes the old path, and nothing rewrites that wrapper until the section is scheduled again — so renaming buys a better name and costs a second directory read for ever, on pain of the first overnight run after an update going silent. The record says what it is on its own first line."
+  },
+  "scheduledDeployCancellation": {
+    "note": "Which acts turn a scheduled deploy off without being asked, which deliberately turn none off, and how late is too late for one to still run. The MECHANISM is not shared and never was - launchd against Task Scheduler - but which act cancels what is a rule with inputs and outputs, it is true of both products, and on 2026-09-20 the two apps disagreed about it by accident rather than by decision: Windows cancels when a SECTION is removed and does not when a COURSE is (Plantoir.Core/Models/CourseArchiver.cs), and the mac did neither. That is exactly the quiet difference this folder exists to catch.",
+    "theFault": "A scheduled deploy outliving the course it was set for. The alarm lives OUTSIDE the working folder and is addressed by the course code, so removing the course left it standing, and on the mac StartCalendarInterval carries no year - so a job that never ran came due on the same date twelve months later, against whatever was in the folder by then. Which direction it errs in was MEASURED on the mac, 2026-09-20, and it is worse than it first looked: a course that publishes to NETLIFY refuses (scripts/deploy.py:1204, refuse_to_ask, exit 3) because the site marker lived inside the course folder and went with it; a course that publishes to CLOUDFLARE PAGES does NOT refuse - publish_to_cloudflare contains no refuse_to_ask at all, the teacher's surname is read from courses/.internal/profile.json which is in the WORKING folder and survives the removal, and suggest_pages_name is deterministic - so it builds the new course, creates or reuses a Pages project and reports success; and a course that publishes to a FOLDER does not refuse either, because a folder destination asks nothing ever. So the failure that REPORTS SUCCESS is not a rare edge: it is every folder and every Cloudflare course.",
+    "order": "CANCEL FIRST, then archive and remove - and this is the opposite of a RENAME's order, deliberately. A rename that cancelled before a failed move would silently drop a deploy for a course still sitting there under its old name, so it archives first; a REMOVAL that archived before a failed cancel would leave the very thing this rule exists to prevent, a course that is gone with a live alarm still addressed to it. So: a cancel that FAILS stops the removal, and the teacher is told in a plain sentence. If the removal then fails, the deploy stays cancelled and the sentence says so.",
+    "scopedToOneWorkingFolder": "Everything that cancels, lists or SHOWS a scheduled deploy asks the plist which working folder it belongs to, and leaves alone anything belonging to another. Paths compared with POSIX realpath, never Foundation's resolvingSymlinksInPath - the latter strips /private where the former keeps it, and two spellings of one folder comparing as DIFFERENT would scope every job out silently. The reason is not hypothetical: an agent's label is the course code and the section number and nothing else, so a teacher holding last year's working folder and this year's, both with ICS3U section 1, has ONE alarm between them; without this, removing the course in the folder that does not own it would cancel the other folder's live deploy and report success. That the two folders share one alarm at all is a separate fault with its own issue - a folder-scoped label would orphan every plist a teacher already holds.",
+    "cases": [
+      {
+        "act": "remove one section of a course that has more than one",
+        "cancels": "thatSectionOnly",
+        "provedBy": "run",
+        "why": "The other section's deploy is still meaningful, so it stays."
+      },
+      {
+        "act": "remove a whole course",
+        "cancels": "everyAlarmThisFolderHasForTheCourse",
+        "provedBy": "run",
+        "why": "Asked of the AGENTS rather than of the course's section list: a section removed on an earlier build left an alarm behind and took its number out of the settings, so a walk over the settings cannot see it."
+      },
+      {
+        "act": "remove the only section of a course",
+        "cancels": "everyAlarmThisFolderHasForTheCourse",
+        "provedBy": "run",
+        "why": "The sidebar turns that into a course removal, and it must cancel what a course removal cancels."
+      },
+      {
+        "act": "remove a course whose code also exists in another working folder",
+        "cancels": "nothing",
+        "provedBy": "run",
+        "why": "The one alarm belongs to the other folder. Cancelling it would destroy a deploy the teacher set on purpose and report success - which is worse than the fault being fixed."
+      },
+      {
+        "act": "rename a course",
+        "cancels": "everyAlarmThisFolderHasForTheCourse",
+        "provedBy": "run",
+        "why": "Already true before this rule existed, and listed so it cannot quietly stop being true. After a rename the alarm is addressed by a code no course has any more."
+      },
+      {
+        "act": "roll a section over onto a new website",
+        "cancels": "thatSectionOnly",
+        "provedBy": "run",
+        "why": "A section cut loose has no agreed website to publish to, and a run at half six has nobody to ask what to call one - it would create a name of its own and publish there while the address the students read quietly stopped updating. This case exists because the mac's rollover path was the ONE cancel left folder-blind when the rest of this rule landed on 2026-09-20: it asked only whether a file with that label exists, which is a Mac-wide question, so rolling a section over in one working folder deleted another folder's live deploy and reported it turned off. A rule asserted by prose and run by nothing is how that survived its own fix."
+      },
+      {
+        "act": "restore a backup over a course",
+        "cancels": "nothing",
+        "provedBy": "sourceHasNoCancel",
+        "source": "WorkspaceModel.swift",
+        "symbol": "func restoreBackup",
+        "why": "It replaces the course's CONTENTS in place. The course and its sections are still there, its site marker comes back with it, and the schedule still means what it meant."
+      },
+      {
+        "act": "restore an archived course or section",
+        "cancels": "nothing",
+        "provedBy": "sourceHasNoCancel",
+        "source": "CourseRestorer.swift",
+        "symbol": "enum CourseRestorer",
+        "why": "It ADDS. A section removed - its deploy cancelled by the rule above - and later restored comes back with nothing scheduled, and the teacher sets it again if they want it. That is the safe direction."
+      },
+      {
+        "act": "delete an archive, or delete a backup",
+        "cancels": "nothing",
+        "provedBy": "sourceHasNoCancel",
+        "source": "WorkspaceModel.swift",
+        "symbol": "func deleteArchive",
+        "why": "A zip is deleted; no live course changes."
+      }
+    ],
+    "howToRunACase": "A case with provedBy 'run' is played through the real removal, rename or rollover with a stand-in launchctl, against agents written into a folder of the test's own - NEVER the teacher's ~/Library/LaunchAgents, and on the mac LaunchControl.run now refuses outright while that override is set, so a test that forgets the stand-in fails rather than deleting the ICS3U schedule of whoever ran the suite. A case with provedBy 'sourceHasNoCancel' is a scan of the named SOURCE FILE: it must still contain the named symbol, and it must contain no call that cancels a scheduled deploy anywhere in it. That cannot prove the act is harmless, only that nobody has since taught it to cancel, which is the regression worth catching - a cancel appearing in a restore would be a silent loss of something the teacher set on purpose.",
+    "howLateIsTooLate": {
+      "rule": "A run whose intended moment is further from now than the course's window stands down: it deploys nothing, clears the job away, records the outcome (scheduledPublishStopped.kinds.tooLateToRun) and leaves the trail line 'scheduled deploy turned off'.",
+      "compare": "abs(now - intendedMoment) against the window, on ABSOLUTE instants. No calendar, no time zone, no daylight-saving arithmetic anywhere. Measured on the mac 2026-09-20: a 'same calendar day' rule REFUSES a 23:50 job on a Mac woken at 00:05 - the coalesced wake Apple's own launchd.plist page documents - turning a fifteen-minute delay into a silent non-deploy, which is the precise harm this exists to prevent. It also refuses a job set in Toronto firing at 06:30 local in Tokyo, which arrives BEFORE the recorded instant; abs is what allows that one.",
+      "failsOpen": "A moment that is missing or unreadable means RUN. A deploy the teacher asked for beats a refusal nobody sees, and fail-closed would turn one unparseable stamp into every scheduled deploy silently not happening.",
+      "whereTheMomentComesFrom": "The environment the scheduler hands the process, falling back to the job's own stored moment, which is still on disk at that instant.",
+      "cases": [
+        {
+          "name": "fifteen minutes late, across midnight",
+          "lateBySeconds": 900,
+          "chosenDays": 7,
+          "expectRuns": true
+        },
+        {
+          "name": "two and a half hours late, the same morning",
+          "lateBySeconds": 9000,
+          "chosenDays": 7,
+          "expectRuns": true
+        },
+        {
+          "name": "twenty-six hours late - away sick, opened the laptop the next afternoon",
+          "lateBySeconds": 93600,
+          "chosenDays": 7,
+          "expectRuns": true
+        },
+        {
+          "name": "thirteen hours EARLY, after a move to another time zone",
+          "lateBySeconds": -46800,
+          "chosenDays": 7,
+          "expectRuns": true
+        },
+        {
+          "name": "eight days late",
+          "lateBySeconds": 691200,
+          "chosenDays": 7,
+          "expectRuns": false
+        },
+        {
+          "name": "a year late - the fault itself",
+          "lateBySeconds": 31536000,
+          "chosenDays": 7,
+          "expectRuns": false
+        },
+        {
+          "name": "two days late, with one day chosen",
+          "lateBySeconds": 172800,
+          "chosenDays": 1,
+          "expectRuns": false
+        },
+        {
+          "name": "two days late, with three days chosen",
+          "lateBySeconds": 172800,
+          "chosenDays": 3,
+          "expectRuns": true
+        },
+        {
+          "name": "a year late, with two weeks chosen - the longest window still refuses it",
+          "lateBySeconds": 31536000,
+          "chosenDays": 14,
+          "expectRuns": false
+        },
+        {
+          "name": "the moment cannot be read",
+          "momentIsUnknown": true,
+          "chosenDays": 1,
+          "expectRuns": true
+        }
+      ]
+    },
+    "theSetting": {
+      "key": "scheduled_deploy_may_run_late_days",
+      "where": "Course Settings, under Deploying, beside the other deploying settings. NOT in the new-course wizard: a brand-new course cannot have anything scheduled, because a section that has never been deployed cannot be scheduled at all.",
+      "offered": [
+        1,
+        3,
+        7,
+        14
+      ],
+      "default": 7,
+      "whenItIsRead": "At the moment the deploy fires, from the course's own settings file inside the working folder the job named - so changing the setting after scheduling changes what the job already on disk will do. The sweep asks the same question through the same function; two answers to 'how late is too late for this course' is one more than anybody can keep in step.",
+      "whenTheJobsCourseCodeIsLOSSY": "An agent written before the course code was recorded in the job itself carries it only in its own NAME, uppercased with every non-alphanumeric turned into a hyphen - so a course called \"Chess Club\" comes back \"CHESS-CLUB\" and is not found by name. The folder is matched by that sanitised form instead, and ONLY when exactly one folder matches: two codes that sanitise the same way are ambiguous, and guessing between them would read one course's setting for another's job. With no unique answer the default applies - the same answer a course that has gone gets. The folder is found by comparing the NAMES in courses/, never by asking the filesystem whether a built path exists: a teacher's volume is case-insensitive by default, so asking for CHESS-CLUB answers yes when the folder is really Chess-Club, and a lossy code would walk into a different course's settings and read its window. Measured on the mac 2026-09-20 against a folder pair one hyphen apart. Without this step such a course fell back to the default at sweep time although its teacher had chosen another window, and the direction of that mistake is a deploy DROPPED.",
+      "whenItCannotBeRead": "The default. A course that is gone, a file that cannot be read, a key that is not there - all of them mean the default rather than a refusal. A job whose course folder has gone is refused by the launcher anyway; the stand-down must still clear the job away, or the same job comes back next year, which is the whole fault.",
+      "storedValueCases": [
+        {
+          "means": 7,
+          "stored": null
+        },
+        {
+          "means": 1,
+          "stored": 1
+        },
+        {
+          "means": 14,
+          "stored": 14
+        },
+        {
+          "means": 7,
+          "stored": 5
+        },
+        {
+          "means": 7,
+          "stored": 0
+        },
+        {
+          "means": 7,
+          "stored": 365
+        },
+        {
+          "means": 7,
+          "stored": -1
+        }
+      ],
+      "whyAShortList": "A fixed list rather than a number a teacher types. The value is read at the scheduled moment with nobody there, so a 0 or a 365 typed into a field is a fault nobody meets until the morning it matters - and anything stored that is not one of the offered choices reads as the default rather than as itself, which is what the cases above pin.",
+      "whyNoAlways": "There is deliberately no 'always' and no 'never expires'. That is the annual repeat this whole rule exists to close, offered back as a setting."
+    },
+    "wording": {
+      "confirmationSectionRemoved": "Section {section} is set to deploy on its own. Removing it turns that off.",
+      "confirmationCourseRemovedOneSection": "{sections} of {course} is set to deploy on its own. Removing {course} turns that off.",
+      "confirmationCourseRemovedSeveralSections": "{sections} of {course} are set to deploy on their own. Removing {course} turns that off.",
+      "couldNotTurnItOffOneSection": "{sections} of {course} is set to deploy on its own, and Plantoir could not turn that off — so nothing has been removed. Turn it off from the section’s menu, then try again.",
+      "couldNotTurnItOffSeveralSections": "{sections} of {course} are set to deploy on their own, and Plantoir could not turn that off — so nothing has been removed. Turn them off from the section’s menu, then try again.",
+      "removalFailedAfterTurningItOffOneSection": "{sections} of {course} will no longer deploy on its own — that was turned off first. Removing it then failed: {reason}",
+      "removalFailedAfterTurningItOffSeveralSections": "{sections} of {course} will no longer deploy on their own — that was turned off first. Removing it then failed: {reason}",
+      "settingTitle": "A scheduled deploy may still run this late",
+      "settingCaption": "A deploy set to happen on its own runs at the time you chose. If this Mac was off or asleep then, it runs at the next wake instead — and this is how long after your chosen time that is still worth doing. Later than this, Plantoir leaves it alone rather than putting up a site you set up for a different day, and tells you it did.",
+      "settingChoices": {
+        "1": "1 day",
+        "3": "3 days",
+        "7": "1 week",
+        "14": "2 weeks"
+      },
+      "rule": "{sections} renders as 'Section 1' or 'Sections 1 and 2', the same listing a rename uses. The singular and the plural are separate strings rather than one string with a verb placeholder, for the reason assist-wording's linkedClassWasLeftAlone / linkedClassesWereLeftAlone are a pair: one rendering cannot show both branches, and a contract holding half a sentence is a contract the other platform has to finish by guessing. NOTHING is said after a cancel that WORKED - the confirmation already said it would happen, and a second alert saying it did is noise. A rename shows one because a rename's confirmation never mentions the schedule.",
+      "machineryCheck": "No 'job', 'agent', 'plist', 'launchd', 'task' or 'scheduler' in any sentence above. 'Scheduled deploy' is the teacher's name for it."
+    },
+    "whatWasRejected": [
+      {
+        "instead": "Only the overdue sweep, which is provably harmless once the run's own check exists, plus the run's check, which reaches plists ALREADY ON DISK because every released plist's first program argument is the app's own binary - so an upgraded app runs the new check for an old job the moment it next tries to fire.",
+        "rejected": "Sweeping a working folder for jobs whose COURSE no longer exists, at folder-open and at course creation",
+        "why": "It is the only code here that DELETES something a teacher set on purpose, and every way it can be wrong is silent. An existing-but-empty courses/ reads as 'no courses' and would destroy every alarm naming that folder - a volume not mounted, a synced folder mid-materialisation - which is the same shape as the Docker check that read a daemon that did not answer as 'the machine is empty'. A course code recovered from a LABEL is sanitised and lossy, so a mismatch reads as 'this course does not exist'. And what it actually buys, once the run's own check exists, is one residue: a still-future job whose course was removed BEFORE the teacher upgraded and whose code is recreated before its date. That is not worth the family of ways it can delete a live deploy."
+      },
+      {
+        "instead": "Elapsed time between two absolute instants.",
+        "rejected": "Deciding lateness by 'the same calendar day'",
+        "why": "Measured: it refuses a 23:50 job on a Mac woken at 00:05, and it refuses a job that fires early after a time-zone move. It also drags a calendar, a locale and daylight saving into the one function that decides whether a teacher's site updates."
+      },
+      {
+        "instead": "A week, chosen per course from a short list.",
+        "rejected": "A twenty-four hour window, fixed for everybody",
+        "why": "A teacher away sick opens the laptop twenty-six hours late and still wants the site updated, and a laptop closed over a weekend is ordinary. The fault this closes is about eleven months late, so the window only has to sit far below that."
+      },
+      {
+        "instead": "The shortest window is one day and the longest is two weeks.",
+        "rejected": "An 'always' or 'never expires' choice in the setting",
+        "why": "That is the annual recurrence, offered back to the teacher as a preference."
+      },
+      {
+        "instead": "The orchestration lives in a model type the suite can drive, which takes the launchctl stand-in explicitly.",
+        "rejected": "Cancelling inside the course archiver",
+        "why": "The archiver's own tests build an ICS3U fixture - a course a teacher plausibly has - and set no override for where agents live, so a cancel inside it with the real launchctl as its default would boot out and delete a real ICS3U schedule on the machine running the suite. Putting it in the sidebar view was rejected too, for the opposite reason: nothing in the suite constructs that view, so the wiring could not be pinned and a later edit that dropped the call would leave the suite green."
+      }
+    ]
   },
   "scheduledDeployRefusals": {
     "alsoSaid": {

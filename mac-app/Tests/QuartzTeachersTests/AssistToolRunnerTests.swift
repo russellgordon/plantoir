@@ -3961,8 +3961,11 @@ final class AssistToolRunnerTests: XCTestCase {
         defer {
             try? FileManager.default.removeItem(at: made.root)
             ScheduledDeploy.launchAgentsDirectoryOverride = nil
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
         }
         ScheduledDeploy.launchAgentsDirectoryOverride = made.root.appendingPathComponent("LaunchAgents")
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            made.root.appendingPathComponent("LaunchAgents").deletingLastPathComponent().appendingPathComponent("scheduled")
 
         try write(page: "Unit 1, Day 1", publish: "false", body: "One.", in: made.course)
 
@@ -4003,8 +4006,11 @@ final class AssistToolRunnerTests: XCTestCase {
         defer {
             try? FileManager.default.removeItem(at: made.root)
             ScheduledDeploy.launchAgentsDirectoryOverride = nil
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
         }
         ScheduledDeploy.launchAgentsDirectoryOverride = made.root.appendingPathComponent("LaunchAgents")
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            made.root.appendingPathComponent("LaunchAgents").deletingLastPathComponent().appendingPathComponent("scheduled")
 
         let refused: AssistToolOutcome = await made.runner.run(call: call(
             "schedule_deploy",

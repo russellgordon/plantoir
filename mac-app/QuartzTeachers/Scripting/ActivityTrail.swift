@@ -256,6 +256,30 @@ nonisolated enum ActivityTrail {
         /// told from one that never happened. Without this line the trail can
         /// answer "why did my site not update?" and cannot answer "did it?".
         case scheduledPublishFinished = "scheduled publish finished"
+
+        /// A deploy the teacher had set to happen on its own was turned off by
+        /// something OTHER than them asking for it.
+        ///
+        /// Three things turn one off without being asked: removing the course,
+        /// removing the section, and the day it was set for going by — and the
+        /// line says WHICH, in the teacher's own terms, carrying the course and
+        /// the section. One event with three reasons rather than three events:
+        /// somebody reading the trail wants to know their overnight deploy was
+        /// turned off and by what, and the difference between two ways of
+        /// removing something means nothing to them.
+        ///
+        /// Without it, a teacher whose site stopped updating has no line
+        /// anywhere explaining why — the alarm simply is not there any more,
+        /// which reads exactly like one that was never set. That is the same
+        /// silence `scheduled publish needed an answer` was built for, one step
+        /// further back.
+        ///
+        /// Says DEPLOY where its three neighbours say publish. A site is
+        /// deployed and a page is published (Russell, 2026-09-20), and the
+        /// shipped names are left alone rather than renamed here — a new name
+        /// carrying the old vocabulary is the expensive mistake, because the
+        /// contract pins it on both platforms.
+        case scheduledDeployTurnedOff = "scheduled deploy turned off"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
         case itemExcluded = "item excluded"

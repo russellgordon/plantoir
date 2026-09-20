@@ -128,6 +128,37 @@ class CourseConfiguration {
         }
     }
 
+    /// How late a deploy set to happen on its own may still go ahead, in
+    /// days. Course-level, like every other deploying setting.
+    ///
+    /// The teacher chooses it in Course Settings; absent, or anything that is
+    /// not one of the offered choices, means a week. The rule and the reasons
+    /// live in `ScheduledDeployLateness`, which is also what reads this key at
+    /// the scheduled moment, when no `CourseConfiguration` is loaded.
+    ///
+    /// Read through `intValue(forKey:fallback:)` with the key written out as a
+    /// LITERAL rather than through `ScheduledDeployLateness.configurationKey`,
+    /// for the reason spelled out beside `unitWord`:
+    /// `FileFormatsContractTests` counts the keys this file reads by scanning
+    /// the SOURCE for that labelled argument, so a key reached through a
+    /// constant is invisible to the very check that exists to stop a config
+    /// key being added without telling Windows. The two spellings are pinned
+    /// to the same contract entry by tests on both sides of it.
+    var scheduledDeployMayRunLateDays: Int {
+        get {
+            return ScheduledDeployLateness.days(
+                fromStoredValue: intValue(
+                    forKey: "scheduled_deploy_may_run_late_days",
+                    fallback: ScheduledDeployLateness.defaultDays
+                )
+            )
+        }
+        set {
+            values["scheduled_deploy_may_run_late_days"] =
+                ScheduledDeployLateness.days(fromStoredValue: newValue)
+        }
+    }
+
     /// One place this course publishes to — either the primary
     /// (`deployTarget`) or one of `additionalDeployTargets`, both reduced
     /// to the same shape so a deploy can walk one plain list instead of
