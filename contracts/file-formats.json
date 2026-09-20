@@ -65,6 +65,18 @@
         "why": "EMPTY means Netlify, and that is not an oversight: every course written before the other destinations existed has no key at all, and must keep working."
       },
       {
+        "default": 7,
+        "key": "scheduled_deploy_may_run_late_days",
+        "type": "integer",
+        "values": [
+          1,
+          3,
+          7,
+          14
+        ],
+        "why": "How late a deploy set to happen on its own may still go ahead. ABSENT means 7, and so does anything that is not one of the values above — an older build's number, a value hand-edited into the file — because the alternative is honouring a stored 0 and standing every scheduled deploy down. Written by the settings form and by nothing else; the wizard deliberately does not ask, since a course that has never been deployed cannot be scheduled at all. READ AT THE MOMENT THE DEPLOY FIRES, out of this file, by a process with no app around it — so changing it after scheduling changes what a job already set will do. The rule it feeds, and what was rejected, is shared-rules.json → scheduledDeployCancellation. Added on the mac 2026-09-20; the Python does not read it and does not need to, and neither does a build."
+      },
+      {
         "key": "emojis",
         "type": "per-section map of strings"
       },

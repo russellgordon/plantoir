@@ -2054,6 +2054,7 @@ final class SharedRulesContractTests: XCTestCase {
             case .buildNeededAnAnswer: built.append("buildNeededAnAnswer")
             case .didNotFinish: built.append("didNotFinish")
             case .succeeded: built.append("succeeded")
+            case .tooLateToRun: built.append("tooLateToRun")
             }
         }
         built.sort()
