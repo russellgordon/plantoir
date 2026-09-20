@@ -2006,13 +2006,15 @@ final class SharedRulesContractTests: XCTestCase {
             .section("scheduledPublishStopped")
         let sentences: [String: Any] = try XCTUnwrap(section["sentences"] as? [String: Any])
 
-        let cases: [(ScheduledPublishOutcome.Kind, String)] = [
-            (.neededAnAnswer, "neededAnAnswer"),
-            (.buildNeededAnAnswer, "buildNeededAnAnswer"),
-            (.didNotFinish, "didNotFinish"),
-            (.succeeded, "succeeded"),
-        ]
-        for (kind, key) in cases {
+        // Walked from `allCases`, NEVER from a list retyped here. A
+        // hard-coded list of four is how `tooLateToRun` reached both the
+        // contract and the Swift on 2026-09-20 and was pinned to neither: the
+        // one sentence Windows would implement FROM the contract was the one
+        // sentence the mac did not check against it. `contractKey(for:)` is an
+        // exhaustive switch, so a sixth kind cannot compile without being
+        // given a key here.
+        for kind in ScheduledPublishOutcome.Kind.allCases {
+            let key: String = SharedRulesContractTests.contractKey(for: kind)
             let template: String = try XCTUnwrap(sentences[key] as? String)
             let expected: String = template
                 .replacingOccurrences(of: "{course}", with: "ICS3U")
@@ -2049,12 +2051,7 @@ final class SharedRulesContractTests: XCTestCase {
 
         var built: [String] = []
         for kind in ScheduledPublishOutcome.Kind.allCases {
-            switch kind {
-            case .neededAnAnswer: built.append("neededAnAnswer")
-            case .buildNeededAnAnswer: built.append("buildNeededAnAnswer")
-            case .didNotFinish: built.append("didNotFinish")
-            case .succeeded: built.append("succeeded")
-            }
+            built.append(SharedRulesContractTests.contractKey(for: kind))
         }
         built.sort()
 
@@ -2251,6 +2248,22 @@ final class SharedRulesContractTests: XCTestCase {
     // too for a while; two gates checking the same three substrings of the
     // same file is the shape that drifts, and the toolchain's gate is the
     // right home for a claim about a toolchain file.
+
+    /// What the contract calls one outcome kind.
+    ///
+    /// ONE exhaustive switch, walked by the kinds test AND the sentences test,
+    /// so a kind added to the enum cannot compile until somebody has given it
+    /// a contract key — and then both tests reach it at once. Two lists, one
+    /// per test, is what let `tooLateToRun` land unpinned.
+    static func contractKey(for kind: ScheduledPublishOutcome.Kind) -> String {
+        switch kind {
+        case .neededAnAnswer: return "neededAnAnswer"
+        case .buildNeededAnAnswer: return "buildNeededAnAnswer"
+        case .didNotFinish: return "didNotFinish"
+        case .succeeded: return "succeeded"
+        case .tooLateToRun: return "tooLateToRun"
+        }
+    }
 
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)

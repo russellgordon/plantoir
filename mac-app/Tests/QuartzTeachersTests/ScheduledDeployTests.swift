@@ -41,9 +41,12 @@ final class ScheduledDeployTests: XCTestCase {
             encoding: .utf8
         )
         ScheduledDeploy.launchAgentsDirectoryOverride = agentsDirectory
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            agentsDirectory.deletingLastPathComponent().appendingPathComponent("scheduled")
         addTeardownBlock {
             MainActor.assumeIsolated {
                 ScheduledDeploy.launchAgentsDirectoryOverride = nil
+                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
             }
         }
     }
@@ -283,7 +286,8 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(written.contains("deploy.sh"), written)
 
         ScheduledDeploy.cancelScheduledDeploy(
-            courseCode: course.code, sectionNumber: 1, runner: runner
+            courseCode: course.code, sectionNumber: 1,
+            inWorkingFolder: workspaceURL, runner: runner
         )
         XCTAssertFalse(FileManager.default.fileExists(atPath: commandURL.path),
                        "A cancelled deploy left a runnable copy of itself behind")
@@ -460,7 +464,8 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: plistURL.path))
 
         let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
-            courseCode: "ICS3U", sectionNumber: 1, runner: launchControl
+            courseCode: "ICS3U", sectionNumber: 1,
+            inWorkingFolder: workspaceURL, runner: launchControl
         )
 
         XCTAssertNil(problem)
@@ -476,7 +481,8 @@ final class ScheduledDeployTests: XCTestCase {
         try prepare()
         let launchControl: FakeLaunchControl = FakeLaunchControl()
         XCTAssertNil(ScheduledDeploy.cancelScheduledDeploy(
-            courseCode: "ICS3U", sectionNumber: 4, runner: launchControl
+            courseCode: "ICS3U", sectionNumber: 4,
+            inWorkingFolder: workspaceURL, runner: launchControl
         ))
     }
 

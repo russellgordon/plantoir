@@ -98,6 +98,9 @@ struct CourseSettingsView: View {
                         cloudflareAccountID: $settings.cloudflareAccountID,
                         additionalDeployTargets: $configuration.additionalDeployTargets
                     )
+                    ScheduledDeployLatenessPicker(
+                        days: $configuration.scheduledDeployMayRunLateDays
+                    )
                 } header: {
                     FormSectionHeader("Deploying")
                 }
