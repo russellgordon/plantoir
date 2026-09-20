@@ -210,6 +210,170 @@ launchers:
    under `/mnt`. Published ports still appear on `localhost` thanks to
    WSL2's automatic localhost forwarding, so the preview URL is unchanged.
 
+### Which app macOS asks about when it protects the Desktop
+
+**Met on a second Mac running v1.2.0, 2026-09-19** ([issue
+#226](https://github.com/russellgordon/plantoir/issues/226)): macOS asked to
+let **iTerm** read files on the Desktop, where the working folder was. Nothing
+on that Mac was misconfigured. The label is the literal truth about who
+started the virtual machine, and the paragraph above about the working folder
+living under `$HOME` is why the virtual machine touches those files at all.
+
+**The mechanism.** macOS decides a Desktop / Documents / Downloads prompt by
+the code identity of the **responsible process** of whoever makes the syscall,
+not by the process itself. Responsibility is fixed at spawn:
+
+| How the process started | Responsible process | Who the prompt names |
+|---|---|---|
+| LaunchServices (`open`, the Dock, Finder) | itself | that app |
+| launchd (a login item, `brew services`) | itself | that binary |
+| spawned by anything else | **inherited from the parent** | the parent's responsible app |
+| …and that responsible process later exits | **itself** | that binary, by its path |
+
+It lands on the virtual machine's host process because, with `vmType: vz` and
+`mountType: virtiofs`, there is no separate file server to blame: the VM runs
+*inside* `limactl hostagent` through Virtualization.framework and the host side
+of the share is served from that same process. Measured on the development
+Mac: `~/.colima/_lima/colima/ha.pid` and `vz.pid` hold the **same** number. So
+every file a build reads or writes in the working folder is read by that one
+process, and macOS attributes all of it to whoever started it.
+
+**Measured 2026-09-19, macOS 26.6 (Darwin 25.6.0)** — twice, independently,
+with `responsibility_get_pid_responsible_for_pid` and throwaway
+background-only apps:
+
+- The development Mac's hostagent (`/opt/homebrew/bin/limactl`, **PPID 1**)
+  answers *responsible pid 4498* — `/Applications/iTerm.app`. Being
+  daemonised and reparented to launchd did **not** break the attribution.
+- A test app → `/bin/bash launcher.sh` → `nohup sleep 900 &` — the same
+  two-hop, reparented shape as Plantoir → `preview.sh` → hostagent — keeps the
+  **app** as the responsible process of the daemonised grandchild.
+- When that app exits, the orphan becomes its **own** responsible process.
+- **Relaunching does not re-adopt it.** A second instance of the same binary
+  with the same bundle identifier owns its own new descendants; the old orphan
+  stays itself. Once orphaned, orphaned for that VM's lifetime.
+
+So: a virtual machine Plantoir started carries Plantoir's name — **but only
+while that Plantoir is running.** Afterwards the hostagent answers for itself,
+and TCC stores a non-bundled client by absolute path rather than by bundle
+identifier (measured: `client_type` 1, e.g. `/usr/bin/osascript`), so the name
+in play becomes `…/Application Support/Plantoir/tools/bin/limactl` — meaningless
+to a teacher, and tied to a path a tool-version bump rewrites.
+
+**How [#220](https://github.com/russellgordon/plantoir/issues/220) changes the
+picture.** Until that work, Plantoir's quit path could not stop the virtual
+machine on a teacher's Mac at all, which made the orphaned state above every
+teacher's normal state from the second launch onward rather than a developer's
+edge case. #220 is what fixes it, and it landed as its own piece; its rule, the
+conditions it refuses under and what it rejected are in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "Quitting: what it frees, what
+it refuses to free, and why", and are deliberately not restated here.
+
+**What this piece does about it: the four sentences.** The app declared no
+`NS…UsageDescription` at all, so its own prompt — the one a teacher is
+genuinely meant to see, raised when Plantoir writes `.toolchain/` and the
+launchers into the folder the moment it is chosen — carried macOS's bare
+default and not one word from us. `mac-app/project.yml` now carries
+`NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription`,
+`NSDownloadsFolderUsageDescription` and `NSFileProviderDomainUsageDescription`,
+all four with the same sentence: a teacher only ever sees one of them, and four
+near-identical strings drift apart. The file-provider key is not decoration —
+it is the TCC service for iCloud Drive, Dropbox, OneDrive and Google Drive
+folders, which the app explicitly supports rather than refuses ("Use This
+Folder Anyway"). **This does not fix the iTerm label and must not be sold as
+doing so**; it fixes the prompt that does carry Plantoir's name.
+
+`PrivacyUsageStringsTests` pins the keys, their emptiness and rule 1 against
+the built bundle — which, because the tracked `QuartzTeachers/Info.plist` is
+the build's input, also catches a `project.yml` edit made without re-running
+`xcodegen generate`. It proves **plist content only**.
+
+**Removable and network volumes were considered and rejected.** Nothing in the
+Swift refuses a working folder outside `$HOME`, so
+`NSRemovableVolumesUsageDescription` and `NSNetworkVolumesUsageDescription` are
+genuinely reachable. They are still wrong: the sentence promises a class
+website, and a folder on an external drive is the one place that cannot produce
+one — the virtual machine is given only the home folder, so the workspace is
+refused outright with the sentence in `contracts/app-rules.json` →
+`failureExplanations` (§4 below). A prompt that promises what the next screen
+refuses is worse than a bare prompt. Revisit only if such a folder ever becomes
+buildable.
+
+**The pin, and why it matters.** This is *Lima's* behaviour, not a macOS
+guarantee — a parent may disclaim responsibility for a child at spawn, and some
+do: `/usr/bin/osascript` and the `claude` CLI hold their own path-keyed TCC
+rows on the development Mac despite normally being spawned by apps. What is
+measured above is Lima `2.2.0` with Colima `v0.10.3`, the versions pinned in
+`setup.sh`. **Re-measure on a bump**, or this section quietly becomes false.
+
+**What stays UNMEASURED**, and should not be written down as if it were not:
+
+1. **What the sheet actually renders**, with a usage string and without one, on
+   macOS 26. Measuring it means making a real prompt appear and leaving a TCC
+   row behind for a throwaway bundle identifier.
+2. **Whether a self-responsible, non-bundled helper prompts under its own name
+   or is silently refused.** This decides how bad the orphaned state is: a
+   confusing dialog naming `limactl` is survivable, an unexplained "Operation
+   not permitted" from inside the build is the worse product outcome.
+3. **Whether `tccd` re-evaluates responsibility** for a long-lived process
+   whose responsible process died mid-life, or serves a cached answer for that
+   pid. If it caches, the symptom appears only after the VM restarts.
+4. **Whether the folder picker alone carries enough user intent** to grant the
+   folder without any prompt for a non-sandboxed app.
+
+**Rejected — a Plantoir-owned VM profile (`colima -p plantoir`).** Colima
+0.10.3 does support it, so it is possible; it is still wrong on four counts.
+
+1. **It does not buy the name it is bought for.** Per the measurements above, a
+   private VM carries Plantoir's name only until the first quit; after that the
+   prompt names `limactl` by path. It trades "iTerm" for something no better.
+2. **It costs every teacher who already has an engine a second VM** — a second
+   disk image, a second RAM reservation, and a full rebuild of
+   `teaching-quartz` inside it (132 s of a cold setup, measured on the second
+   Mac).
+3. **It contradicts rule 7's politeness about a shared VM**, doubling a
+   machine's container overhead to avoid a prompt.
+4. **It is a three-launcher, two-platform change**: `--profile` on every colima
+   call, `--context` on every docker call, `_colima_growth_flags`, the quit
+   path's emptiness check, `verify.sh`.
+
+And the argument for it that is only half true, written down so it is not made
+again: "riding on somebody else's virtual machine caused this". A per-session
+VM helps against a *stale* foreign VM only if quitting stops it — fix the quit
+path (#220) and a teacher's own VM is fresh daily; leave it broken and a
+Plantoir-owned profile rots exactly the same way, because uptime accumulates
+either way. **Revival trigger**: a *teacher*, not a developer, reporting a
+prompt that names something other than Plantoir, or a teacher's preview failing
+against an engine Plantoir did not start.
+
+**Rejected — telling the teacher in the interface that something else was
+already running the builder.** Rule 1 forbids naming the machinery, and the
+plain-words version ("something else on this Mac is already running the part
+that builds your websites") is frightening and actionable by nobody.
+
+**Rejected — steering new working folders away from the Desktop.**
+`WorkspacePickerView` suggests the Desktop today, and that is right: the
+Desktop is where a teacher can *see* their folder. `~/Documents` is protected
+by the same machinery, and a folder a teacher will never find in Finder without
+being taught where it is trades discoverability for one Allow click. The
+picker's wording stays exactly as it is.
+
+**One caution for anyone reproducing this.** The confirming experiment — turn a
+terminal's Desktop access off in System Settings, start the engine from
+Plantoir instead, and watch whose name the next prompt carries — is safe on a
+machine where no work lives on the Desktop. **It must not be run on the
+development Mac**, where this repository sits at
+`~/Desktop/folders-that-must-exist/plantoir`: revoking the terminal's Desktop
+access cuts every session's access to the checkout. And never `tccutil reset`
+anything — it clears grants for every app at once, with no undo. Toggling one
+app's row in System Settings is reversible and is enough.
+
+**Nothing here is owed to Windows.** There is no TCC: Windows does not ask
+before a program reads a folder the user owns. The nearest thing, Defender's
+Controlled Folder Access, is off by default and *blocks* rather than prompts,
+so there is no sentence to mirror and no key to add — know the mechanism,
+implement nothing.
+
 ## 4. Mount-aware container lifecycle
 
 This is the most subtle part of the launchers. Each working folder has its

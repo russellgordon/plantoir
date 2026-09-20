@@ -67,6 +67,16 @@ Beyond the actions, the app owns delivery and resources:
   dismissable notice above the path bar. Either is shown once per folder.
   The sentences, the detection cases and the timing are in
   `contracts/shared-rules.json` → `cloudSyncedFolders`.
+- **macOS's own privacy prompt explains itself.** The Desktop, Documents and
+  Downloads are protected folders, and so are the ones a sync service manages,
+  so the first time Plantoir writes into a working folder in one of them the
+  teacher is shown a sheet. `Info.plist` carries the sentence that sheet puts
+  under macOS's own line — four `NS…UsageDescription` keys, one sentence
+  between them, pinned by `PrivacyUsageStringsTests`. **Which app the prompt
+  names is a separate question with a surprising answer**, and it is not always
+  Plantoir: see
+  [Launcher scripts → "Which app macOS asks about when it protects the
+  Desktop"](03-launcher-scripts.md#which-app-macos-asks-about-when-it-protects-the-desktop).
 - **The built website is kept outside the working folder** — every working
   folder, not only the synced ones. `courses/<CODE>/.merged_output` is a
   symlink to `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`,

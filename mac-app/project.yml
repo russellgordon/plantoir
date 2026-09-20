@@ -96,6 +96,23 @@ targets:
         NSAppTransportSecurity:
           # The embedded preview loads http://localhost:8081 (plain HTTP).
           NSAllowsLocalNetworking: true
+        # The sentence macOS shows under "Plantoir would like to access files
+        # in your Desktop folder". Without these keys the sheet carries no
+        # word from us at all. ONE sentence across all four keys on purpose:
+        # a teacher only ever sees one of them, and four near-identical
+        # strings drift apart. Rule 1 applies — it is teacher-facing text, and
+        # `PrivacyUsageStringsTests` enforces that. The four folders are the
+        # ones a working folder is really put in: Desktop and Documents are
+        # what the picker suggests, Downloads is where a teacher who
+        # downloaded a folder of notes leaves it, and the file-provider key
+        # covers the iCloud Drive / Dropbox / OneDrive / Google Drive case the
+        # app explicitly supports ("Use This Folder Anyway", see
+        # CloudSyncedFolder). Removable and network volumes were considered
+        # and REJECTED — documentation/03 §3 says why.
+        NSDesktopFolderUsageDescription: "Plantoir reads and writes the course notes in your working folder, so it can build your class websites."
+        NSDocumentsFolderUsageDescription: "Plantoir reads and writes the course notes in your working folder, so it can build your class websites."
+        NSDownloadsFolderUsageDescription: "Plantoir reads and writes the course notes in your working folder, so it can build your class websites."
+        NSFileProviderDomainUsageDescription: "Plantoir reads and writes the course notes in your working folder, so it can build your class websites."
         NSHumanReadableCopyright: "MIT License"
     settings:
       base:
