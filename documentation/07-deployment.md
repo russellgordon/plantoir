@@ -1010,6 +1010,113 @@ changing `BuildFreshness`, which the Deploy button uses too, so it is its own
 piece of work with its own measurement; giving the rebuild its own exit code
 was rejected as a launcher contract change Windows shares.
 
+## A course kept for reference is never deployed — fifteen doors, one rule
+
+A REFERENCE COURSE is last year's course, or a course full of example content,
+kept in this year's sidebar to be read. It may be previewed; it is never
+deployed. The keys are in
+[`08-course-config-reference.md`](08-course-config-reference.md), the lock is in
+[`09-mac-app.md`](09-mac-app.md), and the whole rule as data — including the
+door table below — is
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.refusal`.
+
+**A missed door is a deploy that REPORTS SUCCESS**, which is the worst
+direction this feature can fail in. So the doors were enumerated from the code
+twice, independently — by the plan and then by its review, which went looking
+for a sixteenth and found none — and each refusal has a test PROVED to fail
+with that refusal turned off.
+
+| Door | Caught at |
+|---|---|
+| The section window's **Deploy** button | `SectionDetailView.refusalForAReferenceCourse`, first thing in `deployAndWait()` (and the button is not drawn at all) |
+| The local assistant's `deploy_section`, window branch | `AssistToolRunner.deploySection`, **before the preview is stopped** |
+| …its headless branch | the same, plus `AssistToolchainWork.deploy` |
+| The deploy approval card's **Go** | the same — and closed by construction: the assistant is never offered on a reference course |
+| `deploy_section` over **MCP** | the write gate in `AssistToolRunner.run(call:)`, then the two above |
+| `schedule_deploy`, local and over MCP | `AssistToolRunner.scheduleRequest`, then `ScheduledDeploy.problem` |
+| The sidebar's **Schedule Deploy…** sheet | `ScheduledDeploy.problem`, **before** "that time has already passed" |
+| A scheduled deploy **already on disk**, firing | `deploy.sh`'s own check |
+| `plan_scheduled_deploy` (MCP only) | `AssistToolRunner.scheduleRequest` |
+| `./deploy.sh <CODE> <N>` by hand, to a web host | `deploy.sh`, then `deploy.py` |
+| **`./deploy.sh <CODE> <N> --to-folder <path>`** | **`deploy.sh` and ONLY `deploy.sh`** |
+| `deploy.bat` → `deploy.ps1` | `deploy.ps1`'s own check |
+| `python3 scripts/deploy.py …` | `deploy.py`, first thing in `main()` |
+| `verify-deploy.sh` / `.ps1` | inherits the two launchers' |
+
+### Why door 12 needs the SHELL and not only `deploy.py`
+
+The folder destination does its work with `rsync` **on the host** and `exit 0`s
+before the container is ever started (`deploy.sh`, the `--to-folder` branch).
+`deploy.py` is never entered on that path. A refusal written only in the shared
+Python therefore leaves the folder destination wide open — and this is measured
+rather than argued: with the launcher's check removed, the launcher published a
+frozen course and said
+
+```
+✅ Published: 1 file(s) updated.
+```
+
+exit 0. That is the same shape as the live-reload defect of 2026-09-05, which
+is why `verify.sh` greps **both** `deploy.sh` and `deploy.ps1` for this guard
+as well as for that one. The structural check costs six lines and makes the
+Windows obligation visible from this side rather than only in an issue.
+
+### Plain shell, failing CLOSED, and no new exit code
+
+The launcher's check reads `course_config.json` with `grep` — **no host
+`python3`**. Everything before the flag loop, and the whole folder publish, needs
+no interpreter on the host today, and this product's first-run promise is "no
+Homebrew, no admin rights"; adding one here would break publishing for a teacher
+whose Command Line Tools are missing.
+
+It **fails closed**: a settings file that is there and cannot be read refuses
+and says so. A settings file that is ABSENT is not its business — the course
+folder check further down answers that in its own words. The shared Python is
+the other way round on purpose: a malformed config reads as NOT a reference
+course, because a course nobody can open must not become undeployable by
+accident, and the marker is not the only defence anyway.
+
+**No fourth exit code.** `deploy.sh` states its own invariant — exit 3 means "a
+question nobody was there to answer" and nothing else, every other exit is 0 or
+1 — and a new code would have to be read by the scheduled wrapper, by
+`ScheduledPublishOutcome` and by the Windows twin before it meant anything.
+Exit 1, matched on OUTPUT by an `app-rules.json` → `failureExplanations` case,
+which is how every other launcher failure already becomes a sentence. That case
+matters most for a deploy set to happen on its own: it runs with the app closed,
+and without it the app shows the generic "did not finish" while the real reason
+sits in a log nobody opens.
+
+### The refusal does NOT depend on the lock
+
+Gated on the marker alone, never on whether the files happen to be locked, and
+a test pins it. If the two were coupled, a course restored from a backup — or
+one whose folder had been on a second Mac, where the locks do not travel —
+would silently become deployable.
+
+### And the fail-safe, for a Plantoir that has never heard of any of this
+
+A teacher may keep their working folder in iCloud Drive and open it on a second
+Mac still running an older release. That copy does not know the marker. So
+whatever makes a course a reference course ALSO writes `deploy_target:
+"local_folder"` with an empty `deploy_folder_path`, drops
+`additional_deploy_targets` and `custom_domains`, and renames the
+`.netlify_sites/` and `.cloudflare_sites/` markers aside to the frozen
+`section<N>.previous-<stamp>.json` name. Every shipped version refuses a folder
+deploy with no folder, in sentences it already has
+(`MultiDestinationDeployRunner.refusalReason`, `ScheduledDeploy.problem`), and a
+section that has never deployed cannot be scheduled at all.
+
+**What that leaves, stated rather than hidden.** An older Plantoir refreshes
+`.toolchain/` back to its own copies, so an old `./deploy.sh` run by hand on
+that Mac could still reach Netlify — and, with the markers renamed aside, it
+would create a **brand-new site** rather than overwrite last year's. Litter,
+not damage. It cannot be closed by construction and belongs in the release
+note. Worth knowing too: the fail-safe's words on an older app are an
+invitation — *"Choose the folder this course deploys into."* — so a determined
+teacher can undo it. That is the honest cost of a defence written in a file
+format an old version can read.
+
 ## A scheduled deploy that outlived its course
 
 Added 2026-09-20, [issue #236](https://github.com/russellgordon/plantoir/issues/236).

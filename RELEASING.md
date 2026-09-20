@@ -107,6 +107,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Log |
 |---|---|---|---|
+| 2026-09-20 | **A course you keep for reference** — last year's, or one full of example content. It sits in its own group in the sidebar under its real code, opens in Obsidian, previews like any other section, and is never put on the web: the Deploy button is not there, and every other way in refuses with a sentence. Its pages are locked, the way Finder locks a file, so nothing changes them by accident. | mac only (branch A of #206; Windows owes the same, see its issue) | 511 |
 
 ## Warnings the release notes MUST carry
 
@@ -120,6 +121,9 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+| 2026-09-20 | **If you keep your working folder in iCloud Drive and use it on two Macs, update BOTH before you keep a course for reference.** | An older Plantoir has never heard of a reference course. It still refuses to deploy one — the course is deliberately left with nowhere to publish to, and older releases refuse that in words they already have — but it refuses it the way it refuses a misconfigured course, and a teacher who follows that refusal's own advice can undo the protection. Measured, and it is the residual hole this feature cannot close by construction. |
+| 2026-09-20 | **A course kept for reference is locked on the Mac it was made on, and only there.** | The lock is a macOS file flag that iCloud Drive does not carry between Macs — measured — so the same course on a second Mac is not locked. Plantoir locks it again the first time it opens the folder there, which is why the warning is "update both Macs" rather than "do not use two Macs". Saying it plainly is the alternative to a promise the product cannot keep. |
+| 2026-09-20 | **The first preview after updating rebuilds your website builder.** | `scripts/`, `contracts/` and the Dockerfile all changed, and the builder's name is a hash of them. Expected, precedented, and a few minutes once. |
 
 ## The short version
 

@@ -301,9 +301,9 @@
         "appliesOnWhy": "NOT permanent, and this one is an acknowledged exception rather than the ordinary use - read contracts/README.md's \"Four ways out\" passage, which rejects exactly this move, and its Named gaps section, which records why it was taken here anyway. Windows could ask the same question: it has publishes and it has a quit. The honest alternative reddens their ContractTests with a failure only they can mend (a NamedGapLedger entry is theirs to write), on a release where nobody is on that side. The cost is real and is stated rather than hidden: appliesOn has NO mend-check, so the day Windows implements this, nothing anywhere goes red to say the contract is now lying. What points at it instead is this sentence, the README's Named-gaps entry, and the windows issue that carries the work. Adopt the rule (quittingWhileWorkIsUnderWay, below) and this line together, or neither - a line saying a teacher was asked, in an app that asks nothing, would be worse than no line - and delete both appliesOn keys when you do."
       },
       {
-        "carries": "the course, the section, and WHY - which of the three things that turn one off without being asked did it",
+        "carries": "the course, the section, and WHY - which of the things that turn one off without being asked did it",
         "event": "scheduled deploy turned off",
-        "why": "A deploy the teacher set to happen on its own was turned off by something other than them asking for it: the course was removed, the section was removed, or the day it was set for had gone by. Without this line a teacher whose site stopped updating has nothing anywhere explaining it - the alarm simply is not there any more, which reads exactly like one that was never set, and that is the same silence 'scheduled publish needed an answer' exists to break, one step further back. ONE event with three reasons rather than three events: somebody reading the trail wants to know their overnight deploy was turned off and by what, and the difference between two ways of removing something means nothing to them. It says DEPLOY where its three neighbours say publish, because a site is deployed and a page is published (Russell, 2026-09-20); the shipped names are left alone rather than renamed here, since a NEW name carrying the old vocabulary is the expensive mistake - this list pins it on both platforms. NOT written by the teacher's own Cancel item, nor by the assistant's cancel_scheduled_deploy: those are the teacher asking, and the trail already carries what they asked for. No appliesOn, deliberately - Windows cancels on removing a SECTION and not on removing a COURSE (Plantoir.Core/Models/CourseArchiver.cs), so two of the three reasons are theirs whatever they decide about the third."
+        "why": "A deploy the teacher set to happen on its own was turned off by something other than them asking for it: the course was removed, the section was removed, or the day it was set for had gone by. Without this line a teacher whose site stopped updating has nothing anywhere explaining it - the alarm simply is not there any more, which reads exactly like one that was never set, and that is the same silence 'scheduled publish needed an answer' exists to break, one step further back. ONE event with several reasons rather than one event each (three when it was written; a fourth since a course could be kept for reference): somebody reading the trail wants to know their overnight deploy was turned off and by what, and the difference between two ways of removing something means nothing to them. It says DEPLOY where its three neighbours say publish, because a site is deployed and a page is published (Russell, 2026-09-20); the shipped names are left alone rather than renamed here, since a NEW name carrying the old vocabulary is the expensive mistake - this list pins it on both platforms. NOT written by the teacher's own Cancel item, nor by the assistant's cancel_scheduled_deploy: those are the teacher asking, and the trail already carries what they asked for. No appliesOn, deliberately - Windows cancels on removing a SECTION and not on removing a COURSE (Plantoir.Core/Models/CourseArchiver.cs), so two of the three reasons are theirs whatever they decide about the third."
       },
       {
         "carries": "the folder it was given, the code and school year it shows, how many sections came across, and which course it was copied from",
@@ -3597,6 +3597,107 @@
       ],
       "alsoRenamedAside": ".netlify_sites/section<N>.json and .cloudflare_sites/section<N>.json become the frozen previous-marker name (file-formats.json → firstDeployMarkers). Renamed rather than deleted: the file holds the site id and the admin address, which a teacher may still want. Two fail-safes fall out of one rename — a deploy that somehow ran would make a NEW site rather than overwrite last year's live one, and a section that has never deployed cannot be scheduled.",
       "kept": "Per-page visibility frontmatter is KEPT exactly as it is: it is last year's record of what students actually saw, and it is what makes a preview of a reference course show a sensible site rather than everything."
+    },
+    "refusal": {
+      "sentence": "{course} is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
+      "rule": "Every door a deploy can start at refuses a reference course, with this sentence, BEFORE anything is stopped, built or uploaded. {course} is the code a TEACHER reads. The sentence says what the course is and names the way out - the course being taught - and it deliberately does NOT tell the teacher to copy anything: nothing in this release copies pages between courses, and a page taken out by hand arrives locked.",
+      "doesNotDependOnTheLock": "The refusal is gated on the MARKER alone and never on whether the files happen to be locked. An entirely unlocked reference course - one restored from a backup, or one whose folder has been on a second Mac - is refused at every door just the same. Both suites pin it. If the two were ever coupled, unlocking a course would make it deployable, and a deploy that reports success is the worst direction this feature can fail in.",
+      "gateByDirection": "Refuse what would START a deploy; never refuse what STOPS one. Cancelling a scheduled deploy is always allowed, on every surface, however the course is marked - a course marked by hand while an alarm was already set must still be able to have that alarm turned off from the app. Whatever writes the marker cancels the course's scheduled deploys in the same act, and so does the pass that meets a reference course when the working folder is read.",
+      "failClosedInTheShell": "The host-side check in deploy.sh and deploy.ps1 reads course_config.json in PLAIN SHELL - no host python3, which that path does not otherwise need on a product whose first-run promise is 'no Homebrew, no admin rights'. It fails CLOSED: a settings file that is there and cannot be read refuses, saying so. A settings file that is ABSENT is not this check's business - the launcher's own 'course folder not found' answers that - and a malformed one reads as NOT a reference course in the shared Python, because a course nobody can open must not become undeployable by accident.",
+      "exitCode": 1,
+      "whyNotANewExitCode": "deploy.sh states its own invariant: exit 3 means 'a question nobody was there to answer' and nothing else, and every other exit is 0 or 1. A fourth code would have to be read by the scheduled wrapper, by ScheduledPublishOutcome and by the Windows twin before it meant anything. Exit 1, matched on OUTPUT by an app-rules.json -> failureExplanations case, which is how every other launcher failure already becomes a sentence.",
+      "doors": [
+        {
+          "door": "the section window's Deploy button",
+          "chokepoint": "SectionDetailView.deployAndWait, first check",
+          "alsoCaughtBy": "the button is not drawn at all on a reference course"
+        },
+        {
+          "door": "the local assistant's deploy_section, window branch",
+          "chokepoint": "AssistToolRunner.deploySection, before the preview is stopped",
+          "why": "Placed before the stop, not after: a refusal any later kills a preview the teacher was reading, for nothing."
+        },
+        {
+          "door": "the local assistant's deploy_section, headless branch",
+          "chokepoint": "AssistToolRunner.deploySection",
+          "alsoCaughtBy": "AssistToolchainWork.deploy"
+        },
+        {
+          "door": "the deploy approval card's Go button",
+          "chokepoint": "AssistToolRunner.deploySection",
+          "why": "Closed by construction as well: the local assistant is never offered on a reference course, and a window request naming one is refused, so the card cannot be reached with one in hand."
+        },
+        {
+          "door": "deploy_section over MCP",
+          "chokepoint": "AssistToolRunner.run(call:), the write gate",
+          "alsoCaughtBy": "AssistToolRunner.deploySection, AssistToolchainWork.deploy"
+        },
+        {
+          "door": "the local assistant's schedule_deploy",
+          "chokepoint": "AssistToolRunner.scheduleRequest",
+          "alsoCaughtBy": "ScheduledDeploy.problem"
+        },
+        {
+          "door": "schedule_deploy over MCP",
+          "chokepoint": "AssistToolRunner.run(call:), the write gate",
+          "alsoCaughtBy": "AssistToolRunner.scheduleRequest, ScheduledDeploy.problem"
+        },
+        {
+          "door": "the sidebar's Schedule Deploy… sheet",
+          "chokepoint": "ScheduledDeploy.problem, first check",
+          "why": "Refused whatever time was asked for, before 'that time has already passed'."
+        },
+        {
+          "door": "a scheduled deploy already on disk, firing at its moment",
+          "chokepoint": "deploy.sh's host-side check",
+          "why": "The alarm was written before the course was marked. It is also cancelled when the folder is next read, but the Mac may not have been opened since - so the launcher has to refuse on its own."
+        },
+        {
+          "door": "plan_scheduled_deploy (MCP only)",
+          "chokepoint": "AssistToolRunner.scheduleRequest",
+          "why": "Publishes nothing, but it would DESCRIBE a deploy that cannot happen - which teaches a session to try."
+        },
+        {
+          "door": "./deploy.sh <CODE> <N> by hand, to a web host",
+          "chokepoint": "deploy.sh's host-side check",
+          "alsoCaughtBy": "deploy.py's own check"
+        },
+        {
+          "door": "./deploy.sh <CODE> <N> --to-folder <path>",
+          "chokepoint": "deploy.sh's host-side check, and ONLY that",
+          "why": "THE TRAP. The folder publish is done with rsync on the HOST and exits 0 before the container is ever started, so deploy.py is never entered on this path. A refusal written only in the shared Python leaves this door wide open. Same shape as the live-reload defect of 2026-09-05, which is why verify.sh greps both launchers for it."
+        },
+        {
+          "door": "deploy.bat -> deploy.ps1",
+          "chokepoint": "deploy.ps1's host-side check",
+          "why": "Windows' own. Its folder branch never enters the container either."
+        },
+        {
+          "door": "python3 scripts/deploy.py --course … --section …",
+          "chokepoint": "deploy.py, first thing in main()",
+          "why": "Before the 'section directory not found' check, so a course with no build yet is still told the real reason."
+        },
+        {
+          "door": "verify-deploy.sh / verify-deploy.ps1",
+          "chokepoint": "inherits the two above",
+          "why": "A harness rather than a door, and it is where the refusal is proved against the REAL launcher rather than a unit test."
+        }
+      ],
+      "toolsStillAllowed": [
+        {
+          "tool": "rebuild_preview",
+          "why": "A reference course may be previewed - that is how a teacher reads last year's pages with their images and links. It writes into the build tree, never into the course."
+        },
+        {
+          "tool": "back_up_course",
+          "why": "It reads the course and writes a zip into courses/_backups/, outside the course folder. The moment before risky editing is exactly when a copy is wanted, and a restored backup is still a reference course because the marker travels in the config."
+        },
+        {
+          "tool": "cancel_scheduled_deploy",
+          "why": "Gate by DIRECTION: this is the act that STOPS a deploy. Refusing it would strand an alarm set before the course was marked, with no way to turn it off from the app."
+        }
+      ],
+      "howTheWriteGateIsChosen": "On the tool's OWN readOnly flag, never a hand-kept list of names - the same reasoning the window binding uses for gating on the schema. The three exemptions above are DATA rather than code, and a test asserts that the non-readOnly tools minus those three are exactly the set the gate refuses, so adding a tool fails the suite rather than opening a hole. And it is never gated on 'is this the course the session greeted': there is no such binding over MCP, and inventing one here to then except it would remove a capability that is the point of having a reference course at all."
     },
     "wording": {
       "staysAsItIs": "{course} is kept for reference, so it stays as it is.",

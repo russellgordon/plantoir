@@ -1119,6 +1119,13 @@ enum AssistToolRefusal: LocalizedError, Equatable {
     case nothingNamed
     case openEndedPublish(CalendarDay)
     case notInThisBuild(String)
+    /// The course named is kept for reference, so nothing may write to it and
+    /// nothing may deploy it.
+    ///
+    /// A case of its own rather than another `notInThisBuild`, so the contract
+    /// can pin it BY NAME: this is the refusal that must never quietly become
+    /// a success, and a free-text refusal is one nothing can assert on.
+    case keptForReference(String)
 
     var errorDescription: String? {
         switch self {
@@ -1154,6 +1161,11 @@ enum AssistToolRefusal: LocalizedError, Equatable {
                  + "particular pages, name them."
         case .notInThisBuild(let what):
             return what
+        case .keptForReference(let code):
+            // The FROZEN sentence, not the deploy one: this refusal covers
+            // every write, and "it is never deployed" answers a question
+            // nobody asked of "add a class to ICS3U".
+            return ReferenceWording.staysAsItIs(course: code)
         }
     }
 

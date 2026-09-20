@@ -46,10 +46,11 @@ enum ScheduledDeployCleanup {
 
     /// Why a scheduled deploy was turned off, in the words the trail uses.
     ///
-    /// One trail event with three reasons rather than three events: a teacher
-    /// reading the trail wants to know their overnight deploy was turned off
-    /// and by what, and the difference between two ways of removing something
-    /// means nothing to them.
+    /// One trail event with several reasons rather than one event each: a
+    /// teacher reading the trail wants to know their overnight deploy was
+    /// turned off and by what, and the difference between two ways of removing
+    /// something means nothing to them. Three when this was written; four
+    /// since a course could be kept for reference.
     nonisolated enum Reason {
 
         /// The whole course was removed from the sidebar.

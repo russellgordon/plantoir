@@ -257,9 +257,93 @@ final class AssistToolRunner {
         }
     }
 
+    /// Tools that may still be run on a course kept for reference, although
+    /// they are not read-only.
+    ///
+    /// Three of them, each for its own reason, and all three are contract DATA
+    /// (`shared-rules.json` → `referenceCourses.refusal.toolsStillAllowed`)
+    /// rather than a judgement made here — a test asserts that the
+    /// non-`readOnly` tools minus these three are exactly the set the gate
+    /// refuses, so adding a tool fails the suite rather than opening a hole.
+    ///
+    /// * `rebuild_preview` — a reference course may be previewed; that is how
+    ///   a teacher reads last year's pages with their images and links. It
+    ///   writes into the build tree, never into the course.
+    /// * `back_up_course` — it reads the course and writes a zip OUTSIDE it.
+    /// * `cancel_scheduled_deploy` — **gate by direction.** This is the act
+    ///   that STOPS a deploy, and refusing it would strand an alarm set before
+    ///   the course was marked, with no way to turn it off from the app.
+    static let toolsAllowedOnAReferenceCourse: Set<String> = [
+        "rebuild_preview",
+        "back_up_course",
+        "cancel_scheduled_deploy",
+    ]
+
+    /// The two tools that put a site on the web, so the write gate can say
+    /// which of the two refusals applies.
+    ///
+    /// Their `plan_` twins are read-only and so never meet the gate; they are
+    /// refused in `scheduleRequest` instead, with the same deploy sentence, so
+    /// a plan never describes a deploy that cannot happen.
+    static let toolsThatDeploy: Set<String> = ["deploy_section", "schedule_deploy"]
+
+    /// Whether this call would write to a course that is kept for reference.
+    ///
+    /// Gated on the tool's OWN `readOnly` flag, never on a hand-kept list of
+    /// names — the same reasoning the window binding uses for gating on the
+    /// schema, and for the same reason: a list somewhere else is a list
+    /// somebody forgets on the day they add a tool.
+    ///
+    /// **Never gated on "is this the course the session greeted".** There is
+    /// no such binding over MCP — a session is scoped to the working folder —
+    /// and inventing one here in order to except it would take away the
+    /// capability a reference course exists for, which is being READ by a
+    /// Claude or Codex session working in the live course.
+    private func courseKeptForReference(namedIn call: AssistToolCall) -> Course? {
+        guard let tool = definition(named: call.function.name) else {
+            return nil
+        }
+        if tool.readOnly {
+            return nil
+        }
+        if AssistToolRunner.toolsAllowedOnAReferenceCourse.contains(tool.name) {
+            return nil
+        }
+        let code: String = AssistToolRunner.text("course", in: call.argumentValues)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if code.isEmpty {
+            return nil
+        }
+        for candidate in workspace.courses
+        where candidate.code.lowercased() == code.lowercased() && candidate.isKeptForReference {
+            return candidate
+        }
+        return nil
+    }
+
     /// Run one tool.
     func run(call: AssistToolCall) async -> AssistToolOutcome {
         let arguments: [String: Any] = call.argumentValues
+
+        // Nothing writes to a course kept for reference, whichever client is
+        // calling. First, before the tool is dispatched at all: a refusal that
+        // arrives after the work has started is not a refusal.
+        if let reference = courseKeptForReference(namedIn: call) {
+            // Two sentences, chosen by what was ASKED FOR rather than by what
+            // was refused. "It is never deployed" answers a question nobody
+            // asked of "add a class to ICS3U", and "it stays as it is" leaves
+            // a teacher who asked for a deploy wondering whether deploying it
+            // later would work.
+            if AssistToolRunner.toolsThatDeploy.contains(call.function.name) {
+                return AssistToolOutcome.refused(
+                    AssistWording.deployRefusedForAReferenceCourse(course: reference.displayCode)
+                )
+            }
+            return AssistToolOutcome.refused(
+                AssistToolRefusal.keptForReference(reference.displayCode).message
+            )
+        }
+
         switch call.function.name {
         case "list_pages":
             return listPages(arguments)
@@ -1482,6 +1566,14 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(refusal(from: found).message)
         }
 
+        // BEFORE the preview is stopped, deliberately. A refusal placed any
+        // later kills a preview the teacher was reading, for nothing.
+        if located.course.isKeptForReference {
+            return AssistToolOutcome.refused(
+                AssistWording.deployRefusedForAReferenceCourse(course: located.course.displayCode)
+            )
+        }
+
         _ = await stopThePreviewBeforeWriting(
             for: located.course, sectionNumber: located.sectionNumber
         )
@@ -1531,6 +1623,18 @@ final class AssistToolRunner {
         let found: Result<Located, AssistToolRefusal> = locate(arguments)
         guard case .success(let located) = found else {
             return .failure(refusal(from: found))
+        }
+        // Here rather than only in `scheduleDeploy`, so `plan_scheduled_deploy`
+        // refuses too: a plan that DESCRIBES a deploy which cannot happen
+        // teaches a session to go and try it.
+        if located.course.isKeptForReference {
+            return .failure(
+                .notInThisBuild(
+                    AssistWording.deployRefusedForAReferenceCourse(
+                        course: located.course.displayCode
+                    )
+                )
+            )
         }
         let raw: String = text("when", in: arguments)
         guard let when = AssistToolRunner.moment(named: raw) else {

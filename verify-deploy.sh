@@ -376,6 +376,47 @@ else
   skip "no section index.md to remove"
 fi
 
+hdr "A course kept for reference is refused by the REAL launcher, at every destination"
+# The one thing a unit test cannot prove: that the refusal returns BEFORE any
+# network call and before anything reaches a folder. The marker is written by
+# hand, the course is put back exactly as it was afterwards, and no site of any
+# kind is created — that is the whole point.
+#
+# --to-folder is the case that matters most: it publishes host-side with rsync
+# and exits 0 before the container is ever started, so `deploy.py`'s own
+# refusal never runs on that path.
+python3 - "$CONFIG" on <<'PY'
+import json, sys, pathlib
+p = pathlib.Path(sys.argv[1]); d = json.loads(p.read_text())
+d["kept_for_reference"] = True
+p.write_text(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+PY
+rm -rf "$FOLDER_TARGET"; mkdir -p "$FOLDER_TARGET"
+for _case in "--to-folder $FOLDER_TARGET" "--target netlify" "--target cloudflare"; do
+  : >"$WORK/deploy-reference.log"
+  run_deploy "$WORK/deploy-reference.log" "$COURSE" "$SECTION" $_case
+  _rc=$?
+  [ "$_rc" -eq 1 ] && ok "refused ($_case), exit 1" \
+                   || no "exit $_rc for $_case — expected 1"
+  grep -aq "is kept for reference, so it is never deployed" "$WORK/deploy-reference.log" \
+    && ok "it said why, in the sentence the contract pins ($_case)" \
+    || no "the refusal sentence is missing ($_case)"
+done
+if [ -z "$(find "$FOLDER_TARGET" -type f 2>/dev/null)" ]; then
+  ok "nothing reached the folder destination"
+else
+  no "A REFERENCE COURSE WAS PUBLISHED to the folder destination"
+fi
+python3 - "$CONFIG" <<'PY'
+import json, sys, pathlib
+p = pathlib.Path(sys.argv[1]); d = json.loads(p.read_text())
+d.pop("kept_for_reference", None)
+p.write_text(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+PY
+grep -q "kept_for_reference" "$CONFIG" \
+  && no "the marker was left behind on the scratch course" \
+  || ok "the scratch course is back to an ordinary one"
+
 hdr "Result"
 echo "  $PASS passed, $FAIL failed, $SKIP skipped"
 echo

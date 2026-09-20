@@ -17,7 +17,7 @@ import Foundation
 /// for this; being told about it should read like a fact rather than a
 /// warning. No "cannot", no "error", no icon — and never a word about how it
 /// is done.
-enum ReferenceWording {
+nonisolated enum ReferenceWording {
 
     // MARK: - Functions
 

@@ -428,6 +428,11 @@
   "failureExplanations" : {
     "cases" : [
       {
+        "expect" : "ICS3U is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
+        "output" : "❌ ICS3U is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
+        "why" : "The launcher's refusal, lifted out of the log and into the sentence the teacher reads. It matters most for a deploy set to happen on its own: that one runs with the app closed, and without this the app shows the generic 'did not finish' while the real reason sits in a file nobody opens. NO NEW EXIT CODE was added for it - deploy.sh states its own invariant, that exit 3 means 'a question nobody was there to answer' and nothing else, and every other exit is 0 or 1 - so this is matched on OUTPUT, which is how every other launcher failure already becomes a sentence. The line is LIFTED rather than rewritten: the launcher's output already is a sentence a teacher can act on, and a second explanation of one rule is how one rule comes to be said two ways."
+      },
+      {
         "expect" : "Netlify is limiting how often websites can be deployed right now. Try deploying again in about a minute.",
         "output" : "Netlify API error 429: rate limited\nWindow resets at: 12:04 (in ~59s).",
         "why" : "Under 90 seconds reads as 'about a minute' rather than '1 minutes'."

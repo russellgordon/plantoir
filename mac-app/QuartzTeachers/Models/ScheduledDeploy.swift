@@ -275,6 +275,13 @@ enum ScheduledDeploy {
         cloudflareAccountID: String,
         locale: Locale = Locale.current
     ) -> String? {
+        // FIRST, before "that time has already passed": a course kept for
+        // reference is refused whatever time was asked for, and telling the
+        // teacher to pick a different time would send them round a loop that
+        // ends in the same place.
+        if course.isKeptForReference {
+            return AssistWording.deployRefusedForAReferenceCourse(course: course.displayCode)
+        }
         if when <= now {
             return "\(dayAndTimeText(when, locale: locale)) has already passed. Pick a time still to come."
         }

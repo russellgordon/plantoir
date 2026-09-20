@@ -3847,6 +3847,57 @@ will eventually ask why the two are not the same.
   were added FIRST, before anything was touched, precisely so the extraction can
   be done later and proved not to have moved anything.
 
+## A course kept for reference: the write gate, and the seam it is NOT gated on
+
+A reference course is read-only to every tool on both surfaces. The gate is one
+check at the top of `AssistToolRunner.run(call:)`, and three decisions in it are
+worth keeping.
+
+**Gated on the tool's own `readOnly` flag, never on a list of names.** A list
+kept beside the gate is a list somebody forgets on the day they add a tool —
+the same reasoning the window binding uses for gating on the SCHEMA rather than
+on a roster. A test asserts that the non-`readOnly` tools minus the exemptions
+are exactly the set the gate refuses, so adding a tool fails the suite rather
+than opening a hole. Measured with the gate turned off: **ten** write tools
+reached a frozen course, `publish_pages`, `re_date_classes` and
+`undo_last_change` among them.
+
+**Three exemptions, and they are contract DATA** (`shared-rules.json` →
+`referenceCourses.refusal.toolsStillAllowed`), each with its reason:
+`rebuild_preview`, because a reference course may be previewed and the preview
+writes into the build tree rather than into the course; `back_up_course`,
+because it reads the course and writes a zip outside it; and
+`cancel_scheduled_deploy`, which is **gate by DIRECTION** — never refuse the act
+that STOPS a deploy. A course marked by hand while an alarm was already set must
+still be able to have that alarm turned off from the app.
+
+**Never gated on "is this the course the session greeted".** There is no such
+binding over MCP: `--mcp-stdio` takes the WORKING FOLDER, so every course in it
+is reachable and the only thing pointing a session at one course is the
+greeting. Inventing a binding here in order to except it would take away the
+capability a reference course exists for — being READ by a Claude or Codex
+session working in the live course. Do not add one believing one already
+exists.
+
+**Two sentences, chosen by what was asked for.** A deploy is told the course is
+never deployed; every other write is told it stays as it is. "It is never
+deployed" answers a question nobody asked of "add a class to ICS3U", and "it
+stays as it is" leaves somebody who asked for a deploy wondering whether it
+would work later.
+
+**The local thirteen-tool surface did not move a byte**, which is the proof
+decision (j) asked for. `contracts/assist-cases.json` → `toolSchemas`, hashed
+before and after the whole change:
+
+```
+toolSchemas.local  n=13  sha256 = 1b3666437802e1038b7801727abbe0968232c32ff878c3934136aa9dc33689f8
+toolSchemas.mcp    n=32  sha256 = 079594d16aad00a8339a6e2cf560fcb508f98711339e14c0ae07bb97f8e76c84
+```
+
+Both identical afterwards. Nothing here is a routing change, so the 29-probe
+suite does not need re-running: the gate is code in front of the dispatch, and
+the sentences are tool OUTPUT rather than definitions.
+
 ## Further reading in this repository
 
 - [`09-mac-app.md`](09-mac-app.md) — the app the assistant lives in
