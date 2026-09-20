@@ -296,19 +296,57 @@ leave undocumented.
 | Fixing only `setup.sh`, where it was seen to fail | `preview.sh` and `deploy.sh` create the container too, whichever runs first. A teacher whose setup succeeded would fail on their first preview instead. |
 | `mkdir -p "$HOST_COURSES"` ahead of the run, to cover the behaviour change below | It puts a bare `mkdir` in front of the `docker run` and makes the sentence unreachable for the case it is FOR: a folder renamed or on a disconnected disk fails at the `mkdir`, and under `set -e` the teacher gets `mkdir: …: No such file or directory` and nothing else. It would also silently re-make the folder, empty, at a path nobody is looking at any more. A `test -d` and the sentence instead. |
 
-**One behaviour genuinely changes.** `-v` with a missing source silently
-CREATED the directory; `--mount` refuses it (`bind source path does not
-exist`). That is the better answer, and it is why `ensure_build_root` runs
-before the container is created and why the courses folder is checked first.
-Nothing ordinary reaches that check: `setup.sh` makes `courses/` itself,
-`preview.sh` has already refused when `course_config.json` is missing and
-`deploy.sh` when the course folder is. What can still produce the daemon's
-refusal is a folder that moved mid-run, and a builds folder that could not be
-made at all (`ensure_build_root` swallows its own failure by design). Both get
-the sentence in `contracts/app-rules.json` →
-`failureExplanations`, the case matched on `bind source path does not exist` —
-the same words the app's `FailureExplainer` says, so a teacher sees one
-sentence whether they are in Plantoir or at the command line.
+**One behaviour genuinely changes, and it is bigger than it first looks.**
+`-v` with a source the VM had never seen silently CREATED the directory
+*inside the VM* and started; `--mount` refuses it (`bind source path does not
+exist`). That is why `ensure_build_root` runs before the container is created
+and why the courses folder is checked first. Nothing ordinary reaches that
+check: `setup.sh` makes `courses/` itself, `preview.sh` has already refused
+when `course_config.json` is missing and `deploy.sh` when the course folder is.
+
+**A working folder OUTSIDE the home folder is the case that changes for a real
+teacher.** The Colima VM mounts only `$HOME`, so an external drive, a second
+volume or `/Users/Shared` is not there to be handed over:
+
+| | before (`-v`) | after (quoted `--mount`) |
+|---|---|---|
+| outside `$HOME`, path the VM has never been given | rc=0, container starts, `/teaching/courses` is **EMPTY**, the build "succeeds" and produces **nothing** | **rc=125**, `bind source path does not exist`, and the launcher's own sentence |
+
+**Measured 2026-09-19**, virtiofs, on three brand-new random paths under
+`/private/tmp` and once under `/Users/Shared`, `--mount` FIRST every time:
+125, 125, 125, 125; `-v` on the same paths afterwards: 0, 0, 0 — and the
+folder inside the container was empty even though the host folder held a
+marker file. **Order is everything in this measurement**: once `-v` has
+created the path inside the VM, a later `--mount` to the same path succeeds
+(and still mounts empty). An earlier round of this work measured `-v` first
+and concluded the two forms behaved alike; they do not, and the write-ups
+that said so have been corrected.
+
+So this is not a regression to be apologised for. A teacher in that state was
+already building nothing; they now find out, in one sentence, on the first
+run. It is also why the refusal branch says something DIFFERENT from the
+missing-folder branch — see below.
+
+**Two situations, two sentences.** The launchers hold both, side by side in
+the shared block:
+
+- the folder is **not there** (`test -d` fails): *"Check that it has not been
+  moved or renamed, then try again."* No contract case, because this check
+  happens before anything is asked of the builder, so there is no output for
+  the app to recognise.
+- the folder **is** there and the workspace was still refused: *"Check that it
+  is inside your home folder — on your Desktop or in Documents, for example —
+  and not on an external drive or in a shared location, then try again."*
+  This one IS a contract case, matched on `bind source path does not exist`,
+  so the app's `FailureExplainer` says the same words — a teacher sees one
+  sentence whether they are in Plantoir or at the command line.
+
+Two rarer causes share that second output and are deliberately not named in
+it: a folder that moved between the `test -d` and the moment the workspace is
+made, and a builds folder that could not be created at all
+(`ensure_build_root` swallows its own failure by design, so a full disk lands
+here). Naming three causes in one sentence would help nobody; the commonest
+one is named and the raw output is shown underneath it.
 
 **No container is recreated for this change.** Measured: a container made with
 `-v` and one made with `--mount` are indistinguishable in `.Mounts` (they

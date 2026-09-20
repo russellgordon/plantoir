@@ -1905,6 +1905,22 @@ final class SharedRulesContractTests: XCTestCase {
     /// them. Checked against the shell itself: all three must define the
     /// builds root, create it before the container, mount it at its own
     /// absolute path, and recreate a container that was made without it.
+    /// The text of `run_container_with_mount()` in one launcher, from the
+    /// line that opens it to the `}` that closes it, or nil when the function
+    /// is not there at all. Written out by hand rather than with a regular
+    /// expression so that what it matches is plain to read.
+    func containerFunctionBody(of launcherText: String) -> String? {
+        let opening: String = "\nrun_container_with_mount() {\n"
+        guard let start = launcherText.range(of: opening) else {
+            return nil
+        }
+        let rest: Substring = launcherText[start.lowerBound...]
+        guard let end = rest.range(of: "\n}\n") else {
+            return nil
+        }
+        return String(rest[..<end.upperBound])
+    }
+
     func testEveryLauncherCarriesTheSameRule() throws {
         let repository: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -1938,11 +1954,25 @@ final class SharedRulesContractTests: XCTestCase {
             // and the container creation now have the missing-folder guard
             // between them, and pinning them adjacent would make any line
             // added there read as this rule being broken.
-            let makesTheBuildsFolder: Range<String.Index>? = text.range(of: "\n  ensure_build_root\n")
-            let makesTheWorkspace: Range<String.Index>? = text.range(of: "\n  if ! docker run -dit")
+            //
+            // Asked of the FUNCTION's own body, not of the file. Searching the
+            // whole launcher finds `ensure_build_root` in the BUILD OUTPUT
+            // BLOCK's link_course_build_output(), hundreds of lines above, so
+            // the order was satisfied by a call that has nothing to do with
+            // the container — and deleting the real one left this green. That
+            // is measured rather than feared: it is how the first version of
+            // this rewrite behaved.
+            let functionBody: String = try XCTUnwrap(
+                containerFunctionBody(of: text),
+                "\(launcher) has no run_container_with_mount()"
+            )
+            let makesTheBuildsFolder: Range<String.Index>? =
+                functionBody.range(of: "\n  ensure_build_root\n")
+            let makesTheWorkspace: Range<String.Index>? =
+                functionBody.range(of: "\n  if ! docker run -dit")
             XCTAssertNotNil(
                 makesTheBuildsFolder,
-                "\(launcher) never makes the builds folder"
+                "\(launcher) never makes the builds folder in run_container_with_mount()"
             )
             XCTAssertNotNil(
                 makesTheWorkspace,

@@ -39,27 +39,38 @@ struct FailureExplainer {
     }
 
     /// The workspace a section is built in could not be made, because a folder
-    /// it is given was not there.
+    /// it needs could not be handed over.
     ///
     /// Asked LAST, so it can never shadow one of the specific troubles above.
     ///
     /// Matched on `bind source path does not exist` and nothing wider. The
     /// tempting substring was `Error response from daemon`, which would put
-    /// "check that it has not been moved or renamed" in front of a teacher
-    /// whose disk was full or whose engine had restarted mid-run — a
-    /// confident wrong guess, which this file exists not to make.
+    /// this in front of a teacher whose disk was full or whose engine had
+    /// restarted mid-run — a confident wrong guess, which this file exists
+    /// not to make.
     ///
-    /// Until 2026-09-19 the commonest cause was a colon in the working
-    /// folder's name (a teacher typing "Comm Tech 26/27" in Finder gets
-    /// "Comm Tech 26:27" on disk), which the launchers now handle — GitHub
-    /// issue #221. What is left is a folder that moved, was renamed or is on
-    /// a disk that went away, and a builds folder that could not be made.
-    /// The launchers print the same sentence themselves, for a teacher at the
-    /// command line and for a publish launchd ran overnight.
+    /// The commonest cause is a working folder the builder cannot reach at
+    /// all: only the home folder is available to it, so an external drive, a
+    /// second volume or /Users/Shared cannot be handed over. Measured
+    /// 2026-09-19 with paths the virtual machine had never been given, three
+    /// of three: refused. That was NOT refused before — the older form
+    /// created the folder out of sight and built against an empty one,
+    /// reporting success and producing nothing — which is why the sentence
+    /// can name the rule now: something finally enforces it.
+    ///
+    /// Two rarer causes share this output and are deliberately not named: a
+    /// folder that moved between the launcher's own check and the moment the
+    /// workspace is made, and a builds folder that could not be created. The
+    /// launchers print the same sentence themselves, for a teacher at the
+    /// command line and for a publish launchd ran overnight. Until
+    /// 2026-09-19 a colon in the folder's name beat all of them — GitHub
+    /// issue #221.
     static func workspaceCouldNotBeMadeExplanation(in output: String) -> String? {
         if output.contains("bind source path does not exist") {
             return "Plantoir could not get this folder ready for building. "
-                 + "Check that it has not been moved or renamed, then try again."
+                 + "Check that it is inside your home folder — on your Desktop or in "
+                 + "Documents, for example — and not on an external drive or in a "
+                 + "shared location, then try again."
         }
         return nil
     }

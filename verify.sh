@@ -774,6 +774,12 @@ docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 # 8081-8084 here would fail whenever a real preview is running on this Mac —
 # which is the very situation the launcher's own free-port search exists to
 # cope with — and would have read as a fault in the code under test.
+#
+# The `-v` below is DELIBERATE and must stay — it is the only one left in this
+# file. This stand-in exists to be an EXISTING teacher's container, and every
+# one of those was made with `-v`; writing it the new way would quietly stop
+# testing that an updated launcher accepts an old container (measured: it
+# does, both directions, because the two forms produce identical `.Mounts`).
 if docker run -dit --name "$CONTAINER_NAME" \
      -v "$(pwd)/courses":/teaching/courses \
      "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1; then

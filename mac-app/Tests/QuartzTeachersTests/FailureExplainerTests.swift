@@ -66,7 +66,7 @@ final class FailureExplainerTests: XCTestCase {
         let explanation: String? = FailureExplainer.explanation(in: output)
         XCTAssertEqual(
             explanation,
-            "Plantoir could not get this folder ready for building. Check that it has not been moved or renamed, then try again."
+            "Plantoir could not get this folder ready for building. Check that it is inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then try again."
         )
     }
 

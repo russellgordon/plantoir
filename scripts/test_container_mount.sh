@@ -76,9 +76,27 @@ for launcher in setup.sh preview.sh deploy.sh; do
   else
     pass "$launcher names no folder with -v"
   fi
-  SENTENCES="$(printf '%s\n' "$BODY" | grep -c 'say_this_folder_could_not_be_opened')"
-  check "$launcher says the sentence when the folder is gone AND when the workspace is refused" \
-    "2" "$SENTENCES"
+  check "$launcher says the right sentence when the folder is not there" \
+    "1" "$(printf '%s\n' "$BODY" | grep -c 'say_this_folder_is_not_there')"
+  check "$launcher says the OTHER one when the folder is there and cannot be reached" \
+    "1" "$(printf '%s\n' "$BODY" | grep -c 'say_this_folder_cannot_be_reached')"
+  # The builds folder is made INSIDE this function and before the workspace.
+  # Checked against the function's own body rather than the whole file: the
+  # BUILD OUTPUT BLOCK calls ensure_build_root too, hundreds of lines above,
+  # and a check that matched that one would go on passing after the call
+  # here was deleted. This mount form REFUSES a source that does not exist,
+  # so a missing builds root stops the run rather than being created quietly.
+  MAKES_BUILDS_ROOT="$(printf '%s\n' "$BODY" | grep -n '^  ensure_build_root$' | cut -d: -f1 | head -1)"
+  MAKES_WORKSPACE="$(printf '%s\n' "$BODY" | grep -n '^  if ! docker run -dit' | cut -d: -f1 | head -1)"
+  if [ -z "$MAKES_BUILDS_ROOT" ]; then
+    fail "$launcher never makes the builds folder inside run_container_with_mount()"
+  elif [ -z "$MAKES_WORKSPACE" ]; then
+    fail "$launcher does not create the workspace in a form that can refuse"
+  elif [ "$MAKES_BUILDS_ROOT" -lt "$MAKES_WORKSPACE" ]; then
+    pass "$launcher makes the builds folder before the workspace, in this very function"
+  else
+    fail "$launcher makes the builds folder AFTER the workspace, so the run stops on a folder it was about to create"
+  fi
   # The last two lines of the function, in order. Piece A adds a check after
   # the container is created, and a ragged tail here is what makes that a
   # conflict rather than an addition.
@@ -156,24 +174,38 @@ for case in rules['failureExplanations']['cases']:
         print(case['expect'])
         break
 " "$REPO/contracts/app-rules.json")"
-SAID="$(say_this_folder_could_not_be_opened | sed 's/^❌ //' | sed 's/^ *//' | tr '\n' ' ' | sed 's/ *$//')"
+SAID="$(say_this_folder_cannot_be_reached | sed 's/^❌ //' | sed 's/^ *//' | tr '\n' ' ' | sed 's/ *$//')"
 if [ -z "$EXPECTED_SENTENCE" ]; then
   fail "the contract explains nothing for a workspace that could not be made"
 else
   check "word for word as contracts/app-rules.json has it" "$EXPECTED_SENTENCE" "$SAID"
 fi
 
-# Rule 1: the words a teacher reads never name the machinery.
+# Rule 1: the words a teacher reads never name the machinery. BOTH sentences.
 BANNED=""
 for word in container Docker docker mount bind daemon volume image; do
-  if say_this_folder_could_not_be_opened | grep -qi -- "$word"; then
+  if { say_this_folder_cannot_be_reached; say_this_folder_is_not_there; } | grep -qi -- "$word"; then
     BANNED="$BANNED $word"
   fi
 done
 if [ -z "$BANNED" ]; then
-  pass "and says nothing about the machinery"
+  pass "and neither sentence says anything about the machinery"
 else
-  fail "the sentence names the machinery:$BANNED"
+  fail "a sentence names the machinery:$BANNED"
+fi
+
+# Two situations, two sentences. A folder that is not there any more has not
+# been put anywhere the builder cannot reach, and telling its owner to move it
+# into their home folder would send them looking for a folder that is gone.
+if [ "$(say_this_folder_is_not_there)" = "$(say_this_folder_cannot_be_reached)" ]; then
+  fail "both situations say the same thing, so one of them is wrong"
+else
+  pass "a folder that is GONE and a folder that cannot be REACHED are told apart"
+fi
+if say_this_folder_is_not_there | grep -q "home folder"; then
+  fail "the missing-folder sentence names a rule that has nothing to do with it"
+else
+  pass "and the missing-folder sentence does not name the home-folder rule"
 fi
 
 echo

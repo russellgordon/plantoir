@@ -6,7 +6,10 @@ NOT named `test_*.py` on purpose. This needs python-frontmatter AND the image's
 own Node modules, so it can only run inside the container; a `test_` name would
 put it in front of Windows' `PythonToolchainTests`, which discovers every
 `scripts/test_*.py` and would fail on a machine that is not doing anything
-wrong. `verify.sh` mounts and runs it:
+wrong. `verify.sh` runs it in the image. It names the file the way the launchers
+name a folder now (`--mount` with quoted fields, `,readonly`); by hand, the
+shorter form below is the same thing, and is safe here because nothing about
+this path can contain a colon:
 
     docker run --rm \
       -v "$(pwd)/scripts/check_visibility_against_the_site.py:/opt/scripts/check_visibility_against_the_site.py:ro" \
