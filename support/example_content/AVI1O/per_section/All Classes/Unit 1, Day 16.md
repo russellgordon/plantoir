@@ -12,8 +12,9 @@ tags:
 
 1. Writing about your own work: [[Writing About Art]]
 2. Intention versus result — the honest version
-3. Studio time
+3. Studio time: the accompanying page written here — your five studies,
+   and the paragraph on somebody else's
 
 ## Things to do before our next class
 
-- [ ] Finish the writing; hand in next class.
+- [ ] Read the page over once before you hand it in next class.

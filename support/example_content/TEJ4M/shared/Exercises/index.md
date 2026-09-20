@@ -36,6 +36,7 @@ the idea there first; these questions are for making it dependable.
 | [[Sampling and Resolution Practice]] | [[Sampling and Resolution]] · [[Filters and Noise]] |
 | [[Bus and Protocol Practice]] | [[Communication Buses]] |
 | [[Control Systems Practice]] | [[Open and Closed Loop Control]] · [[Feedback and Control Systems]] |
+| [[Boolean Logic Practice]] | [[Design and Build a Logic Block]] |
 | [[State Machine Practice]] | [[State Machines]] |
 | [[Network Design Practice]] | [[Network Design]] · [[Security by Design]] |
 
@@ -45,7 +46,7 @@ one you would not defend at a design review — 120% duty is arithmetic
 that has stopped describing anything real, and a junction at 170 °C is a
 part you have already destroyed on paper.
 
-Two habits, both of which get marked all year. **Carry the units through
+Two habits, both of which get marked all semester. **Carry the units through
 the working**, because that is where mistakes announce themselves.
 **State the assumption you made** whenever a question leaves you room —
 the worst case you designed for, the datasheet figure you used, the

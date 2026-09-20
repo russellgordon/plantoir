@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[Predict the Output]]
 2. The problem of the day: [[The Hundred-Line Problem]] — no shortcuts
-   allowed, at first
+   allowed, at first. Who reaches for a pattern and who keeps typing
+   tells me where this unit has to start
 3. Compare and name it: [[Repetition]]
 4. Read and change: [[Looping Programs]]
 5. Log it in your [[Code Journal]]

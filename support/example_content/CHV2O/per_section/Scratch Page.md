@@ -14,8 +14,8 @@ excludeBacklinks: true
   running.
 - The seminars work better after a document than after a reading. Try
   moving the court decision one period earlier.
-- Ask the clerk's office for the deputation rules in November, not
-  January. They were happy to explain them to a class.
+- Ask the clerk's office for the deputation rules early, not
+  the end of the course. They were happy to explain them to a class.
 
 ## Paste area
 

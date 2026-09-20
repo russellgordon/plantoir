@@ -11,8 +11,8 @@ tags:
 ---
 ## Agenda
 
-1. Review, part one: perspective, irony, structure, and the play act by
-   act
+1. Review, part one: [[Narrative Perspective]], [[Irony]],
+   [[Plot and Structure]], and the play act by act
 2. By request: [[Paraphrase Practice]], [[Quotation and Citation Practice]]
 
 ## Things to do before our next class

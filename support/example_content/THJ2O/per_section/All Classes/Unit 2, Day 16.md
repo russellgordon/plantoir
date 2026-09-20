@@ -12,7 +12,8 @@ tags:
 
 1. Finding good information: [[Where to Find Out]]
 2. Government, extension, associations — and judging a source
-3. Practice: three sources on one question, compared
+3. Three sources on one question, compared out loud — no marks, and it
+   is the rehearsal for the report's source section
 
 ## Things to do before our next class
 

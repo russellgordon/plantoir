@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Predict the Circuit]] — base resistor round
-2. Practise: [[Transistor and Op-Amp Practice]], transistor section
+2. Practise: [[Transistor and Op-Amp Practice]], transistor section.
+   Answers folded on the page, and I circulate — nothing is collected
 3. Consolidate: [[Transistors as Switches]] — saturation, and the drive
    current nobody calculates
 

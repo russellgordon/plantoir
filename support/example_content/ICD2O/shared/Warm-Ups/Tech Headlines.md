@@ -36,4 +36,8 @@ report about it, and list what each one left out.
 ## Curriculum connection
 
 ![[A2.1]]
+
+![[A3.1]]
+
+![[B4.3]]
 %%curriculum-end%%

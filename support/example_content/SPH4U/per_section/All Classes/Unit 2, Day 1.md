@@ -10,7 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 2 — hand in the flying pig analysis
+1. Start of Unit 2, on paper and no notes: a ball is dropped and bounces
+   back to nine tenths of its height. Where did the rest of the energy
+   go, and how would you know? Not collected, not marked — I want to see
+   which idea of energy this class is carrying before I teach against it
 2. [[Work and Energy]] and the work–energy theorem
 3. A spring, a ruler, and a graph: [[Hooke's Law and Simple Harmonic Motion]]
 4. Name it: [[Hooke's Law and Elastic Potential Energy]]

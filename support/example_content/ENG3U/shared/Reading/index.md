@@ -2,6 +2,8 @@
 title: Reading
 publish: true
 created: __CREATED__
+tags:
+  - reading
 enableToc: true
 ---
 ## The play
@@ -26,8 +28,13 @@ enableToc: true
 
 ## Poetry
 
-- [[Poetry Unit]] — eight poems across the year, each read beside
+- [[Poetry Unit]] — eight poems across the course, each read beside
   something else.
+
+## Media
+
+- [[Media Texts We Study]] — a documentary, a podcast, two articles on one
+  event, and a campaign, read as closely as the print texts.
 
 ## Independent study
 

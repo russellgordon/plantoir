@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: equilibrium, pH, and one explanation of a
-   shift in terms of rates
+   shift in terms of rates: [[Equilibrium Practice]] and [[Acids and Bases Practice]]
 2. Mark your own; revision list written
 
 ## Things to do before our next class

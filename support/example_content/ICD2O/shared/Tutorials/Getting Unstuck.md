@@ -29,6 +29,10 @@ not. These moves convert spinning back into thinking:
 5. **Step away.** Ten minutes, water, a walk. The brain keeps working
    without the screen glare, and the bug you could not see at 2:10 is
    often obvious at 2:20. This is a debugging move, not giving up.
+6. **Consult authoritative technical documentation.** When inspecting
+   your code hits a wall, search official Python documentation or
+   language reference guides (as taught in [[Finding Answers Online]])
+   for the exact function syntax, parameter requirements, or error type.
 
 ## Knowing which stuck you are in
 
@@ -45,6 +49,8 @@ you is [[Debugging Is the Job]].
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[B2.2]]
 
 ![[C2.6]]
 %%curriculum-end%%

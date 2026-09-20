@@ -32,8 +32,11 @@ sharing files on purpose, with permissions you set and can explain.
 2. **Install or enable the sharing service** on the machine that will
    hold the files — the built-in file-sharing role on that operating
    system, enabled deliberately rather than left on.
-3. **Create the share**: one folder, named for what it is rather than
-   for who made it.
+3. **Create the share**: one folder on the machine that will hold the
+   files, named for what it is rather than for who made it, with the
+   subfolders you would want a year from now. Moving work onto a
+   network drive is the cheapest backup a small office ever gets —
+   [[Maintenance Utilities]] has the naming and filing habits.
 4. **Set permissions twice**, because most systems have two layers —
    the share permission and the file-system permission. Give your
    partner's account read access first and test it, then read-write and
@@ -82,6 +85,8 @@ sharing files on purpose, with permissions you set and can explain.
 ## Curriculum connection
 
 ![[B3.3]]
+
+![[B1.3]]
 
 ![[B3.2]]
 

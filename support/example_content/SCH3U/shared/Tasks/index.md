@@ -7,13 +7,38 @@ tags:
   - chemistry
   - tasks
 ---
-Five pieces of work that are marked, one per unit and one at the end.
-They are not decoration on top of the tests — they are the places where
-you have to put everything together at once, which is the only place I
-can see whether you can.
+Everything I mark, with the format and the criteria written down before
+you start. These are not decoration on top of the tests — they are the
+places where you have to put everything together at once, which is the
+only place I can see whether you can.
 
-Every task page has the same four parts, and they are in this order for
-a reason.
+One task per unit:
+
+| Task | Unit | The short version |
+| --- | --- | --- |
+| [[The Unknown Substance]] | Matter, trends, and bonding | Identify a coded solid from its behaviour, then weigh the risks and benefits of a real substance |
+| [[The Reaction Prediction]] | Chemical reactions | Take an industrial process apart into equations, and predict what a related reaction would do |
+| [[The Yield Investigation]] | Quantities in reactions | Design a reaction, measure what you actually get, and account for the gap |
+| [[The Water Report]] | Solutions and solubility | Measure what is in local drinking water and compare it with the real standards |
+| [[The Air Quality Brief]] | Gases and the atmosphere | Read one Canadian location's real air quality record, and write the chemistry underneath it |
+
+Running the length of the course:
+
+- [[The Lab Reports]] — four write-ups, one per unit, each written in
+  class in the period after the bench work
+
+At the end:
+
+- [[The Chemistry Showcase]] — present your work and defend it under
+  questioning
+- [[Final Examination]] — three hours, a data booklet, and what you can
+  do without help
+
+[[How Marks Work]] says which of these belong to the seventy per cent
+and which to the thirty.
+
+The five unit task pages all have the same four parts, and they are in
+this order for a reason.
 
 | Part | What it does |
 | --- | --- |
@@ -22,13 +47,12 @@ a reason.
 | **What to hand in** | The deliverable, and the parts it must contain |
 | **How it will be judged** | The criteria, in plain language, before you start |
 
-| Task | Unit | The short version |
-| --- | --- | --- |
-| [[The Unknown Substance]] | Matter, trends, and bonding | Identify a coded solid from its behaviour, then weigh the risks and benefits of a real substance |
-| [[The Reaction Prediction]] | Chemical reactions | Take an industrial process apart into equations, and predict what a related reaction would do |
-| [[The Yield Investigation]] | Quantities in reactions | Design a reaction, measure what you actually get, and account for the gap |
-| [[The Water Report]] | Solutions and solubility | Measure what is in local drinking water and compare it with the real standards |
-| [[The Chemistry Showcase]] | Finale | Present your work and defend it under questioning |
+[[The Lab Reports]] and [[The Chemistry Showcase]] carry criteria of
+their own instead, published the same way and just as far in advance.
+The [[Final Examination]] is the one page shaped differently: what is on
+it, and what each part is worth, is written out rather than set as a
+criteria table, because there is nothing to hand in and nothing to
+revise.
 
 > [!important] Read the criteria table before you start
 > Not after. It tells you what separates a level 3 from a level 4, and
@@ -36,7 +60,11 @@ a reason.
 > end. The pattern is always the same one described in
 > [[How Marks Work]]: level 4 is not more work, it is **judgement**.
 
-## Four rules that apply to all five
+## Four rules that apply to everything here
+
+These four hold on every page listed above, the examination included —
+the only difference there is that there is nothing to hand in, so they
+are applied to a written answer instead of to a report.
 
 **Every number carries a unit and a defensible number of significant
 figures.** This is the year that stops being a formatting preference.
@@ -58,10 +86,10 @@ left on the filter paper lowers the recovered mass, so our yield is an
 underestimate*. A limitation with no direction attached is a gesture,
 not an analysis.
 
-**Say what your work does not settle.** Every task has a section for
-limitations, and it is the section I read most carefully. A confident
-claim with no limits stated is weaker work than a modest claim that
-knows exactly where it stops.
+**Say what your work does not settle.** Every piece of written work
+here, task or lab report, has a section for limitations, and it is the
+section I read most carefully. A confident claim with no limits stated
+is weaker work than a modest claim that knows exactly where it stops.
 
 ## Safety applies to tasks exactly as it does to labs
 

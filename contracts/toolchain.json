@@ -33,11 +33,11 @@
       "replaces": "quartz/components/pages/FolderContent.tsx"
     },
     {
-      "cannotBeDropped": "Without it social preview tags point to Jacky Zhao's domain when baseUrl is empty or unconfigured.",
-      "does": "Constructs OpenGraph and Twitter meta tags using the section's baseUrl when present, or page-relative paths when absent, rather than defaulting to quartz.jzhao.xyz.",
+      "cannotBeDropped": "Two things go at once. Social preview tags point to Jacky Zhao's domain when baseUrl is empty or unconfigured, AND every page falls back to the stock <link rel=\"icon\" href=\"static/icon.png\">, so each of a teacher's class sites wears the Quartz logo in the browser tab.",
+      "does": "Constructs OpenGraph and Twitter meta tags using the section's baseUrl when present, or page-relative paths when absent, rather than defaulting to quartz.jzhao.xyz. Also replaces the single stock favicon link with three page-relative ones — static/favicon.ico (sizes=32x32), static/icon.svg (type=image/svg+xml) and apple-touch-icon pointing at static/apple-touch-icon.png — in that ORDER, because a browser takes the last icon it understands, so the .ico serves older Safari and Windows shortcuts while the SVG wins wherever it is supported. The files themselves are installed by build_site.py from support/favicon.",
       "file": "Head.tsx",
       "replaces": "quartz/components/Head.tsx",
-      "whyNotStock": "Stock Quartz unconditionally constructs og:image as https://${cfg.baseUrl}/static/og-image.png, which points to Jacky Zhao's site when baseUrl defaults to quartz.jzhao.xyz and generates invalid URLs when baseUrl is empty. The patch falls back to page-relative static/og-image.png when baseUrl is not configured."
+      "whyNotStock": "Stock Quartz unconditionally constructs og:image as https://${cfg.baseUrl}/static/og-image.png, which points to Jacky Zhao's site when baseUrl defaults to quartz.jzhao.xyz and generates invalid URLs when baseUrl is empty. The patch falls back to page-relative static/og-image.png when baseUrl is not configured. Stock Quartz also links its own quartz/static/icon.png as the favicon; the patch links Plantoir's icon set instead. If Head.tsx is ever re-derived against a newer Quartz, BOTH behaviours have to come with it — the favicon links are the half with no visible symptom during development, because a local preview looks identical either way."
     },
     {
       "cannotBeDropped": "Without it fast rebuilds and quick retries fail with ENOTEMPTY errors on bind-mounted host filesystems.",
@@ -67,12 +67,33 @@
     {
       "pin": "quartz",
       "value": "v4.5.0",
-      "why": "The site generator, cloned at a tag. The patches below are written against this version; a newer Quartz means re-deriving all five."
+      "why": "The site generator, cloned at a tag. The patches below are written against this version; a newer Quartz means re-deriving all seven."
+    },
+    {
+      "pin": "pythonFrontmatter",
+      "value": "1.3.0",
+      "dockerfileContains": "python-frontmatter==1.3.0",
+      "windowsRuntimeContains": "python-frontmatter==1.3.0",
+      "why": "Reads and REWRITES every page's frontmatter in `build_site.process_frontmatter`, which is what decides whether a teacher's page reaches their students. Pinned 2026-09-18 with issue #140, at the version the image already had — the pin changes nothing about what is installed and everything about what can change underneath it."
+    },
+    {
+      "pin": "pyyaml",
+      "value": "6.0.3",
+      "dockerfileContains": "PyYAML==6.0.3",
+      "windowsRuntimeContains": "PyYAML==6.0.3",
+      "why": "**The pin that decides what a teacher's `publish:` line MEANS.** python-frontmatter parses with PyYAML, which is YAML **1.1** — and that is the only reason `publish: no` and `publish: off` hide a page. PyYAML 7 is expected to move to YAML 1.2, where `no` is the string \"no\" and every such page would be PUBLISHED, silently, in courses already in front of students. `contracts/file-formats.json` -> `pageVisibility` states the 1.1 table as fact and both apps are written against it, so an unpinned upgrade would fail nothing anywhere. Named explicitly rather than left to python-frontmatter's own dependency range, because that range is not ours to control."
+    },
+    {
+      "pin": "pillow",
+      "value": "12.3.0",
+      "dockerfileContains": "Pillow==12.3.0",
+      "windowsRuntimeContains": "Pillow==12.3.0",
+      "why": "Draws each section's social sharing card. Pinned with the other two rather than for a known break: an unpinned image is not reproducible, and a card that renders differently is a thing teachers notice after the fact."
     }
   ],
   "rules": [
     {
-      "detail": "Every file in `Dockerfile`, `patches/`, `scripts/`, `support/` and the launchers.",
+      "detail": "Every file in `Dockerfile`, `patches/`, `scripts/`, `support/`, `contracts/` and the launchers. `contracts/` joined the context when the scripts themselves began reading the contract: the container's only bind mount is `courses`, so a shared rule it cannot see is no rule at all. The cost is accepted deliberately — a contract edit changes the hash and forces a rebuild.",
       "rule": "The image tag is a HASH of the whole build context",
       "why": "A changed recipe means a new tag, a rebuild and a recreated container — with no update checks anywhere, and no way for a teacher to be running a mismatched image."
     },
@@ -85,5 +106,15 @@
       "why": "The order is the whole point of the wrangler pin."
     }
   ],
-  "whyWranglerAtAll": "Cloudflare's upload protocol — BLAKE3 hashing, short-lived JWT, batched uploads — is undocumented enough that reimplementing it would break teachers' publishing whenever Cloudflare changed it. So the image carries their CLI instead."
+  "whyWranglerAtAll": "Cloudflare's upload protocol — BLAKE3 hashing, short-lived JWT, batched uploads — is undocumented enough that reimplementing it would break teachers' publishing whenever Cloudflare changed it. So the image carries their CLI instead.",
+  "recipeFolders": {
+    "folders": [
+      "patches",
+      "scripts",
+      "support",
+      "contracts"
+    ],
+    "note": "The recipe's FOLDERS, as data, because there were four hand-maintained copies of this list and they drifted the moment a fifth folder was added: the mac's WorkspaceModel.refreshToolchain, Windows' ToolchainMirror.RecipeFolders, the marketing screenshot harness (website/shots/capture.py), and the Dockerfile. Six carriers are pinned against this list in total, the other two being mac-app/project.yml and windows-app/Plantoir/Plantoir.csproj, which bundle and ship the folders; the Dockerfile is pinned in BOTH directions, since a COPY the contract does not list reproduces the original failure exactly. capture.py's own docstring said 'keep them in step' and it was the one that did not — which broke the demo workspace outright rather than subtly, because it copies the Dockerfile that expects the folder it did not copy.",
+    "why": "A .toolchain/ holding the new Dockerfile without the new folder is not stale, it is UNBUILDABLE: `docker buildx build` fails on the missing COPY, and preview.sh's friendly 'missing the build recipe' message cannot fire because the Dockerfile is present."
+  }
 }

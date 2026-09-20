@@ -18,8 +18,8 @@ Copy that into your notebook — the boxes here are printed, not clickable.
 Because the marks are the record of your thinking, and you will need them
 in a seminar with the book open and no time to search. Digital annotation
 is fine if the text is digital, but the habit is the same:
-[[Close Reading]] explains it, and the marks are assessed in
-[[The Seminar]].
+[[Close Reading]] explains it, and the marks are where the passages you
+bring to [[The Seminar]] come from.
 
 ## The book of your own
 

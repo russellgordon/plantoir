@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. **[[The Civic Action Project]], period 1 of 10:** choosing the issue
-2. Testing that it is specific enough to act on
+1. **[[The Civic Action Project]], period 1 of 10:** choosing the issue, with the criteria table read first
+2. Each group's issue said aloud in one sentence, and the class says whether it is specific enough to act on. No marks; it saves a week
 3. The local decision calendar: what is being decided near here, and when
 
 ## Things to do before our next class

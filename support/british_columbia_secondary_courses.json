@@ -1,0 +1,470 @@
+{
+  "MMA--09": {
+    "formal_name": "Mathematics 9",
+    "short_name": "Mathematics"
+  },
+  "MFMP-10": {
+    "formal_name": "Foundations of Mathematics and Pre-calculus 10",
+    "short_name": "Foundations & Pre-Calculus"
+  },
+  "MWPM-10": {
+    "formal_name": "Workplace Mathematics 10",
+    "short_name": "Workplace Math"
+  },
+  "MFOM-11": {
+    "formal_name": "Foundations of Mathematics 11",
+    "short_name": "Foundations of Math"
+  },
+  "MPREC11": {
+    "formal_name": "Pre-calculus 11",
+    "short_name": "Pre-calculus"
+  },
+  "MWPM-11": {
+    "formal_name": "Workplace Mathematics 11",
+    "short_name": "Workplace Math"
+  },
+  "MHOM-11": {
+    "formal_name": "History of Mathematics 11",
+    "short_name": "History of Math"
+  },
+  "MMACS11": {
+    "formal_name": "Computer Science 11",
+    "short_name": "Computer Science"
+  },
+  "MAPM-12": {
+    "formal_name": "Apprenticeship Mathematics 12",
+    "short_name": "Apprenticeship Math"
+  },
+  "MCALC12": {
+    "formal_name": "Calculus 12",
+    "short_name": "Calculus"
+  },
+  "MFOM-12": {
+    "formal_name": "Foundations of Mathematics 12",
+    "short_name": "Foundations of Math"
+  },
+  "MGEOM12": {
+    "formal_name": "Geometry 12",
+    "short_name": "Geometry"
+  },
+  "MPREC12": {
+    "formal_name": "Pre-calculus 12",
+    "short_name": "Pre-calculus"
+  },
+  "MSTAT12": {
+    "formal_name": "Statistics 12",
+    "short_name": "Statistics"
+  },
+  "MMACS12": {
+    "formal_name": "Computer Science 12",
+    "short_name": "Computer Science"
+  },
+  "MADIT09": {
+    "formal_name": "Information and Communications Technologies 9",
+    "short_name": "ICT 9"
+  },
+  "MCST-10": {
+    "formal_name": "Computer Studies 10",
+    "short_name": "Computer Studies"
+  },
+  "MADCS10": {
+    "formal_name": "Computer Studies 10",
+    "short_name": "Computer Studies"
+  },
+  "MMEDD10": {
+    "formal_name": "Media Design 10",
+    "short_name": "Media Design"
+  },
+  "MWBDV10": {
+    "formal_name": "Web Development 10",
+    "short_name": "Web Development"
+  },
+  "MCMPR11": {
+    "formal_name": "Computer Programming 11",
+    "short_name": "Computer Programming"
+  },
+  "MCINF11": {
+    "formal_name": "Computer Information Systems 11",
+    "short_name": "Computer Information Systems"
+  },
+  "MDCOM11": {
+    "formal_name": "Digital Communications 11",
+    "short_name": "Digital Communications"
+  },
+  "MGRPR11": {
+    "formal_name": "Graphic Production 11",
+    "short_name": "Graphic Production"
+  },
+  "MMEDD11": {
+    "formal_name": "Media Design 11",
+    "short_name": "Media Design"
+  },
+  "MCMPR12": {
+    "formal_name": "Computer Programming 12",
+    "short_name": "Computer Programming"
+  },
+  "MCINF12": {
+    "formal_name": "Computer Information Systems 12",
+    "short_name": "Computer Information Systems"
+  },
+  "MDMD-12": {
+    "formal_name": "Digital Media Development 12",
+    "short_name": "Digital Media Development"
+  },
+  "MGRPR12": {
+    "formal_name": "Graphic Production 12",
+    "short_name": "Graphic Production"
+  },
+  "MMEDD12": {
+    "formal_name": "Media Design 12",
+    "short_name": "Media Design"
+  },
+  "MADDR09": {
+    "formal_name": "Drafting 9",
+    "short_name": "Drafting"
+  },
+  "MADER09": {
+    "formal_name": "Electronics and Robotics 9",
+    "short_name": "Electronics & Robotics"
+  },
+  "MADM-09": {
+    "formal_name": "Metalwork 9",
+    "short_name": "Metalwork"
+  },
+  "MADPT09": {
+    "formal_name": "Power Technology 9",
+    "short_name": "Power Technology"
+  },
+  "MADW-09": {
+    "formal_name": "Woodwork 9",
+    "short_name": "Woodwork"
+  },
+  "MADT-09": {
+    "formal_name": "Technology Education 9",
+    "short_name": "Technology Education"
+  },
+  "MTDRF10": {
+    "formal_name": "Drafting 10",
+    "short_name": "Drafting"
+  },
+  "MTEAR10": {
+    "formal_name": "Electronics and Robotics 10",
+    "short_name": "Electronics & Robotics"
+  },
+  "MTMET10": {
+    "formal_name": "Metalwork 10",
+    "short_name": "Metalwork"
+  },
+  "MTPOW10": {
+    "formal_name": "Power Technology 10",
+    "short_name": "Power Technology"
+  },
+  "MTEXP10": {
+    "formal_name": "Technology Explorations 10",
+    "short_name": "Technology Explorations"
+  },
+  "MWWK-10": {
+    "formal_name": "Woodwork 10",
+    "short_name": "Woodwork"
+  },
+  "MTAUT11": {
+    "formal_name": "Automotive Technology 11",
+    "short_name": "Automotive Technology"
+  },
+  "MTDRF11": {
+    "formal_name": "Drafting 11",
+    "short_name": "Drafting"
+  },
+  "MTEL-11": {
+    "formal_name": "Electronics 11",
+    "short_name": "Electronics"
+  },
+  "MTEK-11": {
+    "formal_name": "Electronics 11",
+    "short_name": "Electronics"
+  },
+  "MENR-11": {
+    "formal_name": "Engineering 11",
+    "short_name": "Engineering"
+  },
+  "MTMET11": {
+    "formal_name": "Metalwork 11",
+    "short_name": "Metalwork"
+  },
+  "MTROB11": {
+    "formal_name": "Robotics 11",
+    "short_name": "Robotics"
+  },
+  "MWWK-11": {
+    "formal_name": "Woodwork 11",
+    "short_name": "Woodwork"
+  },
+  "MTAMJ12": {
+    "formal_name": "Art Metal and Jewellery 12",
+    "short_name": "Art Metal & Jewellery"
+  },
+  "MTAUT12": {
+    "formal_name": "Automotive Technology 12",
+    "short_name": "Automotive Technology"
+  },
+  "MTDRF12": {
+    "formal_name": "Drafting 12",
+    "short_name": "Drafting"
+  },
+  "MTEL-12": {
+    "formal_name": "Electronics 12",
+    "short_name": "Electronics"
+  },
+  "MTEK-12": {
+    "formal_name": "Electronics 12",
+    "short_name": "Electronics"
+  },
+  "MTED-12": {
+    "formal_name": "Engine and Drivetrain 12",
+    "short_name": "Engine & Drivetrain"
+  },
+  "MENR-12": {
+    "formal_name": "Engineering 12",
+    "short_name": "Engineering"
+  },
+  "MTFAC12": {
+    "formal_name": "Furniture and Cabinetry 12",
+    "short_name": "Furniture & Cabinetry"
+  },
+  "MTICD12": {
+    "formal_name": "Industrial Coding and Design 12",
+    "short_name": "Industrial Coding & Design"
+  },
+  "MTMCW12": {
+    "formal_name": "Machining and Welding 12",
+    "short_name": "Machining & Welding"
+  },
+  "MTMEC12": {
+    "formal_name": "Mechatronics 12",
+    "short_name": "Mechatronics"
+  },
+  "MTMET12": {
+    "formal_name": "Metalwork 12",
+    "short_name": "Metalwork"
+  },
+  "MTROV12": {
+    "formal_name": "Remotely Operated Vehicles and Drones 12",
+    "short_name": "ROVs & Drones"
+  },
+  "MTROB12": {
+    "formal_name": "Robotics 12",
+    "short_name": "Robotics"
+  },
+  "MWWK-12": {
+    "formal_name": "Woodwork 12",
+    "short_name": "Woodwork"
+  },
+  "MADEM10": {
+    "formal_name": "Entrepreneurship and Marketing 10",
+    "short_name": "Entrepreneurship & Marketing"
+  },
+  "MAC--11": {
+    "formal_name": "Accounting 11",
+    "short_name": "Accounting"
+  },
+  "MMAP-11": {
+    "formal_name": "Marketing and Promotion 11",
+    "short_name": "Marketing & Promotion"
+  },
+  "MTRM-11": {
+    "formal_name": "Tourism 11",
+    "short_name": "Tourism"
+  },
+  "MACC-12": {
+    "formal_name": "Accounting 12",
+    "short_name": "Accounting"
+  },
+  "MBCA-12": {
+    "formal_name": "Business Computer Applications 12",
+    "short_name": "Business Computer Applications"
+  },
+  "MECOM12": {
+    "formal_name": "E-Commerce 12",
+    "short_name": "E-Commerce"
+  },
+  "MEC--12": {
+    "formal_name": "Economics 12",
+    "short_name": "Economics"
+  },
+  "MENT-12": {
+    "formal_name": "Entrepreneurship 12",
+    "short_name": "Entrepreneurship"
+  },
+  "MFAC-12": {
+    "formal_name": "Financial Accounting 12",
+    "short_name": "Financial Accounting"
+  },
+  "MTRM-12": {
+    "formal_name": "Tourism 12",
+    "short_name": "Tourism"
+  },
+  "MCUL-10": {
+    "formal_name": "Culinary Arts 10",
+    "short_name": "Culinary Arts"
+  },
+  "MFAMS10": {
+    "formal_name": "Family and Society 10",
+    "short_name": "Family & Society"
+  },
+  "MFOOD10": {
+    "formal_name": "Food Studies 10",
+    "short_name": "Food Studies"
+  },
+  "MTXT-10": {
+    "formal_name": "Textiles 10",
+    "short_name": "Textiles"
+  },
+  "MCULA11": {
+    "formal_name": "Culinary Arts 11",
+    "short_name": "Culinary Arts"
+  },
+  "MFOOD11": {
+    "formal_name": "Food Studies 11",
+    "short_name": "Food Studies"
+  },
+  "MIFR-11": {
+    "formal_name": "Interpersonal and Family Relationships 11",
+    "short_name": "Family Relationships"
+  },
+  "MTXT-11": {
+    "formal_name": "Textiles 11",
+    "short_name": "Textiles"
+  },
+  "MCDAC12": {
+    "formal_name": "Child Development and Caregiving 12",
+    "short_name": "Child Development"
+  },
+  "MCULA12": {
+    "formal_name": "Culinary Arts 12",
+    "short_name": "Culinary Arts"
+  },
+  "MFIND12": {
+    "formal_name": "Fashion Industry 12",
+    "short_name": "Fashion Industry"
+  },
+  "MFOOD12": {
+    "formal_name": "Food Studies 12",
+    "short_name": "Food Studies"
+  },
+  "MHLE-12": {
+    "formal_name": "Housing and Living Environments 12",
+    "short_name": "Housing & Living Environments"
+  },
+  "MTXT-12": {
+    "formal_name": "Textiles 12",
+    "short_name": "Textiles"
+  },
+  "MSC--09": {
+    "formal_name": "Science 9",
+    "short_name": "Science"
+  },
+  "MSC--10": {
+    "formal_name": "Science 10",
+    "short_name": "Science"
+  },
+  "MLFSC11": {
+    "formal_name": "Life Sciences 11",
+    "short_name": "Life Sciences"
+  },
+  "MCH--11": {
+    "formal_name": "Chemistry 11",
+    "short_name": "Chemistry"
+  },
+  "MPH--11": {
+    "formal_name": "Physics 11",
+    "short_name": "Physics"
+  },
+  "MESC-11": {
+    "formal_name": "Earth Sciences 11",
+    "short_name": "Earth Sciences"
+  },
+  "MATSC12": {
+    "formal_name": "Anatomy and Physiology 12",
+    "short_name": "Anatomy & Physiology"
+  },
+  "MCH--12": {
+    "formal_name": "Chemistry 12",
+    "short_name": "Chemistry"
+  },
+  "MPH--12": {
+    "formal_name": "Physics 12",
+    "short_name": "Physics"
+  },
+  "MGEOL12": {
+    "formal_name": "Geology 12",
+    "short_name": "Geology"
+  },
+  "MEN--09": {
+    "formal_name": "English Language Arts 9",
+    "short_name": "English 9"
+  },
+  "MEN--10": {
+    "formal_name": "English Language Arts 10",
+    "short_name": "English 10"
+  },
+  "MENST11": {
+    "formal_name": "English First Peoples 11",
+    "short_name": "English First Peoples 11"
+  },
+  "MNMD-11": {
+    "formal_name": "New Media 11",
+    "short_name": "New Media"
+  },
+  "MLST-11": {
+    "formal_name": "Literary Studies 11",
+    "short_name": "Literary Studies"
+  },
+  "MCMPS11": {
+    "formal_name": "Composition 11",
+    "short_name": "Composition"
+  },
+  "MCWR-11": {
+    "formal_name": "Creative Writing 11",
+    "short_name": "Creative Writing"
+  },
+  "MSPLG11": {
+    "formal_name": "Spoken Language 11",
+    "short_name": "Spoken Language"
+  },
+  "MENST12": {
+    "formal_name": "English First Peoples 12",
+    "short_name": "English First Peoples 12"
+  },
+  "MENGL12": {
+    "formal_name": "English Studies 12",
+    "short_name": "English Studies"
+  },
+  "MSS--09": {
+    "formal_name": "Social Studies 9",
+    "short_name": "Social Studies"
+  },
+  "MSS--10": {
+    "formal_name": "Social Studies 10",
+    "short_name": "Social Studies"
+  },
+  "MEPO-12": {
+    "formal_name": "Explorations in Social Studies 11",
+    "short_name": "Explorations in Social Studies"
+  },
+  "MWH-12": {
+    "formal_name": "20th Century World History 12",
+    "short_name": "World History"
+  },
+  "MINST12": {
+    "formal_name": "BC First Peoples 12",
+    "short_name": "BC First Peoples"
+  },
+  "MPGEO12": {
+    "formal_name": "Physical Geography 12",
+    "short_name": "Physical Geography"
+  },
+  "MLST-12": {
+    "formal_name": "Law Studies 12",
+    "short_name": "Law Studies"
+  }
+}

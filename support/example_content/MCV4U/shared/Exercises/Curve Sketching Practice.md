@@ -97,3 +97,21 @@ checklist; let the chart do the remembering.
 > $0 \leq t < 2$ and $3 < t < 4$. The sign chart from
 > [[Curve Sketching]] and the agreement table from
 > [[Motion on a Line]] are the same tool wearing different labels.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B1.1]]
+
+![[B1.2]]
+
+![[B1.3]]
+
+![[B1.4]]
+
+![[B1.5]]
+
+![[B2.1]]
+
+![[B2.2]]
+%%curriculum-end%%

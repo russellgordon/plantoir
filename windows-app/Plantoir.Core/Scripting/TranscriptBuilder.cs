@@ -25,7 +25,42 @@ public sealed class TranscriptBuilder
     public IReadOnlyList<string> Lines => _lines;
 
     /// <summary>The unterminated line under construction.</summary>
-    public string CurrentLine => _currentLine.ToString();
+    public string CurrentLine => VisibleCurrentLine;
+
+    /// <summary>
+    /// The line under construction, unless it is machinery.
+    ///
+    /// <para>A <c>PLANTOIR_HEALTH:</c> line is a JSON blob, and a teacher
+    /// reads this console (CLAUDE.md rule 1). Nothing is lost by hiding it:
+    /// <c>scripts/site_health.py</c> prints the human sentence separately,
+    /// beside the marker, and that sentence is left alone.</para>
+    ///
+    /// <para>Hidden here rather than only at <see cref="PushLine"/> because a
+    /// pseudo console hands over whatever bytes are ready — the marker and its
+    /// payload sit in the current line for as long as it takes the rest of the
+    /// line to arrive, and the console renders it in the meantime.</para>
+    /// </summary>
+    private string VisibleCurrentLine
+    {
+        get
+        {
+            string line = _currentLine.ToString();
+            return CarriesTheHealthMarker(line) ? "" : line;
+        }
+    }
+
+    /// <summary>
+    /// Whether this line is a health finding's machine-readable half.
+    ///
+    /// <para>The whole line goes, not just the marker onward: the launchers can
+    /// glue the marker to the tail of their own chatter, and what precedes it
+    /// there is progress noise rather than a sentence a teacher needs. The
+    /// findings themselves are never at risk — <c>ScriptRunner.ReceiveOutput</c>
+    /// hands the RAW text to <c>CollectHealthFindings</c>, and only then to
+    /// this builder.</para>
+    /// </summary>
+    private static bool CarriesTheHealthMarker(string line) =>
+        line.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal);
 
     /// <summary>Monotonic counter bumped on every append — cheap change detection.</summary>
     public long Version => _version;
@@ -51,8 +86,15 @@ public sealed class TranscriptBuilder
 
     private void PushLine()
     {
-        _lines.Add(_currentLine.ToString());
+        string line = _currentLine.ToString();
         _currentLine.Clear();
+        // Dropped rather than retained-and-filtered-on-read, so it cannot reach
+        // the problem report either: SaveRunTranscript copies Lines wholesale
+        // into the report store, and a payload a teacher may not see is not one
+        // support should be handed. The trail keeps the check's NAME, which is
+        // the part anybody reading the report back would search for.
+        if (CarriesTheHealthMarker(line)) return;
+        _lines.Add(line);
         if (_lines.Count > MaximumRetainedLines)
             _lines.RemoveRange(0, _lines.Count - MaximumRetainedLines);
     }
@@ -63,8 +105,9 @@ public sealed class TranscriptBuilder
         {
             if (_cachedDisplayText is null)
             {
-                var all = _currentLine.Length > 0
-                    ? _lines.Append(_currentLine.ToString())
+                string current = VisibleCurrentLine;
+                var all = current.Length > 0
+                    ? _lines.Append(current)
                     : _lines;
                 _cachedDisplayText = string.Join("\n", all);
             }
@@ -77,7 +120,7 @@ public sealed class TranscriptBuilder
     {
         var collected = new List<string>();
         int budget = maximumCharacters;
-        string current = _currentLine.ToString();
+        string current = VisibleCurrentLine;
         if (current.Length > 0) { collected.Add(current); budget -= current.Length + 1; }
         for (int i = _lines.Count - 1; i >= 0 && budget > 0; i--)
         {

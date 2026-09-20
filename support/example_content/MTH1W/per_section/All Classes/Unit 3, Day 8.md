@@ -19,5 +19,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish collecting your [[A Data Story]] data — workday next class.
+- [ ] Bring what you have collected for [[A Data Story]] — next class is
+      a working period for finishing it.
 - [ ] Journal: where your prediction and the simulation disagreed.

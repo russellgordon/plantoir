@@ -10,9 +10,9 @@ tags:
 it, or nobody in particular?
 
 This is the last seminar of the year, and deliberately the one you could not
-have argued in September. Since then you have performed for a room, watched a
-room perform, improvised alone with your eyes shut, and danced somewhere that
-was not this studio. All of that is evidence.
+have argued at the start of the course. Since then you have performed for a
+room, watched a room perform, improvised alone with your eyes shut, and
+danced somewhere that was not this studio. All of that is evidence.
 
 ## Prepare
 
@@ -20,7 +20,7 @@ Bring **two** moments from your own year: one where the dancing plainly had an
 audience, and one where it plainly did not. Thirty seconds on each. Then bring
 one moment from outside this course — a wedding, a gym, a kitchen, a screen, a
 stage — and be ready to say who you think it was for. Look in
-[[Your Movement Journal]] rather than remembering cold. September is further
+[[Your Movement Journal]] rather than remembering cold. The first weeks are further
 away than it feels.
 
 ## Four positions, and they do not agree

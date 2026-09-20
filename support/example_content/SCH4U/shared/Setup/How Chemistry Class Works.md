@@ -91,7 +91,7 @@ difference between a level 3 and a level 4 all semester — see
 
 Turn up, bring your data, argue with each other, and say when you do not
 follow something. The last one is the only one people find hard, and it
-is the one that changes your mark most.
+is the one that changes what you can do by the most.
 
 > [!note] Missing a class
 > Read the class page — the agenda links everything we used, so you can

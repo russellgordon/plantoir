@@ -40,6 +40,10 @@ a real week teaches more than five changes announced on a Sunday.
 > changing it. Do the same here: measure, decide, act, and check — which
 > is [[The Control Process]] applied to a week of your own life.
 
+The decision section is written in class, and it is marked against the
+four rows on [[The Management Portfolio]] — the same four rows as every
+other entry.
+
 %%curriculum-start%%
 ## Curriculum connection
 

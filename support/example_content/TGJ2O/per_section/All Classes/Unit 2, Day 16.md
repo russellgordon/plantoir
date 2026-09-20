@@ -18,5 +18,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish your captions and your recap draft — tomorrow we file.
+- [ ] Finish your captions and your recap draft — three more classes on
+      the reel and the story, then deadline day.
 - [ ] Journal: the cut you fought hardest to make shorter.

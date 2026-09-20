@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 4 — surface area, and why size changes everything
-2. [[Animal Systems Overview]]: the organising idea
-3. [[The Digestive System]] — mechanical and chemical, in that order
-4. Hand in [[Genetic Counselling Brief]]
+1. Diagnostic, five minutes and not marked: why can a flatworm manage
+   without lungs when you cannot? Your answer, before any teaching
+2. Start of Unit 4 — surface area, and why size changes everything
+3. [[Animal Systems Overview]]: the organising idea
+4. [[The Digestive System]] — mechanical and chemical, in that order
+5. Hand in [[Genetic Counselling Brief]]
 
 ## Things to do before our next class
 

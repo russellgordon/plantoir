@@ -124,7 +124,9 @@ is what [[The Unknown Substance]] asks of you.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B3.4]]
+![[B2.1]]
 
 ![[B2.5]]
+
+![[B3.4]]
 %%curriculum-end%%

@@ -53,4 +53,8 @@ talking to us after the first issue.
 ![[C2.4]]
 
 ![[A3.1]]
+
+![[A3.2]]
+
+![[A3.3]]
 %%curriculum-end%%

@@ -11,9 +11,9 @@ tags:
 ---
 ## Agenda
 
-1. Review, part three: explicit and recursive forms, arithmetic and
-   geometric series, and a financial question with the solver entries
-   stated
+1. Review, part three: explicit and recursive forms, one binomial
+   expanded from Pascal's triangle, arithmetic and geometric series, and
+   a financial question with the solver entries stated
 2. Then the connections map, redrawn from memory
 3. Format walk-through: what each part of [[Final Examination]] asks
    for, and how long to spend

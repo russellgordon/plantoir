@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Studio time: painting
-2. Conferences
-3. Launch: [[The Media Trials]]
+1. Launch: [[The Media Trials]]
+2. Studio time: the same subject painted a second time, differently,
+   with conferences as I come round
+3. Last fifteen minutes: the painting trial annotated
 
 ## Things to do before our next class
 
-- [ ] Annotate your painting trial.
+- [ ] Bring a jar and a rag for the watercolour.

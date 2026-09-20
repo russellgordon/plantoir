@@ -17,7 +17,7 @@ rates — plans, jobs, prices — the decision point is the intersection
 of two lines: [[Break-Even]] wearing work clothes.
 
 The second answer is about transfer: you may never complete a square
-after June, but you will spend a lifetime modelling messy situations,
+after this course, but you will spend a lifetime modelling messy situations,
 checking claims before trusting them, and arguing from constraints.
 That training happens here whether the algebra resurfaces or not.
 

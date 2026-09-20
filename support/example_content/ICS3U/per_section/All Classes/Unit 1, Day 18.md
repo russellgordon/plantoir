@@ -17,12 +17,16 @@ tags:
 3. Fix exactly one thing you watched them stumble over
 4. Read it: [[Writing Code Others Can Read]] — names, comments, and the
    stranger who inherits your file
-5. Hand in [[The Helper Script]] — day 4 — then check your journal
-   against
+5. Hand in [[The Helper Script]] — day 4
+6. Last ten minutes, in your [[Code Journal]]: the hand-off entry,
+   written while it is fresh — the moment your partner hesitated, and
+   what you changed. This is the entry the task's marks rest on, so it
+   is written here, not at home. Then check it against
    [[Journal Checklist]]
 
 ## Things to do before our next class
 
-- [ ] Journal: the moment your partner hesitated, and what you changed.
+- [ ] Bring one thing you wished you could repeat a hundred times
+      without typing it a hundred times.
 - [ ] Bring one thing you wished you could repeat a hundred times
       without typing it a hundred times.

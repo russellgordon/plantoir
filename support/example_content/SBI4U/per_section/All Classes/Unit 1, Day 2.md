@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Food tests: which macromolecule is in which sample?
+1. Diagnostic food tests: which macromolecule is in which sample? No
+   marks on this — it tells me what Grade 11 left you with, and Day 3
+   starts from whatever it says
 2. [[Carbohydrates and Lipids]] — one bond's orientation, two fates
 3. [[Nucleic Acids]] and why DNA stores while RNA works
 4. Practise: [[Biochemistry Practice]], first two

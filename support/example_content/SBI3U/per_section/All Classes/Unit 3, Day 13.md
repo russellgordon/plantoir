@@ -17,5 +17,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Hand in [[Genetic Counselling Brief]] next class.
+- [ ] Three working periods left on [[Genetic Counselling Brief]]; it is
+      handed in on the first day of Unit 4.
 - [ ] Journal: where would you draw the line on germline editing?

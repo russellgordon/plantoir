@@ -18,4 +18,3 @@ tags:
 ## Things to do before our next class
 
 - [ ] Finish the estimates by both methods.
-- [ ] Choose your data set for [[Population Study]].

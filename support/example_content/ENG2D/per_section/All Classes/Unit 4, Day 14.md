@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Comparison practice: one paragraph on two texts, using one idea
-2. In pairs: mark each other's for whether the comparison is doing work
+1. Comparison practice: one paragraph on two texts, using one idea: [[The Literary Essay]]
+2. In pairs: mark each other's for whether the comparison is doing work: [[Paragraph Practice]]
 
 ## Things to do before our next class
 

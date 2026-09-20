@@ -216,9 +216,11 @@ For getting the arrangement onto paper properly, see
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.12]]
+
 ![[B2.3]]
 
-![[C2.3]]
+![[B3.5]]
 
-![[A1.12]]
+![[C2.3]]
 %%curriculum-end%%

@@ -48,7 +48,7 @@ work.
 Present your organization in ninety seconds, then argue the *opposite*
 side to the one your evidence supports — you will find out fast whether
 you understood it. Close by naming what would have to be true, and
-measurable, for you to change your verdict by June.
+measurable, for you to change your verdict by the end of the course.
 [[Arguing About Sustainability]] and [[Strategies and Whether They Work]]
 take this further; your organization goes into [[The Resource Investigation]].
 

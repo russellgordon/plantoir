@@ -26,11 +26,31 @@ The image is layered as follows (in order):
 1. **Base: `python:3.11-slim`** — Debian slim with Python 3.11. Python is
    needed for the four orchestration scripts; 3.11 also provides `zoneinfo`
    for timezone-correct timestamps.
-2. **`pip install python-frontmatter Pillow`** — the two Python
-   dependencies. `python-frontmatter` parses and rewrites the YAML
+2. **`pip install python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0`** —
+   the Python dependencies, all three PINNED since 2026-09-18 (issue #140) at
+   the versions the image already carried, so the pin changed nothing about
+   what is installed. `python-frontmatter` parses and rewrites the YAML
    frontmatter block at the top of each Markdown file (used heavily for the
    per-section `publish`/`created` machinery); Pillow draws each section's
    social sharing card.
+
+   **PyYAML is named explicitly even though python-frontmatter pulls it in,
+   and that is the point of the pin.** python-frontmatter parses with PyYAML,
+   which implements YAML **1.1** — and that is the only reason `publish: no`
+   and `publish: off` hide a page rather than being the strings "no" and
+   "off". PyYAML 7 is expected to move to YAML 1.2, where those pages would be
+   PUBLISHED, silently, in courses already in front of students.
+   `contracts/file-formats.json` → `pageVisibility` states the 1.1 table as
+   fact and both apps are written against it, so an unpinned upgrade would
+   fail nothing anywhere. The reasoning is in
+   [08 → Whether students see a page](08-course-config-reference.md#whether-students-see-a-page),
+   and the pins are in `contracts/toolchain.json` → `pins`. **The same three
+   are pinned in `windows-app/Vendor/fetch-runtime.ps1`** (since 2026-09-19),
+   which builds the runtime that really produces a Windows teacher's site —
+   nothing on that machine builds this image. Each pin names both files it
+   must appear in (`dockerfileContains`, `windowsRuntimeContains`) and a test
+   on each platform holds its own file against them, so a pin raised in one
+   place cannot quietly stay put in the other.
 3. **Node.js 20 + tools** — installed from NodeSource. Quartz is a Node
    program (`npx quartz build`). Also installed: `curl`, `git` (needed to
    clone Quartz), `lsof` (used to kill a previous preview server holding
@@ -78,9 +98,28 @@ The image is layered as follows (in order):
 7. **`cp -r /opt/quartz /opt/quartz-site`** — a spare copy of the scaffold
    (not used by the current build path, which copies from `/opt/quartz`
    directly).
-8. **Copy the four Python scripts** into `/opt/scripts/`:
-   `setup_course.py`, `build_site.py`, `deploy.py`, and `social_card.py`
-   (the per-section social sharing card renderer).
+8. **Copy the Python scripts** into `/opt/scripts/` — eleven of them as of
+   2026-09-18: `toolchain_paths.py`, `contracts.py`, `site_health.py`,
+   `class_pages.py`, `page_visibility.py`, `stop_preview.py`,
+   `setup_course.py`, `build_site.py`, `deploy.py`, `social_card.py` and
+   `netlify_badge.py`. **Count them off the Dockerfile rather than trusting
+   this sentence** — it said "nine … as of 2026-09-05" while the recipe copied
+   ten, `stop_preview.py` having been added without the list following it.
+
+   **They are copied ONE BY ONE, by name, and that is a trap worth knowing.**
+   Splitting a rule out into a new sibling module is therefore a change to the
+   Dockerfile whether or not anybody remembers it is: the baked scripts import
+   their siblings by bare name, which resolves only if the file is sitting
+   beside them. When `class_pages.py` was added and not copied, the image
+   could not be BUILT at all — the Dockerfile imports `setup_course` during
+   the build to bake the Explorer's hide filter, so the failure was not a
+   run-time surprise for one teacher, it was a hard failure of the build that
+   produces the toolchain. Every unit test was green throughout.
+
+   `scripts/test_baked_modules.py` now walks the imports of every baked script
+   with `ast` and fails if one is missing. `verify.sh` runs it BEFORE the image
+   build, because it answers in a tenth of a second what the build answers in
+   three minutes.
 9. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to
@@ -92,6 +131,11 @@ The image is layered as follows (in order):
    - `locales/` — all 27 Quartz locale files with teacher-oriented wording
      (see [customizations §D](06-quartz-customizations.md#d-locale-files-replaced-at-build-time)).
    - `Backlinks.tsx` — a patched Backlinks component installed at build time.
+   - `favicon/` — the four files a built site wears in the browser tab
+     (`icon.svg`, `favicon.ico`, `apple-touch-icon.png`, `icon.png`), drawn
+     from the app icon by `scripts/brand_images.py` and installed by
+     `build_site.py`
+     (see [customizations C2-25](06-quartz-customizations.md#c2-applied-on-every-build)).
    - `fonts/` — the eighteen bundled site fonts (`.ttf`) plus their
      licences. This is the SINGLE font source: the container draws social
      cards with the same files the macOS app bundles for its settings
@@ -158,6 +202,135 @@ Historical note: the image was previously published to Docker Hub by a
 `publish.sh` script and pulled by teachers, with digest-comparison update
 checks. That whole apparatus — and its staleness problems — is gone; the
 recipe travels with the app instead.
+
+## Docker images used to leak forever
+
+Recorded here because the finding sounds like it must apply to both sides, and
+it does not. On the mac, the builder image is tagged
+`teaching-quartz:src-<hash of the build recipe>`, so every recipe change mints
+a new tag and orphans the previous one. Nothing in the repository had ever
+removed one: 139 images and 50 GB on this dev machine, ~115 of them
+`teaching-quartz` tags. Containers were never the problem — each launcher
+already removes its own container by name before recreating it, and the name
+is a hash of the working folder, so it is one container per folder replaced in
+place.
+
+The mac fix is `prune_superseded_images()` in `setup.sh`, `preview.sh` and
+`deploy.sh`: after a build SUCCEEDS, remove every `teaching-quartz:src-*` tag
+except the one just built, skipping any a container still references. It keeps
+exactly one tag; the "keep the previous one for a cheap downgrade" idea was
+rejected because an older Plantoir carries its own bundled recipe and rebuilds
+its tag regardless. `docker builder prune` was rejected outright: it is global
+with no per-project filter, and this machine's Docker is shared with other
+projects.
+
+Three guards on it, each of which an adversarial review found MISSING in the
+first version — worth having in writing, because all three look like
+over-caution until you see the case:
+
+- **Do nothing unless the tag just built is one of ours.** `--image` lets a
+  caller point the image at anything, and "remove everything except the tag I
+  was given" then means "remove every real tag on the machine, including every
+  other working folder's current one".
+- **Do nothing to an image younger than about a day.** The container check is
+  a point-in-time read, and a folder that is mid-recreate — container removed,
+  replacement not yet started — references nothing for a second or two. A
+  build finishing in another folder inside that window would delete the image
+  it is about to run, and the teacher would see a registry-pull failure for an
+  image that exists on no registry. The same guard stops two folders on
+  different recipes from deleting each other's image on every switch.
+- **Ask Docker for the age, never compute it.** `docker image inspect
+  '{{.Created}}'` returns LOCAL time with an offset, not the UTC `Z` it
+  resembles, so comparing it against a UTC cutoff is silently wrong by the
+  machine's offset. `{{.CreatedSince}}` from `docker images` is Docker's own
+  human age string and has no timezone in it at all.
+
+One correction to the paragraph above, for honesty: **containers are cleaned
+up per working folder, but nothing cleans up a DELETED working folder's
+container.** That orphan now permanently pins its image against this cleanup —
+the one image that can never be reclaimed is the one nobody will ever use
+again. Small (an orphan per deleted folder, and a teacher deletes none), noted
+so the write-up is not read as "container hygiene is solved".
+
+**A second measurement, 2026-09-08, on how much the sweep actually reclaims.**
+Nine `teaching-quartz:src-*` images on disk (about 2.42 GB each) against **two**
+containers, so eight were unreferenced. The sweep works; it is simply narrow by
+construction. It runs only on the SUCCESS branch of a build — `build_image_if_missing`
+in `setup.sh` and `preview.sh`, `ensure_image_present` in `deploy.sh` — so a run
+that finds its image already present touches nothing, and superseded tags wait
+for the next recipe change. The age guard above then spares anything younger
+than a day or two, which is why a machine in the middle of toolchain work is
+exactly where several survive each sweep. Add the orphan-container case in the
+paragraph above and nine against two is what you would expect rather than a
+fault.
+
+If that count climbs well past nine on a machine that is NOT mid-toolchain-work,
+that is the signal to open an issue — with a number, since this paragraph is the
+baseline. Deliberately no remedy proposed here: giving the sweep a second
+trigger has hazards of its own, and the success-branch placement is what keeps a
+run that reuses an image from touching anything.
+
+**Windows has nothing to port.** You dropped Docker on 2026-08-19 for the
+native runtime — no image, no tag, no container, nothing to accumulate. (An
+earlier `TODO-TODAY.md` note on the mac claimed "their launchers have the same
+gap"; that was written without checking the `.ps1` files and is wrong.) Do not
+add a cleanup for images that do not exist.
+
+**The question worth asking on that side is the analogous one, not the same
+one:** when a teacher installs a new Plantoir, is a superseded
+`Vendor/runtime/` — or an old model download under `%LOCALAPPDATA%` — left
+behind anywhere it can accumulate across a school year? That is the shape of
+the failure the mac hit: a disk filling with something the teacher has never
+heard of and cannot connect to this app. Nobody here can see a Windows
+machine to answer it, so it is a question rather than a finding.
+
+## The build cache is never cleared, on purpose
+
+Separate from the images above, and easy to conflate with them: BuildKit keeps
+its own build cache, nothing in this repository clears it, and nothing should.
+
+**`docker builder prune` is GLOBAL.** There is no per-project and no per-tag
+filter, so a launcher that called it would throw away the build cache of every
+other project sharing this Colima VM — Supabase's, among others. That is the
+same constraint that shaped the image cleanup one section up, except that there
+the narrow form exists (remove `teaching-quartz:src-*` except the tag just
+built) and here it does not. So clearing the cache stays a by-hand developer
+job:
+
+```bash
+docker builder prune          # global — read the size it offers before agreeing
+```
+
+**A teacher's cache is nothing like a developer's.** The 14 GB in the table below
+came from twelve days of toolchain edits, each minting a new recipe hash. A
+teacher builds the image on install and then does not build again until a
+Plantoir update changes the recipe.
+
+**Measured twice on the dev mac**, sixteen days apart:
+
+| | Build cache | Images |
+|---|---|---|
+| 2026-08-23 | 1301 entries, 14.30 GB, 14.25 GB reclaimable | 139 images, 50.09 GB — before that day's cleanup landed |
+| 2026-09-08 | 632 entries, 4.81 GB, 2.56 GB reclaimable | 37 images, 31.22 GB, **12.39 GB reclaimable** |
+
+The 2026-08-23 note that this migrated from said the cache was "a bigger number
+than the images that were leaking beside it". **It was not, and the same page
+disproves it** — the images section above records 139 images and 50.09 GB that
+day against the cache's 14.30 GB. The claim is repeated here only so that
+nobody re-derives it from the old wording and acts on it. What the second
+measurement does show is that the cache fell to a third of itself unaided,
+while the images stayed the larger reclaimable number throughout.
+
+**None of which touches the decision**, and that is the point worth keeping: it
+never rested on the size. It rests on `prune` having no narrow form.
+
+**If this is ever revisited, the thing to find out first** is whether BuildKit
+can be given a scoped cache per build context — a filtered prune rather than a
+bigger hammer. Reaching for the global command because the number looks large
+is the move this note exists to prevent.
+
+**Windows has nothing to port here either**, for the reason the images section
+gives: no Docker, no BuildKit, no cache.
 
 ---
 

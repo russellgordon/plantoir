@@ -1,0 +1,136 @@
+import Foundation
+
+/// Something wrong with a course's folders, as the toolchain reported it.
+///
+/// The build prints one `PLANTOIR_HEALTH: {json}` line per finding, and the
+/// SENTENCE a teacher reads travels inside that line rather than being written
+/// again here. That is deliberate: the wording has one home
+/// (`contracts/shared-rules.json` → `siteHealth.checks`), and re-authoring it
+/// on each platform is how the same problem ends up worded two different ways
+/// on macOS and Windows.
+struct SiteHealthFinding: Equatable, Identifiable {
+
+    // MARK: - Stored properties
+
+    /// The check's name — `curriculumCoverageFoundNothing` and friends. Stable
+    /// across rewordings, which is what makes it the thing to record on the
+    /// activity trail and the thing to match against the contract.
+    let name: String
+
+    /// One line, in a teacher's words. Already has the course and section
+    /// filled in.
+    let sentence: String
+
+    /// What it means and what to do about it.
+    let detail: String
+
+    /// Whether the problem is one Plantoir could put right on request. Nothing
+    /// acts on this yet; it is carried so the front end can grow a button
+    /// without the toolchain having to change.
+    let fixable: Bool
+
+    let course: String
+    let section: Int
+
+    // MARK: - Computed properties
+
+    var id: String { return "\(course)/\(section)/\(name)" }
+
+    // MARK: - Functions
+
+    /// The marker the toolchain prints. Pinned by
+    /// `contracts/shared-rules.json` → `siteHealth.marker.prefix`.
+    nonisolated static let markerPrefix: String = "PLANTOIR_HEALTH:"
+
+    /// Every finding announced in a stretch of output.
+    ///
+    /// Callers feed this the text as it ARRIVES, not the finished transcript:
+    /// the health lines are printed in the middle of a build, and the app's
+    /// other structured-line readers work from
+    /// `transcript.recentText(maximumCharacters: 8000)` — a TAIL, which on a
+    /// real build has long since scrolled past them.
+    nonisolated static func findings(in text: String) -> [SiteHealthFinding] {
+        var found: [SiteHealthFinding] = []
+        for rawLine in linesOf(text) {
+            let line: String = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard line.hasPrefix(markerPrefix) else {
+                continue
+            }
+            let payload: String = String(line.dropFirst(markerPrefix.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let data = payload.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let name = object["name"] as? String,
+                  let sentence = object["sentence"] as? String else {
+                continue
+            }
+            found.append(SiteHealthFinding(
+                name: name,
+                sentence: sentence,
+                detail: (object["detail"] as? String) ?? "",
+                fixable: (object["fixable"] as? Bool) ?? false,
+                course: (object["course"] as? String) ?? "",
+                section: (object["section"] as? Int) ?? 0
+            ))
+        }
+        return found
+    }
+
+    /// A run's findings, appended to whatever a caller is about to be told.
+    ///
+    /// **For callers with no window to put a dialog in** — the assistant, and
+    /// `Plantoir --mcp-stdio`. A finding that only produced an alert would
+    /// reach nobody there, so the sentence has to travel in the answer itself.
+    /// The wording is the toolchain's own, carried in the marker line, which is
+    /// what stops the assistant describing the same problem in different words
+    /// from the section window.
+    static func appending(to message: String, from runner: ScriptRunner) -> String {
+        if runner.healthFindings.isEmpty {
+            return message
+        }
+        var parts: [String] = [message]
+        for finding in runner.healthFindings {
+            parts.append(finding.sentence + " " + finding.detail)
+        }
+        return parts.joined(separator: "\n\n")
+    }
+
+    /// Splits output into lines, on SCALARS rather than Characters.
+    ///
+    /// This is the bug that driving the real app found, and the codebase warned
+    /// about it before I wrote it: Swift folds "\r\n" into ONE Character
+    /// (a grapheme cluster), so `split(separator: "\n")` does not split there
+    /// at all. `TranscriptBuilder.append(rawText:)` says exactly this in a
+    /// comment — "would hide line endings" — and works scalar by scalar for
+    /// the same reason.
+    ///
+    /// Real output comes from a PTY and ends "\r\n", so every marker line was
+    /// glued to its neighbours: the resulting "line" CONTAINED the prefix but
+    /// did not START with it, `hasPrefix` was false, and every finding was
+    /// dropped. Every unit test passed, because they all used "\n".
+    nonisolated static func linesOf(_ text: String) -> [String] {
+        var lines: [String] = []
+        var current: String.UnicodeScalarView = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            if scalar == "\n" || scalar == "\r" {
+                lines.append(String(current))
+                current = String.UnicodeScalarView()
+                continue
+            }
+            current.append(scalar)
+        }
+        lines.append(String(current))
+        return lines
+    }
+
+    /// Whether a line is one of the machine-readable ones, so the console can
+    /// keep it out of what a teacher reads.
+    ///
+    /// Rule 1: the interface never names the machinery, and a raw JSON blob in
+    /// the console is machinery. The human-readable sentence is printed
+    /// separately by the toolchain, so hiding this line loses nothing.
+    nonisolated static func isMarkerLine(_ line: String) -> Bool {
+        return line.trimmingCharacters(in: .whitespacesAndNewlines)
+            .hasPrefix(markerPrefix)
+    }
+}

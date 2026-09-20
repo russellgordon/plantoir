@@ -32,9 +32,11 @@ land, in risk, and in whose backyard?
 %%curriculum-start%%
 ## Curriculum connection
 
-![[F1.1]]
-
 ![[D1.2]]
 
 ![[D2.7]]
+
+![[F1.1]]
+
+![[F1.2]]
 %%curriculum-end%%

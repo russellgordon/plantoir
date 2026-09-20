@@ -7,7 +7,8 @@ used to bake into the Linux image is fetched here as pinned, portable
 Windows pieces, and the app ships the folder the same way it ships llama/.
 
     runtime\node\       Node.js 20 (win-x64 zip distribution - no installer)
-    runtime\python\     Python 3.11 embeddable + python-frontmatter, Pillow
+    runtime\python\     Python 3.11 embeddable + python-frontmatter 1.3.0,
+                        PyYAML 6.0.3, Pillow 12.3.0
     runtime\quartz\     Quartz v4.5.0 + this repo's patches + node_modules
     runtime\wrangler\   wrangler 4.80.0 (npm prefix; Cloudflare deploys)
     runtime\fonts\      Noto Color Emoji (social sharing cards)
@@ -77,7 +78,21 @@ try {
     $getPip = Join-Path $Temp "get-pip.py"
     Fetch "https://bootstrap.pypa.io/get-pip.py" $getPip
     & "$pyDir\python.exe" $getPip --no-warn-script-location | Out-Null
-    & "$pyDir\python.exe" -m pip install --no-warn-script-location python-frontmatter Pillow | Out-Null
+    # PINNED, and the PyYAML one is not decoration. python-frontmatter parses
+    # with PyYAML, which is YAML 1.1 -- and that is the only reason
+    # `publish: no` and `publish: off` HIDE a page. PyYAML 7 is expected to
+    # move to YAML 1.2, where `no` is the string "no" and every page hidden
+    # that way would be republished, silently, in courses already in front of
+    # students. `contracts/file-formats.json` -> `pageVisibility` states the
+    # 1.1 table as fact and both apps are written against it, so an unpinned
+    # upgrade here would fail nothing anywhere. PyYAML is named explicitly
+    # rather than left to python-frontmatter's own dependency range, because
+    # that range is not ours to control. The versions are the ones the image
+    # and this snapshot already carry, so the pins change nothing about what
+    # is installed and everything about what can change underneath it.
+    # `ToolchainContractTests` holds these against contracts/toolchain.json.
+    & "$pyDir\python.exe" -m pip install --no-warn-script-location `
+        python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0 | Out-Null
     & "$pyDir\python.exe" -c "import frontmatter, PIL; print('frontmatter + Pillow OK')"
     if ($LASTEXITCODE -ne 0) { throw "Python package verification failed" }
     Write-Host "Python $PythonVersion embeddable in place." -ForegroundColor Green
@@ -127,6 +142,7 @@ try {
     # builds and fails outright on an unwritable install.
     $env:PLANTOIR_QUARTZ_DIR = $quartzDir
     $env:PLANTOIR_SUPPORT_DIR = Join-Path $RepoRoot "support"
+    $env:PLANTOIR_CONTRACTS_DIR = Join-Path $RepoRoot "contracts"
     & "$pyDir\python.exe" -c "import sys; sys.path.insert(0, r'$RepoRoot\scripts'); import setup_course; setup_course.ensure_quartz_explorer_anchor(); setup_course.ensure_quartz_overflowlist_static_id()"
     if ($LASTEXITCODE -ne 0) { throw "Baking the Quartz scaffold patches failed" }
     if (-not (Select-String -Path "$quartzDir\quartz.layout.ts" -Pattern 'CQ4T-OMIT-ANCHOR' -Quiet)) {
@@ -134,6 +150,7 @@ try {
     }
     Remove-Item Env:\PLANTOIR_QUARTZ_DIR
     Remove-Item Env:\PLANTOIR_SUPPORT_DIR
+    Remove-Item Env:\PLANTOIR_CONTRACTS_DIR
     Write-Host "Quartz $QuartzTag patched and provisioned." -ForegroundColor Green
 
     # ---- wrangler (Cloudflare's deploy CLI, pinned below 4.100) --------------

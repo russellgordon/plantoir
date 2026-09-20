@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Working period: research and contact
+2. Working period: research and contact, each of you keeping your own
+   notes — two minutes with each pair, and I ask each of you in turn
 3. What may be shared, and what may not — the judgement
 4. Seminar preparation
 5. Cool-down

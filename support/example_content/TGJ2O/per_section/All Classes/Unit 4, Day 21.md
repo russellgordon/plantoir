@@ -17,11 +17,12 @@ comment when you reuse the page; comments never appear on the site either. %%
 
 1. Celebrate: the semester's best frames, ledes, and saves — chosen
    by the newsroom
-2. Launch: [[Final Reflection]] — begin it in class
+2. Finish [[Final Reflection]] — the last of it, written here
 3. Journal collection: [[Journal Checklist]] and [[Showing Growth]] are
    your last look before handing it in
 4. One last standup, whole newsroom
 
 ## Things to do before our next class
 
-- [ ] Finish [[Final Reflection]] and hand in your [[Newsroom Journal]].
+- [ ] Hand in your [[Newsroom Journal]] on the way out —
+      [[Final Reflection]] goes in with it.

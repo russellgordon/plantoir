@@ -12,8 +12,9 @@ tags:
 
 1. Digital and photographic work: [[Digital and Emerging Media]]
 2. Layers, and what a photograph decides for you
-3. Studio time
+3. Studio time: the digital trial; last fifteen minutes annotating it,
+   and your Unit 1 mark-making brought up to trial standard
 
 ## Things to do before our next class
 
-- [ ] Annotate the digital trial.
+- [ ] Nothing tonight.

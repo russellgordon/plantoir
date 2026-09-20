@@ -53,7 +53,7 @@ the list into your own notes if you want to keep track.
 Rename the file the same day, always in the same shape:
 `unit2-phrase-draft3-jan22`. Put it in the unit folder in
 [[The Dance Portfolio]], keep a second copy off your phone, and remember:
-[[Video of Yourself]] only works if the September file can still be found.
+[[Video of Yourself]] only works if the first file can still be found.
 
 %%curriculum-start%%
 ## Curriculum connection

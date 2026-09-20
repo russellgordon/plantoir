@@ -38,10 +38,23 @@ into the cleft, and it binds receptors on the next cell. Chemical, not
 electrical, which is why almost every drug that affects the brain acts
 here.
 
+## Invertebrate response mechanisms
+
+Comparing vertebrate nervous systems with invertebrates highlights contrasting
+evolutionary strategies:
+- **Giant axons:** invertebrates like squids and earthworms lack myelin; they
+  achieve rapid conduction velocities for escape reflexes through very large
+  axon diameters.
+- **Taxis and kinesis:** instinctive invertebrate behaviours — such as negative
+  phototaxis in earthworms or hygrokinesis in terrestrial isopods — provide
+  rapid behavioural homeostasis without complex central processing.
+
 %%curriculum-start%%
 ## Curriculum connection
 
-![[E3.2]]
-
 ![[E2.2]]
+
+![[E2.4]]
+
+![[E3.2]]
 %%curriculum-end%%

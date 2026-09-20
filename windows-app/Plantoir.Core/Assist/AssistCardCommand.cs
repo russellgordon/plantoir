@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace Plantoir.Core.Assist;
@@ -11,6 +12,30 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
     private static readonly Dictionary<string, (string Tool, Dictionary<string, string> Args)> FixedShapes =
         new(StringComparer.OrdinalIgnoreCase)
         {
+            // The publish/deploy distinction, on demand. The local model is
+            // told it every turn in its system prompt and a teacher never was
+            // — the shelf explains what the assistant can DO, not what its
+            // words mean.
+            //
+            // `explain_publishing` is MCP-only, and this is the point issue
+            // #70 makes generally: MCP-only means the local MODEL is not SHOWN
+            // a tool, which is what keeps routing accuracy at the measured
+            // thirteen. It says nothing about whether a teacher may ask for
+            // it. A fixed phrasing is compared in code and never reaches a
+            // model, so adding one costs the router nothing.
+            ["what does publishing mean?"] = ("explain_publishing", new()),
+            ["what is the difference between publishing and deploying?"] = ("explain_publishing", new()),
+
+            // A copy before a big edit. No arguments: the assistant window is
+            // scoped to one course, so the only course it could mean is that
+            // one.
+            ["back up this course"] = ("back_up_course", new()),
+
+            // Answered for a teacher who is looking at one section and wants
+            // to know what else is in the folder.
+            ["what courses do i have?"] = ("list_courses", new()),
+            ["list my courses"] = ("list_courses", new()),
+
             ["what would students see in this section right now?"] = ("check_section", new()),
             ["what do students see right now?"] = ("check_section", new()),
             ["preview"] = ("rebuild_preview", new()),
@@ -47,7 +72,25 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
             ["re-date my classes"] = ("re_date_classes", new()),
             ["redate my classes"] = ("re_date_classes", new()),
             ["re-date this section"] = ("re_date_classes", new()),
-            ["roll this section over to a new year"] = ("re_date_classes", new()),
+            // A ROLLOVER, and only a rollover, carries `rollover`. The three
+            // phrasings above it are ordinary re-dating — a snow day, a
+            // timetable that shifted — and asking THOSE about websites would
+            // let a teacher answer "a new website" mid-semester and abandon
+            // the address their students are reading right now.
+            ["roll this section over to a new year"] = ("re_date_classes", new() { ["rollover"] = "yes" }),
+
+            // The two answers to the website question, as whole sentences
+            // rather than "a new website" — which is an exact match a teacher
+            // could type meaning something else entirely. Each also works as a
+            // FIRST thing to say, for a teacher who already knows which they
+            // want, because re-dating a section already on its dates changes
+            // nothing. Named from AssistWording rather than typed here: the
+            // assistant's own reply offers these back word for word, and a
+            // phrasing a teacher is TOLD to say must be one the matcher takes.
+            [AssistWording.RolloverSayToStartANewWebsite] =
+                ("re_date_classes", new() { ["rollover"] = "yes", ["website"] = "new" }),
+            [AssistWording.RolloverSayToKeepTheSameWebsite] =
+                ("re_date_classes", new() { ["rollover"] = "yes", ["website"] = "same" }),
         };
 
     private static readonly Dictionary<string, int> SpelledNumbers = new(StringComparer.OrdinalIgnoreCase)
@@ -68,7 +111,68 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
 
         if (WholeUnit(tidied) is { } unit) return unit;
         if (MoreDays(tidied) is { } more) return more;
+        if (MakeRoom(tidied) is { } room) return room;
         return DuplicateClass(tidied, message);
+    }
+
+    /// <summary>
+    /// "Make room for a class at Unit 3, Day 4", and the same with a count.
+    /// </summary>
+    /// <remarks>
+    /// <para>PARSED rather than listed, because the sentence is a fixed frame
+    /// with two numbers and a count in it and no judgement anywhere. Reading an
+    /// integer off a fixed shape is not something anybody needs a language
+    /// model for — and this tool is MCP-only, so no local model is shown it at
+    /// all. Without a phrasing here the sentence would reach a model that has
+    /// never heard of the tool.</para>
+    ///
+    /// <para><b>The count and the noun must agree, and that half is the point.</b>
+    /// "Make room for two class at Unit 3, Day 4" is a sentence somebody typed
+    /// carelessly rather than one of these shapes, and this tool RENAMES pages
+    /// the teacher's links point at. Guessing which half they meant — two
+    /// classes, or one — is exactly what a fixed shape exists to avoid, so a
+    /// disagreement refuses and the sentence goes to the model instead.</para>
+    /// </remarks>
+    private static AssistCardCommand? MakeRoom(string tidied)
+    {
+        const string opening = "make room for ";
+        if (!tidied.StartsWith(opening, StringComparison.Ordinal)) return null;
+
+        // The comma in "Unit 3, Day 4" is punctuation in the FRAME rather than
+        // part of any value, so it goes before the words are counted.
+        string[] words = tidied[opening.Length..]
+            .Replace(',', ' ')
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        // <count> class|classes at unit <unit> day <day>
+        if (words.Length != 7) return null;
+        if (words[2] != "at" || words[3] != "unit" || words[5] != "day") return null;
+        if (words[1] != "class" && words[1] != "classes") return null;
+
+        // "a class" is how a teacher writes one of them, and it is the form
+        // the tool's own description and the issue both use as the example.
+        // Taken HERE and not in SpelledNumbers, because "add a more days to
+        // unit 4" is not a sentence — the article belongs to this frame only.
+        int howMany;
+        if (words[0] == "a") howMany = 1;
+        else if (SpelledNumbers.TryGetValue(words[0], out int spelled)) howMany = spelled;
+        else if (!int.TryParse(words[0], NumberStyles.None, CultureInfo.InvariantCulture, out howMany)) return null;
+
+        if (howMany <= 0) return null;
+        if (!int.TryParse(words[4], NumberStyles.None, CultureInfo.InvariantCulture, out int unit) || unit <= 0)
+            return null;
+        if (!int.TryParse(words[6], NumberStyles.None, CultureInfo.InvariantCulture, out int day) || day <= 0)
+            return null;
+
+        // A plural count with a singular noun, or the reverse.
+        if ((howMany == 1) != (words[1] == "class")) return null;
+
+        return new AssistCardCommand("make_room_for_classes", new Dictionary<string, string>
+        {
+            ["unit"] = unit.ToString(CultureInfo.InvariantCulture),
+            ["atDay"] = day.ToString(CultureInfo.InvariantCulture),
+            ["howMany"] = howMany.ToString(CultureInfo.InvariantCulture),
+        });
     }
 
     private static AssistCardCommand? WholeUnit(string tidied)
@@ -147,7 +251,64 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
         return null;
     }
 
-    public JsonObject ToJsonObject(string course, int section)
+    /// <summary>
+    /// The two tools that publish ONE day's class, whose card argument is a
+    /// relative day and whose parameter is an absolute date.
+    /// </summary>
+    private static readonly HashSet<string> PublishesADaysClass = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "publish_class_on",
+        "plan_publish_class_on",
+    };
+
+    /// <summary>
+    /// The card as the JSON this app really sends, with <c>when</c> turned
+    /// into the <c>date</c> the tool takes.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why the rename happens here.</b> The eight fixed phrasings
+    /// ("publish tomorrow's class", and the seven weekdays) set <c>when</c>,
+    /// which is the mac's shape and is pinned by
+    /// <c>contracts/assist-cases.json</c> -&gt; <c>cardPhrasings</c>, so the
+    /// card cannot simply be changed to say <c>date</c>. On the mac the card
+    /// and the runner share a process and the runner reads either name; here
+    /// the call crosses <c>plantoir-mcp</c> over JSON-RPC, and the SDK's
+    /// binder drops a key the method does not declare - and then refuses for
+    /// the required <c>date</c> it never got. That is issue #116: the
+    /// commonest request in the product, and one of the prompt shelf's
+    /// suggested prompts, answered with "That tool couldn't be run".
+    /// So this method - the one place the card becomes the wire - is where
+    /// the two names meet, and where they are reconciled.</para>
+    ///
+    /// <para><b>Why the day is settled HERE rather than in the tool.</b>
+    /// <c>AssistAgent.RunCommand</c> synthesises ONE arguments object and
+    /// reuses it: first for the plan twin, then, if the teacher presses Go,
+    /// for the act itself. Settling "tomorrow" at the moment the phrasing is
+    /// matched means the plan a teacher read and the class that gets published
+    /// are the same day even when the two are minutes apart across midnight.
+    /// Resolving inside the tool instead would let the second call land on a
+    /// different day than the first proposed - rare, silent, and exactly the
+    /// kind of wrong day nobody would think to look for. The tool understands
+    /// these words as well, for MCP callers that have no card
+    /// (<c>PlantoirTools.PlanForDay</c>); it is the same shared reader either
+    /// way, so there is one answer to what "monday" means.</para>
+    ///
+    /// <para>No card sets both <c>when</c> and <c>date</c>, and none should:
+    /// the two would race on the order the dictionary happens to yield them.
+    /// The fixed shapes are written out one by one a few hundred lines above,
+    /// which is where that stays true.</para>
+    ///
+    /// <para>A word that cannot be read is passed through as the <c>date</c>
+    /// unchanged, so the tool answers with its own sentence about the date
+    /// rather than the binder throwing about a parameter a teacher has never
+    /// heard of. No card can reach that branch - all eight words resolve - and
+    /// it is a guard rather than a behaviour.</para>
+    /// </remarks>
+    /// <param name="today">
+    /// The day to count from, for tests. Left null, it is the real today, read
+    /// at the moment the phrasing is matched.
+    /// </param>
+    public JsonObject ToJsonObject(string course, int section, DateOnly? today = null)
     {
         var obj = new JsonObject
         {
@@ -161,7 +322,19 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
         }
         foreach (var (k, v) in Arguments)
         {
-            if (k == "pages")
+            if (k == "when" && PublishesADaysClass.Contains(ToolName))
+            {
+                var day = SectionScheduleSource.ReadRelativeDay(
+                    v, today ?? DateOnly.FromDateTime(DateTime.Now));
+                // InvariantCulture, because a machine set to a non-Gregorian
+                // default calendar renders "yyyy" in ITS year - 2569 for Thai
+                // Buddhist - and the tool would then look for a class on a day
+                // no course has.
+                obj["date"] = day is { } read
+                    ? read.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    : v;
+            }
+            else if (k == "pages")
             {
                 obj[k] = new JsonArray(JsonValue.Create(v));
             }

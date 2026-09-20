@@ -29,6 +29,14 @@ its *size* makes sense against the triangle it lives in.
 6. **Challenge.** A ramp runs $7.5$ m along the ground to a wall. A
    vertical post $1.2$ m tall, standing $3$ m from the ramp's foot,
    just touches the ramp. How high does the ramp meet the wall?
+7. **From similar right triangles to trig ratios.** Right triangle
+   $\triangle ABC$ has $\angle A = 30°$, adjacent side
+   $AC = \sqrt{3} \approx 1.73$, opposite side $BC = 1$, and
+   hypotenuse $AB = 2$. A larger right triangle $\triangle DEF$ has
+   $\angle D = 30°$ and hypotenuse $DE = 10$.
+   (a) Verify $\triangle ABC \sim \triangle DEF$ and find $EF$ and $DF$.
+   (b) Compute the ratio $\frac{\text{opposite}}{\text{hypotenuse}}$ in
+   both triangles. What constant ratio does this define for $30°$?
 
 ## Answers
 
@@ -61,10 +69,26 @@ its *size* makes sense against the triangle it lives in.
 > foot — similar. So $\frac{h}{1.2} = \frac{7.5}{3}$, giving
 > $h = 3$ m. The wall is farther out, so it must beat the post. ✓
 
+> [!success]- Answer 7
+> (a) Both triangles share angles $30°$, $60°$, and $90°$, so
+> $\triangle ABC \sim \triangle DEF$ with scale factor
+> $\frac{10}{2} = 5$. Thus $EF = 1 \times 5 = 5$ and
+> $DF = \sqrt{3} \times 5 \approx 8.66$.
+> (b) In $\triangle ABC$: $\frac{BC}{AB} = \frac{1}{2} = 0.5$.
+> In $\triangle DEF$: $\frac{EF}{DE} = \frac{5}{10} = 0.5$.
+> The ratio is invariant for all right triangles with a $30°$ angle —
+> defining $\sin 30° = 0.5$. Trigonometric ratios exist because
+> similar right triangles preserve side ratios — the foundation of
+> [[The Primary Trigonometric Ratios]].
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[C1.1]]
 
 ![[C1.2]]
 
 ![[C1.3]]
+
+![[C2.1]]
 %%curriculum-end%%

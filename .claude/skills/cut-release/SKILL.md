@@ -15,6 +15,13 @@ this skill automates its steps 5–6 and the note-writing.
 1. Last release: `git describe --tags --abbrev=0` (if no tag exists,
    this is the first release — summarize the product, not the delta).
 2. The story since: `git log <last-tag>..HEAD --pretty=format:'%s%n%b%n---'`
+2a. **`RELEASING.md` → "Warnings the release notes MUST carry".** Read it
+   before drafting, and carry every row into the notes in the teacher's own
+   words. These are things a teacher must DO — usually before updating — as
+   against the things they gain, and drafting from the commits alone will
+   summarise them away: a caution lives in a commit BODY, and a body is what
+   gets compressed. Clear the list in the same commit that moves the version
+   line, exactly as the "Landed since" table is cleared.
 3. The bundle(s) to attach:
    - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `mac-app/publish.sh -Sign`)
    - `windows-app/dist/PlantoirSetup.exe` (freshly built & signed by `publish.ps1 -Sign`)
@@ -193,6 +200,16 @@ git commit -m "Update website for v<version> release"
 git push origin main
 python3 website/build.py --deploy
 ```
+
+`--deploy` fetches `https://plantoir.app` afterward on its own and confirms
+the live version-note line matches `site.json` — watch its output for the
+✅/⚠️/❌ line rather than assuming the push alone means teachers can see the
+new version. A ❌ means the site did not pick up the deploy after several
+retries; tell the user, point them at `https://app.netlify.com`, and do not
+report the release as complete until `python3 website/build.py
+--verify-deploy` comes back ✅. A ⚠️ (network problem reaching the site, not
+a confirmed mismatch) is worth one retry of `--verify-deploy` before treating
+it as a real problem.
 
 **Redraw the brand images in the same commit as the version line.** After
 editing `website/site.json` and rebuilding, and before tagging, run:

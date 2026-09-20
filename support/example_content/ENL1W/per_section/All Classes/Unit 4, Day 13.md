@@ -12,7 +12,8 @@ tags:
 
 1. Concept: [[Paragraphs That Hold Together]] revisited — the order of
    your reasons
-2. [[The Argument]], day 3 — drafting period
+2. [[The Argument]], day 3 — drafting period, starting from whatever
+   yesterday's conference changed about your claim
 
 ## Things to do before our next class
 

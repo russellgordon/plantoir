@@ -71,4 +71,6 @@ Get the evidence right in [[Using Evidence]], the vocabulary right in
 ![[A1.6]]
 
 ![[A1.7]]
+
+![[A1.9]]
 %%curriculum-end%%

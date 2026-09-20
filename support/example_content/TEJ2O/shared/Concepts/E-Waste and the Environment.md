@@ -43,6 +43,27 @@ parts and manuals available or not. A machine designed for repair
 dies slowly and in stages; one designed against it dies all at once,
 whole. [[Repair or Replace]] argues the economics case by case.
 
+## Community stewardship and Ontario recycling programs
+
+Responsible e-waste handling relies on government frameworks and
+community partners:
+
+- **Resource Productivity and Recovery Authority (RPRA):** Enforces
+  Ontario's Producer Responsibility regulations, requiring electronics
+  manufacturers to fund and operate collection and recycling networks.
+- **Municipal and community drop-off depots:** Local transfer stations
+  and designated retail partners accept computers, monitors, cables,
+  and rechargeable batteries for hazardous waste processing.
+- **Non-profit refurbishers and repair cafés:** Community groups wipe,
+  repair, and upgrade donated computers for schools, libraries, and
+  low-income families — diverting functional hardware from smelters.
+- **Toner and battery recycling programs:** Specialised collection
+  channels keep lithium, nickel, cadmium, and fine toner plastics out
+  of municipal solid waste.
+
+Understanding these networks allows technicians to guide clients toward
+sound disposal habits rather than sending machines to landfill.
+
 [^1]: Metal concentrations in printed circuit boards are commonly
     measured at tens to hundreds of grams of gold per tonne, versus
     single-digit grams per tonne in typical commercial gold ore —

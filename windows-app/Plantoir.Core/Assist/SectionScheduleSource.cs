@@ -85,6 +85,17 @@ public static class SectionScheduleSource
         "d Sept yyyy"
     };
 
+    /// <summary>
+    /// The day a word names, or null when it names none.
+    ///
+    /// <para>These words reach the app literally: the phrasings that carry
+    /// them are matched in code and never sent to the model, so "tomorrow"
+    /// arrives as the word "tomorrow" and has to be understood where it
+    /// lands. A date worked out here cannot be a date a model invented.</para>
+    ///
+    /// <para>Pinned by <c>contracts/schedule-rules.json</c> -&gt;
+    /// <c>relativeDays</c>, which both platforms run.</para>
+    /// </summary>
     public static DateOnly? ReadRelativeDay(string input, DateOnly today)
     {
         string trimmed = input.Trim().ToLowerInvariant();
@@ -92,10 +103,80 @@ public static class SectionScheduleSource
         if (trimmed == "tomorrow") return today.AddDays(1);
         if (trimmed == "yesterday") return today.AddDays(-1);
 
+        if (NextWeekday(trimmed, today) is { } named) return named;
+
         if (DateOnly.TryParseExact(input.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var directDate))
             return directDate;
 
         return null;
+    }
+
+    /// <summary>The seven names, mapped to the enum rather than to text.</summary>
+    /// <remarks>
+    /// Compared as <see cref="DayOfWeek"/> values, never as a formatted name.
+    /// Formatting a date to "dddd" asks the machine's CULTURE what Monday is
+    /// called, so on a French-locale machine "monday" would match nothing and
+    /// "publish Monday's class" would quietly stop working for one teacher and
+    /// nobody else. The mac pins <c>en_US_POSIX</c> on its formatter for the
+    /// same reason (<c>CalendarDay.weekdayName</c>).
+    /// </remarks>
+    private static readonly Dictionary<string, DayOfWeek> WeekdayNames = new(StringComparer.Ordinal)
+    {
+        ["monday"] = DayOfWeek.Monday,
+        ["tuesday"] = DayOfWeek.Tuesday,
+        ["wednesday"] = DayOfWeek.Wednesday,
+        ["thursday"] = DayOfWeek.Thursday,
+        ["friday"] = DayOfWeek.Friday,
+        ["saturday"] = DayOfWeek.Saturday,
+        ["sunday"] = DayOfWeek.Sunday,
+    };
+
+    /// <summary>"monday" -&gt; the next Monday, counting TODAY when today is one.</summary>
+    /// <remarks>
+    /// <para><b>Today counts as a match.</b> Asked on a Monday for "Monday's
+    /// class", a teacher means the class they are about to teach, not the one
+    /// a week away - the same reading a person gives it. Rejected: always
+    /// looking forward at least a day, which is defensible in the abstract and
+    /// wrong every Monday morning, on the one day the request is most likely.
+    /// </para>
+    ///
+    /// <para><b>Only forwards, within the next seven days.</b> "Publish
+    /// Monday's class" is said while preparing. A teacher who means a class
+    /// already taught has its Unit and Day in front of them and will say so.
+    /// </para>
+    ///
+    /// <para><b>"monday's" and "monday" are the same request</b> - the
+    /// apostrophe belongs to the phrasing, not to the day. Both spellings of
+    /// the apostrophe, because the one a teacher types depends on their
+    /// keyboard and on what autocorrect did to it.</para>
+    ///
+    /// <para><b>"next monday" is refused rather than guessed</b>, and falls
+    /// through to null here: it can mean the coming Monday or the one after,
+    /// people disagree about which, and a date guessed wrong dates a class
+    /// wrong silently. The model answers that one, with today's date in front
+    /// of it.</para>
+    ///
+    /// <para>This mirrors the mac's <c>AssistToolRunner.dayNamedByWeekday</c>
+    /// decision for decision, because the two apps must date a class the same
+    /// way or the same sentence means different days on different machines.
+    /// </para>
+    /// </remarks>
+    private static DateOnly? NextWeekday(string lowercased, DateOnly today)
+    {
+        string wanted = lowercased;
+        foreach (string suffix in new[] { "'s", "’s" })
+        {
+            if (wanted.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                wanted = wanted[..^suffix.Length];
+                break;
+            }
+        }
+
+        if (!WeekdayNames.TryGetValue(wanted, out var wantedDay)) return null;
+
+        int forward = ((int)wantedDay - (int)today.DayOfWeek + 7) % 7;
+        return today.AddDays(forward);
     }
 
     public static ScheduleOutcome ReadTypedText(string text, ColumnOrdering? ordering = null)

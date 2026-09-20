@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. [[Model Roller Coaster]], day 5 — final runs, filmed, with the energy
-   accounting written up beside them
+   accounting written up beside them. Start with the gap last class's
+   checkpoint found: this is the period for closing it
 2. Where your losses went, and how you know
 
 ## Things to do before our next class

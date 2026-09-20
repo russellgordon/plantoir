@@ -17,4 +17,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Finish [[Scale and Distance Calculations]], all six questions.
-- [ ] Third [[Science in the News]] submission due Friday.
+- [ ] Start looking for your final [[Science in the News]] article. This one
+      is about artificial intelligence in science.

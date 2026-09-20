@@ -12,7 +12,8 @@ tags:
 
 1. Period 6 of 8: peer challenge
 2. Another student attacks your evidence, your model, and your assumptions, in that order
-3. Revision in the room, immediately afterwards
+3. [[Judging Your Own Work]] run against the report's own criteria, on your own
+4. Revision in the room, immediately afterwards
 
 ## Things to do before our next class
 

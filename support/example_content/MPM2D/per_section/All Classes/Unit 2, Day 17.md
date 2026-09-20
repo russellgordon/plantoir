@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint, on your own: analytic geometry, including one proof
-2. Mark your own; revision list written
+1. Checkpoint, on your own: analytic geometry, including one proof — [[Properties on the Grid]]
+2. Mark your own; revision list written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

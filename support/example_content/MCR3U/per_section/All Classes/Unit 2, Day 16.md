@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: an exponent law, a rational exponent, a
-   transformed graph, and an equation from a graph
-2. Compare methods at the boards
+   transformed graph, and an equation from a graph: [[Exponent Laws]], [[Rational Exponents]], and [[Transforming Exponential Functions]]
+2. Compare methods at the boards; practice: [[Exponent Laws Practice]] and [[Exponential Models Practice]]
 
 ## Things to do before our next class
 

@@ -60,3 +60,47 @@ it, in depth.
 
 ![[D2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 3, the research period
+  Watch for: which document a student opens first. The Design row can be
+  filled in from an encyclopaedia entry; only this period shows whether the
+  student went to the Act, the regulation, the schedule of rates, or the
+  application form, or stayed with somebody else's summary of them.
+  Going well: something the programme itself produced is on the screen
+  inside ten minutes — a statute, a form, a departmental annual report.
+  Stuck: three tabs of explanation and none of evidence; or a figure copied
+  down with no year attached to it.
+  Record: one word beside each name — statute, statistics, summary. One
+  pass round the room.
+  The footnotes will tell you which they used — the Evidence row asks for
+  citation, and a reference to an order-in-council does not look like a
+  reference to an encyclopaedia. What only this period tells you is the
+  ORDER: whether they went to the regulation first, or went to it
+  afterwards to dress a conclusion they had already reached. D1.5 asks them
+  to describe a government policy of this period, and those two essays
+  describe it equally well right up until you ask a question the summary
+  did not cover.
+
+TALK — Unit 3, Day 4, the conferences on that agenda
+  Ask: "The task page tells you eligibility rules are where the history
+  is. For your programme, is that true — or is the history somewhere
+  else?"
+  Then: "Who was already doing this job before the programme existed?"
+  The first invites them to argue with a claim printed on the page they
+  are working from, which almost nobody has been asked to do before; a
+  strong answer either defends the rule with a specific one or names a
+  better site and says why — the financing, the agency that administered
+  it, the year it was timed for. The second is the one the records cannot
+  answer: a strong reply names families, churches, mutual societies,
+  unions, or a municipality, and can say what happened to them afterwards.
+  That is D1.6, the impact of a social welfare programme on the lives of
+  Canadians, reasoned from the other end. Do not ask who paid or who was
+  excluded — the task page asks for both, so those answers are already
+  written.
+  Record: one line each on your class list.
+
+The product evidence is the essay handed in on Unit 3, Day 6.
+%%

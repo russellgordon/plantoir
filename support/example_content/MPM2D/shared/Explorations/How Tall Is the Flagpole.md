@@ -59,7 +59,11 @@ skills point straight at [[Inaccessible Heights]] and
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.1]]
+
 ![[C1.3]]
+
+![[C2.1]]
 
 ![[C2.3]]
 %%curriculum-end%%

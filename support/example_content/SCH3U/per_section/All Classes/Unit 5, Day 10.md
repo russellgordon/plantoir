@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. [[The Air Quality Brief]], day 3 — working period: the cumulative argument,
-   and one realistic measure with somebody's name on it
+   and one realistic measure with somebody's name on it. Start with
+   whatever your conference last class sent you back to
 2. Trade with another pair: each challenges one unsourced claim
 
 ## Things to do before our next class

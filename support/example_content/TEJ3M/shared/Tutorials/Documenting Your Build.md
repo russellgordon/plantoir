@@ -6,9 +6,11 @@ tags:
   - tutorials
 enableToc: true
 ---
-Here is the standard every task in this course is marked against, and
-it is not "does it work". It is this: **could a competent stranger,
-holding only your documentation, rebuild it, test it, and repair it?**
+Every task in this course opens its criteria table with a row about
+whether the thing works, and every one of them then has a second row
+that decides far more marks than the first: **could a competent
+stranger, holding only your documentation, rebuild it, test it, and
+repair it?**
 A circuit that works and has no record is a one-off. A circuit with a
 proper record is a design, and the difference is entirely paperwork.
 
@@ -94,7 +96,7 @@ being sufficient and fixing it becomes the only acceptable answer.
 Bench notes and sketches go in your [[Tech Journal]] as they happen.
 The tidy version — schematic, bill of materials, photographs, test
 procedure, known issues — is the deliverable attached to each task,
-and it is what earns most of the marks described in
+and every task's criteria table has a row that depends on it; see
 [[How Marks Work]]. Write it in the language
 [[Writing About Technology]] describes: specific, quantified, and
 addressed to the next technician, who might well be you.

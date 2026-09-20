@@ -47,7 +47,13 @@ debugging, and learning new tools without fear.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A3.1]]
+
 ![[A3.2]]
 
+![[A3.3]]
+
 ![[B4.1]]
+
+![[B4.3]]
 %%curriculum-end%%

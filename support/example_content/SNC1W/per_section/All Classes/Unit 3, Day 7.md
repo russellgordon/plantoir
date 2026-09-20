@@ -14,7 +14,8 @@ tags:
 2. In groups: the patterns you found in the investigation, extended to
    elements nobody tested
 3. Consolidate: back to [[The Periodic Table]] — the table is a
-   prediction machine, not a list
+   prediction machine, not a list. Then back to what you wrote on the first
+   day of this unit, and what you would cross out now
 
 ## Things to do before our next class
 

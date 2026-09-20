@@ -12,9 +12,11 @@ tags:
 
 1. Warm-up: [[Tech Headlines]]
 2. Launch, day 1 of 5: [[The Device Recommendation]] — a real person, a
-   real budget, due in five classes
+   real budget, handed in on our fifth period on it
 3. Interview technique: what to ask instead of 'what do you want'
-4. [[The Algorithm Field Guide]], day 4 — working period with the time left
+4. [[The Algorithm Field Guide]], day 3 — working period with the time
+   left: start with what our conference on day 2 said was a habit
+   rather than an algorithm
 
 ## Things to do before our next class
 

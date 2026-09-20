@@ -2,6 +2,8 @@
 title: Evidence and Analysis Practice
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 Conventions on [[Writing About Literature]].
 
@@ -35,11 +37,11 @@ What is the fix?
 > analysis to three or four sentences, which is where the marks are.
 
 **4.** Integrate this quotation into your own sentence: *"nothing in his
-life became him like the leaving it"*.
+life / Became him like the leaving it"*.
 
 > [!success]- Answer 4
 > *Malcolm's report that Cawdor died better than he lived — "nothing in
-> his life became him like the leaving it" (1.4.7–8) — arrives eight
+> his life / Became him like the leaving it" (1.4.7–8) — arrives eight
 > lines before Duncan trusts Macbeth, and the play never comments on the
 > juxtaposition.*
 

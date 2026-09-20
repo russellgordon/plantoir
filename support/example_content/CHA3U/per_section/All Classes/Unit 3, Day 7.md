@@ -12,7 +12,7 @@ tags:
 
 1. [[Jim Crow and Resistance]] — segregation written into law, and Plessy
 2. Lynching, and Ida B. Wells's use of statistics against it
-3. Conferences
+3. Conferences on source selection and analysis for [[The Industrial Republic]]
 
 ## Things to do before our next class
 

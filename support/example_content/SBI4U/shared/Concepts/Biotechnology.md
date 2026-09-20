@@ -65,4 +65,6 @@ evaluated. [[Asking and Researching Well]] is how you check.
 ![[D1.1]]
 
 ![[D1.2]]
+
+![[D3.5]]
 %%curriculum-end%%

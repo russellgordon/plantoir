@@ -20,6 +20,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish [[Your First Entry]] if bench time ran long.
-- [ ] Read [[What a Strong Entry Looks Like]] and compare it to yours.
+- [ ] Read [[What a Strong Entry Looks Like]] and compare it with the
+      entry you wrote at the bench today.
 - [ ] Journal: the part that surprised you most when the case opened.

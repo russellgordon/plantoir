@@ -26,6 +26,9 @@ struct FailureExplainer {
         if let reason = connectionExplanation(in: output) {
             return reason
         }
+        if let reason = missingFrontPageExplanation(in: output) {
+            return reason
+        }
         if let reason = missingBuildExplanation(in: output) {
             return reason
         }
@@ -130,6 +133,23 @@ struct FailureExplainer {
     static func missingBuildExplanation(in output: String) -> String? {
         if output.contains("Built site not found") {
             return "This website hasn't been built yet. Preview it once, then deploy."
+        }
+        return nil
+    }
+
+    /// The build ran, succeeded at everything it could, and still produced no
+    /// website, because the section has no front page.
+    ///
+    /// Asked BEFORE `missingBuildExplanation`, and the order is the whole
+    /// point. A publish runs the build and then the deploy on one transcript,
+    /// so when a front page is missing the output carries both lines — and
+    /// "hasn't been built yet" is the wrong one to say to somebody who just
+    /// watched it build. The build's own reason is the specific one, so it
+    /// wins.
+    static func missingFrontPageExplanation(in output: String) -> String? {
+        if output.contains("no front page, so no website was produced") {
+            return "This section has no front page, so there is no website to publish. "
+                 + "Put the front page back, then publish again."
         }
         return nil
     }

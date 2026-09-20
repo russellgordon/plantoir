@@ -11,7 +11,7 @@ tags:
 ---
 ## Agenda
 
-1. Review: an unseen dossier worked together against the clock
+1. Review: an unseen dossier worked together against the clock, then read a second time as two of the theorists in [[Schools of Economic Thought]] would read it
 2. [[Reading a Time Series]] and [[Index Numbers and Real Versus Nominal]] under time pressure
 3. Every figure given a year and a source, out loud
 

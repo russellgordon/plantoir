@@ -12,7 +12,7 @@ tags:
 
 1. How a plant works: [[How a Plant Actually Works]]
 2. Germination, photosynthesis, respiration, reproduction
-3. Setting up: [[The Growing Trial]] launched
+3. Setting up: [[The Growing Trial]] launched, criteria read first
 
 ## Things to do before our next class
 

@@ -12,7 +12,8 @@ tags:
 
 1. [[Smooth Landing]], day 3 — working period: your descent function, and the
    constraints written as equations before any algebra
-2. Conference: which constraint is the one that will fight you?
+2. Conference with me at every board. Write down what I say; next class
+   opens with it
 
 ## Things to do before our next class
 

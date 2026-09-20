@@ -13,7 +13,9 @@ tags:
 1. Number talk: [[Which One Doesn't Belong]] — four summaries
 2. Random groups — centre and spread for the same data by three
    different measures, and when each one lies
-3. Clinic: [[One- and Two-Variable Data Practice]], first section
+3. Clinic: [[One- and Two-Variable Data Practice]], first section.
+   Formative: I note who reaches for the mean when the shape of the data
+   is telling them not to
 
 ## Things to do before our next class
 

@@ -18,5 +18,6 @@ tags:
 ## Things to do before our next class
 
 - [ ] Costumes and props ready to go — we run in dress from here on.
-- [ ] We perform next class for an invited audience — reread the success
-      criteria in [[Culminating Performance]].
+- [ ] We perform on Day 20 for an invited audience — reread the success
+      criteria in [[Culminating Performance]], because every run from here
+      is measured against them.

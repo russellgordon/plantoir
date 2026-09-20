@@ -10,10 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. [[Assessing Your Own Work]] — judging against intention
-2. Self-assessment of a Unit 2 piece
-3. Studio time
+1. [[Assessing Your Own Work]] turned on a Unit 2 piece of your own
+2. The same move against a published table: your interpretation draft
+   and the criteria on [[The Interpretation]] — [[Judging Your Own Work]]
+3. Studio time: acting on peer feedback and your self-assessment, drafting
+   the aesthetic judgement stage, and polishing the final 600 words here
+   in class
 
 ## Things to do before our next class
 
-- [ ] Finish the interpretation.
+- [ ] Bring your completed interpretation to hand in next class.

@@ -13,9 +13,9 @@ tags:
 1. [[Newton's Second Law]] — part 2, varying the mass
 2. Graphing $a$ against $F$ and against $1/m$ — [[Graphing Data]]
 3. Consolidate: $F_{net} = ma$, and what the slopes mean
-4. Hand in [[Motion Story]]
 
 ## Things to do before our next class
 
-- [ ] Full lab report for [[Newton's Second Law]], due in three classes — see [[Writing a Lab Report]].
+- [ ] Full lab report for [[Newton's Second Law]] started — see
+      [[Writing a Lab Report]]. The analysis period is next class.
 - [ ] Read [[Friction]] before the next class.

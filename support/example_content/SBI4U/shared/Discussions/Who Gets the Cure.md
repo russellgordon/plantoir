@@ -34,7 +34,9 @@ And who should decide: the public system, the manufacturer, or the family?
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D1.2]]
+![[A1.3]]
 
 ![[D1.1]]
+
+![[D1.2]]
 %%curriculum-end%%

@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Close Reading Essay]], day 1 — claims drafted from your
+1. Launch: [[The Close Reading Essay]], day 1 of 5 — claims drafted from your
    own annotations
 2. Reference: [[The Essay]] — what changes at 700 words
 

@@ -33,6 +33,7 @@ sign chart does not care what kind of function it is analysing.
 
 - [[Radian Measure]]
 - [[The Unit Circle]]
+- [[Sinusoids in Radians]]
 - [[Reciprocal Trigonometric Functions]]
 - [[Compound Angles]]
 - [[Trigonometric Identities]]
@@ -40,9 +41,19 @@ sign chart does not care what kind of function it is analysing.
 ## Unit 4 — Logarithms, rates of change, and combining
 
 - [[The Logarithm]]
+- [[Logarithms as Undoing]]
 - [[Laws of Logarithms]]
+- [[Logarithmic Scales]]
 - [[Rates of Change]]
+- [[Rates of Change in the World]]
 - [[Combining Functions]]
+- [[Composing Functions]]
+- [[The Same Four Parameters]]
+
+[[The Same Four Parameters]] belongs to the whole course rather than to
+this unit: it is where the four families finally admit they were one
+family all along, and it is the last page written and the first one to
+reread at the end of the course.
 
 Most pages end by pointing at the practice set that turns the idea
 into a reflex, and at the curriculum expectations the page serves — so

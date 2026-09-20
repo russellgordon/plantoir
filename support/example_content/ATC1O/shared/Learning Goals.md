@@ -6,7 +6,7 @@ created: __CREATED__
 What you should be able to do by the end of ATC1O, in plain words first
 and in the Ministry's words underneath.
 
-## By June you should be able to
+## By the end of the course you should be able to
 
 - **Generate movement that is yours**, from a stimulus, and repeat it.
 - **Build a dance** with a structure someone watching can follow.
@@ -22,8 +22,8 @@ and in the Ministry's words underneath.
 
 ## The self-check that matters
 
-Two things, in June: can you make a minute of movement that means
-something to you and holds together — and can you say, in accurate
+Two things, at the end of the course: can you make a minute of movement that
+means something to you and holds together — and can you say, in accurate
 words, what a dance you have just watched was doing? That is the whole
 course.
 

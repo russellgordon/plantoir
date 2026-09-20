@@ -46,6 +46,19 @@ take before it stops working, and what to do when it does.
 They do not need a lecture on equilibrium. They need the number, the
 recipe, and the honest limits.
 
+## Who does what
+
+You work in **pairs** at the bench — a titration wants one person on the
+tap and one on the probe, and a buffer challenge run against a water
+control at the same time wants four hands.
+
+**Everything on paper is yours alone.** One buffer is made and one set
+of readings is taken, and the two of you may hand in the same numbers.
+Your specification sheet, your prediction with its working, and your
+account of the gap between predicted and measured are written by you,
+and they are what your mark rests on. Two identical analyses are one
+analysis handed in twice, and I will treat them that way.
+
 ## Part 1 — The design
 
 **a) State your target pH**, to two decimal places, and say where the
@@ -320,4 +333,55 @@ Reading the booklet's tables: [[Reading an Equilibrium Table]].
 ![[E1.2]]
 
 ![[E2.5]]
+
+![[E3.8]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 12, the bench period, during the titration
+  Watch for: when the decision about spacing gets made. Both of the
+  numbers this task rests on come out of how densely the points sit
+  where the pH is moving fastest, and the curve you get back shows the
+  spacing without telling you whether it was planned or noticed halfway
+  up the jump — by which time the equivalence volume has been passed
+  once already. This is the one slot in the task where two minutes of
+  watching can still fix a reading rather than only account for it
+  afterwards.
+  Going well: the tap slowed the moment the pH starts climbing between
+  readings; a stated plan for the last few millilitres before the first
+  drop goes in; the tip rinsed into the flask.
+  Stuck: one increment from start to finish, leaving three points in the
+  region that decides both readings; the jump crossed in a single
+  addition and then approached again from the other side.
+  Record: a cross on your class list beside any pair whose curve is
+  going to be unreadable, and go back to them before they start making
+  the buffer. That is not E2.5 itself — E2.5 is the solving, and it is
+  in the report — but it decides whether there is anything worth solving
+  from.
+
+TALK — Unit 4, Day 13, while they work on the comparison and the analysis
+  Ask: "You read a value off the graph at half equivalence. What did you
+  have to assume about your acid for that reading to mean anything at
+  all?"
+  Then: "Suppose I told you the buret had been reading two per cent high
+  all afternoon. Which of the two numbers you took off that curve
+  changes, and which does not?"
+  A strong first answer gets to one ionisation operating in the region
+  they read — which, for the phosphate and the hydrogencarbonate pairs,
+  means the second one and not the first — and notices that the
+  concentration drops out of the arithmetic there, which is why the
+  reading is worth having and also why it is fragile. A strong second
+  answer sees that every volume scales, so the equivalence volume and
+  the concentration it implies both move, while the pH at half
+  equivalence is read off the other axis at the same physical point and
+  does not. Both are E2.5 reasoned rather than executed, and a report
+  can carry two correct readings without either thought having happened.
+  Record: nothing written down. Note the pairs who reached the second
+  answer, and ask one of them to put it on the board in the last five
+  minutes.
+
+The product evidence is the whole package on Day 14, and the titration
+curve inside it.
+%%

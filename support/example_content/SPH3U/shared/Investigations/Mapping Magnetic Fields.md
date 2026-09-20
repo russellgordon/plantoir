@@ -83,11 +83,15 @@ assume you were wrong.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.6]]
+
 ![[F2.4]]
+
+![[F2.5]]
+
+![[F3.1]]
 
 ![[F3.2]]
 
 ![[F3.3]]
-
-![[A1.6]]
 %%curriculum-end%%

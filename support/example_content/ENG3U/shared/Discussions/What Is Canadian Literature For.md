@@ -2,6 +2,8 @@
 title: What Is Canadian Literature For
 publish: true
 created: __CREATED__
+tags:
+  - discussions
 enableToc: true
 ---
 ## The question
@@ -21,9 +23,10 @@ syllabus attached?
 ## The evidence in this course
 
 Look at [[Reading/index|the reading page]]. A Haisla novel, a Métis poem,
-a Nova Scotian short story, an argument by a writer of Cherokee and Greek
-descent who lives and works here. Ask what they have in common that is
-not simply the border.
+a Cape Breton short story, and an argument about Indigenous people in
+North America by a writer who believed all his life that he was Cherokee
+and was not — see [[The Inconvenient Indian]]. Ask what these have in
+common that is not simply the border.
 
 ## Afterwards
 

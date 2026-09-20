@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 The booking program had one rule: a room holds between one and thirty
 people. The rule was written, tested, and correct. Then a second file
@@ -107,7 +106,7 @@ throughout.
 So if Python will not stop anybody, why bother? Because the point was
 never to defeat an attacker who has your source code. It is to make
 the correct path the obvious one, for people who mean well and are in
-a hurry — including you, in March, at 11 p.m.
+a hurry — including you, later in the course, at 11 p.m.
 
 - **The class can be trusted.** If every change to `_people` goes
   through `set_people`, then "no booking ever has a bad size" is a

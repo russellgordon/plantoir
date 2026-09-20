@@ -41,7 +41,7 @@ same strength and nothing separates from anything. Photograph your work in
 black and white — if it turns to mud, that is a value problem, and
 [[Photographing Your Work]] has the quickest way to check.
 
-## Three jobs, all year
+## Three jobs, all semester
 
 You will use these words to **make** — "this needs a darker value behind the
 figure" is an instruction you can act on — to **describe**, since every

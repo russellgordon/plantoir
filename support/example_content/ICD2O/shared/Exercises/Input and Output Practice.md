@@ -64,6 +64,8 @@ to a person — which means a person can always type the unexpected.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.3]]
+
 ![[C2.1]]
 
 ![[C2.2]]

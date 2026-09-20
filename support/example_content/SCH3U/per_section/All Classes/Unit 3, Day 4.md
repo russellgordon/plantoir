@@ -13,7 +13,7 @@ tags:
 1. Warm-up: mass to moles, moles to particles, cold
 2. The map on the board: mass ↔ moles ↔ particles, and later volume and
    concentration. Draw it in your journal; you will redraw it in
-   January
+   the end of the course
 3. Practise: [[Mole Conversions Practice]], first sections
 
 ## Things to do before our next class

@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. A feminist reading of one chapter, then a materialist one
-2. What each shows about the Commander's household as an economy
+1. A feminist reading of one chapter, then a materialist one: [[The Handmaid's Tale]]
+2. What each shows about the Commander's household as an economy: [[Critical Approaches]]
 
 ## Things to do before our next class
 

@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Predict in writing, with a number and a reason attached to it
-2. Investigation: [[Modelling the Greenhouse Effect]] — you choose the controls
-3. Compare warming curves; the odd result gets the floor first
+1. Diagnostic: predict in writing, with a number and a reason attached to
+   it. Unmarked, and it tells me which of you already has a mechanism for
+   this and which of you has a slogan
+2. Investigation: [[Modelling the Greenhouse Effect]] — you choose the
+   controls, and you leave time to switch the lamp off and keep reading
+3. Compare warming and cooling curves; the odd result gets the floor first
 4. Name it: [[The Greenhouse Effect]] — what the jar shows and what it fakes
 
 ## Things to do before our next class

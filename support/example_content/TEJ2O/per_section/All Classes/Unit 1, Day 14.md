@@ -16,6 +16,7 @@ tags:
 3. Concept: [[Peripherals and Ports]] — what plugs into what, and why the
    shapes differ
 4. Bench time: [[The Build Sheet]], day 3 — the client brief, read properly
+5. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

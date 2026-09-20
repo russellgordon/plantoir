@@ -12,6 +12,7 @@ other page can link here instead of explaining it again.
 | Tutorial | The skill |
 | --- | --- |
 | [[Using This Site]] | Finding your way around this site quickly |
+| [[Scavenger Hunt]] | A quick five-minute orientation across the course |
 | [[Using Version Control]] | Three people editing one program without losing work |
 | [[Reading a Traceback in Someone Else's Code]] | Diagnosing a crash across several files |
 | [[Writing Tests]] | Proving it works, and proving it still works |

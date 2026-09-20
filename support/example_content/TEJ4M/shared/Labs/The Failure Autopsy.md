@@ -121,7 +121,7 @@ is actually worth.
 Somebody designed this device, and it met its specification on the day
 it shipped. Name the decision that made it die anyway.
 
-Then the design-margin question, and this one comes back all year: what
+Then the design-margin question, and this one comes back all semester: what
 would you have changed so it survived a hot day in a closed cabinet, a
 year of being switched on and off, or being plugged in backwards once?
 Give a specific change — a different rating, a different package, a

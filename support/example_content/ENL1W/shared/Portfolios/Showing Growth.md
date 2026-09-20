@@ -10,7 +10,7 @@ exactly what [[The Portfolio Conversation]] asks you to do.
 
 ## The method
 
-1. **Choose a pair.** A September piece and a January piece, ideally of
+1. **Choose a pair.** An early piece and a late one, ideally of
    the same kind: two paragraphs about a text, two openings, two
    journal entries.
 2. **Read them out loud, in order.** Out loud. You will hear things you
@@ -24,10 +24,10 @@ exactly what [[The Portfolio Conversation]] asks you to do.
 
 ## Useful sentences
 
-> In September I explained the quotation by repeating it. Here I say what
+> At the start of the course I explained the quotation by repeating it. Here I say what
 > the word choice does.
 
-> My September paragraph had one sentence length. This one has three, and
+> My an early paragraph had one sentence length. This one has three, and
 > the short one is where I want the reader to stop.
 
 > I still start every paragraph with the same phrase. That is the next
@@ -52,4 +52,6 @@ see in the two pieces without you explaining it.
 ![[C3.8]]
 
 ![[A1.2]]
+
+![[A3.1]]
 %%curriculum-end%%

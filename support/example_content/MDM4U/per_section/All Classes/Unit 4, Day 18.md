@@ -10,7 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[Final Reflection]] and your [[Math Journal]]
+1. First forty minutes: [[Final Reflection]], written here — the last
+   milestone entry of the course, and the last one that carries a
+   mark. [[Showing Growth]] is the method, [[Journal Checklist]] the
+   standard. It comes in with your [[Math Journal]] at the door
 2. Where this goes: [[What a Statistical Study Is For]] again, at the
    careers table — actuary, epidemiologist, analyst, and how each is
    qualified
@@ -18,4 +21,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Bring your questions for the review classes.
+- [ ] Read [[The Final Examination]] before next class. It says what
+      is on the paper, and the three review classes run on the
+      questions you bring to them.

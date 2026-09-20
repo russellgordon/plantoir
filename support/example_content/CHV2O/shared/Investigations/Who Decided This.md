@@ -55,15 +55,23 @@ and it means the trail has more than one government on it. Read
 
 ## What you produce
 
-A single page with five things on it, in this order: the decision, the
-body that made it, the instrument that carries it, the date and the vote
-if there was one, and the route to changing it. Every line gets a source
-a reader could follow.
+A single page with six things on it, in this order:
 
-Then one paragraph of judgement, which is the part that is actually
-marked: was this decision made at the right level? Argue it. A decision
-can be legitimate and badly placed, and saying so precisely is worth more
-than approving or disapproving of the outcome.
+1. **The decision**: what was decided, when, and who is affected.
+2. **The body and order**: the specific level of government, department, or
+   council that held the power.
+3. **The legal instrument**: the statute, regulation, bylaw, motion, or policy
+   amendment that gave it legal force (see [[Bills and What Happens to Them]]).
+4. **The funding mechanism**: how it is paid for (operating budget, capital plan,
+   tax revenue, user fee, or government grant; see [[Budgets as Statements of Priority]]).
+5. **The date and public record**: the meeting minutes, Hansard debate, or
+   official notice.
+6. **The route to change**: what it would take to amend or repeal it.
+
+Then one paragraph of judgement, applying the concepts of political thinking:
+was this decision made at the right level, and does the policy achieve its
+intended objective without destabilising other community priorities? Argue it
+with evidence.
 
 Use [[Who Decides What, and Where]] for the map and
 [[Bills and What Happens to Them]] if the trail leads to a statute. The
@@ -77,4 +85,10 @@ result becomes evidence in [[The Issue Brief]].
 ![[B2.2]]
 
 ![[B2.7]]
+
+![[B2.5]]
+
+![[B2.6]]
+
+![[A2.3]]
 %%curriculum-end%%

@@ -12,7 +12,7 @@ tags:
 
 1. Working period and clinic: anything outstanding from Unit 2
 2. Portfolio time: [[A Map of Your Own]], first version
-3. Conferences
+3. Conferences on thematic map design and spatial clarity for [[The Field Record]]
 
 ## Things to do before our next class
 

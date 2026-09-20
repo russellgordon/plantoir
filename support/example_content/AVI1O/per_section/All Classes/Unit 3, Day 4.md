@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Choose your work; write your first reaction before research.
+- [ ] Choose your work from the approved list; look at it closely.

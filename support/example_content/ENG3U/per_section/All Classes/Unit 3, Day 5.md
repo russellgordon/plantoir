@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. The categories: Dead, Live, Legal. Tracked through the extract
-2. Where the humour lands hardest, and on whom
+1. The categories: Dead, Live, Legal. Tracked through the extract — the
+   tracking earns no mark; it shows me whether the argument has been
+   followed or only agreed with: [[The Inconvenient Indian]]
+2. Where the humour lands hardest, and on whom: [[Reading Non-Fiction]]
 3. Reading period with the novel
 
 ## Things to do before our next class

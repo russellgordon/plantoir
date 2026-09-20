@@ -31,7 +31,7 @@ Ask four questions of any passage:
 Formality is a choice you make about a situation, not a level you are
 stuck on. The register of a seminar, an essay, a news report, and a text
 message should all be different, and moving between them deliberately is
-a marked skill in this course — see [[The Literacy Test]] for two of them
+a skill this course practises — see [[The Literacy Test]] for two of them
 side by side.
 
 ## Reading your own draft for style
@@ -52,4 +52,8 @@ marks will improve a draft more than an hour of adding adjectives.
 ![[C2.6]]
 
 ![[C3.3]]
+
+![[C2.7]]
+
+![[C3.2]]
 %%curriculum-end%%

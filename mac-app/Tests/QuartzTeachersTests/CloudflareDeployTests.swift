@@ -322,6 +322,7 @@ final class HeldPublishingChoice {
     var deployTarget: String = "netlify"
     var deployFolderPath: String = ""
     var cloudflareAccountID: String = ""
+    var additionalDeployTargets: [CourseConfiguration.AdditionalDeployTarget] = []
 
     // MARK: - Computed properties
 
@@ -338,6 +339,10 @@ final class HeldPublishingChoice {
             cloudflareAccountID: Binding(
                 get: { self.cloudflareAccountID },
                 set: { newValue in self.cloudflareAccountID = newValue }
+            ),
+            additionalDeployTargets: Binding(
+                get: { self.additionalDeployTargets },
+                set: { newValue in self.additionalDeployTargets = newValue }
             )
         )
     }

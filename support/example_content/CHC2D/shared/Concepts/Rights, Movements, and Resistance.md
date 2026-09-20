@@ -76,4 +76,6 @@ to keep your claims tied to what the sources actually show.
 ![[D2.2]]
 
 ![[D2.4]]
+
+![[E3.3]]
 %%curriculum-end%%

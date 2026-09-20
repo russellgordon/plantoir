@@ -64,4 +64,6 @@ exactly what [[Historical Perspective]] is for.
 ![[D2.5]]
 
 ![[E2.5]]
+
+![[E3.5]]
 %%curriculum-end%%

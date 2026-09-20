@@ -37,9 +37,11 @@ Every container names the product, shows its pictograms, and gives a signal word
 detail, including first aid and disposal.
 
 > [!question] Before every investigation
-> What could go wrong here, and what would I do about it? Write your answer in
-> the safety section of your lab notebook. That habit is the whole point of
-> A1.5 — see [[A1.5|the safety expectation]].
+> What could go wrong here, and what would I do about it? Write the answer in
+> the safety section of [[Your Lab Notebook]] before you touch anything. That
+> note is what [[A1.5|the safety expectation]] means by applying safe practice
+> *while planning*, and it is the part of [[Lab Reports]] that is marked
+> without ever appearing in the report.
 
 %%curriculum-start%%
 ## Curriculum connection

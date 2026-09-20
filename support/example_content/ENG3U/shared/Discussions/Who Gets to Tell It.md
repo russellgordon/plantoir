@@ -2,6 +2,8 @@
 title: Who Gets to Tell It
 publish: true
 created: __CREATED__
+tags:
+  - discussions
 enableToc: true
 ---
 ## The question

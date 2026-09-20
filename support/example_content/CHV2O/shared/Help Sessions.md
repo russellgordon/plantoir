@@ -14,7 +14,7 @@ reason needed.
 
 This course is ten weeks long and it runs across the winter break, which
 means the two weeks either side of it are the ones people lose. Come in
-early December rather than late.
+early rather than late.
 
 > [!tip] Bring the document, not a description of it
 > The bill, the budget page, the decision itself. Ten minutes with the

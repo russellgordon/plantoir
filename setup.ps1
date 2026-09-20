@@ -143,6 +143,7 @@ function Enter-NativeRuntime {
   $base = if (Test-Path (Join-Path $toolchainDir 'scripts')) { $toolchainDir } else { (Get-Location).Path }
   $env:PLANTOIR_SCRIPTS_DIR = Join-Path $base 'scripts'
   $env:PLANTOIR_SUPPORT_DIR = Join-Path $base 'support'
+  $env:PLANTOIR_CONTRACTS_DIR = Join-Path $base 'contracts'
   $env:PLANTOIR_QUARTZ_DIR  = Join-Path $NATIVE_RUNTIME 'quartz'
   $env:PLANTOIR_EMOJI_FONT  = Join-Path $NATIVE_RUNTIME 'fonts\NotoColorEmoji.ttf'
   $env:PLANTOIR_COURSES_DIR = Join-Path (Get-Location).Path 'courses'

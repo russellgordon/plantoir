@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""
+# The docstring is raw because it quotes a Windows path: `…\plantoir-mcp.exe`
+# is an invalid escape otherwise, and Python 3.12 onwards says so on every run.
+r"""
 Write the tool surface a routing measurement should run against.
 
 Reads `contracts/assist-cases.json` — which is generated from the app itself —
@@ -18,11 +20,30 @@ are measured artifacts — one added sentence in `publish_pages` took the
 promise-card score from 110/110 to 90/110 — so a measurement is only about the
 shipping surface if the descriptions are the shipping ones too.
 
+**On WINDOWS this file is the wrong starting point, and that is not obvious.**
+The contract is generated from the MAC, so what it holds is the mac's
+descriptions, and they are NOT this server's. Measured 2026-09-08: of the 32
+shared tools, 29 full descriptions differ, and of the thirteen the local model
+is shown, FIVE differ in the text `Briefly()` actually produces. So a Windows
+measurement taken from here scores the mac's surface on Windows hardware and
+reads as evidence about neither. On Windows, dump the live surface instead:
+
+    research/ai-assist/dump-tools.ps1 -Exe …\plantoir-mcp.exe -Folder … -Course … -Out tools.json
+    python research/ai-assist/narrow-tools.py tools.json narrowed.json <COURSE>
+
     python3 research/ai-assist/tools-from-contract.py [local|mcp] > /tmp/real-tools.json
-    python3 research/ai-assist/shipped-surface-suite.py 8099 10 /tmp/real-tools.json
+    python3 research/ai-assist/trimmed-surface-suite.py /tmp/real-tools.json 10 \
+        --date-appended --real-course --course VVH2O
+
+**The second line used to name `shipped-surface-suite.py`, and that was wrong**
+— corrected 2026-09-18. Its probes accept `publish_class` and `hide_class`,
+which the app replaced with separate publish and unpublish verbs, so it scores
+the shipping surface against a list of tools that no longer exist and reports
+near-total failure. `trimmed-surface-suite.py` is the suite the current numbers
+come from.
 
 `local` (the default) is what the on-device model is shown — 13 tools, and the
-list the routing figures were measured against. `mcp` is the 23 Claude Code
+list the routing figures were measured against. `mcp` is the 32 Claude Code
 sees.
 """
 import json

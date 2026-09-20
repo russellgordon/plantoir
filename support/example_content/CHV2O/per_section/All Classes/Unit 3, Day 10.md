@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. **Period 8 of 10: the action carried out**
-2. Sending, delivering, or following up on what happened outside class
+1. **Period 8 of 10: the action carried out** for [[The Civic Action Project]]
+2. Sending, delivering, or following up on what happened outside class: [[How Change Actually Happens]]
 3. Recording exactly what you did, and when
 
 ## Things to do before our next class

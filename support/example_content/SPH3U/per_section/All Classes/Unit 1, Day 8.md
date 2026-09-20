@@ -17,5 +17,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Analysis section of [[Measuring g]], due next class.
+- [ ] Analysis section of [[Measuring g]] drafted for next class's
+      analysis period.
 - [ ] Finish [[Kinematic Equation Practice]].

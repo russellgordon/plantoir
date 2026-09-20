@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: object design, encapsulation, and
-   collaboration between objects
-2. Mark your own; write your revision list
+   collaboration between objects — [[Objects Working Together]]
+2. Mark your own; write your revision list: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

@@ -11,11 +11,13 @@ tags:
 ## Agenda
 
 1. Quick number talk: [[Dot Talks]] — one last look at seeing structure
-2. [[Pattern Machines]] demos — machine runs, audience predicts term 100
-3. Circle up: patterns, expressions, code — one idea in three costumes
+2. [[Pattern Machines]], day 7 of 7 — demos: machine runs, audience
+   predicts term 100
+3. Circle up: what made a machine easy to read — and patterns,
+   expressions, code as one idea in three costumes
 4. Journal collection — run the [[Journal Checklist]] first
 
 ## Things to do before our next class
 
-- [ ] Breathe. Unit 3 begins with a question about your own data.
-- [ ] Skim [[Who Does Data Serve]] before next class.
+- [ ] Breathe. Unit 2 has equations left in it, and we go back to them
+      next class.

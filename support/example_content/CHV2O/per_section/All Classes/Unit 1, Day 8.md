@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[What Democracy Asks of You]] — three votes, and everything between them
-2. Turnout, and what it does and does not explain
-3. [[Who Decided This|Who Decided This?]] findings compared across the class
+1. [[Judging Civic Information]] — who paid, who benefits, and what has been left out
+2. Four sources on one issue, ranked and defended. No mark; it decides what we do next class
+3. [[How Government Works]], first build period: which governments are in your issue, and where each of those powers is written down
 
 ## Things to do before our next class
 
-- [ ] Finish the investigation's questions.
+- [ ] Read [[Judging Civic Information]].

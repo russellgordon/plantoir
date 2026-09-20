@@ -6,8 +6,8 @@ tags:
   - tasks
   - unit-1
 ---
-**Unit 1. Individual. Due at the end of week three.** Two to three
-pages, or an equivalent you have agreed with me.
+**Unit 1. Individual. Handed in at the end of the revision period on
+Day 10.** Two to three pages, or an equivalent you have agreed with me.
 
 The first assessed piece, and the foundation of everything after it. You
 document what you can already do, with evidence, and you set out how you
@@ -66,3 +66,43 @@ it once, properly.
 
 ![[A1.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 9, the first half of the working period, while
+part three is on the desks and before you start conferring
+  Watch for: who checks a route and who writes a plausible one. You will
+  catch a WRONG route when you mark it, because you handed out the list
+  yourself. What you cannot catch is a route that happens to be right and
+  was never checked — "go to guidance" written by somebody who has never
+  been. So this corroborates the Accuracy row rather than replacing it.
+  Going well: the handout or the school's own page is open, and what
+  goes down is a name, a room, an hour, or a number that was looked up.
+  Stuck: routes written from assumption, with no door and no name; or a
+  part three built only out of the national helplines on the concept
+  page, with nothing from this school or this town in it — A1.3 asks for
+  the school AND the community.
+  Record: a tick beside every name you saw open the handout or the
+  school's page, and nothing beside the rest. The blanks are who to reach
+  first on Day 10.
+
+TALK — Unit 1, Day 10, while you are at their shoulder for the self-check
+  Ask: "Which of your three strategies has stopped working on you, and
+  what did you use instead?"
+  Then: "Which of the three supports on your list would be hardest for
+  somebody to actually use, and why?"
+  A strong answer to the first names an occasion and a substitution. A1.2
+  asks them to explain how they have used such strategies, and part three
+  already collects a sentence on when each one helps — what it never
+  collects is the time one of them did not, which is where you find out
+  whether the three are real or chosen off the page. The second is A1.3
+  from the other side: "describe how to access" is easy to write and hard
+  to mean, and a student who names the real obstacle — the hours, needing
+  a parent to phone, a waitlist, the walk past the office window — has
+  understood the access half of it.
+  Record: the barrier they named, in three or four words, beside their
+  name. A student who cannot name one is itself the note.
+
+The product evidence is the three parts, handed in at the end of Day 10.
+%%

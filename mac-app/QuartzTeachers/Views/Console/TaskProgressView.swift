@@ -16,6 +16,21 @@ struct TaskProgressView: View {
     let runner: ScriptRunner
     let title: String
     let canCancel: Bool
+    /// True only for a multi-destination deploy, where this view is bound
+    /// to whichever leg ran LAST — showing that one leg's own "Your website
+    /// is live" link would read as though it were the whole story.
+    /// `DeployDestinationLinks` shows every succeeded destination's own
+    /// link instead; a single-destination deploy (the overwhelming
+    /// majority) never sets this and looks exactly as it always has.
+    let hidesSiteLink: Bool
+    /// Every leg of a multi-destination deploy, in order — used TWICE:
+    /// rendered as `DeployDestinationLinks` in place of the single-leg link
+    /// section (right where `hidesSiteLink` skips it), and passed through
+    /// unchanged to `TaskConsoleView` so "Show details" can show EVERY
+    /// destination's own output so far, not just whichever leg happens to
+    /// be `runner` right now. `nil` for everything else (a single
+    /// destination, a preview), which looks exactly as it always has.
+    let allLegs: [MultiDestinationDeployRunner.Leg]?
     let onCancel: (() -> Void)?
 
     @State var isShowingDetails: Bool = false
@@ -28,11 +43,15 @@ struct TaskProgressView: View {
         title: String,
         showingDetailsForTesting: Bool = false,
         canCancel: Bool = true,
+        hidesSiteLink: Bool = false,
+        allLegs: [MultiDestinationDeployRunner.Leg]? = nil,
         onCancel: (() -> Void)? = nil
     ) {
         self.runner = runner
         self.title = title
         self.canCancel = canCancel
+        self.hidesSiteLink = hidesSiteLink
+        self.allLegs = allLegs
         self.onCancel = onCancel
         _isShowingDetails = State(initialValue: showingDetailsForTesting)
     }
@@ -100,7 +119,13 @@ struct TaskProgressView: View {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let _ = noteRefresh(at: context.date)
                 VStack(alignment: .leading, spacing: 10) {
-                    if runner.isRunning {
+                    // `isBetweenPhases`: this runner has already finished
+                    // one script and is about to start a second on the
+                    // same leg (a build, then its deploy) — treated as
+                    // still running so the console keeps showing progress
+                    // rather than flashing "Done" for a leg with a script
+                    // still queued up on it. See `ScriptRunner.isBetweenPhases`.
+                    if runner.isRunning || runner.isBetweenPhases {
                         HStack(spacing: 8) {
                             Text(title)
                                 .font(.headline)
@@ -194,7 +219,17 @@ struct TaskProgressView: View {
 
                         // Finish with something to click: the live site,
                         // or — for folder deploys — the published folder.
-                        if !runner.wasCancelled, exitCode == 0, let siteURL = runner.publishedSiteURL {
+                        // A multi-destination deploy (`hidesSiteLink` set)
+                        // shows `DeployDestinationLinks` here instead —
+                        // every succeeded destination's own link, not just
+                        // this one (the last) leg's — in the SAME spot a
+                        // single destination's own link would sit, above
+                        // "Show details", never down past the console.
+                        if hidesSiteLink {
+                            if let allLegs {
+                                DeployDestinationLinks(legs: allLegs)
+                            }
+                        } else if !runner.wasCancelled, exitCode == 0, let siteURL = runner.publishedSiteURL {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Your website is live.")
                                 Link(siteURL.absoluteString, destination: siteURL)
@@ -203,10 +238,26 @@ struct TaskProgressView: View {
                         } else if !runner.wasCancelled, exitCode == 0, let folderURL = runner.publishedFolderURL {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Your website was deployed to a folder — upload it to your web host whenever you're ready.")
+                                // No `fixedSize` on this note, on purpose —
+                                // the rule `CloudSyncNoticeView` and
+                                // `WebPreviewView.sizeThatFits` already state:
+                                // never make a wrapping text's height RIGID
+                                // inside a view a split-view column can
+                                // measure. A text told to keep its vertical
+                                // size answers with the lines it needs at the
+                                // width it is PROPOSED, and the split view
+                                // measures a column by proposing next to no
+                                // width at all — where this sentence wraps to
+                                // a character per line and claims 1,907
+                                // points. The column took that as its height,
+                                // the window's content grew past the window,
+                                // and the whole interface — sidebar included —
+                                // slid out of the visible band the moment a
+                                // folder publish said "Done". Measured, and
+                                // pinned by `ProgressViewSizeTests`.
                                 Text("One thing to know: the pages won’t look right if you open them straight from the folder — your website only displays properly once it’s on your web host.")
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
                                     .accessibilityIdentifier("publishedFolderRenderNote")
                                 Button("Show in Finder", systemImage: "finder") {
                                     NSWorkspace.shared.activateFileViewerSelecting([folderURL])
@@ -264,7 +315,7 @@ struct TaskProgressView: View {
                 // transcript then demanded tens of thousands of points,
                 // growing the window's content past the window itself
                 // and sliding the interface out of sight.
-                TaskConsoleView(runner: runner)
+                TaskConsoleView(runner: runner, allLegs: allLegs)
                     .frame(minHeight: 200, idealHeight: 260, maxHeight: .infinity)
                     .clipped()
             }

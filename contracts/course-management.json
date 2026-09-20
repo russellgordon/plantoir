@@ -7,7 +7,24 @@
       { "typed": "robotics", "expect": "ROBOTICS" },
       { "typed": "   ", "expect": "" }
     ],
-    "note": "What a course code may be — letters, numbers, and single spaces between them, at most twelve characters. ONE rule, asked by the New Course wizard and by renaming a course, because a code one accepts and the other refuses is a course a teacher can create and then never re-type. The rule is narrow because a course code is not just a label: it IS the folder name under courses/, it is written into course_config.json for the shared Python, it prefixes every backup and archive zip, and on the mac it becomes part of a scheduled publish's launchd label. Each of those has its own opinion about what it will carry; one narrow rule beats four that disagree at the edges.",
+    "note": "What a course code may be — letters, numbers, dashes, and single spaces between them, at most twelve characters. ONE rule, asked by the New Course wizard and by renaming a course, because a code one accepts and the other refuses is a course a teacher can create and then never re-type. The rule is narrow because a course code is not just a label: it IS the folder name under courses/, it is written into course_config.json for the shared Python, it prefixes every backup and archive zip, and on the mac it becomes part of a scheduled publish's launchd label. Each of those has its own opinion about what it will carry; one narrow rule beats four that disagree at the edges.",
+    "clubDetection": {
+      "note": "Whether a course code names a CLUB rather than a course. It decides two things a teacher can see: whether the New Course wizard offers a \"Short label\" field, and whether custom_short_name is written into course_config.json. Ask the course-name CATALOG first and take its answer as final — a code the app ships a name for is a course, whatever shape it happens to be. Only for a code the catalog has never heard of does the fallback apply: four characters or more, and the fourth is not a digit. That fallback is an Ontario-shaped guess (ICS3U, MPM2D put the grade digit fourth) and it is kept only for teacher-invented names like CODING or ROBOTICS, where there is no entry to consult.",
+      "why": "Added 2026-08-23 after the fallback was found running on its own on BOTH platforms. British Columbia's codes put a letter or a dash in fourth place — MTEL-12, MMA--09, MCMPR11 — so every one of BC's 117 courses was read as a club, and a real course was offered a club's short-label field. macOS fixed it in ClubCodeRule; NewCourseDialog.IsClubCode on Windows still carries the original one-line version, so this case list is expected to fail there until it does. That is the contract working, not damage.",
+      "cases": [
+        { "code": "ICS3U", "expectClub": false, "why": "An Ontario course: the catalog knows it, and the fallback would agree anyway." },
+        { "code": "MPM2D", "expectClub": false },
+        { "code": "MTEL-12", "expectClub": false, "why": "A BC course. The fallback alone says CLUB, because the fourth character is an L — the catalog is what settles it." },
+        { "code": "MMA--09", "expectClub": false, "why": "A BC course whose fourth character is a dash." },
+        { "code": "MCMPR11", "expectClub": false, "why": "A BC course with no dash at all and a letter fourth." },
+        { "code": "ROBOTICS", "expectClub": true, "why": "Teacher-invented, unknown to the catalog, fourth character not a digit — the fallback doing the job it was written for." },
+        { "code": "CODING", "expectClub": true },
+        { "code": "CS CLUB", "expectClub": true, "why": "A space is legal in a code, and the fourth character here is a space rather than a digit." },
+        { "code": "  ROBOTICS  ", "expectClub": true, "why": "Surrounding whitespace is trimmed before the question is asked." },
+        { "code": "AP1", "expectClub": false, "why": "Shorter than four characters, so there is no fourth character to judge and the fallback declines rather than guessing." },
+        { "code": "", "expectClub": false, "why": "Nothing typed yet is not a club." }
+      ]
+    },
     "wordingNote": "Every problem has TWO wordings and both are teacher-facing. expectProblem is the full sentence, shown under the New Course wizard's wide field where it can afford to explain itself. expectShort is what the SIDEBAR row shows while a course is being renamed in place, where there is room for about twenty-five characters before the message is cut off mid-word \u2014 and half an explanation explains nothing. Both come off one enum in the code, so they cannot drift into two different rules.",
     "problems": [
       { "typed": "", "existing": ["ICS4U"], "expectProblem": null, "expectShort": null, "why": "An empty field is not-ready-yet, not an error. A warning that appears before the teacher has typed anything is noise." },
@@ -18,10 +35,13 @@
       { "typed": "   ", "existing": [], "expectProblem": null, "expectShort": null, "why": "Nothing but spaces trims to nothing, which is not-ready-yet rather than an error." },
       { "typed": "ics4u", "existing": ["ICS4U"], "expectProblem": "A course named ICS4U already exists — choose a different code.", "expectShort": "ICS4U already exists", "why": "The clash is found case-insensitively — see normalized." },
       { "typed": "  MPM2D  ", "existing": ["ICS4U", "MPM2D"], "expectProblem": "A course named MPM2D already exists — choose a different code.", "expectShort": "MPM2D already exists", "why": "Whitespace never hides a clash." },
-      { "typed": "ICS3U!", "existing": [], "expectProblem": "A course code can only use letters, numbers and spaces.", "expectShort": "Letters, numbers, spaces" },
-      { "typed": "CS-CLUB", "existing": [], "expectProblem": "A course code can only use letters, numbers and spaces.", "expectShort": "Letters, numbers, spaces", "why": "A hyphen is refused like any other punctuation. Clubs are named by the teacher, so this is the rule most likely to meet one — CS CLUB, with a space, is the way to write it." },
-      { "typed": "ICS3U🎉", "existing": [], "expectProblem": "A course code can only use letters, numbers and spaces.", "expectShort": "Letters, numbers, spaces", "why": "Emoji fail the same test punctuation does: not an ASCII letter or digit." },
-      { "typed": "CAFÉ", "existing": [], "expectProblem": "A course code can only use letters, numbers and spaces.", "expectShort": "Letters, numbers, spaces", "why": "An accented letter is refused too. The sentence says letters and numbers, which is true of what is ALLOWED — the alternative is a sentence about character encodings in a sidebar row." },
+      { "typed": "ICS3U!", "existing": [], "expectProblem": "A course code can only use letters, numbers, spaces and dashes.", "expectShort": "Letters, numbers, dashes" },
+      { "typed": "CS-CLUB", "existing": [], "expectProblem": null, "expectShort": null, "why": "A hyphen is ALLOWED, reversed 2026-08-23. This case used to expect a refusal, on the reasoning that a hyphen is punctuation like any other and CS CLUB with a space is the way to write a club. That reasoning was written before British Columbia's codes were in the app: 55 of the 117 codes in support/british_columbia_secondary_courses.json contain a dash — MTEL-12, MFMP-10, MMA--09 — so the rule was refusing more than half of one province's real courses. A dash is safe everywhere a code travels: legal in a folder name, in a zip's name, and in a launchd label." },
+      { "typed": "MTEL-12", "existing": [], "expectProblem": null, "expectShort": null, "why": "A real BC course code, and the one Russell was trying to create when he found the rule refusing it." },
+      { "typed": "MMA--09", "existing": [], "expectProblem": null, "expectShort": null, "why": "Two dashes in a row are fine — the double-character check is about SPACES, where a run is always a typo. A run of dashes is what BC actually prints for its shorter subject codes." },
+      { "typed": "-ICS3U-", "existing": [], "expectProblem": null, "expectShort": null, "why": "A leading or trailing dash is not refused. Unlike a space, it is not trimmed either, so the code is stored with it — allowed rather than special-cased, because nothing downstream minds and a rule with fewer edges is a rule both apps can hold." },
+      { "typed": "ICS3U🎉", "existing": [], "expectProblem": "A course code can only use letters, numbers, spaces and dashes.", "expectShort": "Letters, numbers, dashes", "why": "Emoji fail the same test punctuation does: not an ASCII letter or digit." },
+      { "typed": "CAFÉ", "existing": [], "expectProblem": "A course code can only use letters, numbers, spaces and dashes.", "expectShort": "Letters, numbers, dashes", "why": "An accented letter is refused too. The sentence says letters and numbers, which is true of what is ALLOWED — the alternative is a sentence about character encodings in a sidebar row." },
       { "typed": "ROBOTICS", "existing": [], "expectProblem": null, "expectShort": null, "why": "Ontario codes are six; clubs and locally-named courses are named by the teacher." },
       { "typed": "AP CALC AB", "existing": [], "expectProblem": null, "expectShort": null, "why": "Ten characters including a space — the shape twelve was chosen to allow." },
       { "typed": "ROBOTICS CLUB", "existing": [], "expectProblem": "A course code can be at most 12 characters.", "expectShort": "12 characters at most", "why": "Thirteen. The limit counts the space." },
@@ -43,10 +63,13 @@
       { "code": "ICS3U", "expect": "Intro to Comp Sci" },
       { "code": "  ics3u  ", "expect": "Intro to Comp Sci", "why": "Trimmed and upper-cased before the lookup, exactly as the code field itself is." },
       { "code": "SPH4U", "expect": "Physics" },
+      { "code": "MCMPR11", "expect": "Computer Programming", "why": "British Columbia course code lookup." },
+      { "code": "MFMP-10", "expect": "Foundations & Pre-Calculus", "why": "British Columbia course code lookup." },
+      { "code": "MMA--09", "expect": "Mathematics", "why": "British Columbia course code lookup." },
       { "code": "CODING", "expect": null, "why": "A club code is in no lookup, so nothing is filled in and the teacher types their own name." },
       { "code": "", "expect": null }
     ],
-    "note": "The course name a NEW course starts with, filled in from the code. It is the SHORT name from support/ontario_secondary_courses.json, not the formal one. The formal name is the ministry's string — \"Introduction to Computer Science, Grade 11, U\" — which is correct and which almost nobody wants as a website title: defaulting to it only means the teacher deletes it before typing what they actually call the course. Both names stay one button away in the wizard, and the command-line wizard offers them in the same order (short first, then formal, then a custom name). The fill only ever replaces an empty field or a previous fill of its own, so a teacher's own typing is never overwritten."
+    "note": "The course name a NEW course starts with, filled in from the code. It is the SHORT name from the regional course registries (support/*_secondary_courses.json), not the formal one. The formal name is the ministry's string — \"Introduction to Computer Science, Grade 11, U\" — which is correct and which almost nobody wants as a website title: defaulting to it only means the teacher deletes it before typing what they actually call the course. Both names stay one button away in the wizard, and the command-line wizard offers them in the same order (short first, then formal, then a custom name). The fill only ever replaces an empty field or a previous fill of its own, so a teacher's own typing is never overwritten."
   },
   "gradeLabels": {
     "cases": [
@@ -67,9 +90,24 @@
         "expect": "Grade 10"
       },
       {
+        "code": "MCMPR11",
+        "expect": "Grade 11",
+        "why": "BC trailing 2-digit grade 11."
+      },
+      {
+        "code": "MFMP-10",
+        "expect": "Grade 10",
+        "why": "BC trailing 2-digit grade 10."
+      },
+      {
+        "code": "MMA--09",
+        "expect": "Grade 9",
+        "why": "BC trailing 2-digit grade 09."
+      },
+      {
         "code": "CODING",
         "expect": "",
-        "why": "No digit in the fourth place, so no grade is claimed."
+        "why": "No digit in the fourth place or recognized trailing grade, so no grade is claimed."
       },
       {
         "code": "ABC",
@@ -82,7 +120,7 @@
         "why": "A digit that is not 1–4 is honest about not knowing rather than silently dropping it."
       }
     ],
-    "note": "The grade named by an Ontario course code's FOURTH character, matching the wizard. A club code with no digit there gets no grade label at all rather than a wrong one."
+    "note": "The grade named by a course code across supported jurisdictions (Ontario 4th character digit, BC trailing 2-digit grade), matching the wizard. A club code with no recognized grade gets no grade label at all rather than a wrong one."
   },
   "note": "Names on disk and the rules for adding a section. All of it is string handling over files both apps read, so all of it ports — and the naming grammar in particular MUST, because the two apps list each other's files. A course backed up on a Mac and opened on Windows has to appear in the Backups list, not vanish because the parser was rewritten from memory.",
   "sectionNumbers": {
@@ -206,22 +244,26 @@
       {
         "kind": "backup",
         "maker": "teacher",
-        "name": "ICS3U_backup_2026-08-11_221530.zip"
+        "name": "ICS3U_backup_2026-08-11_221530.zip",
+        "moment": "2026-08-11 22:15:30"
       },
       {
         "kind": "backup",
         "maker": "assistant",
         "name": "ICS3U_backup_2026-08-11_221530_assistant-section3.zip",
+        "moment": "2026-08-11 22:15:30",
         "section": 3,
         "why": "The assistant's own backups say so in the name, so a teacher can see which copies Plantoir made and what each was for. A name WITHOUT that ending is one of the teacher's own — which is exactly what every backup made before this existed is, and why the suffix is added rather than the teacher's being marked."
       },
       {
         "kind": "archive",
-        "name": "ICS3U_2026-08-10_143005.zip"
+        "name": "ICS3U_2026-08-10_143005.zip",
+        "moment": "2026-08-10 14:30:05"
       },
       {
         "kind": "archive",
         "name": "ICS3U-section2_2026-08-10_143005.zip",
+        "moment": "2026-08-10 14:30:05",
         "section": 2
       },
       {
@@ -249,7 +291,28 @@
         "why": "Not a zip."
       }
     ],
+    "couldHaveBeenStamped": {
+      "earliest": "2025-01-01 00:00:00",
+      "futureAllowanceDays": 2,
+      "cases": [
+        { "stamp": "2026-08-10_143005", "expect": true },
+        { "stamp": "2569-08-09_141530", "expect": false, "why": "What a Buddhist-calendar machine wrote before the mac pinned its formatter. Read as Gregorian it is the year 2569, five centuries from now." },
+        { "stamp": "5786-11-26_141530", "expect": false, "why": "The same, from a Hebrew-calendar machine." },
+        { "stamp": "0008-08-09_141530", "expect": false, "why": "A Japanese-calendar machine: Reiwa 8, read as the year 8." },
+        { "stamp": "1448-02-26_141530", "expect": false, "why": "An Islamic-calendar machine." },
+        { "stamp": "2018-12-03_141530", "expect": false, "why": "An ETHIOPIC machine, and the case the bounds exist for: read as Gregorian it is an ordinary date in the past that a person would not blink at. Only 'before Plantoir could have written one' separates it, which is why the floor is a date in this product's own history rather than a round number." },
+        { "stamp": "9999-12-31_235959", "expect": false, "why": "No calendar can explain it." },
+        { "daysFromNow": -1, "expect": true, "why": "Yesterday, computed rather than written, so the list does not go stale." },
+        { "daysFromNow": 1, "expect": true, "why": "Inside the future allowance: the stamp is LOCAL time on both ends, so a zip written at UTC+14 and read at UTC-12 is 26 hours ahead of this machine's now." },
+        { "daysFromNow": 5, "expect": false }
+      ],
+      "note": "Whether a moment is one Plantoir could have stamped into a zip's name. Shared because it is the rule that decides what gets DELETED: PruneBackups (CourseArchiver on both sides) sorts the assistant's backups by the date in their NAME and throws the tail away, so a name written in another machine's calendar — 2569, on a folder carried from a pre-fix Mac — parses cleanly, sorts as the newest thing in the folder, takes one of the five kept places and pushes a real backup off the disk. A stamp this refuses must be neither counted nor deleted; it is still LISTED, so the teacher can restore or delete it themselves. The floor is 2025-01-01 because the archive feature was written on 2026-08-09 and nothing of this kind can be older: set a year and a half earlier it refuses no real name, and it still clears the nearest wrong reading (Ethiopic, 7 years 8 months behind) by six years. ASCII digits and a Gregorian reading throughout, so this list runs identically under en_US_POSIX and CultureInfo.InvariantCulture — unlike the mac's own migration for the old spellings, which is deliberately NOT shared. Proposed from the mac 2026-09-10 (issue #160); Windows deserialises zipNames by key name, so an unknown block leaves its suite GREEN until it is wired up, and issue #161 asks for that. The guard itself is already there: #161's first half landed on 2026-09-19, with these same two bounds held by a test of its own until this list replaces it."
+    },
     "courseCode": "ICS3U",
+    "moment": {
+      "format": "yyyy-MM-dd HH:mm:ss, in the LOCAL time zone",
+      "note": "The moment a recognised name is read as. Pinned because the stamp is written and read in the GREGORIAN calendar on every machine, whatever calendar the machine itself is set to. A date formatter given no locale renders `yyyy` in the CURRENT LOCALE'S calendar, so the same instant is spelled `2569-08-09_141530` on a Buddhist-calendar machine, `0008-08-09_141530` on a Japanese one and `1448-02-26_141530` on an Islamic one (measured on macOS 26 for 2026-08-09 14:15:30) — none of them a name this file says Plantoir writes, and none of them sortable once the folder is opened anywhere else. Windows has always pinned `CultureInfo.InvariantCulture`; the mac pinned `en_US_POSIX` on 2026-09-10 for issue #160, and also goes on READING the old spellings, because a teacher on such a machine has zips already named that way and refusing them would empty their Archives and Backups lists on the day they updated. That reading half is the mac's own migration and is deliberately not a case here: the mac cannot check it on the other side, because .NET's TryParseExact does not treat native digits the way Foundation does. Issue #161 carries what Windows was asked to do about it. The live defect it named — a backup named in another machine's calendar sorts as the newest thing in the folder, and their PruneBackups had no guard against a date that cannot be true — was fixed there on 2026-09-19; what is still owed is asserting these values."
+    },
     "note": "Three kinds of zip live side by side in `courses/_backups/<CODE>/`, told apart by NAME. Each parser accepts only its own form, so the three can never appear in each other's lists — an archive showing up under Backups is a teacher restoring the wrong thing. The timestamp is `yyyy-MM-dd_HHmmss` and contains an underscore of its own, which is why the pieces are counted rather than split on the last underscore."
   }
 }

@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Working period: the land use proposal
-2. Constraints clinic — what the ground and the rules allow
-3. Conferences
+1. Working period: [[The Land Use Proposal]]
+2. Constraints clinic — what the ground and the rules allow: [[Sustainable Communities]]
+3. Conferences on zoning constraints and sustainable community design for [[The Land Use Proposal]]
 
 ## Things to do before our next class
 

@@ -14,7 +14,7 @@ and a canonical novel. Who decided that, and what is it for?
 The list on [[Reading/index|the reading page]]: a play from 1601, a
 Canadian novel from 1985, five short texts, ten poems, and a choice of
 independent study. Somebody chose all of it. Ask what the choices assume
-about what a Grade 12 student should have read by June.
+about what a Grade 12 student should have read by the end of the course.
 
 ## Positions to consider
 
@@ -41,7 +41,15 @@ one sentence each. Bring it; we will read three aloud and test them.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
+![[A1.2]]
+
+![[A1.3]]
+
 ![[A1.6]]
+
+![[A1.8]]
 
 ![[A1.9]]
 

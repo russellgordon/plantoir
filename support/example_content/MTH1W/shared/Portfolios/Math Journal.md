@@ -8,7 +8,7 @@ enableToc: true
 ---
 > [!abstract] At a glance
 > Individual · ongoing all course · one entry after every class ·
-> collected at the end of each unit
+> collected once each unit, after that unit's big task
 
 ## What you are making
 
@@ -36,17 +36,30 @@ Conjectures are welcome any time. "I think the pattern in
 [[Visual Patterns]] is always linear when the growth is constant" is a
 perfect journal sentence — dated, testable, and yours.
 
-## Success criteria and collection
+## What is marked, and what is yours
 
-The journal comes in each unit, read against these criteria —
-[[Journal Checklist]] turns them into a self-check before handing in.
+The whole journal comes in once a unit, in the class after that unit's
+big task, and I read all of it — but only the **milestone entries**
+carry a mark: [[Your First Entry]], the entry written in class after
+each of the three unit checkpoints, and the [[Final Reflection]]. Those
+are written here, in the room, with time given for them. The rest is
+practice, and
+[[How Marks Work]] explains why practice is never the marked thing.
+
+That is not a reason to write less. The daily entries are what the
+milestone entries are built out of — an entry that quotes three
+specific days is only possible if those three days got written down.
+
+Milestone entries are read against these criteria, which
+[[Journal Checklist]] turns into a self-check before you hand in.
 
 | Quality | What it looks like |
 | --- | --- |
-| Regularity | An entry for every class, written close to the day |
-| Honesty | Real fog named, not just victories |
-| Precision | Foggy things located, not just felt |
-| Growth | "What I would try" items reappear as things actually tried |
+| Located | The foggy thing has an address, not just a feeling |
+| Specific | A named method, moment, or number from an actual class |
+| A move | "What I would try" is something you could do next period |
+| Honest | A real difficulty named, and your own part in it — what *I* tried, not what "we" did |
+| A loop closed | An earlier "would try" is picked up again and reported on |
 
 %%curriculum-start%%
 ## Curriculum connection

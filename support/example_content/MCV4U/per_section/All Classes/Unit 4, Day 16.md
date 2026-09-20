@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[The Flight Path]], day 3 — working period: solve it, then check the answer
-   against the diagram you drew first
+1. [[The Flight Path]], day 3 — working period: start with the conference
+   note from Day 12, then solve it and check the answer against the
+   diagram you drew first
 2. Where your answer is impossible — a heading of 400 degrees — the
    diagram catches it and the algebra does not
 

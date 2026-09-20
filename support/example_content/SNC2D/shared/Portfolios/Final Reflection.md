@@ -5,8 +5,10 @@ created: __CREATED__
 tags:
   - portfolio
 ---
-The closing entry. Roughly 500 words, written after
-[[The Optics Design]] is finished and before the course ends.
+The closing entry. Roughly 400 words, written **in class**, in the last
+twenty minutes of [[The Science Showcase]] — which is why it is one of the
+three journal entries that carry a mark. Read the prompts below beforehand
+and think about them; the writing itself happens in the room.
 
 ## What to cover
 

@@ -34,7 +34,7 @@ Three habits to build:
 1. **Read the temperature at the top of the table.** Almost every table
    is compiled at 25 °C. A constant is only a constant at a fixed
    temperature, and temperature is the one disturbance that changes it —
-   see [[Le Châtelier's Principle]].
+   see [[Le Chatelier's Principle|Le Châtelier's Principle]].
 2. **Note the significant figures.** Booklet values are usually given to
    two, which caps your answer at two however many digits the calculator
    offers.

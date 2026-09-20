@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Work period: [[The Application]]
-2. Conferences
-3. Peer reading, checked against the posting's own words
+1. Revision period, the whole of it: act on what the checkpoint found, with me in the room
+2. [[Judging Your Own Work]] on your own package, and the weakest line fixed here
+3. The last two pieces of the package, written here: the page of explanation, and the online-presence entry from [[Evidence of What You Can Do]]
 
 ## Things to do before our next class
 
-- [ ] Finish the application package for next class.
+- [ ] Nothing to write. Bring the package; it goes in at the start of next class.

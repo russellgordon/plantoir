@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Seminars: groups five and six
+1. Seminars: groups five and six — [[The Hamlet Seminar]] (with active listening: [[Seminar Skills]])
 
 ## Things to do before our next class
 

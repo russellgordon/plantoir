@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Day 6 of 8: recommendations drafted, with costs
+1. Day 6 of 8: first, the findings that did not survive yesterday's checkpoint, redrafted — that is what the checkpoint was for — then recommendations drafted, with costs
 2. Every recommendation checked against [[The Law at Work]] and [[The Ground Rules of Change]]
 3. The one-page implementation note started
 

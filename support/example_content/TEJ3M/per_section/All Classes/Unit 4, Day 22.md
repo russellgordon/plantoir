@@ -17,10 +17,13 @@ tags:
    of this room, and what the industry costs the world on the way
 4. Discussion: [[The Trades Are Tech]] — apprenticeship, college,
    university, and certification, argued without a hierarchy
-5. Launch the capstone: [[The Engineering Project]], demonstrated next
-   class at [[The Engineering Showcase]]
+5. Launch the capstone: [[The Engineering Project]] — four working
+   periods, then demonstrated on the last day of the course at
+   [[The Engineering Showcase]]. Read the criteria table tonight; it is
+   the same one you will judge your own work against on the way through
 
 ## Things to do before our next class
 
-- [ ] Submit your project proposal and begin [[Final Reflection]].
+- [ ] Read [[The Engineering Project]] and arrive with the problem in
+      one sentence and who has it.
 - [ ] Journal: which path named today you would take, and its first step.

@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - explorations
-enableToc: true
+enableToc: false
 ---
 Today you interview an AI chatbot — not to use it, but to *study* it.
 The assignment is symmetrical and strange: come back with three

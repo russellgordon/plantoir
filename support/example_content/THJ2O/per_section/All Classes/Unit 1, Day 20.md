@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval: biology, growth factors, and safety so far
-2. What Unit 2 asks: tools, measurement, and building
+1. Retrieval: biology, growth factors, and safety so far: [[Light, Water, Temperature, Soil]] and [[Safe Shop and Site Practice]]
+2. What Unit 2 asks: tools, measurement, and building: [[The Shop Build]]
 3. Shop tidy
 
 ## Things to do before our next class

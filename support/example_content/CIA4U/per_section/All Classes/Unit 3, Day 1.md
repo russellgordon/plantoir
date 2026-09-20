@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval; then [[Circular Flow]] — a map of who pays whom
-2. Leakages and injections, with every flow made to land somewhere
-3. Government and the rest of the world added to the diagram
+1. [[A Model of Your Own]] handed in
+2. Retrieval across Unit 2, then a diagnostic: where does the money you spend end up? Sketch it cold, so I can see what this class already assumes
+3. [[Circular Flow]] built from your sketches — leakages and injections, with every flow made to land somewhere
+4. Government and the rest of the world added to the diagram
 
 ## Things to do before our next class
 

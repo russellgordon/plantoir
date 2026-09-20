@@ -8,8 +8,10 @@ tags:
   - unit-1
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Groups of three.** Full analysis due in three
-> classes. **The point:** measure the net force on something in uniform
+> **Time:** one class, with the full report written in class the next
+> period and handed in at the bell — it is the first of the marked
+> [[Investigation Write-Ups]]. **Groups of three at the bench, write-up
+> yours alone. The point:** measure the net force on something in uniform
 > circular motion two independent ways, and see whether they agree.
 
 A battery-powered toy pig hangs from a pivot on the ceiling and flies in a

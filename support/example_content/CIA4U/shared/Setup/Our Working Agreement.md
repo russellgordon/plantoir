@@ -22,8 +22,8 @@ taking, and it only works under an agreement. This is ours.
   about what should be, and no dataset settles it. Most arguments that go
   nowhere are two people having different ones at each other.
 - **Changing your mind out loud, because the evidence went against you, is
-  the most respected thing anyone does in this room** — worth more, in every
-  discussion criterion, than winning is.
+  the most respected thing anyone does in this room** — and it is what I am
+  listening for in a seminar, far more than for who won it.
 
 ## What is on this syllabus is somebody's Tuesday
 

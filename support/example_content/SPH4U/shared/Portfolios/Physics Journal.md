@@ -7,7 +7,7 @@ tags:
   - portfolios
 ---
 A page a week, in a notebook or a document, written for one reader: you in
-June, trying to remember why any of this made sense.
+months from now, trying to remember why any of this made sense.
 
 ## What goes in an entry
 
@@ -26,12 +26,14 @@ diagnostic in the course and the one students skip most.
 
 ## What it is not
 
-Not a summary of the class. Not a copy of my board notes. Not marked for
-neatness. The murky question at the end is often the most valuable line in
-the entry, and I read those.
+Not a summary of the class. Not a copy of my board notes. Not marked at
+all — see [[How Marks Work]] — because a page a week written at home is
+practice, and practice is not something I evaluate. The murky question at
+the end is often the most valuable line in the entry, and I read those.
 
-[[Portfolio Checklist]] is what a complete portfolio holds by January —
-worth copying into the front of the notebook now rather than in June.
+[[Portfolio Checklist]] is what a complete portfolio holds by the end of the
+course — worth copying into the front of the notebook now rather than at the
+end of the course.
 
 > [!tip] The best time to write it
 > The evening of the class it covers, when the confusion is still fresh

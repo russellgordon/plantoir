@@ -102,3 +102,37 @@ the nearest cent.
 > Waiting cost about \$974 — nearly half the original debt again,
 > in two years. The same exponential that grew question 9's savings
 > works just as tirelessly for the lender.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C1.1]]
+
+![[C1.2]]
+
+![[C1.3]]
+
+![[C1.4]]
+
+![[C1.5]]
+
+![[C2.1]]
+
+![[C2.2]]
+
+![[C2.3]]
+
+![[C2.4]]
+
+![[C3.1]]
+
+![[C3.2]]
+
+![[C3.3]]
+
+![[C3.4]]
+
+![[C3.5]]
+
+![[C3.6]]
+%%curriculum-end%%

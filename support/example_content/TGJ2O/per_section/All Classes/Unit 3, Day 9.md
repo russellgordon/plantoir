@@ -12,7 +12,7 @@ tags:
 
 1. Standup
 2. Warm-up: [[Interview Question Practice]]
-3. Reporting day three: the second source, or the document that replaces
+3. Reporting day two: the second source, or the document that replaces
    it
 4. Desk time: the story you cannot stand up — decided, in writing
 

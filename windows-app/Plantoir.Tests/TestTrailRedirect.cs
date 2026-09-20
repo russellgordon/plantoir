@@ -15,10 +15,19 @@ namespace Plantoir.Tests;
 /// </summary>
 internal static class TestTrailRedirect
 {
+    /// <summary>
+    /// Where the suite's trail lines go. Public so a test that needs its OWN
+    /// trail file can put this one back afterwards.
+    ///
+    /// <para>Restoring <c>null</c> instead would restore the REAL trail, and
+    /// every test that ran afterwards would write a fixture course into a
+    /// teacher's diagnostic record. That is not hypothetical: it happened
+    /// here, and the phantom lines included "removed the small assistant —
+    /// 1.12 GB freed", which reads as a fault that never occurred.</para>
+    /// </summary>
+    internal static readonly string ScratchTrailPath =
+        Path.Combine(Path.GetTempPath(), "plantoir-tests", "activity.txt");
+
     [ModuleInitializer]
-    internal static void Redirect()
-    {
-        string path = Path.Combine(Path.GetTempPath(), "plantoir-tests", "activity.txt");
-        ActivityTrail.SetCustomLogPathForTesting(path);
-    }
+    internal static void Redirect() => ActivityTrail.SetCustomLogPathForTesting(ScratchTrailPath);
 }

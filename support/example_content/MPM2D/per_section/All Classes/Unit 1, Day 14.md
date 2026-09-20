@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: solve a system three ways, and turn one
-   word problem into equations
-2. Compare methods at the boards
+   word problem into equations: [[Linear Systems]] and [[Solving Systems Algebraically]]
+2. Compare methods at the boards; practice: [[Linear Systems Practice]]
 
 ## Things to do before our next class
 

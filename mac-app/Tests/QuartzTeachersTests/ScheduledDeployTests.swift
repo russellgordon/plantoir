@@ -170,7 +170,7 @@ final class ScheduledDeployTests: XCTestCase {
         // notice said `"bash" can run in the background`, which names none of
         // the teacher's applications.
         let programArguments: [String] = try XCTUnwrap(reread["ProgramArguments"] as? [String])
-        XCTAssertEqual(programArguments.count, 3)
+        XCTAssertEqual(programArguments.count, 7)
         XCTAssertFalse(programArguments[0].hasSuffix("/bash"),
                        "A bare interpreter cannot read the teacher's files: \(programArguments[0])")
         XCTAssertTrue(programArguments[0].contains("Plantoir"),
@@ -180,11 +180,19 @@ final class ScheduledDeployTests: XCTestCase {
             programArguments[2],
             ScheduledDeploy.scriptURL(courseCode: "ICS3U", sectionNumber: 1).path
         )
+        // …and which section it is publishing, so the app can mark that
+        // section's pages as published once the script has finished. A
+        // scheduled deploy does not go through the deploy runner, so
+        // without this it publishes and leaves the window saying
+        // " — Edited" until somebody publishes again by hand.
+        XCTAssertEqual(programArguments[3], ScheduledDeploy.sectionFlag)
+        XCTAssertEqual(programArguments[5], "ICS3U")
+        XCTAssertEqual(programArguments[6], "1")
 
         // The work itself is unchanged; it moved into a file the app runs.
         let command: String = ScheduledDeploy.oneShotCommand(
             courseCode: "ICS3U", sectionNumber: 1,
-            workspaceURL: workspaceURL, deployArguments: arguments
+            workspaceURL: workspaceURL, deployArgumentsList: [arguments]
         )
         let scriptPath: String = workspaceURL.appendingPathComponent("deploy.sh").path
         XCTAssertTrue(command.contains("'\(scriptPath)'"), "The agent runs this folder's own deploy.sh")
@@ -248,6 +256,64 @@ final class ScheduledDeployTests: XCTestCase {
                        "A cancelled deploy left a runnable copy of itself behind")
     }
 
+    /// A scheduled deploy tells the launcher that nobody is at the Mac,
+    /// and the Deploy button does not.
+    ///
+    /// The two run the identical launcher through the identical machinery,
+    /// and only this flag tells them apart. Pressing Deploy attaches a
+    /// pseudo-terminal, so a question from the publishing step comes back
+    /// as a dialog somebody answers — that must keep working. At half six
+    /// in the morning the same question either waits forever (measured at
+    /// 45 minutes on Windows) or is answered with a default nobody chose,
+    /// and the website goes to an address nobody picked.
+    @MainActor
+    func testAScheduledDeployTellsTheLauncherNobodyIsHere() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let commandURL: URL = ScheduledDeploy.scriptURL(courseCode: course.code, sectionNumber: 1)
+        try? FileManager.default.removeItem(at: commandURL)
+
+        let runner: FakeLaunchControl = FakeLaunchControl()
+        XCTAssertNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(),
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+
+        let written: String = try String(contentsOf: commandURL, encoding: .utf8)
+        XCTAssertTrue(
+            written.contains("'--non-interactive'"),
+            "The scheduled deploy must tell the launcher nobody can answer a question: \(written)"
+        )
+
+        // The BUILD leg carries it too, in that order.
+        //
+        // The order is asserted, not just the presence, because it is what
+        // `scripts/test_preview_sh_questions.py` drives: that file runs the
+        // launcher with the flag LAST, after another flag, since that is the
+        // shape a parser bug would hide (the flag's `case` arm must not
+        // shift, or it eats what follows). Assert only that the flag appears
+        // somewhere and these two can drift apart in silence — the Python
+        // would go on testing a command line nothing writes any more.
+        XCTAssertTrue(
+            written.contains("--build-only --non-interactive"),
+            "The build leg must pass --build-only --non-interactive, in that "
+            + "order, which is the command line the launcher's own tests "
+            + "drive: \(written)"
+        )
+
+        // And the button does not, so the dialog a teacher answers stays.
+        let buttonArguments: [String] = DeployCommand.arguments(
+            courseCode: course.code,
+            sectionNumber: 1,
+            configuration: course.configuration,
+            cloudflareAccountID: ""
+        )
+        XCTAssertFalse(
+            buttonArguments.contains("--non-interactive"),
+            "Pressing Deploy must still be able to ask the teacher a question"
+        )
+    }
+
     func testTwoSectionsOfOneCourseGetDifferentAgents() throws {
         try prepare()
         let first: String = ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1)
@@ -271,19 +337,31 @@ final class ScheduledDeployTests: XCTestCase {
             courseCode: "ICS3U",
             sectionNumber: 1,
             workspaceURL: workspaceURL,
-            deployArguments: ["ICS3U", "1"]
+            deployArgumentsList: [["ICS3U", "1"]]
         )
         let plistPath: String = ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1).path
         let label: String = ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1)
 
         let removalIndex: String.Index = try XCTUnwrap(command.range(of: "/bin/rm -f '\(plistPath)'")?.lowerBound)
         let deployIndex: String.Index = try XCTUnwrap(command.range(of: "deploy.sh'")?.lowerBound)
-        let bootoutIndex: String.Index = try XCTUnwrap(command.range(of: "bootout gui/")?.lowerBound)
 
         XCTAssertTrue(removalIndex < deployIndex,
                       "The plist goes first, so a Mac restarting mid-deploy comes back with nothing pending")
-        XCTAssertTrue(deployIndex < bootoutIndex,
-                      "The agent boots itself out only once the deploy has finished")
+
+        // The SCRIPT must not boot the job out, and this is a fix rather than
+        // a relaxed assertion. The agent runs the APP, which runs this script
+        // and then records the publish, reads folder problems out of the log,
+        // and writes the trail line for a run that stopped. Booting out from
+        // inside the script ends the job — and the app IS the job — so none
+        // of that ever ran. Measured with a real scheduled deploy on
+        // 2026-09-09: the wrapper wrote its stopped record and the trail got
+        // nothing. The app boots the agent out itself now, once its work is
+        // done, in ScheduledDeploy.bootOutAgent.
+        XCTAssertFalse(
+            command.contains("bootout"),
+            "The generated script must not boot the job out: it would kill the app that is "
+            + "running it, before the app can record what happened."
+        )
         XCTAssertTrue(command.contains(label))
     }
 
@@ -547,7 +625,7 @@ final class ScheduledDeployTests: XCTestCase {
             courseCode: "ICS3U",
             sectionNumber: 1,
             workspaceURL: URL(fileURLWithPath: "/Users/someone/Class Websites"),
-            deployArguments: ["ICS3U", "1"]
+            deployArgumentsList: [["ICS3U", "1"]]
         )
 
         guard let buildAt = command.range(of: "preview.sh"),
@@ -575,15 +653,19 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(command.contains("READY=0"), "A failed build has to stop the deploy")
         XCTAssertTrue(command.contains("if [ \"$READY\" = \"1\" ]; then"))
 
-        // Cleanup sits outside the if: a failed build must still leave
-        // nothing pending, or the agent fires again at the same time
-        // tomorrow with nobody expecting it.
-        guard let bootoutAt = command.range(of: "bootout"),
-              let lastCloseAt = command.range(of: "fi", options: .backwards) else {
-            return XCTFail("The agent must boot itself out when it is done")
-        }
-        XCTAssertTrue(lastCloseAt.lowerBound < bootoutAt.lowerBound,
-                      "Cleanup runs whether or not the build worked")
+        // Nothing pending after a failed build either — but the plist is what
+        // guarantees that, and it is removed at the TOP, before anything runs.
+        // The job's own removal from launchd moved into the app (bootOutAgent)
+        // when a real scheduled run showed that booting out from the script
+        // killed the app before it could record anything.
+        XCTAssertFalse(command.contains("bootout"))
+        let plistRemoval: String = "/bin/rm -f '"
+            + ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1).path + "'"
+        XCTAssertTrue(
+            command.contains(plistRemoval),
+            "A failed build must still leave nothing pending, or the agent fires again "
+            + "tomorrow with nobody expecting it."
+        )
 
         // A working folder with a space in its name is ordinary on a Mac —
         // "Class Websites" is what the documentation itself suggests.
@@ -621,6 +703,38 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(text.contains("Unit 2, Day 3"))
         XCTAssertFalse(text.contains("Unit 2, Day 2"))
         XCTAssertTrue(text.contains("Publish first"))
+    }
+
+    /// A teacher who annotates the flag with a reason has still published the
+    /// page: the build strips the comment before Quartz sees it. Warning them
+    /// that this class is "not published yet", at half six the night before a
+    /// deploy, is a warning about something that is not true — and the page
+    /// students are already reading is the one it names.
+    func testAClassWhoseFlagCarriesAReasonIsNotReportedHeldBack() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let page: String = """
+        ---
+        title: Unit 2, Day 4
+        publish: true # covered on Tuesday
+        created: 2026-09-08T07:00:00.000-0400
+        ---
+
+        Body.
+        """
+        try page.write(
+            to: course.directoryURL
+                .appendingPathComponent("section1/All Classes")
+                .appendingPathComponent("Unit 2, Day 4.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        XCTAssertEqual(
+            ScheduledDeploy.unpublishedClasses(course: course, sectionNumber: 1),
+            [],
+            "The build publishes this page, so nothing should say it is held back"
+        )
     }
 
     func testAFullyPublishedSectionSaysNothingAboutHeldBackClasses() throws {
@@ -671,6 +785,100 @@ final class ScheduledDeployTests: XCTestCase {
         let tooltip: String = SidebarView.scheduledDeployTooltip(for: sixThirtyTomorrow())
         XCTAssertTrue(tooltip.contains("Right-click to cancel"))
         XCTAssertTrue(tooltip.contains("on and awake"))
+    }
+
+    /// The orange triangle has to say what it means, both on hover and to
+    /// anyone listening to the row rather than looking at it.
+    ///
+    /// What this pins is the SENTENCE. That the sentence is attached to the
+    /// triangle is not something a unit test can see; taking the hover text
+    /// off the image would leave this green.
+    ///
+    /// Asked for by Russell on 2026-09-19: the clock beside it has had hover
+    /// text since it shipped, and a warning mark that says nothing leaves a
+    /// teacher to guess which of the two badges is the bad one.
+    func testTheWarningBesideASectionSaysWhatItMeans() throws {
+        let tooltip: String = SidebarView.stoppedPublishTooltip()
+        XCTAssertTrue(
+            tooltip.contains("did not get through"),
+            "The hover text has to say what went wrong in words a teacher would use"
+        )
+        XCTAssertTrue(
+            tooltip.contains("Open this section"),
+            "And it has to say what to do about it"
+        )
+        // Rule 1: nothing in the interface names the machinery.
+        for word in ["script", "toolchain", "Docker", "container", "launchd", "agent"] {
+            XCTAssertFalse(
+                tooltip.localizedCaseInsensitiveContains(word),
+                "The hover text must not mention \(word)"
+            )
+        }
+    }
+
+    /// Every record the wrapper writes has to LAND in one move.
+    ///
+    /// The app watches the record folder so a run that finishes while the
+    /// teacher is looking at that section shows its notice there and then. A
+    /// folder watch sees an entry arrive; it does not see a second line
+    /// appended to a file that is already there — measured, 0 of 40 first
+    /// events carried a readable record when the wrapper wrote with two
+    /// `echo`s, and the completing line produced no event at all. So the record
+    /// is assembled in a temporary file beside the folder and moved in.
+    ///
+    /// **An assertion on generated TEXT, which this file's neighbours rightly
+    /// distrust**: `ScheduledPublishOutcomeTests` RUNS the same generated bash
+    /// for every kind, and that is what proves the record still says the right
+    /// thing. What cannot be tested from here is the timing of the events, and
+    /// the behavioural half of that would need a delay injected into the
+    /// wrapper — which is the very thing being removed.
+    func testTheWrapperWritesEveryRecordInOneMove() throws {
+        let home: URL = URL(fileURLWithPath: "/Users/someone")
+        let command: String = ScheduledDeploy.oneShotCommand(
+            courseCode: "ICS3U",
+            sectionNumber: 2,
+            workspaceURL: URL(fileURLWithPath: "/Users/someone/Class Websites"),
+            deployArgumentsList: [["ICS3U", "2", "--to", "Netlify"]],
+            destinationTypes: ["netlify"],
+            destinationDescriptions: ["Netlify"],
+            homeFolder: home
+        )
+        let record: String = ScheduledPublishOutcome.recordURL(
+            inHomeFolder: home, course: "ICS3U", section: 2
+        ).path
+        let partial: String = ScheduledPublishOutcome.partialRecordURL(
+            inHomeFolder: home, course: "ICS3U", section: 2
+        ).path
+
+        XCTAssertFalse(
+            command.contains(">> '\(record)'"),
+            "Nothing may be appended to the record itself — the line that completes it reaches no watcher"
+        )
+        XCTAssertFalse(
+            command.contains("> '\(record)'"),
+            "The record must be MOVED into place rather than written there"
+        )
+        XCTAssertTrue(
+            command.contains("/bin/mv '\(partial)' '\(record)'"),
+            "The finished record has to be moved into the watched folder in one step"
+        )
+        // Three places write a record: a build that failed, a destination that
+        // failed, and a run that got all the way through.
+        var moves: Int = 0
+        for line in command.components(separatedBy: "\n") {
+            if line.contains("/bin/mv '\(partial)' '\(record)'") {
+                moves += 1
+            }
+        }
+        XCTAssertEqual(moves, 3, "Every one of the three record-writing branches must end in the move")
+        // The temporary file sits BESIDE the watched folder, not in it: a
+        // temporary file inside it is three events, two of them carrying no
+        // readable record. See ScheduledPublishOutcome.partialRecordURL.
+        XCTAssertEqual(
+            URL(fileURLWithPath: partial).deletingLastPathComponent().path,
+            URL(fileURLWithPath: record).deletingLastPathComponent()
+                .deletingLastPathComponent().path
+        )
     }
 }
 

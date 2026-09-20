@@ -2,6 +2,9 @@
 title: Character as Argument
 publish: true
 created: __CREATED__
+enableToc: true
+tags:
+  - concepts
 ---
 Characters are not people, and treating them as people is the fastest way
 to a weak essay. They are constructions doing work in a text — and asking

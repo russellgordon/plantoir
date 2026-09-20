@@ -27,11 +27,14 @@ final class AppRulesContractTests: XCTestCase {
             let configuration: CourseConfiguration = try roundTripped(
                 try XCTUnwrap(testCase["configuration"] as? [String: Any])
             )
+            // Absent means "somebody is at the computer", which is every
+            // case written before a scheduled deploy could say otherwise.
             let arguments: [String] = DeployCommand.arguments(
                 courseCode: try XCTUnwrap(testCase["course"] as? String),
                 sectionNumber: try XCTUnwrap(testCase["section"] as? Int),
                 configuration: configuration,
-                cloudflareAccountID: testCase["cloudflareAccountID"] as? String ?? ""
+                cloudflareAccountID: testCase["cloudflareAccountID"] as? String ?? "",
+                unattended: testCase["unattended"] as? Bool ?? false
             )
             XCTAssertEqual(arguments, try XCTUnwrap(testCase["expectArguments"] as? [String]), name)
         }
@@ -102,6 +105,49 @@ final class AppRulesContractTests: XCTestCase {
             String(decoding: right, as: UTF8.self), String(decoding: left, as: UTF8.self),
             "contracts/app-rules.json no longer matches TaskMilestones."
             + "\n\nRegenerate it:\n    Plantoir --write-contracts contracts"
+        )
+    }
+
+    /// Every milestone list the app HAS reaches the readout.
+    ///
+    /// This is the test whose absence let #82 happen. `AppRulesContract` kept
+    /// its own array naming eight lists while `TaskMilestones` had nine, so
+    /// `exampleCourse` was in no readout — and
+    /// `testEveryMarkerIsClassifiedAndTheClassificationIsTrue` could not
+    /// notice, because it walks the READOUT rather than the code the readout
+    /// is of. A readout cannot catch a regression in the thing it reads, and
+    /// that applies to its COMPLETENESS as much as to its contents.
+    ///
+    /// The fix is structural — the readout is now built from
+    /// `TaskMilestones.allLists` — so this can no longer fail by omission. It
+    /// is kept so that a change reintroducing a second hand-kept array goes
+    /// red instead of quietly dropping a task again.
+    func testEveryMilestoneListReachesTheReadout() throws {
+        let milestones: [String: Any] = try XCTUnwrap(
+            (try AppRulesContractTests.readRules())["milestones"] as? [String: Any]
+        )
+
+        var expected: [String] = []
+        for entry in TaskMilestones.allLists {
+            expected.append(entry.name)
+        }
+        expected.sort()
+
+        var written: [String] = []
+        for key in milestones.keys {
+            if key != "note" {
+                written.append(key)
+            }
+        }
+        written.sort()
+
+        XCTAssertEqual(
+            written,
+            expected,
+            "contracts/app-rules.json → milestones does not name every list in "
+            + "TaskMilestones.allLists. A task missing here is a task whose markers "
+            + "nothing classifies, and a progress bar that stops moving is the only "
+            + "symptom.\n\nRegenerate it:\n    Plantoir --write-contracts contracts"
         )
     }
 
@@ -267,6 +313,132 @@ final class AppRulesContractTests: XCTestCase {
                 )
             }
         }
+    }
+
+    /// Asks the same list the other way round: **every** requirement in
+    /// `modelTiers.requirements` is either answered here or named as one no
+    /// test can execute.
+    ///
+    /// The mirror of Windows'
+    /// `EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable`,
+    /// and added when this section gained rules the mac must keep rather than
+    /// merely describe. The value is the FAILURE: a requirement added on
+    /// either side now fails this test by name on the other, instead of
+    /// sitting in the contract with nothing checking it. The test above
+    /// checks one requirement; this one checks that nothing was skipped.
+    func testEveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable() throws {
+        let section: [String: Any] = try XCTUnwrap(
+            (try AppRulesContractTests.readRules())["modelTiers"] as? [String: Any]
+        )
+        let requirements: [[String: Any]] = try XCTUnwrap(section["requirements"] as? [[String: Any]])
+        var unanswered: Set<String> = []
+        for requirement in requirements {
+            unanswered.insert(try XCTUnwrap(requirement["rule"] as? String))
+        }
+        XCTAssertFalse(unanswered.isEmpty)
+
+        func answer(_ rule: String) {
+            XCTAssertTrue(
+                unanswered.remove(rule) != nil,
+                "No requirement in the contract reads “\(rule)” any more."
+            )
+        }
+
+        // Two rungs, no more.
+        XCTAssertEqual(AssistModelTier.allCases.count, 2)
+        answer("Two rungs, no more")
+
+        // Chosen from the hardware: a small Mac and a large one reach
+        // different answers with nothing asked of the teacher in between.
+        XCTAssertEqual(AssistModelTier.forPhysicalMemory(bytes: 8 * 1_073_741_824), .small)
+        XCTAssertEqual(AssistModelTier.forPhysicalMemory(bytes: 64 * 1_073_741_824), .large)
+        answer("The rung is CHOSEN from the hardware, never asked")
+
+        // The names, which the test above checks in full.
+        var names: [String: String] = [:]
+        for requirement in requirements {
+            if let given = requirement["names"] as? [String: String] {
+                names = given
+            }
+        }
+        XCTAssertEqual(AssistModelTier.small.displayName, names["small"])
+        XCTAssertEqual(AssistModelTier.large.displayName, names["large"])
+        answer("The teacher never learns the model's name")
+
+        // On the HOST, with hardware acceleration — the GPU offload flag is
+        // the executable half, and `AssistModelTierTests` pins the rest of
+        // the line.
+        let arguments: [String] = AssistServerHost.serverArguments(
+            modelPath: "/tmp/model.gguf", port: 8080, tier: .small, threadCount: 4
+        )
+        XCTAssertTrue(arguments.contains("--n-gpu-layers"))
+        answer("The model runs on the HOST, with hardware acceleration")
+
+        // The cap, with the contract's own number rather than a copy of it:
+        // this is the assertion that stops the two apps drifting on a value
+        // neither interface shows.
+        //
+        // Found by the rule it belongs to, not by "the last entry carrying a
+        // cap": a second entry gaining one would otherwise win silently, and
+        // the point of this test is that nothing here is decided by position.
+        let capRule: String = "Every request caps how much the model may write"
+        var entriesCarryingACap: Int = 0
+        var capInTheContract: Int?
+        for requirement in requirements {
+            guard let cap = requirement["cap"] as? Int else {
+                continue
+            }
+            entriesCarryingACap += 1
+            if (requirement["rule"] as? String) == capRule {
+                capInTheContract = cap
+            }
+        }
+        XCTAssertEqual(entriesCarryingACap, 1, "More than one requirement carries a `cap`; which one is the wire value is now a guess.")
+        XCTAssertEqual(capInTheContract, AssistModelClient.mostTokensPerReply)
+        let body: [String: Any] = try AssistModelClient(
+            baseURL: try XCTUnwrap(URL(string: "http://127.0.0.1:1"))
+        ).requestBody(messages: [AssistMessage.user("Hello")], tools: [])
+        XCTAssertEqual(body["max_tokens"] as? Int, capInTheContract)
+        answer(capRule)
+
+        // And what happens when a reply stops at that cap.
+        //
+        // The full behaviour is executed in `AssistCutOffAnswerTests`, where a
+        // page on disk is the assertion. What is asserted HERE is the
+        // mechanism the rule names, rather than the existence of a string: a
+        // reply carrying `finish_reason: "length"` reads as cut off, and
+        // arguments that stopped mid-JSON read as unreadable. Both are the
+        // conditions `AssistAgent.think` gates on, so this fails if either
+        // stops working — which "the sentence is not empty" would not.
+        let stopped: AssistReply = AssistReply(
+            message: AssistMessage(role: "assistant", content: "", toolCalls: nil),
+            completionTokens: 512,
+            wasCutOff: true
+        )
+        XCTAssertTrue(stopped.wasCutOff)
+        let halfWritten: AssistToolCall = AssistToolCall(
+            id: "1", type: "function",
+            function: AssistToolCall.Function(
+                name: "publish_pages", arguments: #"{"course": "ICS3U", "pages": "Unit 1, Day"#
+            )
+        )
+        XCTAssertFalse(halfWritten.argumentsAreReadable, "A call that stopped mid-JSON reads as readable, so the gate would run it.")
+        XCTAssertFalse(AssistWording.answerWasCutOff.isEmpty)
+        answer("A reply the engine stopped part way runs no tool and says so")
+
+        // The one that genuinely cannot be executed, named rather than
+        // dropped. A polarity veto is a rule about how a MODEL is chosen: it
+        // governs the routing suite in research/ai-assist/, measured by hand,
+        // and a test pretending otherwise would be green for the wrong reason.
+        XCTAssertTrue(
+            unanswered.remove("A model that inverts polarity is VETOED, whatever it scores") != nil,
+            "The polarity veto is recorded here as the one requirement no test can execute, and the contract no longer states it in those words."
+        )
+
+        XCTAssertEqual(
+            unanswered, [],
+            "contracts/app-rules.json requires things of the local assistant that no test here answers: \(unanswered.sorted()). The numbers in that section are not shared; the shape is."
+        )
     }
 
     // MARK: - The flags the app passes the launcher
@@ -497,7 +669,237 @@ final class AppRulesContractTests: XCTestCase {
         }
     }
 
+    // MARK: - The outside doors
+
+    /// Runs `outsideAgents` — the two menu items that hand one course to a
+    /// command-line assistant the teacher already has, "Revise with Claude…"
+    /// and "Revise with Codex…".
+    ///
+    /// The block covers BOTH doors deliberately. The Claude door had shipped
+    /// for a year with none of it written down anywhere two apps could
+    /// compare, and adding the second door was the moment that stopped being
+    /// harmless: the sentences, the arguments and what each one writes to disk
+    /// are now data, so a drift on either side is a named failure rather than
+    /// a teacher's report months later.
+    ///
+    /// Every sentence is read FROM the contract and compared with the named
+    /// constant in the code. Nothing here retypes one.
+    func testTheOutsideDoorsSayAndPassWhatTheContractSays() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let agents: [[String: Any]] = try XCTUnwrap(section["agents"] as? [[String: Any]])
+        XCTAssertEqual(agents.count, 2, "Both doors are described here, not only the new one.")
+
+        // Fixed, deliberately plain values: this test is about the SHAPE of
+        // what each door passes, and CodexLauncherTests is where the awkward
+        // paths live.
+        let folder: String = "/Users/teacher/Teaching"
+        let server: String = "/Applications/Plantoir.app/Contents/MacOS/Plantoir"
+        let courseCode: String = "ICS3U_CONTRACT_TEST"
+        let greeting: String = ClaudeCodeLauncher.greeting(courseCode: courseCode, courseName: "Grade 11 Computer Science")
+
+        XCTAssertEqual(section["hiddenWhenNotInstalled"] as? Bool, true)
+        XCTAssertEqual(section["greetingIsTheSameForEveryAgent"] as? Bool, true)
+        XCTAssertEqual(section["serverName"] as? String, "plantoir")
+        XCTAssertFalse(greeting.contains("\""), "greetingCarriesNoDoubleQuotes")
+
+        for agent in agents {
+            let key: String = try XCTUnwrap(agent["key"] as? String)
+            let menuItem: String = try XCTUnwrap(agent["menuItem"] as? String)
+            let didNotOpenTitle: String = try XCTUnwrap(agent["didNotOpenTitle"] as? String)
+            let couldNotStart: String = try XCTUnwrap(agent["couldNotStart"] as? String)
+            let trailLine: String = try XCTUnwrap(agent["trailLine"] as? String)
+            let expectedArguments: [String] = try XCTUnwrap(agent["arguments"] as? [String])
+            let writesForTheConnection: [String] = try XCTUnwrap(agent["writesForTheConnection"] as? [String])
+            let macHandsOverWith: String = try XCTUnwrap(agent["macHandsOverWith"] as? String)
+
+            let scriptPath: String
+            let actualMenuItem: String
+            let actualDidNotOpenTitle: String
+            let actualCouldNotStart: String
+            let actualTrailLine: String
+            var tokens: [String: String] = [
+                "{course}": courseCode,
+                "{folder}": folder,
+                "{server}": server,
+                "{greeting}": greeting,
+            ]
+
+            switch key {
+            case "claude":
+                let configPath: String = try ClaudeCodeLauncher.writeConfig(
+                    workspacePath: folder,
+                    courseCode: courseCode,
+                    serverPath: server
+                )
+                tokens["{config}"] = configPath
+                scriptPath = try ClaudeCodeLauncher.writeLauncherScript(
+                    workspacePath: folder,
+                    courseCode: courseCode,
+                    claudePath: "/usr/local/bin/claude",
+                    configPath: configPath,
+                    prompt: greeting
+                )
+                actualMenuItem = ClaudeCodeLauncher.menuItemTitle
+                actualDidNotOpenTitle = ClaudeCodeLauncher.didNotOpenTitle
+                actualCouldNotStart = ClaudeCodeLauncher.couldNotStartSentence(courseCode: courseCode)
+                actualTrailLine = ClaudeCodeLauncher.trailSentence(courseCode: courseCode)
+            case "codex":
+                scriptPath = try CodexLauncher.writeLauncherScript(
+                    workspacePath: folder,
+                    courseCode: courseCode,
+                    codexPath: "/opt/homebrew/bin/codex",
+                    serverPath: server,
+                    prompt: greeting
+                )
+                actualMenuItem = CodexLauncher.menuItemTitle
+                actualDidNotOpenTitle = CodexLauncher.didNotOpenTitle
+                actualCouldNotStart = CodexLauncher.couldNotStartSentence(courseCode: courseCode)
+                actualTrailLine = CodexLauncher.trailSentence(courseCode: courseCode)
+            default:
+                XCTFail("The contract describes a door \"\(key)\" this app does not implement.")
+                continue
+            }
+            defer {
+                try? FileManager.default.removeItem(atPath: scriptPath)
+                if let configPath = tokens["{config}"] {
+                    try? FileManager.default.removeItem(atPath: configPath)
+                }
+            }
+
+            XCTAssertEqual(actualMenuItem, menuItem, key)
+            XCTAssertEqual(actualDidNotOpenTitle, didNotOpenTitle, key)
+            XCTAssertEqual(actualCouldNotStart, AppRulesContractTests.filled(couldNotStart, with: tokens), key)
+            XCTAssertEqual(actualTrailLine, AppRulesContractTests.filled(trailLine, with: tokens), key)
+
+            // The arguments as the tool will RECEIVE them, not as the script
+            // happens to spell them: the script leaves a bare flag unquoted
+            // and single-quotes everything else, which is a fact about the
+            // writer rather than about the contract.
+            var expectedArgv: [String] = []
+            for argument in expectedArguments {
+                expectedArgv.append(AppRulesContractTests.filled(argument, with: tokens))
+            }
+            let script: String = try String(contentsOfFile: scriptPath, encoding: .utf8)
+            let commandLine: String = try XCTUnwrap(script.components(separatedBy: "\n").last)
+            var argv: [String] = try XCTUnwrap(AppRulesContractTests.splitShellWords(commandLine))
+            XCTAssertFalse(argv.isEmpty, key)
+            argv.removeFirst()
+            XCTAssertEqual(
+                argv, expectedArgv,
+                "The \(key) door does not pass what the contract says.\nscript:\n\(script)"
+            )
+
+            // The server is handed the WORKING FOLDER, by both doors.
+            let serverArguments: [String] = try XCTUnwrap(section["serverArguments"] as? [String])
+            var filledServerArguments: [String] = []
+            for argument in serverArguments {
+                filledServerArguments.append(AppRulesContractTests.filled(argument, with: tokens))
+            }
+            XCTAssertEqual(filledServerArguments, ["--mcp-stdio", folder])
+
+            // What each door writes for the CONNECTION, and what it therefore
+            // does not write. The Codex list is deliberately empty: its server
+            // is described in its arguments, so there is no file at all.
+            let supportDirectory: URL = try ClaudeCodeLauncher.supportDirectory()
+            var connectionFiles: [String] = []
+            for name in writesForTheConnection {
+                connectionFiles.append(AppRulesContractTests.filled(name, with: tokens))
+            }
+            for name in connectionFiles {
+                XCTAssertTrue(
+                    FileManager.default.fileExists(atPath: supportDirectory.appendingPathComponent(name).path),
+                    "\(key) was supposed to write \(name)"
+                )
+            }
+            if key == "codex" {
+                XCTAssertEqual(connectionFiles, [], "The Codex door writes no file for its connection.")
+                XCTAssertFalse(
+                    FileManager.default.fileExists(
+                        atPath: supportDirectory.appendingPathComponent("mcp-\(courseCode)-codex.json").path
+                    )
+                )
+            }
+
+            // And the file the MAC hands to a terminal, which is this
+            // platform's mechanism rather than a shared requirement: Windows
+            // passes the command line to wt.exe directly and writes no script.
+            XCTAssertEqual(
+                URL(fileURLWithPath: scriptPath).lastPathComponent,
+                AppRulesContractTests.filled(macHandsOverWith, with: tokens),
+                key
+            )
+        }
+    }
+
     // MARK: - Private
+
+    /// Split one line of the generated script back into the arguments a tool
+    /// would receive.
+    ///
+    /// The writers emit only two shapes — a bare word, and a POSIX
+    /// single-quoted string in which an apostrophe is written `\'` between
+    /// quoted runs — so this reads both rather than shelling out. Returns nil
+    /// if a quote is left open, which would mean the script is malformed.
+    static func splitShellWords(_ line: String) -> [String]? {
+        var words: [String] = []
+        var current: String = ""
+        var hasCurrent: Bool = false
+        var isInsideQuotes: Bool = false
+        var isEscaped: Bool = false
+
+        for character in line {
+            if isEscaped {
+                current.append(character)
+                hasCurrent = true
+                isEscaped = false
+                continue
+            }
+            if isInsideQuotes {
+                if character == "'" {
+                    isInsideQuotes = false
+                } else {
+                    current.append(character)
+                }
+                continue
+            }
+            switch character {
+            case "'":
+                isInsideQuotes = true
+                hasCurrent = true
+            case "\\":
+                isEscaped = true
+            case " ", "\t":
+                if hasCurrent {
+                    words.append(current)
+                    current = ""
+                    hasCurrent = false
+                }
+            default:
+                current.append(character)
+                hasCurrent = true
+            }
+        }
+
+        if isInsideQuotes || isEscaped {
+            return nil
+        }
+        if hasCurrent {
+            words.append(current)
+        }
+        return words
+    }
+
+    /// Substitute the contract's `{tokens}` without a regular expression, so
+    /// the substitution is as plain as the contract's own notation.
+    private static func filled(_ text: String, with tokens: [String: String]) -> String {
+        var filled: String = text
+        for (token, value) in tokens {
+            filled = filled.replacingOccurrences(of: token, with: value)
+        }
+        return filled
+    }
+
 
     private func roundTripped(_ values: [String: Any]) throws -> CourseConfiguration {
         let data: Data = try JSONSerialization.data(withJSONObject: values, options: [.sortedKeys])

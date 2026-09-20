@@ -116,3 +116,11 @@ context you did not need to touch.
 The mechanics of producing these are in [[Using Version Control]];
 the longer version of this conversation, on your own team's code, is
 [[The Code Review]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.3]]
+
+![[B1.7]]
+%%curriculum-end%%

@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Which One Doesn't Belong]] — four gate choices
-2. [[The Logic Machine]], day 3 — simplify, then draw the circuit you will
+2. [[The Logic Machine]], day 3 — start from the gap your conference
+   found last class, then simplify and draw the circuit you will
    actually build
 
 ## Things to do before our next class

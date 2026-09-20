@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. [[The Comparative Essay]], day 4 — drafting period
+1. [[The Comparative Essay]], day 4 — drafting period, starting with
+   the paragraphs your partner marked as being about one text only
 
 ## Things to do before our next class
 

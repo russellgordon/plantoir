@@ -15,7 +15,7 @@ excludeBacklinks: true
   both sides had read the same evidence. Protect the reading time.
 - Consider moving the budget lesson to whichever week the real federal
   budget lands, wherever that falls in Unit 3.
-- Ask the culminating audiences in September. The ones who push back
+- Ask the culminating audiences at the start of the course. The ones who push back
   hardest produce the best reports.
 
 ## Paste area

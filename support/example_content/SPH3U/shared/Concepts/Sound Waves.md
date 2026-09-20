@@ -33,10 +33,17 @@ about a million, which is why you see the lightning first — and why that
 gap can be turned into a distance measurement, in
 [[The Speed of Sound]].
 
+## Natural wave phenomena: Infrasound & Ultrasound
+
+- **Infrasound ($f < 20\ \text{Hz}$)**: Low-frequency acoustic waves with long wavelengths that travel large distances through the atmosphere and ground with minimal attenuation. Produced naturally by earthquakes, volcanic eruptions, ocean waves, and large mammals (elephants, baleen whales) for long-range communication.
+- **Ultrasound ($f > 20\ 000\ \text{Hz}$)**: High-frequency sound with very short wavelengths ($\lambda = v/f$). Used by bats and odontocetes (dolphins/toothed whales) for echolocation, resolving small spatial targets based on echo time-of-flight ($\Delta t = 2d/v$). In medicine, ultrasonic transducers produce non-invasive diagnostic sonograms and monitor fetal development without ionizing radiation.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[E2.2]]
 
 ![[E3.2]]
+
+![[E3.6]]
 %%curriculum-end%%

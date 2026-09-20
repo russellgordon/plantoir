@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Work period: [[The Rights Case]]
-2. Conferences
-3. Rehearsing answers to each other's hostile questions
+1. Work period: [[The Rights Case]] — and rehearsing answers to each other's hostile questions
+2. Conferences: the draft read with you, and the checkpoint written down
+3. [[Judging Your Own Work]] — you run the routine on your own draft this time, with me at your shoulder
 
 ## Things to do before our next class
 
-- [ ] Finish the case for next class.
+- [ ] Nothing to hand in. Next class is the revision period, start to finish.

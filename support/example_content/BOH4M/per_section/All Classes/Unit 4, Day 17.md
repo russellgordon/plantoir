@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Day 4 of 8: analysis, using the course's own tools
-2. Which tools does your evidence actually call for?
+1. Day 4 of 8: analysis, using the course's own tools: [[The Organization Study]]
+2. Which tools does your evidence actually call for? [[The Tools of the Trade]]
 3. Findings written as claims with evidence attached
 
 ## Things to do before our next class

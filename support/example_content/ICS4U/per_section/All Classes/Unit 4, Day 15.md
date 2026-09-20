@@ -18,7 +18,9 @@ tags:
    "can we build it?"
 4. Pathways: where this goes after Grade 12, including the routes
    nobody mentions at an assembly
-5. Build period
+5. Build period, and your project's privacy statement drafted inside
+   it: what it stores, where it lives, and how your partner deletes it
+   without you
 
 ## Things to do before our next class
 

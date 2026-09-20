@@ -1,8 +1,8 @@
 ---
 title: Portfolio Checklist
-createdSection1: 2027-01-13T07:00:00.000-0500
+createdSection1: 2026-09-09T07:00:00.000-0400
 publishForSection1: true
-createdSection2: 2027-01-14T07:00:00.000-0500
+createdSection2: 2026-09-10T07:00:00.000-0400
 publishForSection2: true
 enableToc: true
 tags:
@@ -25,4 +25,4 @@ Before the final submission:
 | Selection | The pieces chosen show a range, not just the best marks |
 | Reflection | Specific, honest, about thinking rather than feelings |
 | Growth | Change is shown with evidence, not asserted |
-| Care | Organised well enough that a stranger could follow it |
+| Made for a reader | Headings, dates and links that work, so a stranger can find their way through it without you beside them |

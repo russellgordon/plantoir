@@ -12,7 +12,7 @@ tags:
 
 1. [[Cause and Consequence]] applied to Antietam and the Emancipation Proclamation
 2. What the Proclamation freed, and what it pointedly did not
-3. Work period
+3. Work period: the causation section started here
 
 ## Things to do before our next class
 

@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - portfolio
-enableToc: true
+enableToc: false
 ---
 > [!abstract] At a glance
 > Individual · all course · one entry per class · collected each unit
@@ -40,6 +40,9 @@ wrote the day in order" — dated, testable, and yours.
 
 The journal comes in each unit, read against these criteria —
 [[Journal Checklist]] turns them into a self-check before handing in.
+It is **read and written back to, not marked**: nothing in here moves
+your percentage, and [[How Marks Work]] explains why that is the
+arrangement rather than an oversight.
 
 | Quality | What it looks like |
 | --- | --- |
@@ -52,4 +55,10 @@ The journal comes in each unit, read against these criteria —
 ## Curriculum connection
 
 ![[B1.2]]
+
+![[D2.3]]
+
+![[D2.4]]
+
+![[D2.5]]
 %%curriculum-end%%

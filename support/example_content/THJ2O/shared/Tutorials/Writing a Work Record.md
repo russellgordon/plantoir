@@ -26,8 +26,15 @@ is assessed.
 ## Write it the same day
 
 A record written on Friday about Tuesday is a guess. Ten minutes at the
-end of the period is worth an hour of remembering later, which is why
-the last item on most class pages is the log.
+end of a working period is worth an hour of remembering later, which is
+why every period here ends the same way — clean, store, record. See
+[[How This Course Works]].
+
+That is also the entry I mark. Records are assessed from what you write
+at the bench or on the site, on the day the work happened. When the
+"before our next class" list asks you to check your log, that is a
+reminder to make sure it happened, not an instruction to write it up at
+home — see [[How Marks Work]].
 
 ## Say what happened, not what should have happened
 

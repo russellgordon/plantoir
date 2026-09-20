@@ -20,6 +20,7 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Have [[The Build Sheet]] ready to defend — every line justified.
+- [ ] Bring two questions you think your client bench will ask about
+      the sheet — you get three more bench periods before you defend it.
 - [ ] Finish the first block of [[Spec Sheet Practice]].
 - [ ] Journal: one spec-sheet number that changed a choice you made.

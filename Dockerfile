@@ -3,7 +3,19 @@ FROM python:3.11-slim
 
 # Python packages: frontmatter parsing, and Pillow to draw each
 # section's social sharing card.
-RUN pip install python-frontmatter Pillow
+#
+# PINNED, and python-frontmatter's own PyYAML is pinned with it, because
+# whether a teacher's page reaches their students is decided by what PyYAML
+# makes of the line they typed. `publish: no` hides a page ONLY because PyYAML
+# reads YAML 1.1's spellings of no as the boolean false; PyYAML 7 is expected
+# to move to YAML 1.2, where `no` is the string "no" and that same page would
+# be published. Both apps and `contracts/file-formats.json` ->
+# `pageVisibility.readingCases` now state the 1.1 table as fact, so an
+# unpinned upgrade would flip real pages in a teacher's course with nothing
+# failing anywhere. These are the versions the image already had on
+# 2026-09-18, read off `pip freeze` rather than chosen — so the pin changes
+# nothing about what is installed today.
+RUN pip install python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0
 
 # Install Node.js (needed for Quartz) and other tools (incl. dos2unix)
 # fonts-noto-color-emoji: the colour emoji drawn onto social cards.
@@ -48,10 +60,34 @@ RUN cp -r /opt/quartz /opt/quartz-site
 # apply untouched; the Windows-native runtime points it elsewhere via
 # PLANTOIR_* environment variables.
 COPY scripts/toolchain_paths.py /opt/scripts/toolchain_paths.py
+COPY scripts/contracts.py /opt/scripts/contracts.py
+COPY scripts/site_health.py /opt/scripts/site_health.py
+# What a course calls its class pages and which folder they live in. Both
+# setup_course.py and build_site.py import it by bare name, which only resolves
+# if it is baked in beside them — and setup_course.py is IMPORTED further down
+# this file, so a missing copy does not fail at run time, it fails the image
+# build. Caught by verify.sh on 2026-09-04, which is the whole reason a
+# toolchain change is gated on it: the unit tests were green and the image
+# could not be built at all.
+COPY scripts/class_pages.py /opt/scripts/class_pages.py
+# One home for "does the built site show this page?" — read by build_site.py
+# and setup_course.py, and pinned by contracts/file-formats.json.
+COPY scripts/page_visibility.py /opt/scripts/page_visibility.py
+# Which processes belong to a section's preview — the one answer, imported by
+# build_site.py before a build for publishing so the preview server cannot
+# overwrite what was just built. `preview.sh --stop` does NOT run this copy:
+# it pipes the recipe's own copy in over stdin, because stop mode must work
+# against a container built from an older image and this file would not be in
+# one. See contracts/shared-rules.json -> stopPreview.
+COPY scripts/stop_preview.py /opt/scripts/stop_preview.py
 COPY scripts/setup_course.py /opt/scripts/setup_course.py
 COPY scripts/build_site.py /opt/scripts/build_site.py
 COPY scripts/deploy.py /opt/scripts/deploy.py
 COPY scripts/social_card.py /opt/scripts/social_card.py
+# deploy.py's Netlify ad-badge suppression lives in this sibling module —
+# deploy.py imports it by bare name, which only resolves if it is baked in
+# beside it.
+COPY scripts/netlify_badge.py /opt/scripts/netlify_badge.py
 
 # Bake the Explorer's hide filter into the image.
 #
@@ -75,6 +111,14 @@ RUN python3 -c "import sys; sys.path.insert(0, '/opt/scripts');     import setup
 
 # Copy course metadata lookup & other support files into container
 COPY support/ /opt/support/
+
+# The Plantoir contract, read by the scripts themselves (scripts/contracts.py).
+# It must be baked in: the container's only bind mount is `courses`, so neither
+# the working folder's .toolchain/ nor the app bundle is reachable from in
+# here. A contract edit therefore changes the image hash and forces a rebuild —
+# accepted deliberately, because the alternative is a shared rule the container
+# cannot read.
+COPY contracts/ /opt/contracts/
 
 # --- Bake launcher scripts for export ---
 RUN mkdir -p /opt/export

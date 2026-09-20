@@ -15,7 +15,7 @@ tags:
    testing, review, documentation, and the ethics of a system
 2. Then the written questions from strand D: footprint, emerging
    technology, collaborative fields, theory
-3. Format walk-through for the final evaluation
+3. Format walk-through for the [[Final Examination]], part by part
 
 ## Things to do before our next class
 

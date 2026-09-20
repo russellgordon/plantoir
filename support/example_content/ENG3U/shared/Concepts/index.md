@@ -2,6 +2,8 @@
 title: Concepts
 publish: true
 created: __CREATED__
+tags:
+  - concepts
 ---
 **Reading**
 
@@ -17,6 +19,10 @@ created: __CREATED__
 
 - [[Whose Country, Whose Story]]
 - [[Reading Non-Fiction]]
+
+**Media**
+
+- [[Media Texts and Their Arguments]]
 
 **Writing**
 

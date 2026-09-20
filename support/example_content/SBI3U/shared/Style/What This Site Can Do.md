@@ -185,7 +185,8 @@ feature you will use most.
 
 ## Footnotes
 
-Physics writing needs asides, and they belong at the bottom.[^1]
+Biology writing needs asides — the exception, the disputed name, the
+species that does it differently — and they belong at the bottom.[^1]
 
 [^1]: Like this one. Footnotes collect at the end of the page no matter
     where you write them, so you can put the note beside the sentence it

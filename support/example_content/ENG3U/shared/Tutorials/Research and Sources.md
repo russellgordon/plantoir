@@ -2,6 +2,8 @@
 title: Research and Sources
 publish: true
 created: __CREATED__
+tags:
+  - tutorials
 enableToc: true
 ---
 Anyone can find information. The skill worth having is deciding what to
@@ -65,4 +67,12 @@ course, an unchecked citation is treated the same as a made-up one.
 ![[B1.6]]
 
 ![[D1.5]]
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D3.3]]
+
+![[D3.4]]
 %%curriculum-end%%

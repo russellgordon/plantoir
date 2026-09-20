@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Discussion: [[Who Is This For]] — with your own advertisements
-2. The sound-off, sound-only, both experiment
+1. "I Am a Canadian" (Duke Redbird), read aloud: identity as a claim
+   rather than a fact — see [[Poems for Grade 10]]
+2. Discussion: [[Who Is This For]] — with your own advertisements
+3. The sound-off, sound-only, both experiment
 
 ## Things to do before our next class
 

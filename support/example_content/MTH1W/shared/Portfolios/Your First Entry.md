@@ -44,7 +44,7 @@ was fine today, I learned a lot."
 > As [[Math Journal]] promises: entries are private. I read them;
 > other students never do, and nothing you admit here is quoted or
 > used as an example without your explicit okay. The honesty you risk
-> in week one becomes your best evidence of growth by January — but
+> in week one becomes your best evidence of growth by the end of the course — but
 > only you decide who ever hears about it.
 
 %%curriculum-start%%

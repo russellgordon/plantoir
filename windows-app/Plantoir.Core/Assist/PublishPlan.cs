@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -86,7 +88,11 @@ public sealed class PublishPlan
 
             foreach (var page in named)
             {
-                if (page.IsVisibleToStudents != Publishes)
+                // "Already published" has to be a CONFIDENT reading. A page
+                // whose flag this app will not read reports as visible, and
+                // saying nothing needed doing about it would leave the build
+                // holding it back while the teacher was told otherwise.
+                if (page.IsVisibleToStudents != Publishes || !page.VisibilityIsCertain)
                     return null;
             }
 
@@ -190,15 +196,35 @@ public sealed class PublishPlan
     }
 
     /// <summary>
-    /// The unit a teacher named, if that is what they named: "Unit 4", "unit 4",
-    /// "Unit 4." — but never "Unit 4, Day 3", which is one page.
+    /// The unit a teacher named, if that is what they named: "Module 4",
+    /// "module 4", "Module 4." — but never "Module 4, Day 3", which is one
+    /// page.
+    ///
+    /// <para><b>The course's own word AND the literal "unit", both.</b> A
+    /// Module course's teacher says "publish Module 4", but the fixed-shape
+    /// card still emits "Unit 4" and the model echoes "Unit" from the system
+    /// prompt's examples — so accepting only the course's word would refuse
+    /// requests the app itself generates. Accepting only "unit" is the
+    /// opposite failure and is the one that shipped first: "Module 4" was not
+    /// recognised as a unit at all, fell through to page matching, and came
+    /// back as an unknown page. The mac reached the same answer for the same
+    /// reason (<c>AssistPublishPlan.unitNamed(_:term:)</c>).</para>
     /// </summary>
-    public static int? UnitNamed(string raw)
+    public static int? UnitNamed(string raw, string? term = null)
     {
         string tidied = raw.Trim().TrimEnd('.', '!').ToLowerInvariant();
-        if (!tidied.StartsWith("unit ")) return null;
-        string rest = tidied[5..].Trim();
-        if (string.IsNullOrEmpty(rest) || rest.Contains(',')) return null;
+        string? rest = null;
+        foreach (string word in new[] { ClassPageTerm.Cleaned(term).ToLowerInvariant(), "unit" })
+        {
+            string prefix = word + " ";
+            if (tidied.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                rest = tidied[prefix.Length..].Trim();
+                break;
+            }
+        }
+        // A comma means they went on to name a day, which is a page.
+        if (rest is null || rest.Length == 0 || rest.Contains(',')) return null;
         return int.TryParse(rest, out int unit) ? unit : null;
     }
 }
@@ -247,6 +273,14 @@ public sealed record IndexChange(
 }
 
 /// <summary>One page a plan would touch, and what would happen to it.</summary>
+/// <param name="VisibilityIsCertain">
+/// False when the page's flag is a form this app will not read — a value on
+/// the line below the key, a tag, a block scalar, an anchor, an alias.
+/// <para>Anything deciding a page is "already the way you asked" must require
+/// this. Without it, "publish this page" on such a page answered that it was
+/// already published and wrote nothing, while the build was holding it back —
+/// the exact failure the visibility reader exists to remove (issue #140).</para>
+/// </param>
 public sealed record PlannedPage(
     string Title,
     string RelativePath,
@@ -258,12 +292,21 @@ public sealed record PlannedPage(
     string? DisplayTitle = null,
     bool IsFolderIndex = false,
     bool IsClassPage = false,
-    bool IsSectionLocal = false)
+    bool IsSectionLocal = false,
+    bool VisibilityIsCertain = true)
 {
     /// <summary>What the teacher sees this page called (Quartz displayName).</summary>
     public string DisplayTitle { get; init; } = DisplayTitle ?? Title;
 
-    /// <summary>True when students currently see this page.</summary>
+    /// <summary>
+    /// True when students currently see this page.
+    ///
+    /// <para>Read the way the BUILT SITE reads it, and when the page's flag is
+    /// one this app will not guess at, this says VISIBLE — the mild mistake of
+    /// the two, since calling a page hidden while students are reading it is
+    /// the failure that reports success. <see cref="VisibilityIsCertain"/> is
+    /// how anything that WRITES tells the two apart.</para>
+    /// </summary>
     public bool IsVisibleToStudents => CurrentValue is null || !CurrentValue.Value;
 
     /// <summary>False when the page already carries the wanted value.</summary>

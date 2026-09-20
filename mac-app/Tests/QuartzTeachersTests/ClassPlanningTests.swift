@@ -278,6 +278,45 @@ final class ClassPlanningTests: XCTestCase {
         XCTAssertTrue(try text(ofClass: "Unit 1, Day 3", in: course).contains("created: 2026-09-14"))
     }
 
+    /// How many OTHER classes a plan disturbs, counted once each.
+    ///
+    /// **The union of the two lists, and this is the case that shows why.** A
+    /// page inside the unit being changed is BOTH renamed and re-dated, so it
+    /// is in `renames` and in `moves`; a later unit's page is only re-dated.
+    /// Adding the counts would tell a teacher five classes move when three
+    /// do. The union works on titles because `moves` carries each page under
+    /// the name it will HAVE, which is what makes the two lists comparable at
+    /// all. `AssistWording.otherClassesWouldMove` is what reads it, and the
+    /// card it goes on is what a teacher agrees to.
+    @MainActor
+    func testOtherClassesMovingCountsAPageRenamedAndReDatedOnce() throws {
+        let (root, _, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try writeClass("Unit 1, Day 1", on: "2026-09-08", body: "one one", in: course)
+        try writeClass("Unit 1, Day 2", on: "2026-09-10", body: "one two", in: course)
+        try writeClass("Unit 1, Day 3", on: "2026-09-14", body: "one three", in: course)
+        try writeClass("Unit 2, Day 1", on: "2026-09-16", body: "two one", in: course)
+
+        let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+            unit: 1, atDay: 2, count: 1, forSection: 1, in: course
+        )
+        XCTAssertEqual(plan.renames.count, 2, "Both later days of unit 1 are renumbered")
+        XCTAssertEqual(plan.moves.count, 3, "…and both, plus unit 2's day, are re-dated")
+        XCTAssertEqual(
+            plan.otherClassesMoving, 3,
+            "Three pages move; adding the two lists together would say five"
+        )
+
+        // And nothing moves when nothing else is there — the case where the
+        // copy really can be taken back.
+        let atTheEnd: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+            unit: 2, atDay: 2, count: 1, forSection: 1, in: course
+        )
+        XCTAssertEqual(atTheEnd.otherClassesMoving, 0)
+        XCTAssertFalse(atTheEnd.movesAnythingElse, "The new page is not an OTHER class")
+    }
+
     /// Obsidian only rewrites links when OBSIDIAN performs the rename. A
     /// rename on disk from another process reads to it as a delete plus a
     /// create, so the links are ours to follow.

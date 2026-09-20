@@ -16,7 +16,8 @@ sketch.
 1. For $f(x) = \dfrac{1}{x^2 - 4}$: state the vertical and
    horizontal asymptotes, the y-intercept, and the domain.
 2. For $f(x) = \dfrac{2x}{x - 3}$: state the asymptotes and both
-   intercepts.
+   intercepts, then sketch the graph from those features alone — no
+   technology until the sketch is on paper.
 3. For $f(x) = \dfrac{x - 2}{3x + 4}$: state the asymptotes and both
    intercepts.
 4. Describe the graph of $f(x) = \dfrac{x^2 - 1}{x - 1}$ completely.
@@ -35,6 +36,15 @@ sketch.
 > horizontal asymptote is the ratio of leading coefficients,
 > $y = 2$. The numerator is zero at $x = 0$, so the graph passes
 > through the origin — x-intercept and y-intercept in one point.
+> To sketch: draw the two asymptotes first, mark the origin, then
+> settle each side with test values. Rewriting helps —
+> $f(x) - 2 = \frac{6}{x - 3}$ — so the curve sits above $y = 2$
+> exactly when $x > 3$ and below it whenever $x < 3$. On the right,
+> $f(4) = 8$: the branch drops out of the vertical asymptote and eases
+> down towards $y = 2$ as $x$ grows. On the left, $f(-1) = \frac{1}{2}$
+> and $f(2) = -4$: the branch rises towards $y = 2$ as $x$ runs off to
+> the left, and plunges to $-\infty$ as $x$ approaches 3 from below.
+> Two branches, drawn entirely from key features.
 
 > [!success]- Answer 3
 > Vertical asymptote where $3x + 4 = 0$: $x = -\frac{4}{3}$. Equal
@@ -79,7 +89,10 @@ sketch.
 
 ## Inequalities
 
-8. Solve $\dfrac{1}{x + 2} < 3$.
+8. Solve $\dfrac{1}{x + 2} < 3$. Then solve $\dfrac{1}{x + 2} = 3$,
+   say in one sentence how the two answers differ in KIND, and show
+   that a value taken from each piece of your solution set really does
+   satisfy the inequality.
 9. Solve $\dfrac{x + 1}{x - 1} \ge 2$.
 
 > [!success]- Answer 8
@@ -92,6 +105,16 @@ sketch.
 > Solution: $x < -2$ or $x > -\frac{5}{3}$. Both boundaries
 > excluded — one is a strict inequality's zero, the other does not
 > exist.
+>
+> The equation $\frac{1}{x+2} = 3$ gives $x + 2 = \frac{1}{3}$, so
+> $x = -\frac{5}{3}$: one number. The inequality gives two whole
+> intervals, and the equation's answer is exactly the boundary between
+> the part that works and the part that does not. That is the
+> difference in kind — an equation asks *where*, an inequality asks
+> *over what stretch*. Demonstrating it: at $x = -3$,
+> $\frac{1}{-1} = -1 < 3$ ✓; at $x = 0$, $\frac{1}{2} < 3$ ✓. One
+> value from each interval, both satisfying the original — which is
+> what a solution set claims and what a sign chart alone never shows.
 
 > [!success]- Answer 9
 > Subtract 2:
@@ -101,3 +124,23 @@ sketch.
 > negative (test $x = 0$: $\frac{3}{-1} < 0$; test $x = 4$:
 > $\frac{-1}{3} < 0$). Include $x = 3$ (the $\ge$ allows equality),
 > never $x = 1$. Solution: $1 < x \le 3$.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C2.1]]
+
+![[C2.2]]
+
+![[C2.3]]
+
+![[C3.5]]
+
+![[C3.6]]
+
+![[C3.7]]
+
+![[C4.1]]
+
+![[C4.2]]
+%%curriculum-end%%

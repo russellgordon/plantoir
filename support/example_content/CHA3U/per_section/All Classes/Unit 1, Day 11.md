@@ -12,7 +12,7 @@ tags:
 
 1. [[Cooperation Across Difference]] — the Five Nations Confederacy, trade networks, and alliance
 2. What cooperation cost each side, and who set the terms
-3. Work period
+3. Work period: acting on what your conference last class turned up
 
 ## Things to do before our next class
 

@@ -7,8 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Groups of 2 or 3 · four studio periods · designs defended in Week 16 ·
-> one annotated diagram, one optimisation argument
+> Groups of 2 or 3 · five classes, four of them studio periods ·
+> designs defended on the last · one annotated diagram, one
+> optimisation argument
 
 ## What you are making
 
@@ -37,14 +38,47 @@ evidence your argument stands on.
    — area, surface area, volume — using [[Geometric Relationships]].
    Remember [[The Best Box]]: designs holding the same amount can
    differ wildly in what they cost to build.
-4. Choose, and write the argument: what your group optimised for, what
+4. **Prove the drawing is possible before you trust it.** Every design
+   in this task has at least one length nobody can measure directly —
+   the diagonal across a floor plan, the slant of a lid, the brace
+   across a corner. Find it with the right-triangle side-length
+   relationship rather than with a ruler on the sketch, and show the
+   working: a scale floor plan whose diagonal does not match its sides
+   is not a room, and a package whose flap is drawn too short does not
+   fold. Where a shape is composite — an L-shaped room, a box with a
+   triangular gusset — cut it into rectangles and right triangles you
+   can each account for, and say where you cut.
+5. **Put one circle or triangle property to work on purpose.** Not
+   decoration: a corner radius that has to clear a hinge, a triangular
+   brace that makes a rectangle rigid, a circular lid whose
+   circumference must match the tube it caps. Name the property you
+   used from [[Geometric Relationships]] and say what would fail
+   without it.
+6. Take one candidate and change a single dimension by a stated amount.
+   Show what that does to the flat shape it is built from and to the
+   space it encloses — the footprint's area and the package's volume,
+   or the room's floor area and the air above it. The two do not move
+   together, and the argument in step 7 usually turns on that.
+7. Choose, and write the argument: what your group optimised for, what
    you traded away, and the numbers for every candidate — "it uses 18%
    less material and still clears the shelf" is an argument.
-5. Draw the final annotated diagram to scale — every measurement
+8. Draw the final annotated diagram to scale — every measurement
    labelled, every constraint shown satisfied.
 
-Studio periods are class time, and how your group uses them is part of
-what is assessed — [[How Marks Work]] explains how.
+Studio periods are class time, and that is the point: work that carries
+a mark is built where I can see it being built — [[How Marks Work]]
+explains why. In the studio period where the candidates are costed you
+will also judge the design against the table below, following
+[[Judging Your Own Work]]; the two studio periods after it are for
+acting on what you found.
+
+## What is marked as yours
+
+The design is your group's; the mark is not. On the day the design is
+defended, each member answers the Reflect question below out loud, on
+their own — that answer is judged as yours. So is your ability to
+account for any number on the page: I will ask whoever is nearest, not
+whoever drew it.
 
 ## Success criteria
 
@@ -54,8 +88,9 @@ what is assessed — [[How Marks Work]] explains how.
 | Conversions shown | Unit changes are visible steps, not silent leaps |
 | Real alternatives | At least two rejected candidates carry full numbers |
 | A named trade-off | The argument says what was optimised and what it cost |
+| One dimension moved | For one candidate you show what changing a single dimension does to the flat shape and to the space it holds |
 | A true-to-scale diagram | Measurements are labelled and the scale is stated |
-| Shared thinking | Every member can defend any number on the page |
+| Your own defence | You can name the candidate that came closest, the number that ruled it out, and account for any figure on the page |
 
 ## Reflect
 
@@ -72,9 +107,56 @@ it out? No close second usually means the group stopped designing early.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E1.2]]
+
 ![[E1.3]]
 
 ![[E1.4]]
 
-![[E1.6]]
+![[E1.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 15, the build-and-measure period
+  Step 1 of the task has every group write its constraints out as
+  numbers with units. What the finished diagram cannot show you is
+  whether that sheet was ever consulted again. A group that checks
+  against it as it measures and a group that works from memory and
+  checks at the end both hand in a design that meets every constraint —
+  the second one just spends the redesign period discovering it does
+  not.
+  Going well: the constraint sheet is on the desk and being ticked
+  while a tape measure is in someone's hand.
+  Stuck: the sheet is in a bag, and the words "I think that's fine"
+  appear.
+  This one is not evidence for an expectation. It is how you know which
+  groups will spend Day 16's redesign period fixing a constraint they
+  never checked — and which to sit down with before this one ends.
+  Record: two columns on the day plan — sheet out, sheet away.
+
+TALK — Unit 4, Day 14, while the candidates are being costed
+  Do not save these for Day 15's conference: that one is announced as
+  being about the trade-off, and by then the group has a rehearsed
+  answer and a chosen design. Costing day is when the numbers are still
+  in the air.
+  Ask: "Suppose this had to be built somewhere that sells the material
+  by the square foot. What would you have to redo, and what would stay
+  exactly as it is?"
+  Then, past the dimension change the task already asks them to write
+  up: "Which of your other candidates would that same change have hurt
+  most, and why that one?"
+  The first is E1.3, and it separates a student who converted from one
+  who copied a partner's conversion: both write the same line on the
+  diagram. The second is E1.4 carried one step further than the page
+  goes — a strong answer reasons about a shape they did not build,
+  which is the only way to tell understanding of the relationship from
+  a calculation done once.
+  Record: beside each name, one letter for the first answer and one for
+  the second. Take them from each member separately.
+
+The product evidence is the annotated diagram and the optimisation
+argument, handed in on Day 16, with each member's spoken defence that
+same day.
+%%

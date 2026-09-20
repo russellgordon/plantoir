@@ -1831,6 +1831,12 @@ How to use the tools this course uses — starting with the site itself.
         "hidden": [CURRICULUM_FOLDER] + SHARED_FILES + UTILITY_FILES,
         "expandable": folders + ["Setup", "Style", "Tutorials"],
         "curriculum_folder": CURRICULUM_FOLDER,
+        # Which of this family's folders hold work that counts for marks — what
+        # puts the ring on a cell in the Curriculum Coverage map. Declared
+        # rather than guessed at install time, because the guess is a substring
+        # ("task") and at least one family calls its folder "Thinking Tasks":
+        # under an exact-name pool that folder would silently stop counting.
+        "graded_folders": [name for name in folders if "task" in name.lower()],
         "skeleton": True,
         "label": fam["label"],
     }

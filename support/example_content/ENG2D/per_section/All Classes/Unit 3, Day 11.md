@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Seminars: groups five and six
+1. [[The Seminar]], day 3 (part 3 of 3) — seminars: groups five and six
 
 ## Things to do before our next class
 

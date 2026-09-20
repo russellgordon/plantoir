@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Consolidation: what this unit established about who tells a story
-2. Look ahead: the last unit is your own argument, at length
+1. Consolidation: what this unit established about who tells a story: [[Who Gets to Tell It]]
+2. Look ahead: the last unit is your own argument, at length — [[The Critical Essay]]
 
 ## Things to do before our next class
 

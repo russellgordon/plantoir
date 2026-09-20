@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 function Show-Help {
 @"
 Usage:
-  .\deploy.bat <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--diagnose] [--team <TEAM_SLUG>] [--to-folder <PATH>] [--reset-token|--logout]
+  .\deploy.bat <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--diagnose] [--team <TEAM_SLUG>] [--to-folder <PATH>] [--reset-token|--logout] [--non-interactive]
 
 Examples:
   .\deploy.bat ICS3U 1
@@ -102,6 +102,7 @@ function Enter-NativeRuntime {
   $base = if (Test-Path (Join-Path $toolchainDir 'scripts')) { $toolchainDir } else { (Get-Location).Path }
   $env:PLANTOIR_SCRIPTS_DIR = Join-Path $base 'scripts'
   $env:PLANTOIR_SUPPORT_DIR = Join-Path $base 'support'
+  $env:PLANTOIR_CONTRACTS_DIR = Join-Path $base 'contracts'
   $env:PLANTOIR_QUARTZ_DIR  = Join-Path $NATIVE_RUNTIME 'quartz'
   $env:PLANTOIR_EMOJI_FONT  = Join-Path $NATIVE_RUNTIME 'fonts\NotoColorEmoji.ttf'
   $env:PLANTOIR_COURSES_DIR = Join-Path (Get-Location).Path 'courses'
@@ -154,11 +155,13 @@ $RESET_TOKEN = $false
 $TO_FOLDER = ''
 $TARGET = 'netlify'
 $ACCOUNT_ARG = ''
+$NON_INTERACTIVE = $false
 
 for ($i = 2; $i -lt $args.Count; $i++) {
   switch -Regex ($args[$i]) {
     '^--help$|^-h$'      { Show-Help; exit 0 }
     '^--diagnose$'       { $DIAGNOSE = '--diagnose'; continue }
+    '^--non-interactive$' { $NON_INTERACTIVE = $true; continue }
     '^--target$'         { if ($i + 1 -ge $args.Count) { Write-Host "Missing value for --target"; Show-Help; exit 1 }; $TARGET = ([string]$args[$i+1]).ToLower(); $i++; continue }
     '^--target=(.+)$'    { $TARGET = $Matches[1].ToLower(); continue }
     '^--account$'        { if ($i + 1 -ge $args.Count) { Write-Host "Missing value for --account"; Show-Help; exit 1 }; $ACCOUNT_ARG = ([string]$args[$i+1]).Trim(); $i++; continue }
@@ -180,6 +183,25 @@ if ($TARGET -ne 'netlify' -and $TARGET -ne 'cloudflare') {
   exit 1
 }
 
+# Called immediately before every question this script asks. Under
+# --non-interactive there is nobody to answer it - the publish was set to
+# happen on its own, at half six, with the app closed - so it REFUSES and says
+# which question it could not ask, rather than waiting for an answer that will
+# never come or quietly taking a default.
+#
+# Exit code 3 means that and nothing else, matching deploy.py's NEEDS_AN_ANSWER;
+# the scheduled wrapper reads it and leaves a note for the app to show the
+# teacher. Every other exit in this script is 0 or 1.
+function Assert-CanAsk([string]$question, [string]$whatToDo) {
+  if (-not $NON_INTERACTIVE) { return }
+  Write-Host ""
+  Write-Host "This publish was set to happen on its own, so nobody is here to answer:"
+  Write-Host ("   {0}" -f $question)
+  Write-Host (" {0}" -f $whatToDo)
+  Write-Host " Nothing was published."
+  exit 3
+}
+
 # Friendly guard: 'Open' course code ended with zero
 if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
   $suggested = $COURSE_CODE.Substring(0, $COURSE_CODE.Length-1) + 'O'
@@ -191,6 +213,7 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
   if ((Test-Path $suggestedCfg) -and -not (Test-Path $originalCfg)) {
     Write-Host ("I see setup data for '{0}' on disk." -f $suggested)
   }
+  Assert-CanAsk ("Fix course code to '{0}'? [Y/n]" -f $suggested) "Publish this section once from Plantoir, where you can answer it."
   $ans = Read-Host ("Fix course code to '{0}'? [Y/n]" -f $suggested)
   if (-not $ans) { $ans = 'Y' }
   if ($ans -match '^[Yy]$') {
@@ -200,6 +223,42 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
     Write-Host ("Continuing with: {0}" -f $COURSE_CODE)
   }
   Write-Host ""
+}
+
+function Test-CarriesLiveReload([string]$root) {
+  # Does any page under $root still carry the preview's live-reload client?
+  #
+  # WHY THIS IS A FUNCTION AND NOT THE OBVIOUS ONE-LINER. Windows PowerShell
+  # 5.1's `Select-String -Quiet`, fed a PIPELINE of file objects, emits one
+  # result PER FILE rather than one answer overall. A clean site of 314 pages
+  # therefore comes back as a 314-element array of $null - and in PowerShell
+  # a non-empty array is TRUE whatever is in it. So
+  #
+  #     if ($files | Select-String -Pattern ... -List -Quiet) { ... }
+  #
+  # was true whenever the site had TWO OR MORE pages, which is every real
+  # site. (Exactly one page is the one case it got right, by accident: a
+  # single-element array unwraps to the scalar it holds, which is falsy.)
+  # The consequences were both invisible and total: every publish to a folder
+  # announced "This site was built by a preview", rebuilt whether or not it
+  # needed to, waited the full 30 s for a condition that could never become
+  # false, and then refused with "The rebuilt site still carries the
+  # preview's live-reload script. Nothing was published." Publishing to a
+  # folder could not succeed on Windows, ever. Measured 2026-09-05 by
+  # publishing a site whose 314 pages contained no live-reload client at all
+  # and watching it be refused three times running.
+  #
+  # `deploy.sh` is not affected: `grep -rq` returns one exit status for the
+  # whole tree, which is the answer this needs. The bug is entirely in the
+  # PowerShell port of that check.
+  #
+  # Testing for a MatchInfo instead of a Boolean is the fix: -List stops at
+  # the first match in each file, Select-Object -First 1 stops at the first
+  # file, and $null -ne is an unambiguous test whatever the pipeline count.
+  if (-not (Test-Path -LiteralPath $root)) { return $false }
+  $hit = Get-ChildItem -LiteralPath $root -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
+         Select-String -Pattern "ws://localhost:" -List | Select-Object -First 1
+  return ($null -ne $hit)
 }
 
 # ======================
@@ -267,6 +326,9 @@ if (-not $builtFound) {
   Write-Host "Built site not found at:"
   Write-Host " $PUBLIC_DIR_HOST"
   Write-Host ""
+  Write-Host " If you have just built, check this section still has its front page."
+  Write-Host " A section without one produces no website, so there is nothing to publish."
+  Write-Host ""
   Write-Host "Build first:"
   Write-Host (" .\preview.bat {0} {1} --build-only" -f $COURSE_CODE, $SECTION_NUM)
   exit 1
@@ -283,6 +345,79 @@ if (-not $builtFound) {
 if ($TO_FOLDER) {
   $targetDir = Join-Path -Path ($TO_FOLDER.TrimEnd('\','/')) -ChildPath ("section{0}" -f $SECTION_NUM)
   New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+  # A PREVIEW build must never reach a published site. Serve mode bakes a
+  # live-reload client into every page, and on a published site that script
+  # makes a student's browser ask permission to access other apps and
+  # services on this device. deploy.py already refuses this, but ONLY for
+  # Netlify and Cloudflare: this branch publishes host-to-host and never
+  # enters the container, so deploy.py never runs. The app's own publish path
+  # is protected by BuildFreshness; the command line was not. Mirrors the fix
+  # made in deploy.sh on 2026-09-05 — see GUI-IMPROVEMENTS row 392.
+  # The whole HTML tree, not just the front page — see the same comment in
+  # deploy.sh. Detection that read only `index.html` could not see the one
+  # state the wait below exists for.
+  $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
+  if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
+    Write-Host "This site was built by a preview, which bakes in a live-reload script"
+    Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
+    # Forward the flag. Without it this rebuild is a SECOND way a scheduled
+    # publish can meet a question nobody is there to answer: preview.ps1 asks
+    # about a course code ending in a zero, and about a section the
+    # configuration does not list. Under the wrapper's -NonInteractive
+    # PowerShell an unanswered Read-Host THROWS, and preview.ps1's
+    # $ErrorActionPreference = 'Stop' turns that into a bare exit 1 with
+    # nothing said — measured, not assumed; see the long note at the top of
+    # preview.ps1, which also says why the "takes the default and builds the
+    # WRONG course" story belongs to preview.sh and not here.
+    #
+    # Mirrors deploy.sh, which has forwarded it since 2026-09-09; this side had
+    # not, and GitHub issue #124 is where that gap was named.
+    $previewExtra = @()
+    if ($NON_INTERACTIVE) { $previewExtra += '--non-interactive' }
+    & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only" @previewExtra
+    if ($LASTEXITCODE -eq 3) {
+      # Passed straight through, because 3 means one thing: a question went
+      # unanswered. A caller that saw 1 here would tell the teacher their
+      # publish failed, when what it needs to say is which question nobody
+      # was there to answer.
+      Write-Host "Could not rebuild this site for publishing: it needed an answer."
+      exit 3
+    }
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "Could not rebuild this site for publishing."
+      exit 1
+    }
+    # Wait for the rebuild to become VISIBLE here before copying. On the mac
+    # the lag is the container's bind mount; natively on Windows it is the
+    # filesystem settling after a large write, and OneDrive can add to it.
+    # Waits on the condition (a front page without the live-reload client),
+    # not a guessed interval, and is bounded.
+    # The WHOLE TREE, not the front page. Serve mode bakes the client into
+    # every page and the mirror is replaced file by file, so a clean front page
+    # with stale pages behind it is a real state — and publishing that mixture
+    # is worse than publishing the preview wholesale, because the front page
+    # looks fine. See the same comment in deploy.sh.
+    for ($w = 0; $w -lt 150; $w++) {
+      if ((Test-Path -LiteralPath $publishedIndex) -and
+          -not (Test-CarriesLiveReload $PUBLIC_DIR_HOST)) { break }
+      Start-Sleep -Milliseconds 200
+    }
+    if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
+      Write-Host "The rebuilt site still carries the preview's live-reload script."
+      Write-Host "  Nothing was published, rather than publishing pages students'"
+      Write-Host "  browsers would ask about."
+      exit 1
+    }
+    # deploy.sh has had this since the empty-publish bug; this side did not,
+    # so after a timeout with no front page the HTML scan found nothing, the
+    # loop fell through, and robocopy mirrored an empty directory while
+    # reporting success. Found by review on 2026-09-05.
+    if (-not (Test-Path -LiteralPath $publishedIndex)) {
+      Write-Host "The rebuilt site has not appeared. Nothing was published."
+      exit 1
+    }
+  }
+
   Write-Host ("Publishing {0} section {1} to a folder..." -f $COURSE_CODE, $SECTION_NUM)
   # /MIR mirrors (copies changes, deletes removals); robocopy exit codes
   # below 8 all mean success.
@@ -447,6 +582,7 @@ This is the only time you will be asked for it.
      (It is also the long code in the address bar, just after
      dash.cloudflare.com/.)
 "@ | Out-Host
+  Assert-CanAsk "Paste Cloudflare Account ID" "Add the Account ID in this course's settings in Plantoir, under Deploying."
   $entered = (Read-Host "Paste Cloudflare Account ID").Trim()
   if ($entered -notmatch '^[0-9a-fA-F]{32}$') {
     Write-Host "That does not look like an Account ID (it should be 32 letters and digits)."
@@ -556,6 +692,7 @@ this computer.
   8. Copy the long code Cloudflare shows you - it is only shown once - and
      paste it below. Nothing appears as you paste; that is normal.
 "@ | Out-Host
+    Assert-CanAsk "Paste Cloudflare token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
     $pastedSec = Read-Host -AsSecureString "Paste Cloudflare token"
     $plain = $null
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pastedSec)
@@ -646,6 +783,7 @@ this computer.
      it is only shown once.
   6. Paste it below. Nothing appears as you paste; that is normal.
 "@ | Out-Host
+  Assert-CanAsk "Paste Netlify token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
   $pastedSec = Read-Host -AsSecureString "Paste Netlify token"
   $plain = $null
   $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pastedSec)
@@ -672,6 +810,10 @@ if ($NATIVE_RUNTIME) {
   if ($TARGET -eq 'cloudflare') { $deployArgs += @('--target','cloudflare') }
   $deployArgs += @('--course', $COURSE_CODE, '--section', $SECTION_NUM)
   if ($DIAGNOSE)  { $deployArgs += $DIAGNOSE }
+  # PARSING the flag is not enough - it has to reach the Python child, which is
+  # where the site-name question lives. A launcher that took the flag and never
+  # forwarded it would leave a green test suite and an unchanged 45-minute hang.
+  if ($NON_INTERACTIVE) { $deployArgs += '--non-interactive' }
   if ($TEAM_SLUG) { $deployArgs += @('--team', $TEAM_SLUG) }
   # The token rides the child's environment, never a command line: process
   # environments are not persisted anywhere, and wrangler itself reads

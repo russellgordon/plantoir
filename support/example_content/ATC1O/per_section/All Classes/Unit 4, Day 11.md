@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Working period: revision after feedback
+2. Day 7 of 9: revision after feedback — start with
+   [[Judging Your Own Work]] against the criteria on [[The Showing]]
 3. Coaching each group
 4. Running the piece twice
 5. Cool-down

@@ -89,3 +89,19 @@ Fluency is the goal; speed will arrive on its own, uninvited.
 > how you account for it — both describe the same litres arriving
 > per minute, so they must be equal. That physical certainty is the
 > sum rule: $(f + g)' = f' + g'$.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.1]]
+
+![[A2.2]]
+
+![[A2.3]]
+
+![[A3.1]]
+
+![[A3.2]]
+
+![[A3.3]]
+%%curriculum-end%%

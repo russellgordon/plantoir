@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Critical Essay]], day 5 — workshop: unsupported claims marked;
-   weakest section rewritten in class
+1. [[The Critical Essay]], day 5 — workshop: a partner marks
+   unsupported claims
+2. Then your own judgement against the criteria — [[Judging Your Own Work]]
+3. Weakest row named, that section rewritten in class
 
 ## Things to do before our next class
 

@@ -65,7 +65,8 @@ minutes on the day beats an hour in the last week of the semester.
 
 - After every investigation, one entry.
 - After every discussion, two or three sentences on what moved.
-- Once mid-semester, a [[Showing Growth]] comparison.
+- Twice, once in each of Units 3 and 4, a [[Showing Growth]] comparison
+  written in class.
 - At the end, [[Final Reflection]].
 
 > [!important] Predictions get written down before the measurement

@@ -12,6 +12,7 @@ tags:
 
 1. Warm-up: [[Spot the Hazard]] — working at height and under desks
 2. Bench time: [[The Network Job]], day 5 — cabling day
+3. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

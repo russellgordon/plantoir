@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic: name a compound, write a formula, balance an
-   equation, classify a reaction — no notes
-2. Compare and correct in pairs; the room marks itself
+   equation, classify a reaction — no notes: [[Balancing Practice]]
+2. Compare and correct in pairs; the room marks itself: [[Reaction Types Practice]]
 
 ## Things to do before our next class
 

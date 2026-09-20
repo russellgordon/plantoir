@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Builds put into service around the school and beds
+1. Builds put into service around the school and beds: [[The Shop Build]]
 2. Where each one goes and why
-3. Tool maintenance session
+3. Tool maintenance session: [[Maintaining Your Tools]]
 
 ## Things to do before our next class
 

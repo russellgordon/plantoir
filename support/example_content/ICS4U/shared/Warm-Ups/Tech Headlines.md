@@ -58,3 +58,13 @@ material this warm-up produces.
 > standard [[Ethics, Security, and the Profession]] holds every claim
 > to, including the ones your own team will be tempted to make about
 > your project at the handover.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D4.1]]
+%%curriculum-end%%

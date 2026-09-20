@@ -15,6 +15,8 @@ tags:
    argue about where it stopped being honest
 3. Consolidate: interpolation, extrapolation, and residuals as the
    check nobody runs
+4. Exit ticket, not marked: one residual, computed and then said in a
+   sentence about the thing being measured
 
 ## Things to do before our next class
 

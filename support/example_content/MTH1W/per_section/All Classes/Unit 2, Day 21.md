@@ -10,12 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Number talk: [[Visual Patterns]]
-2. Random groups — thinking task: a situation that is linear, and one
+1. First twenty minutes: work your revision list from the checkpoint,
+   with me circulating
+2. Number talk: [[Visual Patterns]]
+3. Random groups — thinking task: a situation that is linear, and one
    that is not, decided from a table alone
-3. Consolidate: what makes a relation linear, said three ways
-4. Look ahead: next unit, the data is real and messier
+4. Consolidate: what makes a relation linear, said three ways
+5. Look ahead: next unit, the data is real and messier
 
 ## Things to do before our next class
 
-- [ ] Bring a question you would like the class to collect data on.
+- [ ] Journal: what you would tell the you who started this course about algebra.

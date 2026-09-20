@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint, on your own: structure to property, with explanation
-2. Mark your own; write your revision list
+1. Checkpoint, on your own: structure to property, with explanation — [[Shapes and Polarity Practice]]
+2. Mark your own; write your revision list: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

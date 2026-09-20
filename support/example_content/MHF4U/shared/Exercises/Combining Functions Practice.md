@@ -112,3 +112,21 @@ models your [[The Signature Function|Signature Function]] may need.
 > 0.8$, so the solution is between; tightening the bracket gives
 > $x \approx 0.74$. Numerical answers to unalgebraic questions are
 > not a concession — they are the method.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D2.1]]
+
+![[D2.3]]
+
+![[D2.4]]
+
+![[D2.5]]
+
+![[D2.6]]
+
+![[D2.7]]
+
+![[D3.2]]
+%%curriculum-end%%

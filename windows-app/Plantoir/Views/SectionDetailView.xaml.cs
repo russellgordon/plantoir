@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,8 +26,44 @@ public sealed partial class SectionDetailView : UserControl
     private readonly Course _course;
     private readonly int _sectionNumber;
     private readonly ScriptRunner _previewRunner = new(SynchronizationContext.Current);
-    private readonly ScriptRunner _deployRunner = new(SynchronizationContext.Current);
+    private readonly MultiDestinationDeployRunner _deployRunner = new(SynchronizationContext.Current);
     private PreviewLeases.Lease? _lease;
+
+    /// <summary>
+    /// The working folder a preview or a deploy was STARTED in — noted where
+    /// the folder is DECIDED (the two preview starts, and the deploy once its
+    /// own preview stop is over), and read by everything that unwinds that
+    /// work.
+    ///
+    /// <para>The alternative — asking <c>_window.Workspace.WorkspacePath</c>
+    /// at teardown — names whatever folder the window happens to be showing
+    /// by then, which is the wrong one exactly when it matters: a window
+    /// pointed at a different working folder replaces the detail pane, and
+    /// <c>Unloaded</c> → <see cref="StopPreview"/> is dispatched a layout pass
+    /// later, with the window already naming the NEW folder. The stop would
+    /// then run against a folder this view never worked in.</para>
+    ///
+    /// <para>Null means no work has started, so there is nothing to stop.
+    /// Every reader is already guarded by a runner being live or a preview
+    /// having been up, so null never reaches one of them with work
+    /// outstanding.</para>
+    ///
+    /// <para>Mac parity: <c>SectionDetailView.swift</c> notes the folder at
+    /// the same three moments rather than at appearance — see
+    /// documentation/12-windows-app.md, "Which folder a teardown names".</para>
+    /// </summary>
+    private string? _folderThisSectionWorksIn;
+
+    /// <summary>
+    /// The working folder this view was BUILT in, and the key its lease rows
+    /// are filed under. Kept separately from
+    /// <see cref="_folderThisSectionWorksIn"/> and written exactly once (the
+    /// compiler enforces it): a deploy started in the one render pass between
+    /// a folder change and the teardown moves the WORK folder, and if the
+    /// registration rode along with it the old folder's lease row would be
+    /// stranded — the mac's own finding, from the review of issue #93.
+    /// </summary>
+    private readonly string? _folderThisSectionRegisteredIn;
 
     // The on-disk half of the same claims. In-memory leases are invisible to
     // the MCP server, which is a different process entirely.
@@ -45,8 +83,104 @@ public sealed partial class SectionDetailView : UserControl
     private bool _isWaitingForServer;
     private CancellationTokenSource? _serverWait;
 
+    /// <summary>
+    /// True for the span between Deploy being clicked and
+    /// <see cref="MultiDestinationDeployRunner.RunAsync"/> actually taking
+    /// over — <c>_deployRunner.IsRunning</c> alone stays false through that
+    /// whole prep phase (stopping a running preview can take ~20s), which
+    /// left the Deploy button clickable again the instant the phase
+    /// started and let a second click race the first's own
+    /// stop-preview-then-deploy sequence. Mirrors the mac's
+    /// `SectionDetailView.isPreparingDeploy` (documentation/05-build-pipeline.md,
+    /// row 318a).
+    /// </summary>
+    private bool _isPreparingDeploy;
+
+    /// <summary>
+    /// Guards <see cref="RefreshPublishedMarker"/> against an out-of-order
+    /// result: several triggers (window activation, a run finishing) can
+    /// fire in quick succession, and a walk started before a publish must
+    /// not overwrite one started after it. Mirrors the mac's generation
+    /// counter — see "The refresh triggers" in documentation/05-build-pipeline.md.
+    /// </summary>
+    private int _publishMarkerGeneration;
+
+    // ---- Folder problems --------------------------------------------------
+    //
+    // Held in view state rather than read off the runner when a dialog is
+    // built, so a teacher who dismisses it and carries on editing does not
+    // meet it again on the next redraw. A healthy course must see nothing at
+    // all: the failure mode for this whole feature is nagging, and a warning
+    // dismissed by habit is one that gets dismissed when it matters.
+
+    /// <summary>True while a folder-problem dialog is on screen.</summary>
+    private bool _healthDialogIsUp;
+
+    /// <summary>
+    /// Set the moment this view is taken off screen, so an operation that was
+    /// awaiting something slow can tell that it is now working on behalf of a
+    /// section nobody is looking at.
+    ///
+    /// <para><b>It is not earlier than <c>IsLoaded</c>, and an earlier comment
+    /// here claimed it was.</b> Both change on <c>Unloaded</c>, which WinUI
+    /// dispatches rather than raising the instant
+    /// <c>DetailHost.Content</c> is reassigned — so a just-replaced view
+    /// briefly reports itself loaded, and this flag does not close that
+    /// window. What it buys is a signal that can be checked from a background
+    /// continuation without touching a XAML property, and one place to put the
+    /// reason. The window is a dispatcher tick against awaits measured in
+    /// seconds, which is why it is left as it is rather than replaced with a
+    /// visual-tree walk.</para>
+    /// </summary>
+    private bool _isTornDown;
+
+    /// <summary>
+    /// What is waiting to be shown and what has been shown already.
+    ///
+    /// <para>Findings are HELD, not dropped, while a dialog is up: never swap
+    /// the contents of one that is already on screen — the title and the
+    /// message would change under the teacher's cursor and what they were
+    /// reading would vanish unacknowledged — but discarding them is not the
+    /// alternative either, since a failed deploy can report while an earlier
+    /// batch is still up.</para>
+    /// </summary>
+    private readonly FolderProblemQueue _healthQueue = new();
+
+    /// <summary>
+    /// True between a finding arriving and the dialog for it being built.
+    ///
+    /// <para>Presentation is posted to the dispatcher rather than run inside
+    /// the notification, and that is load-bearing: <c>site_health.py</c> prints
+    /// every finding in one burst, so they arrive in ONE pseudo-console flush
+    /// and the runner announces them one after another on the same stack.
+    /// Showing on the first announcement would put up a dialog naming one
+    /// problem and then a second naming both. By the time a posted
+    /// presentation runs, the whole flush has been collected.</para>
+    /// </summary>
+    private bool _healthPresentationQueued;
+
     public string CourseCode => _course.Code;
     public int SectionNumber => _sectionNumber;
+
+    /// <summary>
+    /// Raised whenever the browser-chrome state (back/forward/reload
+    /// availability) may have changed, so the app's Preview menu — which
+    /// tracks whichever section is currently shown — can refresh without
+    /// polling. Mirrors mac's PreviewCommands, which reads the same state
+    /// via @FocusedValue instead of an event.
+    /// </summary>
+    public event EventHandler? PreviewChromeChanged;
+
+    /// <summary>Whether a preview is loaded at all — mirrors mac's disabling Reload when there is no controller.</summary>
+    public bool HasPreview => _previewUrl is not null;
+    public bool CanGoBack => HasPreview && Preview.CanGoBack;
+    public bool CanGoForward => HasPreview && Preview.CanGoForward;
+
+    /// <summary>Menu-bar equivalents of Back_Click/Forward_Click/Reload_Click, for the Preview menu.</summary>
+    public void PreviewGoBack() { if (Preview.CanGoBack) Preview.GoBack(); }
+    public void PreviewGoForward() { if (Preview.CanGoForward) Preview.GoForward(); }
+    public void PreviewReload() { if (HasPreview) Preview.Reload(); }
+
     internal bool IsBusy => _previewRunner.IsRunning || _deployRunner.IsRunning;
     // What "busy" means to a DEPLOY since the deploy-during-preview port: a
     // running preview no longer stands in the way (Deploy stops it itself),
@@ -61,6 +195,7 @@ public sealed partial class SectionDetailView : UserControl
         _window = window;
         _course = course;
         _sectionNumber = sectionNumber;
+        _folderThisSectionRegisteredIn = window.Workspace.WorkspacePath;
         SectionTitle.Text = TitleText;
         ObsidianButton.IsEnabled = FolderActions.ObsidianIsInstalled;
 
@@ -73,13 +208,94 @@ public sealed partial class SectionDetailView : UserControl
         // Each runner is bound to the progress view exactly once — its
         // question dialog and outcome states follow whichever runner the
         // view is currently showing, chosen in RefreshChrome via Show().
+        // _deployRunner's own leg runners are registered lazily, as each
+        // becomes active — see RefreshChrome's Progress.Show call, which
+        // registers idempotently. Only one leg is ever running at a time,
+        // so there is never a moment a question from an un-registered leg
+        // could be missed.
         Progress.Register(_previewRunner);
-        Progress.Register(_deployRunner);
-        _previewRunner.PropertyChanged += (_, _) => RefreshChrome();
-        _deployRunner.PropertyChanged += (_, _) => RefreshChrome();
+        _previewRunner.PropertyChanged += (_, args) =>
+        {
+            RefreshChrome();
+            if (args.PropertyName == nameof(_previewRunner.IsRunning) && !_previewRunner.IsRunning)
+                _ = RefreshPublishedMarker();
+            // A new build asks the question again, so a problem it still finds
+            // is told again — "show it once" means once per BUILD, not once
+            // for the life of this view.
+            if (args.PropertyName == nameof(_previewRunner.IsRunning) && _previewRunner.IsRunning)
+                _healthQueue.ForgetShown();
+            // As the build reports them. preview.ps1 does not exit while it is
+            // serving, so waiting for this runner to FINISH would hold the
+            // dialog until the teacher pressed Stop.
+            if (args.PropertyName == nameof(_previewRunner.HealthFindings))
+                NoteHealthFindings(_previewRunner);
+        };
+        _deployRunner.PropertyChanged += (_, args) =>
+        {
+            RefreshChrome();
+            if (args.PropertyName == nameof(_deployRunner.IsRunning) && !_deployRunner.IsRunning)
+                _ = RefreshPublishedMarker();
+        };
         Preview.NavigationCompleted += (_, _) => RefreshChrome();
-        Unloaded += (_, _) => StopPreview();
+        _window.Activated += OnWindowActivated;
+        // Anything last night's scheduled deploy found. It ran with the app
+        // closed, so this is the first moment there is anywhere to say it.
+        // On Loaded rather than in the constructor: presenting needs a
+        // XamlRoot, and the view has none until it is in the tree.
+        Loaded += (_, _) => TakeAnythingTheScheduledDeployFound();
+        Unloaded += (_, _) => { _isTornDown = true; StopPreview(); _window.Activated -= OnWindowActivated; };
         RefreshChrome();
+        _ = RefreshPublishedMarker();
+    }
+
+    // ---- The " — Edited" marker -------------------------------------------
+
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated) return;
+        _ = RefreshPublishedMarker();
+        // Also here, not only on Loaded. A teacher who leaves Plantoir open
+        // overnight — which the scheduled-deploy feature itself suggests, to
+        // keep the machine awake — keeps the SAME view instance on the same
+        // section, so Loaded never fires again and last night's findings would
+        // wait until they clicked away and back. It is a File.Exists when
+        // nothing is waiting.
+        TakeAnythingTheScheduledDeployFound();
+    }
+
+    /// <summary>
+    /// Recomputes whether this section has unpublished edits and, if so,
+    /// appends " — Edited" to the in-pane section header — the closest
+    /// Windows equivalent of the mac's per-section window title bar, since
+    /// this app shows one section at a time inside a single MainWindow
+    /// rather than one OS window per section. Never touches
+    /// <see cref="TitleText"/> itself: that bare name is used everywhere a
+    /// sentence NAMES the section (deploy progress, dialogs), and the marker
+    /// must never leak into one of those — a real report read "Deploying
+    /// ICS3U-S1 — Edited" as though "Edited" were being published.
+    ///
+    /// Runs the file walk off the UI thread so a course on a slow network
+    /// volume cannot stutter the window coming to the front, and applies the
+    /// result only if this is still the most recent request.
+    /// </summary>
+    private async Task RefreshPublishedMarker()
+    {
+        int generation = ++_publishMarkerGeneration;
+        string courseDirectory = _course.DirectoryPath;
+        int sectionNumber = _sectionNumber;
+        var excluded = SectionPublishState.SelfPublishingSubpaths(
+            courseDirectory, _course.Configuration.AllDeployDestinations);
+
+        bool edited;
+        try
+        {
+            edited = await Task.Run(() =>
+                SectionPublishState.HasUnpublishedEdits(courseDirectory, sectionNumber, excluded));
+        }
+        catch { return; } // never let this stand in for a real failure elsewhere
+
+        if (generation != _publishMarkerGeneration) return; // superseded by a newer refresh
+        SectionTitle.Text = SectionPublishState.WindowTitle(TitleText, edited);
     }
 
     // ---- Chrome state ----------------------------------------------------
@@ -104,7 +320,7 @@ public sealed partial class SectionDetailView : UserControl
         // publishing"): Deploy_Click stops the preview itself and waits for
         // the stop — sweep included — before building. Only a deploy already
         // running disables the button.
-        DeployButton.IsEnabled = !_deployRunner.IsRunning && !building;
+        DeployButton.IsEnabled = !_deployRunner.IsRunning && !_isPreparingDeploy && !building;
         if (building)
             ToolTipService.SetToolTip(DeployButton, $"Available in a moment — {_course.Code} is being built");
 
@@ -123,10 +339,29 @@ public sealed partial class SectionDetailView : UserControl
         // shown here — re-subscribing on every event could swallow the
         // IsAwaitingInput transition that raises the question dialog.
         bool showDeploy = !_previewRunner.IsRunning &&
-            (_deployRunner.IsRunning ||
+            (_deployRunner.IsRunning || _isPreparingDeploy ||
              (_deployRunner.StartedAt ?? DateTime.MinValue) > (_previewRunner.StartedAt ?? DateTime.MinValue));
         if (showDeploy)
-            Progress.Show(_deployRunner, $"Deploying {TitleText}", onCancel: CancelDeploy);
+        {
+            // _isPreparingDeploy: nothing is running on _deployRunner yet —
+            // ActiveRunner would either be blank (a fresh leg has never
+            // rendered) or the PREVIOUS deploy's stale outcome. Neither is
+            // what is actually happening right now (row 318a).
+            if (_isPreparingDeploy && !_deployRunner.IsRunning)
+            {
+                Progress.ShowPreparing($"Deploying {TitleText}");
+            }
+            else
+            {
+                // Multi-destination courses get a leg count in the title, so a
+                // teacher watching the progress bar knows it is running a
+                // sequence rather than a single deploy that is unusually slow.
+                string title = _deployRunner.Legs.Count > 1
+                    ? $"Deploying {TitleText} — destination {Math.Min(_deployRunner.CurrentLegIndex + 1, _deployRunner.Legs.Count)} of {_deployRunner.Legs.Count}"
+                    : $"Deploying {TitleText}";
+                Progress.Show(_deployRunner.ActiveRunner, title, onCancel: CancelDeploy, multiRunner: _deployRunner);
+            }
+        }
         else
             Progress.Show(_previewRunner,
                 _previewRunner.IsRunning || _isWaitingForServer
@@ -134,12 +369,14 @@ public sealed partial class SectionDetailView : UserControl
                     : $"Preview of {TitleText}",
                 onCancel: CancelPreview);
 
-        bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || _deployRunner.Transcript.Lines.Count > 0
+        bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || _deployRunner.HasAnyOutput
                          || _previewRunner.Transcript.CurrentLine.Length > 0;
-        bool showConsole = _isWaitingForServer || IsBusy || anyOutput;
+        bool showConsole = _isWaitingForServer || IsBusy || _isPreparingDeploy || anyOutput;
         Progress.Visibility = showConsole ? Visibility.Visible : Visibility.Collapsed;
         NoPreviewState.Visibility = showConsole ? Visibility.Collapsed : Visibility.Visible;
         Preview.Visibility = previewShown ? Visibility.Visible : Visibility.Collapsed;
+
+        PreviewChromeChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private XamlRoot? EffectiveXamlRoot => XamlRoot ?? _window.Content?.XamlRoot;
@@ -164,6 +401,446 @@ public sealed partial class SectionDetailView : UserControl
             App.LogDiagnostic($"Cannot show dialog '{dialog.Title}': No XamlRoot available.");
             return null;
         }
+    }
+
+    // ---- Folder problems -------------------------------------------------
+
+    /// <summary>
+    /// Put a run's folder problems in front of the teacher.
+    ///
+    /// <para>Called when the build REPORTS them, never when a preview finishes
+    /// — and that distinction is the whole reason this feature reaches anybody.
+    /// <c>preview.ps1</c> does not exit while it is serving, so a runner on the
+    /// preview path stays running until the teacher presses Stop; and a section
+    /// missing its <c>index.md</c> makes every request 404, so the server wait
+    /// never succeeds either. Gating on either one would hide the dialog behind
+    /// a preview that the very problem it reports prevents from completing: the
+    /// worse the course, the less likely the teacher was to be told.</para>
+    ///
+    /// <para>A healthy course reports nothing and sees nothing.</para>
+    /// </summary>
+    /// <summary>
+    /// Read out whatever last night's scheduled deploy left for this section.
+    ///
+    /// <para>Marked as having come from a PUBLISH, because it did: the overnight
+    /// run went out to students, so a repair made now is not on their site
+    /// until the teacher publishes again, and that is the sentence they need.</para>
+    ///
+    /// <para><b>Guarded BEFORE consuming</b>, which is the mac's lesson and was
+    /// nearly not taken. The record is DELETED as it is read, and the queue
+    /// holding what it cannot show yet is ALMOST enough — but that queue is a
+    /// field of this view, and the view is discarded when the teacher selects
+    /// another section. So a batch consumed while a dialog was up, whose own
+    /// dialog then never got on screen, would live only in an object about to
+    /// be thrown away. Not consuming at all in that state costs one morning;
+    /// consuming and losing it costs the record for ever.</para>
+    /// </summary>
+    private void TakeAnythingTheScheduledDeployFound()
+    {
+        // No longer racing the folder-problem dialog for the one ContentDialog
+        // WinUI allows: the scheduled publish's outcome is an InfoBar in this
+        // view now, so the two can both be on screen and neither can lose.
+        ShowHowTheScheduledPublishTurnedOut();
+        if (_healthDialogIsUp || _healthQueue.PendingCount > 0) return;
+        try
+        {
+            var waiting = ScheduledHealthFindings.Take(_course.Code, _sectionNumber);
+            if (waiting.Count > 0) NoteHealthFindings(waiting, cameFromPublishing: true);
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"TakeAnythingTheScheduledDeployFound exception: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Show the teacher how last night's scheduled publish turned out — it
+    /// stopped for a question, it did not finish, or it went out.
+    /// </summary>
+    /// <remarks>
+    /// <para>Read here for the same reason the folder problems are: the run
+    /// happened with the app closed, so this is the first moment there is
+    /// anybody to say it to.</para>
+    ///
+    /// <para><b>Reading does not consume it, and the notice is not a
+    /// dialog.</b> Both changed on 2026-09-09 and they are the same change: the
+    /// record now stands until the teacher dismisses it or a run that gets all
+    /// the way through replaces it (shared-rules.json,
+    /// scheduledPublishStopped.clearedBy), which is only possible if it can be
+    /// shown more than once. It also removes a real hole — WinUI allows one
+    /// ContentDialog at a time, so an overnight run that produced BOTH a folder
+    /// problem and a stopped publish had already destroyed the second record by
+    /// the time it found it could not show it.</para>
+    ///
+    /// <para><b>The trail line is NOT written here.</b> It is written by the
+    /// startup sweep in App.OnLaunched, so a teacher who never opens this
+    /// section still gets one — and that teacher is precisely the one who
+    /// writes in to say their site did not update.</para>
+    /// </remarks>
+    private void ShowHowTheScheduledPublishTurnedOut()
+    {
+        ScheduledPublishOutcome.Result? outcome;
+        try { outcome = ScheduledPublishOutcome.Read(_course.Code, _sectionNumber); }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"ShowHowTheScheduledPublishTurnedOut exception: {ex}");
+            return;
+        }
+
+        if (outcome is null)
+        {
+            ScheduledPublishNotice.IsOpen = false;
+            return;
+        }
+
+        // Green for the good news, orange for the two failures. The failures
+        // also get a warning beside their section in the list; a success does
+        // not, because a badge on every section that published fine overnight
+        // is a badge nobody reads by Wednesday (shared-rules.json,
+        // scheduledPublishStopped.attention).
+        bool wrong = ScheduledPublishOutcome.NeedsAttention(outcome.Outcome);
+        ScheduledPublishNotice.Severity = wrong ? InfoBarSeverity.Warning : InfoBarSeverity.Success;
+        ScheduledPublishNotice.Title = wrong
+            ? "Your scheduled publish did not go out"
+            : "Your scheduled publish went out";
+        ScheduledPublishNotice.Message =
+            ScheduledPublishOutcome.Sentence(_course.Code, _sectionNumber, outcome);
+        ScheduledPublishNotice.IsOpen = true;
+    }
+
+    /// <summary>
+    /// The teacher has finished with last night's news, so the record goes.
+    /// </summary>
+    /// <remarks>
+    /// A decision rather than a convenience: clearing only on a scheduled run
+    /// that got through leaves the message standing after somebody has already
+    /// put the problem right by hand, and the next run that would clear it
+    /// could be a week away.
+    /// </remarks>
+    private void ScheduledPublishNoticeDismiss_Click(object sender, RoutedEventArgs e)
+    {
+        DismissTheScheduledPublishNotice();
+        ScheduledPublishNotice.IsOpen = false;
+    }
+
+    /// <summary>
+    /// The bar's own close button means the same thing as Dismiss.
+    /// </summary>
+    /// <remarks>
+    /// <para>Two ways to say "I have read this" that did different things
+    /// would be the worse kind of surprise: the X is the one most people reach
+    /// for, and a teacher who presses it and finds the same notice tomorrow
+    /// morning learns to distrust the notice.</para>
+    ///
+    /// <para><b>Only a real close, though.</b> InfoBar raises Closed for a
+    /// PROGRAMMATIC close as well as a clicked one, and this view closes the
+    /// bar itself twice — once in the Dismiss handler above, and once when a
+    /// section is opened that has no record waiting. Without the reason check
+    /// the first fired the dismissal twice and the second fired one for a
+    /// teacher who had done nothing, which raises SectionOutcomeDismissed and
+    /// makes the sidebar rebuild for no reason. Found by review before either
+    /// could be noticed, because the second delete is a no-op on a file that
+    /// is already gone.</para>
+    /// </remarks>
+    private void ScheduledPublishNotice_Closed(InfoBar sender, InfoBarClosedEventArgs args)
+    {
+        if (args.Reason != InfoBarCloseReason.CloseButton) return;
+        DismissTheScheduledPublishNotice();
+    }
+
+    private void DismissTheScheduledPublishNotice()
+    {
+        try
+        {
+            ScheduledPublishOutcome.Dismiss(_course.Code, _sectionNumber);
+            SectionOutcomeDismissed?.Invoke(_course.Code, _sectionNumber);
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"DismissTheScheduledPublishNotice exception: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Raised when a teacher clears a scheduled publish's notice, so the
+    /// sidebar can take the warning off that section at the same moment.
+    /// </summary>
+    /// <remarks>
+    /// An event rather than a direct call into the sidebar: this view is hosted
+    /// by the window and knows nothing about the tree beside it, and a badge
+    /// that stayed up after the notice was dismissed would say a section still
+    /// needs attention when nothing does.
+    /// </remarks>
+    public static event Action<string, int>? SectionOutcomeDismissed;
+
+    private void NoteHealthFindings(ScriptRunner? runner, bool cameFromPublishing = false)
+    {
+        if (runner is null) return;
+        NoteHealthFindings(runner.HealthFindings, cameFromPublishing);
+    }
+
+    private void NoteHealthFindings(IReadOnlyList<SiteHealthFinding> findings, bool cameFromPublishing)
+    {
+        if (_healthQueue.Note(findings, cameFromPublishing)) QueueHealthPresentation();
+    }
+
+    private void QueueHealthPresentation()
+    {
+        if (_healthPresentationQueued || _healthDialogIsUp) return;
+        _healthPresentationQueued = true;
+        bool accepted = DispatcherQueue.TryEnqueue(async () =>
+        {
+            _healthPresentationQueued = false;
+            await PresentPendingHealthFindingsAsync();
+        });
+        // A refused enqueue (the dispatcher is shutting down) would otherwise
+        // leave the flag set forever, and every later finding would be dropped
+        // by the guard above rather than shown.
+        if (!accepted) _healthPresentationQueued = false;
+    }
+
+    /// <summary>
+    /// Show what is waiting, then whatever arrived while it was on screen.
+    /// </summary>
+    private async Task PresentPendingHealthFindingsAsync()
+    {
+        if (_healthDialogIsUp) return;
+        if (_healthQueue.TakeNext() is not { } next) return;
+        var findings = next.Findings;
+        bool cameFromPublishing = next.CameFromPublishing;
+
+        _healthDialogIsUp = true;
+        bool putBack = false;
+        try
+        {
+            var choice = await ShowHealthDialogAsync(FolderProblemsDialog.Findings(findings));
+            if (choice is null)
+            {
+                // It never got on screen — another dialog held the one slot
+                // WinUI allows, for longer than the retries covered. Hand the
+                // batch back rather than losing it: TakeNext marked it shown,
+                // and a dialog nobody saw has told nobody anything.
+                _healthQueue.PutBack(findings, cameFromPublishing);
+                putBack = true;
+            }
+            else if (choice == ContentDialogResult.Primary)
+            {
+                var outcome = SiteHealthRepair.OutcomeOfRepairing(
+                    findings, _course,
+                    cameFromPublishing
+                        ? SiteHealthRepair.Occasion.Publishing
+                        : SiteHealthRepair.Occasion.Building);
+                // The marker is refreshed because a repair CHANGES the
+                // section's content on the teacher's behalf, and nothing else
+                // would: RefreshPublishedMarker runs when the section stops
+                // being busy and on window activation, and the section stopped
+                // being busy before this dialog appeared while a dialog does
+                // not make the window active again.
+                _ = RefreshPublishedMarker();
+                if (outcome is not null)
+                {
+                    // Shown only AFTER the dialog it was asked for from has
+                    // gone — contracts/shared-rules.json ->
+                    // siteHealth.repair.oneAlertAtATime.
+                    if (outcome.CanRebuild && WhyTheRepairCannotBePreviewedNow() is { } instead)
+                        outcome = instead;
+                    await PresentRepairOutcomeAsync(outcome);
+                }
+            }
+        }
+        finally
+        {
+            _healthDialogIsUp = false;
+        }
+
+        if (putBack)
+        {
+            // Try again once whatever is holding the slot has had time to go,
+            // rather than recursing straight back into the same refusal. It
+            // stops of its own accord: the batch is presented the first time
+            // the slot is free.
+            await Task.Delay(2000);
+            // Not onto a section nobody is looking at. EffectiveXamlRoot falls
+            // back to the WINDOW's root, so a replaced view would go on
+            // retrying and eventually put a dialog about the old section over
+            // whatever the teacher switched to.
+            if (_isTornDown || !IsLoaded) return;
+            QueueHealthPresentation();
+            return;
+        }
+
+        await PresentPendingHealthFindingsAsync();
+    }
+
+    private async Task PresentRepairOutcomeAsync(SiteHealthRepair.Outcome outcome)
+    {
+        var choice = await ShowHealthDialogAsync(FolderProblemsDialog.RepairOutcome(outcome));
+        if (choice == ContentDialogResult.Primary) await PreviewAgainAfterRepairAsync();
+    }
+
+    /// <summary>
+    /// Why "Preview Again" would not work just now, or null when it would.
+    ///
+    /// <para>Say so rather than swallowing the press. Every other gated control
+    /// here disables itself or explains; a button that quietly does nothing is
+    /// the silence this whole feature exists to remove, arriving in the button
+    /// meant to end it.</para>
+    ///
+    /// <para>The publish question is asked of <see cref="CourseActivity"/>, not
+    /// of this view's own deploy runner: the assistant publishes the same
+    /// section in the same process and is invisible to it. And it says "this
+    /// course", not "this section", because the check matches on the folder and
+    /// the course code and deliberately ignores the section number — publishing
+    /// section 2 would otherwise be reported as section 1 publishing.</para>
+    /// </summary>
+    private SiteHealthRepair.Outcome? WhyTheRepairCannotBePreviewedNow()
+    {
+        if (_window.Workspace.WorkspacePath is not { } workspacePath) return null;
+
+        // Said in the same shape as the other two rather than through
+        // TheAssistantIsBuilding()'s own dialog: that one is a second
+        // ContentDialog raised while the outcome dialog is still closing,
+        // which WinUI refuses — and its refusal is swallowed, so the press
+        // would do nothing and say nothing. Silence, in the button meant to
+        // end silence.
+        if (CourseActivity.IsBuildingElsewhere(workspacePath, _course.Code))
+        {
+            return new SiteHealthRepair.Outcome(
+                $"{_course.Code} is being built just now.",
+                "The assistant is rebuilding this course, and building it here at the same time " +
+                "would clash. You can preview it again once that has finished, and the change " +
+                "will be there.",
+                false);
+        }
+
+        if (_lease is null && PreviewLeases.Active.Any(
+                lease => lease.FolderPath == workspacePath
+                         && lease.CourseCode == _course.Code
+                         && lease.SectionNumber == _sectionNumber))
+        {
+            return new SiteHealthRepair.Outcome(
+                "This section is open in another window.",
+                "Preview it from there to see the change.",
+                false);
+        }
+
+        if (_deployRunner.IsRunning || _isPreparingDeploy
+            || CourseActivity.IsPublishing(workspacePath, _course.Code))
+        {
+            return new SiteHealthRepair.Outcome(
+                "Plantoir is publishing this course just now.",
+                // Deliberately not "press Preview Again": this is the outcome
+                // whose button is withheld, and naming a button that is not on
+                // screen is worse than saying nothing.
+                "You can preview it again once that has finished, and the change will be there.",
+                false);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Build the site again after a repair, so the teacher can see it.
+    ///
+    /// <para>A preview that is already up is stopped and started again rather
+    /// than left alone: <c>content/</c> is a one-off copy made during the
+    /// build, and the only watcher in preview mode syncs the built site out to
+    /// this PC — nothing carries a folder restored on disk into a preview that
+    /// is already serving. Live reload does not cover this.</para>
+    ///
+    /// <para>The LEASE decides whether to stop, not the window's appearance: a
+    /// preview whose wait timed out has cleared <c>_isWaitingForServer</c> and
+    /// never set <c>_previewUrl</c> while still holding the port, so asking
+    /// those two would skip the stop and then be refused the lease — raising a
+    /// refusal dialog out of a repair.</para>
+    ///
+    /// <para>One consequence worth knowing: a preview build is never
+    /// deploy-fresh (<c>app-rules.json</c> -&gt; <c>buildFreshness</c>), so
+    /// previewing after a successful publish means the NEXT publish rebuilds.
+    /// Correct rather than unfortunate, and largely moot — the repair puts
+    /// content back, which forces a rebuild anyway.</para>
+    /// </summary>
+    private async Task PreviewAgainAfterRepairAsync()
+    {
+        try
+        {
+            // Asked AGAIN, at the press. The button was offered when the
+            // outcome dialog was built, and a teacher reads for as long as
+            // they like — a publish can start in that time, from the assistant
+            // as easily as from this window, and starting a build into a
+            // course being published is the race DeployAsync spends thirty
+            // lines avoiding. Withheld here means saying so, in the same
+            // dialog shape, rather than swallowing the press.
+            if (WhyTheRepairCannotBePreviewedNow() is { } instead)
+            {
+                await PresentRepairOutcomeAsync(instead);
+                return;
+            }
+
+            if (_lease is not null || _previewRunner.IsRunning) await StopPreviewAsync();
+
+            // The stop can take ~20 seconds with the dialog already gone, and
+            // the teacher is free to click another section meanwhile — which
+            // replaces this view. Starting a preview from a view nobody can
+            // see leaves a running preview.ps1 on a runner with no window and
+            // a lease that refuses the section's own Preview button
+            // afterwards.
+            if (_isTornDown || !IsLoaded) return;
+
+            // Asked AGAIN after the stop, for the reason DeployAsync gives at
+            // the same point in its own sequence: the leases came off with the
+            // preview and the stop takes long enough for somebody else to
+            // start. WorkLease is an announcement, not a refusal, so nothing
+            // downstream would stop a build landing on top of the assistant's.
+            if (WhyTheRepairCannotBePreviewedNow() is { } nowInstead)
+            {
+                await PresentRepairOutcomeAsync(nowInstead);
+                return;
+            }
+            StartAutomatedPreview();
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"PreviewAgainAfterRepairAsync exception: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// <see cref="ShowDialogSafelyAsync"/>, but it does not give up on the
+    /// first refusal.
+    ///
+    /// <para>WinUI allows one <c>ContentDialog</c> on screen at a time, and
+    /// <c>ShowAsync</c> completes when the dialog BEGINS closing rather than
+    /// when it has gone — so asking for the outcome report immediately after
+    /// the findings dialog can be refused. Swallowing that (which
+    /// <see cref="ShowDialogSafelyAsync"/> does, correctly, for one-off
+    /// dialogs) would lose exactly the report the teacher just pressed a
+    /// button for, which is the failure path this feature exists to close.</para>
+    /// </summary>
+    private async Task<ContentDialogResult?> ShowHealthDialogAsync(ContentDialog dialog)
+    {
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            if (EffectiveXamlRoot is not { } root)
+            {
+                App.LogDiagnostic($"Cannot show '{dialog.Title}': no XamlRoot available.");
+                return null;
+            }
+            dialog.XamlRoot = root;
+            try
+            {
+                return await dialog.ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                // Once per batch, not once per attempt: a teacher reading
+                // another dialog would otherwise fill the log with five lines
+                // every couple of seconds for as long as they take.
+                if (attempt == 0)
+                    App.LogDiagnostic($"Folder-problem dialog refused, retrying: {ex.Message}");
+                await Task.Delay(150);
+            }
+        }
+        return null;
     }
 
     // ---- Preview ---------------------------------------------------------
@@ -196,6 +873,8 @@ public sealed partial class SectionDetailView : UserControl
         {
             if (_previewRunner.IsRunning) { StopPreview(); return; }
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+            // Decided here, so the stop that follows names the same folder.
+            _folderThisSectionWorksIn = workspacePath;
 
             // Clear any prior lease for this section before starting anew
             PreviewLeases.Release(workspacePath, _course.Code, _sectionNumber);
@@ -258,6 +937,18 @@ public sealed partial class SectionDetailView : UserControl
     public void StartDeployForAutomation() => Deploy_Click(this, new RoutedEventArgs());
 
     /// <summary>
+    /// The assistant's entry point: the same path as the Deploy button, but
+    /// AWAITS the real outcome instead of returning the moment the click was
+    /// dispatched. Returns <see cref="DeployAsync"/>'s own return value
+    /// directly — deliberately NOT correlated through a shared field, so a
+    /// second call in flight at the same time (the busy branch in
+    /// <c>AssistAgent.RunTool</c> fires one of these even while a deploy is
+    /// already running, to nudge the app forward) gets its OWN outcome and
+    /// can never steal or orphan another caller's pending await.
+    /// </summary>
+    public Task<string?> StartDeployForAutomationAsync() => DeployAsync();
+
+    /// <summary>
     /// Refuse to start a build while the assistant is running one.
     ///
     /// Checked at the CLICK, not just when the buttons were last drawn: a
@@ -299,6 +990,8 @@ public sealed partial class SectionDetailView : UserControl
             if (_previewRunner.IsRunning) { StopPreview(); return; }
             if (await TheAssistantIsBuilding()) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+            // Decided here, so the stop that follows names the same folder.
+            _folderThisSectionWorksIn = workspacePath;
 
             try
             {
@@ -414,13 +1107,6 @@ public sealed partial class SectionDetailView : UserControl
         }
     }
 
-    private void AbandonWait()
-    {
-        _isWaitingForServer = false;
-        ReleaseLease();
-        RefreshChrome();
-    }
-
     /// <summary>Interface updates must never yank the teacher back from a page they navigated to.</summary>
     private void LoadIfNeeded(Uri url)
     {
@@ -429,9 +1115,53 @@ public sealed partial class SectionDetailView : UserControl
         Preview.Source = url;
     }
 
+    // ---- Teardown ---------------------------------------------------------
+    //
+    // Everything from here to END TEARDOWN REGION unwinds work that has
+    // already started: it stops container-side processes, releases preview
+    // leases and gives back claims. All of it must name the folder the work
+    // STARTED in — which is not necessarily the folder the window is pointing
+    // at by the time the teardown runs.
+    //
+    // A window pointed at a different working folder replaces the detail
+    // pane, and `Unloaded` → StopPreview() is dispatched a layout pass later,
+    // with `_window.Workspace.WorkspacePath` already naming the NEW folder.
+    // Reading it here would stop the new folder's container — which is
+    // another window's preview of the same course and section — and delete
+    // that window's lease row, while the folder being left carried on
+    // serving. The intended behaviour is the opposite: a preview running in
+    // folder A when the window switches to B is stopped against A and A's
+    // lease row released, and nothing of B's is touched.
+    //
+    // So no read of the window's LIVE working folder is allowed below this
+    // line. `_folderThisSectionWorksIn` and `_folderThisSectionRegisteredIn`
+    // are the only folders named here, and
+    // SectionDetailTeardownSourceTests asserts that this region contains ZERO
+    // reads of `_window.Workspace` — a test naming five known methods would
+    // go stale the moment somebody added a sixth.
+    //
+    // ONE EXCEPTION, and it is named rather than tidied away: the scan is
+    // LEXICAL, and every method here ends in RefreshChrome(), which reads the
+    // live folder itself (at the `building` line near the top of the file).
+    // That read is harmless — it decides whether the Deploy button is enabled
+    // and what its tooltip says, for the folder now on screen, which is the
+    // right folder for a question about what the teacher may click next. It
+    // stops nothing and releases nothing. The scan asserts that RefreshChrome
+    // is the ONLY method called from here whose body reads the live folder,
+    // so a second one cannot arrive unnoticed.
+    //
+    // ==== BEGIN TEARDOWN REGION ===========================================
+
+    private void AbandonWait()
+    {
+        _isWaitingForServer = false;
+        ReleaseLease();
+        RefreshChrome();
+    }
+
     private void CancelPreview()
     {
-        if (_previewRunner.IsRunning && _window.Workspace.WorkspacePath is { } workspacePath)
+        if (_previewRunner.IsRunning && _folderThisSectionWorksIn is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
         _previewRunner.CancelByUser();
         _previewUrl = null;
@@ -442,9 +1172,9 @@ public sealed partial class SectionDetailView : UserControl
 
     private void CancelDeploy()
     {
-        if (_deployRunner.IsRunning && _window.Workspace.WorkspacePath is { } workspacePath)
+        if (_deployRunner.IsRunning && _folderThisSectionWorksIn is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
-        _deployRunner.CancelByUser();
+        _deployRunner.Cancel();
     }
 
     private void StopPreview()
@@ -459,7 +1189,7 @@ public sealed partial class SectionDetailView : UserControl
         // a build the sweep then kills.
         bool hadPreview = _previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null;
         _serverWait?.Cancel();
-        if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePath)
+        if (hadPreview && _folderThisSectionWorksIn is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
         if (_previewRunner.IsRunning) _previewRunner.StopByUser();
         _previewUrl = null;
@@ -477,7 +1207,7 @@ public sealed partial class SectionDetailView : UserControl
         // (mac order — see StopPreview). A second sweep after the runner
         // dies catches whatever the first missed while the server was still
         // spawning, and the awaited wait covers both.
-        if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePath)
+        if (hadPreview && _folderThisSectionWorksIn is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
         if (_previewRunner.IsRunning)
         {
@@ -486,7 +1216,7 @@ public sealed partial class SectionDetailView : UserControl
             // just told to die, so hanging here is the only failure left.
             await _previewRunner.WaitUntilFinishedOrKill(5000);
         }
-        if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePathAgain)
+        if (hadPreview && _folderThisSectionWorksIn is { } workspacePathAgain)
         {
             await PreviewStopper.StopSectionProcessesAsync(workspacePathAgain, _course.Code, _sectionNumber);
         }
@@ -508,62 +1238,98 @@ public sealed partial class SectionDetailView : UserControl
         _buildWork = null;
     }
 
+    /// <summary>
+    /// Give the preview lease back, both the exact row and any row for this
+    /// section that a previous view left behind.
+    ///
+    /// <para>The exact release already names the right folder on its own —
+    /// <c>PreviewLeases.Lease</c> carries the <c>FolderPath</c> it was taken
+    /// with. The folder-keyed sweep beside it cannot, so it is filed under
+    /// the folder this view was REGISTERED in rather than under the window's
+    /// current one: under the current one it would delete another window's
+    /// lease row in a folder this section was never previewed in.</para>
+    /// </summary>
     private void ReleaseLease()
     {
         ReleaseBuildClaim();
         _previewWork?.Dispose();
         _previewWork = null;
         if (_lease is { } lease) PreviewLeases.Release(lease);
-        if (_window.Workspace.WorkspacePath is { } wp)
+        if (_folderThisSectionRegisteredIn is { } wp)
         {
             PreviewLeases.Release(wp, _course.Code, _sectionNumber);
         }
         _lease = null;
     }
 
+    // ==== END TEARDOWN REGION =============================================
+
     // ---- Deploy ----------------------------------------------------------
 
-    private async void Deploy_Click(object sender, RoutedEventArgs e)
+    private async void Deploy_Click(object sender, RoutedEventArgs e) => await DeployAsync();
+
+    /// <summary>
+    /// The whole Deploy flow, returning the sentence that describes what
+    /// actually happened. Every CALL gets its own return value — nothing is
+    /// shared across concurrent invocations — so <see cref="Deploy_Click"/>
+    /// (fire-and-forget, for the button and for the assistant's mere
+    /// "bring it forward" nudge) and
+    /// <see cref="StartDeployForAutomationAsync"/> (awaited for the real
+    /// outcome) can safely both be in flight at once without one starving
+    /// or stealing the other's answer.
+    /// </summary>
+    private async Task<string?> DeployAsync()
     {
+        // Overwritten only on the path that actually calls RunAsync and
+        // gets a real outcome back — every early return and the catch block
+        // below leave this as "did not finish", which is true of all of
+        // them: refused, already deploying, the assistant is building, or
+        // an exception before the deploy started.
+        string? outcomeMessage = AssistWording.DeployDidNotFinish(_course.Code, _sectionNumber.ToString());
         try
         {
-            if (_deployRunner.IsRunning) return;
-            if (await TheAssistantIsBuilding()) return;
-            if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+            // _isPreparingDeploy closes a real window, not just a display
+            // one: _deployRunner.IsRunning alone stays false through this
+            // whole prep phase (stopping any preview, waiting for the stop
+            // sweep) — a second click there would race its own
+            // stop-preview-then-deploy sequence against the first's
+            // (row 318a).
+            if (_deployRunner.IsRunning || _isPreparingDeploy) return outcomeMessage;
+            if (await TheAssistantIsBuilding()) return outcomeMessage;
+            if (_window.Workspace.WorkspacePath is not { } workspacePath) return outcomeMessage;
 
-            // Folder publishing (rows 101–102): the save gate keeps the folder
-            // valid, but a hand-edited config could still slip a bad one in —
-            // decline plainly rather than let the launcher discover it.
-            bool toFolder = _course.Configuration.DeploysToLocalFolder;
-            string deployFolder = _course.Configuration.DeployFolderPath.Trim();
-            if (toFolder && CourseConfiguration.DeployFolderProblem(deployFolder) is { } folderProblem)
+            var destinations = _course.Configuration.AllDeployDestinations;
+            string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
+
+            // Refuses up front, against EVERY configured destination, rather
+            // than discovering a missing credential halfway through a
+            // redundancy run — exactly the surprise redundancy exists to
+            // prevent (row 305's RefusalReason).
+            if (MultiDestinationDeployRunner.RefusalReason(destinations, cloudflareAccount) is { } problem)
             {
                 var problemDialog = new ContentDialog
                 {
-                    Title = "The deploy folder needs attention",
-                    Content = folderProblem + " Fix it in this course's settings, then deploy again.",
+                    Title = "This section can't be deployed yet",
+                    Content = problem,
                     CloseButtonText = "OK",
                 };
                 await ShowDialogSafelyAsync(problemDialog);
-                return;
+                return outcomeMessage;
             }
 
-            // Cloudflare needs the teacher's account, and the launcher's console
-            // prompt for it can never be answered from here — so decline plainly
-            // and point at the setting that fixes it.
-            bool toCloudflare = _course.Configuration.DeploysToCloudflare;
-            string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
-            if (toCloudflare && CourseConfiguration.CloudflareAccountProblem(cloudflareAccount) is { } accountProblem)
-            {
-                var accountDialog = new ContentDialog
-                {
-                    Title = "Cloudflare needs your Account ID",
-                    Content = accountProblem + " Add it in this course's settings, under Deploying, then deploy again.",
-                    CloseButtonText = "OK",
-                };
-                await ShowDialogSafelyAsync(accountDialog);
-                return;
-            }
+            // Claim the console for the deploy panel BEFORE touching the
+            // preview runner below. Stopping a running preview sets its own
+            // WasStoppedByUser and flips IsRunning false without touching
+            // _deployRunner.StartedAt — until ClaimConsole() gives it a real
+            // timestamp, RefreshChrome's showDeploy comparison kept picking
+            // the just-stopped preview panel, flashing "Stopped" for a beat
+            // before the deploy panel took over (row 317). _isPreparingDeploy
+            // covers what the timestamp alone does not: _deployRunner.Legs
+            // still holds the PREVIOUS deploy's runners until RunAsync
+            // replaces them with fresh ones a little further down.
+            _deployRunner.ClaimConsole();
+            _isPreparingDeploy = true;
+            RefreshChrome();
 
             // Stop any running or building preview before deploying, and
             // wait for the container-side stop sweep to finish so it cannot
@@ -575,27 +1341,31 @@ public sealed partial class SectionDetailView : UserControl
             else
                 await PreviewStopper.WaitForStopsToFinish(_course.Code, _sectionNumber);
 
+            // AFTER the preview stop, never before it: the stop is unwinding
+            // the PREVIEW's work and must keep naming the folder that preview
+            // started in. Only once it is over does this deploy become the
+            // work this view is doing.
+            _folderThisSectionWorksIn = workspacePath;
+
             // Said AFTER the stop, as on the mac: a deploy that began while
             // we were waiting is the one thing that still stands in the way.
-            if (_deployRunner.IsRunning) return;
+            if (_deployRunner.IsRunning) return outcomeMessage;
             // The stop can take up to ~20 s, and the leases came off with the
             // preview — long enough for the assistant to begin a build of its
             // own. The click-time answer is stale; ask again.
-            if (await TheAssistantIsBuilding()) return;
+            if (await TheAssistantIsBuilding()) return outcomeMessage;
 
-            bool needsBuild = BuildFreshness.NeedsRebuild(_course, _sectionNumber);
-            _deployRunner.Milestones = toFolder
-                ? (needsBuild ? TaskMilestones.BuildAndDeployToFolder : TaskMilestones.DeployToFolder)
-                : toCloudflare
-                    ? (needsBuild ? TaskMilestones.BuildAndDeployToCloudflare : TaskMilestones.DeployToCloudflare)
-                    : (needsBuild ? TaskMilestones.BuildAndDeploy : TaskMilestones.Deploy);
-            string customDomain = CourseConfiguration.NormalizedCustomDomain(
-                _course.Configuration.CustomDomain(_sectionNumber));
-            _deployRunner.CustomDomainForLinks = customDomain.Length == 0 ? null : customDomain;
+            // Where THIS working folder's built websites are kept. The app
+            // has to be able to name that path to answer the question at all;
+            // until 2026-09-06 nothing in the app could, so this asked about
+            // <course>\.merged_output, which Windows stopped writing to when
+            // builds moved out of the working folder.
+            bool needsBuild = BuildFreshness.NeedsRebuild(
+                _course, _sectionNumber, BuildOutputLocation.BuildsRootFor(workspacePath));
 
             // The publish is on the books for its WHOLE life — the quiet build
-            // included — and comes off them on every exit path: the two early
-            // returns below, the normal end, and the catch.
+            // included — and comes off them on every exit path: the normal
+            // end and the catch.
             _publishActivity?.Dispose();
             _publishActivity = CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber);
             _publishWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Publishing);
@@ -603,25 +1373,52 @@ public sealed partial class SectionDetailView : UserControl
             // build claim can simply run its whole length.
             _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
 
-            if (needsBuild)
-            {
-                // Build quietly first; a failed build stops before publishing —
-                // the failure and its output are already on screen.
-                _deployRunner.Run("preview.ps1",
-                    new[] { _course.Code, _sectionNumber.ToString(), "--build-only" }, workspacePath);
-                RefreshChrome();
-                if (!await _deployRunner.WaitUntilFinished()) { EndPublishActivity(); return; }
-            }
-            var deployArguments = toFolder
-                ? new[] { _course.Code, _sectionNumber.ToString(), "--to-folder", deployFolder }
-                : toCloudflare
-                    ? new[] { _course.Code, _sectionNumber.ToString(), "--target", "cloudflare", "--account", cloudflareAccount }
-                    : new[] { _course.Code, _sectionNumber.ToString() };
-            _deployRunner.Run("deploy.ps1", deployArguments, workspacePath,
-                keepTranscript: needsBuild);
-            RefreshChrome();
-            await _deployRunner.WaitUntilFinished();   // outcome already on screen
+            // The real progress panel takes over from here — RunAsync is
+            // about to give _deployRunner.Legs fresh runners of its own and
+            // start reporting real progress on them. No RefreshChrome() call
+            // belongs between this line and RunAsync: _deployRunner.Legs
+            // still holds the PREVIOUS deploy's (finished, stale-outcome)
+            // runners until RunAsync's own synchronous prefix replaces them,
+            // so a refresh sandwiched here would repaint that stale outcome
+            // for exactly the beat this whole fix exists to close — RunAsync
+            // sets IsRunning and notifies synchronously, before its first
+            // await, and that notification is what calls RefreshChrome (see
+            // the constructor's _deployRunner.PropertyChanged subscription).
+            _isPreparingDeploy = false;
+
+            // This build asks the folder question again, and its answer is the
+            // one carrying the sentence about what students can see — so a
+            // finding a preview already reported must not be suppressed here
+            // as "already shown".
+            _healthQueue.ForgetShown();
+
+            // The whole sequence — an optional shared build, then each
+            // destination's own deploy — happens inside RunAsync, which
+            // also resolves each leg's own milestones and custom domain.
+            // For the overwhelming majority of courses (one destination)
+            // this behaves exactly as a single deploy always did.
+            await _deployRunner.RunAsync(_course, _sectionNumber, destinations, cloudflareAccount,
+                workspacePath, needsBuild);
+            // The single place that decides which sentence a teacher (or the
+            // assistant, relaying it) hears — success, all-destinations,
+            // partial, or every-destination-failed — from what actually
+            // happened, not from having reached this line.
+            outcomeMessage = MultiDestinationDeployRunner.Result(
+                _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome).Message;
             EndPublishActivity();
+
+            // What the build said about this course's folders, taken from the
+            // FIRST leg: every destination publishes the same built site, so a
+            // second leg only repeats the findings. A deploy that skipped the
+            // build (nothing had changed) reports none, which is correct — the
+            // checks run inside the build.
+            //
+            // AFTER EndPublishActivity, deliberately: the publish is off the
+            // books by now, so "Preview Again" is not refused on account of
+            // this view's own publish having just finished. And NOT awaited —
+            // the assistant awaits DeployAsync for its answer, and it must not
+            // wait on a teacher reading a dialog.
+            NoteHealthFindings(_deployRunner.Legs.FirstOrDefault()?.Runner, cameFromPublishing: true);
         }
         catch (Exception ex)
         {
@@ -631,6 +1428,20 @@ public sealed partial class SectionDetailView : UserControl
             // the publish and build claims — until the view is torn down.
             EndPublishActivity();
         }
+        finally
+        {
+            // A safety net for every early-return path above (the refusal
+            // dialog, "already deploying", "the assistant is building",
+            // an exception before the flag was cleared): _isPreparingDeploy
+            // must never survive past this method, or the Deploy button and
+            // the console stay stuck showing "Preparing to deploy…" forever.
+            if (_isPreparingDeploy)
+            {
+                _isPreparingDeploy = false;
+                RefreshChrome();
+            }
+        }
+        return outcomeMessage;
     }
 
     private void EndPublishActivity()
@@ -682,6 +1493,13 @@ public sealed partial class SectionDetailView : UserControl
     public void StagePreviewForCapture(ElementTheme theme, string? siteImagePath = null)
     {
         _previewUrl = new Uri("http://localhost:8081");
+        // Setting _previewUrl makes `hadPreview` true, so a later StopPreview
+        // would try to sweep — and with no capture it would name nothing and
+        // sweep nothing. Marketing shots only, and nothing is really running,
+        // but a staged view that answers the teardown's question differently
+        // from a real one is exactly the difference a shot harness should not
+        // introduce.
+        _folderThisSectionWorksIn = _window.Workspace.WorkspacePath;
         PreviewLabel.Text = "Stop Preview";
         PreviewIcon.Glyph = Glyphs.Stop;
         BackButton.IsEnabled = true;

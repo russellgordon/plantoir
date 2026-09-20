@@ -15,7 +15,8 @@ tags:
    your Python blinks a real LED
 3. Compare and name it: [[Code Meets Hardware]] — the whole chain,
    program to pin to light
-4. Launch: [[The Gadget]] — a circuit of your own, run by your code
+4. Launch: [[The Gadget]] — a circuit of your own, run by your code,
+   with its criteria table read together before anyone sketches a wire
 5. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class

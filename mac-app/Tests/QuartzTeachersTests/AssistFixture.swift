@@ -19,12 +19,42 @@ enum AssistFixture {
     /// around and a four-part tuple in a parameter list is unreadable.
     typealias Made = (root: URL, course: Course, runner: AssistToolRunner, siteWork: StubSiteWork)
 
+    /// A clock a test can MOVE, so one conversation can be asked the same
+    /// thing on two different days.
+    ///
+    /// The runner reads its day through a function rather than storing a date
+    /// (issue #143: a window left open across midnight resolved "tomorrow"
+    /// against the day it opened). A test that pins the day passes nothing and
+    /// gets 2026-09-08, the day every assist test is written against; a test
+    /// about the midnight crossing itself makes one of these, hands it in, and
+    /// turns the page mid-test.
+    final class TestClock {
+
+        // MARK: - Stored properties
+
+        /// The day this clock currently reads.
+        var day: CalendarDay
+
+        // MARK: - Initializer
+
+        init(_ day: CalendarDay) {
+            self.day = day
+        }
+    }
 
 
 
+
+    /// - Parameter alsoCourse: a SECOND course in the same working folder,
+    ///   with sections 1 and 2. Added for the window-binding tests, which need
+    ///   a course a window is not for; defaulted to none, so every existing
+    ///   caller gets exactly the folder it always got.
     @MainActor
     static func makeRunner(hasDeployedBefore: Bool = false,
-                            registeringPreview: Bool = false) throws
+                            registeringPreview: Bool = false,
+                            alsoCourse: String? = nil,
+                            clock: TestClock? = nil,
+                            openMainWindow: (@MainActor () -> Void)? = nil) throws
         -> (root: URL, course: Course, runner: AssistToolRunner, siteWork: StubSiteWork) {
         let fileManager: FileManager = FileManager.default
         let root: URL = fileManager.temporaryDirectory
@@ -68,16 +98,51 @@ enum AssistFixture {
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
             .write(to: courseURL.appendingPathComponent("course_config.json"))
 
+        if let secondCode = alsoCourse {
+            let secondURL: URL = root.appendingPathComponent("courses")
+                .appendingPathComponent(secondCode)
+            try fileManager.createDirectory(
+                at: secondURL.appendingPathComponent("section1/All Classes"),
+                withIntermediateDirectories: true
+            )
+            try fileManager.createDirectory(
+                at: secondURL.appendingPathComponent("section2/All Classes"),
+                withIntermediateDirectories: true
+            )
+            let second: [String: Any] = [
+                "course_code": secondCode,
+                "course_name": "Another course entirely",
+                "section_numbers": [1, 2],
+                "num_sections": 2,
+                "per_section_folders": ["All Classes"],
+                "per_section_files": [],
+            ]
+            try JSONSerialization.data(withJSONObject: second, options: [.prettyPrinted])
+                .write(to: secondURL.appendingPathComponent("course_config.json"))
+        }
+
         let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
         workspace.chooseWorkspace(at: root)
-        let course: Course = try XCTUnwrap(workspace.courses.first)
+        // Looked up BY CODE rather than taken as `.first`. A second course
+        // whose code sorts before ICS3U would otherwise change what every
+        // existing caller's `course` is, which is a failure in twenty tests
+        // for a reason nobody would find.
+        var found: Course? = nil
+        for candidate in workspace.courses where candidate.code == "ICS3U" {
+            found = candidate
+        }
+        let course: Course = try XCTUnwrap(found)
 
         let siteWork: StubSiteWork = StubSiteWork()
+        // Pinned to 2026-09-08 unless a test hands in a clock of its own: a
+        // test must not be a different test depending on when it runs.
+        let reading: TestClock = clock ?? TestClock(CalendarDay(year: 2026, month: 9, day: 8)!)
         let runner: AssistToolRunner = AssistToolRunner(
             workspace: workspace,
             siteWork: siteWork,
-            today: CalendarDay(year: 2026, month: 9, day: 8)!,
-            launchControl: SilentLaunchControl()
+            today: { return reading.day },
+            launchControl: SilentLaunchControl(),
+            openMainWindow: openMainWindow
         )
 
         SectionWindowControllers.shared.forgetAll()
@@ -89,14 +154,24 @@ enum AssistFixture {
 
     /// An agent wired to a runner, with a client that is never reached: every
     /// message these tests send is a card phrasing, matched in code.
+    ///
+    /// `engineAt` points it at a real address instead — `StubEngine.baseURL`
+    /// for a test about what the model answered. `asksBeforeChanging` is the
+    /// plan-mode switch, and it defaults to what a teacher has: **on**. A test
+    /// about what a tool DOES to the disk has to turn it off, or the write is
+    /// held behind a plan and the assertion passes for the wrong reason.
     @MainActor
-    static func makeAgent(tools: AssistToolRunner) -> AssistAgent {
+    static func makeAgent(tools: AssistToolRunner,
+                          engineAt engineURL: URL? = nil,
+                          asksBeforeChanging: Bool = true) -> AssistAgent {
+        let settings: AppSettings = AppSettings(defaults: TestDefaults.make())
+        settings.assistantAsksBeforeChanging = asksBeforeChanging
         return AssistAgent(
             courseCode: "ICS3U",
             sectionNumber: 1,
-            client: AssistModelClient(baseURL: URL(string: "http://127.0.0.1:1")!),
+            client: AssistModelClient(baseURL: engineURL ?? URL(string: "http://127.0.0.1:1")!),
             tools: tools,
-            planMode: AssistPlanMode(tier: .small, settings: AppSettings(defaults: TestDefaults.make()))
+            planMode: AssistPlanMode(tier: .small, settings: settings)
         )
     }
 

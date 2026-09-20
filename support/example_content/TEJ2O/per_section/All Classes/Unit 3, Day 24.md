@@ -13,7 +13,8 @@ tags:
 1. Warm-up: [[Binary Bites]] — no notes, timed
 2. Bench check, on your own: a circuit calculation, a truth table, and a
    program traced by hand
-3. Mark your own; note what to practise
+3. Mark your own; note what to practise — no mark is recorded here,
+   which is what makes an honest score useful to you
 
 ## Things to do before our next class
 

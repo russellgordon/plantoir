@@ -7,8 +7,9 @@ struct AssistPublishChange {
 
     let page: AssistSectionPage
 
-    /// The frontmatter key that decides it — named in the plan so a teacher
-    /// reading the plan can go and look at the same line.
+    /// The frontmatter key that will decide it once the change is made —
+    /// always the current spelling, since a page still written the old way is
+    /// migrated as it is edited.
     let key: String
 
     let wasVisible: Bool
@@ -88,9 +89,25 @@ struct AssistPublishPlan {
     let alreadyRight: [AssistSectionPage]
 
     /// Pages an unpublish reached by following a link and left published, each
-    /// with the reason. Always empty when publishing: publishing a page
-    /// publishes everything it links to, with nothing held back.
+    /// with the reason. Always empty when publishing: publishing takes every
+    /// page it reaches, and the one thing it does not reach is said in
+    /// `linkedClassesLeftAlone` instead.
     let kept: [AssistPublishKept]
+
+    /// The other classes this publish followed a link onto and left alone —
+    /// only the ones students cannot already see.
+    ///
+    /// Always empty when unpublishing, whose reach did not change in #173 and
+    /// is the sibling decision held for #201.
+    ///
+    /// A teacher is told about these because the alternative is a plan quietly
+    /// smaller than the one they pictured: a link on the page they just
+    /// published leads somewhere students cannot follow, and nothing else in
+    /// the app would ever tell them so. A class already published needs no
+    /// sentence — it is not a surprise, and "publish it when you get to that
+    /// class" would be false about it — so `AssistPublishPlanner` leaves those
+    /// out.
+    let linkedClassesLeftAlone: [AssistSectionPage]
 
     let dateMoves: [AssistPublishDateMove]
 
@@ -113,8 +130,10 @@ struct AssistPublishPlan {
         guard changesNothing, unknownNames.isEmpty, !namedPages.isEmpty else {
             return nil
         }
-        // Every page they named is already the way they asked for it.
-        for page in namedPages where page.isVisibleToStudents != publishes {
+        // Every page they named is already the way they asked for it — and
+        // this app is SURE of that for every one of them. A page whose flag
+        // cannot be read is not "already done"; it is a page to write.
+        for page in namedPages where page.isVisibleToStudents != publishes || !page.visibilityIsCertain {
             return nil
         }
         let done: String = publishes ? "published" : "hidden"
@@ -196,6 +215,20 @@ struct AssistPublishPlan {
             lines.append("\(alreadyRight.count) \(word) already \(publishes ? "visible" : "hidden").")
         }
 
+        // The classes a link landed on, which this publish left where they
+        // are. Said once, here, so it appears on the plan card AND in the
+        // reply afterwards — `describe()` is the text used for both.
+        if !linkedClassesLeftAlone.isEmpty {
+            lines.append("")
+            var names: [String] = []
+            for page in linkedClassesLeftAlone {
+                names.append(page.displayTitle)
+            }
+            lines.append(AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(names), count: names.count
+            ))
+        }
+
         // The pages that STAY. Every one of them is a page a student can still
         // reach, and a teacher who is told only what came down has no way to
         // tell whether the tool thought about the rest.
@@ -275,19 +308,25 @@ struct AssistPublishPlan {
 /// precisely the reasoning this design exists to keep out of a router. The two
 /// rules are not mirror images of each other, and each is written down once:
 ///
-/// * **Publishing always takes the pages it links to.** Publishing a page whose
-///   links lead somewhere students cannot see is the one thing publishing must
-///   never do.
+/// * **Publishing takes the pages it links to, and stops at another class.**
+///   Publishing a page whose links lead somewhere students cannot see is the
+///   one thing publishing must never do — so it takes what it links to, and
+///   what those link to in turn. The one stop is a link that lands on another
+///   CLASS: a class goes up when the teacher names that class, and material
+///   reachable only through it belongs to it (issue #173). The plan says which
+///   classes were left alone.
 /// * **Unpublishing takes a linked page only when nothing else needs it** — no
 ///   other page links to it, and it is not one of the pages a section cannot do
 ///   without. Hiding a concept page that Unit 3, Day 2 also links to would
-///   break that class to tidy this one.
+///   break that class to tidy this one. Its reach does NOT stop at a class
+///   today; that is the sibling decision, held for #201.
 enum AssistPublishPlanner {
 
     // MARK: - Functions
 
     /// What publishing these pages would do — along with everything they link
-    /// to, always, so no published page points at a page students cannot see.
+    /// to, so no published page points at a page students cannot see, and
+    /// stopping wherever a link lands on another class.
     static func planPublishing(
         titles: [String],
         onOrAfter: CalendarDay?,
@@ -429,8 +468,13 @@ enum AssistPublishPlanner {
         // How far the verb reaches, decided by the verb itself.
         var linked: [AssistSectionPage] = []
         var kept: [AssistPublishKept] = []
+        var linkedClassesLeftAlone: [AssistSectionPage] = []
         if publishes {
-            linked = graph.linkedPages(from: named)
+            let reach: AssistLinkedReach = graph.reachFollowingLinks(from: named)
+            linked = reach.pages
+            linkedClassesLeftAlone = classesWorthTellingTheTeacherAbout(
+                among: reach.classPagesStoppedAt
+            )
         } else {
             let sweep: UnpublishSweep = pagesTakenDownAlongside(
                 named: named, graph: graph, in: course
@@ -462,8 +506,31 @@ enum AssistPublishPlanner {
             changes: changes,
             alreadyRight: alreadyRight,
             kept: kept,
+            linkedClassesLeftAlone: linkedClassesLeftAlone,
             dateMoves: dateMoves
         )
+    }
+
+    /// Of the classes the walk stopped at, the ones worth a sentence.
+    ///
+    /// **Only the ones students cannot already see, and certainly cannot.** The
+    /// sentence exists to explain a link students cannot follow yet; about a
+    /// class that is already published it is false, and it would tell a teacher
+    /// to go and publish a page that is already published. A class whose flag
+    /// this app will not read is NOT left out: "already published" has to be
+    /// something the app is sure of, the same requirement `appendChanges` makes
+    /// of "already the way you asked".
+    private static func classesWorthTellingTheTeacherAbout(
+        among stoppedAt: [AssistSectionPage]
+    ) -> [AssistSectionPage] {
+        var worthSaying: [AssistSectionPage] = []
+        for page in stoppedAt {
+            if page.isVisibleToStudents && page.visibilityIsCertain {
+                continue
+            }
+            worthSaying.append(page)
+        }
+        return worthSaying
     }
 
     private static func appendChanges(
@@ -475,17 +542,26 @@ enum AssistPublishPlanner {
         alreadyRight: inout [AssistSectionPage]
     ) {
         for page in pages {
-            if page.isVisibleToStudents == publishes {
+            // "Already the way you asked" needs CERTAINTY, not just a match.
+            // A page whose flag this app will not read is reported visible,
+            // and a plan that believed that would tell a teacher their page
+            // was already published and write nothing, while the build was
+            // holding it back. So an unreadable flag is always a change, and
+            // `AssistPageVisibility.setting` writes it out in full.
+            if page.isVisibleToStudents == publishes && page.visibilityIsCertain {
                 alreadyRight.append(page)
                 continue
             }
-            guard let text = try? String(contentsOf: page.fileURL, encoding: .utf8) else {
+            // A page that cannot be read cannot be changed either, and
+            // listing it would promise the teacher something the writing step
+            // then quietly skips.
+            guard (try? String(contentsOf: page.fileURL, encoding: .utf8)) != nil else {
                 continue
             }
             changes.append(AssistPublishChange(
                 page: page,
-                key: AssistPageVisibility.keyInUse(
-                    in: text, forSection: sectionNumber, isSectionLocal: page.isSectionLocal
+                key: AssistPageVisibility.publishKey(
+                    forSection: sectionNumber, isSectionLocal: page.isSectionLocal
                 ),
                 wasVisible: page.isVisibleToStudents,
                 willBeVisible: publishes,
@@ -641,6 +717,15 @@ enum AssistPublishPlanner {
             // when that draft is published, everything it links to is
             // published with it, and the plan says so. So a page taken down
             // here comes back the moment anything visible needs it again.
+            //
+            // **With one exception since #173, and it is the strongest
+            // argument for #201.** Publishing now stops at a class page, so a
+            // CLASS taken down by this sweep does not come back by publishing
+            // the page that referred to it. The exception exists because the
+            // two reaches were decided apart: publishing and date-moving stop
+            // at a class (v1.2.0), unpublishing does not yet (#201, v1.3.0).
+            // Closing #201 — an unpublish that stops at a class too — removes
+            // the exception rather than adding a rule.
             if !referrer.isVisibleToStudents {
                 continue
             }
@@ -723,21 +808,35 @@ enum AssistPublishPlanner {
 
     /// The unit a teacher named, if that is what they named: "Unit 4",
     /// "unit 4", "Unit 4." — but never "Unit 4, Day 3", which is one page.
-    static func unitNamed(_ raw: String) -> Int? {
+    ///
+    /// **The course's own word is accepted, and so is "unit".** A course whose
+    /// class pages are "Module 2, Day 3" gets asked to publish "Module 4", and
+    /// reading only "unit" meant the request found nothing and the teacher was
+    /// told no page is called that — a whole feature missing for that course,
+    /// silently. "unit" is still accepted alongside it because a teacher types
+    /// what they are used to and the model echoes what it was shown; the unit
+    /// NUMBER is the answer either way, so accepting both cannot be ambiguous.
+    static func unitNamed(_ raw: String, term: String = ClassPageTerm.standard) -> Int? {
         let tidied: String = raw
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
             .lowercased()
-        guard tidied.hasPrefix("unit ") else {
+        var rest: String? = nil
+        for word in [ClassPageTerm.cleaned(term).lowercased(), "unit"] {
+            let prefix: String = word + " "
+            if tidied.hasPrefix(prefix) {
+                rest = String(tidied.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+                break
+            }
+        }
+        guard let named = rest else {
             return nil
         }
-        let rest: String = String(tidied.dropFirst("unit ".count))
-            .trimmingCharacters(in: .whitespaces)
         // A comma means they went on to name a day, which is a page.
-        if rest.isEmpty || rest.contains(",") {
+        if named.isEmpty || named.contains(",") {
             return nil
         }
-        return Int(rest)
+        return Int(named)
     }
 
     /// A unit's class pages, **highest day first**.
@@ -841,15 +940,32 @@ enum AssistPublishPlanner {
         var claimed: Set<String> = []
         var moves: [AssistPublishDateMove] = []
         for entry in named {
-            for page in graph.linkedPages(from: [entry.page]) {
+            // The same reach publishing uses, so the two halves of one publish
+            // cannot disagree about how far it went. It stops at a class, so a
+            // page reachable only THROUGH another class is never offered a
+            // date here — it takes the date of the class that actually brings
+            // it, when that class is published.
+            for page in graph.reachFollowingLinks(from: [entry.page]).pages {
                 if claimed.contains(page.lowercasedTitle) {
                     continue
                 }
                 // Already out where students can see it — leave it alone.
-                if page.isVisibleToStudents {
+                //
+                // CERTAINLY out, that is. A page whose flag this app will not
+                // read is reported visible, and it is about to be published
+                // by the change list above; skipping it here would publish it
+                // with whatever date it happened to have rather than the day
+                // of the class that brought it.
+                if page.isVisibleToStudents && page.visibilityIsCertain {
                     continue
                 }
                 // A class's date is its place in the schedule.
+                //
+                // Belt and braces since #173: the reach above no longer hands
+                // back a class page at all. Kept because this is where
+                // `class-planning.json` → `datingPagesAClassBrings` names the
+                // rule, and a rule upheld only by the absence of a page is one
+                // a later reader deletes without knowing they have.
                 if page.isClassPage {
                     continue
                 }

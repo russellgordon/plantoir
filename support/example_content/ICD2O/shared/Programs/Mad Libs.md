@@ -54,7 +54,9 @@ Predict in writing first — then run the program and grade yourself.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C3.1]]
+![[C1.3]]
 
 ![[C2.1]]
+
+![[C3.1]]
 %%curriculum-end%%

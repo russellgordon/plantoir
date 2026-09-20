@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic: the cell cycle, a specialised cell's job, the level
-   of organisation, and one system's failure — no notes
-2. Compare and correct in pairs
+   of organisation, and one system's failure — no notes: [[Cells and Specialisation]]
+2. Compare and correct in pairs: [[Tissues, Organs, and Systems]]
 
 ## Things to do before our next class
 

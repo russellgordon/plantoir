@@ -9,35 +9,9 @@ using Plantoir.Services;
 
 namespace Plantoir.ViewModels;
 
-/// <summary>What the sidebar has selected.</summary>
-public abstract record SidebarSelection
-{
-    public sealed record CourseItem(string Code) : SidebarSelection;
-    public sealed record SectionItem(string Code, int Number) : SidebarSelection;
-    public sealed record ArchivedEntry(string Id) : SidebarSelection;
-    public sealed record BackupEntry(string Id) : SidebarSelection;
-
-    /// <summary>The stored string form for per-window restore (row 99).</summary>
-    public string Serialized => this switch
-    {
-        CourseItem(var code) => WindowMemoryCodec.EncodeCourse(code),
-        SectionItem(var code, var number) => WindowMemoryCodec.EncodeSection(code, number),
-        ArchivedEntry(var id) => WindowMemoryCodec.EncodeArchived(id),
-        BackupEntry(var id) => WindowMemoryCodec.EncodeBackup(id),
-        _ => "",
-    };
-
-    /// <summary>Unrecognized or empty stored forms restore no selection.</summary>
-    public static SidebarSelection? Parse(string? stored) =>
-        WindowMemoryCodec.ParseSelection(stored) switch
-        {
-            { Kind: "course" } d => new CourseItem(d.Code),
-            { Kind: "section" } d => new SectionItem(d.Code, d.Section),
-            { Kind: "archived" } d => new ArchivedEntry(d.Id),
-            { Kind: "backup" } d => new BackupEntry(d.Id),
-            _ => null,
-        };
-}
+// SidebarSelection now lives in Plantoir.Core.Models (WorkingFolderSelection.cs),
+// beside the rule that clears it — Plantoir.Tests cannot reference this
+// assembly, so nothing here can be gated by a test. See #162.
 
 /// <summary>
 /// One window's state: its working folder, discovered courses, archived
@@ -54,8 +28,14 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
 
     public AppSettings Settings { get; }
 
-    private string? _workspacePath;
-    public string? WorkspacePath => _workspacePath;
+    /// <summary>
+    /// The folder this window is pointed at, what it has selected, and the
+    /// sidebar memory that survives a folder change — all in Core, so the
+    /// rule about what a folder change lets go of can be tested.
+    /// </summary>
+    private readonly WindowFolderState _state = new();
+
+    public string? WorkspacePath => _state.FolderPath;
 
     public WorkspaceState? State { get; private set; }
     public string? WorkspaceProblem { get; private set; }
@@ -63,20 +43,33 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     public List<ArchivedItem> ArchivedItems { get; private set; } = new();
     public List<BackupItem> BackupItems { get; private set; } = new();
 
-    private SidebarSelection? _selection;
     public SidebarSelection? Selection
     {
-        get => _selection;
-        set { _selection = value; Notify(); Notify(nameof(SelectedCourse)); Notify(nameof(SelectedArchivedItem)); }
+        get => _state.Selection;
+        set { _state.Selection = value; Notify(); Notify(nameof(SelectedCourse)); Notify(nameof(SelectedArchivedItem)); }
     }
 
     // ---- Per-window sidebar memory (row 99) -------------------------------
     // null means "every course open" — the Windows fallback for brand-new
     // windows and for entries remembered before this state existed (the mac
     // restores all-collapsed here; Windows deliberately does not).
-    public HashSet<string>? ExpandedCourseCodes { get; set; }
-    public bool IsShowingArchived { get; set; }
-    public bool IsShowingBackups { get; set; }
+    public HashSet<string>? ExpandedCourseCodes
+    {
+        get => _state.ExpandedCourseCodes;
+        set => _state.ExpandedCourseCodes = value;
+    }
+
+    public bool IsShowingArchived
+    {
+        get => _state.IsShowingArchived;
+        set => _state.IsShowingArchived = value;
+    }
+
+    public bool IsShowingBackups
+    {
+        get => _state.IsShowingBackups;
+        set => _state.IsShowingBackups = value;
+    }
 
     public bool IsCourseExpanded(string code) => ExpandedCourseCodes?.Contains(code) ?? true;
 
@@ -89,17 +82,16 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         else ExpandedCourseCodes.Remove(code);
     }
 
-    private string _filterText = "";
     public string FilterText
     {
-        get => _filterText;
-        set { _filterText = value; Notify(); Notify(nameof(FilteredCourses)); Notify(nameof(ShowsNoFilterMatches)); }
+        get => _state.FilterText;
+        set { _state.FilterText = value; Notify(); Notify(nameof(FilteredCourses)); Notify(nameof(ShowsNoFilterMatches)); }
     }
 
-    public List<Course> FilteredCourses => Workspace.Filter(Courses, _filterText);
+    public List<Course> FilteredCourses => Workspace.Filter(Courses, _state.FilterText);
 
     public bool ShowsNoFilterMatches =>
-        Workspace.ShowsNoFilterMatches(_filterText, Courses.Count, FilteredCourses.Count);
+        Workspace.ShowsNoFilterMatches(_state.FilterText, Courses.Count, FilteredCourses.Count);
 
     public Course? SelectedCourse => Selection switch
     {
@@ -123,48 +115,107 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     }
 
     public string CoursesDirectory() =>
-        Workspace.CoursesDirectory(_workspacePath ?? throw new InvalidOperationException("No working folder."));
+        Workspace.CoursesDirectory(_state.FolderPath ?? throw new InvalidOperationException("No working folder."));
 
     // ---- Folder lifecycle ------------------------------------------------
 
+    /// <summary>
+    /// The teacher chose a folder. Everything a folder change DECIDES happens
+    /// in <see cref="PointAtFolder"/>; what is left here is this route's own
+    /// business — remembering the choice, saying so on the trail, and giving
+    /// back the folder that was left.
+    /// </summary>
     public void ChooseWorkspace(string path)
     {
-        string? previous = _workspacePath;
-        _workspacePath = path;
         Settings.WorkspacePath = path;
         Settings.Save();
         Plantoir.Core.Scripting.ActivityTrail.Note(
             Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderOpened,
             $"working folder opened — {path}");
-        Reload();
-        if (previous is not null && previous != path) ReleaseFolderIfUnused(previous);
+        string? leftBehind = PointAtFolder(path);
+        MarkBuildsFolder();
+        if (leftBehind is not null) ReleaseFolderIfUnused(leftBehind);
         NoteBecameKey();
         Notify(nameof(WorkspacePath));
     }
 
+    /// <summary>
+    /// The app restored a folder this window had open last time, or a new
+    /// window inherited one. Same funnel, deliberately: a rule that only one
+    /// of the two routes obeys is a rule the other quietly breaks.
+    ///
+    /// <para>Nothing here records the choice or releases a folder — a restored
+    /// window must not write "working folder opened" twice, and it has left no
+    /// folder to give back.</para>
+    /// </summary>
     public void AdoptRestoredPath(string path)
     {
         App.LogDiagnostic($"AdoptRestoredPath called with '{path}'");
-        if (string.IsNullOrEmpty(path) || !Directory.Exists(path) || path == _workspacePath)
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path)
+            || WorkingFolder.IsTheSame(path, WorkspacePath))
         {
             App.LogDiagnostic($"AdoptRestoredPath early return: empty/not exists/already path");
             return;
         }
-        _workspacePath = path;
         Plantoir.Core.Scripting.ActivityTrail.Note(
             Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderOpened,
             $"working folder opened — {path}");
-        App.LogDiagnostic("AdoptRestoredPath calling Reload()");
-        Reload();
+        App.LogDiagnostic("AdoptRestoredPath calling PointAtFolder()");
+        PointAtFolder(path);
+        MarkBuildsFolder();
         App.LogDiagnostic("AdoptRestoredPath Reload() finished, calling Notify(WorkspacePath)");
         Notify(nameof(WorkspacePath));
         App.LogDiagnostic("AdoptRestoredPath Notify(WorkspacePath) finished");
     }
 
+    /// <summary>
+    /// The ONE funnel both ways of adopting a folder go through: let go of
+    /// whatever named a course in the folder being left, point at the new one,
+    /// load it, and tell the window. Returns the folder left behind, or null.
+    ///
+    /// <para><c>Notify(nameof(Selection))</c> is load-bearing twice over, and
+    /// AFTER the reload. It re-renders the sidebar and detail pane with the
+    /// selection gone — without it the pane keeps greeting the teacher with
+    /// "Course Not Found" about a folder they have only just arrived in — and
+    /// it is what drives <c>App.RememberOpenWindows()</c>, so without it the
+    /// remembered frame still names the old folder's course and the whole
+    /// defect comes back on the next launch.</para>
+    /// </summary>
+    private string? PointAtFolder(string path)
+    {
+        string? leftBehind = _state.PointAt(path);
+        Reload();
+        // Only when a folder was actually left, so a window adopting its
+        // FIRST folder still notifies exactly what it always did — that one
+        // runs mid-construction, before the window has finished building
+        // itself, and it has nothing to let go of anyway.
+        if (leftBehind is not null)
+        {
+            Notify(nameof(Selection));
+            Notify(nameof(SelectedCourse));
+            Notify(nameof(SelectedArchivedItem));
+        }
+        return leftBehind;
+    }
+
+    /// <summary>
+    /// Names this folder's builds folder — only once the folder is known to
+    /// be a WORKING folder. Marking on every open would create a builds
+    /// folder for a Downloads picked by mistake, one the sweep could never
+    /// remove because the folder still exists: litter from the anti-litter
+    /// change. The mac writes its marker when a build folder is made; this is
+    /// the nearest moment the app has.
+    /// </summary>
+    private void MarkBuildsFolder()
+    {
+        if (_state.FolderPath is { } path && State == WorkspaceState.Ready)
+            BuildOutputLocation.WriteWorkingFolderMarker(path);
+    }
+
     /// <summary>New window inherits the key window's folder; first window shows the picker.</summary>
     public void AdoptFolderForNewWindow()
     {
-        if (_workspacePath is not null) return;
+        if (_state.FolderPath is not null) return;
         var others = _windowModels.Where(m => m != this && m.WorkspacePath is not null)
                                   .Select(m => m.WorkspacePath!).ToList();
         string? inherited = Workspace.FolderForNewWindow(others, _mostRecentKeyFolderPath);
@@ -173,26 +224,36 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
 
     public void NoteBecameKey()
     {
-        if (_workspacePath is not null) _mostRecentKeyFolderPath = _workspacePath;
+        if (_state.FolderPath is not null) _mostRecentKeyFolderPath = _state.FolderPath;
     }
 
     public void UnregisterWindow()
     {
         if (IsTerminating) return;   // the quit path records the list itself
         _windowModels.Remove(this);
-        if (_workspacePath is not null) ReleaseFolderIfUnused(_workspacePath);
+        if (_state.FolderPath is not null) ReleaseFolderIfUnused(_state.FolderPath);
     }
 
+    /// <summary>
+    /// Stop a folder's container once no window still holds it.
+    ///
+    /// <para>The match is <see cref="WorkingFolder.IsTheSame"/>, not string
+    /// equality: a window holding <c>C:\work</c> holds <c>C:\Work</c> too,
+    /// and answering otherwise here does not merely miss a cleanup — it stops
+    /// the container of a folder that IS still open, taking a running preview
+    /// with it.</para>
+    /// </summary>
     private static void ReleaseFolderIfUnused(string path)
     {
-        if (_windowModels.Any(m => m.WorkspacePath == path)) return;
+        if (WorkingFolder.AnyWindowStillHolds(_windowModels.Select(m => m.WorkspacePath), path)) return;
         FolderContainers.StopContainer(path);
     }
 
     public static IReadOnlyList<WorkspaceViewModel> WindowModels => _windowModels;
 
     public static List<string> OpenFolderPaths() =>
-        _windowModels.Where(m => m.WorkspacePath is not null).Select(m => m.WorkspacePath!).Distinct().ToList();
+        _windowModels.Where(m => m.WorkspacePath is not null).Select(m => m.WorkspacePath!)
+                     .Distinct(WorkingFolder.Comparer).ToList();
 
     // ---- Loading ---------------------------------------------------------
 
@@ -204,24 +265,24 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         BackupItems = new List<BackupItem>();
         WorkspaceProblem = null;
         State = null;
-        if (_workspacePath is null) { NotifyLoaded(); return; }
+        if (_state.FolderPath is null) { NotifyLoaded(); return; }
 
         App.LogDiagnostic("WorkspaceViewModel.Reload: RefreshWorkspace starting");
-        BundledToolchain.RefreshWorkspace(_workspacePath);
+        BundledToolchain.RefreshWorkspace(_state.FolderPath);
         App.LogDiagnostic("WorkspaceViewModel.Reload: RefreshWorkspace finished, Classify starting");
-        State = Workspace.Classify(_workspacePath);
+        State = Workspace.Classify(_state.FolderPath);
         App.LogDiagnostic($"WorkspaceViewModel.Reload: State is {State}");
         if (State == WorkspaceState.Ready)
         {
-            if (!Directory.Exists(Workspace.CoursesDirectory(_workspacePath)))
+            if (!Directory.Exists(Workspace.CoursesDirectory(_state.FolderPath)))
                 WorkspaceProblem = "There are no courses in this folder yet. Click New Course to create your first one.";
             else
             {
                 App.LogDiagnostic("WorkspaceViewModel.Reload: DiscoverCourses starting");
-                Courses = Workspace.DiscoverCourses(_workspacePath);
+                Courses = Workspace.DiscoverCourses(_state.FolderPath);
                 App.LogDiagnostic($"WorkspaceViewModel.Reload: DiscoverCourses found {Courses.Count} courses");
-                ArchivedItems = Workspace.FindArchivedItems(_workspacePath);
-                BackupItems = Workspace.FindBackups(_workspacePath);
+                ArchivedItems = Workspace.FindArchivedItems(_state.FolderPath);
+                BackupItems = Workspace.FindBackups(_state.FolderPath);
             }
         }
         App.LogDiagnostic("WorkspaceViewModel.Reload: calling NotifyLoaded()");
@@ -232,10 +293,10 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
 
     public async Task InitializeWorkspaceAsync()
     {
-        if (_workspacePath is null) return;
+        if (_state.FolderPath is null) return;
         try
         {
-            await Task.Run(() => ToolchainMirror.InitializeWorkspace(_workspacePath, BundledToolchain.Root));
+            await Task.Run(() => ToolchainMirror.InitializeWorkspace(_state.FolderPath, BundledToolchain.Root));
         }
         catch (Exception error)
         {
@@ -250,10 +311,10 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
 
     public void InitializeWorkspace()
     {
-        if (_workspacePath is null) return;
+        if (_state.FolderPath is null) return;
         try
         {
-            ToolchainMirror.InitializeWorkspace(_workspacePath, BundledToolchain.Root);
+            ToolchainMirror.InitializeWorkspace(_state.FolderPath, BundledToolchain.Root);
         }
         catch (Exception error)
         {

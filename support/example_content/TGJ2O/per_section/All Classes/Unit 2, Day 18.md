@@ -15,6 +15,8 @@ tags:
 3. Studio: [[Cut a Highlight Reel]] — second pass, with sound that was
    mixed rather than left where it landed
 4. Peer review: another desk watches without you explaining anything
+5. On the crew sheet: name the technique that settled your crew's
+   biggest disagreement on this package
 
 ## Things to do before our next class
 

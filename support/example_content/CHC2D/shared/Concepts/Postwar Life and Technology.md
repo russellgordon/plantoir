@@ -53,4 +53,8 @@ this page is the private half, and the two were built together.
 ![[D1.2]]
 
 ![[D1.3]]
+
+![[D1.1]]
+
+![[D2.6]]
 %%curriculum-end%%

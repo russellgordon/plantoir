@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Briefs delivered, second half
+1. Briefs delivered, second half, with the same one question to each partner
 2. What the class recommended, and where the recommendations contradict each other
 3. [[Your Economics Notebook]] check
 

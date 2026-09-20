@@ -15,6 +15,9 @@ tags:
    training material your partner will actually use
 3. Read another team's documentation and try to run their software
    from it alone
+4. Last fifteen minutes: judge your own package against
+   [[The Handover]]'s criteria table — [[Judging Your Own Work]] — and
+   take your weakest row into tomorrow's rehearsal
 
 ## Things to do before our next class
 

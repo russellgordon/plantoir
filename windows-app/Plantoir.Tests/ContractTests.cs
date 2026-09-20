@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json.Nodes;
 using Plantoir.Core;
 using Plantoir.Core.Assist;
@@ -45,6 +46,44 @@ public class ContractTests
         Assert.Equal(wording["undoDoesNotReachTheLiveSite"]!.ToString(), AssistWording.UndoDoesNotReachTheLiveSite);
         Assert.Equal(wording["whereTheOutputIs"]!.ToString(), AssistWording.WhereTheOutputIs);
         Assert.Equal(wording["nothingToDo"]!.ToString(), AssistWording.NothingToDo);
+
+        // Rolling a section over to a new year. Pinned here rather than merely
+        // present in AssistWording, because the two sentences a teacher is
+        // OFFERED are the two AssistCardCommand must accept verbatim — a
+        // reply that invites a phrasing the matcher does not take is worse
+        // than one that offers nothing.
+        // Both said straight to a teacher now that "back up this course" and
+        // "what does publishing mean?" are fixed phrasings, matched in code.
+        Assert.Equal(wording["backedUpCourse"]!.ToString(),
+                     AssistWording.BackedUpCourse("{course}", "{course}_backup_2026-09-08_190000.zip"));
+
+        // Said when a teacher asks what publishing means twice in one
+        // conversation. Pinned here rather than merely present, because a
+        // fixed phrasing lets a TEACHER reach it — the sentence it replaced
+        // was addressed to a model, and the mac made and corrected that same
+        // mistake, so the two apps saying one thing is the point.
+        Assert.Equal(wording["publishingAlreadyExplained"]!.ToString(),
+                     AssistWording.PublishingAlreadyExplained("{course}", "{section}"));
+
+        Assert.Equal(wording["rolloverWebsiteQuestion"]!.ToString(), AssistWording.RolloverWebsiteQuestion);
+        Assert.Equal(wording["rolloverSayToStartANewWebsite"]!.ToString(), AssistWording.RolloverSayToStartANewWebsite);
+        Assert.Equal(wording["rolloverSayToKeepTheSameWebsite"]!.ToString(), AssistWording.RolloverSayToKeepTheSameWebsite);
+        Assert.Equal(wording["rolloverIsOnANewWebsite"]!.ToString(), AssistWording.RolloverIsOnANewWebsite);
+        Assert.Equal(wording["rolloverHadNoWebsiteYet"]!.ToString(), AssistWording.RolloverHadNoWebsiteYet);
+        Assert.Equal(wording["rolloverKeptTheSameWebsite"]!.ToString(), AssistWording.RolloverKeptTheSameWebsite);
+        Assert.Equal(wording["rolloverWebsiteNotDecided"]!.ToString(), AssistWording.RolloverWebsiteNotDecided);
+        Assert.Equal(wording["rolloverTurnedOffTheScheduledPublish"]!.ToString(),
+                     AssistWording.RolloverTurnedOffTheScheduledPublish);
+        Assert.Equal(wording["rolloverCouldNotTurnOffTheScheduledPublish"]!.ToString(),
+                     AssistWording.RolloverCouldNotTurnOffTheScheduledPublish);
+
+        // The two with a value in them carry the generator's own example, the
+        // same way `deployed` above carries "{course}" and "{section}".
+        Assert.Equal(wording["rolloverStartedANewWebsite"]!.ToString(),
+                     AssistWording.RolloverStartedANewWebsite(
+                         ".netlify_sites/section1.previous-2026-09-08_071500.json"));
+        Assert.Equal(wording["rolloverCouldNotStartANewWebsite"]!.ToString(),
+                     AssistWording.RolloverCouldNotStartANewWebsite(".netlify_sites/section1.json"));
     }
 
     [Fact]
@@ -113,10 +152,29 @@ public class ContractTests
     }
 
     [Fact]
+    public void CourseManagement_ClubDetection_MatchesContract()
+    {
+        string onFile = ContractLoader.GetSupportPath("ontario_secondary_courses.json");
+        string bcFile = ContractLoader.GetSupportPath("british_columbia_secondary_courses.json");
+        var catalog = CourseNameCatalog.Load(onFile, bcFile);
+
+        var doc = ContractLoader.LoadJson("course-management.json");
+        var cases = doc["courseCode"]!["clubDetection"]!["cases"]!.AsArray();
+
+        foreach (var c in cases)
+        {
+            string code = c!["code"]!.ToString();
+            bool expectClub = c["expectClub"]!.GetValue<bool>();
+            Assert.Equal(expectClub, ClubCodeRule.IsClub(code, catalog));
+        }
+    }
+
+    [Fact]
     public void CourseManagement_DefaultCourseName_MatchesContract()
     {
-        string supportFile = ContractLoader.GetSupportPath("ontario_secondary_courses.json");
-        var catalog = CourseNameCatalog.Load(supportFile);
+        string onFile = ContractLoader.GetSupportPath("ontario_secondary_courses.json");
+        string bcFile = ContractLoader.GetSupportPath("british_columbia_secondary_courses.json");
+        var catalog = CourseNameCatalog.Load(onFile, bcFile);
 
         var doc = ContractLoader.LoadJson("course-management.json");
         var cases = doc["defaultCourseName"]!["cases"]!.AsArray();
@@ -243,13 +301,34 @@ public class ContractTests
         var doc = ContractLoader.LoadJson("shared-rules.json");
         var events = doc["activityTrail"]!["mustRecord"]!.AsArray();
 
-        var contractKeys = events.Select(e => e!["event"]!.ToString()).ToHashSet();
+        // `appliesOn` names the platforms an event belongs to; an entry
+        // without it belongs to both. Honouring it is not a loosening: the
+        // assertion below is still equality, so an event this app records
+        // and the contract does not still fails. Without it, "built site
+        // moved out of the working folder" (appliesOn: mac) held this test
+        // red on Windows no matter what was implemented here, and a test
+        // that cannot go green stops being read.
+        var contractKeys = events
+            .Where(e => e!["appliesOn"] is null
+                        || e!["appliesOn"]!.AsArray().Any(p => p!.ToString() == "windows"))
+            .Select(e => e!["event"]!.ToString())
+            .ToHashSet();
 
         var codeKeys = Enum.GetValues<ActivityTrail.Event>()
             .Select(ActivityTrail.KeyFor)
             .ToHashSet();
 
-        Assert.Equal(contractKeys, codeKeys);
+        // `appliesOn` above is for a difference that is permanent and
+        // deliberate. This is the other case: an event Windows OWES and has
+        // not built yet, named in the ledger with the issue and the milestone
+        // that own it. Everything not in the ledger is still compared for
+        // equality, and the ledger itself fails if the event starts existing
+        // here or stops being in the contract. See NamedGapLedger for why this
+        // is not written into the contract as `appliesOn`.
+        var deferred = NamedGapLedger.GapsIn(
+            NamedGapLedger.ActivityTrailEvents, contractKeys, codeKeys);
+
+        Assert.Equal(contractKeys.Except(deferred).ToHashSet(), codeKeys);
     }
 
     [Fact]
@@ -276,18 +355,10 @@ public class ContractTests
         Assert.NotNull(openAction);
         Assert.Equal("Open Folder", openAction["windowsLabel"]?.ToString());
 
-        // Ancestor paths on Windows
-        string path = @"C:\Users\teacher\Desktop\Courses";
-        var crumbs = FolderCrumb.AncestorPaths(path);
-        var expected = new[]
-        {
-            @"C:\",
-            @"C:\Users",
-            @"C:\Users\teacher",
-            @"C:\Users\teacher\Desktop",
-            @"C:\Users\teacher\Desktop\Courses",
-        };
-        Assert.Equal(expected, crumbs);
+        // The ancestor crumbs were hand-typed here until 2026-09-06 and are
+        // now DATA: shared-rules.json → workingFolderPathBar.ancestorPaths
+        // gained `windowsCases`, and SharedRuleContractTests runs them. A copy
+        // kept here as well would be the thing contracts/ exists to end.
     }
 
     [Fact]
@@ -332,6 +403,12 @@ public class ContractTests
             Assert.True(codeRequests.TryGetValue(name, out var codeReq), $"Missing request definition for {name}");
 
             Assert.Equal(req["title"]!.ToString(), codeReq!.Title);
+            // The explanation is the LONGEST thing a teacher reads in one of
+            // these dialogs and was the one field this sweep did not check —
+            // found 2026-09-07 while writing the hand-driven procedure for the
+            // new-site dialog, which told the checker not to eyeball it
+            // "because the contract pins it". It did not. It does now.
+            Assert.Equal(req["explanation"]!.ToString(), codeReq.Explanation);
             Assert.Equal(req["fieldLabel"]!.ToString(), codeReq.FieldLabel);
             Assert.Equal(req["isSecret"]!.GetValue<bool>(), codeReq.IsSecret);
             Assert.Equal(req["linkAddress"]!.ToString(), codeReq.LinkAddress);
@@ -458,6 +535,15 @@ public class ContractTests
         }
     }
 
+    /// <summary>Every tool name <c>plantoir-mcp</c> declares.</summary>
+    private static readonly HashSet<string> PlantoirToolNames = typeof(Plantoir.Mcp.PlantoirTools)
+        .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+        .Select(method => method
+            .GetCustomAttribute<ModelContextProtocol.Server.McpServerToolAttribute>())
+        .Where(attribute => attribute is not null)
+        .Select(attribute => attribute!.Name!)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     [Fact]
     public void AssistCases_Tools_MatchesContract()
     {
@@ -470,14 +556,36 @@ public class ContractTests
         var needsApproval = tools["needsApproval"]!.AsArray().Select(t => t!.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Assert.Equal(needsApproval, AssistAgent.DeploysToStudents);
 
+        // The tools the CONTRACT says the mac shows an MCP client and not its
+        // local model. It went from three to ten on 2026-09-08, when the mac
+        // built the six this app had had all along plus their plan twins — see
+        // issue #70. What changed for Windows was not the tools, which were
+        // already served, but the FIXED PHRASINGS that reach them.
+        // MCP-only means the local MODEL is not SHOWN a tool. Asserted about
+        // THIS app rather than by retyping the contract's list: an inline copy
+        // goes red only when the contract moves, and the fix is always to
+        // retype it — which is the pattern issue #146 called out and CLAUDE.md
+        // means by "deserialise, don't retype".
+        //
+        // The two halves are the whole meaning of the word. Nothing MCP-only
+        // may be in the local surface, which is what protects the measured
+        // routing accuracy of the thirteen; and every one of them must still
+        // be reachable, because MCP-only says nothing about whether a teacher
+        // may ask for it — six of these ten are reached by a fixed phrasing,
+        // matched in code, that no model ever sees (issue #70).
         var mcpOnly = tools["mcpOnly"]!.AsArray().Select(t => t!.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var expectedMcpOnly = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        Assert.NotEmpty(mcpOnly);
+
+        foreach (string tool in mcpOnly)
         {
-            "list_curriculum_expectations",
-            "plan_curriculum_mentions",
-            "add_curriculum_mentions",
-        };
-        Assert.Equal(expectedMcpOnly, mcpOnly);
+            Assert.False(AssistAgent.ForTheLocalModel.Contains(tool),
+                $"{tool} is MCP-only in the contract and this app shows it to the local model, " +
+                "which spends routing accuracy the measurement was taken against.");
+
+            Assert.True(PlantoirToolNames.Contains(tool),
+                $"{tool} is MCP-only in the contract and this server does not offer it at all, " +
+                "so nothing here can reach it — by a fixed phrasing or otherwise.");
+        }
     }
 
     /// <summary>
@@ -486,10 +594,19 @@ public class ContractTests
     /// silently does nothing for it — a teacher who asked to be shown what
     /// would happen is shown nothing, and only for some requests.
     ///
-    /// Deliberately scoped to the local surface. The contract lists twins for
-    /// writes the local model is never offered (re_date_classes), and gating
-    /// one of those here would hold a write behind a proposal this loop never
-    /// asks for.
+    /// Deliberately scoped to the local surface: the contract lists twins for
+    /// writes the local model is never offered, and this loop cannot check
+    /// what it does not route.
+    ///
+    /// <para><b>It is a floor, not a ceiling, and the difference matters.</b>
+    /// "The local model is never offered it" does NOT mean nothing reaches it
+    /// — a FIXED PHRASING reaches a tool no model is shown, and then wants the
+    /// same gate. <c>re_date_classes</c> has been in
+    /// <see cref="AssistAgent.PlanTwins"/> for exactly that reason, and
+    /// <c>make_room_for_classes</c> joined it on 2026-09-09 (issue #70). So
+    /// the loop below skips what it cannot judge; the check underneath it,
+    /// that nothing is gated behind a twin the CONTRACT does not know, is what
+    /// keeps the additions honest.</para>
     /// </summary>
     [Fact]
     public void PlanTwins_CoverEveryLocalWriteThatHasOne()
@@ -552,7 +669,17 @@ public class ContractTests
             var configJson = c["configuration"]!.ToJsonString();
             var config = CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes(configJson));
 
-            var actual = DeployCommand.Arguments(course, section, config, cloudflareAccountID);
+            // A case carrying `unattended` is the SCHEDULED deploy's shape, and
+            // nothing else passes it — the Deploy button, the assistant and an
+            // MCP client all leave it off, because a question they raise
+            // becomes a dialog somebody is there to answer. Read rather than
+            // assumed: a case added on the mac with this key set arrives here
+            // as a real assertion instead of being silently ignored, which is
+            // what happened while this app appended the flag in its own
+            // scheduled wrapper instead.
+            bool unattended = c["unattended"]?.GetValue<bool>() ?? false;
+
+            var actual = DeployCommand.Arguments(course, section, config, cloudflareAccountID, unattended);
             var expected = c["expectArguments"]!.AsArray().Select(x => x!.ToString()).ToList();
 
             Assert.Equal(expected, actual);
@@ -740,16 +867,28 @@ public class ContractTests
             string cloudflareAccountID = given["cloudflareAccountID"]?.ToString() ?? "0123456789abcdef0123456789abcdef";
             bool hasDeployed = given["hasDeployedBefore"]?.GetValue<bool>() ?? true;
 
+            // An ADDITIONAL destination — present only on the cases entry
+            // 305 added. additionalTargetHasDeployedBefore defaults to true
+            // so the "never deployed" case fires only when a scenario asks
+            // for it explicitly.
+            string? additionalTarget = given["additionalTarget"]?.ToString();
+            string additionalFolderPath = given["additionalFolderProblem"]?.GetValue<bool>() == true ? "" : "C:\\Sites\\additional";
+            bool additionalHasDeployed = given["additionalTargetHasDeployedBefore"]?.GetValue<bool>() ?? true;
+
             string tempDir = Directory.CreateTempSubdirectory("contract-sched-deploy").FullName;
             try
             {
+                string additionalTargetsJson = additionalTarget is null
+                    ? "[]"
+                    : $$"""[{"type": "{{additionalTarget}}", "path": "{{additionalFolderPath.Replace("\\", "\\\\")}}"}]""";
                 var config = CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes($$"""
                 {
                     "course_code": "ICS3U",
                     "course_name": "Computer Science",
                     "section_numbers": [1],
                     "deploy_target": "{{target}}",
-                    "deploy_folder_path": "{{folderPath.Replace("\\", "\\\\")}}"
+                    "deploy_folder_path": "{{folderPath.Replace("\\", "\\\\")}}",
+                    "additional_deploy_targets": {{additionalTargetsJson}}
                 }
                 """));
                 var course = new Course("ICS3U", tempDir, config);
@@ -766,6 +905,12 @@ public class ContractTests
                         Directory.CreateDirectory(Path.Combine(tempDir, ".netlify_sites"));
                         File.WriteAllText(Path.Combine(tempDir, ".netlify_sites", "section1.json"), "{}");
                     }
+                }
+                if (additionalTarget is not null && additionalHasDeployed)
+                {
+                    string folderName = additionalTarget == "cloudflare_pages" ? ".cloudflare_sites" : ".netlify_sites";
+                    Directory.CreateDirectory(Path.Combine(tempDir, folderName));
+                    File.WriteAllText(Path.Combine(tempDir, folderName, "section1.json"), "{}");
                 }
 
                 string? problem = ScheduledDeploy.Problem(course, 1, when, now, cloudflareAccountID);
@@ -790,6 +935,16 @@ public class ContractTests
                             break;
                         case "neverDeployed":
                             Assert.Contains("has never been deployed", problem);
+                            break;
+                        case "additionalDeployFolderNeedsAttention":
+                            Assert.Contains("also deploys to a folder", problem);
+                            Assert.Contains("needs attention first", problem);
+                            break;
+                        case "additionalCloudflareAccountMissing":
+                            Assert.Contains("also deploys to Cloudflare Pages, which needs your Account ID", problem);
+                            break;
+                        case "additionalDestinationNeverDeployed":
+                            Assert.Contains("has never been deployed to", problem);
                             break;
                         default:
                             Assert.Fail($"Unknown refusal case: {expectRefusal}");

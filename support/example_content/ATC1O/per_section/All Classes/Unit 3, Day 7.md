@@ -11,9 +11,10 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Working period: arranging the sequence
-3. Coaching on technique specific to each form
-4. Introductions drafted
+2. Checkpoint: each pair runs the sequence for me — one note each, on
+   the technique that form actually asks for
+3. Working period: that note put in, and the sequence arranged
+4. Introductions drafted, with the terminology said out loud
 5. Cool-down
 
 ## Things to do before our next class

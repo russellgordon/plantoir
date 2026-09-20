@@ -131,7 +131,15 @@ cannot name.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A2.1]]
+
+![[A2.2]]
+
 ![[B1.1]]
 
 ![[B1.2]]
+
+![[D1.1]]
+
+![[D1.2]]
 %%curriculum-end%%

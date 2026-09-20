@@ -7,9 +7,10 @@ tags:
   - unit-2
 ---
 Across the course you will produce four maps, each answering a question
-that a paragraph could not answer as well. They collect here, and the
-portfolio is marked on the set rather than on any single sheet — what
-matters is that your maps get better and that you can say why.
+that a paragraph could not answer as well. They collect here, and they
+are marked on the set rather than on any single sheet, as part of
+[[The Field and Map Portfolio]] — what matters is that your maps get
+better and that you can say why.
 
 ## The four
 
@@ -38,6 +39,10 @@ Each map is submitted with a short note — a hundred words is plenty —
 answering three questions: what question was this map for, what did you
 choose to leave off, and what would somebody reading it wrongly conclude?
 
+You write that note in class, in the last part of the period the sheet is
+submitted in, and not at home. It carries a mark, and marked writing in
+this course is done with me in the room.
+
 > [!success]- Why the "leave off" question is the hard one (click to expand)
 > Every map is a selection, and the selection is the argument. Leaving
 > the road network off a flood map makes the flood look isolated;
@@ -45,8 +50,9 @@ choose to leave off, and what would somebody reading it wrongly conclude?
 > a lie. Being able to name your own omissions is the skill that
 > separates making a map from being persuaded by one.
 
-Bring the whole set to the final conferencing period, in the order you
-made them, with the reflections attached.
+Bring the whole set to the period in the last week of Unit 4 when the
+portfolio closes, in the order you made them, with the reflections
+attached.
 
 %%curriculum-start%%
 ## Curriculum connection

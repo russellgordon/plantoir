@@ -35,13 +35,15 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
-%%curriculum-start%%
-## Curriculum connection
-
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
+
+Keep this guidance OUTSIDE the curriculum markers below. Everything between them is deleted for a teacher who set this course up without curriculum pages, and a note written inside them disappears with it.
 %%
+
+%%curriculum-start%%
+## Curriculum connection
 
 ![[A1.1]]
 %%curriculum-end%%

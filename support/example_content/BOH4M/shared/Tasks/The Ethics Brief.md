@@ -58,3 +58,48 @@ Sources are cited the way [[Citing Business Sources]] sets out.
 
 ![[A3.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 17, the working period, while the conferences run
+  Watch for: whose documents are open. When a claim needs a source, does
+  the student go to the company's own release and stop, or to something
+  written by a party that disagrees with the company — the union, the
+  regulator, the community group, the reporter who followed it? The
+  memo's reference list corroborates this and you will see the balance
+  when you mark it; what the list cannot tell you is that a student spent
+  ten minutes looking for the opposing account and could not find one,
+  which is a real finding and belongs in the memo rather than being
+  silently dropped. That is A3.2 (analyse, on the basis of research,
+  including stakeholder analysis, a particular company's commitment to
+  it) — the words "on the basis of research" are what you are watching
+  for.
+  Going well: a document open that the company did not publish, being
+  read for what the other side said rather than mined for a quotation.
+  Stuck: every tab on the screen was published by the company itself.
+  Record: a tick, a dash or a question mark beside each name on the day
+  plan as you cross the room to the next conference.
+
+TALK — Unit 1, Day 17, the conferences already on that agenda
+  Do not ask what the recommendation costs. Both the agenda and the task
+  page print that, and they will arrive with the answer.
+  Ask: "Who inside the company would have argued against you at the time,
+  and what was their strongest point?" A strong answer gives an argument
+  a reasonable person could hold — pay the fine, it is cheaper; the plant
+  is the town's only employer — rather than a straw man. That is A3.1
+  (evaluate the impact of major ethical issues and dilemmas on management
+  strategies and decision making), and the memo will not show it, because
+  the memo only contains the objections the student decided to answer.
+  Then: "If they had done what you recommend, which of the things the
+  company says about itself would it have had to stop saying?" A strong
+  answer quotes something from the company's own website or report and
+  explains the contradiction. That is A3.2 again, heard rather than
+  cited.
+  Record: one line per student, in the margin of the day plan, right
+  then.
+
+The product evidence is the memo, handed in on Day 18 after the first
+fifteen minutes of that period are spent making the change the
+conference named.
+%%

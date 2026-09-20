@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - data
-  - unit-3
+  - unit-1
 ---
 A time series is one measurement repeated. Almost every mistake people
 make with economic data is made in the first ten seconds of looking at

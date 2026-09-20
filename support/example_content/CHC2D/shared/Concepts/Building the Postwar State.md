@@ -67,4 +67,8 @@ Assess which of these changes mattered most, and to whom, in
 ![[D1.5]]
 
 ![[D1.6]]
+
+![[D2.5]]
+
+![[D3.5]]
 %%curriculum-end%%

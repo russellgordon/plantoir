@@ -103,14 +103,37 @@ interface.
 > late, the professional move is to say so early enough that the plan
 > can change.
 
-## Closing, and reviewing the management
-
-A project is not finished when the code runs. Closing means: the
-partner confirms it does what the scope said, they receive it in a
-form they can actually use, the user documentation exists, and
-somebody has agreed who maintains it. That is [[The Handover]], and it
-is the mark.
-
+## Executing the plan and managing individual time
+ 
+Developing software according to a project plan (`B1.2`) requires teams
+to ensure that the product meets genuine end-user needs, functions as
+intended, and is delivered within established quality standards, budget
+constraints, and milestone timelines.
+ 
+- **Time management across dependencies**: In a group project, managing
+  individual time (`B2.2`) is a core technical discipline. Teammates
+  depend on agreed stubs, interfaces, and test fixtures. Delaying a core
+  module blocks everyone downstream.
+- **Producing to specifications**: Software must be coded, thoroughly
+  tested with automated test suites, deployed in an accessible environment,
+  and accompanied by comprehensive external user documentation and
+  training materials (`B1.3`).
+ 
+## Closing the project, and reviewing the management
+ 
+A project is not finished when the code runs. Closing a project (`B1.5`)
+means:
+ 
+1. The partner confirms that the software meets all functional requirements
+   via user acceptance testing.
+2. The software is packaged and delivered in an appropriate, maintainable
+   format (executable distribution, release tag, or managed container).
+3. Clear external user documentation (`A4.4`) — help files, quickstart
+   manuals, and troubleshooting guides — is placed directly into the
+   partner's hands.
+4. A concrete plan for ongoing software support and maintenance is agreed
+   upon in writing.
+ 
 Then, separately, review the *management* — plan against reality. What
 took twice as long as estimated? Which task should have been three
 tasks? What would you do differently with the same six weeks? Written
@@ -118,17 +141,27 @@ honestly, that report is the most useful page in the whole project,
 and it is what [[B1.6|the project review expectation]] asks for. Do it
 with your team, then put the personal version in your
 [[Final Reflection]].
-
+ 
 The team-working habits underneath all of this are in
 [[Working in a Team]]; the review conversation itself is
 [[The Code Review]].
-
+ 
 %%curriculum-start%%
 ## Curriculum connection
-
+ 
 ![[B1.1]]
-
+ 
+![[B1.2]]
+ 
+![[B1.3]]
+ 
 ![[B1.4]]
-
+ 
+![[B1.5]]
+ 
 ![[B1.6]]
+ 
+![[B2.2]]
+ 
+![[A4.4]]
 %%curriculum-end%%

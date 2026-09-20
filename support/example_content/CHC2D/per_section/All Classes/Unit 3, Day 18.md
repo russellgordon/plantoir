@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Towards patriation: what a constitution is for
-2. The negotiations, and who was at the table
+1. Towards patriation: what a constitution is for — [[Patriation, the Charter, and After]]
+2. The negotiations, and who was at the table — [[Whose Rights, and When|Whose Rights, and When?]]
 3. Preparing for Unit 4
 
 ## Things to do before our next class

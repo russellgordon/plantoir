@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: one counting problem, one conditional
-   probability, and one expected value
-2. Compare methods at the boards
+   probability, and one expected value: [[Combinations]], [[Conditional Probability]], and [[Expected Value]]
+2. Compare methods at the boards; practice: [[Probability Practice]]
 
 ## Things to do before our next class
 

@@ -14,13 +14,15 @@ final class AssistToolRunnerTests: XCTestCase {
 
     // MARK: - The surface
 
-    /// The exact twenty. Narrowed from the Windows server's full surface, which
-    /// is far larger: a small local model routes worse the more it is shown,
-    /// and these are the ones a teacher actually asks for.
+    /// The exact twenty-two. Narrowed from the Windows server's full surface,
+    /// which is far larger — 37 tools as of 2026-09-06: a small local model
+    /// routes worse the more it is shown, and these are the ones a teacher
+    /// actually asks for.
     ///
     /// **The count is a measurement, and it has moved.** Routing accuracy was
-    /// counted against FIFTEEN tools. Five have been added since — reading and
-    /// recording a section's timetable, and the page for the next class — and
+    /// counted against FIFTEEN tools. Seven have been added since — reading and
+    /// recording a section's timetable, the page for the next class, and
+    /// re-dating a whole section — and
     /// each was a deliberate decision to spend some of that number. Anyone
     /// changing this figure again should say so out loud, and the accuracy is
     /// worth re-measuring rather than assumed to have survived.
@@ -49,15 +51,17 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertEqual(AssistToolRunner.tools.count, expected.count, "A tool is defined twice.")
     }
 
-    /// What the LOCAL model is shown: thirteen of the twenty.
+    /// What the LOCAL model is shown: thirteen of the twenty-two.
     ///
-    /// Seven are left off because the model never has to NAME them, and every
-    /// schema in the prompt costs a small router accuracy. The six `plan_`
+    /// Nine are left off because the model never has to NAME them, and every
+    /// schema in the prompt costs a small router accuracy. The seven `plan_`
     /// twins are called IN CODE by plan mode, which builds the call from the
     /// write the model already chose; `remember_timetable` is off because dates
     /// the model supplies are dates it may have invented, and a wrong one
-    /// silently puts a class on the wrong day. All seven still RUN — they are
-    /// hidden from the list, not removed from the surface.
+    /// silently puts a class on the wrong day; `re_date_classes` is off because
+    /// its phrasings are matched in code and it is far too large a change to
+    /// reach through a router. All nine still RUN — they are hidden from the
+    /// list, not removed from the surface.
     @MainActor
     func testTheLocalModelIsShownExactlyThirteenToolsAndNoPlans() throws {
         let expected: Set<String> = [
@@ -93,7 +97,14 @@ final class AssistToolRunnerTests: XCTestCase {
 
     /// Claude Code, on the other end of the MCP server, has no plan mode: it
     /// needs the twins by name to show a teacher what a write would do. So the
-    /// seven hidden from the local list are still served there.
+    /// nine hidden from the local list are still served there.
+    ///
+    /// **The list below is checked against the code rather than trusted.** It
+    /// stood at seven for as long as it took two more tools to be hidden, and
+    /// nothing noticed: the two newest — `plan_re_date_classes` and
+    /// `re_date_classes` — were absent, so this test promised a coverage it
+    /// did not give. Asserting the list IS the set difference is what stops
+    /// that happening the next time a tool is hidden.
     @MainActor
     func testTheHiddenToolsAreStillServedToClaudeCode() throws {
         let runner: AssistToolRunner = try makeRunner().runner
@@ -105,8 +116,25 @@ final class AssistToolRunnerTests: XCTestCase {
         let hidden: [String] = [
             "plan_publish_class_on", "plan_publish_pages", "plan_unpublish_pages",
             "plan_scheduled_deploy", "plan_remember_timetable", "plan_add_next_class",
-            "remember_timetable",
+            "plan_re_date_classes", "remember_timetable", "re_date_classes",
         ]
+
+        // Named above so a reader can see WHICH nine, and checked here so the
+        // naming cannot fall behind the code.
+        var shownToTheLocalModel: Set<String> = []
+        for definition in AssistToolRunner.localTools {
+            shownToTheLocalModel.insert(definition.name)
+        }
+        var everythingHidden: Set<String> = []
+        for definition in AssistToolRunner.tools where !shownToTheLocalModel.contains(definition.name) {
+            everythingHidden.insert(definition.name)
+        }
+        XCTAssertEqual(
+            Set(hidden), everythingHidden,
+            "The list of tools hidden from the local model has changed. Add the new one here, "
+            + "and check it is still served over MCP."
+        )
+
         for name in hidden {
             XCTAssertTrue(overMCP.contains(name), "\(name) is missing from the MCP surface.")
             XCTAssertNotNil(runner.definition(named: name), "\(name) must still be runnable.")
@@ -1210,10 +1238,11 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertTrue(text(ofPage: "Unit 1, Day 1", in: made.course).contains("publish: false"))
     }
 
-    /// The older spelling means the OPPOSITE, is read correctly, and is written
-    /// back in the spelling the teacher used.
+    /// The older spelling means the OPPOSITE, is read correctly, and is
+    /// MIGRATED to the current key the first time the assistant changes what
+    /// the page says — end to end, through the tool a teacher actually reaches.
     @MainActor
-    func testTheOlderDraftSpellingIsReadAndKept() async throws {
+    func testTheOlderDraftSpellingIsReadAndMigrated() async throws {
         let made = try makeRunner()
         defer { try? FileManager.default.removeItem(at: made.root) }
 
@@ -1243,8 +1272,19 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertFalse(published.shouldContinue)
         let after: String = text(ofPage: "Unit 1, Day 1", in: made.course)
-        XCTAssertTrue(after.contains("draft: false"), "The teacher's own spelling is kept, inverted.")
-        XCTAssertFalse(after.contains("publish:"), "No second key is invented behind their back.")
+        // Asserted as the WHOLE file rather than as three `contains` checks,
+        // because the promise being made is about the shape of the diff: one
+        // line changed, in place, and nothing else touched. A `contains` pair
+        // passes just as happily on frontmatter that has been reordered.
+        XCTAssertEqual(after, """
+        ---
+        title: Unit 1, Day 1
+        publish: true
+        created: 2026-09-08T07:00:00.000-0400
+        ---
+
+        Loops.
+        """)
     }
 
     /// Choosing classes by date, so "hide everything from next Monday on" is
@@ -2569,6 +2609,167 @@ final class AssistToolRunnerTests: XCTestCase {
         }
     }
 
+    /// A flag the teacher annotated, or typed a word into, still PUBLISHES
+    /// the page — the build strips a comment before Quartz sees it, and makes
+    /// a string of anything it cannot read as a boolean, and a string that is
+    /// not "false" is published.
+    ///
+    /// So asking for such a page to be published is asking for what is already
+    /// there: four words back, and the file left exactly as the teacher wrote
+    /// it. Rewriting the flag to a tidy `true` would be an edit nobody asked
+    /// for, in a file Obsidian very likely has open, and it would throw away
+    /// whatever the word meant to them. Until 2026-09-18 Plantoir read all
+    /// three of these as HIDDEN and offered to publish a page students were
+    /// already reading (issue #140).
+    @MainActor
+    func testAFlagTheTeacherAnnotatedIsAlreadyPublished() async throws {
+        for value in ["true # covered Tuesday", "on", "maybe"] {
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            try write(page: "Unit 4, Day 23", publish: value, date: "2026-09-08",
+                      body: "Nothing linked.", in: made.course)
+            let url: URL = pageURL(of: "Unit 4, Day 23", in: made.course)
+            let before: String = try String(contentsOf: url, encoding: .utf8)
+
+            let outcome: AssistToolOutcome = await made.runner.run(call: call(
+                "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+            ))
+            XCTAssertEqual(outcome.summary, "It's already been published.", "publish: \(value)")
+            XCTAssertEqual(
+                try String(contentsOf: url, encoding: .utf8), before,
+                "publish: \(value) — the teacher's own line is left alone"
+            )
+        }
+    }
+
+    /// And the same page asked to be HIDDEN does change, because the only way
+    /// to say the opposite of what it says is to say it plainly.
+    @MainActor
+    func testTheSameAnnotatedFlagStillHidesWhenAsked() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 23", publish: "true # covered Tuesday", date: "2026-09-08",
+                  body: "Nothing linked.", in: made.course)
+
+        _ = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+        ))
+        let after: String = try String(
+            contentsOf: pageURL(of: "Unit 4, Day 23", in: made.course), encoding: .utf8
+        )
+        XCTAssertTrue(after.contains("publish: false"))
+        XCTAssertFalse(after.contains("# covered Tuesday"))
+    }
+
+    /// A linked page whose flag cannot be read takes the class's date too.
+    ///
+    /// It is about to be published by the change list, so skipping it as
+    /// "already out where students can see it" would publish it with whatever
+    /// date it happened to have rather than the day of the class that brought
+    /// it — which is the one thing the date move exists to fix.
+    @MainActor
+    func testALinkedPageThisAppCannotReadStillTakesTheClassesDate() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 24", publish: "false", date: "2027-01-19",
+                  body: "See [[Bananas]].", in: made.course)
+        try write(courseLevelPage: "Bananas", publishForSection1: "!!str false",
+                  dated: "2026-09-08", body: "Yellow.", in: made.course)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "plan_publish_pages",
+            arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 24"]
+        ))
+        XCTAssertTrue(
+            outcome.detail.contains(
+                "“Bananas” will become visible, with the same date as “Unit 4, Day 24”."
+            ),
+            outcome.detail
+        )
+    }
+
+    /// A flag this app will NOT read is not "already done".
+    ///
+    /// Each of these hides the page on the built site, and the reader calls
+    /// every one of them `cannot tell` rather than guessing. Reporting treats
+    /// that as visible, which is the mild mistake — but a PLAN that believed
+    /// it answered "It's already been published." and wrote nothing, while
+    /// students could not see the page. That is the failure that reports
+    /// success, and it is the one this whole issue exists to remove.
+    @MainActor
+    func testAFlagThisAppCannotReadIsAlwaysWritten() async throws {
+        for value in ["!!str false", "&flag false", "!!bool false"] {
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            try write(page: "Unit 4, Day 23", publish: value, date: "2026-09-08",
+                      body: "Nothing linked.", in: made.course)
+            let url: URL = pageURL(of: "Unit 4, Day 23", in: made.course)
+
+            let outcome: AssistToolOutcome = await made.runner.run(call: call(
+                "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+            ))
+            let after: String = try String(contentsOf: url, encoding: .utf8)
+            XCTAssertTrue(
+                after.contains("publish: true"),
+                "publish: \(value) — the flag must be written out in full: \(outcome.summary)"
+            )
+            XCTAssertEqual(
+                PageVisibilityReader.answer(in: after, forSection: 1), .visible,
+                "publish: \(value) — and the page must now really be published"
+            )
+        }
+    }
+
+    /// The same, asked to hide.
+    @MainActor
+    func testAFlagThisAppCannotReadIsWrittenWhenHidingToo() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 23", publish: "!!str false", date: "2026-09-08",
+                  body: "Nothing linked.", in: made.course)
+
+        _ = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+        ))
+        let after: String = try String(
+            contentsOf: pageURL(of: "Unit 4, Day 23", in: made.course), encoding: .utf8
+        )
+        XCTAssertEqual(PageVisibilityReader.answer(in: after, forSection: 1), .hidden)
+    }
+
+    /// And the same page inside a whole-unit publish, which counts what would
+    /// MOVE and had the identical blind spot.
+    @MainActor
+    func testAWholeUnitPublishCountsAPageItCannotRead() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 1", publish: "true", date: "2026-09-08",
+                  body: "Done.", in: made.course)
+        try write(page: "Unit 4, Day 2", publish: "!!str false", date: "2026-09-09",
+                  body: "Not read.", in: made.course)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
+        ))
+        XCTAssertFalse(
+            outcome.detail.contains("already been published"),
+            "A page whose flag cannot be read is not one that needs no change: \(outcome.detail)"
+        )
+        let after: String = try String(
+            contentsOf: pageURL(of: "Unit 4, Day 2", in: made.course), encoding: .utf8
+        )
+        XCTAssertEqual(
+            PageVisibilityReader.answer(in: after, forSection: 1), .visible,
+            "and the page whose flag could not be read is now really published"
+        )
+    }
+
     /// And the mirror, for hiding.
     @MainActor
     func testUnpublishingAPageThatIsAlreadyHiddenSaysSo() async throws {
@@ -2953,6 +3154,440 @@ final class AssistToolRunnerTests: XCTestCase {
                 "byName=\(byName) did not date the page the class brought"
             )
         }
+    }
+
+    // MARK: - The link walk stops at a class page
+    //
+    // Issue #173. Both contract case lists are RUN HERE, against a real course
+    // on disk and through the real tools, rather than beside the rest of their
+    // own contract files — the reason `SharedRulesContractTests` gives for the
+    // split it already makes: "a synthetic page graph can be built to agree
+    // with whatever it is asked, and the thing worth testing is what happens to
+    // files on disk". The data halves of both keys are checked where they live.
+
+    /// `shared-rules.json` → `followingLinks.stopsAtAClassPage.cases`, run
+    /// through `publish_pages`.
+    ///
+    /// "Untouched" is asserted as the file being BYTE-IDENTICAL, not merely
+    /// still hidden. A page that stayed hidden and was silently re-dated would
+    /// pass a visibility check and is exactly half of what this rule is about.
+    @MainActor
+    func testPublishingStopsAtALinkedClassAsTheContractSays() async throws {
+        for testCase in try AssistToolRunnerTests.cases(
+            in: "contracts/shared-rules.json", section: "followingLinks",
+            key: "stopsAtAClassPage"
+        ) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let pages: [[String: Any]] = try XCTUnwrap(testCase["pages"] as? [[String: Any]])
+
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            var isAClass: [String: Bool] = [:]
+            for page in pages {
+                let title: String = try XCTUnwrap(page["title"] as? String)
+                let classPage: Bool = page["isClassPage"] as? Bool ?? false
+                let visible: Bool = page["visible"] as? Bool ?? false
+                isAClass[title] = classPage
+                try writeContractPage(
+                    title: title, isClassPage: classPage, visible: visible,
+                    links: page["links"] as? [String] ?? [], in: made.course
+                )
+            }
+
+            var before: [String: String] = [:]
+            for (title, classPage) in isAClass {
+                before[title] = contractPageText(
+                    title: title, isClassPage: classPage, in: made.course
+                )
+            }
+
+            let asked: [String] = try XCTUnwrap(testCase["publish"] as? [String])
+            _ = await made.runner.run(call: call(
+                "publish_pages",
+                arguments: [
+                    "course": "ICS3U", "section": 1,
+                    "pages": asked.joined(separator: "; "),
+                ]
+            ))
+
+            for title in testCase["expectVisible"] as? [String] ?? [] {
+                let after: String = contractPageText(
+                    title: title, isClassPage: isAClass[title] ?? false, in: made.course
+                )
+                XCTAssertEqual(
+                    PageVisibilityReader.answer(in: after, forSection: 1), .visible,
+                    "\(name): “\(title)” should be visible"
+                )
+            }
+            for title in testCase["expectUntouched"] as? [String] ?? [] {
+                let after: String = contractPageText(
+                    title: title, isClassPage: isAClass[title] ?? false, in: made.course
+                )
+                XCTAssertEqual(
+                    after, before[title],
+                    "\(name): “\(title)” was written to, and this publish never reached it"
+                )
+            }
+        }
+    }
+
+    /// `class-planning.json` → `datingPagesAClassBrings.reachStopsAtAClassPage`,
+    /// run through `publish_pages` so the dates are read back off disk.
+    @MainActor
+    func testTheDatesAClassBringsStopAtAClassAsTheContractSays() async throws {
+        for testCase in try AssistToolRunnerTests.cases(
+            in: "contracts/class-planning.json", section: "datingPagesAClassBrings",
+            key: "reachStopsAtAClassPage"
+        ) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            var dateWas: [String: String] = [:]
+            var isAClass: [String: Bool] = [:]
+            for entry in try XCTUnwrap(testCase["classes"] as? [[String: Any]]) {
+                let title: String = try XCTUnwrap(entry["title"] as? String)
+                let day: String = try XCTUnwrap(entry["date"] as? String)
+                isAClass[title] = true
+                dateWas[title] = day
+                try writeContractPage(
+                    title: title, isClassPage: true, visible: false,
+                    links: entry["links"] as? [String] ?? [], dated: day, in: made.course
+                )
+            }
+            for entry in try XCTUnwrap(testCase["pages"] as? [[String: Any]]) {
+                let title: String = try XCTUnwrap(entry["title"] as? String)
+                let day: String = try XCTUnwrap(entry["date"] as? String)
+                isAClass[title] = false
+                dateWas[title] = day
+                try writeContractPage(
+                    title: title, isClassPage: false,
+                    visible: entry["visible"] as? Bool ?? false,
+                    links: entry["links"] as? [String] ?? [], dated: day, in: made.course
+                )
+            }
+
+            let asked: [String] = try XCTUnwrap(testCase["publish"] as? [String])
+            _ = await made.runner.run(call: call(
+                "publish_pages",
+                arguments: [
+                    "course": "ICS3U", "section": 1,
+                    "pages": asked.joined(separator: "; "),
+                ]
+            ))
+
+            for title in testCase["expectNoMove"] as? [String] ?? [] {
+                let classPage: Bool = isAClass[title] ?? false
+                let after: String = contractPageText(
+                    title: title, isClassPage: classPage, in: made.course
+                )
+                let key: String = classPage ? "created" : "createdSection1"
+                XCTAssertTrue(
+                    after.contains("\(key): \(try XCTUnwrap(dateWas[title]))"),
+                    "\(name): “\(title)” was re-dated by a class that does not bring it: \(after)"
+                )
+            }
+            for (title, expected) in testCase["expectMoves"] as? [String: String] ?? [:] {
+                let classPage: Bool = isAClass[title] ?? false
+                let after: String = contractPageText(
+                    title: title, isClassPage: classPage, in: made.course
+                )
+                let key: String = classPage ? "created" : "createdSection1"
+                XCTAssertTrue(
+                    after.contains("\(key): \(expected)"),
+                    "\(name): “\(title)” should have taken \(expected): \(after)"
+                )
+            }
+        }
+    }
+
+    /// The teacher is TOLD which linked class was left alone — on the plan card
+    /// they agree to, and in the reply after it ran.
+    ///
+    /// Both surfaces, because they are one sentence written once:
+    /// `AssistPublishPlan.describe()` is the text `plan_publish_pages` hands to
+    /// the card and the text `publish_pages` puts in its reply. A teacher who
+    /// is not told reads a plan quietly smaller than the one they pictured.
+    @MainActor
+    func testPublishingStopsAtALinkedClassAndSaysSo() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 2, Day 3", publish: "false", date: "2026-10-06",
+                  body: "Carrying on in [[Unit 2, Day 4]].", in: made.course)
+        try write(page: "Unit 2, Day 4", publish: "false", date: "2026-10-07",
+                  body: "See [[Worksheet]].", in: made.course)
+        try write(courseLevelPage: "Worksheet", publishForSection1: "false",
+                  dated: "2026-08-01", body: "Questions.", in: made.course)
+
+        let said: String = AssistWording.linkedClassesWereLeftAlone(
+            AssistPublishPlan.listing(["Unit 2, Day 4"]), count: 1
+        )
+
+        let card: AssistToolOutcome = await made.runner.run(call: call(
+            "plan_publish_pages",
+            arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 2, Day 3"]
+        ))
+        XCTAssertTrue(card.forTheCard.contains(said),
+                      "The plan card never mentioned the class it left alone: \(card.forTheCard)")
+
+        let done: AssistToolOutcome = await made.runner.run(call: call(
+            "publish_pages",
+            arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 2, Day 3"]
+        ))
+        XCTAssertTrue(done.detail.contains(said),
+                      "The reply never mentioned the class it left alone: \(done.detail)")
+    }
+
+    /// And NOT about a class students can already see.
+    ///
+    /// "Publish it when you get to that class" is false about a class that is
+    /// already published, and the sentence exists to explain a link students
+    /// cannot follow YET. An already-visible class is not a surprise.
+    @MainActor
+    func testAClassStudentsCanAlreadySeeIsNotNamedAsLeftAlone() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 2, Day 3", publish: "false", date: "2026-10-06",
+                  body: "Carrying on in [[Unit 2, Day 4]].", in: made.course)
+        try write(page: "Unit 2, Day 4", publish: "true", date: "2026-10-07",
+                  body: "Already out.", in: made.course)
+
+        // Built from the wording rather than quoted. A negative assertion
+        // against a copied fragment is the one that passes VACUOUSLY the day
+        // the sentence is reworded — it would then be absent for the wrong
+        // reason, and nothing would say so.
+        let wouldHaveSaid: String = AssistWording.linkedClassesWereLeftAlone(
+            AssistPublishPlan.listing(["Unit 2, Day 4"]), count: 1
+        )
+
+        let done: AssistToolOutcome = await made.runner.run(call: call(
+            "publish_pages",
+            arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 2, Day 3"]
+        ))
+        XCTAssertFalse(
+            done.detail.contains(wouldHaveSaid),
+            "A teacher was told to publish a class that is already published: \(done.detail)"
+        )
+    }
+
+    /// Re-dating a WHOLE SECTION from a new timetable: material behind another
+    /// class is claimed by the class that brings it.
+    ///
+    /// The claim ORDER is what changed. Classes are walked earliest first and
+    /// the first to reach a page locks it, so Day 3's walk used to reach the
+    /// worksheet THROUGH Day 4 and give it Day 3's new day. Now Day 4's own
+    /// walk claims it, which is the decision's own words: material reached only
+    /// through another class belongs to that class.
+    @MainActor
+    func testAWholeSectionReDateGivesMaterialBehindAClassThatClassesDay() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let remembered: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-10-06", "2026-10-07"], source: "timetable.xlsx, block H",
+            forSection: 1, in: made.course
+        )
+        try SectionTimetableStore.applyRememberTimetable(remembered)
+
+        try write(page: "Unit 2, Day 3", publish: "false", date: "2026-01-05",
+                  body: "Carrying on in [[Unit 2, Day 4]].", in: made.course)
+        try write(page: "Unit 2, Day 4", publish: "false", date: "2026-01-06",
+                  body: "See [[Worksheet]].", in: made.course)
+        try write(courseLevelPage: "Worksheet", publishForSection1: "false",
+                  dated: "2026-08-01", body: "Questions.", in: made.course)
+
+        let plan: SectionReDatePlan = try SectionReDatePlanner.plan(
+            forSection: 1, in: made.course, workspaceURL: made.root
+        )
+        var worksheetTakes: String? = nil
+        for move in plan.moves where move.title == "Worksheet" {
+            worksheetTakes = move.to.text
+        }
+        XCTAssertEqual(
+            worksheetTakes, "2026-10-07",
+            "The worksheet behind Unit 2, Day 4 was claimed by a class that does not bring it"
+        )
+    }
+
+    // MARK: - Guards on the stop, which catch an over-broad fix
+
+    /// A class the teacher NAMED is published, and so is what it links to
+    /// directly. The stop is about pages REACHED, never about pages named.
+    @MainActor
+    func testANamedClassAndWhatItLinksToDirectlyAreStillPublished() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 2, Day 3", publish: "false", date: "2026-10-06",
+                  body: "See [[Worksheet]] and [[Unit 2, Day 4]].", in: made.course)
+        try write(page: "Unit 2, Day 4", publish: "false", date: "2026-10-07",
+                  body: "Later.", in: made.course)
+        try write(courseLevelPage: "Worksheet", publishForSection1: "false",
+                  dated: "2026-08-01", body: "Questions.", in: made.course)
+
+        _ = await made.runner.run(call: call(
+            "publish_pages",
+            arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 2, Day 3"]
+        ))
+
+        XCTAssertEqual(
+            PageVisibilityReader.answer(
+                in: text(ofPage: "Unit 2, Day 3", in: made.course), forSection: 1
+            ),
+            .visible, "The class the teacher named was not published"
+        )
+        XCTAssertEqual(
+            PageVisibilityReader.answer(
+                in: text(ofCourseLevelPage: "Worksheet", in: made.course), forSection: 1
+            ),
+            .visible, "A page the named class links to DIRECTLY was not published"
+        )
+    }
+
+    /// A whole-unit publish still publishes every class in the unit.
+    ///
+    /// It names each class as a root of its own plan, one plan per class, so
+    /// the stop removes nothing from it — the guard that would have caught the
+    /// most plausible over-broad version of this change.
+    @MainActor
+    func testAWholeUnitPublishStillPublishesEveryClassInIt() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 2, Day 1", publish: "false", date: "2026-10-05",
+                  body: "On to [[Unit 2, Day 2]].", in: made.course)
+        try write(page: "Unit 2, Day 2", publish: "false", date: "2026-10-06",
+                  body: "On to [[Unit 2, Day 3]].", in: made.course)
+        try write(page: "Unit 2, Day 3", publish: "false", date: "2026-10-07",
+                  body: "The last one.", in: made.course)
+
+        _ = await made.runner.run(call: call(
+            "publish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 2"]
+        ))
+
+        for title in ["Unit 2, Day 1", "Unit 2, Day 2", "Unit 2, Day 3"] {
+            XCTAssertEqual(
+                PageVisibilityReader.answer(
+                    in: text(ofPage: title, in: made.course), forSection: 1
+                ),
+                .visible, "“\(title)” was left behind by a whole-unit publish"
+            )
+        }
+    }
+
+    /// A note TWO classes link to directly is still taken by the first of them
+    /// and still dated by the earliest.
+    ///
+    /// The one shape the stop must not touch: the note is reached directly, not
+    /// through a class, so "the earliest class claims it" is untouched.
+    @MainActor
+    func testANoteTwoClassesLinkToDirectlyIsStillTakenAndDatedByTheEarliest() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 2, Day 3", publish: "false", date: "2026-10-06",
+                  body: "See [[Shared Note]].", in: made.course)
+        try write(page: "Unit 2, Day 4", publish: "false", date: "2026-10-07",
+                  body: "See [[Shared Note]] too.", in: made.course)
+        try write(courseLevelPage: "Shared Note", publishForSection1: "false",
+                  dated: "2026-08-01", body: "Both use this.", in: made.course)
+
+        // Named LATEST first, so an implementation that took the first title it
+        // was given would get the date wrong.
+        _ = await made.runner.run(call: call(
+            "publish_pages",
+            arguments: [
+                "course": "ICS3U", "section": 1, "pages": "Unit 2, Day 4; Unit 2, Day 3",
+            ]
+        ))
+
+        let note: String = text(ofCourseLevelPage: "Shared Note", in: made.course)
+        XCTAssertEqual(PageVisibilityReader.answer(in: note, forSection: 1), .visible,
+                       "A page both classes link to directly was not published")
+        XCTAssertTrue(note.contains("createdSection1: 2026-10-06"),
+                      "The later class claimed a page the earlier one brings: \(note)")
+    }
+
+    /// `check_section` still reports a link from a visible class INTO a hidden
+    /// class.
+    ///
+    /// The cheapest proof the stop did not reach the reporting path.
+    /// `linksIntoHiddenPages()` walks `pages` and `linkedTitles` directly and
+    /// never asks the reach — so a class→class link a teacher wrote is still
+    /// reported as a link students would click and find nothing behind, which
+    /// is now the ONLY way they hear about it.
+    @MainActor
+    func testCheckSectionStillReportsALinkIntoAHiddenClass() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 2, Day 3", publish: "true", date: "2026-10-06",
+                  body: "Carrying on in [[Unit 2, Day 4]].", in: made.course)
+        try write(page: "Unit 2, Day 4", publish: "false", date: "2026-10-07",
+                  body: "Not out yet.", in: made.course)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "check_section", arguments: ["course": "ICS3U", "section": 1]
+        ))
+        XCTAssertTrue(outcome.detail.contains("Unit 2, Day 4"), outcome.detail)
+        XCTAssertTrue(outcome.detail.contains("(hidden)"), outcome.detail)
+    }
+
+    // MARK: - Contract-case fixtures
+
+    /// The `cases` array of one key inside one contract file.
+    private static func cases(
+        in file: String, section: String, key: String
+    ) throws -> [[String: Any]] {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent(file)
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let holder: [String: Any] = try XCTUnwrap(all[section] as? [String: Any])
+        let rule: [String: Any] = try XCTUnwrap(holder[key] as? [String: Any])
+        let list: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertFalse(list.isEmpty, "\(file) → \(section).\(key) has no cases")
+        return list
+    }
+
+    /// One page of a contract case, written where its kind belongs: a class
+    /// page in the section's classes folder, anything else as a course-level
+    /// page, which is where a real course keeps its worksheets and notes.
+    @MainActor
+    private func writeContractPage(title: String,
+                                   isClassPage: Bool,
+                                   visible: Bool,
+                                   links: [String],
+                                   dated: String = "2026-09-08",
+                                   in course: Course) throws {
+        var body: String = "About \(title)."
+        for target in links {
+            body += "\n\nSee [[\(target)]]."
+        }
+        if isClassPage {
+            try write(page: title, publish: visible ? "true" : "false", date: dated,
+                      body: body, in: course)
+        } else {
+            try write(courseLevelPage: title, publishForSection1: visible ? "true" : "false",
+                      dated: dated, body: body, in: course)
+        }
+    }
+
+    @MainActor
+    private func contractPageText(title: String,
+                                  isClassPage: Bool,
+                                  in course: Course) -> String {
+        if isClassPage {
+            return text(ofPage: title, in: course)
+        }
+        return text(ofCourseLevelPage: title, in: course)
     }
 
     // MARK: - What an undo SAYS

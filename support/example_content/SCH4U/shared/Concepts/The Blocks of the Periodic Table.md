@@ -124,5 +124,9 @@ the valence electrons are what react.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C2.2]]
+
+![[C3.1]]
+
 ![[C3.3]]
 %%curriculum-end%%

@@ -44,7 +44,7 @@ This toolchain lets a teacher:
   manual step entirely
   (see [Launcher Scripts](03-launcher-scripts.md#container-runtime-bootstrap)).
   Distribution is **the Plantoir app**: it bundles the full build recipe
-  (Dockerfile, patches, scripts, support files, launchers) and mirrors it
+  (Dockerfile, patches, scripts, support files, contracts, launchers) and mirrors it
   into each working folder's `.toolchain/`, refreshing stale copies — so
   teachers never clone this repository, and an app update IS a toolchain
   update (new recipe → new image tag → local rebuild → recreated
@@ -65,17 +65,59 @@ This toolchain lets a teacher:
 | Command (macOS / Windows) | Script pair | What actually happens |
 |---|---|---|
 | `./setup.sh` / `.\setup.bat` | [`setup_course.py`](04-course-setup.md) | Ensures the container is running with the right folder mounted, then runs an interactive wizard that scaffolds `courses/<CODE>/` and writes `course_config.json` |
-| `./preview.sh ICS3U 1` / `.\preview.bat ICS3U 1` | [`build_site.py`](05-build-pipeline.md) | Merges shared + section-1 content into `.merged_output/section1/`, patches the Quartz scaffold, draws the section's social sharing card, and serves the site — the launcher prints the address (each working folder has its own probed host port block) |
+| `./preview.sh ICS3U 1` / `.\preview.bat ICS3U 1` | [`build_site.py`](05-build-pipeline.md) | Merges shared + section-1 content into `.merged_output/section1/` (a shortcut to a builds folder outside the working folder), patches the Quartz scaffold, draws the section's social sharing card, and serves the site — the launcher prints the address (each working folder has its own probed host port block) |
 | `./deploy.sh ICS3U 1` / `.\deploy.bat ICS3U 1` | [`deploy.py`](07-deployment.md) | Publishes an EXISTING static build — it never builds one: if `public/` is missing or empty the launcher stops and tells the teacher to run preview with `--build-only` first. Then publishes `public/` to the course's chosen destination: delta-upload to a Netlify site (the default), `--target cloudflare` for a Cloudflare Pages project, or `--to-folder` to copy it into a folder on the teacher's own machine |
+
+## Two words that mean different things: PUBLISH and DEPLOY
+
+Both are visible to a teacher, and keeping them apart is a product rule rather
+than a naming preference (reversing an earlier decision to use one word for
+both, which is why older log rows use them interchangeably):
+
+- A **page** is *published*. That is the `publish:` frontmatter flag deciding
+  whether students can see it at all.
+- A **site** is *deployed* — to Netlify, Cloudflare, or a folder.
+
+One word for both makes "I published tomorrow's class" mean a frontmatter flag
+to one person and a live website to another, and the two are hours apart in
+practice. Internal names, script file names and configuration keys keep
+"deploy" throughout; the distinction is about what a teacher reads.
+
+Two related rules the whole product follows, and which shape every surface in
+this documentation:
+
+- **The GUI never mentions the machinery** (`CLAUDE.md` rule 1) — no
+  "toolchain", "script", "Docker", "container" or "WSL" in anything a teacher
+  reads. "Building your website builder…", "Getting this Mac ready…" ("this PC"
+  on Windows).
+- **Use the script logic itself wherever possible.** Both apps run the real
+  launchers and answer their real prompts rather than reimplementing them;
+  progress comes from parsing their output — milestone markers, `#N [k/n]`
+  build steps, "N of M" upload counts, the announced preview address.
 
 ## Key design decisions worth understanding
 
 **Per-section output directories.** Each section gets a complete, independent
-Quartz installation at `courses/<CODE>/.merged_output/section<N>/` (a hidden
-folder, so it does not clutter the Obsidian vault). This costs disk space but
-buys total isolation: each section has its own colour scheme, fonts, emoji,
-page title, and `node_modules`, and a broken build for one section cannot
-affect another.
+Quartz installation — its own colour scheme, fonts, emoji, page title and
+`node_modules` — so a broken build for one section cannot affect another. It
+costs disk space and buys total isolation.
+
+**Where that installation actually lives is worth being precise about, because
+two older descriptions of it were wrong.** It is built on the container's own
+fast storage (`/tmp/quartz-builds/<CODE>/section<N>/`), and only the finished
+`public/` and a copy of `course_config.json` are mirrored back out — so the
+scaffold and `node_modules` have never been on the teacher's disk since the
+build moved to container-internal storage. And since 2026-09-05 what IS mirrored
+back is kept OUTSIDE the working folder:
+`courses/<CODE>/.merged_output` is a shortcut to
+`~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>` on macOS, and
+Windows writes to `%LOCALAPPDATA%\Plantoir\builds\<folder id>`. A built site is
+derived and can always be made again, but keeping it in the working folder meant
+a cloud service uploaded every build of it, Time Machine backed it up, and a zip
+or a Finder copy of the course carried it. Every script and every reader still
+names the same path; the shortcut is what makes that true. See
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`buildOutputLocation`.
 
 **Patch-at-build-time, not fork.** Rather than maintaining a fork of Quartz,
 the toolchain keeps a pristine `v4.5.0` checkout and applies small, mostly

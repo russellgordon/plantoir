@@ -17,7 +17,12 @@ A window without a folder asks for a **working folder** — one containing
 the app offers to initialize. Working folders are **per window**: each
 window restores its own folder across relaunches (frame-keyed), and a new
 window inherits the folder of the window that was key when it was opened —
-or shows the picker when it is the only window.
+or shows the picker when it is the only window. What the sidebar has
+selected belongs to that window's folder: pointing a window at a different
+one lets go of the selection and of everything else naming a course, an
+archive or a backup in the folder being left — see
+[`documentation/09-mac-app.md`](../documentation/09-mac-app.md) → "What a
+window lets go of when it changes working folder".
 
 The app also owns delivery and resources: it mirrors the full toolchain
 recipe into each working folder's `.toolchain/` (refreshing stale
@@ -95,6 +100,18 @@ xcodebuild -project Plantoir.xcodeproj -scheme Plantoir test \
 > by the test runner, which fails the first UI test with
 > "Failed to terminate ca.russellgordon.Plantoir".
 
+**The test bundle changes one thing about AppKit, on purpose.** Its
+`NSPrincipalClass` (`INFOPLIST_KEY_NSPrincipalClass` in `project.yml`) is
+`PlantoirTestBundleSetup` — the `@objc` name of `SheetAnimationSuppressor`,
+which is the string the Info.plist carries and the test asserts. It asks AppKit
+to skip the sheet slide animation
+for the life of the test host. Without it the host segfaults inside a nested
+runloop whenever a test raises and clears an alert on the real window — 10 runs
+in 30 before it existed, 0 in 30 after. Nothing in the shipped app changes, and
+the file itself carries the stack, the numbers, and the levers that look like
+they should work and do not. If a test ever needs to watch a sheet ANIMATE, that
+is the thing standing in its way.
+
 There is also a conventional **XCUITest** suite (`QuartzTeachersUITests`)
 that drives the app with synthesized clicks. Running it requires a one-time
 macOS approval: the first run fails with "Timed out while enabling automation
@@ -127,7 +144,26 @@ requirement.
   pure functions carry the rules worth knowing:
   `SkeletonCatalog.structureToAdopt` (never overwrite a list the teacher has
   edited) and `SkeletonCatalog.sidebar` (curriculum hidden, every other
-  shared folder gets a chevron, per-section folders stay plain links).
+  shared folder gets a chevron, per-section folders stay plain links). A
+  third, `WizardStructure`, carries the toggle's OTHER direction — declining
+  the skeleton puts the defaults back into every list the teacher has not
+  edited since, so the editor shows what will actually be created; its thirteen
+  cases are `contracts/shared-rules.json` → `wizard.skeletonToggle`.
+- **Built websites are kept OUTSIDE the working folder**, and
+  `courses/<CODE>/.merged_output` is a shortcut to
+  `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`
+  (`BuildOutputLocation`). The shortcut is what lets `BuildFreshness`,
+  `ScheduledDeploy`, `SectionDetailView`, the three launchers and a launchd
+  deploy all keep naming the path they already named. The folder id is the
+  same `pwd -P | shasum` hash that names the folder's container, derived once
+  in `BuildOutputLocation.folderIdentifier` and used by `FolderContainers`
+  too. The rule is implemented a second time in the launchers' shell, because
+  a teacher at the command line and a scheduled publish have no app — the two
+  are pinned against `contracts/shared-rules.json` → `buildOutputLocation`.
+  **The one thing to know before touching it**: a builds folder with no
+  shortcut pointing at it is CLEARED rather than reused, because archiving,
+  restoring or replacing a course removes the shortcut and can leave content
+  older than the site built from it.
 - The colour scheme picker's choices come from the repository's own
   `support/colour_schemes.json`, bundled as a resource at build time — and
   the font previews register the TTFs from `support/fonts/`, the same

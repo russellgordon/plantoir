@@ -95,3 +95,13 @@ room who says stop, in
 [[Ethics, Security, and the Profession]]. Per [[Our Classroom Norms]],
 we argue this with ideas and never at people. The point is to build
 better, not to find villains.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D2.1]]
+
+![[D2.2]]
+
+![[D4.1]]
+%%curriculum-end%%

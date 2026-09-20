@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Number talk: [[Number Strings]]
-2. [[Pattern Machines]], day 2 — working period: your pattern designed, and
+2. [[Pattern Machines]], day 2 of 7 — working period: your pattern designed, and
    terms 1 to 4 built so the growth is visible
 3. Conference: can somebody else see your rule from the pictures alone?
 

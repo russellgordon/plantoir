@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. The war ends: what Canada had become by 1945
-2. Work period
-3. Conferences
+1. The war ends: what Canada had become by 1945: [[The War at Home]]
+2. Work period: [[The Wartime Decision]]
+3. Conferences on argument strength and evidence citations for [[The Wartime Decision]]
 
 ## Things to do before our next class
 

@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Tech Headlines]]
-2. [[The Software Project]], day 8 — working period: the second feature, and
-   the first status update in writing
+2. [[The Software Project]], day 8 — working period: the first of the two
+   rows your own check named, then the second feature and the first
+   status update in writing
 3. Status updates read aloud: done, doing, blocked
 
 ## Things to do before our next class

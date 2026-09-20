@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Number talk: [[Estimation Duels]] — first duel of the semester
-2. Random groups — thinking task: [[How Big Is a Million]] at the boards
+2. Random groups — thinking task: [[How Big Is a Million]] at the boards.
+   This one is a diagnostic: nothing is marked, and I am finding out what
+   this class already does with numbers too big to picture
 3. Consolidate from the bottom: tour the boards, climb the strategies
 4. Launch your [[Math Journal]] — write [[Your First Entry]] in class
 5. Check your understanding: two questions, tried alone

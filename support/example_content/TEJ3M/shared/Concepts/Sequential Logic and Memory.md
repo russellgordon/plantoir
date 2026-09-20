@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 Everything in [[Logic Gates]] forgets instantly. Take the inputs away and
 the output goes with them, because a combinational circuit's output

@@ -46,10 +46,13 @@ the strongest papers spend twenty minutes before writing anything.
 
 ## Preparing for it
 
-The three review periods before the examination are built for this: we
-work old cases against the clock and compare diagnoses. Bring your
-worked cases from the term — [[The Flat Structure]] and
-[[The Restructure]] are the closest in shape to what you will meet.
+The last two classes of the course are built for this: we work old cases
+against the clock and compare diagnoses. (The class before those two
+closes the portfolio and walks through how this examination runs, so the
+timed practice is two periods, not three — plan accordingly rather than
+discovering it on the day.) Bring your worked cases from the term —
+[[The Flat Structure]] and [[The Restructure]] are the closest in shape
+to what you will meet.
 
 > [!tip] Practise the first twenty minutes
 > Everyone can write for three hours. The difference between papers is
@@ -70,3 +73,81 @@ worked cases from the term — [[The Flat Structure]] and
 
 ![[E2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Be honest about this one. A three-hour written paper, sat in silence
+under examination conditions, offers you no observation and no
+conversation, and there is no arrangement that would make it offer any.
+The thirty per cent is a product, deliberately and unavoidably.
+
+What that means in practice is that the observation and conversation
+below belong to the SEVENTY. They are evidence of the same expectations,
+and if what you see changes your view of a student it changes their term
+mark — not their examination mark, which is what is on the paper. Gather
+it anyway, and gather it EARLY: there are only two timed-case periods at
+the end, Day 23 is the last day of the year on which a diagnosis is made
+in front of you rather than posted to you, and a plan that leaves all of
+this to the final week collects almost none of it.
+
+OBSERVE — Unit 4, Day 23, the first twenty minutes of the timed case
+  Watch for: what a student does before writing anything. Reading it
+  twice. Marking the case up. Writing three candidate problems and
+  choosing. Or a heading appearing at minute three and the answer being
+  discovered on the way down the page. Every paper you eventually mark
+  will start with a heading, and the ones that planned and the ones that
+  did not are indistinguishable at the top. That is D1.2 (apply different
+  problem-solving strategies to a variety of management planning
+  challenges), and the strategy is only ever visible in the twenty
+  minutes before the writing.
+  Going well: pen on the case rather than on the page; a crossed-out
+  first candidate.
+  Stuck: writing from minute one, or reading passively to the end and
+  then starting again.
+  Record: at minute twenty, one pass of the room and a P or a W beside
+  each name on the seating plan. Sixty seconds, and you will use it when
+  Day 24 asks them to practise the first twenty minutes deliberately.
+
+TALK, first half — Unit 4, Day 7, the Four-Day Week seminar
+  Do not save this task's conversation for the review classes. Day 23's
+  discussion is one period and will reach five or six students; Day 24
+  has no discussion on it at all, so "over the two days you reach most of
+  the class" would be untrue. Start much earlier, in a seminar that is
+  already about one of this task's codes and where you are chairing
+  rather than performing.
+  Ask: "Somebody takes the four-day week and their pay stays the same.
+  What have they been promised that is not in the contract — and what
+  happens to them when it turns out not to be true?" A strong answer
+  reaches the psychological contract without being handed the phrase, and
+  says what its breach does to how somebody works. That is E2.1 (assess
+  the relationship between the individual and an organization,
+  considering issues such as the meaning of work, the psychological
+  contract, the quality of work life, and job satisfaction) — heard, and
+  four months before the paper.
+  Record: four or five names down the margin of your seminar notes, a
+  letter each. Nine seminars run this year; one list across all of them
+  and everybody is heard twice.
+
+TALK, second half — Unit 4, Day 23, the "comparing diagnoses" discussion
+  already on that agenda; take two named students per question
+  Ask: "Before you read that case, what kind of organization were you
+  expecting — and where did it stop matching?" A strong answer can name
+  the assumption it walked in with and the sentence that broke it. That
+  is C1.3 (analyse how personal perception can influence the
+  interpretation of information and thereby affect the decisions an
+  individual makes), which is the one expectation on this task that a
+  written paper almost never shows you, because a paper reports the
+  conclusion and not the expectation it corrected.
+  Then: "What kind of strategic plan is this organization actually
+  running — growth, retrenchment, something else — and what in the case
+  told you?" A strong answer points at a sentence, usually one that is
+  not about strategy at all: a hiring freeze, a closed office, a new
+  region. That is D3.2 (describe the types of strategic plans used by
+  specific organizations).
+  Record: names in two columns on the day plan as you go. Four names,
+  realistically. The rest of this class's conversation evidence came from
+  the seminars, which is why it had to start in the opening weeks.
+
+The product evidence is the paper, written in the examination period.
+%%

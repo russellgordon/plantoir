@@ -21,4 +21,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Look up entrance requirements for one program that interests you.
-- [ ] Journal: what you would tell September-you about functions.
+- [ ] Journal: what you would tell the you who started this course about functions.

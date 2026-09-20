@@ -10,11 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. The site is the course: [[Using This Site]]
-2. Where everything lives: [[How This Site Is Organised]]
-3. What these pages can do: [[What This Site Can Do]]
-4. Where we are going by January: [[Learning Goals]]
+1. [[How Marks Work]] — and why no mark here depends on your politics
+2. [[Getting Help]] and [[Help Sessions]]
+3. Opened: [[Who Decided This|Who Decided This?]] — something in your day was decided by a person, in a room, on a date
 
 ## Things to do before our next class
 
-- [ ] Set up [[Your Civic Notebook]] and make the first entry tonight.
+- [ ] Choose the decision you will trace. Small, local, and real.

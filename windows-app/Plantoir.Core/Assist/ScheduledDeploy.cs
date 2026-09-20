@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -31,6 +33,9 @@ public sealed class ScheduledDeploy
         if (when <= now)
             return $"{when:dddd d MMMM, h:mm tt} has already passed. Pick a time still to come.";
 
+        // The PRIMARY destination — unchanged wording and order from before
+        // a course could have more than one, so every existing check
+        // against this function still passes byte for byte.
         if (course.Configuration.DeployTarget == "local_folder")
         {
             if (Models.CourseConfiguration.DeployFolderProblem(course.Configuration.DeployFolderPath) is { } folderProblem)
@@ -43,10 +48,45 @@ public sealed class ScheduledDeploy
                 return $"{course.Code} deploys to Cloudflare Pages, which needs your Account ID. {accountProblem} Add it in this course’s settings, under Deploying, then schedule this again.";
         }
 
+        // Every ADDITIONAL destination gets the same two checks — a
+        // redundancy target with no valid folder or credential would
+        // otherwise sit silently broken until the scheduled moment, exactly
+        // the surprise asking everything up front exists to prevent.
+        foreach (var target in course.Configuration.AdditionalDeployTargets)
+        {
+            if (target.Type == "local_folder")
+            {
+                if (Models.CourseConfiguration.DeployFolderProblem(target.Path) is { } folderProblem)
+                    return $"{course.Code} also deploys to a folder, and that folder needs attention first: {folderProblem}";
+            }
+            if (target.Type == "cloudflare_pages")
+            {
+                if (Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID) is { } accountProblem)
+                    return $"{course.Code} also deploys to Cloudflare Pages, which needs your Account ID. {accountProblem} Add it in this course’s settings, under Deploying, then schedule this again.";
+            }
+        }
+
         if (!Models.DeployCommand.HasDeployedBefore(sectionNumber, course))
             return $"{course.Code} Section {sectionNumber} has never been deployed, so deploying it asks " +
                    "what to call the website. Nobody would be there to answer that at the scheduled time, " +
                    "and it would wait. Deploy it once from Plantoir, and after that it can be scheduled.";
+
+        // Same reasoning, for any additional destination that has never
+        // gone out — a brand-new Netlify or Cloudflare destination also
+        // asks what to call the site, and local_folder never does
+        // (HasDeployedBefore reports it as always ready).
+        foreach (var target in course.Configuration.AdditionalDeployTargets)
+        {
+            if (!Models.DeployCommand.HasDeployedBefore(sectionNumber, course, target.Type))
+            {
+                string destinationName = Models.DeployCommand.DestinationDescription(
+                    new Models.CourseConfiguration.DeployDestination(target.Type, target.Path));
+                return $"{course.Code} Section {sectionNumber} has never been deployed to {destinationName}, " +
+                       "so deploying it there asks what to call that site. Nobody would be there to answer " +
+                       "that at the scheduled time, and it would wait. Deploy it there once from Plantoir, " +
+                       "and after that it can be scheduled.";
+            }
+        }
 
         return null;
     }
@@ -60,6 +100,69 @@ public sealed class ScheduledDeploy
 
     /// <summary>Classes that are not published yet, and so would not reach students.</summary>
     public required IReadOnlyList<string> UnpublishedClasses { get; init; }
+
+    /// <summary>
+    /// Every class page of a section that is still unpublished — the ones a
+    /// deploy would put the site up without. For the sidebar's own "Schedule
+    /// Deploy…", which has no list of named classes the way the assistant's
+    /// tool does. Date-independent, as the contract's
+    /// <c>scheduledDeployRefusals.alsoSaid</c> rule has it ("list the class
+    /// pages students cannot see yet, by name") and as the mac's
+    /// <c>unpublishedClasses(course:sectionNumber:)</c> has always done: a
+    /// class dated after the deploy is still a page students cannot see.
+    ///
+    /// <para>Walks the same folders <c>AssistWorkspace.ClassPages</c> walks —
+    /// the ones the SHARED membership rule counts
+    /// (<c>contracts/class-planning.json</c> → <c>classFolder.membership</c>),
+    /// not every <c>per_section_folder</c> — and leaves out the same
+    /// <c>index.md</c>, for the same reason: a section's front page is not a
+    /// class. That sentence was false between the two of them until
+    /// 2026-09-19, when both stopped walking the whole list; a test now pins
+    /// the two together on one fixture, because a comment claiming agreement
+    /// is exactly what stops anybody checking. Named by FILE name, as this
+    /// app's own tool names them (<c>AssistWorkspace.PlanScheduledDeploy</c>);
+    /// the mac uses the page's title, a recorded difference.</para>
+    /// </summary>
+    public static List<string> UnpublishedClassesIn(Course course, int sectionNumber)
+    {
+        var names = new List<string>();
+        foreach (string folder in ClassFolderRule.Names(course.Configuration.ClassFolder,
+                                                        course.Configuration.PerSectionFolders))
+        {
+            string root = Path.Combine(course.SectionDirectory(sectionNumber), folder);
+            if (!Directory.Exists(root)) continue;
+            foreach (string page in PagePaths.MarkdownPages(root, sectionNumber))
+            {
+                if (string.Equals(Path.GetFileName(page), "index.md", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string text;
+                try { text = File.ReadAllText(page); } catch { continue; }
+                if (PageFrontmatter.IsDraft(text, sectionNumber))
+                    names.Add(Path.GetFileNameWithoutExtension(page));
+            }
+        }
+        names.Sort(StringComparer.OrdinalIgnoreCase);
+        return names;
+    }
+
+    /// <summary>
+    /// The sentence that goes with that list — the same content
+    /// <see cref="Describe"/> gives the assistant, in prose rather than in
+    /// bullets, because a dialog is not a chat transcript. Null when nothing
+    /// is unpublished.
+    /// </summary>
+    public static string? UnpublishedClassesSentence(IReadOnlyList<string> unpublished)
+    {
+        if (unpublished.Count == 0) return null;
+        int count = unpublished.Count;
+        string listed = string.Join(", ", unpublished.Take(8));
+        if (count > 8) listed += $" …and {count - 8} more";
+        string are = count == 1 ? "class is" : "classes are";
+        string them = count == 1 ? "it" : "them";
+        return $"One thing first — {count} {are} not published yet: {listed}. " +
+               $"Deploying now would put the site up without {them}. " +
+               "Publish first, look the preview over, then schedule this.";
+    }
 
     /// <summary>Where the deploy would land.</summary>
     public required string Destination { get; init; }

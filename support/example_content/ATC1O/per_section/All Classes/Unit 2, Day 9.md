@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Working period: pooling material
+2. Working period: pooling material — each dancer's eight counts logged
+   in their own journal, dated
 3. Structuring the piece: what goes where, and why
 4. [[Devising in a Group]] — how the group decides
 5. Cool-down

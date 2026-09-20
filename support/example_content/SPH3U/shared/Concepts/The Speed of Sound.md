@@ -7,7 +7,7 @@ tags:
   - unit-4
 ---
 Measuring the speed of sound is one of the few genuinely fundamental
-constants a high school class can get within a few percent of, using
+constants a high school class can get within a few per cent of, using
 nothing but a stopwatch and a large space.
 
 ## Three ways to do it

@@ -31,6 +31,33 @@ these are college diplomas that put you in the field within two years.
 And almost all of them involve more writing and more statistics than
 students expect, which is why the reference pages in this course exist.
 
+## The work exists because somebody needed something
+
+None of the roles above appeared because biology found them
+interesting. Each one exists because a society had a problem and paid
+for an answer, and the technology in this course arrived the same way.
+
+| What people needed | What it produced | Where you meet it in this course |
+| --- | --- | --- |
+| Food that keeps, from land that is already farmed | Selective breeding, then crop genetics and controlled-environment growing | [[Plants and Agriculture]] |
+| To stop dying of infections | Antibiotics — and then the resistance problem that came with using them | [[Bacteria and Archaea]] |
+| To know a diagnosis before the symptoms | Genetic screening, and the counselling profession that had to be invented alongside it | [[Genetic Technologies]], [[Genetic Counselling Brief]] |
+| To survive organ failure | Transplant surgery, tissue matching, and the immunology behind rejection | [[Keeping Conditions Steady]] |
+| To sit down for a living without it shortening life | Exercise physiology, fitness measurement, and a food industry reformulating what it sells | [[Animal Systems Overview]] |
+| To breathe in a hospital when lungs fail | Ventilators, blood-gas measurement, and pulse oximetry | [[The Respiratory System]] |
+
+Two things follow that are worth arguing about rather than accepting.
+**The need shapes what gets studied**, so the questions with money
+behind them get answered first — which is why a disease common in
+wealthy countries has more research on it than one affecting more people
+elsewhere. And **every one of these creates a second problem** the
+original need did not anticipate: antibiotics produced resistance,
+screening produced questions about who is entitled to the result, and
+transplantation produced a permanent shortage and a set of decisions
+about who is on the list. Neither observation is an argument against the
+technology. Both are arguments for the people using it knowing where it
+came from, which is what a course like this is for.
+
 ## Three Canadians, and what they actually did
 
 **Lap-Chee Tsui** led the team at Toronto's Hospital for Sick Children
@@ -75,6 +102,8 @@ clinic, a farm, a stable, a park, or a lab.
 ## Curriculum connection
 
 ![[A2.1]]
+
+![[E1.2]]
 
 ![[A2.2]]
 %%curriculum-end%%

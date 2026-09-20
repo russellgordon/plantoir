@@ -11,13 +11,13 @@ tags:
 ## Agenda
 
 1. Warm-up: run your demo once, start to finish, before the doors open
-2. [[Launch Day]] — invited guests meet your artifacts and your docs
-3. Between demos: the remaining [[The Innovation Brief]] presentations
-4. Read together: [[Showing Growth]] — your journal's final week
-5. Log it in your [[Dev Journal]] — tonight's entry writes itself
+2. [[Launch Day]] — invited guests meet your artifacts, your
+   documentation, and your growth statements
+3. Log it in your [[Dev Journal]] before you leave — tonight's entry
+   writes itself
 
 ## Things to do before our next class
 
 - [ ] Journal: one thing a guest said about your artifact that you did
       not expect.
-- [ ] Reread [[Showing Growth]] — final journal collection is next class.
+- [ ] Nothing else. Come back and we will take the room apart together.

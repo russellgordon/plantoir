@@ -10,11 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: name three things in this course powered by the Sun
+1. Warm-up: name three things in this course powered by the Sun: [[The Sun]]
 2. In groups: trace solar energy into food, weather, wind, and
    electricity
 3. Consolidate: photosynthesis, the water cycle, and the grid, on one
-   diagram
+   diagram: [[Where Our Electricity Comes From]]
 
 ## Things to do before our next class
 

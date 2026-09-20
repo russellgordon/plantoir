@@ -42,7 +42,7 @@ the whole subject. Our class discussions run on them; so does
 Before calling written work done, walk [[Showing Your Thinking]]'s
 checklist: the question restated, the reasoning visible, units carried
 through, and an answer *sentence* — $x = 4$ is a value; "each ticket
-cost $4" is an answer.
+cost \$4" is an answer.
 
 The same standard applies to your [[Math Journal]], with one addition:
 name what *you* did and thought, not just what the group did. "We solved

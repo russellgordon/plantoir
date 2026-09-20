@@ -43,7 +43,11 @@ believes.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.1]]
+
 ![[C1.2]]
 
 ![[C2.1]]
+
+![[C2.2]]
 %%curriculum-end%%

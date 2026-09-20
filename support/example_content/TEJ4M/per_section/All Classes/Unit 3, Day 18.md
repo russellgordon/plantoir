@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[Which One Doesn't Belong]] — unit-three finale
 2. Consolidation: the control loop on one page, built by the room
-3. Look ahead: the systems all of this runs on
+3. Journals in for Unit 3. Run [[Journal Checklist]] over yours first
+4. Look ahead: the systems all of this runs on
 
 ## Things to do before our next class
 

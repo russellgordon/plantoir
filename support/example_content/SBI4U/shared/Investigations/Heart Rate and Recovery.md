@@ -40,7 +40,11 @@ disturbance. Recovery rate is the measurement, not maximum heart rate.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
 ![[E2.1]]
+
+![[E2.3]]
 
 ![[E3.1]]
 %%curriculum-end%%

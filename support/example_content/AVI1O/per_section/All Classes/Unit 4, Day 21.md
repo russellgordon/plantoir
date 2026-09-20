@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Portfolio work period: [[The Portfolio]]
-2. Individual conferences
+2. [[The Sketchbook Habit]] marked for the second time, in conference at
+   your own table
 3. Studio open for anything unfinished
 
 ## Things to do before our next class

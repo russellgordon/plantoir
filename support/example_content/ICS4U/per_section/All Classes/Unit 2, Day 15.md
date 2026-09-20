@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Name That Error]]
-2. [[The Structure Study]], day 5 — working period: the write-up — when to
-   use it, when not to, and the evidence
+2. [[The Structure Study]], day 5 — working period: the row your own
+   check named and whatever yesterday's conference sent you back to,
+   then the write-up — when to use it, when not to, and the evidence
 3. Swap with another student and use their structure from the notes
    alone
 

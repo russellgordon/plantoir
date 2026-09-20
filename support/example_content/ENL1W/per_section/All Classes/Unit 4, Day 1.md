@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. The claims you brought, on the board, unsorted
+1. The claims you brought, on the board, unsorted — then hands up for
+   the ones you already believe. Nothing here is marked; it shows me
+   what this room walks in trusting, and where the unit has to start
 2. Concept: [[How Misinformation Travels]] — why the false thing moves
    faster
 3. Check one together, live

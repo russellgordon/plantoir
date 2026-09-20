@@ -7,10 +7,13 @@ tags:
 ---
 A task is a job with a client — sometimes real, sometimes played by
 the bench across the aisle. Each runs over several classes, and the
-bench time is part of the job: what you do with it is assessed, as
-[[How Marks Work]] explains. Every task publishes its criteria up
-front, as things an observer could see at your bench, and each table
-traces back to our [[Learning Goals]]. Process and safety both count.
+bench periods are where the job gets done: work that carries a mark
+happens here, in the room, with me in it — which is the reason those
+periods are on the schedule at all. Every task publishes its criteria
+up front, as things an observer could see at your bench, and each table
+traces back to our [[Learning Goals]]. Every one of them has a
+checkpoint partway through, and a period afterwards for acting on what
+it found; [[How Marks Work]] explains where the mark comes from.
 
 ## The five jobs
 

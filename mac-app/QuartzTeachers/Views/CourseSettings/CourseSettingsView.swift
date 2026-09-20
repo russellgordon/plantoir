@@ -9,6 +9,12 @@ struct CourseSettingsView: View {
 
     let course: Course
 
+    @State var isShowingFoldersHelp: Bool = false
+    @State var isRenamingUnitWord: Bool = false
+
+    /// What the last unit-word rename did, shown under the row until the
+    /// sheet is opened again.
+    @State var unitWordNotice: String? = nil
     @State var saveProblem: String?
     @State var didJustSave: Bool = false
 
@@ -55,6 +61,32 @@ struct CourseSettingsView: View {
                         Text("Chevron or folder name").tag(true)
                         Text("Chevron only (name opens the folder)").tag(false)
                     }
+
+                    // NOT a field saved with the form. Changing the word
+                    // renames every class page in the course, so it goes
+                    // through a sheet that shows the plan and commits straight
+                    // away — Save and Revert never touch `unit_word`.
+                    LabeledContent(UnitWordRenameWording.fieldLabel) {
+                        HStack {
+                            Text(configuration.unitWord)
+                                .accessibilityIdentifier("unitWordValue")
+                            Button(UnitWordRenameWording.renameButton) {
+                                unitWordNotice = nil
+                                isRenamingUnitWord = true
+                            }
+                            .accessibilityIdentifier("renameUnitWordButton")
+                        }
+                    }
+                    Text(UnitWordRenameWording.rowCaption(word: configuration.unitWord))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    if let unitWordNotice {
+                        Text(unitWordNotice)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("unitWordNotice")
+                    }
                 } header: {
                     FormSectionHeader("Settings — Overall")
                 }
@@ -63,7 +95,8 @@ struct CourseSettingsView: View {
                     PublishingChoiceView(
                         deployTarget: $configuration.deployTarget,
                         deployFolderPath: $configuration.deployFolderPath,
-                        cloudflareAccountID: $settings.cloudflareAccountID
+                        cloudflareAccountID: $settings.cloudflareAccountID,
+                        additionalDeployTargets: $configuration.additionalDeployTargets
                     )
                 } header: {
                     FormSectionHeader("Deploying")
@@ -78,27 +111,122 @@ struct CourseSettingsView: View {
                 Section {
                     StringListEditorView(
                         title: "Shared folders (all sections)",
-                        items: $configuration.sharedFolders
+                        items: $configuration.sharedFolders,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "shared")
+                            dropFromMarksPool(name)
+                            ActivityTrail.note(.itemExcluded, "excluded shared folder " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            if configuration.reinclude(name, inScope: "shared") {
+                                ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
+                            }
+                        },
+                        protection: sharedFolderProtection,
+                        renameProblem: { oldName, newName, finishing in
+                            return folderRenameProblem(
+                                oldName, to: newName, scope: .shared, finishing: finishing
+                            )
+                        },
+                        interruptedRenameTarget: { oldName in
+                            return SpecialFolderRenamer.interruptedRenameTarget(
+                                from: oldName, scope: .shared,
+                                courseDirectory: course.directoryURL,
+                                sectionNumbers: course.configuration.sectionNumbers
+                            )
+                        },
+                        onRename: { oldName, newName in
+                            return await renameFolder(oldName, to: newName, scope: .shared)
+                        },
+                        noticeAfterChange: { name, change in
+                            return noticeAfterFolderChange(name, change: change, scope: .shared)
+                        }
                     )
                     StringListEditorView(
                         title: "Shared files (all sections)",
                         hidesMarkdownExtension: true,
-                        items: $configuration.sharedFiles
+                        items: $configuration.sharedFiles,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "shared")
+                            ActivityTrail.note(.itemExcluded, "excluded shared file " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            if configuration.reinclude(name, inScope: "shared") {
+                                ActivityTrail.note(.itemReincluded, "re-included shared file " + name + " in " + course.code)
+                            }
+                        }
                     )
                     StringListEditorView(
                         title: "Per-section folders",
-                        items: $configuration.perSectionFolders
+                        items: $configuration.perSectionFolders,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "per_section")
+                            dropFromMarksPool(name)
+                            ActivityTrail.note(.itemExcluded, "excluded per-section folder " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            if configuration.reinclude(name, inScope: "per_section") {
+                                ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
+                            }
+                        },
+                        protection: perSectionFolderProtection,
+                        renameProblem: { oldName, newName, finishing in
+                            return folderRenameProblem(
+                                oldName, to: newName, scope: .perSection, finishing: finishing
+                            )
+                        },
+                        interruptedRenameTarget: { oldName in
+                            return SpecialFolderRenamer.interruptedRenameTarget(
+                                from: oldName, scope: .perSection,
+                                courseDirectory: course.directoryURL,
+                                sectionNumbers: course.configuration.sectionNumbers
+                            )
+                        },
+                        onRename: { oldName, newName in
+                            return await renameFolder(oldName, to: newName, scope: .perSection)
+                        },
+                        noticeAfterChange: { name, change in
+                            return noticeAfterFolderChange(name, change: change, scope: .perSection)
+                        }
                     )
                     StringListEditorView(
                         title: "Per-section files",
                         hidesMarkdownExtension: true,
-                        items: $configuration.perSectionFiles
+                        items: $configuration.perSectionFiles,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "per_section")
+                            ActivityTrail.note(.itemExcluded, "excluded per-section file " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            if configuration.reinclude(name, inScope: "per_section") {
+                                ActivityTrail.note(.itemReincluded, "re-included per-section file " + name + " in " + course.code)
+                            }
+                        },
+                        protection: perSectionFileProtection
                     )
-                    Text("Tip: you can also simply create new folders in Obsidian — they’re added to your site automatically the next time you preview.")
+                    Text(SpecialNames.contentStructureTip)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } header: {
                     FormSectionHeader("Content Structure")
+                }
+
+                Section {
+                    MembershipToggleListView(
+                        title: GradedFolderWording.listTitle,
+                        allItems: gradedFolderChoices,
+                        members: gradedFoldersBinding,
+                        protection: gradedFolderProtection
+                    )
+                    Text(GradedFolderWording.caption)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Button(SpecialFoldersHelpView.openedBy) {
+                        isShowingFoldersHelp = true
+                    }
+                    .buttonStyle(.link)
+                } header: {
+                    FormSectionHeader("Marks")
                 }
 
                 Section {
@@ -169,6 +297,14 @@ struct CourseSettingsView: View {
                 }
                 .disabled(!FolderActions.obsidianIsInstalled)
                 .help("Edit this course's pages in Obsidian")
+                .sheet(isPresented: $isShowingFoldersHelp) {
+                    SpecialFoldersHelpView(course: course)
+                }
+                .sheet(isPresented: $isRenamingUnitWord) {
+                    UnitWordRenameSheet(course: course) { sentence in
+                        unitWordNotice = sentence
+                    }
+                }
                 .accessibilityIdentifier("openCourseInObsidianButton")
             }
         }
@@ -182,12 +318,80 @@ struct CourseSettingsView: View {
     /// would quietly have nowhere to go, and would only say so much later.
     var savingProblem: String? {
         if course.configuration.deployTarget == "local_folder" {
-            return CourseConfiguration.deployFolderProblem(forPath: course.configuration.deployFolderPath)
+            if let problem = CourseConfiguration.deployFolderProblem(forPath: course.configuration.deployFolderPath) {
+                return problem
+            }
         }
         if course.configuration.deploysToCloudflare {
-            return CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID)
+            if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
+                return problem
+            }
+        }
+        // Every ADDITIONAL destination gets the same check — a redundancy
+        // target with no valid folder or credential would otherwise only
+        // fail the first time a deploy actually reached it.
+        for target in course.configuration.additionalDeployTargets {
+            if target.type == "local_folder" {
+                if let problem = CourseConfiguration.deployFolderProblem(forPath: target.path) {
+                    return problem
+                }
+            }
+            if target.type == "cloudflare_pages" {
+                if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
+                    return problem
+                }
+            }
         }
         return nil
+    }
+
+    /// Every folder that could hold work counting for marks.
+    ///
+    /// Not just the top-level lists. The build matches a graded folder at ANY
+    /// DEPTH, so a course with `Portfolios/Tasks` has assessed work that the
+    /// declared lists never mention — and a control that showed only the
+    /// top-level folders would have let a teacher's first tick freeze a pool
+    /// that silently dropped it. That is the same silent mark-loss that made
+    /// seeding every course with ["Tasks"] unsafe, arriving through the
+    /// interface instead.
+    ///
+    /// The rule itself is `GradedFolderChoices`, so that the walk — its depth
+    /// cap, its skip list, its order and the folders a teacher has REMOVED —
+    /// can be run against the contract's own cases instead of living in a view
+    /// nothing tests.
+    var gradedFolderChoices: [String] {
+        return GradedFolderChoices.choices(
+            for: course.configuration, courseDirectory: course.directoryURL
+        )
+    }
+
+    /// The pool, shown as ticks.
+    ///
+    /// When the course has never been asked (`gradedFolders` is nil), the
+    /// folders the build currently counts are shown ticked — the historical
+    /// rule, any folder whose name mentions tasks — so what a teacher sees is
+    /// what is actually happening rather than a blank list. Nothing is written
+    /// until they change something, and the moment they do, the answer becomes
+    /// explicit and the historical rule stops applying to this course.
+    ///
+    /// Which is why the derived list must be as complete as it can afford to
+    /// be: the first tick freezes it, so anything the build counts today and
+    /// this list omits loses its marks without a word.
+    var gradedFoldersBinding: Binding<[String]> {
+        return Binding(
+            get: {
+                if let chosen = course.configuration.gradedFolders {
+                    return chosen
+                }
+                // The offered list is already de-duplicated by exact name, so
+                // asking the shared rule — which de-duplicates too — gives the
+                // answer the hand-written loop here gave.
+                return GradedFolderRule.inferredPool(from: gradedFolderChoices)
+            },
+            set: { newValue in
+                course.configuration.gradedFolders = newValue
+            }
+        )
     }
 
     // MARK: - Functions
@@ -210,5 +414,305 @@ struct CourseSettingsView: View {
             saveProblem = "Could not save: \(error.localizedDescription)"
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
         }
+    }
+
+    /// A folder removed from the course leaves the marks pool as well, so the
+    /// confirmation's promise ("Removing it will take it out of your course's
+    /// marks pool") is kept and `graded_folders` never names a folder the
+    /// build has been told to exclude — with two conditions, both of which
+    /// exist to stop a removal quietly taking marks OFF the coverage map.
+    ///
+    /// The rule and its seven cases are `contracts/shared-rules.json` →
+    /// `gradedFolders.removingAFolder`. Called after the name has already left
+    /// its list and been written into `excluded_items`, which is what makes
+    /// `gradedFolderChoices` the right question to ask here.
+    func dropFromMarksPool(_ name: String) {
+        // Still offered? Then a folder of that name is still in the course —
+        // `Portfolios/Tasks`, when the top-level `Tasks` was the one removed —
+        // and the pool entry still names work the build publishes. Dropping it
+        // would stop counting a folder nobody removed, and the checklist would
+        // go on showing an untickable row for it.
+        //
+        // Asked CASE-INSENSITIVELY, because the walk returns on-disk spellings:
+        // `Portfolios/tasks` is offered as `tasks`, and an exact test would
+        // read that as "no longer offered" while `build_site.py` goes on
+        // counting the folder. Seventh case of `gradedFolders.removingAFolder`,
+        // raised from Windows as issue #172; the comparison itself, and what
+        // was measured to choose it, are in `GradedFolderChoices.stillOffers`.
+        if GradedFolderChoices.stillOffers(gradedFolderChoices, aFolderNamed: name) {
+            return
+        }
+        // A course that has NEVER been asked is left unasked, rather than
+        // frozen to the historical rule's answer minus this folder. On the
+        // ordinary course whose only marked folder is `Tasks`, freezing writes
+        // `[]` — asked and answered, nothing counting for marks ever again,
+        // from a gesture the teacher was told would take one folder out of the
+        // pool. An absent key keeps the historical rule running instead.
+        //
+        // **This guard is not what makes the never-asked cases pass today, and
+        // it must not be "simplified" away.** The post-exclusion walk is: the
+        // historical rule only ever names folders drawn FROM the choices
+        // (`GradedFolderRule.inferredPool(from:)` reads that list), so a name
+        // the still-offered test has just rejected cannot be in a materialised
+        // pool either. That redundancy holds only while the DROP below is no
+        // more permissive than the still-offered test above — which is this
+        // file's shape (a case-insensitive test over an exact drop) and
+        // Windows' shape (one comparer for both). Reverse it — an exact test
+        // over a case-insensitive drop — and this guard is the only thing left
+        // standing.
+        //
+        // Measured ON WINDOWS 2026-09-18, on code whose drop is
+        // `OrdinalIgnoreCase`: with an exact still-offered test and this guard
+        // replaced by the materialised pool, a never-asked course that removes
+        // a top-level `Tasks` while `Portfolios/tasks` survives writes
+        // `graded_folders: []` — the #142 damage, back. The mac's own drop is
+        // exact, so that mutation stops one line lower instead, at
+        // `!currentGraded.contains(name)`: the materialised pool is `["tasks"]`
+        // and the name is `"Tasks"`. Do not read the `[]` as a mac number, and
+        // do not conclude from a green suite that the guard is dead.
+        guard let currentGraded = course.configuration.gradedFolders else {
+            return
+        }
+        if !currentGraded.contains(name) {
+            return
+        }
+        var remaining: [String] = []
+        for folder in currentGraded {
+            if folder != name {
+                remaining.append(folder)
+            }
+        }
+        course.configuration.gradedFolders = remaining
+    }
+
+    // MARK: - Renaming a folder
+
+    /// Why this folder cannot take that name, or nil when it can.
+    ///
+    /// The names it is checked against are the ones in its OWN scope. A shared
+    /// folder and a per-section folder may legitimately share a name — they
+    /// live in different places on disk, and `discover_shared_items` and
+    /// `discover_section_items` scan for them separately — so checking both
+    /// lists would refuse a rename that is perfectly fine.
+    func folderRenameProblem(
+        _ oldName: String, to newName: String, scope: FolderScope, finishing: Bool = false
+    ) -> String? {
+        let namesInScope: [String]
+        switch scope {
+        case .shared:
+            namesInScope = course.configuration.sharedFolders
+        case .perSection:
+            namesInScope = course.configuration.perSectionFolders
+        }
+        // `finishing` is settled once when the sheet opens, not here: it
+        // touches the filesystem, and this runs on every keystroke.
+        return SpecialFolderRenamer.problem(
+            renaming: oldName, to: newName, existingNames: namesInScope,
+            isFinishingAnInterruptedRename: finishing
+        )
+    }
+
+    /// Renames the folder on disk and rewrites the configuration keys that
+    /// named it, in that order.
+    ///
+    /// Disk first on purpose: if the move fails, nothing has been written and
+    /// the course is exactly as it was. The other way round would leave a
+    /// configuration naming a folder that is not there — which is the state
+    /// this whole feature exists to make impossible.
+    func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) async -> RenameResult {
+        let outcome: FolderRenameOutcome
+        // OFF the main thread. The move is quick; reading every page in the
+        // course to rewrite links is not, on an iCloud-backed vault where an
+        // evicted file downloads on read. The configuration write below stays
+        // on the main actor, because it touches the observable model.
+        let courseDirectory: URL = course.directoryURL
+        let sectionNumbers: [Int] = course.configuration.sectionNumbers
+        do {
+            outcome = try await Task.detached(priority: .userInitiated) {
+                return try SpecialFolderRenamer.rename(
+                    oldName, to: newName, scope: scope,
+                    courseDirectory: courseDirectory,
+                    sectionNumbers: sectionNumbers
+                )
+            }.value
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        do {
+            try course.configuration.recordOnDisk({ values in
+                return SpecialFolderRenamer.renaming(oldName, to: newName, scope: scope, in: values)
+            }, at: course.configFileURL)
+        } catch {
+            // Recorded BEFORE returning, and that ordering is the point: this
+            // is the one outcome the trail exists for. The folder has moved
+            // and the settings do not know, which is the state somebody will
+            // be asked to explain later — and it was the one case with no line
+            // at all, because the note used to sit after this block.
+            ActivityTrail.note(
+                .folderRenamed,
+                "renamed the folder " + oldName + " to " + newName + " in " + course.code
+                + " but could not write it to this course's settings — "
+                + error.localizedDescription
+            )
+            // The folder HAS moved, so this is not "the rename failed" — it is
+            // a rename whose bookkeeping did not land, and saying otherwise
+            // would send the teacher looking for a folder under its old name.
+            return .failed(
+                "“\(oldName)” was renamed to “\(newName)”, but Plantoir could not write the "
+                + "change to this course's settings: \(error.localizedDescription)"
+            )
+        }
+        // The configuration is written, so the rename is whole and the record
+        // of it having started can go. Anything that leaves this record behind
+        // is, by definition, a rename that did not finish.
+        SpecialFolderRenamer.clearRenameRecord(courseDirectory: course.directoryURL)
+        ActivityTrail.note(
+            .folderRenamed,
+            "renamed the folder " + oldName + " to " + newName + " in " + course.code
+            + " (" + scope.configurationKey + ", " + String(outcome.foldersMoved) + " moved, "
+            + String(outcome.pagesRelinked) + " pages relinked)"
+        )
+        // A rename that moved nothing is not a failure — a per-section folder
+        // may legitimately be missing from a section a teacher never filled in
+        // — but it must not be reported as though folders had moved. Told
+        // plainly, because the alternative is a teacher going to Obsidian to
+        // look for a folder that was never there.
+        //
+        // Guarded on the LINKS as well as the folders: a page can carry a
+        // qualified link into a folder no section actually has, and saying
+        // "only this course's settings changed" while pages were rewritten
+        // would be false. Rare, and this sentence exists to be exact.
+        if outcome.foldersMoved == 0 && outcome.pagesRelinked == 0 {
+            return .renamed(
+                SpecialNames.renameFolderDone(from: oldName, to: newName)
+                + " " + SpecialNames.renameFolderNothingWasThere
+            )
+        }
+        return .renamed(
+            SpecialNames.renameFolderDone(from: oldName, to: newName)
+            + " " + SpecialNames.renameFolderRelinked(pages: outcome.pagesRelinked)
+        )
+    }
+
+    /// What a teacher is told after adding or removing a folder — including
+    /// the folder Plantoir has just made for them, which would otherwise
+    /// appear in their vault unexplained.
+    func noticeAfterFolderChange(_ name: String, change: ListChange, scope: FolderScope) -> String? {
+        switch change {
+        case .added:
+            if createFoldersOnDisk(named: name, scope: scope) {
+                ActivityTrail.note(
+                    .folderCreated,
+                    "created the folder " + name + " in " + course.code
+                    + " (" + scope.configurationKey + ")"
+                )
+                return SpecialNames.addCreatesTheFolderMessage(name: name)
+            }
+            return nil
+        case .removed:
+            return SpecialNames.removeLeavesTheFolderOnDiskMessage(name: name)
+        }
+    }
+
+    /// Makes the folder the teacher just named, wherever its scope says it
+    /// lives, and reports whether anything was actually created.
+    ///
+    /// Adding a name used to write a configuration entry pointing at nothing,
+    /// so the folder had to be made in Obsidian afterwards or the entry named
+    /// something that did not exist. Nothing is put INSIDE it: an empty folder
+    /// is the honest starting state, and inventing a page would put words in
+    /// the teacher's mouth.
+    func createFoldersOnDisk(named name: String, scope: FolderScope) -> Bool {
+        let locations: [URL] = SpecialFolderRenamer.folderLocations(
+            named: name, scope: scope,
+            courseDirectory: course.directoryURL,
+            sectionNumbers: course.configuration.sectionNumbers
+        )
+        var created: Bool = false
+        for location in locations {
+            if FileManager.default.fileExists(atPath: location.path) {
+                continue
+            }
+            do {
+                try FileManager.default.createDirectory(at: location, withIntermediateDirectories: true)
+                created = true
+            } catch {
+                // Re-adding a name whose folder is already there is the common
+                // case and is not worth a word; a genuine failure shows up as
+                // the folder simply not being there, which the build's own
+                // checks already report in the teacher's own terms.
+                continue
+            }
+        }
+        return created
+    }
+
+    func sharedFolderProtection(for folder: String) -> ItemProtection {
+        let resolvedCurriculum: String? = CurriculumFolderRule.resolvedCurriculumFolder(for: course)
+        if let resolvedCurriculum, folder == resolvedCurriculum {
+            if course.configuration.includesCurriculumCoverage {
+                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageSetting)
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                    message: SpecialNames.removeCurriculumFolderMessage
+                )
+            }
+        }
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if currentGraded.contains(folder) {
+            if course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
+                return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeGradedFolderTitle(for: folder),
+                    message: SpecialNames.removeGradedFolderMessage
+                )
+            }
+        }
+        return .ordinary
+    }
+
+    func perSectionFolderProtection(for folder: String) -> ItemProtection {
+        if course.configuration.perSectionFolders.count <= 1 {
+            return .blocked(reason: SpecialNames.lastPerSectionFolderBlocked)
+        }
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if currentGraded.contains(folder) && course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+        }
+        // "All Classes" — exactly that folder — is never removable (Russell,
+        // 2026-08-24): the next-class button and the schedule write pages
+        // into it, so a confirmation would be asking the teacher to break
+        // both. Every other per-section folder can be added or removed.
+        if ClassFolder.isTheAllClassesFolder(folder, configured: course.configuration.classFolder) {
+            return .blocked(reason: SpecialNames.classFolderBlocked)
+        }
+        if currentGraded.contains(folder) {
+            return .consequential(
+                title: SpecialNames.removeGradedFolderTitle(for: folder),
+                message: SpecialNames.removeGradedFolderMessage
+            )
+        }
+        return .ordinary
+    }
+
+    func perSectionFileProtection(for file: String) -> ItemProtection {
+        let normalized: String = file.lowercased()
+        if normalized == "index.md" || normalized == "index" {
+            return .blocked(reason: SpecialNames.sectionIndexFileBlocked)
+        }
+        return .ordinary
+    }
+
+    func gradedFolderProtection(for folder: String) -> ItemProtection {
+        guard course.configuration.includesCurriculumCoverage else {
+            return .ordinary
+        }
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if currentGraded.contains(folder) && currentGraded.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+        }
+        return .ordinary
     }
 }

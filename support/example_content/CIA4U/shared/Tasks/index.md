@@ -6,6 +6,10 @@ created: __CREATED__
 Everything you are marked on, with the criteria on each page. Read them
 before you start, not the night before they are due.
 
+**All four units**
+
+- [[The Notebook and Portfolio]]
+
 **Unit 1 — Scarcity, Choice, and Models**
 
 - [[The Market Model]]

@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Seminar: [[What Do We Owe Other Countries|What Do We Owe Other Countries?]]
-2. Aid, trade, migration and debt relief compared as instruments
+2. Aid, trade, migration and debt relief compared as instruments, and the intergovernmental bodies that carry each — the IMF, the World Bank, the OECD, the UN agencies
 3. The number people guess wrong, retrieved before the argument starts
 
 ## Things to do before our next class

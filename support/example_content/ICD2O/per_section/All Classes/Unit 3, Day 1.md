@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Predict the Output]] — the same line, printed five hundred
-   times?
+   times? Your prediction, written before anybody runs it, is how I
+   find out what this room already believes about repetition
 2. Read together: [[The Dice Roller]] — predict, run, explain
 3. Compare and name it: [[Loops]]
 4. Notes to your future self — when repetition is the whole point

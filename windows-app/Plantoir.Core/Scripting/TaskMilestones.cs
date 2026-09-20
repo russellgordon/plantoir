@@ -13,8 +13,7 @@ public static class TaskMilestones
 {
     public static readonly IReadOnlyList<TaskMilestone> CourseCreation = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
+        new TaskMilestone("Getting things ready…", "Detected host timezone offset"),
         new TaskMilestone("Getting ready…", "Welcome to the Course Setup Script"),
         new TaskMilestone("Preparing your course folder…", "'Media' folder"),
         new TaskMilestone("Choosing appearance…", "Quartz Locale"),
@@ -25,30 +24,49 @@ public static class TaskMilestones
 
     public static readonly IReadOnlyList<TaskMilestone> ExampleCourse = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Getting things ready…", "Ensuring container is running"),
+        // A THIRD marker the mac's example-course list does not have, and it
+        // passes MilestoneContractTests.EveryTaskShowsTheSharedStepsTheMacShows
+        // by a margin nobody designed. That test compares only the markers
+        // classified in app-rules.json → markerOrigins.origins, and the key
+        // there is "Host timezone offset" — not this string — so this one
+        // filters out of BOTH sides before the comparison and the two lists
+        // agree about what is left.
+        //
+        // Which means: if anyone ever "tidies" that origins key to match the
+        // full text a launcher prints, this test starts failing, and the cause
+        // will look nothing like the change that caused it. The fix would then
+        // be a decision about whether the two example-course lists should show
+        // the same steps — not a change to the readout. Flagged from the mac in
+        // GitHub issue #121 and written down here, because a closed issue is
+        // not where somebody editing a marker string will look.
+        new TaskMilestone("Getting things ready…", "Detected host timezone offset"),
         new TaskMilestone("Copying the example course…", "Example Course installed to"),
         new TaskMilestone("Finishing up…", "EXAMPLE_COURSE_CODE="),
     };
 
     public static readonly IReadOnlyList<TaskMilestone> Preview = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Starting container if needed"),
+        new TaskMilestone("Getting things ready…", "Running the website builder on this PC"),
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Applying your settings…", "Updated pageTitle"),
         new TaskMilestone("Preparing components…", "Installing dependencies"),
         new TaskMilestone("Building your site…", "Quartz v4"),
-        new TaskMilestone("Opening the preview…", "Launching Quartz preview"),
+        // "Launching Quartz preview" — build_site.py's own print — fires BEFORE
+        // `quartz build --serve` even starts, so it used to complete every
+        // milestone at once and pin the bar on this step for the whole real
+        // build (TODO.md item 1, found 2026-08-19). "Done processing" is
+        // patches/build.ts's own line, printed once the fresh site is actually
+        // written to disk — verified against a real `preview.ps1 --build-only`
+        // transcript 2026-08-23 ("Quartz v4.5.0" then "Done processing N files
+        // in Ns"). markerOrigins.origins in contracts/app-rules.json calls
+        // this "elsewhere" (Quartz's own output, not shared Python).
+        new TaskMilestone("Opening the preview…", "Done processing"),
     };
 
     public static readonly IReadOnlyList<TaskMilestone> Deploy = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Ensuring container is running"),
+        new TaskMilestone("Getting things ready…", "Host timezone offset"),
+        new TaskMilestone("Starting up…", "from this PC"),
         new TaskMilestone("Checking your site…", "Deploying from local build"),
         new TaskMilestone("Connecting to Netlify…", "Netlify site"),
         new TaskMilestone("Comparing what changed…", "delta deploy manifest"),
@@ -59,9 +77,7 @@ public static class TaskMilestones
     /// <summary>Rebuild + publish presented as ONE task with one bar.</summary>
     public static readonly IReadOnlyList<TaskMilestone> BuildAndDeploy = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Starting container if needed"),
+        new TaskMilestone("Getting things ready…", "Running the website builder on this PC"),
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Building your site…", "Quartz v4"),
         new TaskMilestone("Connecting to Netlify…", "Netlify site"),
@@ -84,9 +100,7 @@ public static class TaskMilestones
     /// <summary>Rebuild + folder publish presented as ONE task with one bar.</summary>
     public static readonly IReadOnlyList<TaskMilestone> BuildAndDeployToFolder = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Starting container if needed"),
+        new TaskMilestone("Getting things ready…", "Running the website builder on this PC"),
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Building your site…", "Quartz v4"),
         new TaskMilestone("Copying your files…", "to a folder"),
@@ -99,9 +113,8 @@ public static class TaskMilestones
     /// </summary>
     public static readonly IReadOnlyList<TaskMilestone> DeployToCloudflare = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Ensuring container is running"),
+        new TaskMilestone("Getting things ready…", "Host timezone offset"),
+        new TaskMilestone("Starting up…", "from this PC"),
         new TaskMilestone("Checking your site…", "Deploying from local build"),
         new TaskMilestone("Connecting to Cloudflare…", "Cloudflare project"),
         new TaskMilestone("Uploading your pages…", "Uploading the built site"),
@@ -111,9 +124,7 @@ public static class TaskMilestones
     /// <summary>Rebuild + Cloudflare publish presented as ONE task with one bar.</summary>
     public static readonly IReadOnlyList<TaskMilestone> BuildAndDeployToCloudflare = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Starting container if needed"),
+        new TaskMilestone("Getting things ready…", "Running the website builder on this PC"),
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Building your site…", "Quartz v4"),
         new TaskMilestone("Connecting to Cloudflare…", "Cloudflare project"),

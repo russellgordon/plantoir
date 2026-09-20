@@ -12,10 +12,13 @@ tags:
 
 1. Discussion: [[Who Gets the Cure|Who Gets the Cure?]]
 2. Consent and genetic data, revisited from Grade 11
-3. Work time: [[Biotechnology Brief]] — brief and appendix
+3. Work time: [[Biotechnology Brief]] — the regulation section, at the
+   source rather than at a summary of it. Researched with your partner,
+   written by you
 4. Consolidate the strand
 
 ## Things to do before our next class
 
-- [ ] Hand in [[Biotechnology Brief]] next class.
+- [ ] Read your regulation notes back and mark the one claim you could
+      not trace to a rule.
 - [ ] Read [[Homeostasis and Feedback]].

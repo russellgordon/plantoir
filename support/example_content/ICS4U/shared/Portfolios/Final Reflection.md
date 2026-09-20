@@ -28,7 +28,7 @@ by somebody else. As you read, flag:
 
 ## The shape
 
-Four sections, roughly a page and a half, built the way
+Five sections, roughly two pages, built the way
 [[Showing Growth]] taught: cite the earlier entry, quote your own
 words, then show the now.
 
@@ -42,16 +42,37 @@ words, then show the now.
    [[Efficiency and Big-O]] stops being vocabulary and becomes
    something you use.
 3. **How I work with other people, and their code.** What you now do
-   that you did not do in September: reading before rewriting, asking
+   that you did not do at the start of the course: reading before rewriting, asking
    in review instead of assuming, saying "I am stuck" on the day
    rather than the week after. Be specific about what a teammate
    taught you. Be specific, too, about what you were like to work
-   with in October, if you can bear it.
+   with in the first weeks, if you can bear it.
 4. **What I left behind, and where this goes next.** What condition
    [[The Handover]] left your partner in, honestly, including what
-   will break first. Then the personal version: a course you might
-   take, something you want to build, and one first step you could
-   genuinely take in the next month.
+   will break first. Review your team and individual progress across
+   the project (`B2.3`) — what worked in your collaboration, what
+   failed, and what you learned about software teamwork. Then the
+   pathways reflection (`D4.3`): research and describe a postsecondary
+   pathway you are considering (such as university computer science,
+   software engineering, computer engineering, or college software
+   development) and the careers associated with computer studies that
+   excite you (systems analyst, site reliability engineer, software
+   architect, machine learning researcher), along with the preparation
+   they require.
+5. **Where I stand on the Essential Skills.** The Ontario Skills
+   Passport names a set of skills and work habits that every kind of
+   employment and study runs on; the ones this course leans on hardest
+   are reading text, writing, document use, computer use, thinking
+   (problem solving and decision making), working with others, and
+   continuous learning. Take three of them — not all seven, and not
+   the three you are best at. For each one, say where you were in
+   where you started, where you are now, and cite the dated evidence for both:
+   an entry, a commit, a review, a thing that went wrong. Then name the
+   one you would work on next and what you would do about it. This
+   section is marked on the evidence you cite and the reasoning you
+   build from it. It is not marked on how highly or how harshly you
+   rate yourself, and a rating with nothing under it scores nothing
+   either way.
 
 > [!tip] Do not write it as a thank-you card
 > The temptation is to perform gratitude and round everything up.
@@ -63,6 +84,10 @@ words, then show the now.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[B2.3]]
+
+![[D4.3]]
 
 ![[D4.4]]
 %%curriculum-end%%

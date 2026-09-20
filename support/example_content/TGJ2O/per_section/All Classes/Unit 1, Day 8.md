@@ -18,6 +18,7 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Bring a full draft of [[Your First Byline]] to peer edit.
+- [ ] Bring what you have of [[Your First Byline]] — tomorrow we plan
+      the rest of it on one page.
 - [ ] Try [[Headline Practice]], first block.
 - [ ] Journal: the fact you had to chase hardest.

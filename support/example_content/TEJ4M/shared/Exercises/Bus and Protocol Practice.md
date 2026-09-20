@@ -31,27 +31,49 @@ what you already expected.
    time taken at 100 kHz and at 400 kHz. If the sensor is read ten times
    a second, what fraction of the time is the bus busy?
 
+## Inside the machine
+
+The buses above run between boards. The ones in this section run inside
+one, on a scale where a centimetre is a long way and the arithmetic
+decides what the machine can be built from at all.
+
+10. A processor has a 32-bit address bus. Calculate how many distinct
+    addresses it can put on that bus, and — at one byte per address —
+    the maximum memory it can reach. Then say what changes if the
+    address bus is widened to 36 bits.
+11. Its data bus is 64 bits wide and runs at 1600 MT/s (mega-transfers
+    per second). Calculate the peak transfer rate in bytes per second,
+    and explain why doubling the *clock* does not double the rate a real
+    program sees.
+12. Explain, in two sentences each, what the address bus, the data bus
+    and the control bus each carry, and why they are separate rather
+    than one wide bus shared in time.
+13. A single-board computer specification lists "16 GB RAM, 40-bit
+    physical addressing, dual-channel memory". State which of the three
+    buses each figure describes, and whether the addressing figure
+    constrains the memory figure here.
+
 ## Wiring, addressing, and choosing
 
-5. An I²C bus at 3.3 V has about 100 pF of total capacitance. Taking the
+14. An I²C bus at 3.3 V has about 100 pF of total capacitance. Taking the
    10% – 90% rise time as $t_r \approx 2.2RC$, calculate the rise time
    with 4.7 kΩ pull-ups. The specification allows 1000 ns in standard
    mode (100 kHz) and 300 ns in fast mode (400 kHz) — does this bus meet
    either?
-6. Calculate the largest pull-up resistor that meets the 300 ns fast-mode
+15. Calculate the largest pull-up resistor that meets the 300 ns fast-mode
    limit with that same 100 pF, choose a standard value, and calculate
    the current each device must sink when it pulls the line low. The
    specification requires devices to sink 3 mA — is your choice legal?
-7. Two identical temperature sensors with a fixed I²C address must be
+16. Two identical temperature sensors with a fixed I²C address must be
    read by one microcontroller. Explain why this fails, give three
    different fixes, and state how many usable 7-bit addresses the bus
    has in total.
-8. Choose a bus for each of these, and justify the choice in one
+17. Choose a bus for each of these, and justify the choice in one
    sentence: (a) six small sensors scattered around a chassis, none of
    them fast; (b) a display refreshed 30 times a second with a
    kilobyte per frame; (c) a link from your board to a laptop three
    metres away.
-9. **Find the error.** A group writes: "The sensor worked on the
+18. **Find the error.** A group writes: "The sensor worked on the
    breadboard. We moved it to the chassis on 40 cm leads and set the bus
    to 400 kHz for speed. Now it returns zeros, so the driver code must
    be wrong." Identify the likely fault, and give the order of tests you
@@ -95,7 +117,35 @@ what you already expected.
 >
 > Note also that this ignores clock stretching and any conversion time the sensor needs, both of which are real and both of which make the true figure longer.
 
-> [!success]- Answer 5
+> [!success]- Answer 10
+> $2^{32} = 4\,294\,967\,296$ distinct addresses. At one byte each that is $4\,294\,967\,296$ bytes $= 4\ \text{GiB}$ — the famous ceiling that made 32-bit machines stop being useful for anything data-heavy.
+>
+> Widening to 36 bits gives $2^{36} = 68\,719\,476\,736$ addresses, or $64\ \text{GiB}$ — sixteen times as much, for four more wires. Every extra address line doubles the reach, which is why the width of this bus is one of the defining numbers of a processor generation rather than a detail.
+
+> [!success]- Answer 11
+> 64 bits is 8 bytes, so $8\ \text{bytes} \times 1600 \times 10^{6}\ \text{transfers/s} = 12.8 \times 10^{9}\ \text{bytes/s} = 12.8\ \text{GB/s}$.
+>
+> **Why doubling the clock does not double what a program sees.** The peak figure assumes the bus is busy every cycle with data somebody wanted. Real access is not like that: a memory read has a latency before the first byte arrives that does not shrink with the transfer rate, a cache miss costs that latency in full, and a program that walks memory in a scattered order spends most of its time waiting rather than transferring. Doubling the rate halves the time for the *streaming* part of the work and does nothing at all for the waiting part — which is [[Firmware and System Optimisation]]'s whole argument for measuring before and after rather than reading the specification and claiming the improvement.
+
+> [!success]- Answer 12
+> **The address bus** carries *which* location the processor wants. It is driven by the processor (and by anything else granted the bus) and its width sets the size of the space that can be named at all.
+>
+> **The data bus** carries *what* is being moved, in both directions. Its width sets how much moves per transfer, and it is the one that has to turn around — the same wires carry a read one moment and a write the next.
+>
+> **The control bus** carries *what kind of transaction this is and when* — read or write, memory or peripheral, the strobes that say the address is now valid and the data may now be latched, and the signals by which a slow device asks the processor to wait.
+>
+> **Why separate:** because they are needed at the same instant. The address has to be valid and stable while the data is moving, and the control lines have to say which direction the data bus is being driven in *before* anybody drives it. Multiplexing all three onto one set of wires is possible — some processors multiplex address and data to save pins — but it costs a cycle to switch between them and it needs an external latch to hold the address while the data goes past. Pins against speed, decided once, at the top of the design.
+
+> [!success]- Answer 13
+> **16 GB RAM** is a statement about the memory fitted — not a bus figure at all, though it has to fit inside what the address bus can reach.
+>
+> **40-bit physical addressing** is the address bus: $2^{40} = 1\ \text{TiB}$ of reachable space.
+>
+> **Dual-channel memory** is the data bus: two independent channels to the memory, so twice the width working in parallel.
+>
+> **Does the addressing constrain the memory here?** No, and by an enormous margin: 1 TiB of address space against 16 GB fitted, a factor of sixty-four spare. This is the useful shape of the answer — the constraint is real, it is worth knowing how to check, and on this particular board it is nowhere near binding. Quoting it as a limitation would be true of the arithmetic and false about the machine.
+
+> [!success]- Answer 14
 > $t_r \approx 2.2RC = 2.2 \times 4700\ \Omega \times 100 \times 10^{-12}\ \text{F} \approx 1.03 \times 10^{-6}\ \text{s} = 1034\ \text{ns}$
 >
 > **Standard mode (1000 ns):** marginally over — it fails, by about 3%. In practice a bus like this often works and is sitting right on the limit, which is exactly the kind of design that stops working when somebody adds a device or lengthens a wire.
@@ -104,7 +154,7 @@ what you already expected.
 >
 > This is why 4.7 kΩ is a starting point rather than an answer. The right value depends on your bus capacitance, which depends on your wiring and how many devices are on it.
 
-> [!success]- Answer 6
+> [!success]- Answer 15
 > Rearranging $t_r \approx 2.2RC$ for $R$:
 >
 > $R_{\text{max}} = \frac{t_r}{2.2C} = \frac{300 \times 10^{-9}\ \text{s}}{2.2 \times 100 \times 10^{-12}\ \text{F}} \approx 1364\ \Omega$
@@ -119,7 +169,7 @@ what you already expected.
 >
 > Both ends of this calculation matter, and they pull in opposite directions: smaller resistors give faster edges and more current; larger ones give less current and slower edges. That is the whole design.
 
-> [!success]- Answer 7
+> [!success]- Answer 16
 > **Why it fails:** I²C selects a device by address. Two devices answering to the same address both respond to the same read, driving the data line at the same time. The result is not a neat error — it is corrupted data, or one device winning by accident, and it may look intermittent.
 >
 > **Fix 1 — use the address pin.** Most such parts have one or more address pins; strapping one high and one low gives two different addresses. Free, if the part offers it.
@@ -132,17 +182,17 @@ what you already expected.
 >
 > **Usable addresses:** 7 bits gives $2^7 = 128$ combinations, of which 16 are reserved by the specification, leaving **112** usable.
 
-> [!success]- Answer 8
-> **(a) Six slow sensors around a chassis — I²C.** Two wires reach all six, each answers to its own address, and none of them needs speed; the wiring saving is the entire argument. Size the pull-ups for the real bus length, as in question 6.
+> [!success]- Answer 17
+> **(a) Six slow sensors around a chassis — I²C.** Two wires reach all six, each answers to its own address, and none of them needs speed; the wiring saving is the entire argument. Size the pull-ups for the real bus length, as in question 15.
 >
 > **(b) A display, 30 frames a second at 1 kB per frame — SPI.** That is 30 kB/s of sustained data, which SPI handles trivially and I²C would struggle with; the dedicated chip select is a small price for a single fast device.
 >
 > **(c) A link to a laptop three metres away — UART.** Point to point, no clock to distribute over that distance, and a standard the laptop already speaks through a serial adapter. Neither SPI nor I²C is meant to travel three metres.
 
-> [!success]- Answer 9
+> [!success]- Answer 18
 > **The likely fault is wiring, not code** — and the report contains the evidence. Nothing about the driver changed; two physical things did.
 >
-> Forty centimetres of lead adds capacitance to the bus, which lengthens the rise time on both lines. At the same time the bus rate was raised to 400 kHz, which *shortens* the time available for those edges from 1000 ns to 300 ns. The two changes attack the same margin from both sides, and the arithmetic in questions 5 and 6 says a 4.7 kΩ pull-up was already marginal at 100 pF before the leads were added.
+> Forty centimetres of lead adds capacitance to the bus, which lengthens the rise time on both lines. At the same time the bus rate was raised to 400 kHz, which *shortens* the time available for those edges from 1000 ns to 300 ns. The two changes attack the same margin from both sides, and the arithmetic in questions 14 and 15 says a 4.7 kΩ pull-up was already marginal at 100 pF before the leads were added.
 >
 > "Returns zeros" is itself a clue: it is what you get when the data line never gets high in time, so every bit reads low.
 >
@@ -164,6 +214,8 @@ it is worth more in your [[Tech Journal]] than a page of description.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A1.1]]
 
 ![[A2.4]]
 

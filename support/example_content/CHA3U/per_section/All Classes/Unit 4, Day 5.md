@@ -12,7 +12,7 @@ tags:
 
 1. [[Movements and Backlash]] — Black Power, the women's movement, the American Indian Movement, farm workers, gay liberation
 2. What each movement asked for, in its own founding documents
-3. Research period
+3. Research period: gathering founding documents and movement sources for [[Rights and Movements]]
 
 ## Things to do before our next class
 

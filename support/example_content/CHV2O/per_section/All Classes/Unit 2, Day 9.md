@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Service and Contribution]] — the forty hours, and what they are actually for
-2. Contribution that is not counted anywhere
-3. What makes service useful to the people being served
+1. [[Responsibilities]] — the half of citizenship nobody campaigns on: legal duties, and the ones that are only expected
+2. Where a responsibility turns out to be somebody else's right
+3. [[Service and Contribution]] — the forty hours, contribution that is counted nowhere, and what makes service useful to the people being served
 
 ## Things to do before our next class
 
-- [ ] Read [[Service and Contribution]].
+- [ ] Bring one piece of service or contribution you have seen up close.

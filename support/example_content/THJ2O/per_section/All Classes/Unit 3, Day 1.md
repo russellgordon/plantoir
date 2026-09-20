@@ -10,10 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Propagation Bench]] — your own section
-2. [[Propagation From Seed]] — depth, spacing, and medium
-3. Sowing
+1. Guess the sowing depth for three species, in writing, before we
+   start — no marks; it shows me what to demonstrate
+2. Launch: [[The Propagation Bench]] — your own section, and its
+   criteria
+3. [[Propagation From Seed]] — depth, spacing, and medium
+4. Sowing
 
 ## Things to do before our next class
 
-- [ ] Log your sowing: species, date, depth, count.
+- [ ] Check your sowing log: species, date, depth, count.

@@ -40,7 +40,7 @@ Two distinctions matter:
   have accumulated and nothing is running backwards yet.
 
 One more subtlety. In a reaction such as
-$\ce{2A} \rightarrow 3\ce{B}$, B appears faster than A disappears —
+$\ce{2A -> 3B}$, B appears faster than A disappears —
 by a factor of $\tfrac{3}{2}$. To get a single rate for the reaction
 rather than a rate per species, divide each by its coefficient. Quoting
 "the rate" without saying which substance you measured is incomplete.
@@ -75,7 +75,7 @@ The standard way to measure the orders is the **method of initial
 rates**: run the reaction several times, changing one concentration at a
 time, and see what each change does to the starting rate.
 
-Suppose a set of trials for $\ce{A + B} \rightarrow$ products
+Suppose a set of trials for $\ce{A + B -> products}$
 came out like this.
 
 | Trial | $[\ce{A}]$, mol/L | $[\ce{B}]$, mol/L | Initial rate, mol/(L·s) |

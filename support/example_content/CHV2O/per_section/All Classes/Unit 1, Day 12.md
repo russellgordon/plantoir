@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Issue Brief]] handed in
-2. Seminar: [[Who Should Decide Locally|Who Should Decide Locally?]]
-3. Where a decision should sit, and who is affected either way
+1. [[How Government Works]], second build period: the parties placed on the compass, each with its reasons
+2. The claims neither of you has checked yet, sourced today rather than argued about tomorrow
+3. Checkpoint: I read every pair's draft and diagram against the criteria, and you leave with it in writing
 
 ## Things to do before our next class
 
-- [ ] Notebook: did the seminar move you, and what moved you?
+- [ ] Nothing to write. Bring the feedback sheet back with you.

@@ -27,7 +27,7 @@ Phishing runs on urgency — *act now or your account will be closed* —
 because urgency switches off checking. The habits that beat it are
 unglamorous: slow down, read the actual sender address, and never
 follow a link you were pushed toward. Type the site's address
-yourself instead. A real organization will survive you taking sixty
+yourself instead. A real organisation will survive you taking sixty
 seconds to verify.
 
 ## Sharing on purpose
