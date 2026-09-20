@@ -935,7 +935,7 @@ answers at (port 1, reserved) while the question put to the builder stays real
 — which is precisely the state of the Mac that met this. It cannot be reached
 by accident twice over: it is compiled into DEBUG builds only, so a teacher's
 copy does not contain it; and an app opened from the Dock or from Finder
-inherits no environment at all, so even a debug build only sees it when the
+normally inherits no such variable (only `launchctl setenv` could give it one), so even a debug build only sees it when the
 binary is started from a terminal:
 
 ```bash
