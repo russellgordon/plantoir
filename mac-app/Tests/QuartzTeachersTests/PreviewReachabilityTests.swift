@@ -91,8 +91,9 @@ final class PreviewReachabilityTests: XCTestCase {
 
     /// An app opened from the Dock has `PATH=/usr/bin:/bin:/usr/sbin:/sbin`
     /// and no `docker` on it at all (issue #220). A question asked without
-    /// `HelperPrograms`' environment is answered "no" on every teacher's Mac,
-    /// and "no" here means telling them their website never came up.
+    /// `HelperPrograms`' environment comes back with nothing on every
+    /// teacher's Mac, and nothing means the third sentence — Plantoir could
+    /// not tell — where the first, useful one was the truth.
     func testTheQuestionIsAskedWhereDockerActuallyIs() {
         let home: URL = URL(fileURLWithPath: "/Users/someone")
         let command: HelperPrograms.Command = PreviewReachability.askTheBuilderCommand(
