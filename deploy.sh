@@ -176,6 +176,73 @@ link_course_build_output() {
 }
 # <<< BUILD OUTPUT BLOCK <<<
 
+# >>> CONTAINER MOUNT BLOCK >>> — identical in setup.sh, preview.sh and
+# deploy.sh, and extracted between these two markers by
+# scripts/test_container_mount.sh, which also checks that all three ask for
+# their folders through it. Keep the markers, and keep the three copies the
+# same.
+# ---- Naming the folders the workspace is given -----------------------
+# A teacher who types "Comm Tech 26/27" into Finder gets a folder macOS
+# stores as "Comm Tech 26:27" — a name cannot hold a slash, and a colon is
+# what is written instead. `-v A:B` splits its argument on colons, so that
+# folder cannot be expressed with it AT ALL: the daemon reads
+# "/teaching/courses" as the mode and refuses with exit 125 — after first-run
+# setup has downloaded its tools, started the virtual machine and built the
+# website builder. 147 seconds, and then one line of daemon text, on the real
+# report this comes from (GitHub issue #221). `--mount` takes key=value
+# fields parsed as ONE CSV record instead, so a field may be QUOTED and a
+# literal quote inside it doubled.
+#
+# MEASURED 2026-09-19 against Colima/virtiofs, on both the pinned Docker CLI
+# 29.7.2 and Homebrew's 29.7.1, under /bin/bash 3.2.57 and under zsh:
+#
+#   with -v               only ':' fails
+#   with a PLAIN --mount  ',' and '"' fail instead — strictly worse, since
+#                         "Comm Tech 26,27" is just as ordinary a name
+#   with the form below   colon, comma, double quote, backslash, dollar,
+#                         leading dash, trailing space, semicolon, equals,
+#                         emoji, NFC and NFD accents, a tab, a bare CR and a
+#                         bare LF all mount
+#
+# So: every name a teacher can type in Finder. ONE name still fails, and it
+# is written down rather than rounded off — a name holding a CR IMMEDIATELY
+# FOLLOWED BY an LF. Go's encoding/csv rewrites CR LF to LF inside a quoted
+# field, so the daemon then looks for a path that does not exist and refuses
+# (exit 125, and the sentence below). `-v` mounted that name, so this is a
+# real regression rather than a gap: it is accepted because Finder's rename
+# field will not accept a Return — it takes a script or a restored archive to
+# make such a name — and because the failure is loud rather than silent.
+#
+# The quote must open the FIELD — `"source=/x"` — and never the value:
+# `source="/x"` is refused for EVERY path, ordinary ones included, which is
+# the one trap in this shape.
+bind_mount_argument() {
+  # bind_mount_argument <host source> <container target>
+  local source_path="$1"
+  local target_path="$2"
+  local quoted_source="${source_path//\"/\"\"}"
+  local quoted_target="${target_path//\"/\"\"}"
+  printf '%s' "type=bind,\"source=${quoted_source}\",\"target=${quoted_target}\""
+}
+
+# What a teacher is told when the workspace could not be made at all.
+#
+# The same words the app says for the same trouble — contracts/app-rules.json
+# -> failureExplanations, the case matched on "bind source path does not
+# exist" — so one sentence covers a teacher in Plantoir and a teacher at the
+# command line, and there is one string to keep in step.
+# scripts/test_container_mount.sh checks these lines against that case.
+#
+# It exists because all three launchers run under `set -e`: without it a
+# refusal ends the script with the daemon's own sentence as the last thing on
+# screen and nothing else, which is exactly what the teacher in issue #221
+# was left with.
+say_this_folder_could_not_be_opened() {
+  echo "❌ Plantoir could not get this folder ready for building."
+  echo "   Check that it has not been moved or renamed, then try again."
+}
+# <<< CONTAINER MOUNT BLOCK <<<
+
 # ---- The image is built HERE, from this folder's own recipe ----------
 # Same rules as setup.sh and preview.sh: the tag is a hash of the recipe's
 # contents, built locally when missing. No registry involved.
@@ -1325,17 +1392,32 @@ run_container_with_mount() {
   # outside. Mounting it anywhere else would leave the link dangling in
   # here, and every build would fail on a path the teacher can plainly see
   # working in Finder. It is created before this runs: a bind mount whose
-  # source is missing gives the container an empty folder of its own
-  # instead, and the built site would go nowhere.
+  # source does not exist is REFUSED ("bind source path does not exist"),
+  # and the run stops with the sentence below rather than building into a
+  # folder nobody can find.
   ensure_build_root
-  docker run -dit \
-    --name "$CONTAINER_NAME" \
-    -v "$HOST_COURSES":/teaching/courses \
-    -v "$BUILD_ROOT":"$BUILD_ROOT" \
-    -p ${HOST_BASE}-$((HOST_BASE + 3)):8081-8084 \
-    -p $((HOST_BASE + 1000))-$((HOST_BASE + 1003)):9081-9084 \
-    "$IMAGE" \
-    tail -f /dev/null
+  # The source of a bind mount has to EXIST. `-v` quietly CREATED a folder at
+  # whatever path it was handed; the form below refuses, and refusing is the
+  # better answer — a working folder renamed or deleted while this was
+  # running would otherwise be silently re-made, empty, at a path nobody is
+  # looking at any more. Nothing ordinary reaches this with no courses
+  # folder: setup.sh makes it itself, and preview.sh and deploy.sh have both
+  # already refused, for better reasons, when the course is not there.
+  if [ ! -d "$HOST_COURSES" ]; then
+    say_this_folder_could_not_be_opened
+    exit 1
+  fi
+  if ! docker run -dit \
+      --name "$CONTAINER_NAME" \
+      --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
+      --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
+      -p ${HOST_BASE}-$((HOST_BASE + 3)):8081-8084 \
+      -p $((HOST_BASE + 1000))-$((HOST_BASE + 1003)):9081-9084 \
+      "$IMAGE" \
+      tail -f /dev/null; then
+    say_this_folder_could_not_be_opened
+    exit 1
+  fi
 }
 
 # Whether this container was created with the builds mount. Containers made

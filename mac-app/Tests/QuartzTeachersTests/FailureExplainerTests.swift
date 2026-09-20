@@ -54,6 +54,33 @@ final class FailureExplainerTests: XCTestCase {
         XCTAssertEqual(explanation, "This website hasn't been built yet. Preview it once, then deploy.")
     }
 
+    /// The teacher in GitHub issue #221 waited 147 seconds for one line of
+    /// daemon text. The launchers no longer produce this for a colon in the
+    /// folder's name, but a folder that moved mid-run still can.
+    @MainActor
+    func testAWorkspaceThatCouldNotBeMadeIsExplained() {
+        let output: String = """
+        🆕 Creating a new workspace…
+        docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /Users/person/Desktop/Comm Tech 26:27/courses
+        """
+        let explanation: String? = FailureExplainer.explanation(in: output)
+        XCTAssertEqual(
+            explanation,
+            "Plantoir could not get this folder ready for building. Check that it has not been moved or renamed, then try again."
+        )
+    }
+
+    /// The narrow match, stated as a test rather than only as a comment: an
+    /// ordinary failure from the same daemon must stay unexplained, or a
+    /// teacher whose disk is full is sent to look at their folder's name.
+    @MainActor
+    func testAnotherDaemonFailureIsNotMistakenForIt() {
+        let explanation: String? = FailureExplainer.explanation(
+            in: "docker: Error response from daemon: no space left on device"
+        )
+        XCTAssertNil(explanation, "Only a missing folder is recognised, not every daemon failure")
+    }
+
     @MainActor
     func testUnrecognisedTroubleStaysUnexplained() {
         let explanation: String? = FailureExplainer.explanation(in: "Traceback (most recent call last):\n  File \"deploy.py\", line 12\nKeyError: 'sections'")
