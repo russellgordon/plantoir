@@ -33,7 +33,7 @@ enum ScheduledDeploy {
     /// `EnvironmentVariables` through untouched, so the full moment rides
     /// there: it is what the sidebar reads back, and it also lands in the
     /// agent's own log.
-    static let scheduledForKey: String = "PLANTOIR_SCHEDULED_FOR"
+    nonisolated static let scheduledForKey: String = "PLANTOIR_SCHEDULED_FOR"
 
     // MARK: - Functions
 
@@ -64,7 +64,7 @@ enum ScheduledDeploy {
     ///
     /// A file rather than a line inside the plist, because launchd no longer
     /// runs it directly — see `agentPlist` for why. The app runs this file.
-    static func scriptURL(courseCode: String, sectionNumber: Int) -> URL {
+    nonisolated static func scriptURL(courseCode: String, sectionNumber: Int) -> URL {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library")
@@ -131,7 +131,16 @@ enum ScheduledDeploy {
         guard let courseCode, let sectionNumber else {
             return
         }
-        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        bootOutAgent(label: agentLabel(courseCode: courseCode, sectionNumber: sectionNumber))
+    }
+
+    /// The same, for a caller that has the LABEL and not the pair.
+    ///
+    /// A plist written before v1.2.0 carries no course code and no section
+    /// number — three `ProgramArguments`, no `--scheduled-section` — so the
+    /// stand-down path has only the label, taken from the wrapper script's own
+    /// name. Every plist any release ever wrote is named after its label.
+    nonisolated static func bootOutAgent(label: String) {
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
         process.arguments = ["bootout", "gui/\(getuid())/\(label)"]
@@ -153,7 +162,7 @@ enum ScheduledDeploy {
     /// Where this section's agent is written. `~/Library/LaunchAgents` is
     /// the teacher's own folder — no administrator rights, and nothing of
     /// ours outside it.
-    static func plistURL(courseCode: String, sectionNumber: Int) -> URL {
+    nonisolated static func plistURL(courseCode: String, sectionNumber: Int) -> URL {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         return launchAgentsDirectoryURL().appendingPathComponent("\(label).plist")
     }
@@ -163,10 +172,19 @@ enum ScheduledDeploy {
     /// Set only by tests. A test that wrote into the real `LaunchAgents`
     /// folder would leave a deploy scheduled on the machine running the
     /// suite — which is exactly the kind of surprise this feature exists
-    /// to make deliberate.
-    static var launchAgentsDirectoryOverride: URL?
+    /// to make deliberate. `LaunchControl.run` refuses outright while it is
+    /// set, so a test that forgets `FakeLaunchControl` fails rather than
+    /// reaching the teacher's own agents.
+    ///
+    /// `nonisolated(unsafe)` so that the run fired by launchd — which is
+    /// `nonisolated` and never becomes an app — can ask where the agents are
+    /// through the same two functions everything else uses, rather than
+    /// carrying a second answer to that question. It is written by tests, on
+    /// one thread, before anything reads it; `ActivityTrail.store` is
+    /// replaceable on the same terms and for the same reason.
+    nonisolated(unsafe) static var launchAgentsDirectoryOverride: URL?
 
-    static func launchAgentsDirectoryURL() -> URL {
+    nonisolated static func launchAgentsDirectoryURL() -> URL {
         if let launchAgentsDirectoryOverride {
             return launchAgentsDirectoryOverride
         }
@@ -901,8 +919,31 @@ enum ScheduledDeploy {
     /// them, so the script's own output lands where it always did.
     nonisolated static func runScheduled(
         script: String,
-        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)? = nil
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)? = nil,
+        now: Date = Date()
     ) -> Never {
+        // IS THIS STILL THE DAY IT WAS FOR? Asked before anything else
+        // happens, because the answer can be no.
+        //
+        // `StartCalendarInterval` carries no year, and `RunAtLoad` is false,
+        // so a job whose moment passed while the Mac was OFF is simply loaded
+        // again at the next login and comes due on the same date TWELVE MONTHS
+        // LATER — against whatever is in the working folder by then. Russell's
+        // decision, 2026-09-20: a scheduled deploy is a one-off and must never
+        // recur annually.
+        //
+        // This check reaches plists ALREADY ON DISK, which is why it is the
+        // load-bearing half rather than the sweep: every released plist's
+        // `ProgramArguments[0]` is the app's own binary, so an upgraded app
+        // runs the new check for an old job the moment it next tries to fire.
+        let moment: Date? = intendedMoment(forScript: script)
+        let allowedDays: Int = allowedLatenessDays(forSection: section)
+        if !ScheduledDeployLateness.mayStillRun(
+            intendedMoment: moment, now: now, allowedDays: allowedDays
+        ) {
+            standDown(script: script, section: section, now: now)
+        }
+
         // Taken BEFORE anything runs, for the same reason the Deploy
         // button takes it before its own build: a page edited while an
         // overnight publish is running did not go out, and stamping the
@@ -961,6 +1002,134 @@ enum ScheduledDeploy {
             ))
             exit(1)
         }
+    }
+
+    // MARK: - Standing down: a job whose day has gone by
+
+    /// The label a wrapper script's own path carries.
+    ///
+    /// `…/Application Support/Plantoir/scheduled/<label>.sh`, so the basename
+    /// IS the label and `<label>.plist` is the agent. Taken from the SCRIPT
+    /// rather than rebuilt from a course code and a section, because a plist
+    /// written before v1.2.0 carries neither — and this has to work for every
+    /// plist any release ever wrote, since those are exactly the jobs that
+    /// have been sitting on teachers' Macs waiting to fire a year late.
+    nonisolated static func label(fromScriptPath script: String) -> String? {
+        let name: String = URL(fileURLWithPath: script).lastPathComponent
+        guard name.hasSuffix(".sh") else {
+            return nil
+        }
+        let label: String = String(name.dropLast(3))
+        guard label.hasPrefix(labelPrefix) else {
+            return nil
+        }
+        return label
+    }
+
+    /// The moment this run was set for.
+    ///
+    /// launchd hands the plist's `EnvironmentVariables` to the process it
+    /// starts, so the stamp is normally right here in the environment. The
+    /// plist is read as a fallback — it is still on disk at this instant,
+    /// because only the wrapper deletes it and the wrapper has not run yet.
+    ///
+    /// nil when neither says, and `ScheduledDeployLateness` FAILS OPEN on a
+    /// nil: a deploy the teacher asked for beats a refusal nobody sees.
+    nonisolated static func intendedMoment(
+        forScript script: String,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Date? {
+        if let stamp = environment[scheduledForKey],
+           let moment = ISO8601DateFormatter().date(from: stamp) {
+            return moment
+        }
+        guard let label = label(fromScriptPath: script) else {
+            return nil
+        }
+        let plistURL: URL = launchAgentsDirectoryURL()
+            .appendingPathComponent("\(label).plist")
+        return agent(readingPlistAt: plistURL)?.scheduledFor
+    }
+
+    /// How late this course lets a deploy be, read at the moment it fires.
+    ///
+    /// From the course's own settings in the working folder the job named, so
+    /// a teacher who changed the setting after scheduling changes what the
+    /// job already on disk does. A pre-v1.2.0 plist names no section and no
+    /// folder, so it gets the default.
+    nonisolated static func allowedLatenessDays(
+        forSection section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?
+    ) -> Int {
+        guard let section else {
+            return ScheduledDeployLateness.defaultDays
+        }
+        let workingFolderURL: URL = section.courseDirectory
+            .deletingLastPathComponent()   // courses
+            .deletingLastPathComponent()   // the working folder
+        return ScheduledDeployLateness.days(
+            forCourseCode: section.courseCode, inWorkingFolder: workingFolderURL
+        )
+    }
+
+    /// Deploys nothing, clears the job away, and leaves the teacher a note.
+    ///
+    /// The order is the wrapper's own, for the wrapper's own reason: the
+    /// PLIST goes first, so a Mac that restarts in the middle of this comes
+    /// back with nothing pending, and the job is booted out LAST, because
+    /// booting it out ends this very process.
+    ///
+    /// The note goes through the machinery a scheduled deploy that did not get
+    /// through already has — a record the section shows, and a line on the
+    /// trail — rather than through anything new: a teacher whose site did not
+    /// update looks in one place, and this is that place.
+    nonisolated static func standDown(
+        script: String,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
+        now: Date = Date()
+    ) -> Never {
+        let fileManager: FileManager = FileManager.default
+        if let label = label(fromScriptPath: script) {
+            try? fileManager.removeItem(
+                at: launchAgentsDirectoryURL().appendingPathComponent("\(label).plist")
+            )
+        }
+        // The wrapper goes with it, for the reason `cancelScheduledDeploy`
+        // takes it: a job that is off must not leave a runnable copy of
+        // itself on disk.
+        try? fileManager.removeItem(at: URL(fileURLWithPath: script))
+
+        if let section {
+            let home: URL = fileManager.homeDirectoryForCurrentUser
+            // Anything an earlier run left is cleared first — the same thing
+            // the wrapper does with its own first line, and for the same
+            // reason: `recordStopped` keeps the FIRST record, so last week's
+            // would block today's from being written at all.
+            ScheduledPublishOutcome.clear(
+                inHomeFolder: home, course: section.courseCode, section: section.sectionNumber
+            )
+            ScheduledPublishOutcome.recordStopped(
+                ScheduledPublishOutcome.Stopped(
+                    kind: .tooLateToRun,
+                    destination: ScheduledPublishOutcome.nothingWasDeployedName,
+                    when: now
+                ),
+                inHomeFolder: home,
+                course: section.courseCode,
+                section: section.sectionNumber
+            )
+            ScheduledPublishOutcome.noteOnTrail(
+                inHomeFolder: home, course: section.courseCode, section: section.sectionNumber
+            )
+        }
+
+        if let label = label(fromScriptPath: script) {
+            bootOutAgent(label: label)
+        }
+        // Zero, not a failure: nothing went wrong. The job was asked to do
+        // something that no longer made sense and declined, which is the
+        // feature rather than a fault, and a non-zero exit here would land in
+        // the section's log as an error nobody can act on.
+        exit(0)
     }
 
     /// Which destination types this course publishes to, in deploy order.
@@ -1141,7 +1310,20 @@ enum ScheduledDeploy {
     /// The teacher can delete the agent from `~/Library/LaunchAgents`
     /// without telling us, and a badge promising a deploy that will never
     /// happen is worse than no badge at all.
-    static func nextRun(courseCode: String, sectionNumber: Int, now: Date = Date()) -> Date? {
+    ///
+    /// **Pass the working folder wherever there is one.** A label is the
+    /// course code and section and nothing else, so without it this answers
+    /// about the one agent that code and section have Mac-wide — which, for a
+    /// teacher holding last year's working folder and this year's, is a clock
+    /// shown in the folder that does not own it and a Cancel item beside it.
+    /// It stays optional because a few tests ask the question with no folder
+    /// in hand.
+    static func nextRun(
+        courseCode: String,
+        sectionNumber: Int,
+        now: Date = Date(),
+        inWorkingFolder workingFolderURL: URL? = nil
+    ) -> Date? {
         let destinationURL: URL = plistURL(courseCode: courseCode, sectionNumber: sectionNumber)
         guard let data = try? Data(contentsOf: destinationURL) else {
             return nil
@@ -1151,6 +1333,12 @@ enum ScheduledDeploy {
         }
         guard let plist = decoded as? [String: Any] else {
             return nil
+        }
+        if let workingFolderURL {
+            let named: String = plist["WorkingDirectory"] as? String ?? ""
+            if physicalPath(named) != physicalPath(workingFolderURL.path) {
+                return nil
+            }
         }
         guard let environment = plist["EnvironmentVariables"] as? [String: String] else {
             return nil
@@ -1168,6 +1356,185 @@ enum ScheduledDeploy {
             return nil
         }
         return moment
+    }
+
+    // MARK: - Which agents belong to this working folder
+
+    /// One scheduled deploy as it stands on disk, read back from its own
+    /// agent.
+    nonisolated struct Agent: Equatable {
+
+        // MARK: - Stored properties
+
+        /// The agent's label, which is also the name of its plist and of its
+        /// wrapper script.
+        let label: String
+
+        /// The course code the job names. Un-sanitised when the plist carries
+        /// it (v1.2.0 and later); recovered from the LABEL, and so in
+        /// `sanitizedCode` form, for anything older.
+        let courseCode: String
+
+        let sectionNumber: Int
+
+        /// Which working folder the job belongs to.
+        let workingFolderPath: String
+
+        /// The moment it was set for, or nil when the plist does not say.
+        let scheduledFor: Date?
+
+        let plistURL: URL
+    }
+
+    /// Every scheduled deploy that belongs to ONE working folder.
+    ///
+    /// **Scoped by the plist's `WorkingDirectory`, and this is the half that
+    /// is easy to leave out.** A label is the course code and the section
+    /// number and nothing else, so `plistURL` names ONE file per code and
+    /// section for the whole Mac. A teacher with last year's working folder
+    /// and this year's, both holding ICS3U section 1, has one alarm between
+    /// them — and asking "does this course have a scheduled deploy?" by
+    /// looking for a file would answer yes in the folder that does not own it.
+    /// Removing the course there would then cancel THIS year's deploy and
+    /// report success.
+    ///
+    /// (That the two folders share one alarm at all is a separate fault, filed
+    /// as its own issue: a folder-scoped label would orphan every plist a
+    /// teacher already holds, which is its own migration. What is fixed here
+    /// is that nothing acts on, or shows, a job belonging to a folder that is
+    /// not open.)
+    ///
+    /// Nothing is asked of launchd and nothing outside `labelPrefix` is read —
+    /// the prefix exists for exactly this reason.
+    nonisolated static func agents(inWorkingFolder workingFolderURL: URL) -> [Agent] {
+        let wanted: String = physicalPath(workingFolderURL.path)
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: launchAgentsDirectoryURL(),
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        var found: [Agent] = []
+        for entry in entries {
+            let name: String = entry.lastPathComponent
+            if !name.hasPrefix(labelPrefix) || !name.hasSuffix(".plist") {
+                continue
+            }
+            guard let agent = agent(readingPlistAt: entry) else {
+                continue
+            }
+            if physicalPath(agent.workingFolderPath) != wanted {
+                continue
+            }
+            found.append(agent)
+        }
+        found.sort { first, second in
+            if first.courseCode == second.courseCode {
+                return first.sectionNumber < second.sectionNumber
+            }
+            return first.courseCode < second.courseCode
+        }
+        return found
+    }
+
+    /// One agent, read out of its own plist — or nil when the file is not one
+    /// of ours, or says too little to act on.
+    nonisolated static func agent(readingPlistAt plistURL: URL) -> Agent? {
+        guard let data = try? Data(contentsOf: plistURL) else {
+            return nil
+        }
+        guard let decoded = try? PropertyListSerialization.propertyList(from: data, format: nil) else {
+            return nil
+        }
+        guard let plist = decoded as? [String: Any] else {
+            return nil
+        }
+        guard let label = plist["Label"] as? String, label.hasPrefix(labelPrefix) else {
+            return nil
+        }
+        guard let workingFolderPath = plist["WorkingDirectory"] as? String,
+              !workingFolderPath.isEmpty else {
+            // A job that does not say which folder it belongs to cannot be
+            // scoped to one, and acting on it would be acting blind.
+            return nil
+        }
+
+        var courseCode: String?
+        var sectionNumber: Int?
+        // The plist's OWN copy first: `--scheduled-section <folder> <CODE> <N>`
+        // carries the course code as the teacher spells it.
+        if let arguments = plist["ProgramArguments"] as? [String] {
+            if let index = arguments.firstIndex(of: sectionFlag), index + 3 < arguments.count {
+                courseCode = arguments[index + 2]
+                sectionNumber = Int(arguments[index + 3])
+            }
+        }
+        // Anything written before v1.2.0 has three `ProgramArguments` and no
+        // section flag, so the label is the only route — and the code comes
+        // back in `sanitizedCode` form, which is why every comparison against
+        // a course's own code sanitises both sides.
+        if courseCode == nil || sectionNumber == nil {
+            let recovered = codeAndSection(fromLabel: label)
+            courseCode = recovered?.courseCode
+            sectionNumber = recovered?.sectionNumber
+        }
+        guard let courseCode, let sectionNumber else {
+            return nil
+        }
+
+        var scheduledFor: Date?
+        if let environment = plist["EnvironmentVariables"] as? [String: String],
+           let stamp = environment[scheduledForKey] {
+            scheduledFor = ISO8601DateFormatter().date(from: stamp)
+        }
+
+        return Agent(
+            label: label,
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            workingFolderPath: workingFolderPath,
+            scheduledFor: scheduledFor,
+            plistURL: plistURL
+        )
+    }
+
+    /// The course code and section a LABEL carries, for a plist that does not
+    /// carry them itself.
+    nonisolated static func codeAndSection(fromLabel label: String) -> (courseCode: String, sectionNumber: Int)? {
+        guard label.hasPrefix(labelPrefix + ".") else {
+            return nil
+        }
+        let remainder: String = String(label.dropFirst(labelPrefix.count + 1))
+        guard let separator = remainder.range(of: ".section", options: .backwards) else {
+            return nil
+        }
+        let code: String = String(remainder[remainder.startIndex..<separator.lowerBound])
+        guard let sectionNumber = Int(remainder[separator.upperBound...]), !code.isEmpty else {
+            return nil
+        }
+        return (courseCode: code, sectionNumber: sectionNumber)
+    }
+
+    /// A path with every symlink resolved, POSIX-style.
+    ///
+    /// `realpath` rather than Foundation's `resolvingSymlinksInPath()`, which
+    /// strips the `/private` prefix from `/var` and `/tmp` paths where the
+    /// POSIX call keeps it — the same trap the container naming met. Two
+    /// spellings of one folder comparing as DIFFERENT would quietly scope
+    /// every job out, and nothing would be cancelled or shown at all.
+    ///
+    /// A path that does not exist comes back as it went in, so a working
+    /// folder on an unmounted volume compares by its plain text rather than
+    /// matching nothing.
+    nonisolated static func physicalPath(_ path: String) -> String {
+        guard let resolved = realpath(path, nil) else {
+            return path
+        }
+        let physical: String = String(cString: resolved)
+        free(resolved)
+        return physical
     }
 
     // MARK: - Wording
@@ -1340,8 +1707,26 @@ struct LaunchControl: LaunchControlRunning {
         _ = LaunchControl.run(arguments: ["bootout", "\(domainTarget)/\(label)"])
     }
 
+    /// What this says when it refuses to run, because a test is driving.
+    static let refusedUnderATestRun: String =
+        "launchctl was not run: this app is writing its agents somewhere other than "
+        + "~/Library/LaunchAgents, which only a test does. Pass FakeLaunchControl."
+
     /// Runs launchctl and collects what it said.
+    ///
+    /// **It refuses outright while `launchAgentsDirectoryOverride` is set**,
+    /// which is set by tests and by nothing else. Every test that can reach an
+    /// agent is supposed to pass `FakeLaunchControl`, and that was a rule for
+    /// whoever writes the test — exactly the kind that holds until somebody
+    /// adds the eleventh one. The cost of forgetting is not a red test: the
+    /// suite builds an ICS3U fixture, and "a course a teacher plausibly has"
+    /// means the forgotten default would boot out and delete Russell's own
+    /// ICS3U schedule on the machine running it. So the guard is structural
+    /// rather than written down.
     static func run(arguments: [String]) -> (exitCode: Int32, output: String) {
+        if ScheduledDeploy.launchAgentsDirectoryOverride != nil {
+            return (exitCode: -1, output: refusedUnderATestRun)
+        }
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
         process.arguments = arguments
