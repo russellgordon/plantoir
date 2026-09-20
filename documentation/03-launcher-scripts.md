@@ -202,7 +202,7 @@ if ! docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
     -p ${HOST_BASE}-$((HOST_BASE+3)):8081-8084 \
     -p $((HOST_BASE+1000))-$((HOST_BASE+1003)):9081-9084 \
     "$IMAGE" tail -f /dev/null; then
-  say_this_folder_could_not_be_opened
+  say_this_folder_cannot_be_reached
   exit 1
 fi
 ```
@@ -210,6 +210,20 @@ fi
 where `WORKDIR_ID` is the folder hash and `HOST_BASE` the probed port
 block. **Why `--mount` and not `-v`** has its own section below; the short
 version is that `-v` cannot name a folder called "Comm Tech 26:27" at all.
+
+**The launcher's refusal is broader than the app's matcher, knowingly.** The
+`if ! docker run` branch above speaks for ANY failure to create the
+workspace, while the app's explanation
+(`contracts/app-rules.json` → `failureExplanations`) matches only
+`bind source path does not exist`. Measured 2026-09-19: an address already
+in use and a name already taken also end in exit 125 with the folder safely
+inside the home folder, and a command-line user then reads advice about the
+home folder that is not their trouble. Accepted for now because both are
+transient — the free-address probe sees the virtual machine's forwarder
+0.11 s after `docker run` returns, so the window is about 0.2 s — and "then
+try again" is the right next step for them; narrowing the launcher's
+sentence to the daemon's text is tracked as its own issue.
+
 Every launcher inspects the existing container before using it:
 
 1. **No `/teaching/courses` mount at all?** Recreate the container.
