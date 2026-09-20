@@ -79,15 +79,35 @@ nonisolated enum ScheduledPublishOutcome {
         /// nowhere to look, and "it did" is an answer worth having.
         case succeeded = "succeeded"
 
+        /// The day it was set for had gone by, so the run stood down and
+        /// deployed nothing.
+        ///
+        /// Nothing was attempted and nothing failed — which is exactly why it
+        /// could not be filed under any of the three above. `didNotFinish`'s
+        /// own sentence names a DESTINATION that stopped, and there was none:
+        /// filling that slot in would read correctly and be false, which is
+        /// the mistake `buildNeededAnAnswer` was created to stop being made,
+        /// and the contract records it as REJECTED in as many words.
+        ///
+        /// Added 2026-09-20 with the fix for a scheduled deploy outliving its
+        /// course. **Windows does not have the fault**: their task is created
+        /// with `/SC ONCE`, which has no annual recurrence to close. What they
+        /// owe is to say whether their task is set to run after a MISSED
+        /// start, and to carry this kind only if it is.
+        case tooLateToRun = "too late to run"
+
         /// Whether this is something the teacher should be chased about.
         ///
-        /// All three failures are; a success is news rather than a problem, so it
-        /// gets the sentence in the section and NOT a warning badge in the
-        /// sidebar. A badge on every section that published fine overnight is
-        /// a badge nobody reads by Wednesday.
+        /// All three failures are, and so is a run that stood down — the site
+        /// the teacher was expecting is not there either way, and the whole
+        /// reason this type exists is that silence reads as "nothing was ever
+        /// scheduled". A success is news rather than a problem, so it gets the
+        /// sentence in the section and NOT a warning badge in the sidebar: a
+        /// badge on every section that published fine overnight is a badge
+        /// nobody reads by Wednesday.
         var needsAttention: Bool {
             switch self {
-            case .neededAnAnswer, .buildNeededAnAnswer, .didNotFinish:
+            case .neededAnAnswer, .buildNeededAnAnswer, .didNotFinish, .tooLateToRun:
                 return true
             case .succeeded:
                 return false
@@ -131,6 +151,15 @@ nonisolated enum ScheduledPublishOutcome {
     /// whose second line was sometimes absent would be a second format for a
     /// shell script to get right at half six in the morning.
     static let buildDestinationName: String = "your website (it could not be built)"
+
+    /// The same stand-in, for a run that stood down without attempting
+    /// anything.
+    ///
+    /// Written into the record and never shown, exactly as
+    /// `buildDestinationName` is for `buildNeededAnAnswer`: every record has
+    /// ONE shape — the kind, then a name — and a second line that is sometimes
+    /// absent would be a second format for something else to get right.
+    static let nothingWasDeployedName: String = "your website (nothing was deployed)"
 
     // MARK: - Functions
 
@@ -338,6 +367,18 @@ nonisolated enum ScheduledPublishOutcome {
                 "a scheduled publish finished, publishing to " + stopped.destination,
                 course: course, section: section, at: stopped.when
             )
+        case .tooLateToRun:
+            // The SAME event, and the same words, that removing a course
+            // writes — because the same thing happened to the teacher's alarm.
+            // The phrase comes from `ScheduledDeployCleanup.Reason` rather
+            // than being retyped here, so the three ways a scheduled deploy
+            // gets turned off cannot drift into three different sentences.
+            ActivityTrail.note(
+                .scheduledDeployTurnedOff,
+                "turned off a scheduled deploy "
+                + ScheduledDeployCleanup.Reason.theDayItWasSetForHadGoneBy.trailPhrase,
+                course: course, section: section, at: stopped.when
+            )
         }
         return true
     }
@@ -372,6 +413,15 @@ nonisolated enum ScheduledPublishOutcome {
         case .succeeded:
             return "\(course) Section \(section) published on its own to "
                  + "\(stopped.destination). Your students have the new pages."
+        case .tooLateToRun:
+            // No destination, on purpose: none was reached, and none was
+            // going to be. The sentence says what Plantoir chose and why, so
+            // that a teacher meeting it does not go looking for a failure
+            // there was not.
+            return "\(course) Section \(section) was set to deploy on its own on a day that has "
+                 + "since gone by, so Plantoir left it alone rather than putting up a site you "
+                 + "set up for a different day. Deploy it yourself whenever you are ready, and "
+                 + "schedule the next one from the section’s menu."
         }
     }
 }

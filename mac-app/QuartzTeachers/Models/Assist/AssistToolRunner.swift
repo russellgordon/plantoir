@@ -1634,17 +1634,33 @@ final class AssistToolRunner {
         }
 
         let pending: Date? = ScheduledDeploy.nextRun(
-            courseCode: located.course.code, sectionNumber: located.sectionNumber
+            courseCode: located.course.code,
+            sectionNumber: located.sectionNumber,
+            inWorkingFolder: workspace.workspaceURL
         )
         if pending == nil {
             // Safe to call when nothing is scheduled — and it still tidies
             // away an agent left behind by a Mac that was off, which is why
             // this goes ahead rather than returning here.
-            ScheduledDeploy.cancelScheduledDeploy(
+            //
+            // Gated on the agent belonging to THIS working folder since
+            // 2026-09-20. `nextRun` is scoped now, so it answers nil both for
+            // "nothing is scheduled here" and for "the one agent this code
+            // and section have belongs to another working folder" — and the
+            // tidy-up below would have deleted somebody else's live deploy
+            // on the strength of that nil.
+            let ours: [ScheduledDeploy.Agent] = ScheduledDeployCleanup.agentsOwnedBy(
                 courseCode: located.course.code,
                 sectionNumber: located.sectionNumber,
-                runner: launchControl
+                inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL
             )
+            if !ours.isEmpty {
+                ScheduledDeploy.cancelScheduledDeploy(
+                    courseCode: located.course.code,
+                    sectionNumber: located.sectionNumber,
+                    runner: launchControl
+                )
+            }
             return AssistToolOutcome.wrote(
                 "There is no deploy scheduled for \(located.course.code) Section "
                 + "\(located.sectionNumber).",

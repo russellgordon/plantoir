@@ -464,6 +464,27 @@ class WorkspaceModel {
         }
         workspaceURL = url
         reloadCourses()
+        sweepScheduledDeploysThatAreTooLate(inWorkingFolder: url)
+    }
+
+    /// Clears this folder's scheduled deploys whose moment has long gone by.
+    ///
+    /// **After first paint, not during the adoption.** `LaunchControl.run` is
+    /// a synchronous `Process` with `waitUntilExit`, and this runs on the main
+    /// actor, so doing it inline would hold the window's opening for one
+    /// `launchctl bootout` per job found. A `Task` yields to the run loop
+    /// first, so the sidebar is on screen before any of it happens — and in
+    /// the ordinary case the whole thing is one directory listing that finds
+    /// nothing to do.
+    ///
+    /// Not gated on a test run: `ScheduledDeploy.launchAgentsDirectoryOverride`
+    /// is nil under the suite, so the listing reads the real `LaunchAgents`
+    /// folder and — this is the load-bearing part — finds no agent naming a
+    /// throwaway fixture folder, so there is never anything to cancel.
+    private func sweepScheduledDeploysThatAreTooLate(inWorkingFolder url: URL) {
+        Task { @MainActor in
+            ScheduledDeployCleanup.sweepDeploysThatAreTooLate(inWorkingFolder: url)
+        }
     }
 
     /// What this window lets go of when it points at a different folder.

@@ -856,7 +856,11 @@ struct SidebarView: View {
     /// after something else happened to redraw the sidebar.
     func scheduledDeployTime(courseCode: String, sectionNumber: Int, generation: Int) -> Date? {
         _ = generation
-        return ScheduledDeploy.nextRun(courseCode: courseCode, sectionNumber: sectionNumber)
+        return ScheduledDeploy.nextRun(
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            inWorkingFolder: workspace.workspaceURL
+        )
     }
 
     /// What the orange triangle beside a section means, said in full on hover
@@ -1085,7 +1089,11 @@ struct SidebarView: View {
                 courseCode: course.code,
                 sectionNumber: nil,
                 title: "Remove \(course.code)?",
-                message: "Nothing is deleted. \(course.code) and all of its sections move to Archived, at the bottom of the sidebar, where you can get them back."
+                message: withScheduledDeployWarning(
+                    "Nothing is deleted. \(course.code) and all of its sections move to Archived, at the bottom of the sidebar, where you can get them back.",
+                    courseCode: course.code,
+                    sectionNumber: nil
+                )
             )
         case .archived:
             // The minus button removes live courses; an archived item is
@@ -1103,19 +1111,55 @@ struct SidebarView: View {
                     courseCode: course.code,
                     sectionNumber: nil,
                     title: "Remove \(course.code)?",
-                    message: "Section \(sectionNumber) is the only section of \(course.code), so the whole course moves to Archived. Nothing is deleted — you can get it back from the bottom of the sidebar."
+                    message: withScheduledDeployWarning(
+                        "Section \(sectionNumber) is the only section of \(course.code), so the whole course moves to Archived. Nothing is deleted — you can get it back from the bottom of the sidebar.",
+                        courseCode: course.code,
+                        sectionNumber: nil
+                    )
                 )
             } else {
                 removalRequest = RemovalRequest(
                     courseCode: course.code,
                     sectionNumber: sectionNumber,
                     title: "Remove Section \(sectionNumber) of \(course.code)?",
-                    message: "Nothing is deleted. This section moves to Archived, at the bottom of the sidebar, where you can get it back."
+                    message: withScheduledDeployWarning(
+                        "Nothing is deleted. This section moves to Archived, at the bottom of the sidebar, where you can get it back.",
+                        courseCode: course.code,
+                        sectionNumber: sectionNumber
+                    )
                 )
             }
         }
     }
 
+    /// The confirmation's own sentence, with the scheduled-deploy warning
+    /// appended when there is one to give.
+    ///
+    /// Only when something really is scheduled IN THIS WORKING FOLDER: a
+    /// promise about another folder's deploy would be a promise Plantoir is
+    /// not going to keep.
+    func withScheduledDeployWarning(
+        _ message: String, courseCode: String, sectionNumber: Int?
+    ) -> String {
+        guard let workspaceURL = workspace.workspaceURL else {
+            return message
+        }
+        guard let warning = ScheduledDeployCleanup.warningForConfirmation(
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            inWorkingFolder: workspaceURL
+        ) else {
+            return message
+        }
+        return message + "\n\n" + warning
+    }
+
+    /// Carries the teacher's "Remove" through to the model, which turns the
+    /// scheduled deploy off FIRST and archives second.
+    ///
+    /// The view keeps one call and the alert; the order, the reporting and the
+    /// trail line live in `ScheduledDeployCleanup`, where a test can drive
+    /// them — nothing in the suite constructs this view.
     func performRemoval(_ request: RemovalRequest) {
         guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
             return
@@ -1130,21 +1174,27 @@ struct SidebarView: View {
             return
         }
 
-        do {
-            if let sectionNumber = request.sectionNumber {
-                try CourseArchiver.archiveAndRemoveSection(
-                    sectionNumber,
-                    from: courseToRemove,
-                    coursesDirectoryURL: coursesDirectoryURL
-                )
-            } else {
-                try CourseArchiver.archiveAndRemoveCourse(
-                    courseToRemove,
-                    coursesDirectoryURL: coursesDirectoryURL
-                )
-            }
-        } catch {
-            removalProblem = error.localizedDescription
+        var result: ScheduledDeployCleanup.RemovalResult
+        if let sectionNumber = request.sectionNumber {
+            result = ScheduledDeployCleanup.removeSection(
+                sectionNumber,
+                from: courseToRemove,
+                coursesDirectoryURL: coursesDirectoryURL
+            )
+        } else {
+            result = ScheduledDeployCleanup.removeCourse(
+                courseToRemove,
+                coursesDirectoryURL: coursesDirectoryURL
+            )
+        }
+
+        if let problem = result.problem {
+            removalProblem = problem
+        }
+        // Redraws the clocks: a deploy turned off on the way out must not
+        // leave its badge behind on a section that is still here.
+        scheduleGeneration += 1
+        if !result.didRemove {
             return
         }
 
