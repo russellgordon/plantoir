@@ -2740,9 +2740,10 @@ final class AssistToolRunner {
     ///
     /// **Not politeness — the alternative is a website nobody named going
     /// live.** A section cut loose has no agreed website to publish TO, and a
-    /// scheduled run has nobody to ask: `runScheduled` re-checks nothing, and
-    /// `deploy.py`'s name prompt returns its DEFAULT when there is no terminal
-    /// rather than failing. So the overnight run would create
+    /// scheduled run has nobody to ask: `runScheduled` re-checks WHETHER IT IS
+    /// STILL THE DAY (since 2026-09-20) and nothing else — not what the site is
+    /// called — and `deploy.py`'s name prompt returns its DEFAULT when there is
+    /// no terminal rather than failing. So the overnight run would create
     /// `<code>-s<n>-<year>-<name>` and publish there, while the address the
     /// teacher's students actually read quietly stopped updating. Renaming a
     /// course turns scheduled publishes off for the same reason and says so.

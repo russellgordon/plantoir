@@ -28,11 +28,17 @@ enum ScheduledDeploy {
 
     /// The environment key carrying the moment the agent was set for.
     ///
-    /// `StartCalendarInterval` has no year — it repeats annually — so the
-    /// plist alone cannot say which day it meant. launchd passes
-    /// `EnvironmentVariables` through untouched, so the full moment rides
-    /// there: it is what the sidebar reads back, and it also lands in the
-    /// agent's own log.
+    /// `StartCalendarInterval` has no year — the same month and day come
+    /// round again — so the plist alone cannot say which day it meant. launchd
+    /// passes `EnvironmentVariables` through untouched, so the full moment
+    /// rides there: it is what the sidebar reads back, what the RUN re-checks
+    /// its own lateness against (`ScheduledDeployLateness`), and it also lands
+    /// in the agent's own log.
+    ///
+    /// Since 2026-09-20 a job whose moment is further from now than the course
+    /// allows stands down instead of deploying, so the annual return is closed
+    /// rather than merely unlikely — but it is closed by THIS value, which is
+    /// why a plist that does not carry one fails open.
     nonisolated static let scheduledForKey: String = "PLANTOIR_SCHEDULED_FOR"
 
     // MARK: - Functions
@@ -448,6 +454,14 @@ enum ScheduledDeploy {
     /// a course that may not exist any more. The plist is removed FIRST,
     /// so even a Mac that restarts mid-deploy comes back with nothing
     /// pending, and the job boots itself out LAST, once the deploy is done.
+    ///
+    /// **This is still the FIRST line of defence and not the only one.** It
+    /// only ever helped a job that RAN; a job whose moment passed while the Mac
+    /// was off never reached this script at all and came due a year later
+    /// anyway. Since 2026-09-20 the run re-checks its own moment before the
+    /// script is reached, and stands down past the course's window — so the
+    /// annual return is closed for a job that never ran too. See
+    /// `ScheduledDeployLateness` and `standDown`.
     static func oneShotCommand(
         courseCode: String,
         sectionNumber: Int,
