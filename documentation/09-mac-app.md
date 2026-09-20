@@ -685,6 +685,13 @@ meant to be small and shippable; and a preview that is lost costs a rebuild,
 while a publish that is lost costs a half-updated class website. Previews are
 not abandoned either — they are stopped cleanly on the way out.
 
+The same reasoning covers the assistant's own rebuild of a preview
+(`AssistSiteWork.rebuildPreview`, a `--build-only` run): it is work under way
+that the question does not ask about, and what is lost by quitting through it
+is a rebuild, never a page a student can see. Russell's ruling named "a
+publish or preview"; asking about a preview BUILD as well is tracked as its
+own issue rather than widened into this fix.
+
 **What is never asked about**, because it cannot be seen from here: a scheduled
 publish (launchd runs a SECOND Plantoir process with its own statics), an
 assistant driving Plantoir over MCP (another process again — two of Russell's
