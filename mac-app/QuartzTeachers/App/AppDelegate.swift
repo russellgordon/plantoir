@@ -41,9 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // is answered: a quit the teacher then calls off must leave the
             // app exactly as it was, and `isTerminating` is not a flag that
             // can be taken back.
-            let underWay: String? = QuitConfirmation.workUnderWay(
-                publishes: CourseActivity.activePublishes
-            )
+            let underWay: String? = QuitConfirmation.workUnderWay()
             let reason: QuitConfirmation.Reason = QuitConfirmation.reason(
                 forQuitReasonCode: AppDelegate.quitReasonCode()
             )

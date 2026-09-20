@@ -444,10 +444,15 @@ enum FolderContainers {
         // saying the memory came back, on a day it did not.
         lines.append("      if docker stop -t 2 \"$2\" >/dev/null 2>&1; then")
         lines.append("        note \"$3\"")
-        lines.append("      else")
-        lines.append("        note \"$5\"")
+        lines.append("        return 0")
         lines.append("      fi")
-        lines.append("      return 0")
+        // A REFUSED stop leaves one of ours running just as surely as a
+        // deliberate refusal does, and the shared-machine question below has
+        // to hear about it: our container is in `docker ps -q` either way,
+        // and a builder that would not stop would otherwise be reported as
+        // "other software on this Mac".
+        lines.append("      note \"$5\"")
+        lines.append("      return 1")
         lines.append("    fi")
         lines.append("    sleep 1")
         lines.append("    waited=$((waited + 1))")
@@ -489,7 +494,10 @@ enum FolderContainers {
         lines.append("      " + noteCall(
             .leftTheSharedSetupRunning,
             occasion: occasion,
-            reasonSomethingElseIsUsingIt: "this folder’s own website builder is still working"
+            // "running", not "working": this branch is reached both by a
+            // builder deliberately left alone mid-publish and by one that
+            // refused to stop, and only the first of those is working.
+            reasonSomethingElseIsUsingIt: "this folder’s own website builder is still running"
         ))
         lines.append("    elif anyLauncherRunning; then")
         lines.append("      " + noteCall(
