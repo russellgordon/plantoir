@@ -1182,7 +1182,7 @@
       "cases" : [
         {
           "answer" : "the site answered inside the builder",
-          "sentence" : "Your website is built, and your website builder is serving it — but this Mac cannot reach it.\n\nNothing is wrong with your pages. Something on this Mac that other apps use too has stopped passing your website through. Restarting your Mac puts it right.",
+          "sentence" : "Your website is built, and your website builder is serving it — but this Mac cannot reach it.\n\nNothing is wrong with your pages. Something on this Mac has stopped passing your website through. Restarting your Mac puts it right.",
           "verdict" : "thisMacCannotReachIt",
           "why" : "The site answering inside while this Mac cannot reach the same site is PROOF rather than inference, and it is the only one of the three that can say what to do: restarting the Mac is the remedy that was watched working on the machine that met this."
         },

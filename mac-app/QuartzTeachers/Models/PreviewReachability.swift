@@ -369,9 +369,8 @@ nonisolated enum PreviewReachability {
         case .thisMacCannotReachIt:
             return "Your website is built, and your website builder is serving it — "
                  + "but this Mac cannot reach it.\n\n"
-                 + "Nothing is wrong with your pages. Something on this Mac that other "
-                 + "apps use too has stopped passing your website through. Restarting "
-                 + "your Mac puts it right."
+                 + "Nothing is wrong with your pages. Something on this Mac has stopped "
+                 + "passing your website through. Restarting your Mac puts it right."
         case .theSiteNeverAnswered:
             return "Your website did not come up, so Plantoir stopped waiting for it.\n\n"
                  + "Nothing has been lost. Press Preview to try again — and if it "
