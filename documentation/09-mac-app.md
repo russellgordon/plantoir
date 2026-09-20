@@ -1299,6 +1299,17 @@ because the obvious home is wrong twice over:
   while that override is set, so the rule is structural rather than a note to
   whoever writes the eleventh test; `ScheduledDeployCleanupTests` pins the
   refusal.
+- **And the wrapper SCRIPTS need the same seam, which they did not have until
+  2026-09-20.** `cancelScheduledDeploy` deletes the wrapper whatever runner it
+  was handed, and `scriptURL` had no override at all — so a test that moved only
+  the agents folder deleted `~/Library/Application Support/Plantoir/scheduled/
+  <label>.sh` for real. The teacher's ALARM survived, in their own folder, and
+  would fire on its date at a script that is gone: a scheduled deploy failing
+  for a reason nothing explains, caused by somebody running the suite weeks
+  earlier. `scheduledScriptsDirectoryOverride` closes it, and
+  `scheduledScriptsDirectoryURL()` traps in a Debug build when the agents
+  override is set and this one is not — a test that moves one and forgets the
+  other fails on the spot rather than reaching a teacher's file.
 - **Not inside `SidebarView.performRemoval` either**, which is where it started.
   Nothing in the suite constructs that view — every reference to it is to a
   static member — so a cancel living there could be proved only by proving the

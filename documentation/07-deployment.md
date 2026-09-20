@@ -1105,6 +1105,18 @@ do. The folder-open sweep asks the same question through the same function; two
 answers to "how late is too late for this course" is one more than anybody can
 keep in step.
 
+**Finding the course folder is not `fileExists` on a built path, and that is
+measured.** A job written before the course code went into the plist carries it
+only in its LABEL, uppercased with every non-alphanumeric turned into a hyphen —
+so a course called "Chess Club" comes back "CHESS-CLUB". Asking the filesystem
+whether `courses/CHESS-CLUB` exists answers **yes** on a teacher's volume, which
+is case-insensitive by default, when the folder is really called `Chess-Club`:
+a different course entirely, whose window would then be read for this job. The
+names in `courses/` are compared directly instead — an exact match first, then a
+unique sanitised one — which takes the filesystem's opinion out of it. With no
+unique answer the default applies, the same answer a course that has gone gets.
+Caught by the suite on 2026-09-20 against a folder pair one hyphen apart.
+
 ### What a stand-down does, in order
 
 The order is the wrapper's own, for the wrapper's own reasons:
@@ -1138,14 +1150,50 @@ An agent's label is the course code and the section number and nothing else, so
 the whole Mac**. A teacher holding last year's working folder and this year's,
 both with ICS3U section 1, has one alarm between them.
 
-So the removal cancel, the sweep, `CourseRenamer.sectionsWithAScheduledPublish`,
-the sidebar's clock and the assistant's tidy-up cancel all read the plist's
-`WorkingDirectory` and leave alone anything belonging to another folder. Paths
-are compared with **POSIX `realpath`, never Foundation's
+So every one of these reads the plist's `WorkingDirectory` and leaves alone
+anything belonging to another folder:
+
+| Where | What it does |
+|---|---|
+| `ScheduledDeployCleanup.removeCourse` / `.removeSection` | the sidebar's Remove |
+| `ScheduledDeployCleanup.sweepDeploysThatAreTooLate` | the folder-open sweep |
+| `ScheduledDeployCleanup.warningForConfirmation` | the extra sentence in the confirmation |
+| `CourseRenamer.sectionsWithAScheduledPublish` | what a rename turns off |
+| `ScheduledDeploy.nextRun(inWorkingFolder:)` | the sidebar's clock, and so the Cancel item beside it |
+| `AssistToolRunner.cancelScheduledDeploy` | the assistant's own cancel, and its tidy-up branch |
+| `AssistToolRunner.turnOffAnyScheduledPublish` | the rollover onto a new website |
+| `ScheduledDeploy.cancelScheduledDeploy` | the backstop under all of them |
+
+**The last two are the ones to know about.** `turnOffAnyScheduledPublish` was
+left folder-blind when the rest of this landed — it asked only whether a file
+with that label exists — so for one day a rollover in this year's folder deleted
+last year's live deploy and said it had turned it off, while the contract
+sentence above asserted it could not. Nothing ran that sentence; the `cases`
+list had no rollover entry. It has one now, and the lesson generalises: a claim
+of the form "everything does X" needs a case behind it or it is prose that reads
+as a gate.
+
+The backstop is why the list cannot grow a hole again. `cancelScheduledDeploy`
+takes the working folder as a **required parameter** and checks the plist
+against it, so the unscoped form cannot be written by accident — a caller that
+had not thought about which folder it meant no longer compiles. A job belonging
+to another folder is left alone and reported as success, deliberately: there is
+nothing of this folder's to turn off, which is the same answer as "there was
+never one set".
+
+Paths are compared with **POSIX `realpath`, never Foundation's
 `resolvingSymlinksInPath()`** — the same trap the container naming met: the
 latter strips `/private` where the former keeps it, and two spellings of one
 folder comparing as DIFFERENT would scope every job out silently, so nothing
 would be cancelled or shown at all.
+
+**A working folder that has MOVED loses its clock and its Cancel item.**
+`nextRun` answers nil when the plist's stored path no longer resolves to the
+open folder, and the context menu offers "Cancel Deploy at …" only when it does
+not. So after a teacher moves their working folder, an existing scheduled deploy
+becomes invisible and un-cancellable from the app. Bounded rather than fixed:
+the job's own wrapper path moved too, so it cannot deploy anything, and the
+lateness check clears it away the next time it tries to fire.
 
 That two working folders share one alarm at all is a separate fault with its own
 issue. A folder-scoped label would orphan every plist a teacher already holds,
@@ -1192,7 +1240,12 @@ Putting it in `SidebarView.performRemoval` was rejected for the opposite reason:
 nothing in the suite constructs that view — every reference to it is to a static
 member — so the wiring could not be pinned, and a later edit that dropped the
 call would leave the suite green. `LaunchControl.run` now also refuses outright
-while the override is set, so the rule is structural rather than written down.
+while the agents override is set, so the rule is structural rather than written
+down — and since the same day so does the SCRIPTS folder, which is the half that
+claim did not cover: `cancelScheduledDeploy` deletes the wrapper whatever runner
+it was handed, and `scriptURL` had no override at all, so the suite really was
+deleting `~/Library/Application Support/Plantoir/scheduled/<label>.sh` for the
+fixture code. See `documentation/09-mac-app.md`.
 
 **Cancelling on a restore.** Restoring a backup replaces a course's CONTENTS in
 place: the course and its sections are still there, its site marker comes back

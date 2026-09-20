@@ -203,7 +203,10 @@ enum CourseRenamer {
         var unstopped: [Int] = []
         for sectionNumber in scheduledSections {
             let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
-                courseCode: previousCode, sectionNumber: sectionNumber, runner: runner
+                courseCode: previousCode,
+                sectionNumber: sectionNumber,
+                inWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
+                runner: runner
             )
             if problem == nil {
                 stopped.append(sectionNumber)

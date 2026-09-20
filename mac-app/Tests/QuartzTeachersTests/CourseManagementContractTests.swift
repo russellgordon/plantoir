@@ -400,9 +400,12 @@ final class CourseManagementContractTests: XCTestCase {
         let agentsURL: URL = root.appendingPathComponent("LaunchAgents")
         try fileManager.createDirectory(at: agentsURL, withIntermediateDirectories: true)
         ScheduledDeploy.launchAgentsDirectoryOverride = agentsURL
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            agentsURL.deletingLastPathComponent().appendingPathComponent("scheduled")
         addTeardownBlock {
             MainActor.assumeIsolated {
                 ScheduledDeploy.launchAgentsDirectoryOverride = nil
+                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
             }
             try? FileManager.default.removeItem(at: root)
         }

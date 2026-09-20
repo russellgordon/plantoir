@@ -302,8 +302,14 @@ final class RolloverWebsiteTests: XCTestCase {
         let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
+        // A REAL agent rather than the `<plist/>` stub this used to write.
+        // Since 2026-09-20 the rollover asks each agent WHICH WORKING FOLDER
+        // it belongs to, so a file that says nothing is a file that belongs to
+        // nobody — see `testARolloverNeverTouchesAnotherFoldersScheduledDeploy`.
         let plistURL: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1)
-        try "<plist/>".write(to: plistURL, atomically: true, encoding: .utf8)
+        try RolloverWebsiteTests.writeAgent(
+            courseCode: course.code, sectionNumber: 1, workingFolder: root, at: plistURL
+        )
 
         let said: String = await reDate(
             runner, course: course, arguments: ["rollover": "yes", "website": "new"]
@@ -317,6 +323,68 @@ final class RolloverWebsiteTests: XCTestCase {
             FileManager.default.fileExists(atPath: plistURL.path),
             "The scheduled publish must actually be gone, not just described as gone."
         )
+    }
+
+    /// Rolling a section over in ONE working folder must not destroy another
+    /// folder's live scheduled deploy.
+    ///
+    /// **The case the rest of issue #236 was written for, in the one cancel
+    /// path its first pass missed.** An agent's label is the course code and
+    /// the section number and nothing else, so `plistURL` names one file per
+    /// code and section for the whole Mac. A teacher holding last year's
+    /// working folder and this year's, both with ICS3U section 1, with the
+    /// live deploy in LAST year's, used to roll section 1 over in this year's
+    /// and have the other folder's deploy deleted — and be told it had been
+    /// turned off. Nothing ran the contract sentence that forbade it, so the
+    /// sentence read as true and was false.
+    @MainActor
+    func testARolloverNeverTouchesAnotherFoldersScheduledDeploy() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let otherFolder: URL = root.deletingLastPathComponent()
+            .appendingPathComponent("last-years-working-folder-\(UUID().uuidString)")
+        let plistURL: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1)
+        try RolloverWebsiteTests.writeAgent(
+            courseCode: course.code, sectionNumber: 1, workingFolder: otherFolder, at: plistURL
+        )
+
+        let said: String = await reDate(
+            runner, course: course, arguments: ["rollover": "yes", "website": "new"]
+        )
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: plistURL.path),
+            "The OTHER working folder's live scheduled deploy was destroyed by a rollover here."
+        )
+        XCTAssertFalse(
+            said.contains(AssistWording.rolloverTurnedOffTheScheduledPublish),
+            "Nothing of this folder's was turned off, so nothing may say it was: \(said)"
+        )
+    }
+
+    /// One agent on disk, in the shape every release since v1.0.0 writes.
+    static func writeAgent(
+        courseCode: String, sectionNumber: Int, workingFolder: URL, at plistURL: URL
+    ) throws {
+        let plist: [String: Any] = [
+            "Label": ScheduledDeploy.agentLabel(
+                courseCode: courseCode, sectionNumber: sectionNumber
+            ),
+            "WorkingDirectory": workingFolder.path,
+            "ProgramArguments": [
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir",
+                ScheduledDeploy.runFlag,
+                "/tmp/scheduled.sh",
+                ScheduledDeploy.sectionFlag,
+                workingFolder.path,
+                courseCode,
+                String(sectionNumber),
+            ],
+        ]
+        try PropertyListSerialization.data(
+            fromPropertyList: plist, format: .xml, options: 0
+        ).write(to: plistURL)
     }
 
     /// A section with no scheduled publish is told nothing about one.
@@ -672,8 +740,13 @@ final class RolloverWebsiteTests: XCTestCase {
             at: agentsDirectory, withIntermediateDirectories: true
         )
         ScheduledDeploy.launchAgentsDirectoryOverride = agentsDirectory
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            agentsDirectory.deletingLastPathComponent().appendingPathComponent("scheduled")
         addTeardownBlock {
-            MainActor.assumeIsolated { ScheduledDeploy.launchAgentsDirectoryOverride = nil }
+            MainActor.assumeIsolated {
+                ScheduledDeploy.launchAgentsDirectoryOverride = nil
+                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+            }
         }
 
         let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(

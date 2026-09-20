@@ -66,18 +66,62 @@ enum ScheduledDeploy {
         return result.isEmpty ? "COURSE" : result
     }
 
+    /// A folder to write the one-shot scripts into instead of the teacher's
+    /// own, and the other half of `launchAgentsDirectoryOverride`.
+    ///
+    /// **It was missing until 2026-09-20, and the gap had teeth.**
+    /// `cancelScheduledDeploy` deletes the wrapper script whatever runner it
+    /// was handed, so a test that moved only the AGENTS folder still deleted
+    /// `~/Library/Application Support/Plantoir/scheduled/<label>.sh` for real —
+    /// for `ICS3U`, the fixture code, chosen precisely because it is "a course
+    /// a teacher plausibly has". The teacher's alarm would survive (its plist
+    /// was in the test's folder) and fire on its date at a script that is no
+    /// longer there: a scheduled deploy failing for a reason nothing explains,
+    /// caused by somebody running the suite weeks earlier.
+    nonisolated(unsafe) static var scheduledScriptsDirectoryOverride: URL?
+
+    /// Where the one-shot scripts live.
+    ///
+    /// **The structural guard**: setting the agents override and forgetting
+    /// this one is the mistake that deletes a teacher's file, so it is trapped
+    /// rather than written down. A test that has moved one and not the other
+    /// fails on the spot in a Debug build, and falls back to a throwaway folder
+    /// in any build where assertions are off — so the real folder is not
+    /// reached either way. In the app both overrides are always nil and neither
+    /// branch is live.
+    nonisolated static func scheduledScriptsDirectoryURL() -> URL {
+        if let scheduledScriptsDirectoryOverride {
+            return scheduledScriptsDirectoryOverride
+        }
+        if launchAgentsDirectoryOverride != nil {
+            assertionFailure(
+                "A test has moved the agents folder and not the scheduled-scripts folder. "
+                + "Set ScheduledDeploy.scheduledScriptsDirectoryOverride too, or cancelling "
+                + "will delete a real teacher's wrapper script."
+            )
+            return quarantinedScriptsDirectoryURL
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("Plantoir")
+            .appendingPathComponent("scheduled")
+    }
+
+    /// Where the guard above sends a test that forgot, so that even with
+    /// assertions off nothing real is touched. One folder per process, so a
+    /// test that wrote and then read back still finds what it wrote.
+    nonisolated static let quarantinedScriptsDirectoryURL: URL = FileManager.default
+        .temporaryDirectory
+        .appendingPathComponent("Plantoir-scheduled-quarantine-" + UUID().uuidString, isDirectory: true)
+
     /// Where this section's one-shot script is written.
     ///
     /// A file rather than a line inside the plist, because launchd no longer
     /// runs it directly — see `agentPlist` for why. The app runs this file.
     nonisolated static func scriptURL(courseCode: String, sectionNumber: Int) -> URL {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library")
-            .appendingPathComponent("Application Support")
-            .appendingPathComponent("Plantoir")
-            .appendingPathComponent("scheduled")
-            .appendingPathComponent("\(label).sh")
+        return scheduledScriptsDirectoryURL().appendingPathComponent("\(label).sh")
     }
 
     /// The flag the agent launches the app with.
@@ -1294,13 +1338,39 @@ enum ScheduledDeploy {
     }
 
     /// Takes the alarm off. Returns nil on success.
+    ///
+    /// **The working folder is REQUIRED, and that is the point of it.** A
+    /// label is the course code and the section number and nothing else, so
+    /// this names one file per code and section for the whole Mac — and a
+    /// caller that did not think about which folder it meant would cancel
+    /// another working folder's live deploy and report success. Every caller
+    /// used to have to remember to ask first; one of them did not
+    /// (`AssistToolRunner.turnOffAnyScheduledPublish`, the rollover path, until
+    /// 2026-09-20), and a rule enforced by everybody remembering is a rule
+    /// with a hole in it. Making the parameter mandatory means the unscoped
+    /// form cannot be written by accident.
+    ///
+    /// **A job belonging to another folder is LEFT ALONE and reported as
+    /// success**, deliberately. It is not a failure — there is nothing of this
+    /// folder's to turn off, which is the same answer as "there was never one
+    /// set", and that is already what this returns for a missing agent. Saying
+    /// otherwise would put a problem in front of a teacher about a course they
+    /// are not looking at. In practice no caller reaches it: each one asks
+    /// `ScheduledDeployCleanup.agentsOwnedBy` or a folder-scoped `nextRun`
+    /// first, and this is the backstop under those.
     @discardableResult
     static func cancelScheduledDeploy(
         courseCode: String,
         sectionNumber: Int,
+        inWorkingFolder workingFolderURL: URL,
         runner: LaunchControlRunning = LaunchControl()
     ) -> String? {
         let destinationURL: URL = plistURL(courseCode: courseCode, sectionNumber: sectionNumber)
+        if let agent = agent(readingPlistAt: destinationURL) {
+            if physicalPath(agent.workingFolderPath) != physicalPath(workingFolderURL.path) {
+                return nil
+            }
+        }
         runner.bootOut(label: agentLabel(courseCode: courseCode, sectionNumber: sectionNumber))
         // The script goes with the alarm. A cancelled deploy that left its
         // command behind would leave a runnable copy of itself on disk.

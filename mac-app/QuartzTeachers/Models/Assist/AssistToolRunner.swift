@@ -1658,6 +1658,7 @@ final class AssistToolRunner {
                 ScheduledDeploy.cancelScheduledDeploy(
                     courseCode: located.course.code,
                     sectionNumber: located.sectionNumber,
+                    inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL,
                     runner: launchControl
                 )
             }
@@ -1672,6 +1673,7 @@ final class AssistToolRunner {
         if let problem = ScheduledDeploy.cancelScheduledDeploy(
             courseCode: located.course.code,
             sectionNumber: located.sectionNumber,
+            inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL,
             runner: launchControl
         ) {
             return AssistToolOutcome.refused("That could not be cancelled: \(problem)")
@@ -2747,13 +2749,25 @@ final class AssistToolRunner {
     /// `<code>-s<n>-<year>-<name>` and publish there, while the address the
     /// teacher's students actually read quietly stopped updating. Renaming a
     /// course turns scheduled publishes off for the same reason and says so.
+    ///
+    /// **Scoped to THIS working folder since 2026-09-20 (issue #236), and it
+    /// was the one cancel path that was not.** It used to ask whether
+    /// `plistURL` exists, which is a Mac-wide question: a label is the course
+    /// code and the section number and nothing else. So a teacher holding last
+    /// year's working folder and this year's, both with ICS3U section 1, with
+    /// the live deploy in last year's, would roll section 1 over in THIS
+    /// year's folder and have the OTHER folder's deploy deleted — and be told
+    /// it had been turned off. That is the fault #236 exists to close, in the
+    /// one place the fix first missed.
     private func turnOffAnyScheduledPublish(
         course: Course, sectionNumber: Int
     ) -> ScheduledPublishOutcome {
-        let plistURL: URL = ScheduledDeploy.plistURL(
-            courseCode: course.code, sectionNumber: sectionNumber
+        let ours: [ScheduledDeploy.Agent] = ScheduledDeployCleanup.agentsOwnedBy(
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            inWorkingFolder: workspace.workspaceURL ?? course.directoryURL
         )
-        guard FileManager.default.fileExists(atPath: plistURL.path) else {
+        guard !ours.isEmpty else {
             return .noneWasSet
         }
         // `runner: launchControl` is not optional here. The default runs the
@@ -2762,7 +2776,10 @@ final class AssistToolRunner {
         // to whoever is running the suite — the fixture course is ICS3U, which
         // is a course a teacher plausibly has.
         let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
-            courseCode: course.code, sectionNumber: sectionNumber, runner: launchControl
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            inWorkingFolder: workspace.workspaceURL ?? course.directoryURL,
+            runner: launchControl
         )
         // The failure is REPORTED, never swallowed: a plist left behind is
         // loaded again at next login, so the publish really can still fire —

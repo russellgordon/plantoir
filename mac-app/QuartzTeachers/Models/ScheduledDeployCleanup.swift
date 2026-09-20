@@ -246,6 +246,9 @@ enum ScheduledDeployCleanup {
             let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
                 courseCode: agent.courseCode,
                 sectionNumber: agent.sectionNumber,
+                // The agent's own answer, so the backstop inside the cancel
+                // cannot disagree with the list this was chosen from.
+                inWorkingFolder: URL(fileURLWithPath: agent.workingFolderPath),
                 runner: runner
             )
             if problem == nil {

@@ -45,6 +45,10 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         // touched while leaving a sentinel in their Application Support.
         ScheduledDeploy.launchAgentsDirectoryOverride =
             home.appendingPathComponent("Library/LaunchAgents")
+        // And the wrapper scripts, which `cancelScheduledDeploy` deletes
+        // whatever runner it was handed — see ScheduledDeploy's own note.
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            home.appendingPathComponent("Library/Application Support/Plantoir/scheduled")
         try FileManager.default.createDirectory(
             at: ScheduledDeploy.launchAgentsDirectoryOverride!, withIntermediateDirectories: true
         )
@@ -52,6 +56,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
 
     override func tearDownWithError() throws {
         ScheduledDeploy.launchAgentsDirectoryOverride = nil
+        ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
         let root: URL = home.deletingLastPathComponent()
         try? FileManager.default.removeItem(at: root)
         try super.tearDownWithError()
