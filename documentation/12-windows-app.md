@@ -1495,7 +1495,10 @@ so all three are worth having before you write it.
 
 One more thing the mac learned here that is NOT about stubs. The app will not
 show a preview until the section's built `index.html` has CHANGED, and it
-waits up to 120 seconds for that (mac: `waitForPreviewServer` phase 2). A stub
+waits up to 120 seconds for that (mac: `waitForPreviewServer` phase 2 — which
+since 2026-09-20 also breaks out early when the run has announced its server
+and then gone quiet for 45 seconds, so the late arrival is now about 45 s
+rather than two minutes; the cap itself is unchanged). A stub
 that serves a site from anywhere other than the folder a real build writes into
 never trips the check, so the preview arrives two minutes late and the test
 times out first — which looks like the server never came up. The stub must

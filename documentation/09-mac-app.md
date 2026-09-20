@@ -808,6 +808,184 @@ will not close.
 would rot from uptime in exactly the same way unless the quit path works, so
 fixing the quit path is the prerequisite either way rather than the alternative.
 
+## A preview that never appears: bounding the QUIET, not the run
+
+Written 2026-09-20 for [issue #225](https://github.com/russellgordon/plantoir/issues/225),
+met by Russell on a second Mac with v1.2.0 and byte-identical in v1.1.0 — a
+fault, not a regression.
+
+**What a teacher met.** Preview, a progress bar that fills, a console ending
+`Started a Quartz server listening at http://localhost:8081`, and then nothing
+at all. Three previews abandoned in four minutes (109.3 s, 57.6 s, and a
+problem report taken 11 s into the third). The website was built correctly and
+served correctly every time; that Mac had stopped passing NEW addresses through
+from the builder, its virtual machine having been up six weeks — the same
+uptime the quit fault above produces. A reboot cured it.
+
+**Plantoir's own fault was the silence.** `waitForPreviewServer` ran one
+counter from the start of the run — not "120 + 600", which is what the first
+diagnosis said and a test written from it would have asserted — and at 600 s it
+set `isWaitingForServer = false` and stopped. No sentence, no trail line, the
+port still leased, and `SectionWindowControllers` still reporting `.building`
+to every other window and to the assistant, because a running runner with no
+address is what `.building` means.
+
+### Why the bound is on the quiet
+
+A first-ever preview legitimately takes minutes: **109.3 s** for the preview
+and **132.0 s** for the setup before it, measured on the Mac that met this. So
+no bound on the RUN can be both short enough to help and long enough to be
+safe — sixty seconds from `previewRunner.run` lands in the middle of a first
+build and tells a teacher their Mac is broken on their first five minutes with
+the app.
+
+What cannot be explained by a big course or a slow Mac is a run that has
+announced its server and then says nothing AND answers nothing. `preview.sh`'s
+transcripts from that night stop dead after `Started a Quartz server` — runs 2
+and 3 end at `hint: exit with ctrl+c` with nothing after. So
+`PreviewReachability.Silence` counts from that line and is restarted by every
+character that arrives after it: a preview that is still printing is never
+stalled, however long it has been going.
+
+**Forty-five seconds, and the number comes from measurement.** Once that line
+is printed the server is already listening, so everything left is Plantoir's
+own once-a-second polling (at most 2 s) and the hop out of the builder onto
+this Mac. MEASURED on the development Mac, 2026-09-20, with a throwaway
+container of its own on a free port:
+
+| | |
+|---|---|
+| site answers inside the builder → answers on this Mac | **0.026 s** |
+| one question put to the builder (`docker exec … curl`) | **0.03 s**, five runs |
+
+Forty-five seconds is more than twenty times the whole healthy interval, and it
+is asked of a run that is also saying nothing. It replaces a wait that ended in
+silence thirteen times later.
+
+### The question that makes the sentence true
+
+Two things a teacher cannot tell apart produce the same complaint — "the
+preview never came up" — and they are a world apart in what to do about them:
+the site was never served, or the site is being served and this Mac cannot
+reach it. One is their pages; one is their Mac. (There is a third thing,
+below, and it is neither: not knowing.)
+
+The builder can be asked directly, and its answer is proof rather than
+inference: `docker exec <container> curl …` against the port INSIDE the
+builder. The port matters — the host port differs for every working folder
+after the first (this Mac's own folder runs `0.0.0.0:8091->8081/tcp`), so
+asking the builder about a host port asks it about a site it has never heard
+of, and the answer, "no", is the sentence that blames the teacher's pages.
+
+**The question goes first and the stop goes second**, because stopping ends the
+very server the question is about; the two the wrong way round answer "nothing
+is serving it" every single time.
+`PreviewReachabilityTests.testTheBuilderIsAskedBeforeThePreviewIsStopped` pins
+that order by reading the source, since nothing else can.
+
+The question carries its own deadline in the shell, the way
+`FolderContainers.quitScript` does: it is asked at the one moment a teacher is
+already waiting, so an engine that never answers must not become the new way of
+saying nothing.
+
+**There are THREE answers, not two, and the third is the one the first version
+of this got wrong.** It read everything that was not a site as "nothing is
+serving it" — the programs not being found, the builder no longer being there,
+an engine that never replied inside that ten-second deadline — and so asserted
+"Your website did not come up" about a run whose console says
+`Started a Quartz server listening at …` two lines above the alert. A sentence
+a teacher can see is false costs more than saying nothing. The discriminator is
+MEASURED and cheap: a served site prints `200`, a port with nothing on it
+prints `000` (that is what `curl` writes when nothing replied), and a question
+that could not be put prints nothing at all, because the complaint goes to the
+error channel and that is discarded. So a three-digit reply is the builder
+speaking and an empty one is Plantoir not knowing — `PreviewReachability.Answer`,
+and the third case gets a sentence that says it could not tell and points at
+"Report a Problem…".
+
+**And the answer has to still belong to the run it was found out about.** The
+question takes about a tenth of a second and can take ten, and a teacher can
+press Stop or close the window inside that. Without a re-check they get an
+alert about a preview they have already ended, and the trail gets
+`preview did not appear` for a run that stopped because they asked it to —
+which is the misreading this line was added to prevent, arriving from the other
+direction. The run is identified by WHEN IT STARTED (`ScriptRunner.startedAt`)
+rather than by whether something is running now, because stopping this preview
+and starting another leaves a runner that is running, that nobody stopped, and
+that is a different run. `isStillTheSameWait`, checked after the `await` and
+before anything is said or recorded.
+
+### What is left behind
+
+The run is **stopped**, the way the Stop Preview button stops it. Three things
+follow and all three are wanted: nothing is left serving a website nobody can
+see; the section stops reporting itself as building, which a wait that merely
+gave up would have said for ever; and the port goes back through the one path
+that hands it back, rather than being freed under a live server that still
+holds it inside the container. The comment at `rebuildAfterRepair` that relies
+on a timed-out wait still HOLDING its port was corrected in the same edit — it
+is now true of one path (the outer ten-minute bound, a run that never announced
+a server) rather than of every timeout.
+
+The teacher gets one of three sentences, under a title that is true of all
+three — "Cannot Preview Yet" reads as "wait and it will work" in front of a
+remedy that is restarting the Mac, and a second `.alert` modifier on this view
+is the one thing it must not have (four of them segfaulted SwiftUI's bridge),
+so the shared alert carries its title in state beside its message. The trail
+gets one line, `preview did not appear`, carrying the course, the section, the
+seconds and which of the three it was. The sentences are in
+`contracts/app-rules.json` → `previewPorts.whenThePreviewNeverAppears`, so
+Windows can match the behaviour rather than re-derive it.
+
+### Seeing it happen on a healthy Mac
+
+`PLANTOIR_PRETEND_THIS_MAC_CANNOT_REACH_THE_PREVIEW=1`, read at the moment the
+address is tried, makes Plantoir look for the preview at an address nothing
+answers at (port 1, reserved) while the question put to the builder stays real
+— which is precisely the state of the Mac that met this. It cannot be reached
+by accident twice over: it is compiled into DEBUG builds only, so a teacher's
+copy does not contain it; and an app opened from the Dock or from Finder
+normally inherits no such variable (only `launchctl setenv` could give it one), so even a debug build only sees it when the
+binary is started from a terminal:
+
+```bash
+PLANTOIR_PRETEND_THIS_MAC_CANNOT_REACH_THE_PREVIEW=1 \
+  ~/Library/Developer/Xcode/DerivedData/Plantoir-euwbmkpykeyuztbpzedmiptcsqsg/Build/Products/Debug/Plantoir.app/Contents/MacOS/Plantoir
+```
+
+Press Preview on any section and wait for the build plus 45 seconds.
+
+### What was REJECTED, and why
+
+**Offering to restart the website builder from inside the app.** The proposed
+gate — offer it when every running container is Plantoir's — is open precisely
+when the damage is worst: on an ordinary teacher's Mac every container is
+`teaching-quartz-*` by definition, including one belonging to a second window,
+a second copy of the app, or `Plantoir --mcp-stdio` running a publish, and
+nothing on the mac records a publish across processes. `docker ps` also answers
+for whichever context is current, which the launchers never pin. And the remedy
+itself is UNMEASURED: the stale ssh control master is `ppid 1`, not a child of
+the hostagent, so "restart the VM and the forwards come back" is an assumption.
+The advice in the sentence — restart the Mac — is the one remedy that was
+watched working.
+
+**A sixty-second bound on the whole run**: see above; it refuses every first
+preview.
+
+**A check at builder-creation time in the launchers.** It would have fired once
+during setup that night, but the report's own transcripts say
+`✅ Container teaching-quartz-329b275b is already running with correct mount.`
+for all three previews — `run_container_with_mount()` is reached only on
+create or recreate — so it would not have run on any of the three occasions a
+teacher was left waiting. A check in the preview path, against the port that
+preview will use, is the one that earns its place. Its own issue.
+
+**Believing the log.** `ha.stderr.log` writes `Forwarding TCP from …` even when
+every forward failed; the tell is the `failed to set up forwarding` warning,
+and on a healthy Mac that warning appears too — but only for the duplicate
+`[::]` attempt after the `0.0.0.0` one has already succeeded. A host listener,
+or an actual connection, is the only signal that decides.
+
 ## Which folders Plantoir uses
 
 Course Settings carries a **"What else does Plantoir use my folders for?"**

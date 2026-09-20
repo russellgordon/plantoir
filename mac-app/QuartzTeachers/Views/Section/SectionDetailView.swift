@@ -86,8 +86,22 @@ struct SectionDetailView: View {
     /// would be two names for one folder.
     @State var folderThisSectionWorksIn: URL?
 
-    /// Why a preview could not start, shown as an alert.
+    /// Why a preview could not start, or did not appear, shown as an alert.
     @State var previewRefusal: String?
+
+    /// What that alert is CALLED, because two different things now arrive in
+    /// it and one title cannot be true of both.
+    ///
+    /// "Cannot Preview Yet" is right for a refusal to start — another window
+    /// holds the section, so wait and it will work. It is wrong in front of a
+    /// preview that built, was served, and could not be reached: there the
+    /// remedy is restarting the Mac and "Yet" quietly says otherwise. A
+    /// SECOND `.alert` modifier was the obvious alternative and is the one
+    /// thing this view must not have — four alerts on it segfaulted SwiftUI's
+    /// bridge, which is why the folder dialogs share one.
+    ///
+    /// Every write of `previewRefusal` sets this beside it.
+    @State var previewRefusalTitle: String = "Cannot Preview Yet"
 
     /// A publish that was set to happen on its own and did not get through.
     ///
@@ -448,7 +462,7 @@ struct SectionDetailView: View {
             }
             stopPreview()
         }
-        .alert("Cannot Preview Yet", isPresented: previewRefusalBinding) {
+        .alert(previewRefusalTitle, isPresented: previewRefusalBinding) {
             Button("OK") {
                 previewRefusal = nil
             }
@@ -686,10 +700,17 @@ struct SectionDetailView: View {
                 return
             }
             // The LEASE decides, not the window's appearance. A preview whose
-            // wait timed out has cleared `isWaitingForServer` and never set
+            // wait ran out has cleared `isWaitingForServer` and never set
             // `previewURL`, while still holding the port — so asking those two
             // would have skipped the stop and then been refused the lease,
             // raising a refusal alert out of a repair.
+            //
+            // Still true, and now of ONE path rather than of every timeout.
+            // A wait that ends because the builder said its server was up and
+            // then went quiet stops the run and hands the port back itself
+            // (`stopWaitingForThePreview`, issue #225); what is left holding a
+            // port in silence is the outer ten-minute bound — a run that never
+            // announced a server at all.
             if previewLease != nil || previewRunner.isRunning {
                 await stopPreviewAndWait()
             }
@@ -1014,6 +1035,7 @@ struct SectionDetailView: View {
                 sectionNumber: sectionNumber
             )
         } catch {
+            previewRefusalTitle = "Cannot Preview Yet"
             previewRefusal = error.localizedDescription
             return
         }
@@ -1385,6 +1407,58 @@ struct SectionDetailView: View {
         // ports map to a per-folder block, so the port cannot be assumed.
         var serverURL: URL = URL(string: "http://127.0.0.1:\(port)/")!
 
+        // How long this run has said NOTHING since the builder announced its
+        // server — and nil until it has announced one.
+        //
+        // The distinction is the whole of issue #225. A run that is still
+        // printing is not stalled however long it has been going, and a first
+        // preview legitimately takes minutes; a run that has said its server
+        // is up, and then says nothing and answers nothing, cannot be
+        // explained by a big course or a slow Mac. So the bound is on the
+        // QUIET rather than on the run, and it starts at that line rather
+        // than at the start, where `waitedSeconds` starts.
+        var silence: PreviewReachability.Silence?
+
+        /// How much has been said, and when — which starts the clock at the
+        /// builder's line and restarts it every time more arrives.
+        ///
+        /// `utf8.count` rather than `count`, because the only question here is
+        /// whether MORE has been said than last time and counting graphemes
+        /// to answer it would be waste. Reading `displayText` at all is not
+        /// free: the transcript caches its joined text but throws the cache
+        /// away on every chunk of output, so a noisy run re-joins its lines
+        /// here once a second. Phases 1 and 2 already read it every second for
+        /// their own reasons; this adds that cost to phase 3, on a string of
+        /// at most 4,000 lines, once a second.
+        func noticeWhatTheRunIsSaying() {
+            let saidSoFar: String = previewRunner.transcript.displayText
+            if silence == nil {
+                if saidSoFar.contains(PreviewReachability.theBuilderSaysItsServerStarted) {
+                    silence = PreviewReachability.Silence(
+                        charactersSoFar: saidSoFar.utf8.count, at: Date()
+                    )
+                }
+                return
+            }
+            silence?.note(charactersSoFar: saidSoFar.utf8.count, at: Date())
+        }
+
+        /// How long it has said nothing, once that is longer than anything a
+        /// working preview does — and nil while there is still nothing to
+        /// explain.
+        func silenceThatCannotBeExplained() -> Int? {
+            guard let silence else {
+                return nil
+            }
+            let moment: Date = Date()
+            if !silence.hasGoneQuiet(
+                forSeconds: PreviewReachability.secondsOfSilenceBeforeGivingUp, at: moment
+            ) {
+                return nil
+            }
+            return silence.secondsOfSilence(at: moment)
+        }
+
         // Phase 1: wait for the script to announce ITS server is starting
         // (which happens right after it has freed the port).
         // Up to 10 minutes: a first-ever build may pull the Docker image
@@ -1451,6 +1525,16 @@ struct SectionDetailView: View {
                 buildFinished = true
                 break
             }
+            // A run that has announced its server and then gone quiet has
+            // nothing left to wait for HERE: whatever it was going to write
+            // has been written. Going on to phase 3 rather than giving up at
+            // this point is deliberate — the site may well be answering, and
+            // that is the case this loop's own bound exists to hand on to
+            // (`buildFinished` stays false, so the one reload still happens).
+            noticeWhatTheRunIsSaying()
+            if silenceThatCannotBeExplained() != nil {
+                break
+            }
             try? await Task.sleep(for: .seconds(1))
             waitedSeconds += 1
             waitedForBuild += 1
@@ -1467,7 +1551,13 @@ struct SectionDetailView: View {
                 releasePreviewLease()
                 return
             }
-            var request: URLRequest = URLRequest(url: serverURL)
+            // The address the teacher's Mac is asked about — the announced
+            // one, unless this copy of Plantoir has been started with the
+            // debug-only request to pretend it cannot be reached, which is
+            // how the sentence below can be seen on a healthy Mac.
+            var request: URLRequest = URLRequest(
+                url: PreviewReachability.addressToTry(announced: serverURL)
+            )
             request.timeoutInterval = 2
             do {
                 let (_, response) = try await URLSession.shared.data(for: request)
@@ -1509,9 +1599,80 @@ struct SectionDetailView: View {
             } catch {
                 // Server not up yet — keep waiting.
             }
+            // It has said its server is up, it has said nothing since, and it
+            // has just failed to answer. That is as much as waiting can find
+            // out, so stop and say which of the two things happened.
+            //
+            // This sits AFTER the attempt above rather than at the top of the
+            // loop, deliberately: a run that arrives here with the clock
+            // already run out — phase 2 breaks out on the same signal — still
+            // gets one real try at the address before anything is decided.
+            noticeWhatTheRunIsSaying()
+            if let seconds = silenceThatCannotBeExplained() {
+                await stopWaitingForThePreview(
+                    portInsideTheBuilder: port, secondsOfSilence: seconds
+                )
+                return
+            }
             try? await Task.sleep(for: .seconds(1))
             waitedSeconds += 1
         }
         isWaitingForServer = false
+    }
+
+    /// Ends a preview that announced its website and never showed it, and
+    /// tells the teacher which of the two things happened.
+    ///
+    /// **The builder is asked first, and that order is load-bearing**:
+    /// stopping the preview ends the very server the question is about, so
+    /// asking afterwards would answer "nothing is serving it" every time and
+    /// the teacher would be told their website had failed to build when it
+    /// had not.
+    ///
+    /// **Then the run is STOPPED, the way the Stop Preview button stops it.**
+    /// Three things follow from that and all three are wanted. Nothing is
+    /// left serving a website nobody can see. The section stops reporting
+    /// itself as building — `SectionWindowControllers` reads a running runner
+    /// with no address as `.building`, so a wait that merely gave up would
+    /// have every other window and the assistant saying it was still building
+    /// for ever. And the port goes back through the one path that hands it
+    /// back, rather than being freed under a server that still holds it.
+    func stopWaitingForThePreview(portInsideTheBuilder: Int, secondsOfSilence: Int) async {
+        // Which run this is about, noted before the question rather than
+        // assumed after it — see `isStillTheSameWait`.
+        let theRunThisIsAbout: Date? = previewRunner.startedAt
+
+        var answer: PreviewReachability.Answer = .couldNotFindOut
+        if let folder = folderThisSectionWorksIn {
+            answer = await PreviewReachability.askTheBuilder(
+                PreviewReachability.askTheBuilderCommand(
+                    containerName: FolderContainers.containerName(forFolder: folder.path),
+                    portInsideTheBuilder: portInsideTheBuilder
+                )
+            )
+        }
+        // The teacher may have pressed Stop, or closed the window, while the
+        // question was being asked. Then there is nothing left to say: an
+        // alert about a preview they have already ended, and a trail line
+        // saying it never appeared, would both be about a run that stopped
+        // because they wanted it to.
+        if !PreviewReachability.isStillTheSameWait(
+            startedAt: theRunThisIsAbout,
+            theRunNowStartedAt: previewRunner.startedAt,
+            theTeacherStoppedIt: previewRunner.wasStoppedByUser,
+            theRunIsStillGoing: previewRunner.isRunning
+        ) {
+            return
+        }
+        let verdict: PreviewReachability.Verdict = PreviewReachability.verdict(for: answer)
+        ActivityTrail.note(
+            .previewNeverAppeared,
+            PreviewReachability.trailLine(for: verdict, secondsOfSilence: secondsOfSilence),
+            course: course.code,
+            section: sectionNumber
+        )
+        stopPreview()
+        previewRefusalTitle = PreviewReachability.alertTitle
+        previewRefusal = PreviewReachability.sentence(for: verdict)
     }
 }
