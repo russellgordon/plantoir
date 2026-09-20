@@ -1917,8 +1917,13 @@ final class SharedRulesContractTests: XCTestCase {
                 text.contains("Library/Application Support/Plantoir/builds/${WORKDIR_ID}"),
                 "\(launcher) does not know where built websites go"
             )
+            // Named through the shared helper rather than with `-v`, which
+            // splits its argument on ':' and so cannot express a working
+            // folder called "Comm Tech 26:27" at all — see the contract's
+            // buildOutputLocation.containerRecreate.mountForm, and
+            // scripts/test_container_mount.sh, which pins the helper itself.
             XCTAssertTrue(
-                text.contains("-v \"$BUILD_ROOT\":\"$BUILD_ROOT\""),
+                text.contains("--mount \"$(bind_mount_argument \"$BUILD_ROOT\" \"$BUILD_ROOT\")\""),
                 "\(launcher) does not mount the builds folder at its own absolute path, so the link would dangle inside the container"
             )
             // The DEFINITION is not the behaviour. An earlier version of this
@@ -1929,10 +1934,26 @@ final class SharedRulesContractTests: XCTestCase {
                 text.contains("\n  elif ! container_has_builds_mount; then"),
                 "\(launcher) defines the check but never branches on it, so a container made before this change keeps running without the mount — and a mount cannot be added to a container that exists"
             )
-            XCTAssertTrue(
-                text.contains("\n  ensure_build_root\n  docker run -dit"),
-                "\(launcher) creates the container without making the builds folder first — a bind mount whose source is missing gives the container an empty folder of its own, and the built website goes nowhere"
+            // Asked as an ORDER rather than as two adjacent lines: the call
+            // and the container creation now have the missing-folder guard
+            // between them, and pinning them adjacent would make any line
+            // added there read as this rule being broken.
+            let makesTheBuildsFolder: Range<String.Index>? = text.range(of: "\n  ensure_build_root\n")
+            let makesTheWorkspace: Range<String.Index>? = text.range(of: "\n  if ! docker run -dit")
+            XCTAssertNotNil(
+                makesTheBuildsFolder,
+                "\(launcher) never makes the builds folder"
             )
+            XCTAssertNotNil(
+                makesTheWorkspace,
+                "\(launcher) does not create the container in a form that can refuse"
+            )
+            if let buildsFolder = makesTheBuildsFolder, let workspace = makesTheWorkspace {
+                XCTAssertTrue(
+                    buildsFolder.upperBound < workspace.lowerBound,
+                    "\(launcher) creates the container without making the builds folder first — this mount form REFUSES a source that does not exist, so the run would stop on the builds folder rather than build into it"
+                )
+            }
             XCTAssertTrue(
                 text.contains("\nlink_course_build_output \"$")
                     || text.contains("\n  link_course_build_output \"$"),
