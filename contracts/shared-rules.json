@@ -3389,5 +3389,220 @@
       "mac"
     ],
     "appliesOnWhy": "Written on the mac 2026-09-19 with the quit-path fix it belongs to. An acknowledged EXCEPTION, not a permanent difference: Windows could ask the same question, and contracts/README.md's \"Four ways out\" passage rejects softening a contract this way. Taken here because the alternative reddens a suite nobody is watching with a failure only Windows can mend, and recorded in the README's Named gaps section so the file does not argue both sides. Two honest costs: appliesOn has no mend-check, so nothing will go red when Windows adopts this; and the block-level appliesOn KEY ITSELF is read by no test on either platform, so that key is documentation rather than a gate. The block's own cases are run on the mac (QuitConfirmationTests) and by nothing on Windows. The SHAPE is portable - what counts as under way, what never counts, and when never to ask are all platform-neutral; only the signal that says the system is logging out differs (kAEQuitReason here, WM_QUERYENDSESSION there). Adopt this and the \"quit asked about work under way\" trail line together, or neither, and delete both appliesOn keys when you do."
+  },
+  "referenceCourses": {
+    "note": "A REFERENCE COURSE is last year's course — or a course full of example content — kept in this year's sidebar so a teacher can read it, and which Plantoir never deploys. It is FROZEN: its pages are locked on disk, and every action that would change a page, a setting or the shape of the course is withheld. This block is the whole rule as data: how one is marked, how the school years are named and offered, when a code may not join the shelf, and what is done to the course's deploying settings so that an OLDER copy of either app — one that has never heard of the marker — refuses it too.",
+    "markerKey": "kept_for_reference",
+    "absentMeansFalse": true,
+    "schoolYearKey": "reference_school_year",
+    "schoolYearAbsentMeans": "Other",
+    "identity": {
+      "folderName": "The folder under courses/ — ICS3U-2025. It is IDENTITY: the launcher argument, the built-site folder, the preview lease, the backup zip's name and the scheduled-deploy identifier are all built from it, so two ICS3Us never collide.",
+      "courseCode": "course_code stays the REAL code — ICS3U, unchanged from the course it was copied from. That is also what keeps the preview's site title, grade label and social card right, and it is why the folder and the key are allowed to disagree here and nowhere else.",
+      "displayedToTheTeacher": "The real code. A teacher reads ICS3U in the sidebar, the window title, every alert and every sentence; the folder name appears only where a folder name is the fact — Obsidian's own vault switcher, for one, which opens the course folder AS the vault and shows its name.",
+      "why": "A separate display_code key was REJECTED: it would be a third spelling of the same fact, and it would leave the site builder putting ICS3U-2025 in the site title of a course whose preview the teacher is reading."
+    },
+    "schoolYearLabel": {
+      "rule": "A school year is named for the calendar year it STARTS in and is stored as that integer. The label is derived: the starting year, an EN DASH (U+2013), and the last two digits of the following year.",
+      "why": "Storing the integer keeps the dash out of the file format entirely, and one rule in one place means the two apps cannot render the same year two ways.",
+      "cases": [
+        {
+          "startingYear": 2022,
+          "expect": "2022–23"
+        },
+        {
+          "startingYear": 2025,
+          "expect": "2025–26"
+        },
+        {
+          "startingYear": 2099,
+          "expect": "2099–00",
+          "why": "The century rolls; the label is the last two digits of the following year and nothing more. Pinned so neither app invents a four-digit second half."
+        }
+      ]
+    },
+    "schoolYearsOffered": {
+      "rule": "Newest first, from the school year containing today down to the floor. A new school year appears on 1 AUGUST — the year containing today is today.month >= 8 ? today.year : today.year - 1. The current school year IS offered, and is first. 'No year' is offered too, and is always last; it is an absence rather than a year, so it is not in this list.",
+      "floor": 2022,
+      "rollsOverInMonth": 8,
+      "currentYearIsOffered": true,
+      "why": "The rule is INHERITED rather than invented: Windows already ships Timetable.AcademicYearStarting with exactly this shape, documented as 'a school year is named for the calendar year it starts in, and starts in the late summer'. Ontario and BC both start in September, so 1 August leaves a month of headroom for a teacher setting up over the summer. The top end is derived from the day and never written down, so the list grows by itself; the floor is Russell's and does not move. Every function takes the DAY rather than reading the clock, or none of these cases could be run at all.",
+      "cases": [
+        {
+          "today": "2026-07-31",
+          "expect": [2025, 2024, 2023, 2022],
+          "why": "The day before the rollover: 2026–27 is not offered yet."
+        },
+        {
+          "today": "2026-08-01",
+          "expect": [2026, 2025, 2024, 2023, 2022],
+          "why": "The rollover day itself, and the first day 2026–27 appears."
+        },
+        {
+          "today": "2026-09-20",
+          "expect": [2026, 2025, 2024, 2023, 2022]
+        },
+        {
+          "today": "2030-08-01",
+          "expect": [2030, 2029, 2028, 2027, 2026, 2025, 2024, 2023, 2022],
+          "why": "Nine years, grown by itself, with nothing hard-coded at the top."
+        }
+      ]
+    },
+    "schoolYearRead": {
+      "rule": "A stored reference_school_year reads as the year when it is a whole number within the offered list for today, and as 'Other' otherwise.",
+      "why": "Anything else — a missing key, a null, a hand-edited 2019, a 2031 written on a Mac with a wrong clock, a word, a true — lands in 'Other', which a teacher can see and can change. The alternative is a group labelled 0000–01 built out of a value that coerced to zero. A year ABOVE the range today joins its own group on the day that year arrives, because the range only grows at the top. A JSON true needs no case of its own in the code: true and 1 are indistinguishable without CFGetTypeID, and both read as the year 1, which is out of range either way.",
+      "cases": [
+        {
+          "name": "the ordinary case",
+          "storedValue": 2025,
+          "today": "2026-09-20",
+          "expect": 2025
+        },
+        {
+          "name": "no key at all",
+          "storedIsAbsent": true,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "an explicit null",
+          "storedValue": null,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "below the floor",
+          "storedValue": 2019,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "beyond today",
+          "storedValue": 2031,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "not a number",
+          "storedValue": "last year",
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "a boolean",
+          "storedValue": true,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "the current school year, which is offered",
+          "storedValue": 2026,
+          "today": "2026-09-20",
+          "expect": 2026,
+          "why": "A teacher may keep a copy of a course they are teaching this year — the other semester's, or one they will not run again in this order."
+        }
+      ]
+    },
+    "codeUniqueWithinAGroup": {
+      "rule": "Within one school-year group — including 'Other' — no two reference courses may share a course code. Refused with a sentence when a course is put on the shelf and again when its year is changed. The courses a teacher TEACHES are in no group at all and are never consulted.",
+      "why": "Three rows all saying ICS3U under one year is a teacher's mistake made permanent; the same three under 2024–25, 2025–26 and 'Other' is exactly what they meant. It is also what makes 'take a fresh copy' an ordered act — delete the reference copy first, then copy again — rather than a way to end up with two of the same thing.",
+      "cases": [
+        {
+          "name": "the same code in the same year",
+          "shelf": [{"code": "ICS3U", "year": 2025}],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "expect": "refused"
+        },
+        {
+          "name": "the same code in different years",
+          "shelf": [{"code": "ICS3U", "year": 2024}],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "expect": "allowed"
+        },
+        {
+          "name": "one with a year and one without",
+          "shelf": [{"code": "ICS3U", "year": null}],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "expect": "allowed"
+        },
+        {
+          "name": "two with no year at all",
+          "shelf": [{"code": "ICS3U", "year": null}],
+          "placing": {"code": "ICS3U", "year": null},
+          "expect": "refused",
+          "why": "'Other' is a group like any other. Two ADA1Os of example content with nothing to tell them apart is the row a teacher cannot read."
+        },
+        {
+          "name": "a different code in the same year",
+          "shelf": [{"code": "ICS3U", "year": 2025}],
+          "placing": {"code": "ICS4U", "year": 2025},
+          "expect": "allowed"
+        },
+        {
+          "name": "beside the LIVE course of the same code",
+          "shelf": [],
+          "liveCourses": ["ICS3U"],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "expect": "allowed",
+          "why": "The ordinary case, not an exception: a teacher keeps last year's ICS3U while teaching this year's. The rule never looks at the courses being taught."
+        },
+        {
+          "name": "re-filing a course into the year it is already in",
+          "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025"}],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "ignoringFolderName": "ICS3U-2025",
+          "expect": "allowed",
+          "why": "Changing a course's school year must not find the course itself sitting where it is about to move from."
+        }
+      ]
+    },
+    "neutralises": {
+      "rule": "Whatever makes a course a reference course writes these settings in the same act, so the course has nowhere to deploy to whatever is reading it.",
+      "why": "The marker is what THIS version reads. This is what every other version reads — including an older Plantoir on a second Mac sharing the folder over iCloud Drive. Every shipped version refuses a folder deploy with no folder, with sentences it already has. Measured: a real previous-generation working folder carries no deploy_target at all, and an absent deploy_target reads as 'netlify', so a plain copy would have arrived with a working Deploy button aimed at last year's live class site.",
+      "keys": [
+        {
+          "key": "deploy_target",
+          "becomes": "local_folder"
+        },
+        {
+          "key": "deploy_folder_path",
+          "becomes": ""
+        },
+        {
+          "key": "additional_deploy_targets",
+          "becomes": "removed"
+        },
+        {
+          "key": "custom_domains",
+          "becomes": "removed",
+          "why": "A reference course must never claim last year's domain — the live course that replaced it may be using it."
+        }
+      ],
+      "alsoRenamedAside": ".netlify_sites/section<N>.json and .cloudflare_sites/section<N>.json become the frozen previous-marker name (file-formats.json → firstDeployMarkers). Renamed rather than deleted: the file holds the site id and the admin address, which a teacher may still want. Two fail-safes fall out of one rename — a deploy that somehow ran would make a NEW site rather than overwrite last year's live one, and a section that has never deployed cannot be scheduled.",
+      "kept": "Per-page visibility frontmatter is KEPT exactly as it is: it is last year's record of what students actually saw, and it is what makes a preview of a reference course show a sensible site rather than everything."
+    },
+    "rejected": [
+      {
+        "what": "A second display_code key",
+        "why": "A third spelling of one fact, and it would leave the site builder writing ICS3U-2025 into the site title and social card of a course whose preview the teacher is reading."
+      },
+      {
+        "what": "Renaming Course.code to folderName",
+        "why": "273 call sites across 55 files for a rename that buys clarity and no behaviour, inside a piece whose dangerous half is the refusal."
+      },
+      {
+        "what": "A lower-case folder suffix (ICS3U-examples)",
+        "why": "The launchers put their course argument through tr '[:lower:]' '[:upper:]' before building courses/<CODE>, so the folder would simply not be found. Every proposed folder name is upper case, and a test pins that it survives being normalised again."
+      },
+      {
+        "what": "A free-text label beside the code instead of a school year",
+        "why": "Russell's decision: rows are told apart by school year. A typed label is a second naming system to validate, and two teachers' labels for the same thing would not sort."
+      },
+      {
+        "what": "A reference/ sibling folder beside courses/",
+        "why": "Everything that finds a course walks courses/ — discovery, the launchers, the build output link, the backups list. A second home would be a second answer to 'where are the courses', and the marker gives the same separation for one key."
+      }
+    ]
   }
 }
