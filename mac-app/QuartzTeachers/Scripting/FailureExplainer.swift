@@ -14,6 +14,9 @@ struct FailureExplainer {
     /// A plain-language reason for the failure, or nil when the output
     /// shows nothing recognisable.
     static func explanation(in output: String) -> String? {
+        if let reason = keptForReferenceExplanation(in: output) {
+            return reason
+        }
         if let reason = vaultLinkExplanation(in: output) {
             return reason
         }
@@ -34,6 +37,34 @@ struct FailureExplainer {
         }
         if let reason = workspaceCouldNotBeMadeExplanation(in: output) {
             return reason
+        }
+        return nil
+    }
+
+    /// The launcher refused because the course is kept for reference.
+    ///
+    /// **Asked FIRST, and it exists for one caller in particular.** A deploy
+    /// the teacher set to happen on its own runs with the app closed; when it
+    /// fails, the app shows `ScheduledPublishOutcome`'s generic "did not
+    /// finish", and the real reason stays in a log nobody opens. This is what
+    /// lifts the refusal out of that log and into the sentence they read.
+    ///
+    /// The launcher's output already IS a sentence a teacher can act on —
+    /// that is what makes a new exit code unnecessary. So this lifts the line
+    /// out rather than writing a second explanation of the same rule, which is
+    /// how one rule ends up said two ways.
+    static func keptForReferenceExplanation(in output: String) -> String? {
+        let marker: String = "is kept for reference, so it is never deployed"
+        for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            guard line.contains(marker) else {
+                continue
+            }
+            var sentence: String = String(line).trimmingCharacters(in: .whitespaces)
+            // The launchers put a cross in front of every refusal.
+            while let first = sentence.first, first == "❌" || first == " " {
+                sentence.removeFirst()
+            }
+            return sentence.trimmingCharacters(in: .whitespaces)
         }
         return nil
     }

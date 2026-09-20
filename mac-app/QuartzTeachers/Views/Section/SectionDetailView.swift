@@ -1173,6 +1173,31 @@ struct SectionDetailView: View {
         }
     }
 
+    /// Why this course is never deployed, or nil when it is an ordinary one.
+    ///
+    /// **A static function rather than three lines inside `deployAndWait`**,
+    /// for the reason `ScheduledDeployCleanup` exists: nothing in the suite
+    /// constructs this view — every reference to it is to a static member — so
+    /// a guard living inside an instance method could be proved only by
+    /// proving something else, and an edit that dropped it would leave the
+    /// suite green. A missed deploy door is a deploy that reports success.
+    ///
+    /// `isAboutTheDestination` so the window raises it as an alert: it is a
+    /// fact about the course rather than something that went wrong while
+    /// running, which is the same distinction the destination refusals make.
+    /// A teacher never normally meets it — the Deploy button is not drawn on a
+    /// reference course at all.
+    static func refusalForAReferenceCourse(_ course: Course) -> AssistSiteWorkResult? {
+        guard course.isKeptForReference else {
+            return nil
+        }
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.deployRefusedForAReferenceCourse(course: course.displayCode),
+            isAboutTheDestination: true
+        )
+    }
+
     /// The Deploy button. The work itself is `deployAndWait()`, so the
     /// assistant can press the same button and be told how it went.
     func startDeploy() {
@@ -1200,6 +1225,17 @@ struct SectionDetailView: View {
     /// caller is how a Cloudflare course quietly starts deploying to Netlify
     /// from one of the two paths, so there is only ever one.
     func deployAndWait() async -> AssistSiteWorkResult {
+        // FIRST — before the busy check, before the destination check, before
+        // any preview is stopped. A course kept for reference is never
+        // deployed, and the teacher meets that as a missing button rather
+        // than as a refusal; this is what catches every other way in.
+        //
+        // `isAboutTheDestination` so the window raises it as an alert: it is
+        // a fact about the course rather than something that went wrong while
+        // running, which is the same distinction the destination refusals make.
+        if let refusal = SectionDetailView.refusalForAReferenceCourse(course) {
+            return refusal
+        }
         guard let workspaceURL = workspace.workspaceURL else {
             return AssistSiteWorkResult(
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message

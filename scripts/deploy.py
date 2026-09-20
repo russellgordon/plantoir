@@ -24,6 +24,7 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import toolchain_paths
+import reference_course
 from collections import Counter
 
 # ---- Host OS signaling & example command helper -----------------------------
@@ -1044,6 +1045,23 @@ def main():
 
     global NON_INTERACTIVE
     NON_INTERACTIVE = bool(getattr(args, 'non_interactive', False))
+
+    # A course kept for reference is never deployed. FIRST — before the
+    # section directory and the built site are looked for, so a reference
+    # course with no build yet is told the real reason rather than "run the
+    # preview first", which is advice that leads nowhere.
+    #
+    # This covers every caller that reaches the container: the launchers on
+    # both platforms, a scheduled run, and anyone running this file by hand.
+    # It does NOT cover deploy.sh's --to-folder branch, which publishes on the
+    # host and exits before this is entered — that door has its own check, in
+    # the launcher, and verify.sh greps both launchers for it.
+    course_dir = toolchain_paths.COURSES_DIR / args.course
+    if reference_course.is_reference(course_dir):
+        print("❌ " + reference_course.refusal_sentence(
+            reference_course.display_code(course_dir)
+        ))
+        sys.exit(1)
 
     # Keep .gitignore hygiene and migrate *profile only* from legacy if present.
     _ensure_courses_gitignore()

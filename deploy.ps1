@@ -225,6 +225,50 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
   Write-Host ""
 }
 
+# ---------- A course kept for reference is never deployed ----------
+#
+# HERE, early, for the same reason deploy.sh checks here: this script's own
+# folder-publish branch copies host-side and never enters the container, so
+# deploy.py's refusal never runs on that path. A guard written only in the
+# shared Python would leave the folder destination wide open. verify.sh greps
+# BOTH launchers for this, from the mac, so its absence here is caught on that
+# side rather than only by somebody noticing.
+#
+# Plain PowerShell, reading the settings file directly: this path needs no
+# python on the host and must not start to.
+#
+# FAILS CLOSED — a settings file that is there and cannot be read refuses. A
+# settings file that is ABSENT is not this check's business; the course-folder
+# check further down says that in its own words.
+#
+# The sentence is a constant so a test can compare it with
+# contracts/shared-rules.json -> referenceCourses.refusal.sentence.
+$REFERENCE_COURSE_REFUSAL = "is kept for reference, so it is never deployed. Deploy the course you are teaching instead."
+$referenceCfg = Join-Path -Path $ScriptDir -ChildPath ("courses\{0}\course_config.json" -f $COURSE_CODE)
+if (Test-Path -LiteralPath $referenceCfg) {
+  $referenceText = $null
+  try {
+    $referenceText = Get-Content -LiteralPath $referenceCfg -Raw -ErrorAction Stop
+  } catch {
+    Write-Host ""
+    Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
+    Write-Host "   its settings file could not be read. Nothing was published."
+    exit 1
+  }
+  if ($referenceText -match '"kept_for_reference"\s*:\s*true') {
+    # The code a TEACHER reads, which for a reference course is deliberately
+    # not the folder name. Falls back to the folder when there is none.
+    $referenceCode = $COURSE_CODE
+    if ($referenceText -match '"course_code"\s*:\s*"([^"]*)"') {
+      if ($Matches[1]) { $referenceCode = $Matches[1] }
+    }
+    Write-Host ""
+    Write-Host ("{0} {1}" -f $referenceCode, $REFERENCE_COURSE_REFUSAL)
+    Write-Host ""
+    exit 1
+  }
+}
+
 function Test-CarriesLiveReload([string]$root) {
   # Does any page under $root still carry the preview's live-reload client?
   #

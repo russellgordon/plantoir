@@ -180,6 +180,13 @@ else
   cat /tmp/verify_deploy_non_interactive_test.log
 fi
 
+if (cd scripts && python3 test_reference_course.py) >/tmp/verify_reference_course_test.log 2>&1; then
+  pass "a course kept for reference is never deployed, at every door the shared toolchain owns (scripts/test_reference_course.py)"
+else
+  fail "a course kept for reference is never deployed, at every door the shared toolchain owns (scripts/test_reference_course.py)"
+  cat /tmp/verify_reference_course_test.log
+fi
+
 # RUNS deploy.sh, where the test above only reads it. That distinction is the
 # reason this exists: the flag was written on a machine with no bash, and
 # starting the script found two things in prompt_for_cf_account that reading it
@@ -270,6 +277,29 @@ if [ "$_folder_guard_ok" = true ]; then
   pass "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
 else
   fail "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
+fi
+
+# A course kept for reference is never deployed, and the FOLDER destination is
+# the door that needs the launcher's own refusal: it publishes host-side and
+# exits 0 before the container is started, so deploy.py's check never runs on
+# that path. Exactly the shape of the guard above, and the same reason for
+# checking it structurally — a missing guard here is a deploy that REPORTS
+# SUCCESS on a frozen course, which is the worst direction this can fail in.
+_reference_guard_ok=true
+for _launcher in deploy.sh deploy.ps1; do
+  if ! grep -q "kept_for_reference" "$_launcher"; then
+    _reference_guard_ok=false
+    echo "   $_launcher does not refuse a course that is kept for reference"
+  fi
+  if ! grep -q "REFERENCE_COURSE_REFUSAL" "$_launcher"; then
+    _reference_guard_ok=false
+    echo "   $_launcher carries no refusal sentence to say when it does"
+  fi
+done
+if [ "$_reference_guard_ok" = true ]; then
+  pass "a course kept for reference is refused before anything is published (deploy.sh and deploy.ps1)"
+else
+  fail "a course kept for reference is refused before anything is published (deploy.sh and deploy.ps1)"
 fi
 
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops

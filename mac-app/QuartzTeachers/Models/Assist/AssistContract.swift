@@ -163,6 +163,15 @@ enum AssistContract {
             "askedAboutACourseThatIsNotHere": AssistWording.askedAboutACourseThatIsNotHere(
                 course: course, otherCourse: otherCoursePlaceholder
             ),
+            // A course kept for reference. The first of these is also in
+            // shared-rules.json, because the shared Python has to say it and
+            // cannot read this file; a test pins the two together.
+            "deployRefusedForAReferenceCourse": AssistWording.deployRefusedForAReferenceCourse(
+                course: course
+            ),
+            "askedAboutAReferenceCourse": AssistWording.askedAboutAReferenceCourse(
+                course: course, otherCourse: otherCoursePlaceholder
+            ),
             // Taking something back. The placeholder stands in for the change's
             // own past-tense clause — "unpublished Unit 4, Day 23" — which is
             // what makes these sentences rather than slots: the undo used to

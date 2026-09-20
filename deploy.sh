@@ -424,6 +424,54 @@ if [[ "$COURSE_CODE" =~ ^[A-Z]{3}[0-9]0$ ]]; then
   echo ""
 fi
 
+# ---------- A course kept for reference is never deployed ----------
+#
+# HERE, before the flag loop, and that placement is the whole point: the
+# --to-folder branch further down does its work with rsync on the HOST and
+# exits 0 before the container is ever started, so `deploy.py`'s own refusal
+# never runs on that path. A guard written only in the shared Python would
+# leave the folder destination wide open — the same shape as the live-reload
+# defect of 2026-09-05, which is why verify.sh greps this file AND deploy.ps1
+# for it.
+#
+# PLAIN SHELL, with no host python3. Everything above this point, and the whole
+# folder publish, needs no interpreter on the host, and this product's first-run
+# promise is "no Homebrew, no admin rights" — adding one here would make a
+# folder publish fail on a Mac with no Command Line Tools.
+#
+# FAILS CLOSED. A settings file that is there and cannot be read refuses and
+# says so. A settings file that is ABSENT is not this check's business: the
+# course-folder check further down says that in its own words.
+#
+# The sentence is a constant so a test can compare it with
+# contracts/shared-rules.json -> referenceCourses.refusal.sentence; the
+# launcher cannot read the contract here, because this runs before
+# BUILD_CONTEXT is resolved and, under --image, it is never resolved at all.
+REFERENCE_COURSE_REFUSAL="is kept for reference, so it is never deployed. Deploy the course you are teaching instead."
+_course_config="courses/${COURSE_CODE}/course_config.json"
+if [[ -f "$_course_config" ]]; then
+  if ! _config_text="$(cat "$_course_config" 2>/dev/null)"; then
+    echo "❌ Plantoir cannot tell whether $COURSE_CODE is kept for reference —"
+    echo "   its settings file could not be read. Nothing was published."
+    exit 1
+  fi
+  # `"kept_for_reference": true` and nothing else. A false, a missing key or
+  # anything that is not the literal true reads as an ordinary course.
+  _reference_code="$COURSE_CODE"
+  if printf '%s' "$_config_text" | grep -Eq '"kept_for_reference"[[:space:]]*:[[:space:]]*true'; then
+    # The code a TEACHER reads, which for a reference course is deliberately
+    # not the folder name. Falls back to the folder when there is none.
+    _recorded_code="$(printf '%s' "$_config_text" \
+      | grep -Eo '"course_code"[[:space:]]*:[[:space:]]*"[^"]*"' \
+      | head -n 1 | sed -E 's/.*"([^"]*)"[[:space:]]*$/\1/')"
+    if [[ -n "$_recorded_code" ]]; then _reference_code="$_recorded_code"; fi
+    echo ""
+    echo "❌ ${_reference_code} ${REFERENCE_COURSE_REFUSAL}"
+    echo ""
+    exit 1
+  fi
+fi
+
 # Parse flags
 DIAGNOSE=""
 TEAM_SLUG=""

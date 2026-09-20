@@ -872,6 +872,36 @@ the shared Python and watching that case — and only that case — fail. The sa
 was done for the descendant walk. A green suite proves nothing about a case
 that cannot fail.
 
+## A course kept for reference is refused in the launcher, early
+
+`deploy.sh` and `deploy.ps1` both read `courses/<CODE>/course_config.json`
+before the flag loop and refuse, with a sentence, when it says
+`"kept_for_reference": true`. The full reasoning is
+[`07-deployment.md`](07-deployment.md) → "A course kept for reference is never
+deployed"; three things belong here, beside the launchers themselves:
+
+- **It is in the launcher because the FOLDER destination never reaches the
+  container.** That branch copies with `rsync` on the host and exits 0 before
+  `deploy.py` is entered, so a refusal written only in the shared Python would
+  not run on it. Measured with the guard removed: the launcher published the
+  frozen course and reported `✅ Published: 1 file(s) updated.`
+- **Plain shell, not `python3`.** Nothing on that path needs a host
+  interpreter today, and the launchers' whole first-run promise is that a
+  teacher installs nothing. The check is a `grep` for the key and a second one
+  for `course_code`, so the sentence names the code a teacher reads rather than
+  the folder.
+- **It fails CLOSED.** A settings file that exists and cannot be read refuses.
+  A settings file that is absent is left to the course-folder check further
+  down, which already says that in its own words.
+
+The sentence is a constant (`REFERENCE_COURSE_REFUSAL`) rather than read from
+the contract, because this runs before `BUILD_CONTEXT` is resolved and under
+`--image` it is never resolved at all. `scripts/test_reference_course.py`
+compares both launchers' constants with
+`contracts/shared-rules.json` → `referenceCourses.refusal.sentence`, and
+`verify.sh` greps both files for the guard — the same structural check the
+live-reload guard has, for the same reason.
+
 ## `--image` is the mac's flag alone
 
 Found 2026-09-06 while wiring the contract's case lists into the Windows suite.
