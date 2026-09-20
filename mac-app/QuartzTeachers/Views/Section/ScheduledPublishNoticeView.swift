@@ -62,7 +62,7 @@ struct ScheduledPublishNoticeView: View {
             Image(systemName: needsAttention
                   ? "exclamationmark.triangle.fill"
                   : "checkmark.circle.fill")
-                .foregroundStyle(needsAttention ? .orange : .green)
+                .foregroundStyle(bandColour)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 // No `fixedSize` on this sentence, on purpose — the rule
@@ -110,10 +110,24 @@ struct ScheduledPublishNoticeView: View {
         // is laid out below the toolbar either way; it is the BACKGROUND, not
         // the layout, that bled.
         //
+        // **Do not delete this on the strength of a clean screenshot**, and
+        // that warning is measured rather than cautious. A review of this
+        // change rendered the content view — which under a full-size content
+        // window includes the strip behind the titlebar — and read the top
+        // rows back: with the DEFAULT background the green is painted up there
+        // in BOTH the old arrangement and the new one, and with
+        // `ignoresSafeAreaEdges: []` nothing is painted there at all. So
+        // moving the band above the stack did not stop the bleed; this did.
+        // Whether the bleed SHOWS depends on the state of the toolbar's
+        // material: two captures of the same shape on the pre-#219 build
+        // disagree, one grey and one green. A toolbar that looks right in a
+        // screenshot is therefore not evidence that the background is clipped.
+        //
         // Measured after this change, dark and light, with a preview showing
-        // and without: the toolbar's pixels are identical with a band and
-        // without one — (30, 30, 30) in dark, (246, 246, 246) in light, at
-        // every point sampled across it.
+        // and without: the toolbar above the detail column is identical with a
+        // band and without one — a mean of (34.7, 34.7, 34.7) in dark and
+        // (240.7, 240.7, 240.7) in light over 2,812 points sampled between
+        // x = 350 and x = 1090 and y = 6 and y = 44 in window coordinates.
         .background(bandColour.opacity(0.12), ignoresSafeAreaEdges: [])
         .accessibilityIdentifier("stoppedPublishNotice")
     }

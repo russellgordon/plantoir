@@ -347,11 +347,17 @@ final class ProgressViewSizeTests: XCTestCase {
     /// the placeholder's), so the `ZStack` centred it and put 237 points of
     /// nothing above the notice.
     ///
-    /// What this CAN pin is the filling, which is the structural cause; where
-    /// the pixels land is confirmed by eye against the real app, and by the
-    /// screenshot in the write-up. The console branch of the same layer has
-    /// always filled — `consoleArea` ends in a `Spacer(minLength: 0)` — which
-    /// is why the notice sat correctly whenever anything was running.
+    /// What this CAN pin is the FILLING, which is the structural cause, and it
+    /// is still the right test after issue #219 moved the notice above the
+    /// stack: a placeholder that hugs its content makes the column around it
+    /// hug too, and the band floats again. The console branch has always
+    /// filled — `consoleArea` ends in a `Spacer(minLength: 0)` — which is why
+    /// the notice sat correctly whenever anything was running.
+    ///
+    /// The 189 and 246 below are the measurement #216 was fixed against, when
+    /// the notice still sat inside the stack's base layer; the column measured
+    /// here is the band and the placeholder together, which is what the app
+    /// builds above the stack today.
     @MainActor
     func testTheEmptySectionFillsItsWindowSoTheNoticeSitsAtTheTop() {
         let outcome: ScheduledPublishOutcome.Stopped = ScheduledPublishOutcome.Stopped(
@@ -359,17 +365,17 @@ final class ProgressViewSizeTests: XCTestCase {
             destination: "Netlify, Cloudflare Pages",
             when: Date(timeIntervalSince1970: 1_758_297_000)
         )
-        let baseLayer = VStack(spacing: 0) {
+        let column = VStack(spacing: 0) {
             ScheduledPublishNoticeView(
                 outcome: outcome, course: "ICS4U", sectionNumber: 1, dismiss: {}
             )
             NoPreviewPlaceholderView(deploysToLocalFolder: false)
         }
-        let claimed: CGFloat = heightClaimedOfAWholeWindow(of: baseLayer, width: 800, height: 720)
+        let claimed: CGFloat = heightClaimedOfAWholeWindow(of: column, width: 800, height: 720)
         XCTAssertGreaterThanOrEqual(
             claimed,
             719,
-            "Offered a 720-point window, the section's base layer claimed only \(claimed) points, so the stack around it centres the notice instead of leaving it under the toolbar"
+            "Offered a 720-point window, the notice and the placeholder together claimed only \(claimed) points, so the stack around them centres the pair instead of leaving the notice under the toolbar"
         )
     }
 
@@ -475,6 +481,70 @@ final class ProgressViewSizeTests: XCTestCase {
             720 - ProgressViewSizeTests.squeezedHeightBound,
             "The notice took \(720 - withNotice) points of the window, which is more than any honest state of it claims"
         )
+    }
+
+    /// The two measurements above build the column themselves, so they say
+    /// that this SHAPE is the right one and nothing about the app having it.
+    /// This reads the view's own source and says where the notice is mounted.
+    ///
+    /// Reading source is the convention here rather than a workaround: no real
+    /// `SectionDetailView` ever mounts in a unit test (it needs a course, a
+    /// workspace and two runners), and `WorkingFolderSelectionTests` pins the
+    /// same file the same way for the same reason. Without it, somebody
+    /// "simplifying" `body` back into one `ZStack` — which is exactly what it
+    /// looked like until issue #219 — turns nothing red.
+    func testTheNoticeIsMountedAboveTheStackTheSiteLivesIn() throws {
+        let source: String = try readSource(
+            "QuartzTeachers/Views/Section/SectionDetailView.swift"
+        )
+        let notice: Range<String.Index> = try XCTUnwrap(
+            source.range(of: "ScheduledPublishNoticeView("),
+            "SectionDetailView no longer shows the scheduled-publish notice at all"
+        )
+        let stack: Range<String.Index> = try XCTUnwrap(
+            source.range(of: "ZStack {"),
+            "SectionDetailView no longer has the stack the site is laid over"
+        )
+        let site: Range<String.Index> = try XCTUnwrap(
+            source.range(of: "WebPreviewView("),
+            "SectionDetailView no longer shows the site"
+        )
+        XCTAssertTrue(
+            notice.lowerBound < stack.lowerBound,
+            "The notice must be mounted ABOVE the stack the site lives in, or a teacher with a preview showing sees nothing but a tint through the toolbar — issue #219"
+        )
+        XCTAssertTrue(
+            stack.lowerBound < site.lowerBound,
+            "The site must still be laid inside that stack, over the console and the placeholder"
+        )
+    }
+
+    /// And the band's colour must stop at the band's own edges.
+    ///
+    /// A `.background(_:)` ignores every safe-area edge by default, which puts
+    /// the fill in the strip the window's toolbar sits in — measured, in BOTH
+    /// the old arrangement and the new one — where a translucent toolbar
+    /// samples it. Whether it SHOWS depends on the material's state, so a
+    /// screenshot with a clean toolbar is not evidence that this is still here.
+    func testTheNoticesColourStopsAtItsOwnEdges() throws {
+        let source: String = try readSource(
+            "QuartzTeachers/Views/Section/ScheduledPublishNoticeView.swift"
+        )
+        XCTAssertTrue(
+            source.contains("ignoresSafeAreaEdges: []"),
+            "The notice's background must not reach into the safe area, or it tints the window's toolbar"
+        )
+    }
+
+    /// One of this project's own source files, read as text.
+    ///
+    /// The same helper, by the same name, as `WorkingFolderSelectionTests`.
+    private func readSource(_ relativePath: String) throws -> String {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
     }
 
     /// Dismissing gives the room straight back.

@@ -817,20 +817,37 @@ Measured by hand (2026-09-19, dark and light, a real preview showing): with the
 band arriving, the page the teacher was on is **100% identical across 5,525
 sampled points once shifted down by the band's 57 points** — the same page,
 simply moved, not reloaded — and when the record goes, the site's pixels match
-what they were before the band arrived, 8,250 of 8,250. What a test can pin is
+what they were before the band arrived, 8,250 of 8,250. (That second half is the
+record being REMOVED, which is the watcher's path; pressing Dismiss by hand was
+not driven, and the unit test below is what covers it.) What a test can pin is
 the same property without a browser: `ProgressViewSizeTests` measures the room
 the site is OFFERED, with a stand-in that answers `sizeThatFits` exactly as
 `WebPreviewView` does. 720 points with no notice; less with one. On the old
 arrangement it was 720 either way, which is the fault stated as a number.
 
-**The toolbar must not take the band's colour, either.** A `.background(_:)`
-ignores every safe-area edge by default, so the band's fill reached up into the
-strip the window's toolbar sits in — and a toolbar is a translucent material
-that samples what is behind it. `.background(bandColour.opacity(0.12),
+**The toolbar must not take the band's colour, either, and that is a SECOND
+mechanism rather than a consequence of the first.** A `.background(_:)` ignores
+every safe-area edge by default, so the band's fill reached up into the strip
+the window's toolbar sits in — and a toolbar is a translucent material that
+samples what is behind it. `.background(bandColour.opacity(0.12),
 ignoresSafeAreaEdges: [])` stops the colour at the band's own edges. The band's
-LAYOUT was never the problem; the background was. Measured after the change,
-552 points sampled right across the toolbar: identical with a band and without,
-(30, 30, 30) in dark and (242, 242, 242) in light.
+LAYOUT was never the problem; the background was.
+
+**Do not delete that `[]` on the strength of a clean screenshot.** Measured by
+rendering the content view — which under a full-size content window includes the
+strip behind the titlebar — and reading its top rows back: with the default
+background the green is painted up there in BOTH the old arrangement and the
+new one, and with `ignoresSafeAreaEdges: []` nothing is painted there at all.
+Moving the band above the stack did not stop the bleed; this did. Whether the
+bleed SHOWS depends on the state of the toolbar's material, which is why it is
+hard to catch by eye: two captures of the same shape on the pre-#219 build
+disagree, one grey and one green.
+
+Measured after the change, dark and light, with a preview showing and without:
+the toolbar above the detail column is identical with a band and without one —
+a mean of **(34.7, 34.7, 34.7) in dark and (240.7, 240.7, 240.7) in light**,
+over 2,812 points sampled between x = 350 and x = 1090 and y = 6 and y = 44 in
+window coordinates.
 
 **And it now sits where it belongs.** In the same smoke Russell found the band
 floating in the MIDDLE of an empty window. The cause was that the base layer hugged
