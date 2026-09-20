@@ -134,13 +134,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.messageText = QuitConfirmation.question(about: workUnderWay)
         alert.informativeText = QuitConfirmation.explanation()
         alert.alertStyle = .warning
-        // First button is the default one, and the safe answer is the default
-        // answer: a teacher who hits Return without reading keeps their work.
-        alert.addButton(withTitle: QuitConfirmation.keepWorkingButton)
-        alert.addButton(withTitle: QuitConfirmation.quitAnywayButton)
-        if alert.runModal() == .alertSecondButtonReturn {
-            return .quitAnyway
+        // The titles AND their meanings come from one ordered list, because
+        // `NSAlert` reports a POSITION and nothing else: two `addButton`
+        // calls written out here could be reordered in one line and would
+        // then swap what each answer means, so Keep Working would quit.
+        for button in QuitConfirmation.buttonsInOrder {
+            alert.addButton(withTitle: button.title)
         }
-        return .keepWorking
+        let response: NSApplication.ModalResponse = alert.runModal()
+        return QuitConfirmation.choice(
+            atButtonIndex: response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+        )
     }
 }

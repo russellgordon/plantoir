@@ -506,7 +506,8 @@ a helper handed a stripped environment cannot reach the engine — and under the
 rules below, a question that could not be asked means "stop nothing", so the
 symptom would be the same silent no-op.
 
-It replaced **two** hand-maintained PATH strings — `ScriptRunner.start` and
+It replaced **two** hand-maintained PATH strings — one inside
+`ScriptRunner.run(scriptNamed:arguments:workingDirectory:)` and one in
 `ScheduledDeploy.propertyList`'s launchd plist, neither of which named the
 tools folder — and gave one to the quit path, which had none at all. The
 scheduled publish worked only because the launcher re-exports that folder from
@@ -521,10 +522,25 @@ themselves — because a fixed two minutes was the first shape and it was wrong:
 six folders each waiting twenty seconds is already two minutes, so the sixth
 would be killed mid-way and the teacher told nothing about any of them. **The
 deadline writes its own line before it fires**, since the one ending that
-reports nothing is the fault this whole piece is about. Its honest limit: the
-`kill -9` does not take a wedged `docker` grandchild with it — measured, one
-stuck on a dead socket was still there afterwards. What the deadline buys is
-that Plantoir's own shell goes away and says so. It is
+reports nothing is the fault this whole piece is about.
+
+Two honest limits, both measured rather than assumed. The `kill -9` does not
+take a wedged `docker` grandchild with it — one stuck on a dead socket was
+still there afterwards — so what the deadline buys is that PLANTOIR's own shell
+goes away and says so; a hung `docker` is the engine's problem and killing it
+would unwedge nothing. And because the guard cannot see what it killed, a
+`colima stop` that was merely SLOW can succeed after the guard has already
+written "anything still running was left alone", leaving that line standing and
+the success line never written. At sixty seconds of slack that is unlikely, and
+it errs the safe way round — the trail understates what was freed rather than
+overstating it.
+
+**The allowance is not as generous as it sounds**, and the arithmetic is worth
+having before anybody trims it: the per-folder wait counts loop ITERATIONS, and
+each iteration also runs a real `ps -Ao args=` (25 ms measured) and a
+`docker top` (about 37 ms). Six busy folders come to roughly 128 s of loop, 12 s
+of `docker stop` grace and 10–20 s of `colima stop` — about 160 s against a
+180 s deadline. It is
 detached and survives the app: measured, an 18-second job finished well after
 its parent had gone, so a 10–20 second `colima stop` will finish too. `&!` is a
 zsh-ism and is gone.

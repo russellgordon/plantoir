@@ -306,13 +306,24 @@ final class QuitScriptTests: XCTestCase {
 
     // MARK: - Every ending has a line on the trail
 
-    /// Each outcome the script can reach is one of the contract's events, and
-    /// says something a teacher would recognise rather than naming a program.
+    /// Every ending the script can reach says something a teacher would
+    /// recognise rather than naming a program, and carries nothing that would
+    /// need redacting — the script appends to the trail directly, so
+    /// `LogRedactor` never sees these lines.
+    ///
+    /// That each ending is one of the contract's EVENTS is pinned elsewhere,
+    /// by `SharedRulesContractTests.testTheTrailRecordsEveryEventTheContract
+    /// Requires`; this is about the words.
     @MainActor
     func testEveryEndingSaysSomethingATeacherWouldRecognise() {
-        // `allCases`, not a hand-written list: a seventh ending added
-        // without a sentence would otherwise be covered by nothing.
-        XCTAssertGreaterThan(FolderContainers.Outcome.allCases.count, 5)
+        // `allCases`, not a hand-written list: an ending ADDED without a
+        // sentence would otherwise be covered by nothing. The floor catches
+        // the other direction — an ending deleted leaves this green unless
+        // something says how many there ought to be.
+        XCTAssertGreaterThanOrEqual(
+            FolderContainers.Outcome.allCases.count, 9,
+            "An ending was removed. If that was deliberate, lower this number and say why in documentation/09."
+        )
         for outcome in FolderContainers.Outcome.allCases {
             let sentence: String = FolderContainers.sentence(
                 for: outcome,

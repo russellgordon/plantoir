@@ -47,6 +47,23 @@ enum QuitConfirmation {
         case quitAnyway
     }
 
+    /// One button, and what pressing it means.
+    ///
+    /// The pair travels together for a reason. `NSAlert` has no notion of
+    /// which button means what: it reports `.alertFirstButtonReturn` for
+    /// whichever title was added first, so a one-line reorder of two
+    /// `addButton` calls would silently swap the MEANINGS and make Keep
+    /// Working quit. Keeping the title beside its answer, in one ordered
+    /// list that the alert and the test both read, is what stops that being
+    /// a one-line change with nothing in its way.
+    struct Button {
+
+        // MARK: - Stored properties
+
+        let title: String
+        let choice: Choice
+    }
+
     // MARK: - Stored properties
 
     /// The four-character codes macOS sends when the quit is the SYSTEM's
@@ -69,6 +86,14 @@ enum QuitConfirmation {
 
     static let keepWorkingButton: String = "Keep Working"
     static let quitAnywayButton: String = "Quit Anyway"
+
+    /// The buttons in the order they are put up. The FIRST is the default
+    /// one, and the safe answer is the default answer: a teacher who presses
+    /// Return without reading keeps their work.
+    static let buttonsInOrder: [Button] = [
+        Button(title: keepWorkingButton, choice: .keepWorking),
+        Button(title: quitAnywayButton, choice: .quitAnyway)
+    ]
 
     // MARK: - Functions
 
@@ -126,6 +151,16 @@ enum QuitConfirmation {
     static func explanation() -> String {
         return "Quitting now could leave it unfinished, with the class website "
             + "part way updated."
+    }
+
+    /// What the button at a given position means — read from the same list
+    /// the alert builds itself from, so the two cannot disagree.
+    static func choice(atButtonIndex index: Int) -> Choice {
+        if index >= 0 && index < buttonsInOrder.count {
+            return buttonsInOrder[index].choice
+        }
+        // An answer nobody recognises is the safe one.
+        return .keepWorking
     }
 
     /// The line the trail gets, whichever way it went.
