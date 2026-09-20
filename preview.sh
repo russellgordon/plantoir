@@ -521,10 +521,14 @@ bind_mount_argument() {
 # command line, and there is one string to keep in step.
 # scripts/test_container_mount.sh checks these lines against that case.
 #
-# It exists because all three launchers run under `set -e`: without it a
-# refusal ends the script with the daemon's own sentence as the last thing on
-# screen and nothing else, which is exactly what the teacher in issue #221
-# was left with.
+# It exists because a refusal otherwise says nothing a teacher can use.
+# setup.sh and deploy.sh run under `set -e`, so the script ends there with the
+# daemon's own sentence as the last thing on screen — exactly what the teacher
+# in issue #221 was left with. preview.sh has NO `set -e` (measured
+# 2026-09-19 while proving this, and the opposite of what the plan for it
+# assumed), so it did something worse: it carried straight on past the
+# refusal, said "No such container" twice, announced that it was building,
+# and produced nothing. Both roads want the same sentence and a stop.
 say_this_folder_could_not_be_opened() {
   echo "❌ Plantoir could not get this folder ready for building."
   echo "   Check that it has not been moved or renamed, then try again."
