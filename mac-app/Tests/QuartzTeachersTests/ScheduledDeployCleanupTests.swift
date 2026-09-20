@@ -48,6 +48,8 @@ final class ScheduledDeployCleanupTests: XCTestCase {
         try FileManager.default.createDirectory(at: coursesDirectoryURL, withIntermediateDirectories: true)
 
         ScheduledDeploy.launchAgentsDirectoryOverride = agentsDirectory
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            agentsDirectory.deletingLastPathComponent().appendingPathComponent("scheduled")
         launchControl = FakeLaunchControl()
         let previousStore: ProblemReportStore = ActivityTrail.store
         ActivityTrail.store = ProblemReportStore(folderURL: trailFolderURL)
@@ -55,6 +57,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
         addTeardownBlock {
             MainActor.assumeIsolated {
                 ScheduledDeploy.launchAgentsDirectoryOverride = nil
+                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
                 ActivityTrail.store = previousStore
             }
             // Put a folder this test made read-only back, or the whole
@@ -169,7 +172,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     func testEveryCancellationCaseInTheContractHolds() throws {
         let rule: [String: Any] = try Self.section("scheduledDeployCancellation")
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 8, "The case list has lost cases.")
+        XCTAssertGreaterThanOrEqual(cases.count, 9, "The case list has lost cases.")
 
         for oneCase in cases {
             let act: String = try XCTUnwrap(oneCase["act"] as? String)
@@ -255,6 +258,34 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             )
             XCTAssertEqual(launchControl.bootedOutLabels, [], act)
             XCTAssertEqual(cancels, "nothing")
+
+        case "roll a section over onto a new website":
+            // Driven at the seam the rollover itself uses — the gate that
+            // decides whether anything of THIS folder's is there to turn off.
+            // The tool end to end is
+            // `RolloverWebsiteTests.testStartingANewWebsiteTurnsOffAScheduledPublish`
+            // and its other-folder twin; what is pinned here is that the
+            // contract's case has something behind it at all, which is what
+            // this path lacked when the rule first landed.
+            _ = try makeCourse(sections: [1, 2])
+            try writeAgent(sectionNumber: 1)
+            try writeAgent(sectionNumber: 2)
+            let owned: [ScheduledDeploy.Agent] = ScheduledDeployCleanup.agentsOwnedBy(
+                courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL
+            )
+            XCTAssertEqual(owned.count, 1, act)
+            XCTAssertNil(
+                ScheduledDeploy.cancelScheduledDeploy(
+                    courseCode: "ICS3U",
+                    sectionNumber: 1,
+                    inWorkingFolder: workingFolderURL,
+                    runner: launchControl
+                ),
+                act
+            )
+            XCTAssertFalse(agentExists(sectionNumber: 1), act)
+            XCTAssertTrue(agentExists(sectionNumber: 2), "\(act): only that section's")
+            XCTAssertEqual(cancels, "thatSectionOnly")
 
         case "rename a course":
             let course: Course = try makeCourse()
@@ -952,6 +983,129 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             "turned off a scheduled deploy "
             + ScheduledDeployCleanup.Reason.theDayItWasSetForHadGoneBy.trailPhrase
         ), trailText())
+    }
+
+    // MARK: - A course code that came back out of a label
+
+    /// A MODERN job for a course whose code has a space gets the window its
+    /// teacher chose.
+    ///
+    /// Everything written since the course code went into the job itself
+    /// carries the teacher's own spelling, so `courses/Chess Club/` is found
+    /// by name.
+    func testASpacedCourseCodeKeepsItsOwnWindowWhenTheJobRecordsIt() throws {
+        try prepare()
+        try makeCourse(code: "Chess Club", sections: [1], mayRunLateDays: 14)
+        let now: Date = Date()
+        try writeAgent(
+            courseCode: "Chess Club", sectionNumber: 1,
+            when: now.addingTimeInterval(-8 * 24 * 3600)
+        )
+        let outcome = ScheduledDeployCleanup.sweepDeploysThatAreTooLate(
+            inWorkingFolder: workingFolderURL, now: now, runner: launchControl
+        )
+        XCTAssertTrue(
+            outcome.isQuiet,
+            "Eight days late with two weeks chosen must stand: \(outcome)"
+        )
+        XCTAssertTrue(agentExists(courseCode: "Chess Club", sectionNumber: 1))
+    }
+
+    /// And a LEGACY job for the same course does too, although its code came
+    /// back uppercased and hyphenated.
+    ///
+    /// Without the sanitised match the config path `courses/CHESS-CLUB/` does
+    /// not exist, the default window applies, and a job eight days late is
+    /// swept although the run itself would have let it go ahead — a deploy
+    /// dropped, which is the direction that matters.
+    func testASpacedCourseCodeKeepsItsOwnWindowEvenFromALegacyJob() throws {
+        try prepare()
+        try makeCourse(code: "Chess Club", sections: [1], mayRunLateDays: 14)
+        let now: Date = Date()
+        try writeAgent(
+            courseCode: "Chess Club", sectionNumber: 1,
+            when: now.addingTimeInterval(-8 * 24 * 3600), legacy: true
+        )
+        XCTAssertEqual(
+            ScheduledDeployLateness.days(
+                forCourseCode: "CHESS-CLUB", inWorkingFolder: workingFolderURL
+            ),
+            14,
+            "A lossy code must still find the folder it names"
+        )
+        let outcome = ScheduledDeployCleanup.sweepDeploysThatAreTooLate(
+            inWorkingFolder: workingFolderURL, now: now, runner: launchControl
+        )
+        XCTAssertTrue(outcome.isQuiet, "\(outcome)")
+        XCTAssertTrue(agentExists(courseCode: "Chess Club", sectionNumber: 1))
+    }
+
+    /// Two codes that sanitise the same way are ambiguous, and the default is
+    /// what an ambiguous answer gets — never one course's setting read for
+    /// another course's job.
+    func testAnAmbiguousSanitisedCodeGetsTheDefault() throws {
+        try prepare()
+        try makeCourse(code: "Chess Club", sections: [1], mayRunLateDays: 14)
+        try makeCourse(code: "Chess-Club", sections: [1], mayRunLateDays: 1)
+        XCTAssertEqual(
+            ScheduledDeployLateness.days(
+                forCourseCode: "CHESS-CLUB", inWorkingFolder: workingFolderURL
+            ),
+            ScheduledDeployLateness.defaultDays
+        )
+    }
+
+    // MARK: - The cancel's own backstop
+
+    /// The cancel takes the working folder as a REQUIRED argument and leaves
+    /// alone a job belonging to another one.
+    ///
+    /// Every caller asks `agentsOwnedBy` or a folder-scoped `nextRun` first,
+    /// so nothing reaches this today — it is the backstop under those, and it
+    /// is what makes the unscoped form impossible to write by accident.
+    func testTheCancelItselfLeavesAnotherFoldersJobAlone() throws {
+        try prepare()
+        let otherFolder: URL = workingFolderURL
+            .deletingLastPathComponent().appendingPathComponent("other-workspace")
+        try writeAgent(sectionNumber: 1, workingFolder: otherFolder)
+
+        XCTAssertNil(ScheduledDeploy.cancelScheduledDeploy(
+            courseCode: "ICS3U",
+            sectionNumber: 1,
+            inWorkingFolder: workingFolderURL,
+            runner: launchControl
+        ))
+        XCTAssertTrue(agentExists(sectionNumber: 1))
+        XCTAssertEqual(launchControl.bootedOutLabels, [], "It must not even boot it out")
+    }
+
+    // MARK: - The wrapper scripts live inside the test's own tree
+
+    /// A test can never delete a real scheduled deploy's wrapper script.
+    ///
+    /// `cancelScheduledDeploy` removes the wrapper whatever runner it was
+    /// handed, and until 2026-09-20 `scriptURL` had no override at all — so a
+    /// test that moved only the AGENTS folder deleted
+    /// `~/Library/Application Support/Plantoir/scheduled/<label>.sh` for real.
+    /// The teacher's alarm survived in their own folder and would fire at a
+    /// script that was gone. ICS3U is the fixture code precisely because it is
+    /// a course a teacher plausibly has.
+    func testTheWrapperScriptPathStaysInsideTheTestsOwnFolder() throws {
+        try prepare()
+        let scriptPath: String = ScheduledDeploy.scriptURL(
+            courseCode: "ICS3U", sectionNumber: 1
+        ).path
+        let realPath: String = ("~/Library/Application Support/Plantoir/scheduled" as NSString)
+            .expandingTildeInPath
+        XCTAssertFalse(
+            scriptPath.hasPrefix(realPath),
+            "A test is about to write or delete inside the teacher's own scheduled folder: "
+            + scriptPath
+        )
+        XCTAssertTrue(
+            scriptPath.hasPrefix(workingFolderURL.deletingLastPathComponent().path),
+            scriptPath
+        )
     }
 
     // MARK: - The structural guard

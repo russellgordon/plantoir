@@ -893,9 +893,13 @@ struct SidebarView: View {
     }
 
     func cancelScheduledDeploy(_ request: ScheduledDeployRequest) {
+        guard let workspaceURL = workspace.workspaceURL else {
+            return
+        }
         if let problem = ScheduledDeploy.cancelScheduledDeploy(
             courseCode: request.course.code,
-            sectionNumber: request.sectionNumber
+            sectionNumber: request.sectionNumber,
+            inWorkingFolder: workspaceURL
         ) {
             scheduleProblem = problem
         }

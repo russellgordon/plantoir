@@ -119,9 +119,14 @@ nonisolated enum ScheduledDeployLateness {
     /// the stand-down still has to remove the plist, or the same job comes back
     /// next year, which is the whole fault.
     static func days(forCourseCode courseCode: String, inWorkingFolder workingFolderURL: URL) -> Int {
-        let configURL: URL = workingFolderURL
-            .appendingPathComponent("courses")
-            .appendingPathComponent(courseCode)
+        let coursesURL: URL = workingFolderURL.appendingPathComponent("courses")
+        guard let folderName = courseFolderName(
+            matching: courseCode, inCoursesFolder: coursesURL
+        ) else {
+            return defaultDays
+        }
+        let configURL: URL = coursesURL
+            .appendingPathComponent(folderName)
             .appendingPathComponent("course_config.json")
         guard let data = try? Data(contentsOf: configURL) else {
             return defaultDays
@@ -136,6 +141,59 @@ nonisolated enum ScheduledDeployLateness {
             return defaultDays
         }
         return days(fromStoredValue: stored.intValue)
+    }
+
+    /// Which course folder a code names, allowing for a code that came back
+    /// out of an agent's LABEL rather than out of the agent itself.
+    ///
+    /// **The direct name first**, which is every modern job: an agent written
+    /// by v1.2.0 or later carries the course code as the teacher spells it, so
+    /// `courses/Chess Club/` is found by name and the teacher's chosen window
+    /// applies.
+    ///
+    /// **Then a sanitised match**, for a job written before v1.2.0. Those
+    /// carry no course code at all, so the only route is the label — and a
+    /// label is uppercased with every non-alphanumeric turned into a hyphen,
+    /// so "Chess Club" comes back "CHESS-CLUB" and `courses/CHESS-CLUB/` does
+    /// not exist. Without this step such a course silently fell back to the
+    /// default window at sweep time even though its teacher had chosen
+    /// another, and the direction of that mistake is a deploy DROPPED.
+    ///
+    /// **Only a UNIQUE match counts.** Two codes that sanitise the same way
+    /// ("Chess Club" and "Chess-Club") are ambiguous, and guessing between
+    /// them would read one course's setting for another's job; with no unique
+    /// answer the caller gets the default, which is the same thing a course
+    /// that has gone gets.
+    static func courseFolderName(matching courseCode: String, inCoursesFolder coursesURL: URL) -> String? {
+        // The NAMES, never `fileExists` on a built path — and that is measured
+        // rather than fastidious. A teacher's volume is case-insensitive by
+        // default, so asking whether `courses/CHESS-CLUB` exists answers YES
+        // when the folder is really called `Chess-Club`: a lossy code from an
+        // old job's label would walk straight into a DIFFERENT course's
+        // settings and read its window. The suite caught exactly that on
+        // 2026-09-20, against a folder pair one hyphen apart. Comparing the
+        // names ourselves takes the filesystem's opinion out of it.
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            atPath: coursesURL.path
+        ) else {
+            return nil
+        }
+        for entry in entries {
+            if entry == courseCode {
+                return entry
+            }
+        }
+        let wanted: String = ScheduledDeploy.sanitizedCode(courseCode)
+        var matches: [String] = []
+        for entry in entries {
+            if ScheduledDeploy.sanitizedCode(entry) == wanted {
+                matches.append(entry)
+            }
+        }
+        if matches.count == 1 {
+            return matches[0]
+        }
+        return nil
     }
 
     /// What the teacher reads above the choice in Course Settings.
