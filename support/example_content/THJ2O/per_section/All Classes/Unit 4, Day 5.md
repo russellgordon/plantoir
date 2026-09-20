@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Site Project]] — jobs offered and groups formed
+1. Launch: [[The Site Project]] — jobs offered, criteria read, groups formed
 2. Period 1 of 8: survey the site, measure, photograph
 3. Recording conditions
 

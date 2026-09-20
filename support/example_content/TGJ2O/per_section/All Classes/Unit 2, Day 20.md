@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Standup — deadline day
-2. Desk time: final edits, then file — [[The Athletics Package]] is
-   published
+2. Desk time: act on your conference note and your own self-check —
+   final edits, then file. [[The Athletics Package]] is published
 3. Studio: [[Design a Social Card]] to send readers to your package
 4. Edit and compare: cards on the screen, packages open beside them
 5. Journal collection: [[Journal Checklist]] and

@@ -10,12 +10,15 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Osmosis in Plant Tissue]] in class
-2. The intercept, and what it tells you about the cell sap you never
+1. The intercept, and what it tells you about the cell sap you never
    measured directly
-3. Skill: [[Graphing Data]] — a line of best fit, and reading a value
+2. Skill: [[Graphing Data]] — a line of best fit, and reading a value
    off it honestly
+3. Then write up [[Osmosis in Plant Tissue]] at the bench — write-up one
+   of five on [[Investigation Reports]], handed in at the end of the
+   period
 
 ## Things to do before our next class
 
-- [ ] Report finished; the intercept interpreted.
+- [ ] Journal: what the intercept told you that no single measurement
+      could.

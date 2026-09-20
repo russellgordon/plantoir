@@ -2,7 +2,8 @@
 title: Citing Sources
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - tutorials
 ---
 A citation answers one question: *where would I go to check this?*
 
@@ -16,7 +17,8 @@ tells the reader how much weight the claim carries.
 For the texts we study, cite by act, scene, and line for drama and by
 page for prose:
 
-> Juliet calls her name "the enemy" of Romeo (2.2.38).
+> Duncan admires the castle's "pleasant seat" as he arrives to be killed
+> in it (1.6.1).
 > Lisamarie hears the b'gwus story from her uncle (Robinson 8).
 
 ## In the Works Cited list
@@ -30,7 +32,9 @@ Alphabetical, at the end.
 **A novel**
 > Robinson, Eden. *Monkey Beach*. Alfred A. Knopf Canada, 2000.
 
-**An article on a website**
+**An article on a website** — this one is invented, to show the shape.
+There is no such article, and on a page about honesty it would be odd
+not to say so.
 > Nguyen, Thanh. "What the Storm Took." *The Globe and Mail*, 3 Feb.
 > 2024, theglobeandmail.com/canada/storm-took.
 
@@ -38,9 +42,11 @@ Alphabetical, at the end.
 > King, Thomas. *The Inconvenient Indian: A Curious Account of Native
 > People in North America*. Doubleday Canada, 2012.
 
-**A secondary source in a journal**
-> Fee, Margery. "Writing Orality." *Canadian Literature*, no. 224, 2015,
-> pp. 12–29.
+**A secondary source in a journal** — every field is checkable, which is
+the point of the entry. This one is real.
+> Fee, Margery. "Writing Orality: Interpreting Literature in English by
+> Aboriginal Writers in North America, Australia and New Zealand."
+> *Journal of Intercultural Studies*, vol. 18, no. 1, 1997, pp. 23–39.
 
 ## Three habits that prevent the whole problem
 

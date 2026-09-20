@@ -10,12 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. Number talk: [[Would You Rather]]
-2. Random groups — thinking task: a claim from the news, taken apart
+1. First twenty minutes: work your revision list from the checkpoint,
+   with me circulating
+2. Number talk: [[Would You Rather]]
+3. Random groups — thinking task: a claim from the news, taken apart
    with everything Unit 3 has given you
-3. Consolidate: the four questions to ask of any statistic
-4. Look ahead: next unit measures things, and money is one of them
+4. Consolidate: the four questions to ask of any statistic
 
 ## Things to do before our next class
 
-- [ ] Bring one price you think is unfair, with a reason.
+- [ ] Journal: which of the four questions you have never thought to ask.

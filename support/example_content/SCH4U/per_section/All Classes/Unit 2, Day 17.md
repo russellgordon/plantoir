@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: four compounds — which does not belong?
+1. Warm-up: four compounds — which does not belong? [[Isomers]]
 2. Consolidation: one molecule, taken all the way — named, its shape,
-   its polarity, its likely reactions, and what it is used for
+   its polarity, its likely reactions, and what it is used for: [[Organic Reactions]]
 3. Look ahead: next unit asks where the energy comes from
 
 ## Things to do before our next class

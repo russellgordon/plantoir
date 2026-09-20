@@ -12,7 +12,9 @@ tags:
 
 1. Why the boundary is the hard part — regions compared
 2. [[Landscape and Identity]]: whose Canada is in the picture?
-3. Working period
+3. Working period: the changes yesterday's conference and your
+   self-check named, and your own meaning section for
+   [[The Region Study]] — written and signed today
 
 ## Things to do before our next class
 

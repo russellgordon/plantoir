@@ -7,9 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo · launched in Unit 4 and due seven classes later · four working
-> periods · one written report, one twelve-minute seminar, and questions
-> you have to answer without notes
+> Solo · launched Unit 4, Day 7 and due Unit 4, Day 13 · three working
+> periods and two seminar days · one written report, one twelve-minute
+> seminar, and questions you have to answer without notes
 
 ## What you are making
 
@@ -58,14 +58,19 @@ Twelve minutes, then questions from the room for five, answered without
 notes. The audience's job is to ask the question your report avoided —
 and everybody prepares one question for each seminar in advance.
 
+Seminars run on Unit 4, Days 12 and 13, half the room on each day.
+Rehearse yours once against a timer before Day 12 — twelve minutes is
+shorter than it sounds, and the part that gets cut when you overrun is
+always the theory you worked hardest on.
+
 ## The working periods
 
 | Day | What it is for |
 | --- | --- |
-| 1 | Topic registered; the first two sources found and judged together |
-| 2 | The theory section — the hardest part, drafted with me available |
-| 3 | The consequences section, and the connection to another discipline |
-| 4 | Seminar rehearsed on one other student, and cut to twelve minutes |
+| Unit 4, Day 7 | Topic registered; the first two sources found and judged together |
+| Unit 4, Day 8 | The theory section — the hardest part, drafted while I work my way round the room |
+| Unit 4, Day 10 | The consequences section and the cross-discipline connection; then drafts are traded and one unsourced claim in each is challenged |
+| Unit 4, Days 12 and 13 | Seminars, half the room each day; the report is handed in at the end of Day 13 |
 
 ## How this is assessed
 
@@ -104,3 +109,53 @@ want to spend more time in, and what would that require of you?
 
 ![[D4.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+The seminars are not the place for this. You are running the room on
+Days 12 and 13, the room is asking the questions, and what you can
+gather while chairing is thin. Both of the moments below come earlier,
+while the report can still change.
+
+OBSERVE — Unit 4, Day 10, when drafts are traded and one unsourced
+claim in each is challenged
+  Watch for: what the writer does with the challenge in the ten
+  minutes after it lands. Going to find out whether a source exists,
+  softening the sentence until it no longer needs one, and defending
+  it from memory are three different relationships with evidence — and
+  the finished report will carry five citations whichever of the three
+  happened, so it cannot tell you which one you are reading.
+  Going well: a source is opened, and the sentence either gains a
+  citation or gets cut.
+  Stuck: "everybody knows that", and the sentence survives untouched.
+  Record: three columns beside the topic list — sourced it, cut it,
+  kept it. Initials only.
+  That is D4.1, reporting on the basis of what is actually in the
+  industry publications rather than on the basis of what is generally
+  said.
+
+TALK — Unit 4, Day 8, while you are working your way round the room on
+the theory section
+  The theory section is what that period is announced for, so nobody
+  has prepared an answer about consequences yet, which is exactly why
+  this is the day to ask.
+  Ask: "Which country or community gets this ten years after we do,
+  and what decides the ten years?"
+  Then: "Name the money. Who spends less because of this, and who
+  stops being paid?"
+  A strong answer names a reason for the delay that is not simply
+  wealth, and names an industry rather than "jobs". The report is
+  asked for who gains and who loses; neither of these is that
+  question, and both are much harder to answer from a summary. That is D3.1,
+  which asks for the impact on societies and cultures around the world
+  and on the economy — two things a report can easily reach the end
+  without ever addressing, and which are much harder to bluff out loud
+  than on paper.
+  Record: two lines each, on the topic list. Anybody who cannot answer
+  either one has a report to change, and there are two working days
+  left in which to change it.
+
+The product evidence is the report handed in on Day 13, and the
+seminar itself.
+%%

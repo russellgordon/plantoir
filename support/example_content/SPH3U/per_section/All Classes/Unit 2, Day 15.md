@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval warm-up — no notes: a free-body diagram, a system, and a
-   friction calculation
-2. Checkpoint, on your own: forces end to end
+   friction calculation: [[Free-Body Diagram Practice]]
+2. Checkpoint, on your own: forces end to end: [[Force and Acceleration Practice]]
 3. Mark your own; revision list written
 
 ## Things to do before our next class

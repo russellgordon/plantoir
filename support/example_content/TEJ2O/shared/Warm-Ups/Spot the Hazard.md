@@ -9,8 +9,8 @@ A photo of a bench goes up — staged the night before, never a real
 student's workspace — and the question is simple: what here could
 hurt someone or something? Drinks beside open cases, a powered
 supply with its cover off, a cable run across a walkway.
-[[Safety in the Lab]] gets read once in September; this routine is
-how it stays read all year.
+[[Safety in the Lab]] gets read once at the start of the course; this routine is
+how it stays read all semester.
 
 ## How to run it
 

@@ -1,8 +1,8 @@
 ---
 title: Investigations
-createdSection1: 2026-08-14T12:24:26.000-0400
+createdSection1: 2027-01-18T07:00:00.000-0500
 publishForSection1: true
-createdSection2: 2026-08-14T12:24:26.000-0400
+createdSection2: 2027-01-19T07:00:00.000-0500
 publishForSection2: true
 enableToc: false
 ---
@@ -17,4 +17,6 @@ not optional reading.
 > Goggles, tied-back hair, closed-toe shoes. If you are missing any of the
 > three, you will be doing the written alternative instead.
 
-Format for the write-up: [[Writing a Lab Report]].
+Format for the write-up: [[Writing a Lab Report]]. Seven of these
+investigations are written up for marks — [[Lab Reports]] says which seven,
+which period each is written in, and what the write-ups are judged against.

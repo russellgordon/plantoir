@@ -45,10 +45,34 @@ shares that one port's bandwidth — it multiplies sockets, not speed.
 When an adapter chain fails at the bench, test the promise at each
 link, the habit [[Cable Habits]] drills.
 
+## Peripheral functions and system communication
+
+Peripherals classify into three functional categories based on how they
+interact with the mainboard:
+
+- **Input peripherals:** Translate user actions or physical phenomena
+  into digital signals. Keyboards and mice capture mechanical switch
+  events; flatbed and document scanners convert reflected optical
+  patterns into bitmap images; microphones digitize pressure waves.
+- **Output peripherals:** Convert digital system data into human-usable
+  or physical form. Monitors render frame buffers into light; sound
+  cards decode PCM audio streams for speakers; printers deposit ink or
+  toner onto paper.
+- **Bi-directional and expansion devices:** Network interface cards,
+  external storage drives, and multi-function touchscreens send and
+  receive data simultaneously.
+
+High-speed system buses on the mainboard coordinate these peripherals
+without stalling the processor.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A1.2]]
+
+![[A1.3]]
+
+![[A1.4]]
 
 ![[B1.1]]
 %%curriculum-end%%

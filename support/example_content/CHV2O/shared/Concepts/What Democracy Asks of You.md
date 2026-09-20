@@ -2,6 +2,7 @@
 title: What Democracy Asks of You
 publish: true
 created: __CREATED__
+enableToc: true
 tags:
   - concepts
   - unit-1
@@ -53,6 +54,57 @@ each group would say you had understood them.
 > sentence its holders would accept? If not, you know the issue as a
 > slogan, not as an issue.
 
+## How governments form: the electoral process
+
+Canada uses a single-member plurality voting system, commonly called
+**first-past-the-post**, for federal and provincial elections. The country is
+divided into geographic constituencies (ridings). On election day, voters in
+each riding mark a ballot for one local candidate. The candidate who wins the
+most votes in that riding wins the seat — even if they win only 35 per cent of
+the local vote in a multi-candidate race.
+
+After all 338 federal ridings (or 124 Ontario provincial ridings) are counted,
+the Governor General or Lieutenant Governor invites the party leader who can
+command the **confidence of the legislature** to form the government:
+
+- **A majority government** occurs when one party wins more than half of the
+  total seats in the chamber (at least 170 seats federally). A majority can
+  pass its budget and legislation reliably.
+- **A minority government** occurs when the governing party wins the most seats
+  but fewer than half overall. To govern and pass laws, it must seek the ongoing
+  support of other parties on a vote-by-vote basis or through a formal
+  supply-and-confidence agreement.
+
+Understanding this mechanism explains why party strategy focuses heavily on key
+ridings and why a government's policy agenda depends directly on whether it holds
+a majority or minority mandate.
+
+## National symbols, commemoration, and civic pride
+
+Taking pride in your country is an important foundation of civic engagement. In
+Canada, constructive patriotism means celebrating genuine collective
+achievements — such as universal public health care, the *Charter of Rights and
+Freedoms*, peacekeeping traditions, and vibrant multicultural communities —
+while honestly acknowledging historical injustices and taking responsibility to
+correct them.
+
+Nations use **symbols and public commemorations** to communicate shared values:
+
+- **National symbols** — the National Flag of Canada (the Maple Leaf), the
+  beaver, the national anthem *O Canada*, the Great Seal, and honours like the
+  Order of Canada — represent sovereignty, history, and constitutional
+  continuity.
+- **Official commemorations** — such as **Remembrance Day** on November 11
+  (honouring veterans and civilian sacrifices in defence of democracy and peace)
+  and the **National Day for Truth and Reconciliation** on September 30 (Orange
+  Shirt Day, acknowledging the tragic legacy of the residential school system
+  and honouring Indigenous survivors and communities) — provide deliberate
+  civic moments for public reflection, education, and collective commitment.
+
+Commemoration is a living civic process. How statues, holidays, street names,
+and monuments are chosen, re-evaluated, or renamed reflects an evolving public
+dialogue about whose contributions are recognised in the common story.
+
 ## Why anyone bothers
 
 People engage for reasons that repeat across a century of Canadian
@@ -75,4 +127,8 @@ Start recording issues in [[Your Civic Notebook]] this week. The
 ![[B1.1]]
 
 ![[B1.4]]
+
+![[B2.8]]
+
+![[C1.4]]
 %%curriculum-end%%

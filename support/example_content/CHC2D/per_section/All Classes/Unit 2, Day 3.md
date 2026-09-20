@@ -12,7 +12,7 @@ tags:
 
 1. [[Where the Records Live]] — the archives you can actually reach
 2. Finding aids and catalogue records: [[Working in an Archive]]
-3. Research period
+3. Research period: searching local and national archives for [[The Thirties Case]]
 
 ## Things to do before our next class
 

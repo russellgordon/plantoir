@@ -27,12 +27,16 @@ length is Pythagoras wearing coordinates.
    $C(1, 5)$ is isosceles.
 7. **Challenge.** Find the point on the $y$-axis that is the same
    distance from $(2, 1)$ as from $(6, 3)$. Verify your answer.
+8. **Medians and right bisectors.** For $\triangle ABC$ with vertices
+   $A(-2, 0)$, $B(4, 0)$, and $C(2, 6)$: (a) find the equation of the
+   median from $C$ to side $AB$; (b) determine the equation of the
+   perpendicular bisector of $AB$ in standard form $Ax + By + C = 0$.
 
 ## Answers
 
 > [!success]- Answer 1
-> Average each coordinate: $\left(\frac{2+8}{2}, \frac{6+10}{2}\right)
-> = (5, 8)$. It should land between $A$ and $B$ — it does.
+> Average each coordinate: $\left(\frac{2+8}{2}, \frac{6+10}{2}\right) = (5, 8)$. It
+> should land between $A$ and $B$ — it does.
 
 > [!success]- Answer 2
 > Run $8$, rise $6$: $\sqrt{8^2 + 6^2} = 10$ — a 6–8–10 triangle on the grid.
@@ -61,10 +65,30 @@ length is Pythagoras wearing coordinates.
 > $4 + (y-1)^2 = 36 + (y-3)^2$, so $4y = 40$ and the point is
 > $(0, 10)$. Verify: both distances are $\sqrt{85}$. ✓
 
+> [!success]- Answer 8
+> (a) The midpoint of $AB$ is
+> $M = \left(\frac{-2+4}{2}, \frac{0+0}{2}\right) = (1, 0)$.
+> The median joins $C(2, 6)$ to $M(1, 0)$, with slope
+> $m = \frac{6-0}{2-1} = 6$. Equation through $(1, 0)$:
+> $y = 6(x - 1) = 6x - 6$.
+> (b) $AB$ lies on the $x$-axis (horizontal, slope $0$), so its
+> perpendicular bisector is the vertical line through $M(1, 0)$:
+> $x = 1$, or in standard form $x - 1 = 0$.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[B1.4]]
+
+![[B1.5]]
 
 ![[B2.1]]
 
 ![[B2.2]]
+
+![[B2.5]]
+
+![[B3.1]]
+
+![[B3.2]]
 %%curriculum-end%%

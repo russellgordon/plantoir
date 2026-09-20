@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Period 4 of 8: evidence, continued
-2. A site visit or an interview, where possible
+1. Period 4 of 8: evidence, continued for [[The Commemoration Inquiry]]
+2. A site visit or an interview, where possible: [[Oral History and Testimony]]
 3. Conferences on what the evidence supports
 
 ## Things to do before our next class

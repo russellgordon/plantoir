@@ -39,6 +39,49 @@ cord was ever tested there. Every prediction should come with its
 pedigree: interpolated or extrapolated, tight fit or loose one. Saying
 so plainly is part of [[Showing Your Thinking]].
 
+## What a model is for
+
+Fitting a line is not the goal. A **model** is a deliberate
+simplification of something real, built so that a decision can be made
+before the real thing has finished happening — and that is the only
+reason anybody puts up with the simplification. Your bungee line lets
+somebody choose a cord length for a drop nobody has tested. That is the
+trade the whole exercise is: accept that the line is not the truth, in
+exchange for an answer you can act on now.
+
+Decisions get made this way constantly, and usually invisibly. A city
+sizes a water main from a model of how a neighbourhood grows. A hospital
+staffs a Monday from a model of how many people arrive. A phone
+estimates your arrival time from a model of traffic. None of those
+models is right. Each is *useful*, and the people who rely on them are
+supposed to know the difference — which is what makes the reporting step
+below the part that matters, rather than the paperwork at the end.
+
+## Reporting a model honestly
+
+When you hand a model to somebody, four things have to travel with it,
+and a model reported without them is worse than no model, because it
+will be believed further than it deserves.
+
+| What to report | The bungee example | Why a reader needs it |
+| --- | --- | --- |
+| What question it answers | how far the cord stretches from a given storey | a model answers one question, not every question |
+| How well it fits | points hug the line closely, no fanning out | a loose fit and a tight fit support very different claims |
+| Where it stops being trustworthy | tested from storeys 1 to 6 only | outside that range you are extrapolating, and you must say so |
+| What it predicts, with its pedigree | "about 280 cm at storey 7, interpolated between tested drops" | the number and its warrant belong in the same sentence |
+
+**Limitations are not an apology.** "This assumes the cord is the same
+cord and the mass is the same mass" is not weakness — it is the
+condition under which the number is any good, and stating it is what
+separates a model from a guess with a graph attached. A group that
+reports a fit of "quite good" and a prediction for storey fifty has told
+a reader nothing they can check, which means they have told them nothing
+at all.
+
+The same four rows are what [[A Data Story]] asks you to write, and what
+[[Judging Your Own Work]] asks you to judge yourself against before you
+hand it in.
+
 [[Scatter Plot Practice]] builds the mechanics with real datasets,
 [[Using Desmos]] fits and compares models in seconds, and
 [[A Data Story]] asks you to build an honest claim from a plot of
@@ -48,4 +91,8 @@ your own.
 ## Curriculum connection
 
 ![[D1.3]]
+
+![[D2.1]]
+
+![[D2.5]]
 %%curriculum-end%%

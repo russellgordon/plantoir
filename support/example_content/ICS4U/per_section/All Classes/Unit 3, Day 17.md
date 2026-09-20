@@ -13,8 +13,9 @@ tags:
 1. Warm-up: [[Spot the Bug]]
 2. Method: [[Writing Tests]] — what to test first when everything is
    unfinished
-3. [[The Software Project]], day 6 — working period: tests for the core
-   feature, written before it is finished
+3. [[The Software Project]], day 6 — working period: whatever yesterday's
+   milestone check stopped on, then tests for the core feature, written
+   before it is finished
 
 ## Things to do before our next class
 

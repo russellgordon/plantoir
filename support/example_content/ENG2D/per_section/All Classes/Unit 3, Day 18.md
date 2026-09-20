@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Consolidation: what the novel and the play both know about who gets
-   listened to
-2. Look ahead: the last unit reads the texts nobody assigned you
+   listened to: [[Whose Reading Counts]]
+2. Look ahead: the last unit reads the texts nobody assigned you — [[The Seminar]]
 
 ## Things to do before our next class
 

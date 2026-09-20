@@ -16,6 +16,8 @@ tags:
    acid does — rinse any splash long past the point it feels finished
 3. Record temperature against time and decide where the peak really is
 4. Compare the room's peaks — same reaction, different numbers, why?
+   The spread is the diagnostic: it tells me which measuring habits
+   survived the summer, and it decides how Days 2 and 3 run
 5. [[Measuring Well]] — the thermometer is not the only source of spread
 
 ## Things to do before our next class

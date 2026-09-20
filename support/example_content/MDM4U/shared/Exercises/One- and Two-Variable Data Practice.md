@@ -188,3 +188,35 @@ $$12, \; 15, \; 15, \; 17, \; 18, \; 20, \; 22, \; 25, \; 28, \; 31, \; 52$$
 > stretching your hand makes you taller. This is exactly the
 > distinction [[Correlation and Causation]] exists to protect, and a
 > strong $r$ never settles it.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B2.4]]
+
+![[C1.2]]
+
+![[C2.1]]
+
+![[C2.2]]
+
+![[C2.3]]
+
+![[C2.4]]
+
+![[D1.1]]
+
+![[D1.2]]
+
+![[D1.3]]
+
+![[D1.5]]
+
+![[D2.1]]
+
+![[D2.2]]
+
+![[D2.5]]
+
+![[D3.1]]
+%%curriculum-end%%

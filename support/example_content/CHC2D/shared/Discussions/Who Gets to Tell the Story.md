@@ -61,4 +61,6 @@ and who would have to be asked to fill the gap.
 ![[D3.1]]
 
 ![[A1.3]]
+
+![[D3.2]]
 %%curriculum-end%%

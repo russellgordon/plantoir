@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Response pieces shown and discussed
-2. How context changed what we made
-3. Studio time
+1. Response pieces shown and discussed: [[Interpreting a Work]]
+2. How context changed what we made: [[The Critical Analysis Process]]
+3. Studio time: documenting and mounting the response pieces for class review
 
 ## Things to do before our next class
 

@@ -6,7 +6,7 @@ created: __CREATED__
 What you should be able to do by the end of BOH4M, in plain words first
 and in the Ministry's words underneath.
 
-## By June you should be able to
+## By the end of the course you should be able to
 
 - **Say how an organization is put together**, and why it is arranged
   that way rather than another way.

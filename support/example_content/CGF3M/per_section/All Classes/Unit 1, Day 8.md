@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish your two-column pages tonight, while you can still remember which end of the bay you were on.
+- [ ] Bring the notebook back tomorrow. The first ten minutes of class are for finishing today's pages, because what is marked is written in the room.

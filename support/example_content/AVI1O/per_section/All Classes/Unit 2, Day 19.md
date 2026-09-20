@@ -11,9 +11,10 @@ tags:
 ## Agenda
 
 1. [[Surface and Texture]] revisited across media
-2. The same texture attempted in four media
-3. Studio time
+2. The same texture attempted in four media, compared on one sketchbook
+   page here
+3. Studio time: surface and texture exploration across mixed media
 
 ## Things to do before our next class
 
-- [ ] Compare the four in your sketchbook.
+- [ ] Read [[Giving Feedback]] again before the critique.

@@ -47,7 +47,7 @@ through. The fastest way to collect real surfaces into a sketchbook.
 > Divide a sketchbook page into six boxes and draw the same small object in
 > each — one box per technique above. Same object, same light, six
 > surfaces. You will find out in forty minutes which technique suits your
-> hand, and you will have a reference page you use all year.
+> hand, and you will have a reference page you use all semester.
 
 Choosing a technique is choosing an effect. Ask what you want the surface
 to do before you ask which method to use, and the answer usually names

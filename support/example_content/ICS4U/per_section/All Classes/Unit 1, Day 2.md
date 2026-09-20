@@ -16,7 +16,8 @@ tags:
 3. Compare and name it: [[Objects and Classes]] — a name for the thing
    that was already sitting in yesterday's inherited program
 4. Read and change: [[Your First Class]]
-5. Start your journal: [[Your First Entry]], written here in class
+5. Start your journal: [[Your First Entry]] and [[Writing About Code]],
+   written here in class
 
 ## Things to do before our next class
 

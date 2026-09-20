@@ -12,16 +12,15 @@ tags:
 
 1. Number talk: [[Which One Doesn't Belong]] — four expressions, three
    of them secretly equal
-2. Random groups — different-looking formulas, identical outputs:
-   prove it or break it
-3. Consolidate: [[Equivalent Algebraic Expressions]] — simplifying
-   rationals, and the restrictions that keep us honest
-4. [[The Transformation Gallery]] due — a gallery walk of galleries
-5. Close the unit: every family we met fits one recipe
+2. [[The Transformation Gallery]] due — a gallery walk of galleries. I
+   come to each of you once, with one question about a portrait of my
+   choosing
+3. Ten minutes, in class: your gallery entry in the [[Math Journal]] —
+   which portrait was hardest to hang, and what it taught you about the
+   recipe. This is the entry that belongs to the task
+4. Close the unit: every family we met fits one recipe
 
 ## Things to do before our next class
 
-- [ ] First journal collection is next class — measure your entries
-      against [[Journal Checklist]].
-- [ ] Journal: the restriction your group almost forgot, and what it
-      protects.
+- [ ] Journal: a pair of expressions that look different and behave the
+      same — where have you met one?

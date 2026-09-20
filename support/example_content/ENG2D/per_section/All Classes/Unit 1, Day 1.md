@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Welcome — what Grade 10 academic asks that Grade 9 did not
-2. A story read cold, and six minutes of writing about it
+2. Diagnostic, and not marked: a story read cold, then six minutes of
+   writing about it — it tells me where this class is starting from
 3. Read together: [[How This Class Works]] and [[How Marks Work]]
 4. Tour: [[Using This Site]], [[How This Site Is Organised]], and
    [[What This Site Can Do]]

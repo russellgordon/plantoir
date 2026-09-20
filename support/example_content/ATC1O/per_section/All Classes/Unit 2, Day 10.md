@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Working period
+2. Working period: assembling the first full phrase sequence for [[The Composition Study]]
 3. Coaching each group in turn
 4. First walking version, end to end
 5. Cool-down

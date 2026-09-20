@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Studio time
+1. Studio time: developing the second piece of the series for [[The Body of Work]]
 2. [[Assessing Your Own Work]] applied mid-series
-3. Conferences
+3. Conferences on technical execution and self-assessment for [[The Body of Work]]
 
 ## Things to do before our next class
 

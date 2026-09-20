@@ -89,9 +89,11 @@ upgrade is usually a setting, not a broken part.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A2.2]]
+
 ![[A2.3]]
 
 ![[A2.4]]
 
-![[A2.2]]
+![[B2.3]]
 %%curriculum-end%%

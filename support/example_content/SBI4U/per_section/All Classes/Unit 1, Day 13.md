@@ -10,10 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. [[Enzyme Investigation]], day 4 — working period: analysis and the report,
-   with the conclusion justified by your own numbers
-2. Trade reports; challenge one conclusion each
+1. [[Enzyme Investigation]], day 4 — working period: analysis, the report with
+   its conclusion justified by your own numbers, and the paragraph on
+   where your enzyme earns a living
+2. I read each of your conclusions while you work, and leave a note on it
+3. Last fifteen minutes: [[Judging Your Own Work]] against the criteria on
+   [[Enzyme Investigation]] — name your weakest row and what you will do
+   about it tomorrow
 
 ## Things to do before our next class
 
-- [ ] Report drafted; due next class.
+- [ ] Report drafted. My note on your conclusion comes back next class.

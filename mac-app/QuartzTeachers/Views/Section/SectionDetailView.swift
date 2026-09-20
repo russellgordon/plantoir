@@ -11,7 +11,23 @@ struct SectionDetailView: View {
     let sectionNumber: Int
 
     @State var previewRunner = ScriptRunner()
-    @State var deployRunner = ScriptRunner()
+
+    /// Runs every configured destination in sequence — see
+    /// `MultiDestinationDeployRunner`. For the overwhelming majority of
+    /// courses (exactly one destination) this behaves exactly like a
+    /// single `ScriptRunner` always did.
+    @State var deployRunner = MultiDestinationDeployRunner()
+
+    /// True from the moment Deploy is pressed until `deployRunner` actually
+    /// starts running — the span spent stopping any preview and doing the
+    /// pre-flight checks below, before there is any real progress to show.
+    /// `consoleArea` shows a plain "Preparing to deploy…" placeholder while
+    /// this is true, instead of `TaskProgressView` bound to a `deployRunner`
+    /// that has nothing to say yet — a fresh, idle runner renders as
+    /// nothing at all (see `deployAndWait()`), and the PREVIOUS deploy's
+    /// runner still holding last time's finished outcome is no better,
+    /// since neither is what is actually happening right now.
+    @State var isPreparingDeploy: Bool = false
 
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
@@ -20,18 +36,151 @@ struct SectionDetailView: View {
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
 
+    /// The folder this view REGISTERED itself under in
+    /// `SectionWindowControllers`, and the only thing the unregister may read.
+    ///
+    /// Written in exactly one place — `.onAppear`, before the registration —
+    /// and read in exactly one place, the unregister in `onDisappear`. That
+    /// is what makes "a registration and its unregister name the same folder"
+    /// true by construction rather than by everything happening to line up,
+    /// and the registry has no other way to forget a key: nothing sweeps it,
+    /// so an entry unregistered under the wrong folder is stranded for the
+    /// life of the app.
+    ///
+    /// It is NOT `workspace.workspaceURL`, for the reason the piece was
+    /// written: choosing a different working folder clears the selection,
+    /// which tears this view down, and `onDisappear` runs on a later pass
+    /// with the window already pointing somewhere else.
+    ///
+    /// And it is not the same property as `folderThisSectionWorksIn` below,
+    /// which is the finding that split them. One property doing both jobs was
+    /// wrong for a window one render pass wide: between the selection being
+    /// cleared and `onDisappear` running, the assistant can still find this
+    /// controller registered under the OLD folder and press Deploy — and a
+    /// deploy notes the folder its work belongs to, which would have moved
+    /// the key the unregister then used.
+    @State var folderThisSectionRegisteredIn: URL?
+
+    /// The working folder the work in flight belongs to — and the folder
+    /// every stop and cancel must be aimed at, whatever the window points at
+    /// by the time the stop runs.
+    ///
+    /// Written where a piece of work's folder is DECIDED: `startPreview()`,
+    /// beside the lease, and `deployAndWait()`. Not on appearance, and not
+    /// from the model at the moment of stopping — the first would say nothing
+    /// about what is actually running, and the second is the bug: a stop read
+    /// from the model during teardown runs the NEW folder's `preview.sh` for
+    /// a section that folder may not even have, while the old folder's
+    /// container-side build or server keeps going (which matters when another
+    /// window still holds that folder — when the last one leaves, its
+    /// container is already being stopped). Writing it where the work starts
+    /// is what makes start and stop name one folder by construction.
+    ///
+    /// Nil means there is nothing to stop, and every reader is already
+    /// guarded by `previewRunner.isRunning` or `deployRunner.isRunning`.
+    ///
+    /// **One note serves both a preview and a deploy, deliberately.** They
+    /// never run at once for this section: `deployAndWait()` stops a running
+    /// preview and waits for it before it notes anything of its own, and the
+    /// Preview button is disabled while a deploy runs. Splitting this further
+    /// would be two names for one folder.
+    @State var folderThisSectionWorksIn: URL?
+
     /// Why a preview could not start, shown as an alert.
     @State var previewRefusal: String?
 
+    /// A publish that was set to happen on its own and did not get through.
+    ///
+    /// Read from disk rather than held in memory, because the run that wrote
+    /// it happened at half six with this app closed. Nil when the last
+    /// scheduled run got through, when there has never been one, or when the
+    /// teacher has dismissed it.
+    @State var stoppedScheduledPublish: ScheduledPublishOutcome.Stopped?
+
+    /// Folder problems the last build reported, shown once when it finishes.
+    ///
+    /// Held here rather than read from the runner at render time so that the
+    /// dialog appears ONCE per run: a teacher who dismisses it and carries on
+    /// editing must not have it thrown at them again on every redraw.
+    @State var healthFindings: [SiteHealthFinding] = []
+
+    /// Drives the dialog separately from the findings themselves, so the title
+    /// is not recomputed from an array that the dismissal is clearing.
+    /// Findings that arrived while a dialog was already up, waiting their turn
+    /// — each batch with the occasion it arrived on.
+    ///
+    /// The occasion travels WITH them because it decides what is offered next.
+    /// Held findings used to be shown with whatever the flag happened to be
+    /// from the previous batch, so a preview's findings held behind an
+    /// overnight publish were given the publish sentence, and the reverse told
+    /// somebody who had just published that only their preview was stale.
+    @State var heldHealthFindings: [(findings: [SiteHealthFinding], cameFromPublishing: Bool)] = []
+
+    /// What a repair just did, while that is being shown.
+    @State var repairOutcome: SiteHealthRepair.Outcome?
+
+    /// The same, waiting for the alert it was requested from to go away.
+    @State var pendingRepairOutcome: SiteHealthRepair.Outcome?
+
+    /// Which of the two folder dialogs is up, if either. One alert modifier
+    /// serves both — see the comment on it.
+    @State var healthDialog: HealthDialog?
+
+    enum HealthDialog {
+        case findings
+        case outcome
+    }
+
+    /// Whether the findings on screen came from PUBLISHING rather than from a
+    /// preview — including an overnight publish reported the next morning.
+    ///
+    /// It chooses the SENTENCE and nothing else. The preview is offered either
+    /// way; what differs is whether the teacher is also told that publishing
+    /// again is what reaches students.
+    @State var healthFindingsCameFromPublishing: Bool = false
+
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
+
+    /// Whether this section's pages have changed since it last published
+    /// — the " — Edited" marker in the title bar.
+    ///
+    /// Held rather than computed on every redraw, and refreshed only at
+    /// the moments a teacher could be LOOKING at the title bar: the window
+    /// arriving, the app coming to the front, this window becoming the key
+    /// one, and a publish or preview finishing. A body that recomputed it
+    /// would walk the course folder every time a console line arrived.
+    @State var hasUnpublishedEdits: Bool = false
+
+    /// Which refresh is the current one. `NSWindow.didBecomeKeyNotification`
+    /// fires for EVERY window and panel in the app — the assistant, a
+    /// settings sheet, an alert — and app activation fires alongside it, so
+    /// several walks can be in flight at once. Without this counter their
+    /// results land in whatever order they finish, and a walk begun before
+    /// a publish can overwrite the answer from one begun after it: the
+    /// window says " — Edited" about a section that has just gone out.
+    @State var refreshGeneration: Int = 0
 
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
 
-    var titleText: String {
+    /// What this section is CALLED — used wherever a sentence names it
+    /// ("Deploying ICS3U-S1"). Deliberately without the " — Edited"
+    /// marker: the marker is a statement about the window's contents, not
+    /// part of the section's name, and "Deploying ICS3U-S1 — Edited" reads
+    /// as though "Edited" were something being deployed.
+    var sectionName: String {
         return "\(course.code)-S\(sectionNumber)"
+    }
+
+    /// What the window's title bar says — the name, plus the marker when
+    /// there is something unpublished.
+    var titleText: String {
+        return SectionPublishState.windowTitle(
+            base: sectionName,
+            hasUnpublishedEdits: hasUnpublishedEdits
+        )
     }
 
     var isBusy: Bool {
@@ -41,34 +190,93 @@ struct SectionDetailView: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack {
-            // Base layer: always laid out in the normal, safe-area
-            // respecting flow. Keeping it mounted means its geometry is
-            // never inherited from the full-bleed web view above it —
-            // which is what dragged the progress header under the
-            // window's toolbar when a preview was restarted.
-            VStack(spacing: 0) {
-                if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || !deployRunner.transcript.lines.isEmpty {
-                    consoleArea
-                } else {
-                    ContentUnavailableView(
-                        "No Preview Running",
-                        systemImage: "globe",
-                        description: Text(course.configuration.deploysToLocalFolder
-                            ? "Click Preview to build this section's website and see it here, or Deploy to copy it to your deploy folder."
-                            : "Click Preview to build this section's website and see it here, or Deploy to put it online.")
-                    )
-                }
+        // The notice is ABOVE everything this section can show, including the
+        // site — one band, in one place, in every state.
+        //
+        // It used to sit in the base layer of the ZStack below, under the
+        // full-bleed web view: with a preview showing (the commonest state) a
+        // teacher saw nothing but a green tint bleeding through the toolbar,
+        // which is issue #219. Putting the band in the layer ABOVE the site
+        // would have meant writing it twice — once for each state — so it is
+        // here instead, outside the stack altogether. The site takes the room
+        // that is left and gets it back the moment the notice is dismissed.
+        //
+        // REJECTED: `.safeAreaInset(edge: .top)` on the web view, and a second
+        // copy of the band inside a cover-layer `VStack`. Both put the band
+        // inside the branch that exists only while a preview is up, so the
+        // no-preview case needs its own copy — two places to keep in step for
+        // one sentence — and both move the band between containers as previews
+        // start and stop.
+        VStack(spacing: 0) {
+            if let stoppedScheduledPublish {
+                ScheduledPublishNoticeView(
+                    outcome: stoppedScheduledPublish,
+                    course: course.code,
+                    sectionNumber: sectionNumber,
+                    dismiss: dismissScheduledPublishNotice
+                )
             }
+            ZStack {
+                // Base layer: always laid out in the normal, safe-area
+                // respecting flow. Keeping it mounted means its geometry is
+                // never inherited from the full-bleed web view above it —
+                // which is what dragged the progress header under the
+                // window's toolbar when a preview was restarted.
+                VStack(spacing: 0) {
+                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
+                        consoleArea
+                    } else {
+                        // Fills the height it is offered, which is what keeps
+                        // the notice above it flush under the toolbar: a layer
+                        // that claims less than the stack offers is CENTRED by
+                        // it, and the notice floated mid-window. See the view's
+                        // own comment for the measurement.
+                        NoPreviewPlaceholderView(
+                            deploysToLocalFolder: course.configuration.deploysToLocalFolder
+                        )
+                    }
+                }
 
-            // Cover layer: the site itself, deliberately full-bleed.
-            if let previewURL {
-                WebPreviewView(controller: previewController, url: previewURL)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityIdentifier("previewWebView")
+                // Cover layer: the site itself, full-bleed within whatever
+                // room the notice leaves. It stays in this one branch however
+                // the notice comes and goes — the web view is a live WKWebView
+                // with a page scrolled to where the teacher left it, and
+                // moving it between containers is how that gets thrown away.
+                if let previewURL {
+                    WebPreviewView(controller: previewController, url: previewURL)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .accessibilityIdentifier("previewWebView")
+                }
             }
         }
         .navigationTitle(titleText)
+        .task {
+            refreshEditedMarker()
+        }
+        .onChange(of: isBusy) { _, nowBusy in
+            // A publish clears the marker; a preview leaves the content
+            // alone but is the other moment the folder has just been read.
+            if !nowBusy {
+                refreshEditedMarker()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshEditedMarker()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            refreshEditedMarker()
+        }
+        // A scheduled run is a separate process, so the FILE it writes is the
+        // only event there is. Reading the watcher's counter here is what
+        // registers this view as an observer of it; when it moves — a record
+        // arrived, one was cleared, or the app came back to the front — the
+        // section re-reads its own record and the band appears where the
+        // teacher is already looking, instead of waiting for them to click away
+        // and back. The sidebar's badge follows the same counter, so the two
+        // move together.
+        .onChange(of: ScheduledPublishWatcher.shared.generation) { _, _ in
+            loadStoppedScheduledPublish()
+        }
         .toolbar {
             // Every item is ALWAYS present (disabled when inapplicable):
             // conditionally inserting toolbar items makes macOS rebuild
@@ -134,7 +342,14 @@ struct SectionDetailView: View {
                     startDeploy()
                 }
                 .labelStyle(.titleAndIcon)
-                .disabled(deployRunner.isRunning)
+                // `isPreparingDeploy` closes a real window, not just a
+                // display one: `deployRunner.isRunning` alone stays false
+                // through `deployAndWait()`'s whole prep phase (stopping any
+                // preview, waiting for containers to clear), and the button
+                // was clickable again the instant that phase started — a
+                // second click there raced its own stop-preview-then-deploy
+                // sequence against the first's.
+                .disabled(deployRunner.isRunning || isPreparingDeploy)
                 .help("Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
 
@@ -165,9 +380,20 @@ struct SectionDetailView: View {
         // These are the same functions the toolbar buttons call, so the
         // assistant and the buttons can never drift apart.
         .onAppear {
+            // Looked for on every appearance rather than once at launch: a
+            // section opened after a run finished must show what it left, and
+            // this is also what a window restored at launch reads. A run that
+            // finishes while this section is ALREADY showing is the watcher's
+            // job, above. The trail line belongs to the run, not to either of
+            // these reads.
+            loadStoppedScheduledPublish()
             guard let folder = workspace.workspaceURL else {
                 return
             }
+            // The key this section is about to register under, noted while
+            // the window still points here — `onDisappear` runs when it may
+            // not. This is the property's ONLY write; see its comment.
+            folderThisSectionRegisteredIn = folder
             SectionWindowControllers.shared.register(
                 folderPath: folder.path,
                 courseCode: course.code,
@@ -188,8 +414,32 @@ struct SectionDetailView: View {
                 )
             )
         }
+        .task {
+            // Anything the overnight publish found. It ran with the app
+            // closed, so this is the first moment there is anywhere to say it
+            // — and `takeFolderProblems` consumes the record, so it is
+            // reported once rather than every time this window opens.
+            // Guard BEFORE consuming: `takeFolderProblems` deletes the record
+            // as it reads it, so taking it while a dialog is already up threw
+            // the overnight findings away permanently.
+            guard healthFindings.isEmpty else {
+                return
+            }
+            let waiting: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
+                courseCode: course.code, sectionNumber: sectionNumber
+            )
+            if !waiting.isEmpty {
+                healthFindings = waiting
+                // The overnight run PUBLISHED, so the sentence must say that
+                // students are still seeing the old site.
+                healthFindingsCameFromPublishing = true
+                healthDialog = .findings
+            }
+        }
         .onDisappear {
-            if let folder = workspace.workspaceURL {
+            // The key this section registered under, never the folder its
+            // work belongs to and never the window's current one.
+            if let folder = folderThisSectionRegisteredIn {
                 SectionWindowControllers.shared.unregister(
                     folderPath: folder.path,
                     courseCode: course.code,
@@ -212,11 +462,275 @@ struct SectionDetailView: View {
         } message: {
             Text(deployRefusal ?? "")
         }
+        // ONE alert for both the findings and what a repair did, switched by
+        // `healthDialog`, rather than two `.alert` modifiers on the same view.
+        //
+        // Two was a crash, not a style preference: SwiftUI's alert bridge
+        // segfaulted in `updateExistingAlert` while closing a sheet, reliably,
+        // once this view carried four alerts. A view presents one alert at a
+        // time anyway, so modelling that explicitly is both what SwiftUI wants
+        // and what the sequencing needs.
+        .alert(healthAlertTitle, isPresented: healthDialogBinding) {
+            switch healthDialog {
+            case .findings:
+                if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
+                    Button(title) {
+                        // The marker is refreshed because a repair CHANGES the
+                        // section's content on the teacher's behalf, and
+                        // nothing else here would: `refreshEditedMarker` runs
+                        // on appear, when the section stops being busy, and on
+                        // window activation — the section stopped being busy
+                        // before this alert appeared, and an alert on this
+                        // window does not make it key again.
+                        defer { refreshEditedMarker() }
+                        // Only REMEMBERED here: the outcome is shown once this
+                        // alert has actually gone, from `onChange`. Raising a
+                        // second alert from inside this action loses one of
+                        // them, and the one lost is the report just asked for.
+                        pendingRepairOutcome = SiteHealthRepair.outcome(
+                            ofRepairing: healthFindings, in: course,
+                            occasion: healthFindingsCameFromPublishing ? .publishing : .building
+                        )
+                    }
+                }
+                Button("OK") { }
+            case .outcome:
+                if repairOutcome?.canRebuild == true {
+                    Button("Preview Again") {
+                        rebuildAfterRepair()
+                    }
+                }
+                Button("OK") { }
+            case .none:
+                Button("OK") { }
+            }
+        } message: {
+            Text(healthAlertMessage)
+        }
+        // Findings go up as soon as the build reports them, NOT when the
+        // preview finishes.
+        //
+        // Driving the real app is what found this. Deleting a section's
+        // index.md produces the "no front page" finding — and also makes every
+        // request 404, so `waitForPreviewServer` never succeeds and the call
+        // after it is never reached. The dialog was gated behind a preview that
+        // the very problem it reports prevents from completing: the worse the
+        // course, the less likely the teacher was to be told.
+        .onChange(of: previewRunner.healthFindings.count) { _, count in
+            if count > 0 {
+                showHealthFindings(from: previewRunner)
+            }
+        }
+        .onChange(of: healthDialog == nil) { _, isGone in
+            if isGone {
+                healthFindings = []
+                repairOutcome = nil
+                showAnythingWaiting()
+            }
+        }
+    }
+
+    /// The title of the folder-problem dialog.
+    ///
+    /// Plain words, and never the machinery: a teacher is told what is wrong
+    /// with THEIR course, not that a check failed. One problem names itself;
+    /// several are counted, because a title listing three sentences is not a
+    /// title.
+    var healthAlertTitle: String {
+        if healthDialog == .outcome {
+            return repairOutcome?.headline ?? ""
+        }
+        if healthFindings.count == 1 {
+            return healthFindings[0].sentence
+        }
+        if healthFindings.isEmpty {
+            // Reached only while the alert is being torn down, after the
+            // findings have been cleared. Saying "0 things need your attention"
+            // there is the unreachable-by-design string made reachable, which
+            // this view has now met twice.
+            return ""
+        }
+        return "\(healthFindings.count) things need your attention"
+    }
+
+    var healthDialogBinding: Binding<Bool> {
+        return Binding(
+            get: { healthDialog != nil },
+            set: { isPresented in
+                if !isPresented {
+                    healthDialog = nil
+                }
+            }
+        )
+    }
+
+    var healthAlertMessage: String {
+        if healthDialog == .outcome {
+            return repairOutcome?.detail ?? ""
+        }
+        var paragraphs: [String] = []
+        for finding in healthFindings {
+            if healthFindings.count == 1 {
+                paragraphs.append(finding.detail)
+            } else {
+                paragraphs.append(finding.sentence + "\n" + finding.detail)
+            }
+        }
+        return paragraphs.joined(separator: "\n\n")
+    }
+
+    /// Shows whatever is queued, now that the dialog it was queued behind has
+    /// gone.
+    ///
+    /// One alert at a time: SwiftUI presents one per view, and asking for a
+    /// second while the first is dismissing loses one of them. A repair's
+    /// outcome goes first — it is the answer to something the teacher just
+    /// pressed — and findings that arrived meanwhile follow.
+    func showAnythingWaiting() {
+        if let waiting = pendingRepairOutcome {
+            pendingRepairOutcome = nil
+            repairOutcome = waiting
+            healthDialog = .outcome
+            return
+        }
+        if !heldHealthFindings.isEmpty {
+            let next = heldHealthFindings.removeFirst()
+            healthFindings = next.findings
+            healthFindingsCameFromPublishing = next.cameFromPublishing
+            healthDialog = .findings
+        }
+    }
+
+    /// Builds the site again after a repair, so the teacher can see it.
+    ///
+    /// A preview that is already up is stopped first and started again, which
+    /// is the same order the Deploy button uses — starting a second one behind
+    /// the first would take a port it then could not have.
+    /// One consequence worth knowing, because nothing else says it: a preview
+    /// build is never deploy-fresh (`app-rules.json` → `buildFreshness` — serve
+    /// mode bakes a live-reload client into every page), so previewing after a
+    /// successful publish means the NEXT publish rebuilds. That is correct
+    /// rather than unfortunate, and largely moot anyway: the repair itself puts
+    /// content back, which forces a rebuild regardless.
+    func rebuildAfterRepair() {
+        Task { @MainActor in
+            // Every other way into a preview is gated — the toolbar button is
+            // disabled while the section is busy, and Deploy while a deploy
+            // runs. This was the one path with neither, so it could start a
+            // build in the same working folder as a running deploy.
+            // `CourseActivity` as well as this view's own runner. The
+            // assistant publishes the same section, in this same process,
+            // through `AssistSiteWork` — invisible to `deployRunner`. That did
+            // not matter while publish-origin findings offered no button at
+            // all; widening the offer is what made this reachable, so the guard
+            // had to widen with it.
+            // `coursePublishIsRunning`, NOT `courseIsBusy`: the latter is
+            // "previewing OR publishing", so asking it here refused the preview
+            // whenever one was already running — which is every time this
+            // button is offered. Found by pressing it.
+            //
+            // Narrowing it gave something up, though, and this is where it
+            // comes back: `courseIsBusy` also covered a preview held in ANOTHER
+            // window, and without that check `startPreview` would be refused
+            // the lease and raise an error alert out of a repair. So the lease
+            // is asked directly.
+            let somebodyElseIsPublishing: Bool = {
+                guard let folder = workspace.workspaceURL else {
+                    return false
+                }
+                return CourseActivity.coursePublishIsRunning(
+                    folderPath: folder.path, courseCode: course.code
+                )
+            }()
+            let anotherWindowHasThePreview: Bool = {
+                guard previewLease == nil, let folder = workspace.workspaceURL else {
+                    return false
+                }
+                for lease in PreviewLeases.active {
+                    if lease.folderPath == folder.path
+                        && lease.courseCode == course.code
+                        && lease.sectionNumber == sectionNumber {
+                        return true
+                    }
+                }
+                return false
+            }()
+            if anotherWindowHasThePreview {
+                pendingRepairOutcome = SiteHealthRepair.Outcome(
+                    headline: "This section is open in another window.",
+                    detail: "Preview it from there to see the change.",
+                    canRebuild: false
+                )
+                showAnythingWaiting()
+                return
+            }
+            if deployRunner.isRunning || isPreparingDeploy || somebodyElseIsPublishing {
+                // Say so. Every other gated control here disables itself or
+                // shows a refusal; swallowing the press is the silence this
+                // whole feature exists to remove, arriving in the button meant
+                // to end it.
+                // "this course", not "this section": the check matches on the
+                // folder and the course code, and deliberately ignores the
+                // section number, so publishing section 2 would otherwise be
+                // reported as section 1 publishing.
+                pendingRepairOutcome = SiteHealthRepair.Outcome(
+                    headline: "Plantoir is publishing this course just now.",
+                    // Deliberately not "press Preview Again": this outcome is
+                    // the one whose button is withheld, so naming a button that
+                    // is not on screen would be worse than saying nothing.
+                    detail: "You can preview it again once that has finished, "
+                          + "and the change will be there.",
+                    canRebuild: false
+                )
+                showAnythingWaiting()
+                return
+            }
+            // The LEASE decides, not the window's appearance. A preview whose
+            // wait timed out has cleared `isWaitingForServer` and never set
+            // `previewURL`, while still holding the port — so asking those two
+            // would have skipped the stop and then been refused the lease,
+            // raising a refusal alert out of a repair.
+            if previewLease != nil || previewRunner.isRunning {
+                await stopPreviewAndWait()
+            }
+            startPreview()
+        }
+    }
+
+    /// Puts a finished run's folder problems in front of the teacher.
+    ///
+    /// Only when the run actually produced some — a healthy course must never
+    /// see a dialog, which is the difference between a warning that gets read
+    /// and one that gets dismissed by habit.
+    func showHealthFindings(from runner: ScriptRunner?, cameFromPublishing: Bool = false) {
+        guard let runner, !runner.healthFindings.isEmpty else {
+            return
+        }
+        // Never swap the contents of a dialog that is already up: the title
+        // and the message would change under the teacher's cursor, and the
+        // findings they were reading would vanish unacknowledged.
+        //
+        // But HELD, not dropped. Returning early discarded them — and the
+        // failed-deploy path can arrive while the overnight findings are
+        // already on screen, so this is reachable rather than theoretical.
+        if healthDialog != nil {
+            // Appended, not assigned: three arrivals during one dialog used to
+            // lose the middle batch.
+            heldHealthFindings.append(
+                (findings: runner.healthFindings, cameFromPublishing: cameFromPublishing)
+            )
+            return
+        }
+        healthFindings = runner.healthFindings
+        healthFindingsCameFromPublishing = cameFromPublishing
+        healthDialog = .findings
     }
 
     /// Why this section's deploy would not get anywhere, or nil when it
-    /// would. Both destinations that need something from the teacher are
-    /// checked: the folder, and the Cloudflare Account ID.
+    /// would. EVERY configured destination is checked — the primary and
+    /// every additional one — so a redundancy target with no valid folder
+    /// or credential is caught here rather than discovered halfway
+    /// through a run that already published to the others.
     var deployRefusalReason: String? {
         return SectionDetailView.deployRefusalReason(
             configuration: course.configuration,
@@ -226,17 +740,10 @@ struct SectionDetailView: View {
 
     /// The same check, free of the view, so it can be tested.
     static func deployRefusalReason(configuration: CourseConfiguration, cloudflareAccountID: String) -> String? {
-        if configuration.deployTarget == "local_folder" {
-            if let folderProblem = CourseConfiguration.deployFolderProblem(forPath: configuration.deployFolderPath) {
-                return "\(folderProblem) Fix it in this course’s settings, under Deploying, then deploy again."
-            }
-        }
-        if configuration.deploysToCloudflare {
-            if let accountProblem = CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) {
-                return "\(accountProblem) Add it in this course’s settings, under Deploying, then deploy again."
-            }
-        }
-        return nil
+        return MultiDestinationDeployRunner.refusalReason(
+            destinations: configuration.allDeployDestinations,
+            cloudflareAccountID: cloudflareAccountID
+        )
     }
 
     var deployRefusalBinding: Binding<Bool> {
@@ -264,13 +771,39 @@ struct SectionDetailView: View {
     var consoleArea: some View {
         VStack(spacing: 0) {
             if showsDeployProgress {
-                TaskProgressView(
-                    runner: deployRunner,
-                    title: "Deploying \(titleText)",
-                    onCancel: {
-                        cancelDeploy()
+                // .leading: DeployDestinationChecklist is a compact HStack
+                // with no content of its own that forces full width, so
+                // under this VStack's default (.center) alignment it would
+                // float centred while TaskProgressView's own text starts at
+                // the left margin — two different leading edges for what
+                // reads as one panel. Explicit .leading lines them up.
+                VStack(alignment: .leading, spacing: 0) {
+                    if isPreparingDeploy {
+                        preparingToDeployPlaceholder
+                    } else {
+                        // Only appears once a course has more than one
+                        // destination — the overwhelming majority never see
+                        // this at all, and the progress panel beneath it
+                        // looks exactly as it always has.
+                        if deployRunner.legs.count > 1 {
+                            DeployDestinationChecklist(legs: deployRunner.legs)
+                        }
+                        // DeployDestinationLinks renders INSIDE TaskProgressView
+                        // itself, in the same spot a single destination's own
+                        // "Your website is live" link would sit — above "Show
+                        // details", never pushed down past the (variable-height)
+                        // console.
+                        TaskProgressView(
+                            runner: deployRunner.activeRunner,
+                            title: deployProgressTitle,
+                            hidesSiteLink: deployRunner.legs.count > 1,
+                            allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
+                            onCancel: {
+                                cancelDeploy()
+                            }
+                        )
                     }
-                )
+                }
             } else {
                 TaskProgressView(
                     runner: previewRunner,
@@ -284,12 +817,47 @@ struct SectionDetailView: View {
         }
     }
 
+    /// Stands in for the real deploy progress panel during `deployAndWait()`'s
+    /// prep work — stopping any preview, waiting for containers to clear —
+    /// before there is a real, running `deployRunner` to show. No "Show
+    /// details" or Cancel here: there is genuinely nothing yet to look at
+    /// or to stop, unlike once the real panel takes over a moment later.
+    var preparingToDeployPlaceholder: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("Deploying \(sectionName)")
+                    .font(.headline)
+                Spacer()
+                Text("Preparing to deploy…")
+                    .foregroundStyle(.secondary)
+            }
+            ProgressView()
+                .progressViewStyle(.linear)
+        }
+        .padding(12)
+    }
+
+    /// What the deploy panel is called. Names the destination currently
+    /// running only once there is more than one to distinguish between —
+    /// a course with a single destination keeps the plain title it has
+    /// always had.
+    var deployProgressTitle: String {
+        return SectionDetailView.deployProgressTitle(
+            sectionName: sectionName,
+            isRunning: deployRunner.isRunning,
+            legCount: deployRunner.legs.count,
+            currentDestinationDescription: deployRunner.currentLeg.map { leg in
+                DeployCommand.destinationDescription(for: leg.destination)
+            }
+        )
+    }
+
     /// What the preview panel is called. While the preview is being made
     /// the title says so; once it has finished or been stopped, the panel
     /// is simply about the preview, so it must stop claiming to be
     /// preparing one.
     var previewTaskTitle: String {
-        return SectionDetailView.previewTaskTitle(isPreparing: previewRunner.isRunning, sectionName: titleText)
+        return SectionDetailView.previewTaskTitle(isPreparing: previewRunner.isRunning, sectionName: sectionName)
     }
 
     /// True when the console should be about publishing rather than
@@ -303,7 +871,78 @@ struct SectionDetailView: View {
         )
     }
 
+    // MARK: - A scheduled publish that stopped
+
+    /// Forget the notice a scheduled run left behind.
+    ///
+    /// The notice itself is `ScheduledPublishNoticeView` — its own view, so
+    /// that a test can measure it; what stays here is the part that touches
+    /// this view's own state and the workspace.
+    func dismissScheduledPublishNotice() {
+        ScheduledPublishOutcome.clear(
+            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            course: course.code,
+            section: sectionNumber
+        )
+        stoppedScheduledPublish = nil
+        // The sidebar's badge is read during a row's render, so it
+        // needs telling that the answer changed — Dismiss happens
+        // here, in a different view with its own state.
+        //
+        // Said out loud even though `clear` deletes the file and the watcher
+        // would see that: a button must not wait on the filesystem to show what
+        // the teacher just did, and the test suite runs with no watcher started.
+        ScheduledPublishWatcher.shared.noteChanged()
+    }
+
+    /// Look for a stopped run. READ ONLY — the trail line is written by the
+    /// run itself (`ScheduledDeploy.runScheduled`), not here.
+    ///
+    /// Nothing is written back to the record either, which matters: an earlier
+    /// draft appended a "noted" marker, and rewriting the file changed its
+    /// modification date, so the notice showed the morning the teacher opened
+    /// it instead of the half six the run stopped at.
+    func loadStoppedScheduledPublish() {
+        stoppedScheduledPublish = ScheduledPublishOutcome.stopped(
+            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            course: course.code,
+            section: sectionNumber
+        )
+    }
+
     // MARK: - Functions
+
+    /// Works out whether the title bar should say " — Edited", off the
+    /// main thread: the check is a directory walk, and however brief, a
+    /// course on a slow network volume must not be able to stutter a
+    /// window that is being brought to the front.
+    func refreshEditedMarker() {
+        let courseDirectory: URL = course.directoryURL
+        let sectionNumber: Int = self.sectionNumber
+        // A course that publishes into a folder inside itself would
+        // otherwise feed its own marker: `deploy.py` writes the whole
+        // built site there, so every check after a publish would differ
+        // from the one before it and the window would say " — Edited"
+        // permanently.
+        let excluded: [String] = SectionPublishState.selfPublishingSubpaths(
+            courseDirectory: courseDirectory,
+            destinations: course.configuration.allDeployDestinations
+        )
+        refreshGeneration += 1
+        let generation: Int = refreshGeneration
+        Task.detached(priority: .utility) {
+            let edited: Bool = SectionPublishState.hasUnpublishedEdits(
+                courseDirectory: courseDirectory,
+                sectionNumber: sectionNumber,
+                excludingRelativePaths: excluded
+            )
+            await MainActor.run {
+                if generation == refreshGeneration {
+                    hasUnpublishedEdits = edited
+                }
+            }
+        }
+    }
 
     /// Names the preview panel for what it is at the moment.
     static func previewTaskTitle(isPreparing: Bool, sectionName: String) -> String {
@@ -311,6 +950,26 @@ struct SectionDetailView: View {
             return "Preparing the preview of \(sectionName)"
         }
         return "Preview of \(sectionName)"
+    }
+
+    /// Names the destination CURRENTLY running only while the deploy is
+    /// still going — once it has finished, naming just one destination in
+    /// the title is misleading when every configured destination actually
+    /// ran (a teacher who deployed to Netlify AND Cloudflare should not see
+    /// a title that only mentions whichever one happened to run last). The
+    /// checklist above already names each destination with its own
+    /// checkmark, and `DeployDestinationLinks` below lists every live link,
+    /// so the finished title reverts to the plain single-destination form.
+    static func deployProgressTitle(
+        sectionName: String,
+        isRunning: Bool,
+        legCount: Int,
+        currentDestinationDescription: String?
+    ) -> String {
+        if isRunning, legCount > 1, let currentDestinationDescription {
+            return "Deploying \(sectionName) — \(currentDestinationDescription)"
+        }
+        return "Deploying \(sectionName)"
     }
 
     /// Whichever task is running now, or — once both have finished — the
@@ -336,6 +995,15 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // The folder this preview belongs to, noted at the moment it is
+        // decided — which is HERE, not at the appearance. The appearance
+        // notes only the key this section registered under, and it can
+        // return without a folder at all while this function goes on
+        // working from the model — so a note made there would have let a
+        // preview start that no stop was ever aimed at. Every stop reads
+        // this, so writing it beside the lease is what makes start and
+        // stop name one folder.
+        folderThisSectionWorksIn = workspaceURL
         // Each preview runs on its own port, so several windows can show
         // sections side by side without taking each other down.
         let lease: PreviewLeases.Lease
@@ -392,6 +1060,12 @@ struct SectionDetailView: View {
                 workingDirectory: workspaceURL
             )
             await waitForPreviewServer(port: lease.port, siteAsItWas: siteAsItWas)
+
+            // A second chance, for the ordinary case where the wait finished
+            // quickly and the teacher is now looking at the preview. The
+            // findings usually arrived long before this — see the onChange on
+            // the body, which is what actually gets them on screen.
+            showHealthFindings(from: previewRunner)
         }
     }
 
@@ -407,7 +1081,7 @@ struct SectionDetailView: View {
     func stopPreviewAndWait() async {
         let courseCode: String = course.code
         let section: Int = sectionNumber
-        let folder: URL? = workspace.workspaceURL
+        let folder: URL? = folderThisSectionWorksIn
         stopPreview()
         if let folder {
             await PreviewStopper.stopSectionProcessesAndWait(
@@ -419,7 +1093,11 @@ struct SectionDetailView: View {
     func stopPreview() {
         // Ending the host-side script leaves the build or server inside
         // the container running; the launcher's stop mode reclaims them.
-        if previewRunner.isRunning, let workspaceURL = workspace.workspaceURL {
+        // Against the folder the work in flight belongs to — a preview's,
+        // or a deploy's build when a cancel reaches this way — never the one
+        // the window points at now. This also runs from `onDisappear`, which
+        // is after a folder change has already moved the window on.
+        if previewRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -439,7 +1117,7 @@ struct SectionDetailView: View {
 
     /// Cancels the running preview from the progress view.
     func cancelPreview() {
-        if previewRunner.isRunning, let workspaceURL = workspace.workspaceURL {
+        if previewRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -455,14 +1133,14 @@ struct SectionDetailView: View {
 
     /// Cancels the running deploy from the progress view.
     func cancelDeploy() {
-        if deployRunner.isRunning, let workspaceURL = workspace.workspaceURL {
+        if deployRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
                 workspaceURL: workspaceURL
             )
         }
-        deployRunner.cancelByUser()
+        deployRunner.cancel()
     }
 
     /// Hands the port back, whatever ended the preview.
@@ -505,15 +1183,50 @@ struct SectionDetailView: View {
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
             )
         }
+        // The toolbar button disables itself on `isPreparingDeploy`, but the
+        // assistant reaches this function directly, with no button to have
+        // disabled — guard here too, or two overlapping deploys can run at
+        // once and stomp on `deployRunner`'s shared state (legs, startedAt)
+        // as each writes over the other's.
+        if isPreparingDeploy || deployRunner.isRunning {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.sectionIsBusy(
+                    course: course.code, section: String(sectionNumber)
+                )
+            )
+        }
 
-        // Whatever is wrong with the destination is said here, before a
-        // build starts: discovering it after several minutes of work would
-        // waste the teacher's time and read as a failure of the deploy.
+        let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
+
+        // Whatever is wrong with ANY configured destination is said here,
+        // before a build starts: discovering it partway through a
+        // redundancy run would waste the teacher's time and let some
+        // destinations quietly go out while others never got the chance.
         if let problem = deployRefusalReason {
             return AssistSiteWorkResult(
                 succeeded: false, message: problem, isAboutTheDestination: true
             )
         }
+
+        // Claim the console for the deploy panel before touching the preview
+        // runner below. Stopping a running preview here sets its own
+        // `wasStoppedByUser`, which — until `deployRunner.run()` gives this a
+        // real timestamp a little further down — left `showsDeployProgress`
+        // comparing stale timestamps and picking the just-stopped preview
+        // panel, flashing "Stopped" for a beat before the deploy panel took
+        // over. Marking the deploy as started immediately keeps the console
+        // on the deploy panel through that whole window.
+        //
+        // `isPreparingDeploy` covers what that timestamp alone does not:
+        // `deployRunner.legs` still holds the PREVIOUS deploy's runners
+        // (finished, one way or another) until `run()` replaces them with
+        // fresh ones a little further down, and `consoleArea` must not show
+        // either that stale outcome or the flat-out blank a fresh, unstarted
+        // runner renders as — neither is what is actually happening right
+        // now, which is: getting ready to deploy.
+        deployRunner.startedAt = Date()
+        isPreparingDeploy = true
 
         // Stop any running or building preview before deploying, and wait for
         // container processes to exit so they cannot kill or race the deploy build.
@@ -525,10 +1238,19 @@ struct SectionDetailView: View {
             )
         }
 
+        // The note `startPreview()` makes, made here for the deploy —
+        // AFTER any running preview has been stopped, never before. A
+        // preview already running belongs to the folder IT started in, and
+        // writing this first would have pointed that preview's own stop,
+        // two lines up, at whatever the window happens to show now.
+        // `cancelDeploy()` reclaims the container-side build against it.
+        folderThisSectionWorksIn = workspaceURL
+
         // What the Deploy button's `disabled` says, said in words. The
         // assistant reaches this by pressing the button while a deploy is
         // already running in this window.
         if deployRunner.isRunning {
+            isPreparingDeploy = false
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.sectionIsBusy(
@@ -538,25 +1260,12 @@ struct SectionDetailView: View {
         }
 
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
-        // A folder or Cloudflare deploy never touches Netlify, so their
-        // progress must not talk about it either.
-        if course.configuration.deploysToLocalFolder {
-            deployRunner.milestones = needsBuild ? TaskMilestones.buildAndDeployToFolder : TaskMilestones.deployToFolder
-        } else if course.configuration.deploysToCloudflare {
-            deployRunner.milestones = needsBuild ? TaskMilestones.buildAndDeployToCloudflare : TaskMilestones.deployToCloudflare
-        } else {
-            deployRunner.milestones = needsBuild ? TaskMilestones.buildAndDeploy : TaskMilestones.deploy
-        }
-
-        // When this section has a custom domain, the live-site link shown
-        // after publishing wears it instead of the Netlify address.
-        let customDomain: String = CourseConfiguration.normalizedCustomDomain(
-            course.configuration.customDomain(forSection: sectionNumber)
-        )
-        deployRunner.customDomainForLinks = customDomain.isEmpty ? nil : customDomain
 
         // Let the rest of the app know this course is mid-publish (so,
-        // for example, Add Section… declines until it finishes).
+        // for example, Add Section… declines until it finishes) — ONE
+        // bracket around the whole sequence of destinations, not one per
+        // destination: from outside this window, the course is "busy
+        // publishing" for the whole span.
         CourseActivity.beginPublish(
             folderPath: workspaceURL.path,
             courseCode: course.code,
@@ -570,57 +1279,54 @@ struct SectionDetailView: View {
             )
         }
 
-        if needsBuild {
-            deployRunner.run(
-                scriptNamed: "preview.sh",
-                arguments: [course.code, String(sectionNumber), "--build-only"],
-                workingDirectory: workspaceURL
-            )
-            if let problem = deployRunner.launchProblem {
-                return AssistSiteWorkResult(succeeded: false, message: problem)
-            }
-            let built: Bool = await deployRunner.waitUntilFinished()
-            if !built {
-                // The failure and its output are already on screen.
-                return AssistSiteWorkResult(
-                    succeeded: false,
-                    message: AssistWording.couldNotBuildBeforeDeploying(
-                        course: course.code, section: String(sectionNumber)
-                    )
-                )
-            }
-        }
+        // The real progress panel takes over from here — `deployRunner.run()`
+        // is about to give `deployRunner.legs` fresh runners of its own and
+        // start reporting real progress on them.
+        isPreparingDeploy = false
 
-        // What the launcher is asked to do is decided in one place —
-        // shared with the scheduled deploy, so an alarm set for half
-        // six sends the site to the same destination this button does.
-        let deployArguments: [String] = DeployCommand.arguments(
-            courseCode: course.code,
+        // What the launcher is asked to do, for each destination, is
+        // decided in one place — shared with the scheduled deploy and the
+        // assistant's headless path, so an alarm set for half six sends
+        // the site to the same destinations this button does.
+        await deployRunner.run(
+            course: course,
             sectionNumber: sectionNumber,
-            configuration: course.configuration,
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
-        )
-        deployRunner.run(
-            scriptNamed: DeployCommand.scriptName,
-            arguments: deployArguments,
+            destinations: destinations,
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            keepingTranscript: needsBuild
+            needsBuild: needsBuild
         )
-        if let problem = deployRunner.launchProblem {
-            return AssistSiteWorkResult(succeeded: false, message: problem)
-        }
-        let deployed: Bool = await deployRunner.waitUntilFinished()
-        if !deployed {
+
+        // A failed shared build is reported the same way regardless of
+        // how many destinations were configured — none of them were ever
+        // reached, so the wording says "could not be built", not "did
+        // not finish", which would wrongly suggest the upload failed.
+        if deployRunner.legs.first?.buildFailed == true {
+            // Show the folder problems HERE too. A build that failed because
+            // the curriculum folder or Media is missing is the case where the
+            // finding is most likely to be the cause, and moving the call
+            // below the early return had quietly dropped it altogether —
+            // de-headlining it was the intent, discarding it was not.
+            showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
             return AssistSiteWorkResult(
                 succeeded: false,
-                message: AssistWording.deployDidNotFinish(
+                message: AssistWording.couldNotBuildBeforeDeploying(
                     course: course.code, section: String(sectionNumber)
                 )
             )
         }
-        return AssistSiteWorkResult(
-            succeeded: true,
-            message: AssistWording.deployed(course: course.code, section: String(sectionNumber))
+
+        // What the build said about this course's folders — AFTER the failure
+        // paths above, so a deploy that did not publish is not headlined by a
+        // folder warning. Taken from the FIRST leg: every destination publishes
+        // the same built site, so a second leg only repeats the findings.
+        showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
+
+        return MultiDestinationDeployRunner.result(
+            course: course.code,
+            section: String(sectionNumber),
+            destinationCount: destinations.count,
+            outcome: deployRunner.outcome
         )
     }
 

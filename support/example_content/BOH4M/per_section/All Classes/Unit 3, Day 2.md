@@ -13,6 +13,7 @@ tags:
 1. A badly stated problem, restated four ways
 2. Strategies worth having: [[Solving Management Problems]]
 3. Five whys, run on a real school problem
+4. Last fifteen minutes: the change my note named on your draft yesterday, made here — then [[The People Problem]] handed in
 
 ## Things to do before our next class
 

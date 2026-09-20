@@ -35,13 +35,50 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
+%%
+Below, link to the specific curriculum expectations this page substantively addresses.
+Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
+Keep this note OUTSIDE the curriculum markers — everything between them is deleted for a teacher who declines curriculum pages, and a comment nested inside disappears with it.
+%%
+
 %%curriculum-start%%
 ## Curriculum connection
 
-%%
-Link to the specific curriculum expectations this page substantively addresses.
-Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
-%%
-
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+This block is for you, not for students: nothing between the percent
+signs is ever published. Every task page in this course carries one,
+because observation and conversation are the two kinds of evidence a
+real semester loses first. Fill in the three parts and it takes about
+ten minutes once.
+
+Name the real day from the arc, not a plausible-sounding one, and
+check that day's agenda actually schedules what you are describing.
+Plain text only in here — no links and no transclusions, because both
+would be counted by the site as though they were on the published
+page.
+
+OBSERVE — Unit  , Day  , which period and what it is for
+  Watch for: something visible only while they work, and invisible in
+  what they hand in. If you cannot name one, the task may be worth
+  reopening.
+  Going well:
+  Stuck:
+  Record: how you will note it for a whole class, in seconds.
+
+TALK — Unit  , Day  , at a conference or check-in the arc already has
+  Ask:
+  Then:
+  A strong answer sounds like:            , which is the expectation
+  code             heard aloud. Check the expectation's wording says
+  what you are claiming, and do not reuse a question already printed
+  on this page or on that day's agenda — they will have rehearsed it.
+  Record:
+
+The product evidence is                   . That one arrives on its
+own.
+%%

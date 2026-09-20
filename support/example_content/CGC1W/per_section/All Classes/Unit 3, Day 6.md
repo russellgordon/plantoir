@@ -12,8 +12,9 @@ tags:
 
 1. **Field day — the neighbourhood.** [[The Land Use Walk]], population edition
 2. Housing types, densities, ages of buildings, who is on the street
-3. Back in the room: does the census match what you saw?
+3. Back in the room: does the census match what you saw? Then your
+   neighbourhood entry for [[The Field Record]], written before you go
 
 ## Things to do before our next class
 
-- [ ] Write up the walk against your census profile.
+- [ ] Send me the photograph of today's entry if you did not at the door. Read [[Comparing Communities]].

@@ -17,7 +17,10 @@ tags:
 3. Consolidate: the unit in one line — counting builds the sample
    space, and probability reads it
 4. Launch: [[The Fair Game Audit]] — you will design or dismantle a
-   game of chance, and defend the verdict with numbers
+   game of chance, and defend the verdict with numbers. Read its
+   criteria table today, before you choose a game: it is what I will
+   read the audit against, and it is on the page from now until it is
+   handed in
 5. How it is assessed: [[How Marks Work]] — the argument is the product
 
 ## Things to do before our next class

@@ -20,5 +20,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Skim [[Final Reflection]] — we begin it together next class.
+- [ ] Skim [[Final Reflection]] — we begin writing it together in a
+      few classes' time.
 - [ ] Journal: one thing an invited reader said that you will keep.

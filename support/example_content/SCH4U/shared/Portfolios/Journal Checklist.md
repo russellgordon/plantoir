@@ -8,9 +8,29 @@ tags:
 What I check for at the end of the semester, so you can check for it
 first.
 
+## Which entries carry a mark
+
+The **milestone entries** — the end-of-unit ones written in class, the
+[[Showing Growth]] comparison, and [[Final Reflection]]. Those are the
+part of your seventy per cent that this folder contributes, and they are
+written in the room, in a period set aside for them, which is why they
+are the ones I can mark. See [[How Marks Work]].
+
+Everything else in here is yours. I read it, it is what makes the
+milestone entries possible at all, and it is not marked. That is not a
+reason to skip it: an entry written at home on the evening of the lab is
+where the raw readings and the doubts survive, and the milestone entry
+in three weeks' time is built out of them.
+
+So the checklist below has two jobs. The contents list is what a
+complete journal holds; the table under it is the standard I judge the
+milestone entries against.
+
 ## Contents
 
 - [ ] [[Your First Entry]] present, from the first week
+- [ ] The milestone entry for each unit, written in class — these are
+      the ones that carry a mark
 - [ ] An entry for each investigation you ran — there are eight of them
 - [ ] Every one of those entries contains a prediction recorded
       **before** the measurement, with the model it came from named
@@ -25,7 +45,7 @@ first.
 - [ ] [[Final Reflection]] completed
 - [ ] Dates on everything, in order, readable by a stranger
 
-## How it is assessed
+## How the milestone entries are judged
 
 | Criterion | What I am looking for |
 | --- | --- |
@@ -36,7 +56,7 @@ first.
 | Reasoning | Mechanism attempted, not just the pattern described |
 | Limitations | Named by you, sized, and with the direction they pushed |
 | Growth | Change shown with two pieces side by side, not asserted |
-| Care | Organised well enough that a reader can follow it cold |
+| Readable cold | A reader who was not there can follow the entries in order and find any number in them |
 
 ## The two rows that separate this course from last year
 
@@ -73,5 +93,7 @@ number suggests. See [[Working with Logarithms in Chemistry]] and
 > to the same number of decimal places regardless of what measured it,
 > go and read [[Significant Figures and Units]] before you hand it in.
 
-Standard to aim at: [[What a Strong Entry Looks Like]]. How the
-categories are weighted: [[How Marks Work]].
+Standard to aim at: [[What a Strong Entry Looks Like]]. Reading a draft
+against a table like this one, in time to change something:
+[[Judging Your Own Work]]. How the categories are weighted:
+[[How Marks Work]].

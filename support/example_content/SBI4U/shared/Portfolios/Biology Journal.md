@@ -6,8 +6,8 @@ enableToc: true
 tags:
   - portfolios
 ---
-A page a week, in your own words, written for one reader: you in June,
-trying to remember why any of this made sense.
+A page a week, in your own words, written for one reader: you at the end of
+the course, trying to remember why any of this made sense.
 
 ## What goes in an entry
 
@@ -25,7 +25,8 @@ vocabulary is where understanding hides. The moment you try to explain
 meiosis without using the word "meiosis", you find out whether you have
 it.
 
-[[Portfolio Checklist]] is what a complete portfolio holds by January.
+[[Portfolio Checklist]] is what a complete portfolio holds by the end of the
+course.
 
 > [!tip] Drawing counts
 > A labelled diagram you drew yourself is worth three paragraphs copied

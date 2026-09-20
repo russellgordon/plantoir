@@ -12,7 +12,7 @@ asks you to do something you have not named before.
   piece of work in this course runs on, and the four concepts of
   geographic thinking
 
-The inquiry process page is the one that repays a second reading in
-December. By then you will have run the loop half a dozen times, and the
-parts that read as abstract in September will read as a description of
-what you actually did.
+The inquiry process page is the one that repays a second reading near
+the end of the course. By then you will have run the loop half a dozen
+times, and the parts that read as abstract at the start will read as a
+description of what you actually did.

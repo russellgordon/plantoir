@@ -13,7 +13,7 @@ tags:
 1. Shop induction: where everything is, and where the stops are
 2. [[Personal Protective Equipment]] — fitted and checked
 3. [[Before You Start Work]] — the habit that prevents most of it
-4. What we are aiming at by June: [[Learning Goals]]; where to find me
+4. What we are aiming at by the end of the course: [[Learning Goals]]; where to find me
    when you are stuck: [[Getting Help]]
 
 ## Things to do before our next class

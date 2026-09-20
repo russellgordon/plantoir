@@ -73,7 +73,7 @@ pattern.
 >
 > The general pattern for neutralization is
 >
-> $$\text{acid} + \text{base} \rightarrow \text{salt} + \text{water}$$
+> $$\ce{acid + base -> salt + water}$$
 >
 > where "salt" means the ionic compound built from the metal of the
 > base and the negative ion of the acid — not specifically table salt,
@@ -207,6 +207,8 @@ this page first.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[C2.6]]
 
 ![[C3.5]]
 

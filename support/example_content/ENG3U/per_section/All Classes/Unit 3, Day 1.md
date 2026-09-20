@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Begin [[Monkey Beach]]: who Eden Robinson is, and where Kitamaat is
-2. The opening pages read aloud
-3. Concept: [[Whose Country, Whose Story]] — how we read this unit
+1. An unseen page that explains nothing, read cold, then five minutes of
+   writing — not marked: it shows me what this class does with a text
+   that withholds
+2. Begin [[Monkey Beach]]: who Eden Robinson is, and where Kitamaat is
+3. The opening pages read aloud
+4. Concept: [[Whose Country, Whose Story]] — how we read this unit
 
 ## Things to do before our next class
 

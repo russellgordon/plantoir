@@ -13,15 +13,15 @@ Written in the first week, kept, and read again at the end.
    argument" is more useful than "I am good at essays".
 3. **What you find hardest** — starting, structure, quoting, speaking in
    discussion, finishing.
-4. **What you want to be able to do by June.** In your own words.
+4. **What you want to be able to do by the end of the course.** In your own words.
 
 A page, handwritten, twenty minutes.
 
 ## Why
 
-Because in June you will read it beside what you can then do, and write
-about the difference — see [[Showing Growth]]. Most students cannot feel
-their own progress; this is the evidence that it happened.
+Because at the end of the course you will read it beside what you can then
+do, and write about the difference — see [[Showing Growth]]. Most students
+cannot feel their own progress; this is the evidence that it happened.
 
 > [!note] Who reads it
 > Nobody, unless you decide otherwise. I check it exists.

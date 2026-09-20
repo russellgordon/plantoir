@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Portfolio conferences, one by one
-2. Others: practical practice and site maintenance
+1. Portfolio conferences, one by one: [[The Evidence Portfolio]]
+2. Others: practical practice and site maintenance: [[Your Skills Record]]
 3. Shop tidy
 
 ## Things to do before our next class
 
-- [ ] Portfolio ready for submission.
+- [ ] Note the two things your conference asked for — next period has
+      time for them.

@@ -2,7 +2,6 @@
 title: Curriculum
 publish: true
 created: __CREATED__
-enableToc: true
 ---
 Everything we do in this course points at one or more of these
 expectations, from **TEJ3M — Computer Engineering Technology,

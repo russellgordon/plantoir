@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. **Period 4 of 4: [[The Pathway Plan]] handed in**
-2. Final revisions, and what changed since September
-3. Booking the adult who will hear your defence
+1. **Period 4 of 4:** [[Judging Your Own Work]] on your own plan, in the first ten minutes
+2. The rest of the period: act on what the checkpoint and the self-check found. [[The Pathway Plan]] handed in at the end of it
+3. Booking the adult who will hear [[The Plan Defence]], and reading again what it asks of you
 
 ## Things to do before our next class
 

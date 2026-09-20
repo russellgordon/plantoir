@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: a drug that acts at a synapse — predict its effect
+1. Warm-up: a drug that acts at a synapse — predict its effect: [[The Nervous System]]
 2. Random groups — agonists and antagonists, matched to three real
-   medications
+   medications: [[Homeostasis Practice]]
 3. Consolidate: why almost every drug acts at a receptor
 
 ## Things to do before our next class

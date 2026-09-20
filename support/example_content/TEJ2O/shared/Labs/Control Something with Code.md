@@ -94,5 +94,9 @@ from across the room. Either one is a first sketch of [[The Gadget]].
 
 ![[B2.4]]
 
+![[B5.1]]
+
+![[B5.2]]
+
 ![[B5.4]]
 %%curriculum-end%%

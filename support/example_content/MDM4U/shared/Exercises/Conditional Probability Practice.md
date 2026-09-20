@@ -175,3 +175,13 @@ tree or build the table; both are faster than staring at the formula.
 > exclusive events are about as far from independent as two events
 > can get, and the fact that both phrases sound like "unrelated" is
 > the reason this question exists.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.5]]
+
+![[A1.6]]
+
+![[A2.5]]
+%%curriculum-end%%

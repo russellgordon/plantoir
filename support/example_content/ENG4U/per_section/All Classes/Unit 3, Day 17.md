@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. The closet scene in two productions: casting, blocking, and what the
-   camera decides about Gertrude
-2. One episode of the television adaptation, in extract
+   camera decides about Gertrude: [[The Adaptation Study]]
+2. One episode of the television adaptation, in extract: [[Adaptation and Media]]
 
 ## Things to do before our next class
 

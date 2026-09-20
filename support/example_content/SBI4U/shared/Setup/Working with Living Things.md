@@ -37,3 +37,9 @@ ready. You do not have to justify it, and it does not affect your mark.
 > thickness of the left ventricle wall is something you understand in
 > about two seconds and never forget. That is the trade this page is
 > weighing, and it is worth being honest that it is a trade.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.4]]
+%%curriculum-end%%

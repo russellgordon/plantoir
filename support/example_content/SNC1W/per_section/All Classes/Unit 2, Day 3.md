@@ -10,11 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Measuring Abiotic Factors]] in class
+1. Bench: write up [[Measuring Abiotic Factors]] in class — the first of the
+   seven marked [[Lab Reports]]
 2. Compare the two sites: which factor differed most, and did the living
    things differ with it?
 3. Skill: [[Making Graphs in a Spreadsheet]] on your own data
 
 ## Things to do before our next class
 
-- [ ] Report finished with a graph of both sites.
+- [ ] Read [[Modelling Energy Flow]]. Next class you build it.

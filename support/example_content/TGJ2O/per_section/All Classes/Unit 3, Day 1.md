@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Standup — new beat: the community
-2. New warm-up: [[One-Minute Pitch]] — every reporter pitches, timed
+2. New warm-up: [[One-Minute Pitch]] — every reporter pitches, timed,
+   and I hear what this room thinks a question worth chasing sounds like
 3. Compare pitches, then go deeper on [[News Values]] — why some pitches
    pulled the whole room in
 4. Launch: [[The Investigation]] — a community story that answers a

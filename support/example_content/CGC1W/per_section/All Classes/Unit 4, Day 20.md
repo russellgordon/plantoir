@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. **Day 3 of 4:** analysis
-2. The four concepts applied to what you found — [[The Concepts of Geographic Thinking]]
+2. The four concepts applied to what you found — one each, written and
+   signed: [[The Concepts of Geographic Thinking]]
 3. Checkpoint conference with me: findings, not slides
 
 ## Things to do before our next class

@@ -24,7 +24,7 @@ enum ScheduledDeploy {
     /// The prefix every one of our agents' labels carries, so an agent of
     /// ours is never mistaken for anything else in the teacher's
     /// `LaunchAgents` folder.
-    static let labelPrefix: String = "ca.russellgordon.Plantoir.deploy"
+    nonisolated static let labelPrefix: String = "ca.russellgordon.Plantoir.deploy"
 
     /// The environment key carrying the moment the agent was set for.
     ///
@@ -39,7 +39,7 @@ enum ScheduledDeploy {
 
     /// This section's agent label — the course code AND the section number,
     /// so two sections of one course can never collide, nor two courses.
-    static func agentLabel(courseCode: String, sectionNumber: Int) -> String {
+    nonisolated static func agentLabel(courseCode: String, sectionNumber: Int) -> String {
         let code: String = sanitizedCode(courseCode)
         return "\(labelPrefix).\(code).section\(sectionNumber)"
     }
@@ -48,7 +48,7 @@ enum ScheduledDeploy {
     /// already letters and digits, so in practice this changes nothing —
     /// it is here so that a club named with a space cannot produce a label
     /// launchd refuses.
-    static func sanitizedCode(_ courseCode: String) -> String {
+    nonisolated static func sanitizedCode(_ courseCode: String) -> String {
         var result: String = ""
         for character in courseCode.uppercased() {
             if character.isLetter || character.isNumber {
@@ -76,6 +76,70 @@ enum ScheduledDeploy {
 
     /// The flag the agent launches the app with.
     nonisolated static let runFlag: String = "--run-scheduled-deploy"
+
+    /// The flag carrying which section the run belongs to, so the app can
+    /// mark that section's pages as published once the script has
+    /// finished. Without it a scheduled deploy publishes perfectly and
+    /// leaves the window saying " — Edited" until somebody publishes again
+    /// by hand — the flagship "publish tomorrow's class overnight" feature
+    /// quietly disagreeing with the title bar.
+    nonisolated static let sectionFlag: String = "--scheduled-section"
+
+    /// Where the script says every destination succeeded. A file rather
+    /// than an exit code because the script ends by booting its own agent
+    /// out of launchd, so its status is `launchctl`'s and not the
+    /// deploy's.
+    nonisolated static func successSentinelURL(
+        courseCode: String,
+        sectionNumber: Int,
+        inHomeFolder home: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> URL {
+        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        return home
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("Plantoir")
+            .appendingPathComponent("scheduled")
+            .appendingPathComponent("\(label).succeeded")
+    }
+
+    /// The course folder and section a `--scheduled-section` invocation
+    /// names, or nil when it names none.
+    nonisolated static func requestedSection(
+        from arguments: [String]
+    ) -> (courseDirectory: URL, courseCode: String, sectionNumber: Int)? {
+        guard let index = arguments.firstIndex(of: sectionFlag), index + 3 < arguments.count,
+              let sectionNumber = Int(arguments[index + 3]) else {
+            return nil
+        }
+        let workspace: URL = URL(fileURLWithPath: arguments[index + 1])
+        let courseCode: String = arguments[index + 2]
+        return (
+            workspace.appendingPathComponent("courses").appendingPathComponent(courseCode),
+            courseCode,
+            sectionNumber
+        )
+    }
+
+    /// Take the fired agent out of launchd, now that its work is finished.
+    ///
+    /// Best effort on purpose: the plist is already gone by this point, so an
+    /// agent left registered cannot fire again — it is untidy rather than
+    /// dangerous, and a failure here must not take a publish's own exit code
+    /// with it.
+    nonisolated static func bootOutAgent(courseCode: String?, sectionNumber: Int?) {
+        guard let courseCode, let sectionNumber else {
+            return
+        }
+        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        let process: Process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["bootout", "gui/\(getuid())/\(label)"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
+    }
 
     /// The script a `--run-scheduled-deploy` invocation should run, or nil
     /// when this is an ordinary launch.
@@ -114,9 +178,13 @@ enum ScheduledDeploy {
     /// Where the agent's own output goes. A deploy that ran at half six
     /// with nobody watching has to have left something behind, or a
     /// failure is invisible until a student says the site is stale.
-    static func logURL(courseCode: String, sectionNumber: Int) -> URL {
+    nonisolated static func logURL(
+        courseCode: String,
+        sectionNumber: Int,
+        inHomeFolder home: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> URL {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
-        return FileManager.default.homeDirectoryForCurrentUser
+        return home
             .appendingPathComponent("Library")
             .appendingPathComponent("Logs")
             .appendingPathComponent("Plantoir")
@@ -145,6 +213,9 @@ enum ScheduledDeploy {
 
         let configuration: CourseConfiguration = course.configuration
 
+        // The PRIMARY destination — unchanged wording and order from
+        // before a course could have more than one, so every existing
+        // check against this function still passes byte for byte.
         if configuration.deployTarget == "local_folder" {
             if let folderProblem = CourseConfiguration.deployFolderProblem(forPath: configuration.deployFolderPath) {
                 return "\(course.code) deploys to a folder, and that folder needs attention first: \(folderProblem)"
@@ -161,8 +232,39 @@ enum ScheduledDeploy {
             }
         }
 
+        // Every ADDITIONAL destination gets the same two checks — a
+        // redundancy target with no valid folder or credential would
+        // otherwise sit silently broken until the scheduled moment,
+        // exactly the surprise asking everything up front exists to
+        // prevent.
+        for target in configuration.additionalDeployTargets {
+            if target.type == "local_folder" {
+                if let folderProblem = CourseConfiguration.deployFolderProblem(forPath: target.path) {
+                    return "\(course.code) also deploys to a folder, and that folder needs attention first: \(folderProblem)"
+                }
+            }
+            if target.type == "cloudflare_pages" {
+                if let accountProblem = CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) {
+                    return "\(course.code) also deploys to Cloudflare Pages, which needs your Account ID. \(accountProblem) Add it in this course’s settings, under Deploying, then schedule this again."
+                }
+            }
+        }
+
         if !DeployCommand.hasDeployedBefore(section: sectionNumber, in: course) {
             return "\(course.code) Section \(sectionNumber) has never been deployed, so deploying it asks what to call the website. Nobody would be there to answer that at the scheduled time, and it would wait. Deploy it once from Plantoir, and after that it can be scheduled."
+        }
+
+        // Same reasoning, for any additional destination that has never
+        // gone out — a brand-new Netlify or Cloudflare destination also
+        // asks what to call the site, and local_folder never does
+        // (`hasDeployedBefore` reports it as always ready).
+        for target in configuration.additionalDeployTargets {
+            if !DeployCommand.hasDeployedBefore(section: sectionNumber, in: course, destinationType: target.type) {
+                let destinationName: String = DeployCommand.destinationDescription(
+                    for: CourseConfiguration.DeployDestination(type: target.type, path: target.path)
+                )
+                return "\(course.code) Section \(sectionNumber) has never been deployed to \(destinationName), so deploying it there asks what to call that site. Nobody would be there to answer that at the scheduled time, and it would wait. Deploy it there once from Plantoir, and after that it can be scheduled."
+            }
         }
 
         return nil
@@ -210,8 +312,7 @@ enum ScheduledDeploy {
             }
             let isVisible: Bool = AssistPageVisibility.publishes(
                 in: text,
-                forSection: sectionNumber,
-                isSectionLocal: true
+                forSection: sectionNumber
             )
             if !isVisible {
                 held.append(page.title)
@@ -298,6 +399,10 @@ enum ScheduledDeploy {
             Bundle.main.executableURL?.path ?? "/bin/bash",
             runFlag,
             scriptURL(courseCode: courseCode, sectionNumber: sectionNumber).path,
+            sectionFlag,
+            workspaceURL.path,
+            courseCode,
+            String(sectionNumber),
         ]
         plist["StartCalendarInterval"] = schedule
         plist["WorkingDirectory"] = workspaceURL.path
@@ -323,17 +428,33 @@ enum ScheduledDeploy {
         courseCode: String,
         sectionNumber: Int,
         workspaceURL: URL,
-        deployArguments: [String]
+        deployArgumentsList: [[String]],
+        destinationTypes: [String] = [],
+        destinationDescriptions: [String] = [],
+        // Defaulted to the real home, and takeable so a test can drive the
+        // GENERATED SHELL for real without writing into the teacher's own
+        // Application Support. BuildOutputLocation.buildsRoot takes one for
+        // the same reason, and the comment there says why it had to.
+        homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> String {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         let plistPath: String = plistURL(courseCode: courseCode, sectionNumber: sectionNumber).path
         let scriptPath: String = workspaceURL.appendingPathComponent(DeployCommand.scriptName).path
-        let logDirectory: String = logURL(courseCode: courseCode, sectionNumber: sectionNumber)
-            .deletingLastPathComponent().path
+        let logDirectory: String = logURL(
+            courseCode: courseCode, sectionNumber: sectionNumber, inHomeFolder: homeFolder
+        ).deletingLastPathComponent().path
 
-        var deployLine: String = "/bin/bash \(shellQuoted(scriptPath))"
-        for argument in deployArguments {
-            deployLine += " \(shellQuoted(argument))"
+        // One line per configured destination. Deliberately NOT chained
+        // with `&&` — a destination failing must not stop the others from
+        // running, which is the entire point of a course having more than
+        // one. Only a failed BUILD (below, `$READY`) skips every line.
+        var deployLines: [String] = []
+        for arguments in deployArgumentsList {
+            var deployLine: String = "/bin/bash \(shellQuoted(scriptPath))"
+            for argument in arguments {
+                deployLine += " \(shellQuoted(argument))"
+            }
+            deployLines.append(deployLine)
         }
 
         // BUILD IF STALE, THEN DEPLOY — exactly what the Deploy button does.
@@ -360,8 +481,17 @@ enum ScheduledDeploy {
             .appendingPathComponent(courseCode)
             .path
 
+        // --non-interactive on the BUILD leg as well as the deploy, and this
+        // is the half that is easy to miss: the agent runs preview.sh
+        // DIRECTLY, so a question there is asked with nobody in front of it
+        // just as surely as one from deploy.sh. preview.sh has no `set -e`,
+        // so without the flag its 'Open' course-code guard reads at end of
+        // input, takes the [Y/n] DEFAULT, and builds a DIFFERENT course —
+        // which then publishes successfully against the wrong course. A
+        // refusal is the better failure.
         let buildLine: String = "/bin/bash \(shellQuoted(previewPath)) "
-            + "\(shellQuoted(courseCode)) \(shellQuoted(String(sectionNumber))) --build-only"
+            + "\(shellQuoted(courseCode)) \(shellQuoted(String(sectionNumber))) "
+            + "--build-only --non-interactive"
 
         var lines: [String] = []
         lines.append("/bin/mkdir -p \(shellQuoted(logDirectory))")
@@ -390,20 +520,259 @@ enum ScheduledDeploy {
         // and it earns its place: without it, .merged_output is itself
         // newer than the page it contains, so the site would look stale the
         // instant it was built and rebuild every single time.
+        let stoppedDirectory: String = ScheduledPublishOutcome
+            .directory(inHomeFolder: homeFolder).path
+        let stoppedRecord: String = ScheduledPublishOutcome.recordURL(
+            inHomeFolder: homeFolder,
+            course: courseCode,
+            section: sectionNumber
+        ).path
+        // Every record is assembled here and MOVED into place, so the app's
+        // watch on the record folder sees one event carrying a whole file. See
+        // `recordCompletionLines` and `ScheduledPublishOutcome.partialRecordURL`
+        // — including why this sits beside the record folder rather than in it.
+        let stoppedPartialRecord: String = ScheduledPublishOutcome.partialRecordURL(
+            inHomeFolder: homeFolder,
+            course: courseCode,
+            section: sectionNumber
+        ).path
+
+        // Clear LAST time's record before this run does anything.
+        //
+        // Without this, "the first destination that stopped wins" quietly
+        // becomes "the first destination that stopped SINCE THE LAST CLEARED
+        // RUN wins": a record from last week that nobody dismissed blocks
+        // tonight's from being written at all, so tonight's failure — a
+        // different destination, possibly a different kind — reaches neither
+        // the teacher nor the trail. Within one run the first still wins,
+        // which is what was meant.
+        lines.append("/bin/rm -f \(shellQuoted(stoppedRecord))")
+
         lines.append("READY=1")
         lines.append("if [ \"$NEEDS_BUILD\" = \"1\" ]; then")
-        lines.append("  if ! \(buildLine); then READY=0; fi")
+        lines.append("  \(buildLine)")
+        lines.append("  BUILD_RC=$?")
+        lines.append("  if [ $BUILD_RC -ne 0 ]; then")
+        lines.append("    READY=0")
+        // A failed BUILD is a stopped scheduled publish too, and this is the
+        // case the flag itself created: preview.sh --non-interactive REFUSES
+        // the course-code guard and exits 3, and every deploy line below is
+        // skipped when READY=0 — so without this the teacher would be told
+        // nothing at all about the one failure this change introduced.
+        //
+        // Exit 3 HERE is its own kind, and not the one a destination gets.
+        // Nothing was published because nothing was reached, so the sentence
+        // names no destination and sends the teacher to Preview — previewing
+        // is what asks the question. Until GitHub issue #132, proposed from
+        // Windows, this wrote `neededAnAnswer` with a stand-in destination and
+        // told a teacher that publishing to a site nobody had contacted needed
+        // an answer.
+        lines.append("    /bin/mkdir -p \(shellQuoted(stoppedDirectory))")
+        lines.append("    if [ $BUILD_RC -eq 3 ]; then")
+        lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.buildNeededAnAnswer.rawValue))"
+            + " > \(shellQuoted(stoppedPartialRecord))")
+        lines.append("    else")
+        lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.didNotFinish.rawValue))"
+            + " > \(shellQuoted(stoppedPartialRecord))")
+        lines.append("    fi")
+        // Written for BOTH build branches. The outright failure puts it in
+        // the teacher's sentence; buildNeededAnAnswer never shows it, and it
+        // is written anyway so every record has one shape for the reader — see
+        // ScheduledPublishOutcome.buildDestinationName.
+        for completion in recordCompletionLines(
+            indentedBy: "    ",
+            destination: ScheduledPublishOutcome.buildDestinationName,
+            temporaryPath: stoppedPartialRecord,
+            recordPath: stoppedRecord
+        ) {
+            lines.append(completion)
+        }
+        lines.append("  fi")
         lines.append("fi")
         // Deploy only if there is something good to deploy — the button
         // returns early on a failed build rather than sending the previous
         // one, and an unattended run must not be less careful.
+        // Every destination's own result is tracked, because the section
+        // is only marked as published when EVERY one of them worked — a
+        // course publishing to two hosts, one of which failed, has not
+        // published. The sentinel is what tells the app that, since this
+        // script's own exit status belongs to `launchctl bootout` below.
+        let sentinelPath: String = successSentinelURL(
+            courseCode: courseCode, sectionNumber: sectionNumber, inHomeFolder: homeFolder
+        ).path
+        lines.append("/bin/rm -f \(shellQuoted(sentinelPath))")
+        lines.append("ALL_OK=\"$READY\"")
+        // A stopped run leaves a note the app reads: at once, if the teacher is
+        // looking at that section (`ScheduledPublishWatcher` watches the folder
+        // these are moved into), and otherwise the next time they open it.
+        // Until this existed, an overnight publish that did not
+        // get through said so in the section's own log and NOWHERE else — so
+        // "my site did not update on Tuesday and I do not know why" had no
+        // answer, and a run that stopped looked exactly like one that was never
+        // scheduled.
+        //
+        // Exit 3 is deploy.sh and deploy.py's NEEDS_AN_ANSWER and means that
+        // alone; it is tested BEFORE the general non-zero branch because it is
+        // also non-zero. Any other failure is recorded too — a revoked token, a
+        // network that was down — because the SILENCE is the teacher's
+        // complaint, not the cause. Where the two platforms stand on this is
+        // compared in contracts/shared-rules.json → scheduledPublishStopped →
+        // platformDifferences, and nowhere else, so it cannot rot in four
+        // places at once.
+        //
+        // This is the DESTINATION leg, so exit 3 here is `neededAnAnswer` and
+        // not the build's own kind: deploy.sh was reached, and the question it
+        // refused is one the Publish button asks.
+        //
+        // ONE path through deploy.sh escapes that and is filed rather than
+        // fixed here (GitHub issue #136). Publishing to a FOLDER — and only to
+        // a folder — reruns preview.sh --build-only itself when any page under
+        // the section's `public/` carries `ws://localhost:`, and passes its
+        // exit 3 straight through: a BUILD question, reported from here as
+        // though the folder had asked it. Netlify and Cloudflare go through
+        // deploy.py, whose rebuild runs build_site.py directly, asks nothing
+        // and fails with 1, so they land in `didNotFinish` honestly. It needs
+        // NEEDS_BUILD=0 above, which is BuildFreshness.needsRebuild written
+        // out in shell and looks at `index.html` ALONE, while deploy.sh greps
+        // the whole tree. So a clean front page in front of a stale preview
+        // page reaches it. Bringing the two checks into step is a change to
+        // BuildFreshness as well as to this script and belongs to its own
+        // piece of work; the exit code cannot tell the two apart, and giving
+        // the rebuild its own code is a launcher contract change Windows
+        // shares.
+        //
+        // The FIRST destination that stopped is the one kept: a course can
+        // publish to several and only one may have gone wrong, so overwriting
+        // would report the last thing rather than the first.
         lines.append("if [ \"$READY\" = \"1\" ]; then")
-        lines.append("  \(deployLine)")
+        var legIndex: Int = 0
+        for deployLine in deployLines {
+            var name: String = "your website"
+            if legIndex < destinationDescriptions.count {
+                name = destinationDescriptions[legIndex]
+            } else if legIndex < destinationTypes.count {
+                name = destinationTypes[legIndex]
+            }
+            lines.append("  \(deployLine)")
+            lines.append("  RC=$?")
+            lines.append("  if [ $RC -ne 0 ]; then")
+            lines.append("    ALL_OK=0")
+            lines.append("    if [ ! -f \(shellQuoted(stoppedRecord)) ]; then")
+            lines.append("      /bin/mkdir -p \(shellQuoted(stoppedDirectory))")
+            lines.append("      if [ $RC -eq 3 ]; then")
+            lines.append("        /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.neededAnAnswer.rawValue))"
+                + " > \(shellQuoted(stoppedPartialRecord))")
+            lines.append("      else")
+            lines.append("        /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.didNotFinish.rawValue))"
+                + " > \(shellQuoted(stoppedPartialRecord))")
+            lines.append("      fi")
+            for completion in recordCompletionLines(
+                indentedBy: "      ",
+                destination: name,
+                temporaryPath: stoppedPartialRecord,
+                recordPath: stoppedRecord
+            ) {
+                lines.append(completion)
+            }
+            lines.append("    fi")
+            lines.append("  fi")
+            legIndex += 1
+        }
         lines.append("fi")
-        // Cleanup runs either way: a failed build must still leave nothing
-        // pending, or the agent fires again at the same time tomorrow.
-        lines.append("/bin/launchctl bootout gui/$(/usr/bin/id -u)/\(shellQuoted(label))")
+        // Cleared only by a run that got all the way through — every
+        // destination, exit zero — and only after every destination has run.
+        // The teacher can also dismiss it in the app, which is where this side
+        // differs from Windows: clearing only on success leaves the message
+        // standing after somebody has already fixed the problem by hand, and
+        // the next scheduled run that would clear it could be a week away.
+        // A run that got through records that it DID, rather than only
+        // deleting the evidence that it did not. Same reason as the failures:
+        // a scheduled publish leaving no trace cannot be told from one that
+        // never happened, so the trail could answer "why did my site not
+        // update?" and could not answer "did it?".
+        lines.append("if [ \"$ALL_OK\" = \"1\" ]; then")
+        lines.append("  /bin/mkdir -p \(shellQuoted(stoppedDirectory))")
+        lines.append("  /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.succeeded.rawValue))"
+            + " > \(shellQuoted(stoppedPartialRecord))")
+        var whereItWent: String = destinationDescriptions.joined(separator: ", ")
+        if destinationDescriptions.isEmpty {
+            whereItWent = destinationTypes.joined(separator: ", ")
+        }
+        for completion in recordCompletionLines(
+            indentedBy: "  ",
+            destination: whereItWent,
+            temporaryPath: stoppedPartialRecord,
+            recordPath: stoppedRecord
+        ) {
+            lines.append(completion)
+        }
+        lines.append("fi")
+        // The sentinel carries WHERE it went, so the record a scheduled
+        // publish leaves is the same shape as the button's.
+        lines.append(
+            "if [ \"$ALL_OK\" = \"1\" ]; then /bin/echo "
+            + shellQuoted(destinationTypes.joined(separator: " "))
+            + " > \(shellQuoted(sentinelPath)); fi"
+        )
+        // NO `launchctl bootout` here, and that is a fix rather than an
+        // omission. It used to be this script's last line, and it killed the
+        // publish's own parent: the agent runs THIS APP, which runs this
+        // script and then does its post-run work — recording the publish,
+        // reading folder problems out of the log, and writing the trail line
+        // for a run that stopped. Booting the job out from inside the script
+        // ends the job, and the app IS the job, so none of that work ever ran.
+        //
+        // Measured 2026-09-09 with a real scheduled deploy: the wrapper wrote
+        // its stopped record at 05:38:09 and the trail got nothing. Running
+        // the identical app arguments against a script that does NOT boot out
+        // wrote the line immediately, and dated it 05:38:09 — the run's own
+        // time, not the moment of reading.
+        //
+        // So the app boots the job out itself, after its work is done. The
+        // property the old line was protecting is kept: the PLIST is still
+        // removed first, so a Mac that restarts mid-deploy comes back with
+        // nothing pending, whatever happens to the job afterwards.
         return lines.joined(separator: "\n")
+    }
+
+    /// The two shell lines that finish a record and put it in the folder the
+    /// app watches, in ONE move.
+    ///
+    /// Only the TAIL of the write, deliberately: two of the three places that
+    /// record an outcome choose the kind in shell rather than in Swift
+    /// (`if [ $BUILD_RC -eq 3 ]`, `if [ $RC -eq 3 ]`), so a helper that took the
+    /// kind as an argument could serve only the third — or would need a `$KIND`
+    /// expression, which must not go through `shellQuoted` since that would
+    /// quote the dollar sign. Each branch writes its own kind into the temporary
+    /// file with `>`; this adds the destination line and moves the finished file
+    /// into place.
+    ///
+    /// **Why a temporary file and a move rather than two `echo`s** — and why the
+    /// temporary file sits in the PARENT of the record folder — is measured, with
+    /// the numbers, in `ScheduledPublishOutcome.partialRecordURL`. The short
+    /// version: the app watches that folder so the notice can appear while the
+    /// teacher is looking at the section, and a record written in two steps was
+    /// delivered as one event carrying half a file, 0 times out of 40.
+    ///
+    /// Nothing about FAILURE changes. The generated wrapper has no `set -e`, so a
+    /// write that fails leaves an empty temporary file, which `mv` then installs,
+    /// and an empty record reads as no record at all — exactly what a failed
+    /// `echo` straight into the record produced before. A failed `mv` leaves no
+    /// record, likewise.
+    static func recordCompletionLines(
+        indentedBy indent: String,
+        destination: String,
+        temporaryPath: String,
+        recordPath: String
+    ) -> [String] {
+        var result: [String] = []
+        result.append(
+            "\(indent)/bin/echo \(shellQuoted(destination)) >> \(shellQuoted(temporaryPath))"
+        )
+        result.append(
+            "\(indent)/bin/mv \(shellQuoted(temporaryPath)) \(shellQuoted(recordPath))"
+        )
+        return result
     }
 
     /// One argument, safe to paste into a shell command.
@@ -434,18 +803,30 @@ enum ScheduledDeploy {
             return "This working folder is missing a piece it needs (\(DeployCommand.scriptName)), so there is nothing to schedule."
         }
 
-        let deployArguments: [String] = DeployCommand.arguments(
-            courseCode: course.code,
-            sectionNumber: sectionNumber,
-            configuration: course.configuration,
-            cloudflareAccountID: cloudflareAccountID
-        )
+        // One argument list per configured destination — the same order
+        // `CourseConfiguration.allDeployDestinations` deploys in: the
+        // primary first, then each additional destination.
+        var deployArgumentsList: [[String]] = []
+        var destinationDescriptions: [String] = []
+        for destination in course.configuration.allDeployDestinations {
+            destinationDescriptions.append(DeployCommand.destinationDescription(for: destination))
+            deployArgumentsList.append(DeployCommand.arguments(
+                courseCode: course.code,
+                sectionNumber: sectionNumber,
+                destination: destination,
+                cloudflareAccountID: cloudflareAccountID,
+                // The one caller that passes this. Nobody is at the Mac at
+                // the scheduled moment, so the launcher must refuse a
+                // question rather than wait for an answer or pick one.
+                unattended: true
+            ))
+        }
         let plist: [String: Any] = propertyList(
             courseCode: course.code,
             sectionNumber: sectionNumber,
             when: when,
             workspaceURL: workspaceURL,
-            deployArguments: deployArguments
+            deployArguments: deployArgumentsList.first ?? []
         )
         let destinationURL: URL = plistURL(courseCode: course.code, sectionNumber: sectionNumber)
 
@@ -468,7 +849,9 @@ enum ScheduledDeploy {
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
                 workspaceURL: workspaceURL,
-                deployArguments: deployArguments
+                deployArgumentsList: deployArgumentsList,
+                destinationTypes: scheduledDestinationTypes(course: course),
+                destinationDescriptions: destinationDescriptions
             ) + "\n"
             try command.write(to: commandURL, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes(
@@ -505,13 +888,55 @@ enum ScheduledDeploy {
     /// Output is not captured here — launchd already points the agent's
     /// stdout and stderr at the section's log, and this process inherits
     /// them, so the script's own output lands where it always did.
-    nonisolated static func runScheduled(script: String) -> Never {
+    nonisolated static func runScheduled(
+        script: String,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)? = nil
+    ) -> Never {
+        // Taken BEFORE anything runs, for the same reason the Deploy
+        // button takes it before its own build: a page edited while an
+        // overnight publish is running did not go out, and stamping the
+        // finishing state would mark it published.
+        var fingerprintBeforeRunning: String?
+        var logSizeBeforeRunning: UInt64 = 0
+        if let section {
+            fingerprintBeforeRunning = SectionPublishState.fingerprint(
+                courseDirectory: section.courseDirectory,
+                sectionNumber: section.sectionNumber
+            )
+            // launchd APPENDS to this log and nothing truncates it, so where it
+            // ends now is where this run's own output begins.
+            logSizeBeforeRunning = logSize(
+                courseCode: section.courseCode, sectionNumber: section.sectionNumber
+            )
+        }
+
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [script]
         do {
             try process.run()
             process.waitUntilExit()
+            recordScheduledPublish(section: section, fingerprint: fingerprintBeforeRunning)
+            // Publishes regardless; the findings are kept for somebody to read
+            // when they are next at the machine.
+            recordFolderProblems(section: section, fromByteOffset: logSizeBeforeRunning)
+            // The trail line for a run that stopped, written HERE rather than
+            // when a teacher opens the section. This process IS Plantoir
+            // (--run-scheduled-deploy), so the redactor and the trail are
+            // loaded — and a teacher who never opens the section is exactly
+            // the one who reports "my site did not update", so a line that
+            // waits for them to look is a line they never get.
+            if let section {
+                ScheduledPublishOutcome.noteOnTrail(
+                    inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+                    course: section.courseCode,
+                    section: section.sectionNumber
+                )
+            }
+            // LAST, once the work above is done. See the note in
+            // oneShotCommand: this used to be the wrapper's final line, which
+            // killed this process before any of the three calls above ran.
+            bootOutAgent(courseCode: section?.courseCode, sectionNumber: section?.sectionNumber)
             exit(process.terminationStatus)
         } catch {
             FileHandle.standardError.write(Data(
@@ -519,6 +944,153 @@ enum ScheduledDeploy {
             ))
             exit(1)
         }
+    }
+
+    /// Which destination types this course publishes to, in deploy order.
+    static func scheduledDestinationTypes(course: Course) -> [String] {
+        var result: [String] = []
+        for destination in course.configuration.allDeployDestinations {
+            result.append(destination.type)
+        }
+        return result
+    }
+
+    /// Where a scheduled run leaves the folder problems it found, for the app
+    /// to read the next time it opens.
+    ///
+    /// Beside the success sentinel and consumed the same way, because the
+    /// shape is already proven here: a one-shot run writes a small file, the
+    /// app reads it and deletes it.
+    nonisolated static func findingsSentinelURL(courseCode: String, sectionNumber: Int) -> URL {
+        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("Plantoir")
+            .appendingPathComponent("scheduled")
+            .appendingPathComponent("\(label).findings")
+    }
+
+    /// Keeps whatever the run said about this course's folders, so it can be
+    /// shown when somebody is next there to read it.
+    ///
+    /// **A scheduled deploy never refuses on a finding** — it publishes and
+    /// reports afterwards. A slightly inaccurate curriculum map is a paper cut;
+    /// a site update a teacher was counting on that silently did not happen is
+    /// not. See `contracts/shared-rules.json` →
+    /// `siteHealth.scheduledDeployPublishesAnyway`.
+    ///
+    /// The findings are read back out of the LOG rather than from a pipe.
+    /// `runScheduled` deliberately does not capture the child's output —
+    /// launchd points its stdout and stderr at that log and the process
+    /// inherits them — and an unread pipe is exactly what wedged the Windows
+    /// assistant's server, so this reads the file launchd already wrote.
+    nonisolated static func recordFolderProblems(
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
+        fromByteOffset offset: UInt64
+    ) {
+        guard let section else {
+            return
+        }
+        let log: URL = logURL(
+            courseCode: section.courseCode, sectionNumber: section.sectionNumber
+        )
+        guard let text = textOfLog(at: log, fromByteOffset: offset) else {
+            return
+        }
+        var markerLines: [String] = []
+        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line: String = String(rawLine).trimmingCharacters(in: .whitespaces)
+            if SiteHealthFinding.isMarkerLine(line) {
+                markerLines.append(line)
+            }
+        }
+        let sentinel: URL = findingsSentinelURL(
+            courseCode: section.courseCode, sectionNumber: section.sectionNumber
+        )
+        if markerLines.isEmpty {
+            // Nothing wrong this time: clear anything an earlier run left, so
+            // a problem that has since been put right stops being reported.
+            try? FileManager.default.removeItem(at: sentinel)
+            return
+        }
+        try? FileManager.default.createDirectory(
+            at: sentinel.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try? markerLines.joined(separator: "\n").write(to: sentinel, atomically: true, encoding: .utf8)
+    }
+
+    /// How big the log is right now.
+    ///
+    /// Taken BEFORE the run so that afterwards only THIS run's output is read.
+    /// launchd opens `StandardOutPath` with O_APPEND and nothing rotates or
+    /// truncates it, so the file still holds every previous night's output —
+    /// reading the whole thing meant last week's findings were rewritten into
+    /// the sentinel every night, and the "nothing wrong this time" branch
+    /// became unreachable the moment a single problem had ever been logged. A
+    /// teacher who fixed the folder would have gone on being told about it
+    /// forever.
+    nonisolated static func logSize(courseCode: String, sectionNumber: Int) -> UInt64 {
+        let log: URL = logURL(courseCode: courseCode, sectionNumber: sectionNumber)
+        let attributes = try? FileManager.default.attributesOfItem(atPath: log.path)
+        return (attributes?[.size] as? UInt64) ?? 0
+    }
+
+    /// The log from `offset` onward, or the whole file when it is SHORTER than
+    /// the offset — which means somebody rotated or deleted it mid-run, and
+    /// reading from a stale offset would return nothing at all.
+    nonisolated static func textOfLog(at log: URL, fromByteOffset offset: UInt64) -> String? {
+        guard let data = try? Data(contentsOf: log) else {
+            return nil
+        }
+        if offset == 0 || UInt64(data.count) < offset {
+            return String(data: data, encoding: .utf8)
+        }
+        return String(data: data.suffix(from: Int(offset)), encoding: .utf8)
+    }
+
+    /// What the last scheduled run found, if anything, consuming the record so
+    /// it is reported once rather than every time the app opens.
+    nonisolated static func takeFolderProblems(
+        courseCode: String, sectionNumber: Int
+    ) -> [SiteHealthFinding] {
+        let sentinel: URL = findingsSentinelURL(
+            courseCode: courseCode, sectionNumber: sectionNumber
+        )
+        guard let text = try? String(contentsOf: sentinel, encoding: .utf8) else {
+            return []
+        }
+        try? FileManager.default.removeItem(at: sentinel)
+        return SiteHealthFinding.findings(in: text)
+    }
+
+    /// Marks the section's pages as published, if the script said every
+    /// destination worked. The sentinel is consumed either way, so a run
+    /// that failed cannot be read as a success by the next one.
+    nonisolated static func recordScheduledPublish(
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
+        fingerprint: String?
+    ) {
+        guard let section, let fingerprint else {
+            return
+        }
+        let sentinel: URL = successSentinelURL(
+            courseCode: section.courseCode, sectionNumber: section.sectionNumber
+        )
+        guard let written = try? String(contentsOf: sentinel, encoding: .utf8) else {
+            return
+        }
+        try? FileManager.default.removeItem(at: sentinel)
+        var destinations: [String] = []
+        for name in written.split(separator: " ") {
+            destinations.append(String(name).trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        SectionPublishState.recordPublish(
+            courseDirectory: section.courseDirectory,
+            sectionNumber: section.sectionNumber,
+            fingerprint: fingerprint,
+            destinations: destinations
+        )
     }
 
     /// Takes the alarm off. Returns nil on success.

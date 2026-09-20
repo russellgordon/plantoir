@@ -7,7 +7,9 @@ tags:
   - skills
 ---
 Every formal report in this course uses the same six sections. Learn the shape
-once and it serves you for every science course after this.
+once and it serves you for every science course after this. The seven reports
+that are marked — and the criteria they are marked against — are on
+[[Lab Reports]].
 
 | Section | What belongs there | Common mistake |
 | --- | --- | --- |

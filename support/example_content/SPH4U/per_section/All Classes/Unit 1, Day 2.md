@@ -19,4 +19,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish the first section. [[Your First Entry]] in the portfolio.
+- [ ] Finish the first section. Skim [[Your First Entry]] to see the shape
+      a journal entry takes.

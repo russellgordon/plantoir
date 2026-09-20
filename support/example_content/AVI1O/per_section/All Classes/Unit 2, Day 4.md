@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Watercolour: transparency, and letting the paper work
-2. Studio time
-3. Trial annotated
+1. Watercolour: transparency, and letting the paper work: [[Painting]]
+2. Studio time: watercolour wash and paper transparency trials for [[The Media Trials]]
+3. Trial annotated for [[The Media Trials]]
 
 ## Things to do before our next class
 

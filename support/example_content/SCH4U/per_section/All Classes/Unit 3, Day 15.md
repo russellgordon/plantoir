@@ -13,6 +13,8 @@ tags:
 1. [[The Rate Investigation]], day 4 — working period: graph it, take the
    order, and state the uncertainty
 2. Compare orders across the room — the spread is a finding
+3. In the last twenty minutes: [[Judging Your Own Work]] against the
+   criteria table, then fix your weakest row before you leave
 
 ## Things to do before our next class
 

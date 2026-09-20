@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. [[Measuring an Economy]] — GDP built by expenditure and by industry
-2. C + I + G + (X − M) computed from one real Canadian quarter
+2. C + I + G + (X − M) computed from one real Canadian quarter — worked at the board and compared before we move
 3. What GDP leaves out, stated precisely rather than dismissively
 
 ## Things to do before our next class

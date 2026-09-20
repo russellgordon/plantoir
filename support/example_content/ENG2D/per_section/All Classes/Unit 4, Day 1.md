@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. The advertisements you brought, on the screen, unsorted — the unit's
-   texts are listed on [[Media Texts We Study]]
+1. Diagnostic, and not marked: the advertisements you brought, on the
+   screen, unsorted — what the room notices unprompted tells me where to
+   start. The unit's texts are listed on [[Media Texts We Study]]
 2. Concept: [[Media Forms and Techniques]] — the five questions
 3. First analysis, together, on one text
 

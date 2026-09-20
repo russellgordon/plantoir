@@ -7,9 +7,9 @@ tags:
 ---
 By mid-course, your [[Math Journal]] stops being only a diary and
 becomes something rarer: **evidence**. The person who wrote your
-September entries no longer quite exists — and because that person
+your earliest entries no longer quite exists — and because that person
 wrote honestly, you can prove it. Showing growth means putting your
-September self and your now-self side by side and letting the
+starting self and your now-self side by side and letting the
 difference speak.
 
 ## Growth is a claim plus evidence
@@ -19,7 +19,7 @@ nothing yet. Growth writing pairs every claim with evidence from your
 own record — and the strongest evidence is the gap between two
 entries:
 
-> In September I wrote that my group made me prove the "obviously"
+> At the start of the course I wrote that my group made me prove the "obviously"
 > rectangle and that it took the length formula four times. Last week
 > in [[The Quadrilateral Case File]] I was the one saying "equal
 > diagonals is not enough — we need them bisecting each other too",
@@ -36,7 +36,7 @@ point to?
 
 Treat your earlier entries the way an essay treats sources:
 
-- **Date it** — "In my September 24 entry…" — the distance matters.
+- **Date it** — "In my entry from the third week…" — the distance matters.
 - **Quote a phrase, not a page.** Your words from the time carry more
   truth than your summary of them now. "Obvious is apparently not a
   reason", from [[Your First Entry]], says more than "I used to skip
@@ -47,7 +47,7 @@ Treat your earlier entries the way an essay treats sources:
 > [!tip] Growth is not always getting more answers right
 > Some growth is speed traded for depth. Some is a new noticing: a
 > vertex that smells wrong on the sketch, structure in
-> [[Visual Patterns]] that was invisible in September. New noticing
+> [[Visual Patterns]] that was invisible at the start of the course. New noticing
 > is growth, and your early entries prove it was not always there.
 
 %%curriculum-start%%

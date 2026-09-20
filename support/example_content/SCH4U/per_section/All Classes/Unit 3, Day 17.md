@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieval clinic: a calorimetry calculation, a Hess's law problem,
-   and a rate law from data — no notes
+   and a rate law from data — no notes: [[Hess's Law Practice]] and [[Rate Law Practice]]
 2. Compare routes on the board
 
 ## Things to do before our next class

@@ -14,7 +14,10 @@ tags:
 2. Tour of the site: [[Using This Site]] and [[How This Site Is Organised]]
 3. Read together: [[Safety in the Lab]] — the laser rules especially
 4. How the course runs: [[How Physics Class Works]], [[How Marks Work]], and [[Learning Goals]]
-5. Warm-up: three vectors, three groups, one disagreement — [[Vectors in Two Dimensions]]
+5. Warm-up, and the reason for it: three vectors, three groups, one
+   disagreement — [[Vectors in Two Dimensions]]. Nothing is collected and
+   nothing is marked; I am finding out what Grade 11 left you with, and
+   which of the next four classes needs to be slower
 
 ## Things to do before our next class
 

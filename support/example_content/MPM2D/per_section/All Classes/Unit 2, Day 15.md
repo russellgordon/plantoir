@@ -13,7 +13,9 @@ tags:
 1. Verdicts: [[The Quadrilateral Case File]] — present your proof, name
    your shape beyond reasonable doubt
 2. The jury asks questions — one per group, per [[Our Classroom Norms]]
-3. Journal collection — run [[Journal Checklist]] before handing it in
+3. Last ten minutes, here in class: this unit's milestone entry in your
+   [[Math Journal]] — the entry that is evaluated. Run
+   [[Journal Checklist]] before handing the journal in
 4. Look ahead: next unit, a curve at last
 
 ## Things to do before our next class

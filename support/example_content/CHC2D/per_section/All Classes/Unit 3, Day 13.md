@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Work period: the public-facing piece
-2. What a stranger can learn in five minutes
-3. Conferences
+1. Work period: the public-facing piece for [[The Rights Inquiry]]
+2. What a stranger can learn in five minutes — [[Using Evidence]]
+3. Conferences on public-facing format and display design for [[The Rights Inquiry]]
 
 ## Things to do before our next class
 

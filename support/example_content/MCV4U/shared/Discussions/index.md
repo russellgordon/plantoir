@@ -14,7 +14,7 @@ conjectured before they are named and models get defended in public,
 that habit is not a nicety; it is the method. Argue hard with the
 claim; thank the person who made it.
 
-Four conversations we return to all year:
+Four conversations we return to all semester:
 
 - [[When Will I Use This]] — the oldest question, and the course
   that finally gets to answer it without deferring

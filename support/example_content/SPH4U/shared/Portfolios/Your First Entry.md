@@ -5,8 +5,9 @@ created: __CREATED__
 tags:
   - portfolios
 ---
-Your first [[Physics Journal]] entry is written in class, so the format is
-never a mystery afterwards.
+Your first [[Physics Journal]] entry is started in class, on the day
+[[The Flying Pig]] flies, so that the format is never a mystery
+afterwards. Like every entry, it is not marked.
 
 ## The prompt
 

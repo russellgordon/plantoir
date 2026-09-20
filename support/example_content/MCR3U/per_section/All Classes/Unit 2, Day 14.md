@@ -11,12 +11,15 @@ tags:
 ## Agenda
 
 1. Data day — every group gets a fresh data set: cooling water, a
-   bouncing ball, dice that decay
-2. From table to equation — hunt the constant ratio, then name the base
-3. Discuss: [[What Makes a Model Good]] — fit is not the whole story
-4. [[Double or Nothing]] due — two-minute stand-up summaries
+   bouncing ball, dice that decay. From table to equation: hunt the
+   constant ratio, then name the base
+2. Discuss: [[What Makes a Model Good]] — fit is not the whole story
+3. [[Double or Nothing]] due — two-minute stand-up summaries
+4. Ten minutes, in class: your model entry in the [[Math Journal]] —
+   where your model should not be trusted, and why saying so made the
+   write-up stronger. This is the entry that belongs to the task
 
 ## Things to do before our next class
 
-- [ ] Journal: where your model should not be trusted, and why saying
-      so makes the write-up stronger.
+- [ ] Journal: the model in the room today that fitted best, and whether
+      fitting best was the same as being best.

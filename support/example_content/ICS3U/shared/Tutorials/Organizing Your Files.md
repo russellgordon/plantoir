@@ -5,8 +5,8 @@ created: __CREATED__
 tags:
   - tutorials
 ---
-Fifteen minutes now saves an hour in January, and it saves it on the
-worst possible day — the one where the project is due and the file is
+Fifteen minutes now saves an hour at the end of the course, and it saves it
+on the worst possible day — the one where the project is due and the file is
 called `final2 copy (1).py`.
 
 ## The shape to build today

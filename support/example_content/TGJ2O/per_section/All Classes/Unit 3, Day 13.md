@@ -15,7 +15,8 @@ tags:
 3. Peer edit: another desk marks every claim that is not attributed
 4. Fact-check clinic: swap stories and check three claims each to their
    origin
-5. Desk time: fix what they found, or cut it
+5. Desk time: fix what they found, or cut it — and the weakest row
+   your own check named yesterday
 
 ## Things to do before our next class
 

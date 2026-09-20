@@ -16,7 +16,10 @@ tags:
    [[Writing Code Others Can Read]]
 3. Rehearsal swap: import a neighbour's toolbox from their note alone.
    Every question you must ask is a defect in the note
+4. Now judge the whole thing against the criteria on [[The Toolbox]] —
+   [[Judging Your Own Work]]. All six can be judged today; two of them
+   could not have been yesterday. Name your weakest row
 
 ## Things to do before our next class
 
-- [ ] Fix your note. Back the whole folder up.
+- [ ] Back the whole folder up.

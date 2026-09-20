@@ -8,6 +8,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Opens the trail for this launch.
     func applicationDidFinishLaunching(_ notification: Notification) {
         ActivityTrail.noteLaunch()
+        // Built websites are kept outside the working folder, so a folder the
+        // teacher has thrown away leaves its builds behind with nothing left
+        // to name them. Once a launch, off the main thread — it is a few
+        // directory reads and touches nothing a window is about to show.
+        if !WorkspaceModel.isRunningTests {
+            Task.detached(priority: .utility) {
+                BuildOutputLocation.discardBuildsForMissingWorkingFolders()
+            }
+            // Watch for what a scheduled run leaves behind, so its notice
+            // reaches a teacher who is already looking at that section. One
+            // watcher for the app: the folder hangs off the home folder, not
+            // off a working folder. Behind the same guard as the line above —
+            // the suite must never watch the teacher's real Application
+            // Support.
+            ScheduledPublishWatcher.shared.start()
+        }
     }
 
     /// Without this, modern macOS quietly declines to restore state at all.

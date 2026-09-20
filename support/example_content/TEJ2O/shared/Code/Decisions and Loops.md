@@ -67,5 +67,9 @@ fails, and predict every printed line.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B5.1]]
+
+![[B5.2]]
+
 ![[B5.3]]
 %%curriculum-end%%

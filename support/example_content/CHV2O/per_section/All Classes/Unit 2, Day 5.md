@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launched: [[The Rights Case]]
+1. Launched: [[The Rights Case]] — the criteria read together before anybody chooses
 2. Choosing a case that is about rights rather than policy in general
 3. The hostile question, and preparing two minutes for it
 

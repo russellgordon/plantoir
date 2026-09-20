@@ -13,7 +13,8 @@ tags:
 1. Warm-up: [[The Standard Warm-Up]]
 2. Mid-point showings between groups
 3. Feedback exchanged, notes taken
-4. Revision begins
+4. Revision begins — start with [[Judging Your Own Work]] against the
+   criteria on [[The Composition Study]]
 5. Cool-down
 
 ## Things to do before our next class

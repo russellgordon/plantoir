@@ -211,3 +211,23 @@ $\hat{y} = 3.54x + 49.2$ with $r = 0.97$.
 > inflation — at which point readers could judge "big" for
 > themselves. That is the standard [[The Statistical Claim Report]]
 > holds you to as well.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D2.1]]
+
+![[D2.2]]
+
+![[D2.3]]
+
+![[D2.4]]
+
+![[D2.5]]
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[E1.5]]
+%%curriculum-end%%

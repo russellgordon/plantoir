@@ -102,6 +102,12 @@ back for a redesign, and that is the system working.
 
 ## What to hand in
 
+You work at the bench with a partner, and the results table is shared.
+**Your identification and the evidence chain behind it are written by
+you alone**, in your own words — that part, and what I see and hear at
+your bench, is what your individual mark rests on. The risk and benefit
+brief is yours alone from the first line.
+
 **1. An identification report**, two pages at most.
 
 - Your electronegativity prediction, with the calculation, dated before
@@ -187,11 +193,52 @@ deal. See [[What Counts as Evidence]] and [[Reading a Data Table]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.3]]
+
+![[A1.5]]
+
+![[A1.7]]
+
 ![[B1.2]]
 
 ![[B2.5]]
 
-![[A1.3]]
-
-![[A1.7]]
+![[B2.6]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+This is the first bench task of the course, so what you record here is
+also your baseline for everybody's technique.
+
+OBSERVE — Unit 1, Day 10, the bench half of the period, and again on
+Day 11
+  Watch for: what happens when a result is doubtful. A student who runs
+  the test again, or who sets up a control beside it, is doing the thing
+  the mark is for; a student who writes down the tidier of two readings
+  has produced an identical-looking results table. Watch too for whether
+  one thing changes at a time — same volume, same heat, same timing —
+  or whether three things move at once and the comparison quietly dies.
+  Going well: a repeated test, a control running alongside, a crossed-out
+  reading left legible with the second one beside it.
+  Stuck: a spatula going from one solid straight into the next, so that
+  the next result is about two substances and nobody knows it.
+  Record: your class list with three columns — repeated it, controlled
+  it, neither. Ten seconds a bench as you walk the room.
+
+TALK — Unit 1, Day 11, at the conference already on that agenda
+  Ask: "Point at the reading on this table you trust least. What would
+  you have to change to trust it?"
+  Then: "If I handed you a second vial of the same substance right now,
+  which of your tests would you run differently, and why that one?"
+  A strong answer names a procedural change — a control, a repeat, a
+  smaller volume, a fresh spatula — rather than "be more careful". That
+  is A1.5 heard: adapting a procedure as required, which the finished
+  report shows only as a method that happened to work.
+  Record: one line per STUDENT, not per bench, since the report is
+  half shared.
+
+The product evidence is the identification report and the risk and
+benefit brief, handed in on Day 14.
+%%

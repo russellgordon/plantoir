@@ -63,6 +63,13 @@ final class AssistToolchainWork: AssistSiteWork {
     /// The runner in use, so a caller can watch the output if it wants to.
     private(set) var runner: ScriptRunner = ScriptRunner()
 
+    /// Runs a deploy against every one of the course's configured
+    /// destinations — the same `MultiDestinationDeployRunner`
+    /// `SectionDetailView.deployAndWait()` uses, so this headless path and
+    /// the real Deploy button can never drift the way `DeployCommand.
+    /// arguments` itself once warned against.
+    private(set) var deployRunner: MultiDestinationDeployRunner = MultiDestinationDeployRunner()
+
     // MARK: - Initializer
 
     init(workspace: WorkspaceModel) {
@@ -107,8 +114,11 @@ final class AssistToolchainWork: AssistSiteWork {
         }
         return AssistSiteWorkResult(
             succeeded: true,
-            message: AssistWording.rebuiltForACallerWithNoWindow(
-                course: course.code, section: String(sectionNumber)
+            message: SiteHealthFinding.appending(
+                to: AssistWording.rebuiltForACallerWithNoWindow(
+                    course: course.code, section: String(sectionNumber)
+                ),
+                from: runner
             )
         )
     }
@@ -139,6 +149,7 @@ final class AssistToolchainWork: AssistSiteWork {
             )
         }
 
+        let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
         CourseActivity.beginPublish(
             folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
@@ -149,85 +160,50 @@ final class AssistToolchainWork: AssistSiteWork {
             )
         }
 
-        runner = ScriptRunner()
-        if needsBuild {
-            runner.milestones = AssistToolchainWork.milestones(
-                for: course.configuration, buildingFirst: true
-            )
-            runner.run(
-                scriptNamed: "preview.sh",
-                arguments: [course.code, String(sectionNumber), "--build-only"],
-                workingDirectory: workspaceURL
-            )
-            if let problem = runner.launchProblem {
-                return AssistSiteWorkResult(succeeded: false, message: problem)
-            }
-            let built: Bool = await runner.waitUntilFinished()
-            if !built {
-                return AssistSiteWorkResult(
-                    succeeded: false,
-                    message: AssistWording.couldNotBuildBeforeDeploying(
-                        course: course.code, section: String(sectionNumber)
-                    )
-                )
-            }
-        } else {
-            runner.milestones = AssistToolchainWork.milestones(
-                for: course.configuration, buildingFirst: false
-            )
-        }
-
-        // Asked of the SAME place the Deploy button asks. Built here instead,
-        // this path sent a Cloudflare course to Netlify — `--target` and
-        // `--account` were never passed, and `deploy.sh` defaults to Netlify
-        // because every course written before Cloudflare existed relies on
-        // that. Nothing failed; the site simply went to the wrong web host.
-        let arguments: [String] = DeployCommand.arguments(
-            courseCode: course.code,
+        // The same sequencer the Deploy button uses. Built separately
+        // here once, this path sent a Cloudflare course to Netlify —
+        // `--target` and `--account` were never passed, and `deploy.sh`
+        // defaults to Netlify because every course written before
+        // Cloudflare existed relies on that. Nothing failed; the site
+        // simply went to the wrong web host.
+        deployRunner = MultiDestinationDeployRunner()
+        await deployRunner.run(
+            course: course,
             sectionNumber: sectionNumber,
-            configuration: course.configuration,
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
-        )
-        runner.run(
-            scriptNamed: DeployCommand.scriptName,
-            arguments: arguments,
+            destinations: destinations,
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            keepingTranscript: needsBuild
+            needsBuild: needsBuild
         )
-        if let problem = runner.launchProblem {
-            return AssistSiteWorkResult(succeeded: false, message: problem)
-        }
-        let deployed: Bool = await runner.waitUntilFinished()
 
-        if !deployed {
-            return AssistSiteWorkResult(
-                succeeded: false,
-                message: AssistWording.deployDidNotFinish(
-                    course: course.code, section: String(sectionNumber)
-                )
+        if deployRunner.legs.first?.buildFailed == true {
+            // The findings travel even when the build failed: a missing
+            // curriculum or Media folder is a likely CAUSE of the failure, and
+            // over stdio there is no other way to mention it.
+            var message: String = AssistWording.couldNotBuildBeforeDeploying(
+                course: course.code, section: String(sectionNumber)
             )
+            if let runner = deployRunner.legs.first?.runner {
+                message = SiteHealthFinding.appending(to: message, from: runner)
+            }
+            return AssistSiteWorkResult(succeeded: false, message: message)
         }
-        return AssistSiteWorkResult(
-            succeeded: true,
-            message: AssistWording.deployed(course: course.code, section: String(sectionNumber))
-        )
-    }
 
-    /// The steps a teacher is shown for this course's destination.
-    ///
-    /// A folder or Cloudflare deploy never touches Netlify, so their progress
-    /// must not talk about it either — the section window works this out the
-    /// same way, and getting it wrong here narrated a Cloudflare deploy as a
-    /// Netlify one.
-    private static func milestones(
-        for configuration: CourseConfiguration, buildingFirst: Bool
-    ) -> [TaskMilestone] {
-        if configuration.deploysToLocalFolder {
-            return buildingFirst ? TaskMilestones.buildAndDeployToFolder : TaskMilestones.deployToFolder
+        let outcome: AssistSiteWorkResult = MultiDestinationDeployRunner.result(
+            course: course.code,
+            section: String(sectionNumber),
+            destinationCount: destinations.count,
+            outcome: deployRunner.outcome
+        )
+        guard let runner = deployRunner.legs.first?.runner else {
+            return outcome
         }
-        if configuration.deploysToCloudflare {
-            return buildingFirst ? TaskMilestones.buildAndDeployToCloudflare : TaskMilestones.deployToCloudflare
-        }
-        return buildingFirst ? TaskMilestones.buildAndDeploy : TaskMilestones.deploy
+        // Taken from the FIRST leg: every destination publishes the same built
+        // site, so a second leg only repeats the same findings.
+        return AssistSiteWorkResult(
+            succeeded: outcome.succeeded,
+            message: SiteHealthFinding.appending(to: outcome.message, from: runner),
+            isAboutTheDestination: outcome.isAboutTheDestination
+        )
     }
 }

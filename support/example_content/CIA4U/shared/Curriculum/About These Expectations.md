@@ -43,7 +43,7 @@ Strand A's stem reads **"Throughout this course, students will:"** while
 B through E say *by the end of this course*. The economic inquiry
 process, the handling of data, and the concepts of economic thinking are
 meant to run through every unit rather than be taught as a block in
-September, and this course is built that way.
+the first week, and this course is built that way.
 
 ## What "FOCUS ON" means
 
@@ -69,5 +69,5 @@ when you are planning.
 
 A code is a shared address. When a student asks "why are we studying
 this?", the answer is a link. When a department writes a course outline,
-or a teacher takes over a class in February, the codes are what make one
+or a teacher takes over a class partway through, the codes are what make one
 person's planning legible to another.

@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[The Process Study]] handed in
+1. First half of the period: [[The Process Study]] revision — today's job is acting on the line you took away yesterday
 2. Launch: [[The Sphere Connections]] — pairs, one global feature, traced back until you reach a process
-3. Features claimed and negotiated; no two pairs on the Ring of Fire
+3. Features claimed and negotiated; no two pairs on the Ring of Fire, and each pair says out loud what supplies its feature's energy
 
 ## Things to do before our next class
 

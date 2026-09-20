@@ -13,7 +13,8 @@ tags:
 
 1. Review, part one: limits, one derivative from first principles, and
    the rules mixed and unlabelled
-2. Clinic: your questions at the boards
+2. Clinic: your questions at the boards, starting with the revision
+   lists from Day 19
 3. By request: [[Limits Practice]], [[Derivative Rules Practice]],
    [[Chain Rule Practice]]
 

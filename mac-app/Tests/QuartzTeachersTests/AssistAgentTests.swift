@@ -132,14 +132,15 @@ final class AssistAgentTests: XCTestCase {
 
     /// Without a date, "tomorrow" became the schema's example date. With one
     /// PREPENDED, routing lost 15 points. The position is the finding.
-    func testTheDatelineIsShapedTheWayItWasMeasured() {
-        let dateline: String = AssistAgent.dateline()
-        XCTAssertTrue(dateline.hasPrefix("(Today is "), "The measured form is '(Today is <ISO date>, a <weekday>.)'")
-        XCTAssertTrue(dateline.hasSuffix(".)"))
-
-        let formatter: DateFormatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        XCTAssertTrue(dateline.contains(formatter.string(from: Date())), "An ISO date, not a localised one")
+    func testTheDatelineIsShapedTheWayItWasMeasured() throws {
+        // Pinned to a known day rather than compared against `Date()`: a test
+        // that formats today and then looks for today in the answer is a
+        // function of the wall clock and cannot fail.
+        let tuesday: CalendarDay = try XCTUnwrap(CalendarDay(year: 2026, month: 9, day: 8))
+        XCTAssertEqual(
+            AssistAgent.dateline(on: tuesday), "(Today is 2026-09-08, a Tuesday.)",
+            "The measured form is '(Today is <ISO date>, a <weekday>.)'"
+        )
     }
 
     /// The two acts share a word in ordinary speech, and the model will

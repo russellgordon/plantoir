@@ -42,7 +42,7 @@ names a real moment and stays with it — which already beats a page of
 > As [[Drama Journal]] promises: entries are private. I read them; other
 > students never do, and nothing you admit here is ever quoted, projected,
 > or used as an example without your explicit okay. The nervousness you
-> name in week one becomes your best evidence of growth by January — but
+> name in week one becomes your best evidence of growth by the end of the course — but
 > only you will decide if anyone else ever hears about it. This is
 > [[Why Trust Comes First]], applied to the page instead of the stage.
 

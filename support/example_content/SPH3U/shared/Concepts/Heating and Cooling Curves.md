@@ -75,9 +75,11 @@ radiation. Every part of the design targets one route.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D2.10]]
+
 ![[D2.11]]
 
-![[D3.8]]
+![[D3.7]]
 
-![[D2.10]]
+![[D3.8]]
 %%curriculum-end%%

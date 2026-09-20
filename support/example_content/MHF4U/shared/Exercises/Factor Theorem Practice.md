@@ -82,3 +82,17 @@ that audit is part of the question.
 > $f(x) = (x - 1)^2(x + 1)(x - 5)$ — the factor $x - 1$ was hiding
 > twice. Audit with fresh substitutions: $f(-1) = 1 + 6 + 4 - 6 - 5
 > = 0$ ✓ and $f(5) = 625 - 750 + 100 + 30 - 5 = 0$. ✓
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C3.1]]
+
+![[C3.2]]
+
+![[C3.3]]
+
+![[C3.4]]
+
+![[C3.7]]
+%%curriculum-end%%

@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Circular Motion Design Challenge]], day 3 — build and test day
-2. Measure what it actually did, not what it should have done
+1. First ten minutes: fix what came out of yesterday's conference. Your
+   prediction is locked, so this is the apparatus and the diagram
+2. [[Circular Motion Design Challenge]], day 3 — build and test day
+3. Measure what it actually did, not what it should have done
 
 ## Things to do before our next class
 

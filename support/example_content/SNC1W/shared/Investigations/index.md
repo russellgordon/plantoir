@@ -15,4 +15,6 @@ not optional reading.
 > Goggles, tied-back hair, closed-toe shoes. If you are missing any of the
 > three, you will be doing the written alternative instead.
 
-Format for the write-up: [[Writing a Lab Report]].
+Format for the write-up: [[Writing a Lab Report]]. Seven of these
+investigations are written up for marks — [[Lab Reports]] says which seven,
+which period each is written in, and what the write-ups are judged against.

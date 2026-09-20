@@ -81,6 +81,24 @@ this examination is part of the final 30% of the course mark alongside
 [[Plant Growth Investigation]], so that neither one afternoon nor one
 investigation decides your grade alone.
 
+## Success criteria
+
+The same criteria that have been on every task page all semester, applied
+to a paper instead of a report. [[Judging Your Own Work]] works on a
+practice answer as well as it does on a report: judge one of your cold
+attempts row by row, and bring the row you wrote "not yet" beside to the
+review classes. That is a better question than "can we go over Unit 3".
+
+| Quality | What it looks like on the paper |
+| --- | --- |
+| Explained, not named | The variation, the pressure and the differential survival, in that order — not the phrase "natural selection" |
+| Working shown | Punnett squares gridded; ratios derived rather than recalled |
+| Drawings to the conventions | Title, magnification where it applies, ruled label lines that do not cross |
+| A claim the data allows | The data question states the conclusion AND what its uncertainty permits you to say |
+| Terms used exactly | Systolic and diastolic, homologous and analogous, genotype and phenotype, xylem and phloem |
+| Connections made | Where two strands meet — diffusion in a lung and in a leaf — the answer says so |
+| Partial beats blank | An unfinished explanation of a mechanism earns marks; an empty space earns none |
+
 %%curriculum-start%%
 ## Curriculum connection
 
@@ -98,3 +116,43 @@ investigation decides your grade alone.
 
 ![[A2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+An examination gives you one kind of evidence and no other, and that is
+fine as long as you do not pretend otherwise. Nothing here suggests
+watching or talking to anyone in the examination room; the observation
+and conversation evidence for these same expectations has to be collected
+in the review sequence, five days earlier, where it can still change
+somebody's preparation as well as your record of them.
+
+OBSERVE — Unit 5, Day 18, the unseen data set in the skills section
+  Watch for the ORDER in which the two halves of an answer get written.
+  Some students write down what the numbers permit and then arrive at a
+  claim; others write the claim they arrived at on the way in and go
+  looking for numbers to carry it. The marked paper separates these only
+  when the second kind happens to be wrong, which is roughly half the
+  time.
+  Going well: the limits of the data on the page before the conclusion
+  is.
+  Stuck: a confident opening sentence, then a search.
+  Record: three columns — limits first, claim first, did not start. Keep
+  it. Day 19 is an open clinic driven by whatever students bring, and the
+  middle column names the ones who will not bring anything.
+
+TALK — Unit 5, Day 19, at the individual conferences that day already has
+  Ask: "Pick a job that runs on the biology in Unit 4. What does that
+  person do on an ordinary Tuesday?"
+  Then: "Where would somebody standing here have to start to end up
+  doing it?"
+  A strong answer describes the work rather than the title, and knows the
+  route in — a program, a placement, a degree — which is both halves of
+  A2.1, careers and the training they need. The examination asks one
+  question in this area and marks a written sentence; a student who
+  freezes on paper can be fluent here, and this is the last chance in the
+  course to find that out.
+  Record: one line each, and the job they named.
+
+The product evidence is the examination itself.
+%%

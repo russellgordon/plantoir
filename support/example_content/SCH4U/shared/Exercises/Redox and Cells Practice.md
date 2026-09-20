@@ -133,7 +133,7 @@ $\ce{MnO4-(aq) + Fe^2+(aq) -> Mn^2+(aq) + Fe^3+(aq)}$
 > then oxygen with water, then hydrogen with $\ce{H+}$, then charge
 > with electrons:
 >
-> $\begin{aligned} \ce{MnO4-} &\rightarrow \ce{Mn^2+ + 4H2O} \\ \ce{MnO4- + 8H+} &\rightarrow \ce{Mn^2+ + 4H2O} \\ \ce{MnO4- + 8H+ + 5e-} &\rightarrow \ce{Mn^2+ + 4H2O} \end{aligned}$
+> $\begin{aligned} \ce{MnO4-} &\ce{-> Mn^2+ + 4H2O} \\ \ce{MnO4- + 8H+} &\ce{-> Mn^2+ + 4H2O} \\ \ce{MnO4- + 8H+ + 5e-} &\ce{-> Mn^2+ + 4H2O} \end{aligned}$
 >
 > Check the electron count on that last line: the left is
 > $-1 + 8 - 5 = +2$ and the right is $+2$. ✓
@@ -182,7 +182,7 @@ $\ce{MnO4-(aq) + I-(aq) -> MnO2(s) + I2(s)}$
 > **Equalise the electrons.** Three and two, so multiply by 2 and 3
 > respectively to reach six:
 >
-> $\begin{aligned} \ce{2MnO4- + 4H2O + 6e-} &\rightarrow \ce{2MnO2 + 8OH-} \\ \ce{6I-} &\rightarrow \ce{3I2 + 6e-} \end{aligned}$
+> $\begin{aligned} \ce{2MnO4- + 4H2O + 6e-} &\ce{-> 2MnO2 + 8OH-} \\ \ce{6I-} &\ce{-> 3I2 + 6e-} \end{aligned}$
 >
 > **Add:**
 >
@@ -418,6 +418,8 @@ a cell yourself: [[Building a Galvanic Cell]].
 ![[F2.1]]
 
 ![[F2.3]]
+
+![[F2.4]]
 
 ![[F2.6]]
 %%curriculum-end%%

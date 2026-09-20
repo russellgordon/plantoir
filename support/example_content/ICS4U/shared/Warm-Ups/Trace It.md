@@ -91,3 +91,13 @@ Tracing on paper is slow, and that is the feature. See
 technique on the program you have inherited in
 [[The Inherited Program]] — a call stack you draw yourself is worth
 more than an hour of scrolling.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.5]]
+
+![[A3.5]]
+
+![[C2.1]]
+%%curriculum-end%%

@@ -154,11 +154,15 @@ Be specific here — "there might have been errors" is not a limitation.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
+![[A1.7]]
+
 ![[B2.2]]
 
 ![[B2.3]]
 
 ![[B2.4]]
 
-![[A1.2]]
+![[B2.5]]
 %%curriculum-end%%

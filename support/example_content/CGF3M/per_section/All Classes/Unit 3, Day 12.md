@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Stewardship Argument]] work period — criteria stated before the recommendation is written
-2. Conferences: what would this site do on its own, and over what timescale?
-3. Register checked against the audience — a council reads costs, a landowner reads a practical sequence
+1. Drafts handed back at the door. The whole period is [[The Stewardship Argument]] work, and its job is acting on the note in your margin
+2. Criteria stated in writing before the recommendation, for anybody whose draft has them the other way round
+3. Conferences: what would this site do on its own, and over what timescale? Feedback only
+4. Register checked against the audience — a council reads costs, a landowner reads a practical sequence
 
 ## Things to do before our next class
 

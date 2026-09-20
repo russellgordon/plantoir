@@ -171,6 +171,10 @@ problem, and then bring the year together in
 %%curriculum-start%%
 ## Curriculum connection
 
+![[F2.5]]
+
+![[F2.6]]
+
 ![[F3.5]]
 
 ![[F3.6]]

@@ -10,7 +10,7 @@ students. %%
 
 ## Section __SECTION_NUMBER__ — notes to myself
 
-- Book the farm visit in early September. One date in Unit 3, and ask
+- Book the farm visit in the first weeks. One date in Unit 3, and ask
   whether they will take a second group at harvest.
 - Shoreline: confirm with the conservation authority before any planting
   goes in the bank. Approval takes longer than you think.
@@ -19,8 +19,8 @@ students. %%
   powered equipment until they pass.
 - Check the woodlot for ticks before the first visit and brief the class
   properly. Long trousers, tucked socks, checks afterwards.
-- Order lino, seed, and media in September. The propagation bench stalls
-  in October otherwise.
+- Order lino, seed, and media at the start of the course. The propagation bench stalls
+  later in the course otherwise.
 
 ## Before you run this course — what only you can decide
 

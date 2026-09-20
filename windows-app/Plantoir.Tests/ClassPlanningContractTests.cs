@@ -18,8 +18,13 @@ public class ClassPlanningContractTests
             string title = c["title"]!.ToString();
             int? expectUnit = c["expectUnit"]?.GetValue<int>();
             int? expectDay = c["expectDay"]?.GetValue<int>();
+            // A case with no `term` uses the DEFAULT word — which is what a
+            // course says when `unit_word` is absent, and what every course
+            // made before 2026-09-01 says. Read with a default rather than
+            // treated as a new shape, or every pre-existing case breaks.
+            string? term = c["term"]?.ToString();
 
-            var parsed = UnitDay.Parse(title);
+            var parsed = UnitDay.Parse(title, term);
             if (expectUnit is null)
             {
                 Assert.Null(parsed);
@@ -160,6 +165,89 @@ public class ClassPlanningContractTests
                     string mentions = mentionsNode.ToString();
                     string allProblems = string.Join(" ", plan.Problems);
                     Assert.Contains(mentions, allProblems);
+                }
+            }
+            finally
+            {
+                try { Directory.Delete(folder, recursive: true); } catch { }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Duplicating a lesson as the next class: where the copy lands, what else
+    /// moves, and whether it can be taken back.
+    ///
+    /// <para>Pure planner data — a timetable, a list of classes, a page title
+    /// — so it is portable, which is why it is in the contract rather than
+    /// only in <c>DuplicateClassTests</c>. The mac has no runner for this key
+    /// yet, and its second case is expected to fail there: its undo is keyed
+    /// on renames alone.</para>
+    /// </summary>
+    [Fact]
+    public void Duplication_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("class-planning.json");
+        var cases = doc["duplication"]!["cases"]!.AsArray();
+        Assert.NotEmpty(cases);
+
+        foreach (var c in cases)
+        {
+            if (c is null) continue;
+            string name = c["name"]!.ToString();
+            var timetable = c["timetable"]!.AsArray().Select(x => DateOnly.Parse(x!.ToString())).ToList();
+            var expectRenames = c["expectRenamesInOrder"]!.AsArray().Select(x => x!.ToString()).ToList();
+
+            string folder = Directory.CreateTempSubdirectory("contract-duplicate").FullName;
+            try
+            {
+                File.WriteAllText(Path.Combine(folder, "preview.ps1"), "# marker");
+                File.WriteAllText(Path.Combine(folder, "deploy.ps1"), "# marker");
+                string courseDir = Path.Combine(folder, "courses", "ICS3U");
+                string classesDir = Path.Combine(courseDir, "section1", "All Classes");
+                Directory.CreateDirectory(classesDir);
+                File.WriteAllText(Path.Combine(courseDir, "course_config.json"),
+                    """
+                    {
+                      "course_code": "ICS3U",
+                      "course_name": "Introduction to Computer Science",
+                      "section_numbers": [1],
+                      "num_sections": 1,
+                      "per_section_folders": ["All Classes"],
+                      "per_section_files": []
+                    }
+                    """);
+
+                TimetableMemory.Write(folder, "ICS3U", 1, timetable, "contract test", new DateOnly(2026, 9, 1));
+
+                foreach (var existing in c["existingClasses"]!.AsArray())
+                {
+                    string title = existing!["title"]!.ToString();
+                    File.WriteAllText(Path.Combine(classesDir, title + ".md"),
+                        $"---\ntitle: {title}\npublish: true\n" +
+                        $"created: {existing["date"]}T07:00:00.000-0400\n---\n\n{title}\n");
+                }
+
+                var workspace = new AssistWorkspace(folder, new FakeLauncher());
+                var plan = workspace.PlanDuplicateClass("ICS3U", 1, c["duplicate"]!.ToString());
+
+                Assert.Equal(c["expectNewTitle"]!.ToString(), plan.NewTitle);
+                Assert.Equal(DateOnly.Parse(c["expectDate"]!.ToString()), plan.NewDate);
+                Assert.Equal(expectRenames, plan.Insertion.Renames.Select(r => $"{r.From} → {r.To}").ToList());
+
+                bool undoOffered = c["expectUndoOffered"]!.GetValue<bool>();
+                Assert.True(undoOffered != plan.MovesOtherClasses,
+                    $"“{name}”: the contract says undo is " + (undoOffered ? "offered" : "withheld")
+                    + $" and this app would {(plan.MovesOtherClasses ? "withhold" : "offer")} it — "
+                    + $"{plan.Insertion.Renames.Count} renames, {plan.Insertion.Moves.Count} date moves.");
+
+                // And the copy really is hidden, whatever the source was.
+                if (doc["duplication"]!["forcedUnpublished"]!["value"]!.GetValue<bool>())
+                {
+                    workspace.ApplyDuplicateClass(plan);
+                    string copy = File.ReadAllText(Path.Combine(classesDir, plan.NewTitle + ".md"));
+                    Assert.True(Plantoir.Core.Models.PageFrontmatter.IsDraft(copy, 1),
+                                $"“{name}”: the copy of a published lesson is visible to students.");
                 }
             }
             finally

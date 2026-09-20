@@ -48,8 +48,22 @@ know that a crash on your first program is the traditional welcome to
 programming. You now have everywhere you need to
 [[Data in Programs|start building]].
 
+## Organising your files and workspace
+
+Whether working in an online sandbox or on your local machine, sound file
+management practices start on day one:
+
+- **Create a dedicated folder** for this course (such as `icd2o/`) with
+  subfolders for exercises, programs, and tasks.
+- **Save with the `.py` extension** using descriptive lowercase names (like
+  `greeter.py` or `dice_roller.py`) rather than generic names like `temp.py`.
+- **Sync to cloud storage** so your code is backed up and accessible from
+  both school and home, as detailed in [[Files and the Cloud]].
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[B2.1]]
 
 ![[C2.1]]
 %%curriculum-end%%

@@ -2,6 +2,8 @@
 title: The Essay
 publish: true
 created: __CREATED__
+tags:
+  - concepts
 enableToc: true
 ---
 An argument with evidence, arranged so a reader can follow it. At this

@@ -14,7 +14,7 @@ that matters: *what do you leave with that you did not arrive with?*
 ## Before you write
 
 Reread your journal front to back in one sitting — expect the
-September entries to feel written by someone else. As you read,
+your earliest entries to feel written by someone else. As you read,
 flag:
 
 - one entry that embarrasses you a little — growth hides there
@@ -27,7 +27,7 @@ Three sections, roughly a page, built the way [[Showing Growth]]
 taught — date it, quote your own words, then show the now:
 
 1. **How my craft changed.** The biggest difference between what
-   September-you and now-you can *make* — writing, shooting,
+   the you who started this course and now-you can *make* — writing, shooting,
    cutting — proven with two cited entries, from the nerves of
    [[Your First Byline]] to [[Publication Day]].
 2. **How my news judgement changed.** The other axis, just as real:
@@ -38,7 +38,9 @@ taught — date it, quote your own words, then show the now:
 3. **Where this goes next.** The habits are only real once they
    have an address outside this room: a course you might take, a
    [[D2.1|field where these skills already earn a living]], a thing
-   you want to cover or make on your own — and a first step you
+   you want to cover or make on your own, or a [[D2.2|program, mentorship network, or support group]]
+   (such as Skills Ontario, OYAP, or community media associations) that supports
+   non-traditional career choices in communications — and a first step you
    could actually take this summer.
 
 > [!tip] Do not write it as a thank-you card
@@ -53,7 +55,11 @@ taught — date it, quote your own words, then show the now:
 
 ![[D2.1]]
 
+![[D2.2]]
+
 ![[D2.3]]
 
 ![[D2.4]]
+
+![[D2.5]]
 %%curriculum-end%%

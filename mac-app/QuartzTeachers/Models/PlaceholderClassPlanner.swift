@@ -93,7 +93,9 @@ enum PlaceholderClassPlanner {
         let fileManager: FileManager = FileManager.default
         for offset in 0..<count {
             let day: Int = firstDay + offset
-            let title: String = UnitDay(unit: unit, day: day).title
+            let title: String = UnitDay(
+                unit: unit, day: day, term: course.configuration.unitWord
+            ).title
             let pageURL: URL = folderURL.appendingPathComponent(title + ".md")
 
             // Never written over. A page with this name may be a lesson the

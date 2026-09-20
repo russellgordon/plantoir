@@ -57,3 +57,11 @@ fourth one took in two seconds" is a feeling with an address and an
 exit. The feeling is real data about you; the fault is the handle you
 can actually turn. That pairing is the whole method in
 [[Getting Unstuck]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.4]]
+
+![[D3.6]]
+%%curriculum-end%%

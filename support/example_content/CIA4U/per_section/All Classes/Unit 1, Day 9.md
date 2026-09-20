@@ -12,7 +12,8 @@ tags:
 
 1. [[Incentives]] — what a policy pays people to do, and who can actually do it
 2. Three incentives that produced what nobody intended
-3. Scarcity analysis work period; conferences on the 'given up' section
+3. Fifteen minutes, modelled together: one anonymous draft judged against the task's own criteria — [[Judging Your Own Work]], so you watch before you do it
+4. The rest of the period: scarcity analysis work, your own self-check first, conferences on the 'given up' section running through it
 
 ## Things to do before our next class
 

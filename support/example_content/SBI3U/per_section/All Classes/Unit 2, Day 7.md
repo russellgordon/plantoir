@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: three fossils, three ages, one sequence
+1. Warm-up: three fossils, three ages, one sequence: [[Evidence for Evolution]]
 2. Random groups — the fossil record's gaps: what they mean, and the
    argument that mistakes absence of evidence for evidence of absence
-3. Consolidate: dating methods, and the confidence each one carries
+3. Consolidate: dating methods, and the confidence each one carries: [[Evolution Practice]]
 
 ## Things to do before our next class
 

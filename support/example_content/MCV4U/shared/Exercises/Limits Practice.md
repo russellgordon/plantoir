@@ -99,3 +99,15 @@ numeric road first where you can; the estimate audits the algebra.
 > As $h \to 0$: $f'(x) = 2x - 5$. Sanity check with the toolbox to
 > come: the power rule will say the same thing in one line — but
 > you just proved it, and that is better.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.1]]
+
+![[A1.2]]
+
+![[A1.3]]
+
+![[A1.4]]
+%%curriculum-end%%

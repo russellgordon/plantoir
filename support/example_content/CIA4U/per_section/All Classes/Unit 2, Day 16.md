@@ -12,7 +12,7 @@ tags:
 
 1. [[Who Is Missing From the Workforce]] — a shortage claim tested
 2. Participation, vacancies and wages: what a real shortage would look like in the data
-3. Intervention argument work period
+3. Intervention argument work period, starting with the third parties your programme creates or compensates
 
 ## Things to do before our next class
 

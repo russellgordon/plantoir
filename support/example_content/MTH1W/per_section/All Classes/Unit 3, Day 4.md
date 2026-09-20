@@ -14,7 +14,7 @@ tags:
 2. Random groups — thinking task: the same data, drawn three ways, one
    of them designed to mislead
 3. Consolidate: what a graph's axes decide before anybody reads it
-4. [[A Data Story]], day 3 — working period: your question and how you will
+4. [[A Data Story]], day 3 of 9 — working period: your question and how you will
    collect
 
 ## Things to do before our next class

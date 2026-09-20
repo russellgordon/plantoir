@@ -11,7 +11,7 @@ conjecture only becomes knowledge after other people have pushed on it
 pushing is always aimed at ideas, never at the classmate brave enough
 to voice one. Argue hard with the claim; thank the person who made it.
 
-Four conversations we return to all year:
+Four conversations we return to all semester:
 
 - [[When Will I Use This]] — the oldest question, answered honestly
 - [[Mistakes Are Data]] — the sign-error museum; never erase

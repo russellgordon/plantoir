@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint, on your own: exponents, exponential graphs, and models
-2. Mark your own; revision list written
+1. Checkpoint, on your own: exponents, exponential graphs, and models — [[Exponential Models Practice]]
+2. Mark your own; revision list written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 
-- [ ] Journal: what you would tell September-you about exponents.
+- [ ] Journal: what you would tell the you who started this course about exponents.

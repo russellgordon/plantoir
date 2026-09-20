@@ -13,7 +13,8 @@ tags:
 1. Standup — new beat: athletics
 2. New warm-up: [[Caption This]] — first round
 3. Studio: [[Portraits with Purpose]] — cameras in hand, portraits of
-   teammates, no lesson first
+   teammates, no lesson first, so I can see what you already do with
+   one
 4. Edit and compare: contact sheets on the screen
 5. File and log: [[Newsroom Journal]]
 

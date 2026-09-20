@@ -10,6 +10,11 @@ before you start.
 
 - [[The Source Study]]
 - [[The War Question]]
+- [[The Portfolio Case]]
+
+[[The Portfolio Case]] is launched in the first week and closes in the last
+one. Its criteria are here from the beginning because the notebook it is
+built on starts in the first fortnight.
 
 **Unit 2 — Canada, 1929–1945**
 

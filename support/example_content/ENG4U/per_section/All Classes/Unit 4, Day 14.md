@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Sight passage under time — prose, then poetry. Both marked together
+1. Sight passage under time — prose, then poetry. Both marked against
+   the criteria by you, together, at the end
 2. Practise: [[Sight Passage Practice]]
 
 ## Things to do before our next class

@@ -11,8 +11,11 @@ tags:
 ## Agenda
 
 1. 1.1: a ghost, and four men trying to decide what they saw
-2. Tutorial: [[Reading Shakespeare]] — the six moves
-3. The vocabulary of proof, from the first scene
+2. Ten minutes: eight lines paraphrased cold, before anybody is taught
+   anything — it tells me where this room starts with the verse
+3. Tutorial: [[Reading Shakespeare]] — the six moves, aimed at whatever
+   those eight lines showed
+4. The vocabulary of proof, from the first scene
 
 ## Things to do before our next class
 

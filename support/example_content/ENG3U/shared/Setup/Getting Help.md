@@ -2,6 +2,8 @@
 title: Getting Help
 publish: true
 created: __CREATED__
+tags:
+  - setup
 ---
 1. **Ask the person beside you.** Half of English is talking about a text
    with somebody who read it differently.
@@ -24,5 +26,5 @@ ten minutes to fix at a table with the outline in front of us.
 > [!tip] The independent study
 > If you are behind on [[The Independent Study]], say so at the
 > checkpoint rather than after it. Every plan I have made with a student
-> who spoke up at checkpoint two has worked; the ones made in April are
+> who spoke up at checkpoint two has worked; the ones made at the end of the course are
 > triage.

@@ -15,6 +15,7 @@ tags:
    function whose domain is the natural numbers
 3. At the boards: explicit and recursive forms of the same sequence,
    and what each is good for
+4. Journals returned — read what I wrote back before you leave
 
 ## Things to do before our next class
 

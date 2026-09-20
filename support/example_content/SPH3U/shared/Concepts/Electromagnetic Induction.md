@@ -36,6 +36,8 @@ province at hundreds of thousands of volts and arrives at your house at
 %%curriculum-start%%
 ## Curriculum connection
 
+![[F1.2]]
+
 ![[F2.7]]
 
 ![[F3.8]]

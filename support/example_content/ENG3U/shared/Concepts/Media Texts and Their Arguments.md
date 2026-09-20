@@ -2,6 +2,8 @@
 title: Media Texts and Their Arguments
 publish: true
 created: __CREATED__
+tags:
+  - concepts
 enableToc: true
 ---
 Documentaries, podcasts, long-form journalism, and campaigns are texts

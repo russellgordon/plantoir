@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 [[Spot the Hazard]] puts a photograph of a bench on the screen and gives
 you sixty seconds. The photographs get harder through the semester, and

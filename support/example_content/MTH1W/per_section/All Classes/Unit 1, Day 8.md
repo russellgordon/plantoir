@@ -16,7 +16,8 @@ tags:
 3. Consolidate: estimates worth defending, and how to write enormous numbers
 4. Notes to your future self — naming [[Powers and Exponent Rules]]
    and [[Scientific Notation]]
-5. Launch our first task: [[Fermi Festival]] — pick a question that bugs you
+5. Launch our first task: [[Fermi Festival]], day 1 of 5 — pick a
+   question that bugs you
 
 ## Things to do before our next class
 

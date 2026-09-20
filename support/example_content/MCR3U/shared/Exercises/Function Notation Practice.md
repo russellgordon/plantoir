@@ -79,3 +79,11 @@ Exact answers throughout; no calculator needed.
 > question said *all* inputs for a reason — a quadratic can reach
 > the same output from two sides, and reporting only one is the
 > most common miss here.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.1]]
+
+![[A1.2]]
+%%curriculum-end%%

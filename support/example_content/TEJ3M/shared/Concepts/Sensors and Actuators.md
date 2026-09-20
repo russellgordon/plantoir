@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 [[Drive a Motor]] is the class where somebody always asks why we cannot
 just wire the motor to a pin. The answer is a number: the motor wants

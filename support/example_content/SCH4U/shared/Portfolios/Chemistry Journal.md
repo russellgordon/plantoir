@@ -6,9 +6,9 @@ enableToc: true
 tags:
   - portfolio
 ---
-A test mark tells you where you stood on one morning. Your journal shows
-what changed across a semester, and you are the only person who can
-build it.
+An examination mark tells you where you stood on one morning. Your
+journal shows what changed across a semester, and you are the only
+person who can build it.
 
 ## What it is for
 
@@ -94,8 +94,15 @@ minutes on the day beats an hour in the last week of the semester.
 - After every investigation, one entry.
 - After every discussion, two or three sentences on what moved.
 - Whenever a model failed you, an entry saying where its boundary is.
-- Once mid-semester, a [[Showing Growth]] comparison.
-- At the end, [[Final Reflection]].
+- At the end of each unit, the milestone entry — written in class, in
+  the time set aside for it on that day's agenda, and the part of this
+  folder that is marked.
+- Once mid-semester, a [[Showing Growth]] comparison, also in class.
+- At the end, [[Final Reflection]], written in the last twenty minutes
+  of the showcase.
+
+Which of those carry a mark, and why the rest do not:
+[[Journal Checklist]].
 
 > [!important] Predictions get written down before the measurement
 > Not after, and not "roughly what I was expecting". A prediction

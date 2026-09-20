@@ -108,6 +108,38 @@ public sealed class AssistAgent
     };
 
     /// <summary>
+    /// Arguments the SERVER declares and the local model must not be shown,
+    /// as <c>tool.argument</c>.
+    ///
+    /// <para><b>Why a tool can have an argument its own model may not see.</b>
+    /// <c>duplicate</c> exists because Plantoir's window sends the card's
+    /// arguments to this server over JSON-RPC and the binder DROPS a key the
+    /// method does not declare — so "duplicate Unit 3, Day 2 as my next class"
+    /// silently made a blank page until the parameter was added (issue #149).
+    /// It is filled by <see cref="AssistCardCommand"/>, in code, from a
+    /// sentence matched in code. No model fills it, and no model should:
+    /// <c>add_next_class</c> IS one of the thirteen tools the local model
+    /// routes to, and every extra argument on a tool it already picks is a
+    /// chance to invent a page title for a request that named none.</para>
+    ///
+    /// <para>The mac has the same aim and reaches it differently, which is
+    /// worth knowing before "fixing" either: there the card and the tool
+    /// runner share a process, so no binder stands between them and
+    /// <c>duplicate</c> is simply absent from the published schema. There is
+    /// no schema to narrow because there is no schema.</para>
+    ///
+    /// <para>MIRRORED in <c>research/ai-assist/narrow-tools.py</c> and pinned
+    /// by <c>NarrowToolsMirrorTests</c>, for the reason the tool list is: a
+    /// routing score measured through a surface the app does not ship is worse
+    /// than no score.</para>
+    /// </summary>
+    internal static readonly HashSet<string> CardOnlyArguments = new(StringComparer.Ordinal)
+    {
+        "add_next_class.duplicate",
+        "plan_add_next_class.duplicate",
+    };
+
+    /// <summary>
     /// Narrow a tool list to what the local model should see.
     ///
     /// A tool NOT in the set is not hidden from the teacher — they can ask for
@@ -135,9 +167,38 @@ public sealed class AssistAgent
             if (copy["function"]?["description"]?.GetValue<string>() is { } description)
                 copy["function"]!["description"] = Briefly(description).Replace(ExampleCourse, courseCode);
             MakeExamplesReal(copy["function"]?["parameters"], courseCode);
+            HideCardOnlyArguments(copy["function"]?["parameters"], name);
             kept.Add(copy);
         }
         return kept;
+    }
+
+    /// <summary>
+    /// Take the card-only arguments out of one tool's schema — from
+    /// <c>properties</c> AND from <c>required</c>, since a required key that
+    /// is not described is a schema no model can satisfy.
+    /// </summary>
+    private static void HideCardOnlyArguments(JsonNode? parameters, string toolName)
+    {
+        if (parameters is not JsonObject schema) return;
+
+        foreach (string pair in CardOnlyArguments)
+        {
+            int dot = pair.IndexOf('.');
+            if (dot < 0) continue;
+            // Case-insensitively, because ForTheLocalModel matches tool names
+            // that way and two answers to "is this that tool" is how an
+            // argument stays visible to the router by accident.
+            if (!string.Equals(pair[..dot], toolName, StringComparison.OrdinalIgnoreCase)) continue;
+            string argument = pair[(dot + 1)..];
+
+            if (schema["properties"] is JsonObject properties) properties.Remove(argument);
+            if (schema["required"] is JsonArray required)
+            {
+                for (int i = required.Count - 1; i >= 0; i--)
+                    if (required[i]?.GetValue<string>() == argument) required.RemoveAt(i);
+            }
+        }
     }
 
     /// <summary>The course code the server's schemas use in their examples.</summary>
@@ -226,8 +287,8 @@ public sealed class AssistAgent
     public static bool NeedsApproval(string name) => DeploysToStudents.Contains(name);
 
     /// <summary>
-    /// The <c>plan_</c> twin of each write the local model can reach — what
-    /// the assistant runs, and reads out, before it does the thing itself.
+    /// The <c>plan_</c> twin of each write the assistant can reach — what it
+    /// runs, and reads out, before it does the thing itself.
     ///
     /// This is the CONFIRMATION setting's machinery. Deploying always waits
     /// for a button; everything else waits only while the teacher has "ask
@@ -242,6 +303,17 @@ public sealed class AssistAgent
     /// no page, <c>undo_last_change</c> IS the remedy, <c>deploy_section</c>
     /// waits on its own button whatever this setting says, and a cancelled
     /// scheduled deploy is remedied by scheduling it again.
+    ///
+    /// <para><b>"The local model can reach" is the wrong test, and reading it
+    /// that way left a hole.</b> A FIXED PHRASING reaches a tool no model is
+    /// shown — <c>AssistCardCommand</c> matches the sentence in code and
+    /// <c>RunCommand</c> consults this map exactly as a routed call does. So
+    /// <c>make_room_for_classes</c> belongs here even though it is MCP-only:
+    /// it is the most dangerous tool on the surface, renaming pages a
+    /// teacher's links point at, and without the entry it would have been the
+    /// ONE card that ran with no plan shown first. The mac never had this gap
+    /// because it derives twins from its tool surface rather than listing
+    /// them; a hand-written list has to be told.</para>
     /// </summary>
     internal static readonly Dictionary<string, string> PlanTwins = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -251,6 +323,7 @@ public sealed class AssistAgent
         ["add_next_class"] = "plan_add_next_class",
         ["remember_timetable"] = "plan_remember_timetable",
         ["re_date_classes"] = "plan_re_date_classes",
+        ["make_room_for_classes"] = "plan_make_room_for_classes",
     };
 
     /// <summary>
@@ -297,7 +370,23 @@ public sealed class AssistAgent
         "and undo_last_change takes it back — so do what was asked without asking permission first. " +
         "Never guess a course, a section, a page title " +
         "or a date — if you are not certain, look it up or ask. " +
-        "If no tool fits, say so plainly instead of inventing one.\n" +
+        "If no tool fits, say so plainly instead of inventing one. " +
+        // Measured 2026-08-24 (research/ai-assist/conversational-residue-results.txt):
+        // without these two sentences the model routed "I posted X by mistake, make
+        // it a draft again" to undo_last_change instead of unpublish (undo is for the
+        // ASSISTANT's own last action, not something the teacher did earlier), and
+        // "hide tomorrow's class again — the page is X" sometimes declined outright.
+        // Adding both sentences fixed both clusters and raised conversational routing
+        // accuracy from 85% to 91-94% across two runs, with no new misses elsewhere.
+        // A version that also named cancel_scheduled_deploy explicitly (to fix the
+        // still-unsolved "delete the X folder" probe) made two unrelated cases regress
+        // — kept out for exactly the reason AssistToolRunner.localTools's doc comment
+        // gives: a small model reads an extra clause as new signal, not a boundary.
+        "undo_last_change reverses only the assistant's own most recent action — a " +
+        "teacher describing something THEY did earlier, even calling it a mistake, is " +
+        "asking to publish or unpublish, not to undo. There is no tool to delete, " +
+        "remove or rename a page or a folder — if asked for that, say so plainly " +
+        "instead of choosing a tool that does something else.\n" +
         // Two words that sound alike and are not. The teacher gets this
         // explained once per section by explain_publishing; the model
         // needs it every turn, because it is the distinction it is
@@ -390,9 +479,12 @@ public sealed class AssistAgent
     /// server's own container run, invisible, while the chat showed dots —
     /// and finished with the result sitting on disk where nobody could see
     /// it. The main window already knows how to build a section with its
-    /// console on screen and the preview in front of the teacher. So
-    /// rebuild_preview and deploy_section never reach the server from here:
-    /// they press Plantoir's own buttons. The server keeps those tools for
+    /// console on screen and the preview in view — and, on Windows, it comes
+    /// forward only when it was minimised or hidden, because the teacher may
+    /// still be typing in the assistant's own window (a chosen divergence
+    /// from the mac; see MainWindow.ComeForwardIfHidden). So rebuild_preview
+    /// and deploy_section never reach the server from here: they press
+    /// Plantoir's own buttons. The server keeps those tools for
     /// the clients that have no window — Claude Code, and deploys scheduled
     /// for half six in the morning.
     /// </summary>
@@ -401,8 +493,18 @@ public sealed class AssistAgent
     /// <summary>Deploy through the main window's own flow, console and all. Any thread.</summary>
     public Action? StartDeployInApp { get; set; }
 
-    /// <summary>Async version of StartDeployInApp.</summary>
-    public Func<Task>? StartDeployInAppAsync { get; set; }
+    /// <summary>
+    /// Async version of StartDeployInApp that AWAITS the deploy's real
+    /// outcome and returns the sentence to say — success, failure, or a
+    /// multi-destination partial — computed by
+    /// <see cref="MultiDestinationDeployRunner.Result"/> from what actually
+    /// happened. A null return means the deploy never actually ran (refused,
+    /// already busy, or an exception before it started) — RunTool falls back
+    /// to <see cref="AssistWording.DeployDidNotFinish"/>, never to the
+    /// unconditional "Deployed" this replaced, because reporting success by
+    /// default is exactly the bug this delegate exists to close.
+    /// </summary>
+    public Func<Task<string?>>? StartDeployInAppAsync { get; set; }
 
     /// <summary>Check if the section is currently busy.</summary>
     public Func<bool>? SectionIsBusy { get; set; }
@@ -436,6 +538,13 @@ public sealed class AssistAgent
 
     /// <summary>Invoked whenever a pending plan/write action is accepted by the teacher.</summary>
     public Action? OnPlanAccepted { get; set; }
+
+    /// <summary>
+    /// The copy saved before this conversation's first change, the moment an
+    /// answer first names it. The window shows "Restore Section N…" from
+    /// then on. Any thread.
+    /// </summary>
+    public Action<string>? OnConversationBackup { get; set; }
 
     /// <summary>Provides the human-readable destination for publishing/deploying (e.g. "Netlify", "Cloudflare Pages", "a folder on this computer").</summary>
     public Func<string>? DestinationProvider { get; set; }
@@ -739,6 +848,7 @@ public sealed class AssistAgent
     private async Task<List<Line>> ShowPlan(string twinName, JsonObject call, CancellationToken cancellation)
     {
         var answer = await _tools.CallTool(twinName, ArgumentsOf(call), OnToolProgress, cancellation);
+        if (answer.ConversationBackupPath is { } savedCopy) OnConversationBackup?.Invoke(savedCopy);
 
         // A plan twin can come back with a REFUSAL — no such page, no such
         // section — and a refusal is an answer, not a proposal. "Shall I go
@@ -1015,11 +1125,13 @@ public sealed class AssistAgent
             _handedToApp = true;
             return Answer(call, AssistWording.PreviewIsRebuilding(_courseCode, _section.ToString()));
         }
-        if (name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) && StartDeployInApp is not null)
+        if (name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) &&
+            (StartDeployInApp is not null || StartDeployInAppAsync is not null))
         {
             if (SectionIsBusy?.Invoke() == true)
             {
-                StartDeployInApp.Invoke();
+                if (StartDeployInApp is not null) StartDeployInApp.Invoke();
+                else if (StartDeployInAppAsync is not null) _ = StartDeployInAppAsync.Invoke();
                 _handedToApp = true;
                 return Answer(call, AssistWording.SectionIsBusy(_courseCode, _section.ToString()));
             }
@@ -1038,14 +1150,19 @@ public sealed class AssistAgent
 
             if (StartDeployInAppAsync is not null)
             {
-                await StartDeployInAppAsync.Invoke();
+                string? outcome = await StartDeployInAppAsync.Invoke();
+                _handedToApp = true;
+                return Answer(call, outcome ?? AssistWording.DeployDidNotFinish(_courseCode, _section.ToString()));
             }
             else
             {
-                StartDeployInApp.Invoke();
+                StartDeployInApp?.Invoke();
+                _handedToApp = true;
+                // No async wiring available means no way to await the real
+                // outcome — the caller pressed the button and this is all
+                // that can honestly be said about it.
+                return Answer(call, AssistWording.Deployed(_courseCode, _section.ToString()));
             }
-            _handedToApp = true;
-            return Answer(call, AssistWording.Deployed(_courseCode, _section.ToString()));
         }
 
         // A page edit does what a person would do: stop the preview, change
@@ -1067,6 +1184,7 @@ public sealed class AssistAgent
         }
 
         var answer = await _tools.CallTool(name, arguments, OnToolProgress, cancellation);
+        if (answer.ConversationBackupPath is { } savedCopy) OnConversationBackup?.Invoke(savedCopy);
         // The MODEL is given the long half; the teacher's line is added by
         // whoever called this, from the short one.
         _messages.Add(new JsonObject

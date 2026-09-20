@@ -14,6 +14,8 @@ tags:
 1. Review, part one: narration, irony, structure — then the play, act by
    act
 2. By request: [[Paraphrase Practice]], [[Evidence and Analysis Practice]]
+   — practice, unmarked as ever; ask for the one you have been quietly
+   avoiding
 
 ## Things to do before our next class
 

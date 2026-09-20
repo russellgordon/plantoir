@@ -13,7 +13,8 @@ tags:
 1. Welcome — how a room full of programmers works:
    [[How This Class Works]] and [[Our Classroom Norms]]
 2. Unplugged build: [[The Unplugged Algorithm]] — write instructions a
-   human must follow with no common sense whatsoever
+   human must follow with no common sense whatsoever. This is also how
+   I find out what the room already knows, before any of it is taught
 3. Compare and name it: [[What a Program Is]]
 4. Tour of the site, so nothing here is hidden from you:
    [[Using This Site]]

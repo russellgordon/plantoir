@@ -12,8 +12,11 @@ tags:
 
 1. Number talk: [[Estimation Duels]] — how much data did you generate today?
 2. Discussion: [[Who Does Data Serve]]
-3. Launch our task: [[A Data Story]] — a question you actually want answered
-4. Random groups — brainstorm questions of interest at the boards
+3. Launch our task: [[A Data Story]], day 1 of 9 — a question you
+   actually want answered
+4. Random groups — brainstorm questions of interest at the boards. A
+   diagnostic, unmarked: I want to hear what this class already believes
+   data can and cannot settle
 5. Consolidate: what makes a question answerable with data?
 
 ## Things to do before our next class

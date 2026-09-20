@@ -35,13 +35,49 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
-%%curriculum-start%%
-## Curriculum connection
-
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
+This comment sits OUTSIDE the curriculum markers on purpose: everything between
+them is deleted for a teacher who declines curriculum pages, and a note nested
+inside would disappear with it.
 %%
+
+%%curriculum-start%%
+## Curriculum connection
 
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Marks rest on three kinds of evidence: what students make, what you watch
+them do, and what they tell you. The first arrives on its own. Fill in the
+other two here, for THIS task. Nobody else ever sees this note — it is a
+comment, so it never appears on the website.
+
+Keep it to plain text. A wikilink or a transclusion written inside these
+markers still counts as a link everywhere else in the system, so a hidden
+note would quietly claim curriculum coverage no student page provides.
+
+OBSERVE — Unit ?, Day ?, which period
+
+  Watch for: something visible only while they work, and invisible in the
+  finished piece. Never a performance or a dress run — you are running the
+  room. If you cannot name one, the task may be worth rethinking.
+  Going well:
+  Stuck:
+  Record: how you will note it in a few seconds, for a whole class.
+
+TALK — Unit ?, Day ?, ideally a conference the schedule already has
+
+  Ask: a real question, in the words you would say — and not one already
+  printed on this page or on that day's agenda, because they will have
+  rehearsed it.
+  Then: a second one.
+  A strong answer sounds like: and the expectation you would be hearing.
+  Record:
+
+The product evidence is: what gets handed in or performed, and when.
+%%

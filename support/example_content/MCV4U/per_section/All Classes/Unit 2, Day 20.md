@@ -11,9 +11,11 @@ tags:
 ## Agenda
 
 1. Number talk: [[Estimation Duels]]
-2. Consolidation: one messy function differentiated by two different
+2. First fifteen minutes: the top item on the revision list you wrote
+   last class, taken to the boards
+3. Consolidation: one messy function differentiated by two different
    routes, and the results reconciled
-3. Look ahead: next unit, the derivative goes back to describing shapes
+4. Look ahead: next unit, the derivative goes back to describing shapes
 
 ## Things to do before our next class
 

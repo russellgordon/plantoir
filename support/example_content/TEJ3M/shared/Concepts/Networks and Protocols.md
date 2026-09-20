@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 Two machines in [[Build and Test a Network]] were cabled together, both
 switched on, both with link lights, and neither could see the other. The

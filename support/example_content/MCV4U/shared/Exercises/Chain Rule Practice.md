@@ -83,3 +83,11 @@ loud; the sorting is most of the skill.
 > chain multiply: $20$. Note which numbers went *unused* — $f'(2)$
 > never appeared, because the outer machine is evaluated where the
 > inner one *delivers*, not where you started.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A3.4]]
+
+![[A3.5]]
+%%curriculum-end%%

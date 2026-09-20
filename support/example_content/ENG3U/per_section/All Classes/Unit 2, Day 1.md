@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. 1.1–1.3: the witches, and what a prophecy actually says
-2. Tutorial: [[Reading Shakespeare]] — the six moves
-3. Parts distributed; read aloud
+1. Four lines of verse, paraphrased cold and not marked — it tells me
+   what this class already does with Shakespeare's language
+2. 1.1–1.3: the witches, and what a prophecy actually says
+3. Tutorial: [[Reading Shakespeare]] — the six moves
+4. Parts distributed; read aloud
 
 ## Things to do before our next class
 

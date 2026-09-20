@@ -8,7 +8,7 @@ tags:
 ---
 Four ideas do most of the work in this subject. They are not topics to get
 through — they are the questions a geographer brings to anything, which is why
-we meet them on the second day and use them until June.
+we meet them on the second day and use them until the end of the course.
 
 The four names below are the Ministry's. The plain-words explanations are this
 course's own, written for you.

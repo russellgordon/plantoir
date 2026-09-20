@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: which of these four organisms shares the most recent common
-   ancestor with us?
+   ancestor with us? [[The Kingdoms of Life]]
 2. Random groups — build a cladogram from a table of characteristics,
-   then compare with the accepted one
+   then compare with the accepted one: [[Classification and Taxonomy]]
 3. Consolidate: what a branching diagram claims, and what it does not
 
 ## Things to do before our next class

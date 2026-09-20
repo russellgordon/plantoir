@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Period 5 of 8: analysis
+1. Period 5 of 8: analysis, starting from what your conference last class said the evidence will actually support
 2. [[Historical Significance]] and [[Continuity and Change]] applied across a century rather than named
 3. The strongest opposing view, written out in full before it is answered
 

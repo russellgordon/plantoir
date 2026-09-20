@@ -14,9 +14,11 @@ tags:
 2. Concept: [[Indicators of Climate Change]]
 3. Exercise: [[Interpreting Climate Graphs]]
 4. Discussion: [[Whose Responsibility Is Climate Action]]
+5. Task launched: [[Climate Change Action Plan]] — read the criteria table
+   before you choose an impact, not after
 
 ## Things to do before our next class
 
-- [ ] Task assigned: [[Climate Change Action Plan]], due in one week.
-- [ ] **Unit 2 test next class.** The Concepts pages are the study guide.
+- [ ] Read [[Climate Change Action Plan]] to the end, criteria table
+      included. Bring one impact you might choose.
 - [ ] Stuck on something? [[Help Sessions]] run twice a week.

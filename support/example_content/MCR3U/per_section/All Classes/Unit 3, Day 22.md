@@ -13,7 +13,9 @@ tags:
 1. Number talk: [[Would You Rather]]
 2. Consolidation: one cyclical situation, taken all the way — data,
    equation, prediction, and its honest limit
-3. Look ahead: the last unit counts things, and then counts money
+3. Back to the wave data on the wall: which sources gave clean sinusoids,
+   and why some did not
+4. Look ahead: the last unit counts things, and then counts money
 
 ## Things to do before our next class
 

@@ -74,3 +74,61 @@ final class CourseActivityTests: XCTestCase {
         XCTAssertFalse(CourseActivity.courseIsBusy(folderPath: "/folder", courseCode: "MPM2D"))
     }
 }
+
+/// Which question the repair dialog asks before starting a preview.
+///
+/// It must ask whether somebody is PUBLISHING. `courseIsBusy` answers
+/// "previewing or publishing", and asking that one refused the preview whenever
+/// a preview was already running — which is every time the button is offered,
+/// since the findings come from a build. Found by pressing the button.
+@MainActor
+final class CourseActivityPublishOnlyTests: XCTestCase {
+
+    // MARK: - Functions
+
+    override func setUp() {
+        super.setUp()
+        CourseActivity.reset()
+        PreviewLeases.reset()
+    }
+
+    override func tearDown() {
+        CourseActivity.reset()
+        PreviewLeases.reset()
+        super.tearDown()
+    }
+
+    func testAPreviewDoesNotCountAsAPublish() throws {
+        let folder: String = "/tmp/some-folder"
+        let lease: PreviewLeases.Lease = try PreviewLeases.lease(
+            folderPath: folder, courseCode: "ICS3U", sectionNumber: 1
+        )
+        defer { PreviewLeases.release(lease) }
+
+        XCTAssertTrue(CourseActivity.courseIsBusy(folderPath: folder, courseCode: "ICS3U"),
+                      "a preview does make the course busy")
+        XCTAssertFalse(
+            CourseActivity.coursePublishIsRunning(folderPath: folder, courseCode: "ICS3U"),
+            "but it is not a publish, and the repair dialog must not treat it as one"
+        )
+    }
+
+    func testAPublishDoesCountAsAPublish() {
+        let folder: String = "/tmp/some-folder"
+        CourseActivity.beginPublish(folderPath: folder, courseCode: "ICS3U", sectionNumber: 1)
+        defer { CourseActivity.endPublish(folderPath: folder, courseCode: "ICS3U", sectionNumber: 1) }
+
+        XCTAssertTrue(
+            CourseActivity.coursePublishIsRunning(folderPath: folder, courseCode: "ICS3U")
+        )
+    }
+
+    func testAnotherCoursesPublishIsNotThisCoursesProblem() {
+        CourseActivity.beginPublish(folderPath: "/tmp/f", courseCode: "OTHER", sectionNumber: 1)
+        defer { CourseActivity.endPublish(folderPath: "/tmp/f", courseCode: "OTHER", sectionNumber: 1) }
+
+        XCTAssertFalse(
+            CourseActivity.coursePublishIsRunning(folderPath: "/tmp/f", courseCode: "ICS3U")
+        )
+    }
+}

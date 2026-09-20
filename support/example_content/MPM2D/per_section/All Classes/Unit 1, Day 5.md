@@ -16,8 +16,9 @@ tags:
 3. Consolidate: swapping an expression in for a variable
 4. Notes to your future self — [[Solving Systems Algebraically]],
    the substitution half
-5. Launch our first task: [[Break-Even]] — pick a small venture worth
-   modelling
+5. Launch our first task: [[Break-Even]] — we read its success criteria
+   table together before anybody picks a venture, because that table is
+   the whole standard the pitch is judged against
 
 ## Things to do before our next class
 

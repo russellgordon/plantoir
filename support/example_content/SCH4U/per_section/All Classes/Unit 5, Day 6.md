@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Launch, day 1 of 4: [[The Cell Report]] — one electrochemical
-   technology, judged on whether it could do a specific job
+   technology, judged on whether it could do a specific job. Read the
+   criteria, and read which half of it is yours alone
 2. Working period: technology chosen; half equations written and
    balanced
 

@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[The Sketchbook Habit]] first marking
+1. [[The Sketchbook Habit]] first marking, handed back in the period
 2. What a strong sketchbook looked like — anonymous examples
-3. Studio time
+3. Studio time, starting with whatever the marking just told you
 
 ## Things to do before our next class
 

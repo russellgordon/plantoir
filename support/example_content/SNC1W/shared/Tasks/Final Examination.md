@@ -62,7 +62,7 @@ cram, because it was built over five months.
 2. **Redraw the diagrams from memory** — an atom, a series circuit, a
    food web, the carbon cycle. If you cannot draw it, you cannot yet
    explain it.
-3. **Re-read your own lab reports.** What you wrote about what went wrong
+3. **Re-read your own [[Lab Reports]].** What you wrote about what went wrong
    at the bench is the most efficient revision there is, because you
    wrote it at the moment you understood.
 4. **Say the explanations out loud.** Every long-answer mark on this
@@ -86,9 +86,9 @@ afternoon nor one piece of writing decides your grade alone.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[A1.1]]
-
 ![[B2.2]]
+
+![[B2.6]]
 
 ![[C2.4]]
 
@@ -96,3 +96,51 @@ afternoon nor one piece of writing decides your grade alone.
 
 ![[E2.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+An examination is deliberately product only. There is nobody to talk to in
+that room and nothing to watch except handwriting, and that is the whole
+point of it: one afternoon that is unambiguously theirs. So this block is
+about the four review classes in front of it, which are the last chance in
+the semester to hear these expectations out loud — and worth taking, because
+for nearly everybody in the room this is the first examination they have ever
+written.
+
+OBSERVE — Unit 5, Day 17, review part three, while the scale questions are on
+the board
+  Watch for: what goes on the page before any digits do. Two students who both
+  arrive at the right distance got there by different routes, and a marked
+  script cannot tell you which of them will survive a number they have not met
+  before.
+  Going well: a unit chosen and an order of magnitude estimated before the
+  calculator comes out, and a sanity check said out loud — that cannot be
+  right, it is smaller than the Sun.
+  Stuck: digits first, unit added at the end if at all, and no reaction at all
+  to an answer that is out by a factor of a thousand.
+  Record: two columns on your day plan — unit first, or digits first. That is
+  E2.5 watched, and using appropriate units of measure is exactly the half of
+  it that a correct final answer conceals.
+
+TALK — Unit 5, Day 18, the individual conferences already on that agenda
+  They will want to spend the time on format, and the format is on this page
+  already. Give them one question from each end of the course instead.
+  Ask: "Calcium is element twenty, magnesium is element twelve. Without the
+  table in front of you — which one has the bigger atoms, and which reacts
+  faster with water? Tell me how you know from where they sit."
+  Then: "Your phone charger says five volts and two amps. What resistance is
+  the phone showing it, and why does that number change while it charges?"
+  The first is C2.4: position in the table explained through the structure of
+  the atoms, rather than a group name recited. Listen for shells and valence
+  electrons doing actual work in the answer. The second is D2.5 applied to
+  something nobody has set as a question — two and a half ohms is the easy
+  half, and the interesting half is whether they notice the current falls as
+  the battery fills. Both codes are on this paper, and both are far quicker to
+  check by ear here than to discover from the script afterwards, when it is
+  too late to do anything about either.
+  Record: two ticks per student in your conference list, and one sentence each
+  about what to send them back to.
+
+The product evidence is the paper, and it arrives on its own.
+%%

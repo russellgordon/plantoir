@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Investigation work time, procedures approved first
-2. Discussion: [[The Fields We Live In]]
+1. [[Optics Investigation Report]], day 3 — working period: first the
+   changes your procedure needs after yesterday's approval
+2. Then the apparatus built and one trial run, so that next class is spent
+   collecting data rather than finding out what is wrong with the bench
 3. Unit 4 consolidation: what forces the wave model, and what breaks it
-4. Hand in [[Optics Investigation Report]]
 
 ## Things to do before our next class
 

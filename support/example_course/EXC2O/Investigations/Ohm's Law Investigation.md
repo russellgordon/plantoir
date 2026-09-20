@@ -54,7 +54,9 @@ graph LR
 2. Calculate the slope. What quantity is it, and what are its units?
 3. Compare the slope with the resistor's marked value. Give the percent
    difference:
-   $$\text{percent difference} = \frac{|\text{measured} - \text{marked}|}{\text{marked}} \times 100\%$$
+
+$$\text{percent difference} = \frac{|\text{measured} - \text{marked}|}{\text{marked}} \times 100\%$$
+
 4. Should your line pass through the origin? What would a non-zero intercept
    mean?
 

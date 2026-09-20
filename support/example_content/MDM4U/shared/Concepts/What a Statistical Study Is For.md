@@ -101,5 +101,9 @@ their week actually looks like.
 
 ![[C1.1]]
 
+![[C1.2]]
+
 ![[D3.3]]
+
+![[E1.5]]
 %%curriculum-end%%

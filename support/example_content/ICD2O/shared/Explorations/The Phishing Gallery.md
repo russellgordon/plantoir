@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - explorations
-enableToc: true
+enableToc: false
 ---
 Around the room hang a dozen messages: a parcel that could not be
 delivered, a streaming account "on hold", a prize with a countdown

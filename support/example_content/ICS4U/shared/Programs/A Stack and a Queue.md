@@ -5,7 +5,7 @@ created: __CREATED__
 tags:
   - programs
 ---
-The library has one copy of the exam study guide and, in March, a
+The library has one copy of the exam study guide and, later in the course, a
 waiting list for it. It also has a front desk where somebody types
 fast and occasionally types wrong, and wants the last thing they did
 taken back.

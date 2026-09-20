@@ -11,9 +11,10 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Tech Headlines]]
-2. Launch, day 1 of 4: [[The Efficiency Case]] — a slow program made
+2. Hand in [[The Structure Study]] — day 6, and done
+3. Launch, day 1 of 4: [[The Efficiency Case]] — a slow program made
    fast, and the argument for the change in energy rather than seconds
-3. Working period: measure the baseline across several input sizes.
+4. Working period: measure the baseline across several input sizes.
    [[Profiling and Timing Code]]
 
 ## Things to do before our next class

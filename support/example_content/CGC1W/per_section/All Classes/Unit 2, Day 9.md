@@ -12,8 +12,9 @@ tags:
 
 1. Before we go: what to look for on a working farm
 2. **Field visit — the farm** (five minutes' drive; we leave promptly). [[The Farm Visit]]
-3. Inputs, outputs, labour, land, and markets — recorded
+3. Inputs, outputs, labour, land, and markets — recorded on site, then
+   your farm entry for [[The Field Record]] written back at school
 
 ## Things to do before our next class
 
-- [ ] Write up the farm visit against your question.
+- [ ] Send me the photograph of today's entry if you did not at the door. Write your thank-you to the grower.

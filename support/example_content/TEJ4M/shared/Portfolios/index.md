@@ -20,7 +20,7 @@ what you predicted and what the meter said. This year it records
 **what you decided** — the choice you made, the alternative you turned
 down, the margin you left, and the measurement that showed whether you
 were right. A journal like that is not a diary of a semester. It is the
-raw material of a design record, and by April it is the strongest
+raw material of a design record, and a year from now it is the strongest
 evidence you own that you can do this work.
 
 The hub is [[Tech Journal]]. These pages support it, roughly in the
@@ -30,13 +30,20 @@ order you will need them:
 | --- | --- |
 | [[Your First Entry]] | Week one, facing a blank page |
 | [[What a Strong Entry Looks Like]] | Once the habit exists |
+| [[Judging Your Own Work]] | The period before a task is handed in |
 | [[Journal Checklist]] | Before each unit's collection |
 | [[Showing Growth]] | Mid-course, when old entries become evidence |
 | [[Final Reflection]] | The last week, reading the whole record |
 
+One of those pages is not about the journal at all.
+[[Judging Your Own Work]] is the inspection you run against a task's
+own criteria table before you hand it in, and it lives here because it
+runs on the same evidence the journal has been collecting — and because
+it is the same habit pointed at something else.
+
 Entries take ten minutes and feel trivial while you are writing them.
 The value arrives months later, when your capstone documentation needs
-the reason you chose a part in November and only your journal has it —
+the reason you chose a part weeks earlier and only your journal has it —
 and when [[Showing Growth]] calls first-week-you as a witness. Both of
 those only work if first-week-you wrote honestly, including the part
 where you had no idea why the circuit was doing that.

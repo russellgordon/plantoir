@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: place an organism using a key, name the
-   ranks, and criticise a sampling design
+   ranks, and criticise a sampling design: [[Using a Dichotomous Key]] and [[Classification Practice]]
 2. Compare answers in pairs
 
 ## Things to do before our next class

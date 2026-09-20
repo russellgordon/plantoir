@@ -43,6 +43,17 @@ Three things are different from Grade 9, and they are the whole point.
   to claim from the data you got. That paragraph is where the marks
   live — see [[How Marks Work]].
 
+**Four of the eight are written up, and those write-ups are marked.**
+[[Modelling Digestion]], [[Evidence of a Chemical Change]],
+[[Modelling the Greenhouse Effect]], and [[Finding the Focal Length]] each
+get the period after the bench work to be written up in class, one per
+unit. The criteria are the same eight every time and they are published on
+[[Lab Reports]], which you read on the day before the first write-up. The
+other four carry no mark at all: what you owe them is a journal entry.
+
+The bench work is done in pairs or threes and the raw readings belong to
+the bench. From the analysis section onward, a write-up is yours alone.
+
 > [!danger] Three things, every single lab day
 > Eye protection on from the first move to the last of the cleanup.
 > Long hair tied back, loose sleeves secured, closed-toe shoes. And any

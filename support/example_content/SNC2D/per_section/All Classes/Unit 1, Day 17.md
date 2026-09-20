@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: cells, specialisation, systems, and one
-   explanation of why mitosis matters
-2. Mark your own; write your revision list
+   explanation of why mitosis matters: [[Cells and Systems Practice]]
+2. Mark your own; write your revision list: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

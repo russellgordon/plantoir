@@ -13,7 +13,9 @@ tags:
 1. Warm-up: [[Predict the Circuit]] — gates edition
 2. Bench time: [[Gates in Hardware]] — a second circuit, built to solve a
    problem the room states
-3. Compare: two benches, two designs, one truth table
+3. Compare: two benches, two designs, one truth table — I am listening
+   for who can say why both work, and nothing is being scored
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

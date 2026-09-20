@@ -27,7 +27,17 @@ export default (() => {
     const url = new URL(`https://${hasBaseUrl ? cfg.baseUrl : "example.com"}`)
     const path = url.pathname as FullSlug
     const baseDir = fileData.slug === "404" ? path : pathToRoot(fileData.slug!)
-    const iconPath = joinSegments(baseDir, "static/icon.png")
+
+    // Plantoir's own icon, written into quartz/static by build_site.py. Three
+    // files rather than one, because no single format covers every browser:
+    // the SVG is what anything current prefers and it stays sharp at any size,
+    // the .ico is the fallback older Safari and Windows actually reach for,
+    // and apple-touch-icon.png is what iOS uses when a site is added to the
+    // Home Screen. Paths are relative to the page (baseDir), not absolute, so
+    // a site served from a subfolder still finds them.
+    const iconSvgPath = joinSegments(baseDir, "static/icon.svg")
+    const faviconPath = joinSegments(baseDir, "static/favicon.ico")
+    const appleTouchIconPath = joinSegments(baseDir, "static/apple-touch-icon.png")
 
     // Url of current page
     const socialUrl =
@@ -83,7 +93,11 @@ export default (() => {
           </>
         )}
 
-        <link rel="icon" href={iconPath} />
+        {/* Order matters: a browser takes the LAST icon it understands, so
+            the .ico goes first and the SVG wins wherever it is supported. */}
+        <link rel="icon" href={faviconPath} sizes="32x32" />
+        <link rel="icon" href={iconSvgPath} type="image/svg+xml" />
+        <link rel="apple-touch-icon" href={appleTouchIconPath} />
         <meta name="description" content={description} />
         <meta name="generator" content="Quartz" />
 

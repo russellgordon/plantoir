@@ -182,7 +182,18 @@ enum SectionReDatePlanner {
             let day: CalendarDay = SectionReDatePlanner.date(
                 at: index, from: remembered.dates
             )
-            for page in graph.linkedPages(from: [classPage]) {
+            // The reach stops at a class page (issue #173), so material
+            // reachable only THROUGH another class is claimed by the class
+            // that actually brings it rather than by whichever earlier class
+            // could see it through that one. Class pages themselves are
+            // unaffected: step 1 above dates every numbered class by position.
+            for page in graph.reachFollowingLinks(from: [classPage]).pages {
+                // `isClassPage` is kept on purpose although it can no longer
+                // fire — every class is in `spokenFor` from step 1, and since
+                // #173 the reach does not hand one back either. This is where
+                // the rule is NAMED, and a rule upheld only by the absence of
+                // a page is one a later reader deletes without knowing they
+                // have. Same reasoning as `dateMovesFollowingClasses`.
                 if spokenFor.contains(page.lowercasedTitle) || page.isClassPage || page.isFolderIndex {
                     continue
                 }

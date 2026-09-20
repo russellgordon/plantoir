@@ -16,7 +16,10 @@ tags:
    captions, and attribution
 3. By request: [[Lead Paragraph Practice]], [[Headline Practice]],
    [[Caption Practice]], [[Verification Practice]]
+4. Then one sentence each on what Units 1 and 3 changed in you — the
+   raw material your [[Final Reflection]] will quote
 
 ## Things to do before our next class
 
-- [ ] Five questions from Units 1 and 3, cold.
+- [ ] One sentence written down: something you can do now that you
+      could not at the start of the course.

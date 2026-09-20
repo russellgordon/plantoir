@@ -204,3 +204,15 @@ times = [64, 25, 12, 22, 11]
 > lands at about half of that. Your shuffled numbers will differ
 > slightly because the shuffle differs; the quadrupling will not.
 
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.3]]
+
+![[A3.4]]
+
+![[C2.1]]
+
+![[C2.3]]
+%%curriculum-end%%
+

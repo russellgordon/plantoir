@@ -30,7 +30,7 @@ software, all of which the school provides. If you prefer something else,
 that is fine, as long as what you hand in opens.
 
 > [!tip] Keep everything in one folder, backed up
-> You will re-use your own work: the profile from September appears again
-> in June, and your case notes are the best exam preparation there is. A
-> lost file in January is a real problem — see
+> You will re-use your own work: the profile from the first week appears again
+> at the end of the course, and your case notes are the best exam preparation there is. A
+> lost file at the end of the course is a real problem — see
 > [[The Tools of the Trade]].

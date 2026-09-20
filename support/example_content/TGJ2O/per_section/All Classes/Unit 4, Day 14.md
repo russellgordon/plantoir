@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Standup — the morning after
-2. Debrief: what a reader said that you did not expect
+1. Standup — the morning after: [[Record a Standup]]
+2. Debrief: what a reader said that you did not expect from [[Publication Day]]
 3. The numbers: what was picked up, what was read online, what that
-   tells us
+   tells us: [[Doing the Numbers]]
 4. Desk time: corrections published, if any are needed — and they are
 
 ## Things to do before our next class

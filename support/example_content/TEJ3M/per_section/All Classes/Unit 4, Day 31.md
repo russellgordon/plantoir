@@ -19,13 +19,15 @@ comment when you reuse the page; comments never appear on the site either. %%
    starts the moment the room is ready and not before
 2. Demonstrations in rotation: the working run, one honest failure mode,
    and the measurement that backs the claim being made
-3. Structured peer critique — for every project you visit, one question,
-   one commendation, and one recommendation, in writing
-4. Journals in: [[Journal Checklist]] and [[Showing Growth]] are your
-   last look before they leave your hands
+3. Structured peer critique — for three projects you visit, one
+   question, one commendation, and one recommendation, in writing
+4. Journals in, with [[Final Reflection]] at the front:
+   [[Journal Checklist]] and [[Showing Growth]] are your last look
+   before they leave your hands
 5. Circle up — tools away, shop closed, one final log in your
    [[Tech Journal]]
 
 ## Things to do before our next class
 
-- [ ] Hand in [[Final Reflection]] with your [[Tech Journal]].
+- [ ] Nothing. This was the last one. Collect your journal from me in
+      the last week of the semester, and keep building things.

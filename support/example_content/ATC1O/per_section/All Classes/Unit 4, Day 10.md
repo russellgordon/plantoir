@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Day 6 of 8: feedback showing to another group
+2. Day 6 of 9: feedback showing to another group
 3. [[Showing and Feedback]] protocol, formally
 4. Revision starts immediately
 5. Cool-down

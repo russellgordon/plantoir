@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: the woodlot, again — this time as a resource
+1. Your woodlot entries back, with comments — read them before we go.
+   Warm-up: the woodlot, again, this time as a resource
 2. **Field visit — the woodlot as working forest.** [[The Woodlot Study]], second visit
 3. What would harvesting here actually involve?
 

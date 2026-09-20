@@ -20,5 +20,6 @@ tags:
 
 - [ ] Journal: one air quality claim you have heard, and the measurement
       you would want standing behind it.
-- [ ] Choose the investigation you will present next class, and bring the
-      data you actually recorded for it.
+- [ ] Dig out the data you actually recorded for each investigation. You
+      choose the one you will present when the showcase preparation
+      starts, a few classes from now.

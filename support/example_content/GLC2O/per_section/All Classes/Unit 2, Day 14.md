@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Launched: [[The Application]]
-2. Choosing the opportunity — the posting from [[Reading a Job Ad]] or one you found since
-3. The page of explanation: why this one and not another
+1. Work period: [[The Application]] — the résumé and the covering message, against the posting's own words
+2. Conferences — the checkpoint, and you get it in writing
+3. Peer reading in the last twenty minutes: does every line earn its place against this posting?
 
 ## Things to do before our next class
 
-- [ ] Choose your opportunity and print the posting it comes from.
+- [ ] Nothing to hand in. Next class is the revision period, start to finish.

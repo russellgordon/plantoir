@@ -11,9 +11,10 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Tech Headlines]]
-2. [[The Device Recommendation]], day 4 — working period: a classmate plays
-   your client and reads your draft. Every question they ask is a
-   line you have not written yet
+2. [[The Device Recommendation]], day 4 — working period: fix the row
+   you ruled weakest first, then a classmate plays your client
+   and reads your draft. Every question they ask is a line you have not
+   written yet
 3. Fix it while they are still sitting there
 
 ## Things to do before our next class

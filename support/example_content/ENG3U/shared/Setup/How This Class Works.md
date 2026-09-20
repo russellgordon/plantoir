@@ -2,6 +2,8 @@
 title: How This Class Works
 publish: true
 created: __CREATED__
+tags:
+  - setup
 enableToc: true
 ---
 This course is mostly reading, arguing, and writing — in that order,
@@ -28,17 +30,19 @@ repeatedly.
 
 ## The independent study
 
-A quarter of the course is [[The Independent Study]]: a text you choose,
-read alone, and write about at length. It runs from November to April in
-parallel with everything else, with four checkpoints. It is the closest
-thing here to university work, and the students who leave it until March
-say so afterwards, at length, to anybody who will listen.
+The longest thing you will write here is [[The Independent Study]]: a text
+you choose, read alone, and write about at length. It runs from the middle
+of the course to its final weeks in parallel with everything else, with four
+checkpoints. It is the closest thing here to university work, and the
+students who leave it until the end of the course say so afterwards, at
+length, to anybody who will listen.
 
 ## Talking
 
-You will speak in every class, and lead a seminar at least twice. If that
-is difficult, come and tell me in the first week and we will build to it
-deliberately. [[Seminar Skills]] has the moves.
+You will speak in every class, and you will lead one seminar and take
+part in every other one. If that is difficult, come and tell me in the
+first week and we will build to it deliberately. [[Seminar Skills]] has
+the moves.
 
 %%curriculum-start%%
 ## Curriculum connection

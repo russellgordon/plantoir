@@ -107,3 +107,29 @@ picture audits the arithmetic.
 > torque exactly as doubling the force does — which is why a length
 > of pipe slipped over a wrench handle is the mechanic's cheat, and
 > why pushing along the handle ($\theta = 0$) turns nothing at all.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C1.1]]
+
+![[C1.2]]
+
+![[C1.3]]
+
+![[C1.4]]
+
+![[C2.1]]
+
+![[C2.2]]
+
+![[C2.3]]
+
+![[C2.4]]
+
+![[C2.5]]
+
+![[C2.6]]
+
+![[C2.7]]
+%%curriculum-end%%

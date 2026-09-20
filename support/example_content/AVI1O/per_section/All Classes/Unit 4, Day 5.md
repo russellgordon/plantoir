@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Studio time: second piece, informed by the first
-2. What the first one taught you — recorded
-3. Conferences
+1. Studio time: second piece, informed by the first — [[The Body of Work]]
+2. What the first one taught you — recorded: [[Working in a Series]]
+3. Conferences on series continuity and thematic development for [[The Body of Work]]
 
 ## Things to do before our next class
 

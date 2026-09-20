@@ -8,8 +8,10 @@ tags:
   - unit-3
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Groups of three.** Goggles required — boiling
-> water and hot metal.
+> **Time:** one class plus an analysis period. **Groups of three.**
+> Goggles required — boiling water and hot metal. Write-up: the analysis
+> section, and it is one of the five that are marked — see
+> [[Investigation Reports]].
 
 Heat a metal, drop it into water, and let the two settle. The energy the
 metal loses is the energy the water gains, and from that you can find the
@@ -42,7 +44,7 @@ because the equation already says one gained and one lost.
 
 ## Analysis
 
-1. Compare with the accepted value for your metal. Percent difference?
+1. Compare with the accepted value for your metal. Per cent difference?
 2. Your value will probably be LOW. Why does heat lost to the room and to
    the calorimeter itself push it that way rather than the other?
 3. Water's specific heat is about ten times most metals'. What does that
@@ -51,11 +53,11 @@ because the equation already says one gained and one lost.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D2.8]]
-
-![[D2.10]]
+![[A1.2]]
 
 ![[A1.4]]
 
-![[A1.2]]
+![[D2.9]]
+
+![[D2.10]]
 %%curriculum-end%%

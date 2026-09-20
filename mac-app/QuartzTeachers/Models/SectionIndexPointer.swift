@@ -51,7 +51,9 @@ enum SectionIndexPointer {
     ///
     /// When two visible classes sit on the same date (e.g. overflow lessons or
     /// multi-class days), the higher Unit x, Day y count wins.
-    static func mostRecentVisibleClass(in graph: AssistSectionGraph) -> AssistSectionPage? {
+    static func mostRecentVisibleClass(
+        in graph: AssistSectionGraph, term: String = ClassPageTerm.standard
+    ) -> AssistSectionPage? {
         var newest: AssistSectionPage?
         var newestDay: CalendarDay?
         var newestUnitDay: UnitDay?
@@ -62,7 +64,7 @@ enum SectionIndexPointer {
             guard let day = page.date else {
                 continue
             }
-            let unitDay: UnitDay? = UnitDay(pageTitle: page.title)
+            let unitDay: UnitDay? = UnitDay(pageTitle: page.title, term: term)
             if let soFarDay = newestDay {
                 if day.text < soFarDay.text {
                     continue
@@ -158,7 +160,9 @@ enum SectionIndexPointer {
         let graph: AssistSectionGraph = AssistSectionGraph.read(
             forSection: sectionNumber, in: course, workspaceURL: nil
         )
-        guard let newest = SectionIndexPointer.mostRecentVisibleClass(in: graph) else {
+        guard let newest = SectionIndexPointer.mostRecentVisibleClass(
+            in: graph, term: course.configuration.unitWord
+        ) else {
             return nil
         }
 

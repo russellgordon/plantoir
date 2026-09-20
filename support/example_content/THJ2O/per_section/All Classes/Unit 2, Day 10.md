@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Build day 1: cutting to the list
-2. Squareness checked before anything is fastened
+1. Build day 1: cutting to the list: [[The Shop Build]]
+2. Squareness checked before anything is fastened: [[Fasteners and Construction]]
 3. Clean-down
 
 ## Things to do before our next class

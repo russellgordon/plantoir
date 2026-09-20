@@ -88,3 +88,15 @@ finite list of answers. All domains are $0 \le x \le 2\pi$.
 > $x = \frac{\pi}{6}, \frac{5\pi}{6}, \frac{7\pi}{6},
 > \frac{11\pi}{6}$. The classic error is solving only one lap and
 > losing half the list.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B3.1]]
+
+![[B3.2]]
+
+![[B3.3]]
+
+![[B3.4]]
+%%curriculum-end%%

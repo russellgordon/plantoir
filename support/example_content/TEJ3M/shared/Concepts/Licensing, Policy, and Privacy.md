@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 A technician holds keys to other people's machines and other people's
 information. The rules around that are not paperwork; they are the

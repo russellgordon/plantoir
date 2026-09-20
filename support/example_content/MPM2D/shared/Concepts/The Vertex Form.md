@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 You met this idea at the boards with [[Maximum Enclosure]] — the moment
 your group asked "where exactly is the top of this curve?". The vertex
@@ -38,14 +37,32 @@ Standard form $y = ax^2 + bx + c$ hides the vertex; completing the
 square is the algebra that un-hides it. The move: build the perfect
 square that *almost* matches, then repair the difference.
 
+### Case 1: When $a = 1$
+
 $$
 y = x^2 + 6x + 2 = (x^2 + 6x + 9) + 2 - 9 = (x+3)^2 - 7
 $$
 
 Nothing changed — we added 9 and took it away in the same breath — but
-now the vertex $(-3, -7)$ is visible. Why 9? Half of 6, squared. The
-[[The Border Problem|border problem]] is where that "half, then square"
-pattern first showed itself at the boards.
+now the vertex $(-3, -7)$ is visible. Why 9? Half of the linear
+coefficient 6 is 3, and $3^2 = 9$. With algebra tiles or an area
+diagram, a square $x$ by $x$ with 6 $x$-strips is arranged into a
+$(x + 3)$ by $(x + 3)$ square missing a $3 \times 3 = 9$ corner block.
+The [[The Border Problem|border problem]] is where that "half, then
+square" geometry first showed itself at the boards.
+
+### Case 2: When $a \neq 1$ (no fractions)
+
+When $a \neq 1$, factor $a$ out of the first two terms before completing
+the square inside the brackets:
+
+$$
+\begin{aligned} y &= 2x^2 - 12x + 10 \\ &= 2(x^2 - 6x) + 10 \\ &= 2(x^2 - 6x + 9 - 9) + 10 \\ &= 2((x - 3)^2 - 9) + 10 \\ &= 2(x - 3)^2 - 18 + 10 \\ &= 2(x - 3)^2 - 8 \end{aligned}
+$$
+
+The vertex is $(3, -8)$, and the parabola opens upward with a vertical
+stretch of factor 2. Notice that when $-9$ left the bracket, it was
+multiplied by 2 to become $-18$.
 
 > [!success]- Quick self-check (click to expand)
 > $y = x^2 - 8x + 3$. Half of $-8$ is $-4$; squared is 16.
@@ -65,4 +82,6 @@ builds, and [[The Perfect Arc]] is where it earns its keep.
 ![[A2.3]]
 
 ![[A2.4]]
+
+![[A3.5]]
 %%curriculum-end%%

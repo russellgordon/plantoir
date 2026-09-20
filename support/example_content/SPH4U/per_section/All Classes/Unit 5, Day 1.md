@@ -10,7 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 5 — the experiment a wave model could not explain
+1. Start of Unit 5 — two minutes on paper, no notes: shine a brighter
+   light on a metal and more electrons come off, moving faster. True or
+   false, and why? Nothing is marked; I want to know how firmly the wave
+   model has settled before I take it away
 2. [[The Photoelectric Effect]] and the quantum of energy
 3. [[Wave–Particle Duality]] and de Broglie's question
 4. Practise: [[Relativity and Quanta Practice]], questions 3 and 4

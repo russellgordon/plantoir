@@ -16,8 +16,9 @@ tags:
    safe window is an inequality, not an equation
 3. Consolidate: [[Polynomial and Rational Inequalities]], part two —
    why clearing denominators blindly costs you the answer
-4. Task time: [[Safe Concentration]] — shade your window on the graph
-   and defend both of its edges
+4. Task time: [[Safe Concentration]], day 2 — mark the safe band across
+   your plotted data and estimate where each edge falls; the fitted
+   model on day 3 is what will make them exact
 
 ## Things to do before our next class
 

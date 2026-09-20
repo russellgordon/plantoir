@@ -56,6 +56,8 @@ This position accepts the first argument's mechanics and rejects its
 accounting: the price of every deferral was paid by people with no part in
 the negotiation, and a full answer has to say so out loud.
 
+[[The Four Seminars]] has the criteria, unchanged since the first one.
+
 Open with your position, name the evidence that would move you, and take
 the argument into [[What Held the Union Together|What Held the Union Together?]] and
 [[The Union Divided]].

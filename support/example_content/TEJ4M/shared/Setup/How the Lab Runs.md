@@ -59,7 +59,10 @@ real hardware and real instruments. Roles rotate — hands, instrument,
 recorder — so that nobody spends the semester holding the same tool.
 The recorder's job is real and it is bigger this year: units,
 conditions, the supply setting, the scale settings on any trace, and
-the decisions the bench made along the way.
+the decisions the bench made along the way. That table belongs to the
+bench and everybody copies it; the rest of
+[[The Bench Record|your bench record]] you write yourself, in your own
+words, and it goes in when the bench is reset.
 
 ## Design review
 

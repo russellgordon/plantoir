@@ -15,7 +15,9 @@ tags:
 2. Number talk: [[Graph Talks]] — no equation, no scale: what could
    this graph be saying?
 3. Random groups — [[The Polynomial Sort]] at the boards: twelve
-   mystery graphs, sorted by what they must have in common
+   mystery graphs, sorted by what they must have in common. This is the
+   unit's diagnostic: nothing about it is marked, and what it tells me
+   is which Grade 11 ideas are still in the room
 4. Consolidate: [[Polynomial Functions]] — degree, end behaviour, and
    turning points, each named by a group before the textbook could
 5. The year ahead: [[Learning Goals]] — where this course is going

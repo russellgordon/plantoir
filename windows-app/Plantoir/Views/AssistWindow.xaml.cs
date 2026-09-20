@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -46,6 +47,11 @@ public sealed partial class AssistWindow : Window
     private readonly CancellationTokenSource _closing = new();
     private AssistPromptHistory _history;
     private string? _lastRecalled;
+
+    // ---- What the engine itself has said, sampled onto the trail ---------
+    private long _engineLogMark;
+    private int _engineLinesRecorded;
+    private Task? _engineWatch;
     private string HistoryKey => $"AssistPromptHistory-{_course.Code}-{_section}";
 
     public AssistWindow(string workspacePath, Course course, int section, MainWindow? main = null)
@@ -71,7 +77,12 @@ public sealed partial class AssistWindow : Window
         Subheading.Text = "Ask for a change in plain words. Every change is backed up and can be undone, " +
                           "and nothing reaches students until the section deploys — which always waits for your OK.";
 
-        Closed += (_, _) => Shutdown();
+        RestorePlacement();
+        // Sampled while the window is alive: reading AppWindow inside its own
+        // Closed handler is the one thing the rest of this app avoids
+        // (App.OpenWindow drops a closing window before remembering the rest).
+        AppWindow.Changed += (sender, args) => { if (args.DidPositionChange) _lastPosition = sender.Position; };
+        Closed += (_, _) => { RememberPlacement(); Shutdown(); };
 
         // Started on Loaded, not here: the download offer is a ContentDialog,
         // and a dialog needs a XamlRoot, which does not exist until the
@@ -79,10 +90,235 @@ public sealed partial class AssistWindow : Window
         Root.Loaded += OnceLoaded;
     }
 
+    /// <summary>
+    /// The main window a build or deploy should run in. The one this window
+    /// was opened from, while it is still open; otherwise another window on
+    /// the same working folder; otherwise a NEW one, opened here so that a
+    /// teacher who closed the main window and kept revising still sees the
+    /// build they approved (mac row 300's case). The fresh window is used by
+    /// IDENTITY — the object just returned — never looked up by the folder
+    /// it will end up showing, which is the trap row 300 records. Must be
+    /// called on the UI thread, which every caller here is.
+    /// </summary>
+    /// <summary>
+    /// A window already showing THIS section's folder, or null.
+    ///
+    /// <para><c>_main</c> only counts while it still shows <c>_folder</c>.
+    /// Nothing closes an assistant window when the main window is pointed at
+    /// another working folder, so it can outlive the folder it was opened
+    /// beside — and a hand-back into a window showing something else presses
+    /// buttons about a course that folder has never had (#162).</para>
+    /// </summary>
+    private MainWindow? MainWindowShowingThisSection()
+    {
+        if (_main is { IsClosed: false } main && App.WindowFor(_folder) == main) return main;
+        return App.WindowFor(_folder);
+    }
+
+    /// <summary>
+    /// Where a build or a deploy this conversation asked for is carried out —
+    /// a window on this section's own folder, opened if there is none.
+    /// </summary>
+    private MainWindow? MainWindowForBuilds()
+    {
+        if (MainWindowShowingThisSection() is { } showing) return showing;
+        try { return App.OpenWindow(_folder, null); }
+        catch (Exception ex) { App.LogDiagnostic($"AssistWindow could not open a main window: {ex}"); return null; }
+    }
+
+    // ---- Where this window sits -------------------------------------------
+
+    private string PlacementKey => AppSettings.AssistWindowKey(_folder, _course.Code, _section);
+    private Windows.Graphics.PointInt32? _lastPosition;
+
+    /// <summary>
+    /// Put the window where this SECTION's assistant was last left —
+    /// placement only, the size is the window's own — and only if that point
+    /// is still on a display. A remembered monitor that is gone would put
+    /// the window where a teacher cannot find it, so the point is checked
+    /// against the displays that exist now and the default placement wins
+    /// otherwise (the clamp MainWindow applies to its own frame).
+    /// </summary>
+    private void RestorePlacement()
+    {
+        try
+        {
+            if (!App.Settings.AssistWindowPlacements.TryGetValue(PlacementKey, out var placement)) return;
+            var point = new Windows.Graphics.PointInt32((int)placement.X, (int)placement.Y);
+            var display = Microsoft.UI.Windowing.DisplayArea.GetFromPoint(point, Microsoft.UI.Windowing.DisplayAreaFallback.None);
+            if (display is null) return;
+            var area = display.WorkArea;
+            // Some of the title bar must be inside the work area, or there is nothing to grab.
+            if (point.X > area.X + area.Width - 120 || point.Y > area.Y + area.Height - 60) return;
+            AppWindow.Move(point);
+            _lastPosition = point;
+        }
+        catch (Exception ex) { App.LogDiagnostic($"AssistWindow placement not restored: {ex.Message}"); }
+    }
+
+    private void RememberPlacement()
+    {
+        try
+        {
+            if (_lastPosition is not { } position) return;     // never moved, nothing new to remember
+            App.Settings.AssistWindowPlacements[PlacementKey] = new RememberedPlacement(position.X, position.Y);
+            App.Settings.Save();
+        }
+        catch (Exception ex) { App.LogDiagnostic($"AssistWindow placement not remembered: {ex.Message}"); }
+    }
+
+    // ---- The way back for the whole conversation ---------------------------
+
+    /// <summary>
+    /// The copy saved before this conversation's first change, learned from
+    /// the tools' answers. Null while the conversation has only read — and a
+    /// conversation that only PUBLISHED counts as changed, because the tools
+    /// save the copy before a publish too and publishing state is part of
+    /// what a restore puts back.
+    /// </summary>
+    private string? _conversationBackupPath;
+
+    private void ShowRestoreBanner()
+    {
+        if (_conversationBackupPath is null) return;
+        RestoreBannerTitle.Text = AssistSectionRestore.BannerTitle(_section);
+        RestoreBannerDetail.Text = AssistSectionRestore.BannerDetail();
+        RestoreSectionButton.Content = AssistSectionRestore.ButtonTitle(_section);
+        RestoreBanner.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Ask, then put the section back — and write the outcome into the
+    /// transcript either way. A restore that quietly failed would leave a
+    /// teacher believing their section had gone back when it had not.
+    /// Nothing is rebuilt afterwards; the sentence tells them to ask.
+    /// </summary>
+    private async void RestoreSection_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = AssistSectionRestore.ConfirmationTitle(_course.Code, _section),
+            Content = new TextBlock
+            {
+                Text = AssistSectionRestore.ConfirmationMessage(_course.Code, _section),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 460,
+            },
+            PrimaryButtonText = AssistSectionRestore.GoAheadTitle(_section),
+            CloseButtonText = "Cancel",
+            // The safe answer is the default: this discards work.
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Root.XamlRoot,
+        };
+        ContentDialogResult choice;
+        try { choice = await dialog.ShowAsync(); }
+        catch (Exception ex) { App.LogDiagnostic($"restore dialog: {ex.Message}"); return; }
+        if (choice != ContentDialogResult.Primary) return;
+
+        try
+        {
+            AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
+                                         Workspace.CoursesDirectory(_folder));
+        }
+        catch (Exception error)
+        {
+            Say("Assistant", "Nothing was put back: " + error.Message);
+            return;
+        }
+        ActivityTrail.Note(ActivityTrail.Event.SectionRestored,
+            "put the section back to how it was when this conversation started, from " +
+            Path.GetFileName(_conversationBackupPath!), _course.Code, _section);
+        Say("Assistant", AssistSectionRestore.DoneMessage(_course.Code, _section));
+    }
+
     private void OnceLoaded(object sender, RoutedEventArgs e)
     {
         Root.Loaded -= OnceLoaded;
         _ = Begin();
+    }
+
+    // ---- What the engine itself said --------------------------------------
+
+    /// <summary>How often to look in on the engine while the window is open.</summary>
+    private static readonly TimeSpan EngineWatchInterval = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// Guards <see cref="_engineLogMark"/> and <see cref="_engineLinesRecorded"/>.
+    ///
+    /// On mac, <c>recordWhatTheEngineSaid</c> is always called on the same
+    /// actor, so the equivalent Swift properties need no lock of their own.
+    /// Here the periodic watch deliberately runs on a background thread (see
+    /// <see cref="WatchWhatTheEngineSays"/>) while <see cref="Shutdown"/>'s
+    /// own last look runs on the UI thread and does not wait for an
+    /// in-flight background iteration to finish — cancelling <c>_closing</c>
+    /// only stops the loop's *next* iteration. Without this lock the two
+    /// could race on the ref-parameter mark and the non-atomic increment,
+    /// losing or double-recording lines right at teardown.
+    /// </summary>
+    private readonly object _engineLogGate = new();
+
+    /// <summary>
+    /// Put what the engine has said since the last look onto the trail.
+    ///
+    /// <paramref name="keepingEverything"/> is for the one case where the
+    /// ordinary filter is wrong: an engine that never became ready. There,
+    /// every line is the diagnosis, including the perfectly ordinary ones it
+    /// got through before it stopped. Mirrors mac's
+    /// <c>AssistSession.recordWhatTheEngineSaid</c>.
+    /// </summary>
+    private void RecordWhatTheEngineSaid(bool keepingEverything)
+    {
+        lock (_engineLogGate)
+        {
+            var since = _model.LinesSinceLastLook(ref _engineLogMark);
+            var toRecord = AssistEngineLog.LinesWorthRecording(
+                since, keepingEverything, _engineLinesRecorded);
+            foreach (var line in toRecord)
+            {
+                _engineLinesRecorded++;
+                ActivityTrail.Note(ActivityTrail.Event.AssistantEngineSaid,
+                    $"the assistant's engine said: {line}", _course.Code, _section);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Look in on the engine every so often, so a report made while the
+    /// window is still open carries what it said.
+    ///
+    /// Sampling only at teardown would miss the case this exists for: a
+    /// teacher whose assistant is misbehaving RIGHT NOW, filing a report
+    /// without closing anything. The loop ends itself once the cap is
+    /// reached, so a badly behaved engine costs a fixed amount of work
+    /// rather than a permanent one. Mirrors mac's
+    /// <c>AssistSession.watchWhatTheEngineSays</c>.
+    /// </summary>
+    private void WatchWhatTheEngineSays()
+    {
+        _engineWatch = Task.Run(async () =>
+        {
+            while (!_closing.IsCancellationRequested)
+            {
+                // Touches only ActivityTrail (its own lock) and _model's
+                // server-log buffer (its own lock) — no XAML element is
+                // read or written here, so this runs on the background
+                // thread rather than being marshalled through the
+                // dispatcher.
+                RecordWhatTheEngineSaid(keepingEverything: false);
+                if (_engineLinesRecorded >= AssistEngineLog.MostEngineLinesOnTheTrail)
+                {
+                    return;
+                }
+                try
+                {
+                    await Task.Delay(EngineWatchInterval, _closing.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
+        });
     }
 
     // ---- Starting up -----------------------------------------------------
@@ -97,6 +333,12 @@ public sealed partial class AssistWindow : Window
     /// </summary>
     private async Task Begin()
     {
+        // Claimed as the window opens, not once the engine is ready — a
+        // teacher three minutes into a download still has the assistant open
+        // as far as Settings' "may I remove this model" question is
+        // concerned. Mirrors the mac's AssistSession.prepare().
+        AssistActivity.Begin(_folder, _course.Code, _section);
+
         ActivityTrail.Note(ActivityTrail.Event.AssistantOpened,
             "assistant opened", _course.Code, _section);
         var startingAt = DateTime.UtcNow;
@@ -112,54 +354,105 @@ public sealed partial class AssistWindow : Window
 
         if (!_model.IsInstalled())
         {
-            // The one download, and the one place a teacher gets to refuse it.
-            var offer = new ContentDialog
+            // Shared with Settings' own housekeeping list through
+            // AssistModelStores, rather than downloaded straight into
+            // _model here — a teacher who pressed Download in Settings and
+            // then opened the assistant while it ran used to get a SECOND
+            // download racing the first onto the same file, each undoing
+            // the other. Joining the same store means this window sees
+            // (and can show progress for) a download started anywhere.
+            var store = AssistModelStores.Store(_model.Tier);
+
+            // Whether the download in flight was started from THIS window —
+            // decides what closing the window does. A teacher who shuts
+            // this window has finished with IT, but since the stores are
+            // shared (AssistModelStores), the download this window can see
+            // may have been started in Settings, where the whole point was
+            // to fetch it ahead of time and get on with something else.
+            // Closing a window that merely WATCHED must not cancel that —
+            // mac parity, AssistSession.startedTheDownload; see
+            // GUI-IMPROVEMENTS.md row 219 for the bug this exists to avoid
+            // repeating.
+            bool startedByThisWindow = false;
+
+            // The one place a teacher gets to refuse it — but only when
+            // nothing is already running. A download already in flight
+            // (started from Settings, or from another assistant window on
+            // this tier) was already agreed to once; asking again here
+            // would be asking a question the teacher already answered.
+            if (store.State != AssistModelStoreState.Downloading && !store.IsReady)
             {
-                Title = "Download the assistant?",
-                Content = "The assistant runs on this computer — nothing you write is sent anywhere. " +
-                          "It needs a one-time download of about 1.1 GB, and then it works offline.",
-                PrimaryButtonText = "Download",
-                CloseButtonText = "Not now",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = Root.XamlRoot,
-            };
-            if (await offer.ShowAsync() != ContentDialogResult.Primary)
-            {
-                Say("Assistant", "No assistant, then — close this window whenever you like.");
-                return;
+                var offer = new ContentDialog
+                {
+                    Title = "Download the assistant?",
+                    Content = "The assistant runs on this computer — nothing you write is sent anywhere. " +
+                              "It needs a one-time download of about 1.1 GB, and then it works offline.",
+                    PrimaryButtonText = "Download",
+                    CloseButtonText = "Not now",
+                    DefaultButton = ContentDialogButton.Primary,
+                    XamlRoot = Root.XamlRoot,
+                };
+                if (await offer.ShowAsync() != ContentDialogResult.Primary)
+                {
+                    Say("Assistant", "No assistant, then — close this window whenever you like.");
+                    return;
+                }
+                store.Download();
+                startedByThisWindow = true;
             }
 
-            ActivityTrail.Note(ActivityTrail.Event.AssistantModelDownloadStarted,
-                "assistant download started", _course.Code, _section);
             var note = SayWithBar("Assistant", "Downloading the assistant…");
 
-            // Reports are POSTED to this thread, so one can still be in the
+            // Reports arrive on the store's own thread; this handler is
+            // POSTED to this window's thread, so one can still be in the
             // queue when the download finishes — and it would land after the
             // closing message and overwrite it with a stale byte count. The
             // flag makes anything arriving after the end a no-op.
             bool finished = false;
-            var progress = new Progress<LocalModel.Fetching>(state =>
+            var completion = new TaskCompletionSource();
+            void OnStoreChanged()
             {
-                if (finished) return;
-                note.Text.Text = state.Describe();
-                // An unknown total leaves the bar sweeping rather than sitting
-                // at zero, which reads as stuck.
-                note.Bar.IsIndeterminate = !state.Known;
-                if (state.Known) note.Bar.Value = state.Percent;
-            });
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (finished) return;
+                    if (store.State == AssistModelStoreState.Downloading)
+                    {
+                        var fetching = new LocalModel.Fetching(store.ReceivedBytes, store.TotalBytes);
+                        note.Text.Text = fetching.Describe();
+                        note.Bar.IsIndeterminate = !fetching.Known;
+                        if (fetching.Known) note.Bar.Value = fetching.Percent;
+                    }
+                    else
+                    {
+                        completion.TrySetResult();
+                    }
+                });
+            }
+            store.Changed += OnStoreChanged;
+            using (_closing.Token.Register(() =>
+            {
+                // Cancel the SHARED download only when this window is the
+                // one that started it. A window that merely joined an
+                // in-flight download (started from Settings, or another
+                // assistant window) just stops watching on close — the
+                // download itself keeps running for whoever else is
+                // looking at it.
+                if (startedByThisWindow) store.Cancel();
+                completion.TrySetResult();
+            }))
+            {
+                if (store.IsReady) completion.TrySetResult();   // already finished before we subscribed
+                await completion.Task;
+            }
+            store.Changed -= OnStoreChanged;
 
-            bool installed = await _model.Install(progress, _closing.Token);
             finished = true;
             note.Bar.Visibility = Visibility.Collapsed;
-            if (!installed)
+            if (!store.IsReady)
             {
-                ActivityTrail.Note(ActivityTrail.Event.AssistantModelDownloadFailed,
-                    "assistant download did not finish", _course.Code, _section);
                 note.Text.Text = "The download didn’t finish. Check the network and try opening this window again.";
                 return;
             }
-            ActivityTrail.Note(ActivityTrail.Event.AssistantModelDownloaded,
-                "assistant downloaded", _course.Code, _section);
             note.Text.Text = "The assistant is downloaded.";
         }
 
@@ -167,6 +460,10 @@ public sealed partial class AssistWindow : Window
         {
             ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,
                 "the assistant’s engine would not start", _course.Code, _section);
+            // The engine never became ready, so every line it managed to
+            // write before giving up is the diagnosis — the ordinary filter
+            // would be wrong here.
+            RecordWhatTheEngineSaid(keepingEverything: true);
             Say("Assistant", "The assistant wouldn’t start. Restarting Plantoir usually settles it.");
             return;
         }
@@ -176,6 +473,7 @@ public sealed partial class AssistWindow : Window
         {
             ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,
                 "the assistant’s tools did not answer", _course.Code, _section);
+            RecordWhatTheEngineSaid(keepingEverything: true);
             Say("Assistant", "The assistant started, but Plantoir’s tools didn’t answer. Try opening this window again.");
             return;
         }
@@ -192,18 +490,28 @@ public sealed partial class AssistWindow : Window
             OnToolProgress = NoteToolProgress,
             // Building and deploying automate the main window's own flows —
             // once, on screen — rather than running again behind the chat.
-            ShowPreviewInApp = () => _main?.ShowPreviewFor(_course.Code, _section),
-            StartDeployInApp = () => _main?.DeployFor(_course.Code, _section),
+            ShowPreviewInApp = () => MainWindowForBuilds()?.ShowPreviewFor(_course.Code, _section),
+            StartDeployInApp = () => MainWindowForBuilds()?.DeployFor(_course.Code, _section),
             StartDeployInAppAsync = async () =>
             {
-                if (_main is not null) await _main.DeployForAsync(_course.Code, _section);
+                // The path a real deploy_section takes (the sync one above is
+                // the busy-section fallback), so it must find a window too.
+                if (MainWindowForBuilds() is not { } main) return null;
+                return await main.DeployForAsync(_course.Code, _section);
             },
-            StopPreviewInApp = () => _main?.StopPreviewFor(_course.Code, _section),
+            // Every hand-back names THIS section's folder, never the main
+            // window's: nothing closes an assistant window when the main
+            // window is pointed somewhere else, so `_main` may by now be
+            // showing a different folder entirely (#162).
+            StopPreviewInApp = () => _main?.StopPreviewFor(_folder, _course.Code, _section),
             StopPreviewInAppAsync = async () =>
             {
-                if (_main is not null) await _main.StopPreviewForAsync(_course.Code, _section);
+                if (_main is not null) await _main.StopPreviewForAsync(_folder, _course.Code, _section);
             },
-            SectionIsBusy = () => _main?.IsSectionBusy(_course.Code, _section) == true,
+            // Asked of a window showing this section's folder — the busy
+            // answer is read off a detail pane, and another folder's pane
+            // answers about another folder's section.
+            SectionIsBusy = () => MainWindowShowingThisSection()?.IsSectionBusy(_course.Code, _section) == true,
             // Same process as the previews, so the in-memory leases are the
             // truth about whether one is on screen.
             PreviewIsShowing = () => PreviewLeases.Active.Any(lease =>
@@ -216,6 +524,11 @@ public sealed partial class AssistWindow : Window
                 App.Settings.PlansAcceptedCount++;
                 try { App.Settings.Save(); } catch { }
             },
+            OnConversationBackup = path => DispatcherQueue.TryEnqueue(() =>
+            {
+                _conversationBackupPath = path;
+                ShowRestoreBanner();
+            }),
             DestinationProvider = () =>
             {
                 if (_course.Configuration.DeploysToLocalFolder) return "a folder on this computer";
@@ -237,6 +550,7 @@ public sealed partial class AssistWindow : Window
         ActivityTrail.Note(ActivityTrail.Event.AssistantReady,
             $"the assistant was ready after {(DateTime.UtcNow - startingAt).TotalSeconds:F1}s",
             _course.Code, _section);
+        WatchWhatTheEngineSays();
         // Typing is available from here.
         Input.IsEnabled = true;
         SendButton.IsEnabled = true;
@@ -466,6 +780,22 @@ public sealed partial class AssistWindow : Window
                 });
             }
         }
+    }
+
+    /// <summary>
+    /// Mount the prompt shelf for a marketing capture, as though a teacher had
+    /// typed it.
+    ///
+    /// The shelf is normally mounted on the path that runs once the local
+    /// assistant is ready, and a capture never starts one -- so the window
+    /// photographed with the top third of it blank, and the Windows shot
+    /// omitted a feature the mac's twin leads with. The cards do nothing
+    /// here: tapping one is what a teacher does, and nothing is tapped.
+    /// </summary>
+    public void ShowPromptShelfForCapture()
+    {
+        PromptShelfHost.Content = new AssistPromptShelfView(_ => { });
+        PromptShelfArea.Visibility = Visibility.Visible;
     }
 
     public void AddStagedBubbleForCapture(string speaker, bool fromTeacher, params UIElement[] contents)
@@ -768,6 +1098,16 @@ public sealed partial class AssistWindow : Window
     private void Shutdown()
     {
         try { _closing.Cancel(); } catch { }
+
+        // Released unconditionally, even if Begin() never got this far (the
+        // server was missing, or the teacher declined a download): if this
+        // does not run, Settings stays locked out of removing anything until
+        // the app restarts, which is worse than briefly under-counting.
+        try { AssistActivity.End(_folder, _course.Code, _section); } catch { }
+
+        // The last look comes before the model is stopped and its log
+        // buffer goes with it — same order as mac's `finish()`.
+        RecordWhatTheEngineSaid(keepingEverything: false);
 
         // WAITED ON, not fired and forgotten. The old version started this on
         // a background task and returned, so closing the window — or closing

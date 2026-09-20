@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: name a sampling method's weakness,
-   summarise a data set, and describe a scatter plot in words
-2. Compare methods at the boards
+   summarise a data set, and describe a scatter plot in words: [[Sampling Techniques]] and [[Two-Variable Statistics]]
+2. Compare methods at the boards; practice: [[One- and Two-Variable Data Practice]]
 
 ## Things to do before our next class
 

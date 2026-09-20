@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Which One Doesn't Belong]] — four address plans
-2. [[The Deployment]], day 4 — network addressed and documented, services
-   configured, permission matrix tested
+2. [[The Deployment]], day 4 — network cabled, addressed and proven
+   end to end, services configured, permission matrix tested from the
+   second machine
 
 ## Things to do before our next class
 

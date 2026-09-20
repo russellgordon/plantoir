@@ -12,8 +12,8 @@ tags:
 
 1. The creative process, named: [[The Creative Process]]
 2. Where you are in it right now — labelled in the sketchbook
-3. Studio time
+3. Studio time: colour mixing experiments and value scales for [[The Elements Study]]
 
 ## Things to do before our next class
 
-- [ ] Label your sketchbook pages by stage.
+- [ ] Read [[The Creative Process]] to the end.

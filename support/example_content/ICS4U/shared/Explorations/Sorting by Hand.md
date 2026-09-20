@@ -103,7 +103,7 @@ the board. Some rules barely notice. Some rules fall apart.
 > compare neighbours and swap (bubble sort). Occasionally a group
 > splits the row in half, sorts each half, and interleaves — write that
 > group's names on the board, because they have invented merge sort and
-> they will be very smug about it in Unit 3, Day 4.
+> they will be very smug about it in Unit 3, Day 6.
 >
 > **Do not correct a working rule for being inefficient.** Let the
 > board's numbers say it. A rule that took 70 comparisons next to one
@@ -116,8 +116,8 @@ the board. Some rules barely notice. Some rules fall apart.
 > and you get it for free from cardboard.
 >
 > **Save the board.** Photograph the three columns. They come back on
-> Day 4 next to the machine timings, and again on Day 5 when the counts
-> get a name.
+> Unit 3, Day 7 next to the machine timings, and again on Unit 3,
+> Day 8 when the counts get a name.
 
 ## What tends to surface
 

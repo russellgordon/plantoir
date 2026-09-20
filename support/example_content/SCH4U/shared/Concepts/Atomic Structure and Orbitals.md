@@ -181,11 +181,13 @@ will be asked for.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C3.1]]
-
 ![[C2.2]]
 
+![[C3.1]]
+
 ![[C3.2]]
+
+![[C3.3]]
 
 ![[C3.5]]
 %%curriculum-end%%

@@ -143,6 +143,8 @@ way to write down what the models let you do.[^1]
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C2.2]]
+
 ![[C2.4]]
 
 ![[C3.2]]

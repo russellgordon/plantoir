@@ -77,6 +77,37 @@ final class AssistSession {
     /// window that merely WATCHED must not cancel that.
     private var startedTheDownload: Bool = false
 
+    /// Whether the priming request has come BACK.
+    ///
+    /// Not whether it was sent — the distinction is the whole point. The
+    /// window announces itself ready as soon as the engine answers `/health`,
+    /// which is several seconds before the ~3,400-token warm-up has finished
+    /// reading the tool definitions, and the engine serves one request at a
+    /// time (`--parallel 1`). A first question sent into that gap does not go
+    /// faster for having been sent early: it queues behind the warm-up on the
+    /// server's single slot. Measured on an M-series Mac, 48 GB, the small
+    /// assistant, the same question twice: **1.7 s** asked after the warm-up
+    /// had returned, **3.1 s** asked the instant the field enabled.
+    ///
+    /// So the turn waits for this instead of racing it — see `canSend`.
+    private(set) var hasFinishedWarmUp: Bool = false
+
+    /// Everything waiting for the warm-up to come back.
+    ///
+    /// A teacher who presses Return during those few seconds must not have
+    /// the keystroke swallowed — "a key that silently does nothing reads as a
+    /// dropped keystroke" is already the rule the composer's arrow keys
+    /// follow, and it applies just as much here. `waitUntilWarmedUp()` parks
+    /// them here and they are resumed together the moment the warm-up ends.
+    private var warmUpWaiters: [CheckedContinuation<Void, Never>] = []
+
+    /// How many of the engine's own lines this conversation has put on the
+    /// trail, against the cap below.
+    private var engineLinesRecorded: Int = 0
+
+    /// The loop that looks in on the engine's log while the window is open.
+    private var engineWatch: Task<Void, Never>?
+
     // MARK: - Computed properties
 
     /// The model this window is running.
@@ -112,10 +143,18 @@ final class AssistSession {
     /// mid-run would interleave with the tool calls of the first — so the
     /// send waits even though the typing does not.
     var canSend: Bool {
-        guard readiness == .ready, let agent else {
+        guard readiness == .ready, hasFinishedWarmUp, let agent else {
             return false
         }
         return !agent.isBusy
+    }
+
+    /// The gap between the window saying it is ready and the warm-up coming
+    /// back — the only time `canSend` is false while `canAcceptTyping` is
+    /// true, and the reason the send button shows a spinner rather than
+    /// simply being dimmed for no visible reason.
+    var isWarmingUp: Bool {
+        return readiness == .ready && !hasFinishedWarmUp
     }
 
     /// Whether there is a way back to how this section was when the
@@ -169,7 +208,13 @@ final class AssistSession {
 
     /// Work out what this window can offer, and get as far towards a
     /// conversation as it can without asking the teacher anything.
-    func prepare() async {
+    ///
+    /// `openMainWindow` comes from `AssistWindowView`'s own `@Environment
+    /// (\.openWindow)` — the one capability only the local in-app assistant
+    /// has, letting a deploy or preview it starts put the section on screen
+    /// itself rather than running silently. See `AssistToolRunner.
+    /// revealSectionOnScreen`.
+    func prepare(openMainWindow: @escaping @MainActor () -> Void) async {
         // Claimed as the window opens, not when the engine is ready. A
         // teacher three minutes into a download has the assistant open as
         // far as they are concerned, and a second window started meanwhile
@@ -195,7 +240,7 @@ final class AssistSession {
             }
         }
 
-        await startEngine()
+        await startEngine(openMainWindow: openMainWindow)
     }
 
     /// Watch the download until it finishes or fails, mirroring its progress
@@ -231,7 +276,7 @@ final class AssistSession {
     }
 
     /// Start the server and build the agent.
-    private func startEngine() async {
+    private func startEngine(openMainWindow: @escaping @MainActor () -> Void) async {
         readiness = .starting
         let startedAt: Date = Date()
         ActivityTrail.note(
@@ -248,48 +293,105 @@ final class AssistSession {
         case .ready:
             guard let baseURL = host.baseURL else {
                 readiness = .failed(reason: "The assistant's engine started but gave no address.")
+                finishWarmUp()
                 return
             }
-            // The assistant window is its own window, so it gets its own
-            // workspace pointed at the same folder rather than reaching into
-            // the main window's. The tools take the course and section as
-            // arguments — the same shape the MCP server uses — so the runner
-            // needs the folder, not this window's particular section.
-            let workspace: WorkspaceModel = WorkspaceModel()
-            workspace.adoptRestoredPath(workingFolder.path)
-            let runner: AssistToolRunner = AssistToolRunner(workspace: workspace)
-            self.toolRunner = runner
-            let agent: AssistAgent = AssistAgent(
-                courseCode: courseCode,
-                sectionNumber: sectionNumber,
-                client: AssistModelClient(baseURL: baseURL),
-                tools: runner,
-                planMode: AssistPlanMode(tier: tier)
-            )
-            self.agent = agent
-            readiness = .ready
             ActivityTrail.note(
                 .assistantReady,
                 String(format: "the assistant was ready after %.1fs", Date().timeIntervalSince(startedAt)),
                 course: courseCode, section: sectionNumber
             )
-            await warmUp(client: AssistModelClient(baseURL: baseURL), runner: runner)
+            await beginConversation(baseURL: baseURL, openMainWindow: openMainWindow)
 
         case .failed(let reason):
             readiness = .failed(reason: reason)
+            finishWarmUp()
             ActivityTrail.note(
                 .assistantWouldNotStart,
                 "the assistant would not start — " + reason,
                 course: courseCode, section: sectionNumber
             )
+            recordWhatTheEngineSaid(keepingEverything: true)
 
         case .stopped, .starting:
             readiness = .failed(reason: "The assistant's engine did not become ready.")
+            finishWarmUp()
             ActivityTrail.note(
                 .assistantWouldNotStart,
                 "the assistant did not become ready",
                 course: courseCode, section: sectionNumber
             )
+            recordWhatTheEngineSaid(keepingEverything: true)
+        }
+    }
+
+    /// Build the conversation on an engine that is already answering, say so,
+    /// and prime it — in that order, with the first turn held until the
+    /// priming request has come back.
+    ///
+    /// **Split out of `startEngine()` because the ORDER is the behaviour.**
+    /// `startEngine()` cannot be driven by a test without spawning a real
+    /// `llama-server`, so the one thing worth pinning here — that a turn
+    /// cannot start before the warm-up returns — would have been untestable
+    /// where it lives. This takes an address instead of making one, so a test
+    /// can hand it a stubbed endpoint that holds its answer and watch
+    /// `canSend` stay false while it does.
+    func beginConversation(
+        baseURL: URL,
+        openMainWindow: (@MainActor () -> Void)? = nil
+    ) async {
+        // The assistant window is its own window, so it gets its own
+        // workspace pointed at the same folder rather than reaching into
+        // the main window's. The tools take the course and section as
+        // arguments — the same shape the MCP server uses — so the runner
+        // needs the folder, not this window's particular section.
+        let workspace: WorkspaceModel = WorkspaceModel()
+        workspace.adoptRestoredPath(workingFolder.path)
+        let runner: AssistToolRunner = AssistToolRunner(
+            workspace: workspace, openMainWindow: openMainWindow
+        )
+        self.toolRunner = runner
+        let agent: AssistAgent = AssistAgent(
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            client: AssistModelClient(baseURL: baseURL),
+            tools: runner,
+            planMode: AssistPlanMode(tier: tier)
+        )
+        self.agent = agent
+        // Ready enough to TYPE into, deliberately, and not yet ready to send
+        // from: the box has to accept the keyboard while the warm-up runs or
+        // a teacher spends those seconds unable to start writing.
+        readiness = .ready
+        watchWhatTheEngineSays()
+        await warmUp(client: AssistModelClient(baseURL: baseURL), runner: runner)
+    }
+
+    /// Wait until the priming request has come back. Returns at once once it
+    /// has, so a caller never has to ask first.
+    func waitUntilWarmedUp() async {
+        if hasFinishedWarmUp {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            warmUpWaiters.append(continuation)
+        }
+    }
+
+    /// The warm-up is over — whether it answered, failed, or never ran.
+    ///
+    /// Called on every path out of starting up, including the failures.
+    /// A window that gave up on its engine still has to release anybody
+    /// waiting on this, or a Return pressed a moment earlier waits forever.
+    private func finishWarmUp() {
+        if hasFinishedWarmUp {
+            return
+        }
+        hasFinishedWarmUp = true
+        let waiting: [CheckedContinuation<Void, Never>] = warmUpWaiters
+        warmUpWaiters = []
+        for continuation in waiting {
+            continuation.resume()
         }
     }
 
@@ -302,10 +404,16 @@ final class AssistSession {
     /// Doing it while they are still reading the promise card and deciding
     /// what to type makes it free.
     ///
-    /// It is deliberately fire-and-forget: if it fails, the first real message
-    /// simply pays the cost itself, which is exactly what would have happened
-    /// anyway. Nothing is shown to the teacher either way.
+    /// Its FAILURE is fire-and-forget: if the priming request comes back an
+    /// error, the first real message simply pays the cost itself, which is
+    /// exactly what would have happened anyway. Nothing is shown to the
+    /// teacher either way.
+    ///
+    /// Its TIMING is not. The first turn waits for this to return — see
+    /// `hasFinishedWarmUp` — so `finishWarmUp()` runs on the way out however
+    /// this ends, which is why it is in a `defer` rather than at the bottom.
     private func warmUp(client: AssistModelClient, runner: AssistToolRunner) async {
+        defer { finishWarmUp() }
         var definitions: [AssistToolDefinition] = []
         for definition in runner.definitions {
             definitions.append(definition.namingTheRealCourse(courseCode))
@@ -315,6 +423,158 @@ final class AssistSession {
             AssistMessage.user("Say only: ready"),
         ]
         _ = try? await client.respond(messages: priming, tools: definitions)
+    }
+
+    // MARK: - What the engine itself said
+
+    /// The most of the engine's own chatter one conversation may put on the
+    /// trail.
+    ///
+    /// The trail is deliberately coarse — it is a record of what the TEACHER
+    /// did, and its failure mode is that the one line that mattered ends up
+    /// on page forty. A cap is what keeps a chatty engine from being that
+    /// page forty. Twelve is enough for a model that will not load (the
+    /// reason is in the last handful of lines) and nowhere near enough to
+    /// bury a morning's work.
+    static let mostEngineLinesOnTheTrail: Int = 12
+
+    /// How often to look in on the engine while the window is open.
+    ///
+    /// A poll rather than a reader, and that is the whole safety property:
+    /// nothing reads on the ENGINE's timetable, so the engine can never block
+    /// waiting for us. Fifteen seconds because the thing being caught — a
+    /// context overflow, a slot error — is being read minutes or days later
+    /// in a report, and the only deadline is "before the teacher sends it".
+    private static let engineWatchInterval: Duration = .seconds(15)
+
+    /// Look in on the engine every so often, so a report made while the
+    /// window is still open carries what it said.
+    ///
+    /// Sampling only at teardown would have been simpler and would have
+    /// missed the case this exists for: a teacher whose assistant is
+    /// misbehaving RIGHT NOW, filing a report without closing anything.
+    ///
+    /// The loop ends itself once the cap is reached, so a badly behaved
+    /// engine costs a fixed amount of work rather than a permanent one.
+    private func watchWhatTheEngineSays() {
+        engineWatch?.cancel()
+        engineWatch = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else {
+                    return
+                }
+                self.recordWhatTheEngineSaid(keepingEverything: false)
+                if self.engineLinesRecorded >= AssistSession.mostEngineLinesOnTheTrail {
+                    return
+                }
+                do {
+                    try await Task.sleep(for: AssistSession.engineWatchInterval)
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    /// Put what the engine has said since the last look onto the trail.
+    ///
+    /// `keepingEverything` is for the one case where the ordinary filter is
+    /// wrong: an engine that never became ready. There, every line is the
+    /// diagnosis — including the perfectly ordinary ones it got through
+    /// before it stopped.
+    private func recordWhatTheEngineSaid(keepingEverything: Bool) {
+        guard let host else {
+            return
+        }
+        let toRecord: [String] = AssistSession.engineLinesWorthRecording(
+            from: host.engineLinesSinceLastLook(),
+            keepingEverything: keepingEverything,
+            alreadyRecorded: engineLinesRecorded
+        )
+        for line in toRecord {
+            engineLinesRecorded += 1
+            ActivityTrail.note(
+                .assistantEngineSaid,
+                "the assistant's engine said: " + line,
+                course: courseCode, section: sectionNumber
+            )
+        }
+    }
+
+    /// Which of the engine's lines go on the trail, already shortened.
+    ///
+    /// Separated from the writing so the two decisions that matter — what is
+    /// worth keeping, and how much of it — can be checked against real engine
+    /// output without an engine. The alternative was a rule that only a
+    /// running `llama-server` could exercise, which is the same as a rule
+    /// nothing checks.
+    static func engineLinesWorthRecording(
+        from lines: [String],
+        keepingEverything: Bool,
+        alreadyRecorded: Int,
+        cap: Int = AssistSession.mostEngineLinesOnTheTrail
+    ) -> [String] {
+        var worthKeeping: [String] = []
+        for line in lines {
+            if keepingEverything || AssistSession.readsLikeATrouble(line) {
+                worthKeeping.append(line)
+            }
+        }
+
+        // The LAST few, not the first: when an engine gives up, the reason is
+        // at the bottom of what it wrote.
+        let roomLeft: Int = max(0, cap - alreadyRecorded)
+        var index: Int = max(0, worthKeeping.count - roomLeft)
+        var chosen: [String] = []
+        while index < worthKeeping.count {
+            chosen.append(AssistSession.shortened(worthKeeping[index]))
+            index += 1
+        }
+        return chosen
+    }
+
+    /// Whether a line the engine wrote is worth a teacher's trail.
+    ///
+    /// **Measured against a real engine rather than guessed** (llama.cpp
+    /// build b10435, 2026-08-20). Its lines carry a severity letter as their
+    /// second field — `0.46.018.667 E srv send_error: …` — so `E` is the
+    /// signal to key off. Warnings deliberately are NOT: a perfectly healthy
+    /// start prints six of them, five being a CORS block that cannot matter
+    /// on a server bound to 127.0.0.1 with no key, and one a token-type
+    /// quirk in the weights. Recording those would spend the whole budget on
+    /// noise before the teacher had asked anything.
+    ///
+    /// The word test beside it is the belt to that braces: the severity field
+    /// is this build's format and a future build could drop it, while a line
+    /// naming an error or an exception says so in any format. It is what
+    /// catches `W srv operator(): got exception: …`, a warning that is
+    /// genuinely worth having.
+    static func readsLikeATrouble(_ line: String) -> Bool {
+        var firstTwoFields: [Substring] = []
+        for field in line.split(separator: " ", omittingEmptySubsequences: true) {
+            firstTwoFields.append(field)
+            if firstTwoFields.count == 2 {
+                break
+            }
+        }
+        if firstTwoFields.count == 2 && firstTwoFields[1] == "E" {
+            return true
+        }
+        let lowered: String = line.lowercased()
+        for word in ["error", "exception", "failed", "failure"] {
+            if lowered.contains(word) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// One line, cut to something a trail can hold.
+    static func shortened(_ line: String, to longest: Int = 200) -> String {
+        if line.count <= longest {
+            return line
+        }
+        return String(line.prefix(longest)) + "…"
     }
 
     /// Put this section back to how it was when the conversation started, and
@@ -327,9 +587,10 @@ final class AssistSession {
     /// gone back when it had not.
     func restoreSection() {
         let saidSoFar: Int = agent?.entries.count ?? 0
+        let backupURL: URL? = toolRunner?.conversationBackupURL
         do {
             try AssistSectionRestore.restore(
-                backupURL: toolRunner?.conversationBackupURL,
+                backupURL: backupURL,
                 courseCode: courseCode,
                 sectionNumber: sectionNumber,
                 coursesDirectoryURL: coursesDirectoryURL
@@ -342,6 +603,15 @@ final class AssistSession {
             ))
             return
         }
+        // On the trail as well as in the transcript, and only once the restore
+        // has actually happened. The transcript lives inside a conversation the
+        // teacher will close; the trail is what is still there next week, when
+        // they ask why the section's pages are older than the changes above
+        // them. The file NAME says which copy it came from without saying a
+        // word about what is written on any page.
+        AssistSectionRestore.noteRestored(
+            courseCode: courseCode, sectionNumber: sectionNumber, backupURL: backupURL
+        )
         restoreNotes.append(RestoreNote(
             text: AssistSectionRestore.doneMessage(
                 courseCode: courseCode, sectionNumber: sectionNumber
@@ -358,7 +628,17 @@ final class AssistSession {
         if startedTheDownload {
             store.cancel()
         }
+        // Anybody still parked on the warm-up is let go here rather than left
+        // waiting on a window that has gone. `canSend` is false from this
+        // point on regardless, so nothing they were waiting to do can happen.
+        finishWarmUp()
+        engineWatch?.cancel()
+        engineWatch = nil
+        // The last look comes BEFORE the log is thrown away, and `stop()`
+        // deliberately leaves the file behind so this order is possible.
+        recordWhatTheEngineSaid(keepingEverything: false)
         host?.stop()
+        host?.discardEngineLog()
         host = nil
         agent = nil
         toolRunner = nil

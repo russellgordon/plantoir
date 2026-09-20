@@ -98,3 +98,17 @@ and *audit* your candidate before you crown it.
 > hidden ones cost more time than a fresh patch does. Compare
 > strategies, as [[B2.5|the curriculum asks]]: a table of $R(t)$
 > and a graph both point to the same summit the algebra found.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B2.1]]
+
+![[B2.2]]
+
+![[B2.3]]
+
+![[B2.4]]
+
+![[B2.5]]
+%%curriculum-end%%

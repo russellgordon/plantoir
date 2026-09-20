@@ -20,4 +20,5 @@ tags:
 
 - [ ] Finish [[Naming Compounds]] — all ten.
 - [ ] Product chosen and two elements identified.
-- [ ] Halfway point: add a [[Showing Growth]] entry to your portfolio.
+- [ ] Halfway point: find an early piece of your work and a recent one on
+      the same skill. You write the [[Showing Growth]] comparison in class.

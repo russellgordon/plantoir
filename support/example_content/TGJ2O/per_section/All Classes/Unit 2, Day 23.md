@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Standup
+1. Standup: [[Record a Standup]]
 2. Consolidation: light, moment, position, sound — on one page, built by
-   the room
+   the room: [[Making Photographs]] and [[Shooting Video]]
 3. Look ahead: next unit the story does not want to be found
 
 ## Things to do before our next class

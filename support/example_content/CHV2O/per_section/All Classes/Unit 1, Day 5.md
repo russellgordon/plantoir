@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[How Canada Is Governed]] — constitutional monarchy, parliamentary democracy, federation
-2. Three claims in one sentence, taken one at a time
-3. Where a law actually comes from, start to finish
+1. [[Indigenous Governance]] — governments that legislate, tax, and negotiate now
+2. Treaty relationships, self-government agreements, and the Crown
+3. The treaty area this school sits in, named
 
 ## Things to do before our next class
 
-- [ ] Read [[How Canada Is Governed]].
+- [ ] Read [[Indigenous Governance]]. Bring one question you want answered.

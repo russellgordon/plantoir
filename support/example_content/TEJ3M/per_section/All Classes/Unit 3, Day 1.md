@@ -14,7 +14,8 @@ tags:
    device, weighed against what the hardware could actually do
 2. Bench time: a board, a cable, and no instructions. Find the pins,
    power it up, and describe in writing what the pre-loaded program does
-   and what evidence you have for that
+   and what evidence you have for that. Nothing is marked today; the
+   descriptions tell me who has met a board like this before
 3. The pinout is a primary source, not a poster — back to
    [[Reading a Datasheet]] to settle which pin is which
 4. Compare and name it: [[Inside a Microcontroller]] — processor,

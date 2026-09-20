@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint, on your own: circuits, Ohm's law, power, and efficiency
-2. Mark your own; revision list written
+1. Checkpoint, on your own: circuits, Ohm's law, power, and efficiency —
+   [[Electrical Power and Efficiency]]
+2. Mark your own; revision list written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

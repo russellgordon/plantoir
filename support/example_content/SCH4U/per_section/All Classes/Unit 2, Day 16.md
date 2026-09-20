@@ -11,9 +11,10 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: naming, isomers, functional groups, and one
-   predicted organic reaction
+   predicted organic reaction: [[Organic Naming Practice]]
 2. Mark your own; revision list written
 
 ## Things to do before our next class
 
-- [ ] Journal: what you would tell yourself before the next naming test.
+- [ ] Journal: what you would tell yourself before the next naming
+      checkpoint.

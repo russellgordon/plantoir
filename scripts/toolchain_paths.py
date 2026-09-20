@@ -35,6 +35,16 @@ QUARTZ_DIR = _env_path("PLANTOIR_QUARTZ_DIR", "/opt/quartz")
 # Where these scripts themselves live (deploy.py re-invokes build_site.py).
 SCRIPTS_DIR = _env_path("PLANTOIR_SCRIPTS_DIR", "/opt/scripts")
 
+# The Plantoir contract: the shared case data both apps' test suites run, and
+# which these scripts now read too, so one rule has one home rather than three
+# implementations that drift. See scripts/contracts.py for what reads it.
+#
+# It has to be BAKED INTO THE IMAGE (Dockerfile: COPY contracts/), because the
+# container's only bind mount is `courses` — the working folder's .toolchain/
+# is not mounted and the app bundle is on the host, so neither can be read
+# from in here.
+CONTRACTS_DIR = _env_path("PLANTOIR_CONTRACTS_DIR", "/opt/contracts")
+
 # The teacher's courses. In the container this is the bind mount; natively it
 # is <working folder>/courses.
 COURSES_DIR = _env_path("PLANTOIR_COURSES_DIR", "/teaching/courses")

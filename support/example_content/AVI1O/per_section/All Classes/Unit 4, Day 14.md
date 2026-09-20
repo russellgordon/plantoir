@@ -12,7 +12,8 @@ tags:
 
 1. Period 3 of 8: photographing everything
 2. [[Photographing Your Work]] — light, square-on, colour
-3. Filing so you can find it in five years
+3. Filing so you can find it in five years, and your labels drafted
+   from the record
 
 ## Things to do before our next class
 

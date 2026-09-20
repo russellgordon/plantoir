@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Sampling a Population]] in class
-2. Every assumption of mark and recapture, and which direction each
+1. Every assumption of mark and recapture, and which direction each
    violation pushes your estimate
+2. Then write up [[Sampling a Population]] at the bench — write-up five
+   of five on [[Investigation Reports]], handed in at the end of the
+   period
 3. Clinic: the rest of [[Population Practice]]
 
 ## Things to do before our next class

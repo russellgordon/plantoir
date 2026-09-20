@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[How Marks Work]] — and why no mark here depends on your politics
-2. [[Getting Help]] and [[Help Sessions]]
-3. Opened: [[Who Decided This|Who Decided This?]] — something in your day was decided by a person, in a room, on a date
+1. Diagnostic, before anything is explained: ten real complaints, sorted to the body that could actually act. No marks — it tells me which borders this class already draws and which we have to build
+2. [[Who Decides What, and Where]] — most civic frustration is aimed at the wrong government
+3. Federal, provincial, municipal, and Indigenous jurisdiction, named after the sorting
 
 ## Things to do before our next class
 
-- [ ] Choose the decision you will trace. Small, local, and real.
+- [ ] Read [[Who Decides What, and Where]].

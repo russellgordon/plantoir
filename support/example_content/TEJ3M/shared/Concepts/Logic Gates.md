@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 In [[Gates on the Bench]] you did not look up a truth table — you built
 one. Two switches, a chip, an LED, and a meter, and you filled in four

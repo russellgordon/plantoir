@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Work period and conferences
+1. Work period, acting on the notes from the Day 13 conferences
 2. Peer review of the public pieces
-3. Revision
+3. Revision — your own judgement against the criteria first:
+   [[Judging Your Own Work]], then the weakest row
 
 ## Things to do before our next class
 

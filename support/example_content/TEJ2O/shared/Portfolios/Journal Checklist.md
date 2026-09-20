@@ -8,14 +8,17 @@ tags:
 Your [[Tech Journal]] is collected at the end of each unit. Before
 you hand it in, run this check — it is the same lens I read with,
 so anything you catch here is something we never need to discuss.
-Ten minutes with this list is usually worth one extra entry.
+Ten minutes with this list is usually worth one extra entry. It is
+[[Judging Your Own Work]] applied to the journal, and like every
+self-check in this course, nothing you write here reaches your mark.
 
 ## The check
 
 **Coverage**
 
-- [ ] There is an entry for every bench day in the unit
-- [ ] Entries were written close to the day, not reconstructed the
+- [ ] There is an entry for every bench day in the unit — the days
+      whose agenda ended by sending you to your journal
+- [ ] Entries were written in class on the day, not reconstructed the
       night before collection — reconstructed entries always show
 - [ ] All four prompts appear across the unit: what I built, what
       fought back, what I learned, what I would try next

@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. What you should be able to do by June: [[Learning Goals]], read together
-2. How you are marked: [[How Marks Work]] — and why the December version of a skill is the one that counts
+1. What you should be able to do by the end of this semester: [[Learning Goals]], read together
+2. How you are marked: [[How Marks Work]] — and why the most recent version of a skill is the one that counts
 3. Where to find me: [[Getting Help]] and [[Help Sessions]]
 
 ## Things to do before our next class

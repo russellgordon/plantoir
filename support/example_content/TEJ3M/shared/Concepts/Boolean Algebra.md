@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 Your first attempt at the puzzle in [[Gates on the Bench]] probably used
 five or six gates. Somebody else's used two, and did exactly the same

@@ -35,6 +35,13 @@ real chair could read at a real meeting.
 **A one-page recommendation** to the chair or clerk of that body, with two
 specific changes, what each would cost, and who would have to agree.
 
+**What is marked is yours alone.** The group divides the four sections
+and each of you signs the ones you wrote; the recommendation says who
+drafted it. On top of that, every one of you writes half a page of your
+own answering section three in your own words — whether the gap you found
+matters, and how you know. There is no group mark on this task, and the
+half page is often the strongest evidence in it.
+
 ## How it is marked
 
 | Criterion | What earns the marks |
@@ -68,3 +75,34 @@ allowed.
 
 ![[C1.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 12, the counting period
+  Watch for: whether the count comes off the body's own membership list
+  and minutes, or off an impression the group arrived with. Watch also for
+  the slide from structures to individuals — who somebody "is" rather than
+  how they got the seat. The report will have been tidied before it
+  reaches you; this period is where you hear it.
+  Going well: they open the minutes to settle a disagreement about who
+  actually voted.
+  Stuck: the gap has been named before anybody has finished counting.
+  This is C1.3 visible — assessing whether perspectives are equitably
+  represented, from evidence rather than from expectation.
+  Record: a tick and a dot per group on your day plan, one column each.
+
+TALK — Unit 2, Day 13, the conferences already on that agenda
+  Ask: "Who is already doing this work without a seat, and how did you
+  find them?"
+  Then: "If the chair makes one of your two changes and not the other,
+  which one, and why that one?"
+  A strong answer names a particular person or organisation and what it
+  has actually achieved, and can rank its own two recommendations with a
+  reason. That is C1.1 heard. The report names contributions; only the
+  conversation shows whether their significance was weighed.
+  Record: one line per group, on the back of their membership list.
+
+The product evidence is the findings report and the one-page
+recommendation, handed in on Day 14.
+%%

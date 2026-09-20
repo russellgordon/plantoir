@@ -10,11 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. Launch, day 2 of 5: [[The Property Prediction]] — from structure
-   alone, before any measurement
-2. Working period: choose your substances and write your predictions,
-   with the reasoning, before the bench opens
+1. [[The Property Prediction]], day 2 of 5 — from structure alone,
+   before any source is opened
+2. Working period: your coded substance, your five predictions and your
+   confidence in each, written with every book and site closed. Part 1
+   is dated and handed in before you leave
 
 ## Things to do before our next class
 
-- [ ] Predictions written, with a reason for each.
+- [ ] Nothing on the prediction — it is in. Read the four honest ways a
+      prediction can miss, on [[The Property Prediction]].

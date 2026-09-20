@@ -95,5 +95,7 @@ a *number* to each outcome rather than a name, you need
 
 ![[A1.3]]
 
+![[A1.4]]
+
 ![[A1.5]]
 %%curriculum-end%%

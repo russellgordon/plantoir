@@ -11,9 +11,10 @@ tags:
 ## Agenda
 
 1. [[The Intervention Argument]] papers handed in
-2. [[A Model of Your Own]] conferences — the portfolio piece checked while there is still time
-3. Notebook check: dated figures, with sources
+2. [[A Model of Your Own]] conferences, one at a time — two minutes each, which is why the two questions are chosen in advance
+3. While the conferences run: retrieval across Unit 2 — the firm, the structure, the failure, the remedy
+4. Then, at your own pace: one market from Units 1 and 2 analysed end to end
 
 ## Things to do before our next class
 
-- [ ] Portfolio up to date.
+- [ ] Nothing written tonight. Next class is the period for revising [[A Model of Your Own]] after your conference.

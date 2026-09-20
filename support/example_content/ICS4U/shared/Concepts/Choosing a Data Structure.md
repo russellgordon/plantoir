@@ -87,7 +87,7 @@ versions will work. It is for the paragraph that says *this one, for
 this reason, at this size, with this trade-off accepted*. That
 paragraph is also what your teammates read when they inherit your half
 of [[The Software Project]], and what saves them from replacing a
-deliberate choice with a "simpler" one that breaks in March.
+deliberate choice with a "simpler" one that breaks later in the course.
 
 > [!tip] Two containers is a legitimate answer
 > Keeping a list *and* a dictionary that point at the same objects is

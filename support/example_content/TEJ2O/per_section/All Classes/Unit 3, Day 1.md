@@ -10,7 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up debut: [[Binary Bites]] — count to 31 on one hand
+1. Diagnostic, and nothing recorded: [[Binary Bites]] debuts — count to
+   31 on one hand — then one question round the room: where have you
+   already seen ones and zeros doing real work? How far the room gets
+   today decides how many days we spend on conversion
 2. Bench game: secret messages in ones and zeros passed bench to bench —
    meet binary before anyone names it
 3. Compare and name it: [[Binary and Number Systems]]

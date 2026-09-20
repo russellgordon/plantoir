@@ -23,6 +23,10 @@ them once.
    explanation — the third move is where the marks live.
 6. **Never summarise the plot.** Your reader has read it.
 7. **Name the writer**, not "the author".
+8. **Develop an authoritative voice.** Write with confidence and analytical
+   clarity, cutting apologetic qualifiers (*In my opinion*, *I feel that*).
+9. **Maintain grammatical cohesion and parallelism.** Ensure subject-verb
+   agreement, clear pronoun antecedents, and balanced sentence structures.
 
 ## The paragraph that works
 
@@ -54,9 +58,13 @@ for. See [[The Extended Essay]] for the whole structure.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B1.3]]
+
+![[C2.2]]
+
 ![[C2.3]]
 
 ![[C3.1]]
 
-![[B1.3]]
+![[C3.4]]
 %%curriculum-end%%

@@ -365,7 +365,8 @@ reactants and products are equal."*
 > any concentration at all.
 
 Reference: [[Dynamic Equilibrium]] and
-[[Le Châtelier's Principle]]. Before you use a booklet value:
+[[Le Chatelier's Principle|Le Châtelier's Principle]].
+Before you use a booklet value:
 [[Reading an Equilibrium Table]]. Doing this at the bench:
 [[Disturbing an Equilibrium]]. Where these expressions go next:
 [[Acids and Bases]] and [[Acids and Bases Practice]].

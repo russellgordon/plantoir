@@ -3,6 +3,8 @@ title: Media Texts We Study
 publish: true
 created: __CREATED__
 enableToc: true
+tags:
+  - reading
 ---
 Four media texts, read with the same care as the print ones.
 
@@ -12,6 +14,24 @@ Four media texts, read with the same care as the print ones.
 | An episode of a Canadian narrative podcast | Audio | How sound builds a case, and what an ear cannot check |
 | Two long-form articles on the same event, from different outlets | Journalism | Selection and emphasis, without anybody lying |
 | A public information campaign | Persuasion | A claim with a budget behind it |
+
+## Who paid for it, and what rules it lives under
+
+The four questions above are about the text. This one is about the
+industry it came out of, and it changes what the text was ever free to
+say.
+
+| Form | Who pays | What constrains it |
+| --- | --- | --- |
+| Documentary | Broadcaster, funding agency, sometimes a subject with an interest | Canadian-content rules set by the CRTC shape what gets commissioned at all |
+| Podcast | Advertisers, a subscription, or a parent network | Almost nothing — which is a finding, not a gap |
+| Journalism | Subscriptions and advertising, in a shrinking market | Libel law, a corrections policy, and an editor who can be named |
+| Campaign | A department, a company, or a party, with a budget | Disclosure rules that say who paid, in type small enough to be worth noticing |
+
+Ask it of every text in this unit: who commissioned this, who is paid if
+it works, and what could this form not legally or practically say? A
+documentary that never interviews the other side may be biased. It may
+also be a documentary nobody would fund with the other side in it.
 
 ## How we read them
 

@@ -7,7 +7,7 @@ tags:
   - concepts
 ---
 A concept page says one idea cleanly, once, in a form you can reread in
-January and still follow.
+months from now and still follow.
 
 It is deliberately the *second* time you meet the idea. In this course
 it almost always arrives first as something you did — a sealed tube you
@@ -44,7 +44,7 @@ where the idea was met, and then say it properly.
 **Unit 4 — Chemical systems and equilibrium**
 
 - [[Dynamic Equilibrium]]
-- [[Le Châtelier's Principle]]
+- [[Le Chatelier's Principle|Le Châtelier's Principle]]
 - [[Acids and Bases]]
 - [[Buffers and Titration Curves]]
 

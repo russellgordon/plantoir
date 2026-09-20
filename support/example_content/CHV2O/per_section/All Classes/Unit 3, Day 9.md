@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. **Period 7 of 10:** rehearsal, or a second reader
-2. A hostile question from another group
-3. Revision immediately after it
+2. A hostile question from another group, then [[Judging Your Own Work]] on your own artefact — you run the routine yourself now
+3. Revision immediately after it, and the final version is the one you leave with
 
 ## Things to do before our next class
 
-- [ ] Final version ready to send or to deliver.
+- [ ] Nothing to write. Period 8 is for sending it, or for delivering it.

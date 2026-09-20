@@ -12,7 +12,11 @@ the ideas earn their names after.
 
 Our semester runs in four units:
 
-- **Unit 1 — Under the Hood**: teardowns, builds, and operating systems, ending in [[The Build Sheet]].
-- **Unit 2 — Wired**: cables, switches, and a working network, ending in [[The Network Job]].
-- **Unit 3 — Signals and Logic**: binary, circuits, gates, and code, ending in [[The Gadget]].
-- **Unit 4 — Tech and the World**: e-waste, careers, and [[The Refurb Report]], shown at [[The Shop Showcase]].
+- **Unit 1 — Under the Hood**: teardowns, builds, and operating systems,
+  ending in [[The Build Sheet]].
+- **Unit 2 — Wired**: cables, switches, and a working network, ending in
+  [[The Network Job]].
+- **Unit 3 — Signals and Logic**: binary, circuits, gates, and code,
+  ending in [[The Gadget]].
+- **Unit 4 — Tech and the World**: e-waste, careers, and
+  [[The Refurb Report]], shown at [[The Shop Showcase]].

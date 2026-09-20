@@ -149,3 +149,11 @@ Bring a measured comparison to [[The Race]], and expect to defend
 your algorithm choice with numbers in [[The Structure Study]]. "It
 felt faster" is not going to survive the question "compared to
 what?"
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C2.2]]
+
+![[C2.3]]
+%%curriculum-end%%

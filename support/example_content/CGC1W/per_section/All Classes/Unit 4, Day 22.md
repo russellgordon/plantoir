@@ -17,4 +17,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Re-read your field notebook from September.
+- [ ] Re-read your field notebook from the first week.

@@ -72,6 +72,26 @@ THEME_KEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize"
 # corners keep a crescent of desktop.
 CORNER_DIPS = 8
 
+# DWMWA_EXTENDED_FRAME_BOUNDS excludes the invisible resize border, but it
+# still includes the thin accent border Windows 11 draws directly on the
+# window -- so the raw grab keeps a hairline of that border colour on all
+# four edges. Measured on Obsidian, Plantoir and Edge alike, in both
+# appearances: exactly 1 DIP (2 real pixels at 2x scale). Crop it off before
+# masking, or it survives as stray dark pixels once composited onto the
+# page's own background.
+BORDER_DIPS = 1
+
+# A window sized in real pixels doesn't scale with the display: the original
+# 1680x960 cap was tuned on a 1920x1080-at-150% machine (a work area of
+# 1920x1008 real pixels, 1280x672 DIPs), where it read as "almost the whole
+# screen". The same real-pixel number on a 200%-scaled screen is only
+# 840x480 DIPs -- a physically small window whose UI barely shows anything.
+# Expressed in DIPs instead (the size that cap actually was, in points) and
+# multiplied by the display's own scale, a card occupies the same fraction
+# of the desktop everywhere.
+CARD_WIDTH_DIP = 1120
+CARD_HEIGHT_DIP = 640
+
 
 def announce(message: str) -> None:
     print(f"\n> {message}", flush=True)
@@ -189,6 +209,45 @@ def press_escape() -> None:
     time.sleep(0.8)
 
 
+def press_chord(*virtual_keys: int) -> None:
+    """Press several keys together, e.g. press_chord(VK_CONTROL, ord('P'))."""
+    KEYEVENTF_KEYUP = 0x0002
+    for vk in virtual_keys:
+        user32.keybd_event(vk, 0, 0, 0)
+    for vk in reversed(virtual_keys):
+        user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+
+
+def type_text(text: str) -> None:
+    KEYEVENTF_KEYUP = 0x0002
+    for character in text:
+        vk = user32.VkKeyScanW(ord(character)) & 0xFF
+        user32.keybd_event(vk, 0, 0, 0)
+        user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+        time.sleep(0.02)
+
+
+def reveal_active_file() -> None:
+    """Obsidian's own "Reveal current file in navigation" command.
+
+    Opening a note does not reliably scroll and expand the sidebar to show
+    it -- what actually happens depends on the "Reveal active file" setting,
+    which a fresh vault has never had a reason to turn on, and even turned
+    on it can settle mid-scroll rather than on the note itself. The command
+    does both deterministically, regardless of that setting, which is what
+    makes the sidebar worth photographing instead of three collapsed
+    top-level folders.
+    """
+    VK_CONTROL = 0x11
+    VK_RETURN = 0x0D
+    press_chord(VK_CONTROL, ord('P'))
+    time.sleep(0.6)
+    type_text("Reveal current file")
+    time.sleep(0.8)
+    press_chord(VK_RETURN)
+    time.sleep(1.2)
+
+
 def frame_bounds(hwnd: int) -> tuple[int, int, int, int]:
     """The VISIBLE frame. GetWindowRect includes an invisible resize border."""
     rect = wintypes.RECT()
@@ -230,7 +289,9 @@ def photograph(hwnd: int, destination: Path) -> Path:
     park_pointer()
     left, top, right, bottom = frame_bounds(hwnd)
     image = ImageGrab.grab(bbox=(left, top, right, bottom), all_screens=True)
-    radius = max(1, round(CORNER_DIPS * scale_factor()))
+    border = max(1, round(BORDER_DIPS * scale_factor()))
+    image = image.crop((border, border, image.width - border, image.height - border))
+    radius = max(1, round((CORNER_DIPS - BORDER_DIPS) * scale_factor()))
     destination.parent.mkdir(parents=True, exist_ok=True)
     rounded(image, radius).save(destination, format="PNG")
     print(f"   part {destination.name} ({image.width}x{image.height})")
@@ -322,14 +383,35 @@ def stop(process_name: str) -> None:
     time.sleep(1.0)
 
 
+def stop_matching(process_name: str, command_line_contains: str) -> None:
+    """Kill only the processes whose command line names our own scratch data.
+
+    `stop("msedge.exe")` kills every Edge process on the machine, scratch
+    profile or not -- on a machine where Edge is also someone's actual
+    browser, that closes whatever they had open with no warning. Edge forks
+    many helper processes per window, all named msedge.exe, so it is not
+    enough to find "the" pid either: every one of them is asked, and only
+    the ones launched against our own `--user-data-dir` answer.
+    """
+    query = (
+        "Get-CimInstance Win32_Process -Filter \"Name='" + process_name + "'\" "
+        "| Where-Object { $_.CommandLine -and $_.CommandLine.Contains('" + command_line_contains + "') } "
+        "| ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+    )
+    subprocess.run(["powershell", "-NoProfile", "-Command", query],
+                   capture_output=True, text=True)
+    time.sleep(1.0)
+
+
 # ---- The three cards -----------------------------------------------------
 
 
 def card_geometry() -> tuple[int, int, int, int]:
     """A window as big as the desktop can actually show, at 16:9-ish."""
     left, top, right, bottom = work_area()
-    width = min(1680, right - left - 40)
-    height = min(960, bottom - top - 40)
+    scale = scale_factor()
+    width = min(round(CARD_WIDTH_DIP * scale), right - left - 40)
+    height = min(round(CARD_HEIGHT_DIP * scale), bottom - top - 40)
     return left + 20, top + 20, width, height
 
 
@@ -368,7 +450,11 @@ def capture_obsidian(theme: str, x: int, y: int, w: int, h: int) -> Path:
     hwnd = wait_for_window(lambda: window_titled("Obsidian"), seconds=45)
     time.sleep(3.5)
     place(hwnd, x, y, w, h)
-    time.sleep(2.0)
+    time.sleep(1.5)
+    # Without this the sidebar is three collapsed top-level folders --
+    # correct, but not a picture of anything. Reveal walks the active file's
+    # ancestors open and scrolls to it, showing real class notes instead.
+    reveal_active_file()
     return photograph(hwnd, PARTS / f"obsidian-{theme}.png")
 
 
@@ -413,7 +499,7 @@ def capture_edge(theme: str, x: int, y: int, w: int, h: int) -> Path:
     press_escape()   # belt and braces: any promo bubble that opened anyway
     time.sleep(2.5)
     destination = photograph(hwnd, PARTS / f"edge-{theme}.png")
-    stop("msedge.exe")
+    stop_matching("msedge.exe", str(EDGE_PROFILE))
     return destination
 
 
@@ -442,7 +528,7 @@ def build(exe: Path, themes=("light", "dark")) -> None:
         write_theme(was_apps, was_system)
         restore_vaults(vaults_before)
         stop("Obsidian.exe")
-        stop("msedge.exe")
+        stop_matching("msedge.exe", str(EDGE_PROFILE))
         stop("Plantoir.exe")
         shutil.rmtree(EDGE_PROFILE, ignore_errors=True)
         print("   colour mode, vault list and scratch profile put back")

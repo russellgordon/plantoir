@@ -36,21 +36,36 @@ changes type halfway through is the commonest way an inquiry stalls.
 
 ## Recording how your thinking changed
 
-This is the entry students skip and the one worth most. When a source
-moves you off a position, write three things: what you believed, what you
-read, and what you believe now. Date it. By April you will have a record
-of your own reasoning that you could not reconstruct from memory.
+This is the entry students skip and the one worth most. When a source moves
+you off a position, write three things: what you believed, what you read,
+and what you believe now. Date it. By the end of the course you will have a
+record of your own reasoning that you could not reconstruct from memory.
 
 If nothing has moved you all term, that is a finding too — and usually it
 means you have been reading sources that already agreed with you.
 
-## What is marked
+## What happens to it
 
-The notebook is assessed as a set, once, near the end of term, on
-consistency, precision of sourcing, and evidence that your thinking
-actually moved. It also feeds [[Skills You Are Building]] and, in the
-end, [[The Commemoration Inquiry]] — where the question you settle on
-will very likely be one you first wrote down in October.
+The notebook feeds [[The Portfolio Case]], and the rule there is the rule
+here: **what carries a mark is what you write in class at a milestone.**
+For the notebook that is two periods — the questions milestone at the end
+of Unit 1, and the check in Unit 3, where you choose your three strongest
+entries and write up what each is evidence of, with me reading it beside
+you.
+
+Everything else in here is yours. Adding to it between classes is
+practice: worth doing, never marked on its own, and the reason the two
+milestone periods are possible at all — you cannot choose your three
+strongest entries if there are only four. See [[How Marks Work]].
+
+Long before that, though, it is the thing that makes the rest possible.
+Every task in this course begins from a question and a source, and the
+students who arrive at [[The Commemoration Inquiry]] with four months of
+entries behind them start from something rather than from nothing — the
+question they settle on is very often one they first wrote down in
+early on. It also feeds [[Skills You Are Building]], which asks you to put
+a specific piece of your own work behind every claim you make about
+yourself.
 
 %%curriculum-start%%
 ## Curriculum connection

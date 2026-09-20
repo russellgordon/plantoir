@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: four substances — which does not belong?
-2. Consolidation: one element, taken all the way — position, structure,
+1. First fifteen minutes: yesterday's revision list, worked
+2. Warm-up: four substances — which does not belong?
+3. Consolidation: one element, taken all the way — position, structure,
    properties, and a compound it forms
-3. Look ahead: next unit, the electrons move on purpose
+4. Look ahead: next unit, the electrons move on purpose
 
 ## Things to do before our next class
 

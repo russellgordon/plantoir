@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[Culminating Reflection]] and [[Final Portfolio]], against
-   [[Portfolio Checklist]]
+1. First half hour: finish [[Culminating Reflection]], then hand it in with
+   [[Final Portfolio]], against [[Portfolio Checklist]]
 2. Course feedback, written and anonymous
 3. Then: what [[Final Examination]] asks for, part by part
 

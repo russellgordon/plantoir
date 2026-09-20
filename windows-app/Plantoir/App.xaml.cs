@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml;
@@ -29,7 +31,7 @@ public partial class App : Application
     {
         try
         {
-            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir");
+            string dir = Plantoir.Core.Models.AppDataRoot.Current;
             Directory.CreateDirectory(dir);
             File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}\n");
         }
@@ -38,8 +40,57 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // FIRST, before the diagnostic line, before the trail line, and before
+        // anything reads settings — each of those resolves its location the
+        // moment it is touched, so a redirect applied afterwards is a redirect
+        // that missed the first write.
+        //
+        // `--state-dir` moves this run's ENTIRE Plantoir folder — settings,
+        // the breadcrumb trail, the startup log, scheduled-deploy sentinels,
+        // models, built sites. A UI test drives the REAL shipped executable,
+        // and without it the test would rewrite the teacher's working folder,
+        // remembered windows and window geometry, file its fixture courses in
+        // the trail as though a person had opened them, and — the one that
+        // took an adversarial review to spot — CONSUME their pending
+        // scheduled-deploy sentinels on launch, writing publish state into
+        // their real course folders while the line explaining it went to the
+        // redirected trail where nobody would look.
+        //
+        // Redirecting %LOCALAPPDATA% for the child process does not work and
+        // was tried: GetFolderPath asks Windows for the known folder and
+        // ignores the variable.
+        //
+        // Also read in Program.Main, which logs before this runs.
+        //
+        // QUOTE the path when passing it. `ArgumentAfter`'s raw-string
+        // fallback splits on spaces, so an unquoted path containing one is
+        // read as two arguments.
+        string stateDir = ArgumentAfter(
+            Environment.GetCommandLineArgs(), args.Arguments ?? "", "--state-dir");
+        if (!string.IsNullOrEmpty(stateDir)) AppDataRoot.RedirectTo(stateDir);
+
         LogDiagnostic("App.OnLaunched starting");
+        if (!string.IsNullOrEmpty(stateDir)) LogDiagnostic($"State redirected to {stateDir}");
+
         Plantoir.Core.Scripting.ActivityTrail.NoteLaunch();
+
+        // Say on the trail how every scheduled publish since the last launch
+        // turned out — the ones that stopped, and the ones that went out.
+        //
+        // HERE, and not in MainWindow or SectionDetailView, for two separate
+        // reasons. The contract asks for a line a teacher gets whether or not
+        // they open the section that failed, because that teacher is exactly
+        // the one who writes in to say their site did not update; and this runs
+        // ONCE per process, where RememberOpenWindows can restore several
+        // MainWindows and MainWindow already fires ConsumePending from two
+        // places, so a sweep hosted there would run N times a launch.
+        //
+        // After --state-dir has been applied, so a test run reads its own
+        // folder rather than the teacher's. Best-effort and silent: it writes
+        // trail lines and shows nothing.
+        try { Plantoir.Core.Assist.ScheduledPublishOutcome.NoteFinishedRunsOnTrail(); }
+        catch (Exception ex) { LogDiagnostic($"Scheduled-publish trail sweep failed: {ex}"); }
+
         try
         {
             Settings = AppSettings.Load();
@@ -50,6 +101,21 @@ public partial class App : Application
             LogDiagnostic($"Error loading settings: {ex}");
             Settings = new AppSettings();
         }
+
+        // Name every builds folder this app can name, then sweep the ones
+        // whose working folder is gone. Once per process, here, never per
+        // window. Both are best-effort and silent: a teacher cannot see
+        // either, so neither leaves a trail line.
+        try
+        {
+            var known = new List<string>();
+            if (Settings.WorkspacePath is { } open) known.Add(open);
+            foreach (var rememberedWindow in Settings.RememberedWindows) known.Add(rememberedWindow.Path);
+            BuildOutputLocation.AdoptWorkingFolderMarkers(known);
+            var swept = BuildOutputLocation.DiscardBuildsForMissingWorkingFolders();
+            if (swept.Count > 0) LogDiagnostic($"Swept {swept.Count} builds folder(s) whose working folder is gone");
+        }
+        catch (Exception ex) { LogDiagnostic($"builds sweep: {ex.Message}"); }
 
         string rawArgs = args.Arguments ?? "";
         string[] cmdArgs = Environment.GetCommandLineArgs();
@@ -154,11 +220,41 @@ public partial class App : Application
     }
 
 
+    /// <summary>
+    /// An open main window showing this working folder, or null. For the
+    /// assistant, whose own main window may have been closed under it: the
+    /// build then goes to another window on the same folder rather than to
+    /// a second one opened beside it.
+    /// </summary>
+    public static MainWindow? WindowFor(string folderPath)
+    {
+        foreach (var window in _windows)
+        {
+            if (window.IsClosed || window.Workspace.WorkspacePath is not { } open) continue;
+            try
+            {
+                // The app's single comparison (#162), so this answers the same
+                // way as every other "is that the same folder?" in the app.
+                if (WorkingFolder.IsTheSame(open, folderPath)) return window;
+            }
+            catch (Exception) { /* a malformed stored path is "no window", not a crash in the tool loop */ }
+        }
+        return null;
+    }
+
+    /// <summary>A synced-folder note answered in one window leaves every other window showing that folder.</summary>
+    public static void HideSyncNoticesFor(string path, MainWindow? except)
+    {
+        foreach (var window in _windows)
+            if (!ReferenceEquals(window, except) && !window.IsClosed) window.HideSyncNoticeFor(path);
+    }
+
     /// <summary>Ctrl+N: inherit the key window's folder; alone → the picker.</summary>
     public static MainWindow OpenNewWindow()
     {
         var window = OpenWindow(null, null);
         window.Workspace.AdoptFolderForNewWindow();
+        window.ShowSyncNoticeIfNeeded();
         return window;
     }
 

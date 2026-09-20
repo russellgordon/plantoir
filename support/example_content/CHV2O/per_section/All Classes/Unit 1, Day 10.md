@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Values That Pull Against Each Other]] — the list everyone agrees on, and the trade-offs nobody does
-2. Launched: [[The Issue Brief]]
-3. Choosing an issue live now, specific enough to have sides
+1. Work period: [[The Issue Brief]] — writing for a reader who has four minutes and a decision to make
+2. Modelled first, then yours: [[Judging Your Own Work]], run on last year's brief with the class, then on your own draft
+3. Conferences on what that reader needs before the meeting — the checkpoint, and you get it in writing
 
 ## Things to do before our next class
 
-- [ ] Choose your issue and find three sources of different kinds.
+- [ ] Nothing to hand in. Next class opens with the revision, and the brief goes in at the end of it.

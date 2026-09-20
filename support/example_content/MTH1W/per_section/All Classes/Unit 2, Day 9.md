@@ -20,6 +20,6 @@ tags:
 
 - [ ] Continue [[Equation Practice]].
 - [ ] Read [[When Will I Use This]] — today's crossing point is
-      Exhibit A; we discuss it next class.
+      Exhibit A. Bring one of your own.
 - [ ] [[Pattern Machines]]: your machine should draw its first three terms
       by now.

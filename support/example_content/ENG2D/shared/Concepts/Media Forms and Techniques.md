@@ -35,8 +35,8 @@ plus some of their own.
 The same claim behaves differently as a headline, a thirty-second
 advertisement, a documentary segment, and a post. The form sets the
 audience's expectations, the time available, and what counts as
-evidence — which is why [[The Media Deconstruction]] asks you to make one
-as well as take one apart.
+evidence — which is why [[The Media Deconstruction]] asks you to make media
+texts as well as take one apart.
 
 ## Documentary is not neutral
 

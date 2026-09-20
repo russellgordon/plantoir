@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Independent Study]] — drafting period, with sources closed
+1. [[The Independent Study]], day 7 of 10 — drafting period, with sources closed
 2. Then check: every borrowed idea attributed
 
 ## Things to do before our next class

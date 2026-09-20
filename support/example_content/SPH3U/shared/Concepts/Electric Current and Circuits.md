@@ -31,16 +31,20 @@ and is not.
 | Circle with A | Ammeter, wired IN the loop |
 | Circle with V | Voltmeter, wired ACROSS the component |
 
-That last distinction — ammeter in series, voltmeter in parallel — is the
-practical skill of this unit, and it is why [[Ohm's Law]] can be tested at
-all.
+## Electrical safety in practical circuits
+
+- **Current-limiting devices & GFCI outlets**: Ground Fault Circuit Interrupters (GFCIs) monitor current balance between the hot and neutral conductors; if a ground fault leaks as little as $4\text{--}6\ \text{mA}$ through a person to ground, the GFCI trips within milliseconds to prevent ventricular fibrillation.
+- **Overcurrent protection**: Fuses and circuit breakers in household panels prevent electrical fires by opening the circuit when current exceeds conductor thermal ratings (typically $15\ \text{A}$ or $20\ \text{A}$).
+- **High-voltage transmission safety**: High-voltage transmission lines ($115\ \text{kV}\text{--}500\ \text{kV}$) require tall steel towers, wide right-of-way clearances, and "Call Before You Dig" underground locate protocols to prevent electrical arcing and step-potential injuries.
 
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[F2.1]]
 
+![[F3.3]]
+
 ![[F3.4]]
 
-![[F3.3]]
+![[F3.9]]
 %%curriculum-end%%

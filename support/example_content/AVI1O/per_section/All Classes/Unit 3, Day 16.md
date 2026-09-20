@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Studio time
+1. Studio time: [[The Creative Process]]
 2. Individual conferences on the response piece
-3. Clearing up
+3. Clearing up: [[Clearing Up]]
 
 ## Things to do before our next class
 

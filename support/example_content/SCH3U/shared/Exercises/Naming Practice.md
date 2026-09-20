@@ -253,4 +253,6 @@ starts predicting behaviour: [[Ionic and Covalent Bonding]].
 ![[B2.1]]
 
 ![[B2.7]]
+
+![[B3.4]]
 %%curriculum-end%%

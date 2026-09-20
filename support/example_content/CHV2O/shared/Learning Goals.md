@@ -3,16 +3,16 @@ title: Learning Goals
 publish: true
 created: __CREATED__
 ---
-What you should be able to do by mid-January, in plain words first and in
-the Ministry's words underneath.
+What you should be able to do by the end of the course, in plain words first
+and in the Ministry's words underneath.
 
 Civics is a half credit, and it takes over the period Career Studies has
-been using — same room, same timetable slot, from early November to the
-middle of January. You will notice the handover. What carries across is
-the habit of asking who decided something and on what evidence; what is
-new is that the decisions are public ones, and other people's.
+been using — same room, same timetable slot, right through to the middle of
+the end of the course. You will notice the handover. What carries across is
+the habit of asking who decided something and on what evidence; what is new
+is that the decisions are public ones, and other people's.
 
-## By January you should be able to
+## By the end of the course you should be able to
 
 - **Find who actually decided something** — the level of government, the
   body, the motion, and the date.

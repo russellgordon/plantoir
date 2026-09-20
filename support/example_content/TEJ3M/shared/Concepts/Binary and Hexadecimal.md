@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 [[Binary Bites]] takes four minutes and you have been doing it since
 Grade 10. What changes this year is what the bits are *for*: a memory

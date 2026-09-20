@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Who relief did not reach: rules, status, and race
-2. Work period
+1. Who relief did not reach: rules, status, and race: [[The Crash and the Thirties]]
+2. Work period: acting on the conference notes from last class for [[The Thirties Case]]
 3. Presentation preparation
 
 ## Things to do before our next class

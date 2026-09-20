@@ -13,6 +13,7 @@ tags:
 1. [[Schools of Economic Thought]] — a long argument, not a settled doctrine
 2. Each central claim stated accurately before it is judged
 3. Which school does a given Canadian policy sound like?
+4. The last twenty minutes: [[The Market Model]] repaired after your Day 16 conference, before tomorrow's presentations
 
 ## Things to do before our next class
 

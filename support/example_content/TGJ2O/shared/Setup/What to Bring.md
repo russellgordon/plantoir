@@ -41,4 +41,6 @@ sort it out.
 ## Curriculum connection
 
 ![[D1.2]]
+
+![[D1.1]]
 %%curriculum-end%%

@@ -15,4 +15,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Complete your data table. Analysis questions due next class.
+- [ ] Complete your data table. The report itself is written in class next
+      period — see [[Lab Reports]].

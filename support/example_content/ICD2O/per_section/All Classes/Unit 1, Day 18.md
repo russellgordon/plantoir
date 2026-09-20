@@ -13,9 +13,9 @@ tags:
 1. Warm-up: [[Human Robot]]
 2. Unit 1 consolidation: an algorithm, a component, and a piece of
    software — one page connecting all three to something you use daily
-3. Look ahead: from next class, the machine follows YOUR instructions
+3. Look ahead: in Unit 2, the machine follows YOUR instructions
 
 ## Things to do before our next class
 
 - [ ] Journal: what you now know about a computer that you did not in
-      September.
+      the start of the course.

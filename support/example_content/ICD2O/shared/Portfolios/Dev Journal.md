@@ -4,16 +4,17 @@ publish: true
 created: __CREATED__
 tags:
   - portfolio
-enableToc: true
+enableToc: false
 ---
 > [!abstract] At a glance
-> Individual · ongoing all course · one entry after every class ·
-> collected at the end of each unit
+> Individual · ongoing all course · an entry every time a period ends
+> with "log it" · collected once in each unit
 
 ## What you are making
 
-A developer's log of your course: one short entry after every class,
-written the same day while the details are warm. Ten honest minutes
+A developer's log of your course: a short entry written in the last
+minutes of class, whenever a period ends with "log it", while the
+details are still warm. Ten honest minutes
 beats thirty performed ones — and entries are **private**. I read
 them; other students never do. The journal only works if you can
 admit in it what you would not say at the demo table — that the loop
@@ -41,18 +42,26 @@ one" — dated, testable, and yours.
 
 ## Success criteria and collection
 
-The journal comes in each unit, read against these criteria —
+The journal comes in once each unit, read against these criteria —
 [[Journal Checklist]] turns them into a self-check before handing in.
 
 | Quality | What it looks like |
 | --- | --- |
-| Regularity | An entry for every class, written close to the day |
+| Written from the day | Each entry names the actual moment — the line, the error, the thing that clicked — rather than summarising the period |
 | Honesty | Real breakage recorded, not just victories |
 | Precision | Bugs located and quoted, not just felt |
 | Growth | "Try next" items reappear as things actually tried |
 
+The entries I read against those criteria are the in-class ones. What
+you add afterwards at home — a second thought at eleven at night, the fix
+that finally worked on the bus — is yours, is often the best writing in
+the book, and is not marked. [[How Marks Work]] explains why practice
+between classes is never the thing a mark is put on.
+
 %%curriculum-start%%
 ## Curriculum connection
 
-![[A1.1]]
+![[B2.1]]
+
+![[C2.6]]
 %%curriculum-end%%

@@ -13,8 +13,10 @@ tags:
 1. Warm-up: [[Which One Doesn't Belong]] — four claims about energy
 2. Compare and name it: [[Computing's Footprint]] — where the cost sits,
    and which of it a developer actually controls
-3. [[The Efficiency Case]], day 3 — working period: scale your measurement
-   honestly, and name the Ontario programs you cite
+3. [[The Efficiency Case]], day 3 — working period: the change I marked
+   on your table yesterday first, then scale your measurement honestly,
+   name the Ontario programs you cite, and write down the measures you
+   would take beyond the code
 
 ## Things to do before our next class
 

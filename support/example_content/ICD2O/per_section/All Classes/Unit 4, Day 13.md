@@ -7,14 +7,17 @@ enableToc: false
 excludeBacklinks: true
 tags:
   - unit-4
-  - review
 ---
 ## Agenda
 
-1. Dress run: the whole event, in order, with the class as the audience
-2. Notes to each demo: one thing that landed, one thing to change
-3. Fix the top note before you leave
+1. Set the room: where guests stand, where machines go, who greets
+   people at the door
+2. Full technical run: every machine, every cable, in place
+3. Dress run: the whole event, in order, with the class as the audience
+   — opening sentences included, timed; check requirements against [[Launch Day]]
+4. Notes to each demo: one thing that landed, one thing to change. Fix
+   the top note before you leave — review [[Showing Growth]]
 
 ## Things to do before our next class
 
-- [ ] Top note fixed.
+- [ ] Everything stays in the room, not at home.

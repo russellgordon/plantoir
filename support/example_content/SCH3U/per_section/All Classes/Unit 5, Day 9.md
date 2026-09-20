@@ -15,6 +15,9 @@ tags:
    pollutant, from which reaction, from which activity
 3. Back to [[Gases and the Atmosphere]] for the components and their
    proportions
+4. In the last twenty minutes, a conference with each partner in turn:
+   which number in your brief you cannot yet trace to a source, and what
+   you will do about it
 
 ## Things to do before our next class
 

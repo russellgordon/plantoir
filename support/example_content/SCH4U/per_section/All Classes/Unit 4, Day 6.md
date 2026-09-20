@@ -10,11 +10,15 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Disturbing an Equilibrium]] in class
+1. Bench: write up [[Disturbing an Equilibrium]] in class, the last of
+   [[The Lab Reports]] — in before you leave
 2. Explain each shift by rates, not by 'the system wants to' —
-   [[Le Châtelier's Principle]] is a shortcut over a mechanism
+   [[Le Chatelier's Principle|Le Châtelier's Principle]] is a
+   shortcut over a mechanism
 3. Where the shortcut misleads: adding an inert gas, and heating
 
 ## Things to do before our next class
 
-- [ ] Report finished, with mechanisms rather than slogans.
+- [ ] Nothing to finish — the report went in at the bell.
+- [ ] Journal: the one disturbance that moved the constant rather than
+      the position, in your own words.

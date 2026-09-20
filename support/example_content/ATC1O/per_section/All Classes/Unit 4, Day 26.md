@@ -19,7 +19,8 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Rest. Bring the reflection to the examination period.
+- [ ] Rest. Bring your notes and your portfolio to the examination
+      period — the reflection itself is written there.
 
 %% This page is held back, so it is not on the built site yet — students
 cannot see it. That is how you write next week's classes ahead of time:

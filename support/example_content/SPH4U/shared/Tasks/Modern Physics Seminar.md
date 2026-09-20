@@ -20,25 +20,60 @@ Take one moment when physics changed its mind, and teach it.
 - The photoelectric effect and Einstein's 1905 explanation.
 - Rutherford's foil experiment and the death of the plum pudding.
 - De Broglie's matter waves and the Davisson–Germer confirmation.
+- Pauli's neutrino prediction from beta decay conservation laws and SNO confirmation.
 - The 2012 Higgs announcement, forty-eight years after the prediction.
 - The 2015 detection of gravitational waves.
 
 ## What the seminar must contain
 
 1. **The problem** as it stood before — what the accepted model predicted.
-2. **The experiment**, in enough detail that we could criticise its
-   design.
-3. **The result**, with the actual numbers.
+2. **The experiment or theoretical prediction**, in enough detail that we
+   could criticise its design or reasoning — including who did it, where,
+   and what they were actually trying to find out when they found this instead.
+3. **The result**, with the actual numbers or governing equations.
 4. **What had to be given up.** Every one of these cost physics an idea it
    was fond of. Name it.
-5. **One calculation**, done live on the board, using the physics of this
-   unit.
+5. **One calculation or data analysis**, done live on the board, using the
+   physics of this unit (e.g. photoelectric stopping voltage, relativistic
+   momentum, or de Broglie wavelength).
 
 ## The brief
 
 Two pages: the same argument in writing, with your sources cited properly.
 At least one must be a primary source or a direct account of the
 experiment, not a summary site.
+
+Close it with one paragraph on **what this made possible**: a technology or
+career pathway that exists because of this line of inquiry (e.g. photonics
+researcher, medical radiation physicist, quantum computing engineer, or
+particle accelerator technologist), and the education and training required.
+Where a Canadian did any of the work — on the result itself, or on what
+came out of it (see [[Where This Physics Leads]]) — that belongs here too.
+
+## What is yours alone
+
+You choose the moment together and prepare together. **You each write
+your own brief**, and on the day you each take a named half of the
+twelve minutes — including the live calculation, which one of you sets
+up and the other finishes. I mark what you did, not what the pair did,
+and two briefs that argue the same case in the same words are one brief.
+
+## How this is assessed
+
+All four categories, which is what makes this the culminating task. Read
+your brief and your half of the seminar against these rows before the
+last rehearsal — see [[Judging Your Own Work]].
+
+| Quality | What it looks like in your seminar and brief |
+| --- | --- |
+| The old model is stated fairly | What was believed before, and what it predicted, presented as a reasonable position held by clever people rather than as a mistake |
+| The experiment could be criticised from your account | Apparatus, what was measured, and where the result could have gone wrong, in enough detail that the room can ask a real question |
+| The numbers are the real ones | The actual result with its units, from a source you name, not a rounded version remembered from a video |
+| The people and careers are in it | Who did the work, where, and what they were trying to find out — including related career pathways, required postsecondary education, and Canadian contributions described rather than name-dropped |
+| What it made possible is named | One technology that exists because of this result, and what it does — traced to the physics, not just associated with it |
+| What was given up is named | The specific idea physics lost, said in one plain sentence, and what depended on it |
+| The calculation is yours and it runs | Done live, with the physics of this unit, and recovered from out loud if a line goes wrong |
+| The brief argues rather than summarises | Two pages making a case, documented, with at least one primary source doing real work in the argument |
 
 > [!note] Why the course ends here
 > Because the most useful thing a physics course can leave you with is not
@@ -48,19 +83,74 @@ experiment, not a summary site.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[F1.1]]
-
-![[F1.2]]
-
-![[F3.1]]
-
-![[F3.3]]
+![[A1.11]]
 
 ![[A2.1]]
 
 ![[A2.2]]
 
+![[C3.5]]
+
+![[F1.1]]
+
+![[F1.2]]
+
 ![[F2.1]]
 
-![[A1.11]]
+![[F2.4]]
+
+![[F3.1]]
+
+![[F3.3]]
 %%curriculum-end%%
+
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+The seminar itself on Days 11 and 12 is product evidence and you will
+mark it as such — each of them on their named half, out loud, in front
+of you. What you cannot do on those days is gather the OTHER two kinds:
+you are hosting, the pairs are nervous, and a dress run tells you how
+well something was practised. So this prompt sits in the preparation,
+where there is still time for what you find to change something.
+
+OBSERVE — Unit 5, Day 9, while the live calculation is being rehearsed
+  Watch for: whether the calculation is being re-derived or reproduced.
+  The day asks them to rehearse until either of them can run it from the
+  physics rather than from memory, so this is not a hidden standard —
+  what you are finding out is which pairs can meet it. On Day 11 a
+  recited calculation and an understood one look identical until somebody
+  asks a question, and by then the pair has been marked.
+  Going well: one of them stops mid-line and asks why that step is
+  allowed — and the other has an answer.
+  Stuck: the same string of symbols copied off a phone, faster each time,
+  and neither of them will start it from the beginning when you ask.
+  Record: one tick per person — ran it from the physics, or ran it from
+  memory. Per person, because they are marked separately.
+
+TALK — Unit 5, Day 8, at the conference already on that agenda
+  Its printed question, and item 4 of this page, ask the same thing, so
+  they will have that one ready. The brief also now asks them in writing
+  for the technology and for the Canadian, so those are spent too. These
+  two are not.
+  Ask: "Who was most inconvenienced by this result? Name a person or a
+  research programme, and say what they were working on at the time."
+  Then: "Two words in your topic get used loosely in every popular
+  account of it. Which two, and what do they actually mean?"
+  A strong first answer names somebody with something to lose and says
+  what it was, rather than describing the physics community as one mind
+  changing. That is F1.1 heard: a revolution analysed as something that
+  happened to people. A strong second answer picks the real offenders —
+  "observation" as though a person had to be watching, "relativity" as
+  though everything were relative, "duality" as though light could not
+  make up its mind — and gives the working meaning instead. That is
+  F2.1, the vocabulary of relativity and quanta used precisely, and it
+  is the single best predictor of whether the seminar will teach the
+  room anything or merely describe an apparatus to it.
+  Record: one line per pair on the conference list, plus the name they
+  gave you. The names are worth keeping for next year's Day 7.
+
+The product evidence is the seminar on Day 11 or Day 12 and the brief
+that comes with it.
+%%

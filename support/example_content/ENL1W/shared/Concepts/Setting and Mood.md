@@ -10,7 +10,7 @@ word choice.
 ## Setting does four jobs
 
 1. **It makes the world specific.** "A school" is nowhere. "A portable
-   with a broken heater in February" is somewhere.
+   with a broken heater partway through" is somewhere.
 2. **It applies pressure.** Winter, distance, a curfew, a border — a
    setting can be an antagonist.
 3. **It carries history.** A place has a past, and in Canadian writing

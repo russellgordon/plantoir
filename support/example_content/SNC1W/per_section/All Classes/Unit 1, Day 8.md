@@ -13,7 +13,7 @@ tags:
 1. Warm-up: three claims from this week — which would you check first?
 2. Practise: [[Scientific Notation and Units]] to the end
 3. Skill: [[Measuring Accurately]] again, with the equipment you will use
-   all year
+   all semester
 
 ## Things to do before our next class
 

@@ -7,13 +7,14 @@ tags:
 ---
 A task is a job with a client — sometimes real, usually played by the
 bench across the aisle, and once, at the end, by a room full of guests.
-Each one runs across several classes, and the bench time is part of the
-job: what you do with it is assessed, as [[How Marks Work]] explains.
+Each one runs across several classes, and the bench time is where I
+watch you work — which is evidence in its own right, and one of the
+three kinds [[How Marks Work]] describes.
 
 Every task publishes its criteria in advance, written as things an
 observer could see at your bench, and each table traces back to our
-[[Learning Goals]]. Two of those criteria appear in all five, because
-this year they are what "finished" means:
+[[Learning Goals]]. Two ideas run through every one of those tables,
+because this year they are what "finished" means:
 
 - **A claim with a number.** Not "it works" — at what current, at what
   temperature, within what tolerance, over how many trials.
@@ -21,6 +22,9 @@ this year they are what "finished" means:
   board, code a stranger could follow, and a log of what went wrong.
 
 ## The five jobs
+
+These five are the semester's work — seventy per cent of the credit,
+between them. [[How Marks Work]] explains the weighting.
 
 - [[The Working Circuit]] — design a small circuit, defend every
   component value in arithmetic, solder it, and prove it with a meter.
@@ -32,8 +36,13 @@ this year they are what "finished" means:
   package a stranger could service from.
 - [[The Engineering Project]] — the capstone: a device of your own
   design, proposed in writing, built from circuits, logic, and code.
-- [[The Engineering Showcase]] — the finale: demonstrate what you built
-  to an audience, and give three other projects a real critique.
+
+## And the finale
+
+- [[The Engineering Showcase]] — the last class, and the course's final
+  evaluation on its own: demonstrate what you built to an audience,
+  answer questions from across the whole semester, and give three other
+  projects a real critique. It is the other thirty per cent.
 
 > [!tip] Start with the sentence, not the parts drawer
 > Every task on this list begins with one sentence describing what the

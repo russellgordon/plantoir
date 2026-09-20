@@ -35,16 +35,16 @@ after — not instead.
 
 Some of you have danced for ten years and some have never taken a class.
 Both are normal here. The trained dancers will be asked for detail and
-range; the beginners will be asked for commitment and clarity. Neither
-starts ahead in the marks — read [[How Marks Work]] and you will see
-why.
+range; the beginners will be asked for clarity and for movement that is
+genuinely theirs. Neither starts ahead in the marks — read
+[[How Marks Work]] and you will see why.
 
 ## The shape of the year
 
 Four units — the moving body, making a dance, dance in the world, and
 bringing work to an audience — ending in [[The Showing]], performed for
 an invited audience, and the portfolio you have been building since
-September.
+the start of the course.
 
 ## If something hurts
 

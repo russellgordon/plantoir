@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Cost of a Month]] — one ordinary month, costed properly
+1. [[The Cost of a Month]] — one ordinary month, costed properly, with your guess from last class handed back to sit beside the total
 2. Spreadsheets: formulas, not arithmetic done by hand
 3. Where each figure came from, and the date you found it
 

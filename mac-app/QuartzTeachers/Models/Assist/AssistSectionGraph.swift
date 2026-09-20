@@ -34,13 +34,44 @@ struct AssistSectionPage {
     let isSectionLocal: Bool
 
     /// True when students meet this page as things stand.
+    ///
+    /// Read the way the BUILT SITE reads it, and when the page's flag is one
+    /// this app will not guess at, this says VISIBLE — the mild mistake of the
+    /// two, since calling a page hidden while students are reading it is the
+    /// failure that reports success. `visibilityIsCertain` is how anything
+    /// that WRITES tells the two apart.
     let isVisibleToStudents: Bool
+
+    /// False when the page's flag is a form this app will not read — a value
+    /// on the line below the key, a tag, a block scalar, an anchor.
+    ///
+    /// Anything deciding a page is "already the way you asked" must require
+    /// this. Without it, "publish this page" on such a page answered that it
+    /// was already published and wrote nothing, while the build was holding it
+    /// back — the exact failure this whole reader exists to remove.
+    let visibilityIsCertain: Bool
 
     /// The day the page's frontmatter puts it on, or nil when it has none.
     let date: CalendarDay?
 
     /// The pages this one links to, lowercased, as wikilink targets.
     let linkedTitles: [String]
+
+    /// What THIS course calls the folders its class pages live in — "All
+    /// Classes" by convention, and not always, and not necessarily one.
+    /// Carried on the page rather than worked out from the path, because the
+    /// answer comes from the course's own configured per-section folders and a
+    /// path cannot know it.
+    let classFolderNames: [String]
+
+    /// The page's path relative to its SECTION folder.
+    ///
+    /// Separate from `relativePath`, which is relative to the working folder —
+    /// and which is the FULL ABSOLUTE PATH whenever `workspaceURL` is nil, as
+    /// `SectionIndexPointer.repointIndex` passes it. Asking the class-page
+    /// question of that string meant a teacher whose working folder was
+    /// `~/Documents/All Classes` made every page in every course a class page.
+    let pathWithinSection: String
 
     // MARK: - Computed properties
 
@@ -61,11 +92,20 @@ struct AssistSectionPage {
     /// page, and counting them as orphans made a healthy course look broken:
     /// a real 86-period credit reported 84 pages "linked from nowhere", which
     /// were its lessons.
+    ///
+    /// The rule lives in `ClassFolder` and is pinned by
+    /// `contracts/class-planning.json` → `classFolder`. This used to sniff the
+    /// page's immediate parent for the word "class", which was one of four
+    /// implementations that disagreed with each other — and which answered
+    /// "no" for a lesson filed one folder deeper, since only the immediate
+    /// parent was ever looked at.
     var isClassPage: Bool {
         if isFolderIndex {
             return false
         }
-        return fileURL.deletingLastPathComponent().lastPathComponent.lowercased().contains("class")
+        return ClassFolder.isClassPage(
+            relativePath: pathWithinSection, classFolders: classFolderNames
+        )
     }
 
     var lowercasedTitle: String {
@@ -80,6 +120,29 @@ struct AssistSectionLink {
 
     let fromRelativePath: String
     let toTitle: String
+}
+
+/// What following one or more pages' links reaches, and the class pages the
+/// walk stopped at on the way.
+///
+/// Two halves rather than one list, because a caller needs both and they mean
+/// opposite things: the first is what a verb acts on, the second is what a
+/// teacher has to be TOLD was left alone. Returning only the first made the
+/// stop invisible — a plan quietly smaller than the one the teacher pictured,
+/// with no way to tell "it decided" from "it missed it".
+struct AssistLinkedReach {
+
+    // MARK: - Stored properties
+
+    /// The material reached: transitive, and never a class page.
+    let pages: [AssistSectionPage]
+
+    /// The class pages a link landed on, which the walk did not enter.
+    ///
+    /// Never one of the pages it started from — those are seeded as seen
+    /// before the walk begins, so a class the teacher NAMED is not reported
+    /// here as one that was left alone.
+    let classPagesStoppedAt: [AssistSectionPage]
 }
 
 /// Every page in one section, what links to what, and who can see it.
@@ -145,17 +208,21 @@ struct AssistSectionGraph {
             let dateKey: String = PageFrontmatter.createdKey(
                 forSection: sectionNumber, isSectionLocal: isSectionLocal
             )
+            let visibility: PageVisibilityAnswer = AssistPageVisibility.answer(
+                in: text, forSection: sectionNumber
+            )
             pages.append(AssistSectionPage(
                 title: pageURL.deletingPathExtension().lastPathComponent,
                 displayTitle: displayName(forPageAt: pageURL, in: text),
                 fileURL: pageURL,
                 relativePath: relativePath(of: pageURL, workspaceURL: workspaceURL),
                 isSectionLocal: isSectionLocal,
-                isVisibleToStudents: AssistPageVisibility.publishes(
-                    in: text, forSection: sectionNumber, isSectionLocal: isSectionLocal
-                ),
+                isVisibleToStudents: visibility != .hidden,
+                visibilityIsCertain: visibility != .cannotTell,
                 date: PageFrontmatter.createdDay(in: text, key: dateKey),
-                linkedTitles: linkTargets(in: text)
+                linkedTitles: linkTargets(in: text),
+                classFolderNames: ClassFolder.names(for: course),
+                pathWithinSection: pathWithinSection(of: pageURL, forSection: sectionNumber, in: course)
             ))
         }
         return AssistSectionGraph(courseCode: course.code, sectionNumber: sectionNumber, pages: pages)
@@ -220,19 +287,42 @@ struct AssistSectionGraph {
         return pagesByTitle[tidied]
     }
 
-    /// The pages these ones link to, and the pages THOSE link to, and so on.
+    /// The pages these ones link to, and the pages THOSE link to, and so on —
+    /// stopping at any class page a link lands on.
     ///
     /// Transitive on purpose. "Publish tomorrow's class and everything it links
     /// to" means the concept page the class points at AND the snippet that
     /// concept page points at; stopping at one hop leaves a student one click
     /// from nothing.
-    func linkedPages(from starting: [AssistSectionPage]) -> [AssistSectionPage] {
+    ///
+    /// **A class page is the one stop, and it is a decision rather than an
+    /// oversight.** A class goes up when the teacher names THAT class, so a
+    /// link landing on another class is not collected and is not followed
+    /// through: material reachable only through that class belongs to it and
+    /// goes up with it. Publishing Day 4's worksheet because Day 3 links to
+    /// Day 4 puts it in front of students a day early and dates it to the
+    /// wrong lesson. REJECTED was the middle position — leave the linked class
+    /// alone but walk past it to the material beyond — for those same two
+    /// reasons. Decided 2026-09-19, issue #173, after the two apps were found
+    /// to disagree: Windows stopped, the mac walked through.
+    /// `contracts/shared-rules.json` → `followingLinks.stopsAtAClassPage`.
+    ///
+    /// **The pages STARTED from are never stopped.** They are seeded as seen
+    /// before the walk begins, so naming two classes makes both of them
+    /// starting points, and publishing a whole unit — which names every class
+    /// in it, one plan each — loses nothing.
+    ///
+    /// The name says `reach` rather than `linkedPages` on purpose: the rule
+    /// changed under the old name's promise once already, and renaming it made
+    /// the compiler hand every caller over to be read again.
+    func reachFollowingLinks(from starting: [AssistSectionPage]) -> AssistLinkedReach {
         var seen: Set<String> = []
         for page in starting {
             seen.insert(page.lowercasedTitle)
         }
 
         var found: [AssistSectionPage] = []
+        var classPagesStoppedAt: [AssistSectionPage] = []
         var queue: [AssistSectionPage] = starting
         while !queue.isEmpty {
             let page: AssistSectionPage = queue.removeFirst()
@@ -246,11 +336,18 @@ struct AssistSectionGraph {
                     // that does not exist. Not this tool's business to invent.
                     continue
                 }
+                if linked.isClassPage {
+                    // The walk ends here: the class is neither collected nor
+                    // entered. Only the class itself was marked seen, so a
+                    // page this one ALSO reaches directly is still collected.
+                    classPagesStoppedAt.append(linked)
+                    continue
+                }
                 found.append(linked)
                 queue.append(linked)
             }
         }
-        return found
+        return AssistLinkedReach(pages: found, classPagesStoppedAt: classPagesStoppedAt)
     }
 
     /// Links a student could click on a page they can see, that lead to a page
@@ -345,6 +442,34 @@ struct AssistSectionGraph {
 
     private func normalized(_ name: String) -> String {
         return AssistSectionGraph.normalized(name)
+    }
+
+    /// A page's path relative to its SECTION folder, which is the form the
+    /// class-page rule needs: nothing above the section can reach it, so what
+    /// a teacher called their working folder cannot change what counts as a
+    /// lesson. Shared pages live outside the section folder and fall back to
+    /// their own last two components, which is enough for the rule to see the
+    /// folder they sit in.
+    static func pathWithinSection(of url: URL, forSection sectionNumber: Int, in course: Course) -> String {
+        let full: String = url.standardizedFileURL.path
+        let root: String = course.sectionDirectoryURL(forSection: sectionNumber)
+            .standardizedFileURL.path + "/"
+        if full.hasPrefix(root) {
+            return String(full.dropFirst(root.count))
+        }
+        // A page OUTSIDE the section folder — every course-level shared page,
+        // which `ClassPages.pagesOfSection` deliberately includes, and any
+        // section reached through a symlink, since `standardizedFileURL` does
+        // not resolve those.
+        //
+        // The first version of this returned the last two components, which
+        // put the immediate parent's name back in front of the rule — exactly
+        // the discredited "does the parent mention classes" sniff, and a false
+        // POSITIVE waiting to happen: a course-level folder whose name matched
+        // a configured per-section folder would have made its shared pages
+        // lessons. A shared page is not a class page, so say so plainly rather
+        // than guessing from a fragment of path.
+        return url.lastPathComponent
     }
 
     /// Where a page sits, said the way a teacher would say it.

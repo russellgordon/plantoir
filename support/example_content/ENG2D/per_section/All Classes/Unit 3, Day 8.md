@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Seminars begin: groups one and two
-2. Everybody's participation is assessed, per [[The Seminar]]
+1. [[The Seminar]], day 3 (part 1 of 3) — seminars begin: groups one and
+   two
+2. What you do in a seminar you are not leading is marked too, per
+   [[The Seminar]]
 
 ## Things to do before our next class
 

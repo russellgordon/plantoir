@@ -11,9 +11,10 @@ tags:
 ## Agenda
 
 1. [[Working in a Series]] — how one piece informs the next
-2. Planning the set: media, scale, order
-3. Studio time
+2. Planning the set: media, scale, order — two or three versions weighed
+   here, one finalised
+3. Studio time: creating series thumbnail sketches and material tests for [[The Body of Work]]
 
 ## Things to do before our next class
 
-- [ ] Plan finalised in the sketchbook.
+- [ ] Bring the materials for the first piece.

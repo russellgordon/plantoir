@@ -85,7 +85,7 @@ is $\ce{N2O5}$ being consumed, and $\ce{NO2}$ formed?
 >
 > When you report a rate, say what it is a rate **of**.
 
-**3.** For $\ce{A + B} \rightarrow \text{products}$, initial
+**3.** For $\ce{A + B -> products}$, initial
 rates were measured at 25 °C:
 
 | Trial | $[\ce{A}]_0$ (mol/L) | $[\ce{B}]_0$ (mol/L) | Initial rate (mol/(L·s)) |

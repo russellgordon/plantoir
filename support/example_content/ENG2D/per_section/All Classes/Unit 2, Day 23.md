@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. [[The Literary Essay]], day 5 — workshop: a partner marks every claim
-   without evidence and the weakest paragraph
-2. Rewrite the weakest paragraph in class
+1. [[The Literary Essay]], day 5 — first fifteen minutes on your own:
+   judge your draft against the criteria table, per
+   [[Judging Your Own Work]]
+2. Workshop: a partner marks every claim without evidence and the weakest
+   paragraph
+3. Rewrite the weakest paragraph in class
 
 ## Things to do before our next class
 

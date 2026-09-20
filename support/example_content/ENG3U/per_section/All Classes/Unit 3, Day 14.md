@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Comparative Response]], day 2 — passages gathered from both
+1. [[The Comparative Response]], day 2 of 5 — passages gathered from both
    texts, two each minimum
 2. Concept: [[Reading Non-Fiction]] revisited — what an argument cannot
    do

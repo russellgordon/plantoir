@@ -29,10 +29,10 @@ everything that class used, so a missed period is a page, not a mystery.
 
 ## Why concepts are separate from classes
 
-Because you meet an idea once and need it eleven times. Point of view
-comes up in September in a short story, in November in a novel, and in
-January in a film. It is explained properly in one place —
-[[Point of View]] — and every class that uses it links there.
+Because you meet an idea once and need it eleven times. Point of view comes
+up at the start of the course in a short story, later in a novel, and later
+still in a film. It is explained properly in one place — [[Point of View]] —
+and every class that uses it links there.
 
 That also means the class pages can stay short, which is the point of
 them: a class page is a plan, not a lesson.

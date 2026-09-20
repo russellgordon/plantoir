@@ -26,4 +26,11 @@
     <ProjectReference Include="..\Plantoir.Core\Plantoir.Core.csproj" />
   </ItemGroup>
 
+  <!-- So a test can pin what "today" is, the way Plantoir.Core already lets
+       one. Nothing here is on the tool surface: the MCP SDK serves methods
+       carrying [McpServerTool] and nothing else. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Plantoir.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: two frequencies, one beat frequency — predicted, then heard
-2. Practise: interference, beats, and Doppler at the boards
+1. Warm-up: two frequencies, one beat frequency — predicted, then heard: [[Interference and Beats]]
+2. Practise: interference, beats, and Doppler at the boards: [[The Doppler Effect]]
 3. Where this is used: tuning, sonar, ultrasound, and speed radar
 
 ## Things to do before our next class

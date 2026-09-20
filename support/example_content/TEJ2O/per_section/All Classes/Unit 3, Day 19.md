@@ -13,6 +13,7 @@ tags:
 1. Warm-up: [[Name That Part]] — components from the parts drawer
 2. Bench time: [[The Gadget]], day 3 — circuit built and tested before any
    code is written
+3. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

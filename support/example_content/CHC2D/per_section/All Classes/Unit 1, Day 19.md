@@ -12,7 +12,9 @@ tags:
 
 1. [[Winning the Vote]] — and who was still excluded after 1918
 2. Persons Case, and the limits of it
-3. Notebook
+3. Notebook milestone, written in class: three questions this unit leaves
+   you with — one factual, one comparative, one causal, each labelled. The
+   first marked piece of [[The Portfolio Case]]
 
 ## Things to do before our next class
 

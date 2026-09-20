@@ -2,6 +2,8 @@
 title: Source Use Practice
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 The four moves are on [[Research Writing]]: support, extend, complicate,
 disagree.
@@ -30,15 +32,17 @@ you do with it?
 > at, then read that yourself. An unrefereed summary is not a secondary
 > source; it is somebody else's homework.
 
-**4.** Rewrite to remove the source stacking: *Fee argues X. Smith agrees.
-Lee also notes X. This shows X.*
+**4.** Rewrite to remove the source stacking: *Critic A argues X. Critic
+B agrees. Critic C also notes X. This shows X.*
 
 > [!success]- Answer 4
-> *Fee's account of the novel's orality (18) has become the standard
+> *Critic A's account of the novel's orality has become the standard
 > reading, and it explains the interview passages well. It explains the
 > dream sequences less well, and those are where the novel's method is
 > most visible.*
-> One source, used for something, with your argument driving.
+> One source, used for something, with your argument driving. In your
+> own writing "Critic A" is a name and a page number — inventing one
+> that sounds plausible is the exact habit this page is against.
 
 **5.** You cannot remember whether a sentence in your notes is yours or a
 critic's. What now?

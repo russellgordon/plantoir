@@ -42,6 +42,10 @@ Cells are checked under the microscope before and after — see
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
+![[B2.2]]
+
 ![[B2.5]]
 
 ![[B3.6]]

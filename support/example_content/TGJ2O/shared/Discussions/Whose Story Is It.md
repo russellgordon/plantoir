@@ -33,7 +33,9 @@ Questions worth arguing about:
    When does the room's judgement override the person's — and who
    should have to make that case out loud?
 6. Does a masthead where everyone is alike produce pages where
-   everyone covered is alike? Test it against our coverage map.
+   everyone covered is alike? How can mentoring programs, industry
+   associations, and [[Careers in Communications|non-traditional pathway supports]]
+   broaden who tells stories in media?
 
 Carry it back to practice: every assignment sheet gets one added
 line — *who speaks in this story?* If the answer is "nobody it is
@@ -49,4 +51,8 @@ arrive; [[Releases and Consent]] is how they arrive protected; and
 ![[A3.2]]
 
 ![[D2.4]]
+
+![[D2.2]]
+
+![[D2.1]]
 %%curriculum-end%%

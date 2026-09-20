@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[The Adaptation Study]] — day 3
-2. Gallery: every made text shown or played; readings guessed and checked
+1. First fifteen minutes: the two changes yesterday asked for
+2. Hand in [[The Adaptation Study]] — day 3
+3. Gallery: every made text shown or played; readings guessed and
+   checked
 
 ## Things to do before our next class
 

@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: company circle
-2. [[Culminating Performance]], day 12 — working period: work the notes. The
-   three biggest, not the nine easiest
+2. [[Culminating Performance]], day 12 — working period: work the list you
+   made yesterday, your own weakest row included. The three biggest, not
+   the nine easiest
 3. Re-run only the sections you changed
 
 ## Things to do before our next class

@@ -43,5 +43,11 @@ and who changed it, and a **question that could be tested**.
 
 ![[A3.1]]
 
+![[A3.2]]
+
 ![[B4.1]]
+
+![[B4.2]]
+
+![[C4.2]]
 %%curriculum-end%%

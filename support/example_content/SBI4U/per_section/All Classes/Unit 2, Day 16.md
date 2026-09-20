@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: respiration, photosynthesis, and one data
-   question
-2. Mark your own; revision list written
+   question: [[Metabolism Practice]]
+2. Mark your own; revision list written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

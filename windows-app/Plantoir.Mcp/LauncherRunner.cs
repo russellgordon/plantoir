@@ -63,10 +63,41 @@ public sealed class LauncherRunner : ILauncherRunner
         using var process = new Process { StartInfo = info, EnableRaisingEvents = true };
         var tail = new Queue<string>();
         var gate = new object();
+        var findings = new List<Plantoir.Core.Models.SiteHealthFinding>();
+        var findingsSeen = new HashSet<string>(StringComparer.Ordinal);
 
         void Capture(string? line)
         {
             if (string.IsNullOrWhiteSpace(line)) return;
+
+            // A folder problem, not narration. Lifted out and NEVER passed on
+            // as text: it is a JSON payload, and both the progress reports and
+            // the kept tail are read by a teacher through the assistant
+            // (CLAUDE.md rule 1). The human sentence it carries is reported
+            // properly, by the caller, out of Findings — and site_health.py
+            // prints its own sentence separately besides.
+            if (Plantoir.Core.Models.SiteHealthFinding.Parse(line) is { } finding)
+            {
+                lock (gate)
+                {
+                    // The same problem in one run is one problem, keyed the
+                    // record's own way so this and ScriptRunner cannot drift
+                    // into disagreeing about what a duplicate is.
+                    if (findingsSeen.Add(finding.Identity))
+                    {
+                        findings.Add(finding);
+                        // Recorded here rather than by whatever displays it,
+                        // for the reason the trail exists: this process is
+                        // headless, and a teacher who asks the assistant to
+                        // publish leaves no console behind to look at.
+                        Plantoir.Core.Scripting.ActivityTrail.Note(
+                            Plantoir.Core.Scripting.ActivityTrail.Event.FolderProblemFound,
+                            finding.TrailSentence, finding.Course, finding.Section);
+                    }
+                }
+                return;
+            }
+
             lock (gate)
             {
                 tail.Enqueue(line);
@@ -99,11 +130,16 @@ public sealed class LauncherRunner : ILauncherRunner
         }
 
         string transcript;
-        lock (gate) transcript = string.Join("\n", tail);
+        Plantoir.Core.Models.SiteHealthFinding[] found;
+        lock (gate)
+        {
+            transcript = string.Join("\n", tail);
+            found = findings.ToArray();
+        }
 
         return process.ExitCode == 0
-            ? new LaunchOutcome(true, transcript)
-            : new LaunchOutcome(false, Explain(process.ExitCode, transcript));
+            ? new LaunchOutcome(true, transcript, found)
+            : new LaunchOutcome(false, Explain(process.ExitCode, transcript), found);
     }
 
     /// <summary>

@@ -17,7 +17,7 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Rest. Bring your notebook to the examination.
+- [ ] Rest. You are prepared for the examination.
 
 %% This page is held back, so it is not on the built site yet — students
 cannot see it. That is how you write next week's classes ahead of time:

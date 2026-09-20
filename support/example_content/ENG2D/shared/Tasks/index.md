@@ -14,7 +14,7 @@ Everything marked, with the criteria published before you start.
 - [[The Seminar]] — Unit 3. Lead a discussion of
   *Moon of the Crusted Snow* that other people want to be in.
 - [[The Media Deconstruction]] — Unit 4. Take a media text apart, then
-  make one.
+  make two linked texts for different audiences.
 - [[Final Examination]] — the final evaluation, in the examination
   period.
 

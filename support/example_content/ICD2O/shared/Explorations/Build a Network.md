@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - explorations
-enableToc: true
+enableToc: false
 ---
 Push the desks back. Today the network is made of you: each student
 is a device, each length of string is a cable, and messages are

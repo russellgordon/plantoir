@@ -41,6 +41,30 @@ are drilled in [[Number Systems Practice]].
    classmate opens a browser, finds it fails to load a page, and
    concludes the cable they crimped is bad. List everything wrong with
    that reasoning and give the order they should have worked in.
+10. **Server services and ports.**
+    (a) Match each of the following server services to its standard well-known
+    port number and primary function: HTTP, SSH, SMTP, FTP, and IPP.
+    (b) Explain why an enterprise network uses centralised directory
+    services (such as LDAP or Active Directory) for user authentication rather
+    than maintaining local accounts on individual client machines.
+11. **Cable construction and testing.**
+    (a) State the complete conductor colour sequence from pin 1 to pin 8 for
+    both the T568A and T568B wiring standards.
+    (b) Compare the construction of a straight-through cable versus a
+    crossover cable, stating which pins transmit (Tx) and receive (Rx) in
+    $100\text{BASE-TX}$ Ethernet.
+    (c) An 8-LED continuity cable tester flashes the sequence
+    `1, 2, 4, 3, 5, 6, 7, 8` at the remote unit. Identify the exact wiring
+    fault and describe its effect on network communication.
+12. **Peer-to-peer network deployment.**
+    A small auto repair garage needs to network three workstation PCs and one
+    shared printer in a peer-to-peer workgroup without a dedicated server.
+    (a) List the necessary tools, materials, and equipment to install this
+    wired network.
+    (b) Assign a valid private static IPv4 addressing scheme (address, subnet
+    mask, and broadcast) for all four devices on a $/24$ subnet.
+    (c) Outline the required operating system configuration steps to enable
+    peer-to-peer file and print sharing across the workgroup.
 
 ## Answers
 
@@ -181,6 +205,67 @@ are drilled in [[Number Systems Practice]].
 > discipline as [[Debugging Hardware and Software Together]] — the
 > network just gives you better instruments.
 
+> [!success]- Answer 10
+> **(a) Service and port matching:**
+> - **HTTP (Port 80):** Serves unencrypted web pages, documents, and web apps.
+> - **SSH (Port 22):** Secure, encrypted remote command-line administration and SFTP file transfer.
+> - **SMTP (Port 25 or 587):** Simple Mail Transfer Protocol for routing and relaying outgoing emails.
+> - **FTP (Port 21):** File Transfer Protocol for transferring files between client and server.
+> - **IPP (Port 631):** Internet Printing Protocol for submitting and spooling print jobs over the network.
+>
+> **(b) Centralised directory benefits:**
+> In a peer-to-peer setup with 30 workstations, adding or removing an employee
+> or updating a password requires manually modifying 30 individual local
+> account databases (a total administrative burden of $30 \times \text{users}$
+> accounts). Centralised directory services (LDAP/Active Directory) store user
+> credentials, permissions, and group policies in one central database. Users
+> can authenticate from any workstation with single sign-on (SSO), and account
+> changes take effect instantly across the entire enterprise.
+
+> [!success]- Answer 11
+> **(a) Pin sequences:**
+> - **T568A:** 1: White-Green, 2: Green, 3: White-Orange, 4: Blue, 5: White-Blue, 6: Orange, 7: White-Brown, 8: Brown.
+> - **T568B:** 1: White-Orange, 2: Orange, 3: White-Green, 4: Blue, 5: White-Blue, 6: Green, 7: White-Brown, 8: Brown.
+>
+> **(b) Straight-through vs crossover:**
+> - **Straight-through:** Both ends share the same standard (e.g., T568B on both ends). Pins map 1-to-1 straight through. Connects unlike devices (PC to switch).
+> - **Crossover:** One end is T568A, the other is T568B. Pins 1 and 2 (Transmit pair) are swapped with pins 3 and 6 (Receive pair). In $100\text{BASE-TX}$, data transmits on pins 1 & 2 ($Tx+/Tx-$) and is received on pins 3 & 6 ($Rx+/Rx-$), so a crossover connects like devices (PC directly to PC) so one's transmitter reaches the other's receiver.
+>
+> **(c) Cable fault analysis:**
+> Pins 3 and 4 are swapped (a crossed/transposed pair fault). In Ethernet, pin 3
+> is part of the green/orange receive pair while pin 4 is blue (unused in 100BASE-TX
+> or carrying power in PoE). This fault disrupts the differential pair
+> cancellation and breaks continuity on the receive line, causing the network
+> interface to fail to establish a link (no link light) or experience catastrophic
+> packet loss and frame errors.
+
+> [!success]- Answer 12
+> **(a) Required tools, materials, and equipment:**
+> - Category 5e or Category 6 UTP bulk cable.
+> - $8\text{P}8\text{C}$ modular RJ45 plugs.
+> - Cable stripper, flush wire cutters, and ratcheting RJ45 crimping tool.
+> - 8-conductor continuity cable tester.
+> - 5-port or 8-port unmanaged Gigabit Ethernet switch.
+> - Ethernet Network Interface Cards (NICs) on each PC and network-capable printer.
+>
+> **(b) IPv4 addressing scheme ($192.168.50.0/24$):**
+> - Subnet mask for all devices: $255.255.255.0$ (/24).
+> - Network address: $192.168.50.0$.
+> - Broadcast address: $192.168.50.255$.
+> - PC 1 (Diagnostic Station A): $192.168.50.11$.
+> - PC 2 (Diagnostic Station B): $192.168.50.12$.
+> - PC 3 (Front Counter / Service Desk): $192.168.50.13$.
+> - Shared Network Printer: $192.168.50.20$.
+>
+> **(c) Operating system configuration:**
+> 1. Set identical workgroup names (e.g., `GARAGE_SHOP`) on all three PCs.
+> 2. Enable network discovery and file/printer sharing in OS network settings.
+> 3. Create a shared folder (e.g., `ShopManuals`) on PC 1, setting read/write
+>    permissions for workgroup users.
+> 4. Install printer drivers on PC 1 and share the printer queue, or add the
+>    printer directly via its static IP address ($192.168.50.20$) using standard
+>    TCP/IP printing on each PC.
+
 Wire it, address it, and prove it in [[Build and Test a Network]].
 
 %%curriculum-start%%
@@ -190,5 +275,11 @@ Wire it, address it, and prove it in [[Build and Test a Network]].
 
 ![[A4.2]]
 
+![[A4.3]]
+
+![[B4.1]]
+
 ![[B4.2]]
+
+![[B4.3]]
 %%curriculum-end%%

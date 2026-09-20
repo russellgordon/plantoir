@@ -59,6 +59,13 @@ struct SidebarView: View {
     /// Why a Claude session could not be started, shown as an alert.
     @State var claudeProblem: String?
 
+    /// Why a Codex session could not be started, shown as an alert.
+    ///
+    /// A second property rather than one shared "outside assistant" one,
+    /// because the alert TITLE names the assistant, and a teacher who has both
+    /// installed should be told which of them did not open.
+    @State var codexProblem: String?
+
     // MARK: - Body
 
     var body: some View {
@@ -87,7 +94,28 @@ struct SidebarView: View {
                                     sectionNumber: sectionNumber,
                                     generation: scheduleGeneration
                                 )
-                                sectionRowLabel(sectionNumber: sectionNumber, scheduledFor: scheduledFor)
+                                // Read from disk during the row's render, the
+                                // same way the clock is asked of launchd: a
+                                // teacher who fixes the problem or dismisses
+                                // the notice should see the badge go without
+                                // the sidebar being rebuilt.
+                                //
+                                // The counter is the WATCHER's, which is what
+                                // makes this badge and the section's own band
+                                // move together in both directions: it moves
+                                // when a run finishes (the folder changed) as
+                                // well as when the teacher dismisses a notice.
+                                let stoppedPublish: ScheduledPublishOutcome.Stopped? =
+                                    stoppedPublishBadge(
+                                        courseCode: course.code,
+                                        sectionNumber: sectionNumber,
+                                        generation: ScheduledPublishWatcher.shared.generation
+                                    )
+                                sectionRowLabel(
+                                    sectionNumber: sectionNumber,
+                                    scheduledFor: scheduledFor,
+                                    stoppedPublish: stoppedPublish
+                                )
                                     .tag(SidebarSelection.section(course.code, sectionNumber))
                                     .accessibilityIdentifier("sidebar-\(course.code)-section\(sectionNumber)")
                                     .contextMenu {
@@ -98,6 +126,7 @@ struct SidebarView: View {
                                         // editing and folder actions made it
                                         // read as an afterthought.
                                         reviseWithClaudeItem(course: course)
+                                        reviseWithCodexItem(course: course)
                                         reviseWithAIItem(course: course, sectionNumber: sectionNumber)
                                         Divider()
                                         openInObsidianItem(
@@ -149,6 +178,7 @@ struct SidebarView: View {
                                 .accessibilityIdentifier("sidebar-\(course.code)")
                                 .contextMenu {
                                     reviseWithClaudeItem(course: course)
+                                    reviseWithCodexItem(course: course)
                                     openInObsidianItem(revealing: course.directoryURL, vaultURL: course.directoryURL)
                                     Divider()
                                     // Renaming moves the folder a preview is
@@ -418,13 +448,7 @@ struct SidebarView: View {
         } message: {
             Text(removalProblem ?? "")
         }
-        .alert("Claude didn’t open", isPresented: claudeProblemBinding) {
-            Button("OK") {
-                claudeProblem = nil
-            }
-        } message: {
-            Text(claudeProblem ?? "")
-        }
+        .modifier(OutsideAgentAlerts(claudeProblem: $claudeProblem, codexProblem: $codexProblem))
         .sheet(item: $addSectionCourse) { course in
             AddSectionSheet(course: course) { sectionNumber in
                 workspace.reloadCourses()
@@ -507,18 +531,73 @@ struct SidebarView: View {
 
 
 
-    /// A section's row, wearing a clock when it is set to deploy on its own.
+    /// Whether this section has a stopped scheduled publish to warn about.
+    ///
+    /// `generation` is unused inside and that is the point: naming it as an
+    /// argument is what makes SwiftUI re-read the disk when it changes, which
+    /// is how the badge disappears the moment the teacher dismisses the notice
+    /// in the section view. `scheduledDeployTime` beside it takes one for the
+    /// identical reason.
+    func stoppedPublishBadge(
+        courseCode: String,
+        sectionNumber: Int,
+        generation: Int
+    ) -> ScheduledPublishOutcome.Stopped? {
+        let outcome: ScheduledPublishOutcome.Stopped? = ScheduledPublishOutcome.stopped(
+            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            course: courseCode,
+            section: sectionNumber
+        )
+        // Only a failure earns a badge. A success is news rather than a
+        // problem, and a badge beside every section that published fine
+        // overnight is a badge nobody reads by Wednesday. The sentence inside
+        // the section still says so.
+        guard let outcome, outcome.kind.needsAttention else {
+            return nil
+        }
+        return outcome
+    }
+
+    /// A section's row, wearing a clock when it is set to deploy on its own
+    /// and a warning when a publish that was set to happen on its own did not
+    /// get through.
+    ///
+    /// The warning is here rather than only inside the section because a
+    /// teacher who does not know which section failed cannot open the right
+    /// one — and not knowing is the entire problem this feature exists for.
     @ViewBuilder
-    func sectionRowLabel(sectionNumber: Int, scheduledFor: Date?) -> some View {
-        if let scheduledFor {
+    func sectionRowLabel(
+        sectionNumber: Int,
+        scheduledFor: Date?,
+        stoppedPublish: ScheduledPublishOutcome.Stopped? = nil
+    ) -> some View {
+        if scheduledFor != nil || stoppedPublish != nil {
             HStack {
                 Label("Section \(sectionNumber)", systemImage: "doc.richtext")
                 Spacer()
-                Image(systemName: "clock")
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("scheduledDeployBadge-section\(sectionNumber)")
+                if stoppedPublish != nil {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .accessibilityIdentifier(
+                            "stoppedPublishBadge-section\(sectionNumber)"
+                        )
+                        // The same sentence twice, on purpose: hovering and
+                        // hearing the row should tell a teacher the same thing.
+                        // An orange triangle alone says "something", and a
+                        // teacher who cannot find out what without clicking is
+                        // being asked to guess.
+                        .help(SidebarView.stoppedPublishTooltip())
+                        .accessibilityLabel(Text(SidebarView.stoppedPublishTooltip()))
+                }
+                if let scheduledFor {
+                    Image(systemName: "clock")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier(
+                            "scheduledDeployBadge-section\(sectionNumber)"
+                        )
+                        .help(SidebarView.scheduledDeployTooltip(for: scheduledFor))
+                }
             }
-            .help(SidebarView.scheduledDeployTooltip(for: scheduledFor))
         } else {
             Label("Section \(sectionNumber)", systemImage: "doc.richtext")
         }
@@ -766,17 +845,6 @@ struct SidebarView: View {
         )
     }
 
-    var claudeProblemBinding: Binding<Bool> {
-        return Binding(
-            get: { claudeProblem != nil },
-            set: { isPresented in
-                if !isPresented {
-                    claudeProblem = nil
-                }
-            }
-        )
-    }
-
     // MARK: - Functions
 
     /// When this section next deploys on its own, or nil when nothing is
@@ -789,6 +857,22 @@ struct SidebarView: View {
     func scheduledDeployTime(courseCode: String, sectionNumber: Int, generation: Int) -> Date? {
         _ = generation
         return ScheduledDeploy.nextRun(courseCode: courseCode, sectionNumber: sectionNumber)
+    }
+
+    /// What the orange triangle beside a section means, said in full on hover
+    /// — and the same sentence again for anyone listening rather than looking.
+    ///
+    /// One sentence for all three ways a scheduled publish can stop: from the
+    /// sidebar they mean the same thing to a teacher, which is that the site
+    /// is not what they think it is. WHICH way it stopped, and when, is in the
+    /// section itself, which is where the sentence sends them.
+    ///
+    /// It names no date deliberately. The badge can stand for days if nobody
+    /// dismisses it, and a hover that said "on Tuesday" would have to be right
+    /// about WHICH Tuesday; the section's own notice carries the date in full.
+    static func stoppedPublishTooltip() -> String {
+        return "A publish that was set to happen on its own did not get through. "
+             + "Open this section to see what happened."
     }
 
     /// What the clock beside a section means, said in full on hover.
@@ -857,7 +941,7 @@ struct SidebarView: View {
     @ViewBuilder
     func reviseWithClaudeItem(course: Course) -> some View {
         if ClaudeCodeLauncher.isAvailable, let folder = workspace.workspaceURL {
-            Button("Revise with Claude…", systemImage: "sparkles") {
+            Button(ClaudeCodeLauncher.menuItemTitle, systemImage: "sparkles") {
                 reviseWithClaude(course: course, folder: folder)
             }
             .accessibilityIdentifier("reviseWithClaude-\(course.code)")
@@ -872,7 +956,38 @@ struct SidebarView: View {
         ) {
             return
         }
-        claudeProblem = "Plantoir couldn’t start a Claude session for \(course.code). If Claude Code was updated or moved recently, restarting Plantoir may be enough."
+        claudeProblem = ClaudeCodeLauncher.couldNotStartSentence(courseCode: course.code)
+    }
+
+    /// Opens a Codex session in a terminal, connected to this course through
+    /// Plantoir's MCP server — the same door as the one above, for the other
+    /// assistant a teacher may already have.
+    ///
+    /// Hidden when Codex is not installed, and hidden INDEPENDENTLY of the
+    /// Claude item: a teacher with one of the two sees one item, a teacher
+    /// with both sees both, and a teacher with neither sees no sign that
+    /// either exists. Plantoir never installs an assistant, and never offers
+    /// to — this is a door onto something the teacher chose to put on their
+    /// own Mac.
+    @ViewBuilder
+    func reviseWithCodexItem(course: Course) -> some View {
+        if CodexLauncher.isAvailable, let folder = workspace.workspaceURL {
+            Button(CodexLauncher.menuItemTitle, systemImage: "sparkles") {
+                reviseWithCodex(course: course, folder: folder)
+            }
+            .accessibilityIdentifier("reviseWithCodex-\(course.code)")
+        }
+    }
+
+    func reviseWithCodex(course: Course, folder: URL) {
+        if CodexLauncher.open(
+            workspacePath: folder.path,
+            courseCode: course.code,
+            courseName: course.configuration.courseName
+        ) {
+            return
+        }
+        codexProblem = CodexLauncher.couldNotStartSentence(courseCode: course.code)
     }
 
     /// Opens the assistant for one section, in a window of its own.
@@ -1266,5 +1381,57 @@ struct CourseCodeField: View {
             }
             editor.selectAll(nil)
         }
+    }
+}
+
+/// The two outside doors' failure alerts — "Claude didn't open" and "Codex
+/// didn't open" — lifted out of `SidebarView.body`.
+///
+/// Not a tidy-up. Adding the second alert pushed the sidebar's modifier chain
+/// past what the Swift type-checker will finish, and the build failed with
+/// "the compiler is unable to type-check this expression in reasonable time"
+/// pointing at an unrelated alert two hundred lines away. One modifier in the
+/// chain, whose own body is type-checked on its own, is the smallest cut that
+/// puts it back — and it keeps the two doors' failure paths side by side,
+/// which is where they belong.
+private struct OutsideAgentAlerts: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Binding var claudeProblem: String?
+
+    @Binding var codexProblem: String?
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content
+            .alert(ClaudeCodeLauncher.didNotOpenTitle, isPresented: presentation(of: $claudeProblem)) {
+                Button("OK") {
+                    claudeProblem = nil
+                }
+            } message: {
+                Text(claudeProblem ?? "")
+            }
+            .alert(CodexLauncher.didNotOpenTitle, isPresented: presentation(of: $codexProblem)) {
+                Button("OK") {
+                    codexProblem = nil
+                }
+            } message: {
+                Text(codexProblem ?? "")
+            }
+    }
+
+    /// An alert wants a `Bool`; what the sidebar holds is the sentence itself,
+    /// or nothing.
+    private func presentation(of problem: Binding<String?>) -> Binding<Bool> {
+        return Binding(
+            get: { problem.wrappedValue != nil },
+            set: { isPresented in
+                if !isPresented {
+                    problem.wrappedValue = nil
+                }
+            }
+        )
     }
 }

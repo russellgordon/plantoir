@@ -13,7 +13,9 @@ tags:
 1. Number talk: [[True or False]] — $z$-score claims
 2. Random groups — compare two students on two different tests, and
    two products on two different production lines
-3. Clinic: [[Normal Distribution Practice]] to the end
+3. Clinic: [[Normal Distribution Practice]] to the end. Formative and
+   not collected: whoever is still comparing raw values gets found
+   today rather than on Day 19
 
 ## Things to do before our next class
 

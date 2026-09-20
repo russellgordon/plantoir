@@ -45,13 +45,13 @@ actually uses it. Ambition in this task is spent on *fit*, not on size.
 - **A named person** and, in one sentence, the chore in their words.
 - **Input** typed by that person, **processing** you wrote, and
   **output** they can act on — the shape of every program you will
-  build this year.
+  build this semester.
 - **At least one decision**: something the program handles differently
   depending on the answer.
 - **Prompts a stranger could follow.** No `ENTER VAL:`. Ask a whole
   question, in whole words.
 - **Comments and honest names**, so that the version of you who opens
-  this file in June still knows what it does.
+  this file at the end of the course still knows what it does.
 
 ## How to work
 
@@ -91,7 +91,7 @@ down what you watched somebody else struggle with.
 | Input, process, output | The program asks, works, and answers |
 | A decision that matters | Different answers produce different advice |
 | Written for a stranger | Prompts are whole questions; output is plain |
-| Readable in June | Names say what they hold; comments say why |
+| Readable at the end of the course | Names say what they hold; comments say why |
 | Honest hand-off | You logged what your partner hesitated over |
 
 ## Reflect
@@ -123,4 +123,32 @@ different?
 ![[B1.3]]
 
 ![[A4.2]]
+
+![[C3.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 18, the hand-off
+  The task already sets this up: a partner runs the script while the
+  owner says nothing. That silence is the measurement.
+  Watch for: who reaches for the keyboard, and who writes down what
+  their partner hesitated at. Both scripts may work; only one of these
+  students has learned what the hand-off was for.
+  Going well: pen moves while the partner struggles.
+  Stuck: the owner narrates, or takes over.
+  Record: three columns on your day plan — wrote, watched, took over.
+
+TALK — Unit 1, Day 16, during the build from the skeleton
+  Ask: "Which part of the skeleton did you keep, and which did you
+  throw away?"
+  Then: "What went wrong the first time you changed it?"
+  A strong answer treats the skeleton as a decision rather than as
+  scaffolding to be escaped. That is B2.1 — designing from a template —
+  and a finished script that happens to match the skeleton tells you
+  nothing about whether the student chose it or never left it.
+  Record: one line each; two words is enough.
+
+The product evidence is the script handed in on Day 18.
+%%

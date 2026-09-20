@@ -13,7 +13,7 @@ your first week and come back whenever the routines feel fuzzy.
   the habits that prevent them.
 - [[What to Bring]] — a reporter's notebook, layers for shoot days,
   the phone rule.
-- [[How Marks Work]] — process, growth, and communication. Not being
-  a "natural", because those don't exist.
+- [[How Marks Work]] — the seventy and the thirty, what is judged, and
+  what is deliberately not in your mark.
 - [[Getting Help]] — read it as a stranger, ask your desk, flag
   trouble early.

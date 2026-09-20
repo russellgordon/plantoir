@@ -48,4 +48,6 @@ a list of topics, it is not — yet.
 ![[C2.7]]
 
 ![[C3.5]]
+
+![[C2.6]]
 %%curriculum-end%%

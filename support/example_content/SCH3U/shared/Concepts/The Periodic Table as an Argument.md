@@ -139,6 +139,8 @@ two elements will do when you put them together.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B2.3]]
+
 ![[B3.1]]
 
 ![[B3.2]]

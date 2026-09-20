@@ -14,7 +14,22 @@ dated records and rewriting it would make them unreproducible.
 For a measurement of what actually ships:
 
     python3 research/ai-assist/tools-from-contract.py local > /tmp/real-tools.json
-    python3 research/ai-assist/shipped-surface-suite.py 8099 10 /tmp/real-tools.json
+    python3 research/ai-assist/trimmed-surface-suite.py /tmp/real-tools.json 10 \
+        --date-appended --real-course --course VVH2O
+
+**This used to name `shipped-surface-suite.py`, and that advice was wrong** —
+corrected 2026-09-18. That suite's probes expect `publish_class` and
+`hide_class`, tools the app split into separate verbs long ago, so every probe
+in it now misses by construction and the run reads as a catastrophic routing
+failure that is really a stale accept-list. `trimmed-surface-suite.py` is the
+one whose probes name the shipping tools; it also carries the system prompt,
+the dateline and the example-rewriting, each of which was worth double-digit
+points of accuracy on its own.
+
+On WINDOWS, do NOT start from the contract: it is generated from the mac, so
+its descriptions are the mac's and not the ones Windows' server publishes. Dump
+the live surface with `dump-tools.ps1` and narrow it with `narrow-tools.py`.
+See the note in `tools-from-contract.py`.
 
 A routing score measured against tools the app does not ship is worse than no
 score, because it reads as evidence.

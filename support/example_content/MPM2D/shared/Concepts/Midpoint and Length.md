@@ -46,11 +46,13 @@ the order you subtract in cannot hurt you.
 
 A sketch is not decoration here — it is the method. Groups that
 draw the right triangle first almost never confuse the two formulas,
-because an average looks nothing like a hypotenuse.
+because an average looks nothing like a hypotenuse. The same right
+triangle also yields the line's slope as rise over run:
+$m = \frac{y_2 - y_1}{x_2 - x_1}$.
 
-These two tools do heavy lifting elsewhere: length powers
-[[The Equation of a Circle]], and both together let you verify real
-geometric claims in [[Properties on the Grid]].
+These coordinate tools do heavy lifting elsewhere: length powers
+[[The Equation of a Circle]], and slope, length, and midpoint together
+let you verify real geometric claims in [[Properties on the Grid]].
 [[Midpoint and Length Practice]] has the reps, including segments
 whose length is an ugly root — leave it exact as $\sqrt{45}$, or
 clean it to $3\sqrt{5}$, but resist rounding too early.
@@ -61,6 +63,8 @@ clean it to $3\sqrt{5}$, but resist rounding too early.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[B1.4]]
 
 ![[B2.1]]
 

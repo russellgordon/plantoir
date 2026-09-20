@@ -13,18 +13,20 @@ content, is what makes a body.
 ## In bacteria: the lac operon
 
 Genes for lactose metabolism sit together with a promoter and an operator.
-A repressor blocks transcription until lactose is present; lactose binds
-the repressor and frees the operator. The cell makes the enzymes only when
-there is something to digest.
+A repressor protein blocks transcription until allolactose is present;
+lactose binds the repressor allosterically and frees the operator, allowing
+RNA polymerase to transcribe the operon. The cell makes the enzymes only when
+there is substrate to digest.
 
-It is a switch, and it was the first gene regulation mechanism ever
-worked out.
+Discovered by French biologists **François Jacob and Jacques Monod** in 1961
+(earning the 1965 Nobel Prize), the operon was the first gene regulation
+mechanism ever elucidated.
 
 ## In eukaryotes
 
-More layers: transcription factors, enhancers far from the gene,
-chromatin that must be unpacked before anything can be read, and
-epigenetic marks — methylation and histone modification — that can persist
+More layers: specific transcription factors, distal enhancers looping to
+promoters, chromatin that must be unpacked before anything can be read, and
+epigenetic marks — DNA methylation and histone acetylation — that can persist
 through cell division.
 
 ## Why this matters beyond the exam
@@ -36,6 +38,8 @@ nurture interact".
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[D3.3]]
 
 ![[D3.6]]
 

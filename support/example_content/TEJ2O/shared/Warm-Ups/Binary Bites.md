@@ -8,7 +8,7 @@ tags:
 Two small conversions go up: one number decimal to binary, one
 binary to decimal. Everyone works both, then two volunteers defend
 their *method* out loud — not just the answer, the route. Binary
-Bites is about fluency, never speed: by June a byte should read
+Bites is about fluency, never speed: by the end of the course a byte should read
 like a word, not a puzzle. The ideas live in
 [[Binary and Number Systems]]; this is where they get their reps.
 

@@ -10,9 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Standup
-2. Retrieval warm-up — no notes: an exposure problem, a mic placement,
-   and a caption
+1. Standup: [[Record a Standup]]
+2. Retrieval warm-up — no notes: an exposure problem, a mic placement, and a caption: [[Clean Audio]] and [[Caption Practice]]
 3. Desk check, on your own: one frame, one sequence, one caption, judged
    against the class standard
 

@@ -123,7 +123,7 @@ The `F` is the failing test, the dots are the three that still pass,
 and the report names the file, the line, the expectation, and the
 actual value. Nine seconds, and you know precisely what you broke.
 Without the tests, that bug reaches the library and is reported by a
-student in March as "the list is weird".
+student later in the course as "the list is weird".
 
 ## Regression: the tests that stop bugs coming back
 
@@ -139,8 +139,8 @@ a tool:
 > immediately.
 
 Run the whole suite, not just the new test, every time. That is what
-makes it a regression suite: the four tests you wrote in October are
-what tell you in April that today's improvement was safe.
+makes it a regression suite: the four tests you wrote weeks ago are
+what tell you a year from now that today's improvement was safe.
 
 ## A testing plan you can actually hand in
 

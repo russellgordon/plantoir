@@ -21,5 +21,6 @@ tags:
 ## Things to do before our next class
 
 - [ ] Confirm your community partner is coming, and tell them the time.
-- [ ] Finish [[Final Reflection]] and bring your [[Code Journal]].
+- [ ] Bring your [[Code Journal]]. Day 21 is where the reflection gets
+      finished, in class — do not spend tonight on it.
 - [ ] Rehearse [[The Handover]] once, out loud, with a timer running.

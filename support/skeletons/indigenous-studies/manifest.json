@@ -43,6 +43,9 @@
     "Tutorials"
   ],
   "curriculum_folder": "Curriculum",
+  "graded_folders": [
+    "Tasks"
+  ],
   "skeleton": true,
   "label": "First Nations, M\u00e9tis, and Inuit Studies"
 }

@@ -67,4 +67,8 @@ over in [[Build the Front Page]]. Layout argues in sizes and spaces.
 ![[A1.2]]
 
 ![[B3.2]]
+
+![[B2.5]]
+
+![[B2.6]]
 %%curriculum-end%%

@@ -13,7 +13,8 @@ tags:
 1. [[Body Systems Report]], day 2 — working period: your condition chosen,
    normal structure and function drawn by you
 2. Conference: which two systems will you trace the consequences
-   through?
+   through? Written feedback before you leave — Days 10 and 11 are when
+   you act on it
 
 ## Things to do before our next class
 

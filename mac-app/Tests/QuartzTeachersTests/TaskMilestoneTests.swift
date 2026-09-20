@@ -30,8 +30,19 @@ final class TaskMilestoneTests: XCTestCase {
         XCTAssertEqual(runner.milestonesReached, 5)
         XCTAssertEqual(runner.progressFraction, 5.0 / 8.0, accuracy: 0.001)
 
+        // "Quartz v4.5.0" alone must land on "Building your site…" and go no
+        // further — this is the step the old "Launching Quartz preview"
+        // marker used to make unreachable, by completing every milestone the
+        // instant build_site.py printed it (before the build had even
+        // started). See TaskMilestones.preview's own comment.
         runner.receiveOutput( "Quartz v4.5.0\n")
-        runner.receiveOutput( "🚀 Launching Quartz preview on http://localhost:8081\n")
+        XCTAssertEqual(runner.milestonesReached, 7)
+        XCTAssertEqual(runner.progressFraction, 7.0 / 8.0, accuracy: 0.001)
+        XCTAssertEqual(runner.currentMilestoneLabel, "Opening the preview…")
+
+        // Only the real completion line — printed by patches/build.ts once the
+        // fresh site is actually on disk — finishes the bar.
+        runner.receiveOutput( "Done processing 199 files in 6s\n")
         XCTAssertEqual(runner.milestonesReached, 8)
         XCTAssertEqual(runner.progressFraction, 1.0, accuracy: 0.001)
         XCTAssertEqual(runner.currentMilestoneLabel, "Opening the preview…")

@@ -2,6 +2,8 @@
 title: Shakespeare's Language
 publish: true
 created: __CREATED__
+tags:
+  - concepts
 enableToc: true
 ---
 The method for reading it is on [[Reading Shakespeare]]. This page is

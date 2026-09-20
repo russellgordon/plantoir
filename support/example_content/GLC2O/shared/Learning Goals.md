@@ -3,15 +3,15 @@ title: Learning Goals
 publish: true
 created: __CREATED__
 ---
-What you should be able to do by early November, in plain words first and
+What you should be able to do by the end of the course, in plain words first and
 in the Ministry's words underneath.
 
-Career Studies is a half credit. It runs from September to the first week
-of November, and then Civics takes over this period. Nine weeks is short
+Career Studies is a half credit. It runs from the first week to the first week
+of the course, and then Civics takes over this period. Nine weeks is short
 enough that nothing here is filler, and short enough that a question left
 unasked for a fortnight has cost you a fifth of the course.
 
-## By November you should be able to
+## By the end of the course you should be able to
 
 - **Name what you can already do**, and back every claim with a situation
   somebody else could confirm.

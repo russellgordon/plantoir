@@ -8,8 +8,9 @@ tags:
   - unit-1
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Groups of three.** Write-up: analysis section
-> only, due next class.
+> **Time:** two bench periods and two analysis periods.
+> **Groups of three.** Write-up: the analysis section only, and it is one
+> of the five that are marked — see [[Investigation Reports]].
 
 Everyone is told that objects fall at $9.8\ \text{m/s}^2$ regardless of
 mass. This is where you find out whether that is true in this room, with
@@ -37,7 +38,7 @@ of 20 is what makes stopwatch timing good enough — see
 
 - Video: your table of position and time, and the graph with its slope.
 - Pendulum: length, time for 20 swings, at least three trials.
-- Both: your value of $g$ with an uncertainty, and the percent difference
+- Both: your value of $g$ with an uncertainty, and the per cent difference
   from $9.8\ \text{m/s}^2$.
 
 ## Analysis

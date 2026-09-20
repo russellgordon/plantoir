@@ -36,31 +36,37 @@ enum CourseNameCatalog {
     }
 
     private static func loadEntries() -> [String: CourseNames] {
-        guard let url = Bundle.main.url(forResource: "ontario_secondary_courses", withExtension: "json") else {
-            return [:]
-        }
-        guard let data = try? Data(contentsOf: url) else {
-            return [:]
-        }
-        guard let decoded = try? JSONSerialization.jsonObject(with: data) else {
-            return [:]
-        }
-        guard let dictionary = decoded as? [String: Any] else {
-            return [:]
-        }
-
         var result: [String: CourseNames] = [:]
-        for (code, rawEntry) in dictionary {
-            guard let entry = rawEntry as? [String: Any] else {
+        let catalogFiles: [String] = [
+            "ontario_secondary_courses",
+            "british_columbia_secondary_courses"
+        ]
+        for fileName in catalogFiles {
+            guard let url = Bundle.main.url(forResource: fileName, withExtension: "json") else {
                 continue
             }
-            guard let formalName = entry["formal_name"] as? String else {
+            guard let data = try? Data(contentsOf: url) else {
                 continue
             }
-            guard let shortName = entry["short_name"] as? String else {
+            guard let decoded = try? JSONSerialization.jsonObject(with: data) else {
                 continue
             }
-            result[code] = CourseNames(formal: formalName, short: shortName)
+            guard let dictionary = decoded as? [String: Any] else {
+                continue
+            }
+
+            for (code, rawEntry) in dictionary {
+                guard let entry = rawEntry as? [String: Any] else {
+                    continue
+                }
+                guard let formalName = entry["formal_name"] as? String else {
+                    continue
+                }
+                guard let shortName = entry["short_name"] as? String else {
+                    continue
+                }
+                result[code] = CourseNames(formal: formalName, short: shortName)
+            }
         }
         return result
     }

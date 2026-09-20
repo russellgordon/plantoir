@@ -12,7 +12,7 @@ tags:
 
 1. Black soldiers, contraband camps, and emancipation from below
 2. [[Testimony and Narrative]] revisited — soldiers' letters and pension files
-3. Conferences
+3. Conferences on soldiers' letters and pension file evidence for [[The Union Divided]]
 
 ## Things to do before our next class
 

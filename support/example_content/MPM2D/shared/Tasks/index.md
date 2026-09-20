@@ -23,3 +23,7 @@ Every criteria table traces back to our [[Learning Goals]].
   each by two independent methods, and defend an error bracket.
 - [[The Math Symposium]] — the culminating task: one curated exhibit,
   one growth statement, one defended conversation.
+
+The first four are the semester's evidence. The symposium and the
+[[Final Examination]] together are the final evaluation at the end of
+the course — [[How Marks Work]] explains how the two halves fit.

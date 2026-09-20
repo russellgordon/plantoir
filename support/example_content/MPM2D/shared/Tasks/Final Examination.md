@@ -76,7 +76,19 @@ of the marks available.
 
 ## How this is assessed
 
-Against the same expectations as everything else. Per [[How Marks Work]],
+Against the same expectations as everything else, and against four
+criteria you have already met on every task this semester:
+
+- **The route is visible.** Each step follows from the one above it, and
+  a reader who was not in the room can follow it without you.
+- **The diagram comes first.** Anything on the grid or in a triangle is
+  answered from a labelled sketch, not from the sentence.
+- **The answer is about the situation.** Where a question sets one, a
+  bare coordinate or a bare number is not yet an answer.
+- **Accuracy is stated.** Exact where an exact value exists, and the
+  rounding named where it does not.
+
+Per [[How Marks Work]],
 this examination is part of the final 30% of the course mark alongside
 [[The Math Symposium]], so that neither one afternoon nor one project
 decides your grade alone.
@@ -84,13 +96,64 @@ decides your grade alone.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A3.5]]
+
 ![[A3.6]]
 
 ![[A4.1]]
 
 ![[B1.3]]
 
+![[B1.4]]
+
+![[B1.5]]
+
 ![[B2.5]]
 
 ![[C3.1]]
+
+![[C3.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Say the awkward part first: this one is product evidence and nothing
+else. An examination room is no place to watch anybody or to talk to
+anybody, and attempting it would be unfair to everyone else sitting
+there. So the other two sources for these expectations have to be taken
+from the review classes instead — which has the side benefit that
+whatever you find can still change how somebody prepares.
+
+OBSERVE — Unit 4, Day 18, review part one at the boards, cold
+  Watch for: which route a student takes to a sketch. A3.6 asks for a
+  variety of methods, and the finished paper shows only whichever one
+  got used. At the boards you can see who holds three routes and picks
+  between them, who has one and forces it onto every question, and who
+  starts a table of values because a table never refuses.
+  Going well: the choice said out loud — "it factors, so I will take
+  the zeros and put the axis between them".
+  Stuck: a table of values for a quadratic that arrived already in
+  factored form.
+  Record: three columns — chooses / one route / table of values. Keep
+  the sheet. Day 21's clinic runs on whatever students bring, and the
+  one-route students are precisely the ones who will bring nothing.
+
+TALK — Unit 4, Day 21, at the individual conferences that class is
+built around
+  Put a sketched parabola with no equation on the desk between you:
+  "Tell me two things you can read straight off this, and one thing you
+  cannot."
+  Then draw a segment on a grid with a line crossing it: "Is that the
+  right bisector? Convince me without calculating anything exactly."
+  The first hears A4.1 as reading a graph rather than solving an
+  equation. The second hears B1.3 and B2.5 as an argument —
+  perpendicular, and through the midpoint — where a written answer
+  arrives as arithmetic that can have a guess hidden inside it. It is
+  the final time you and that student will talk about mathematics
+  together, and for one who has said very little all semester it can tell
+  you more than the paper does.
+  Record: one line each, plus which sketch you put in front of them.
+
+The product evidence is the paper itself.
+%%

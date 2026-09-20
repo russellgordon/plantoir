@@ -20,8 +20,10 @@ cost you a ninth of the time available.
 > The posting, the spreadsheet, the draft on a screen. Ten minutes with
 > the document open beats half an hour of describing it.
 
-In the last fortnight the Wednesday session is for defence rehearsals —
-book it, so you are not sharing the room with four other people.
+In the second-last week the Wednesday session is for defence rehearsals,
+and in the last week it is for the defences that do not fit the
+scheduled block. Book it either way, so you are not sharing the room
+with four other people.
 
 If none of these times work, say so and we will find one. See
 [[Getting Help]] for the other ways to reach me.

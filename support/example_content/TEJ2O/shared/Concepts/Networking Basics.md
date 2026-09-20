@@ -45,10 +45,34 @@ else. [[How Data Travels]] follows one message through all of this,
 and [[The Network Job]] is where you plan a small network for a
 client who just wants it to work.
 
+## Comparing network architectures: LAN, WAN, P2P, and client-server
+
+Choosing an architecture means matching technology to the job:
+
+| Architecture | Geographic scope | Typical media | Administration |
+| --- | --- | --- | --- |
+| LAN | Single room, building, or site | Twisted-pair copper, Wi-Fi | Local administrator |
+| WAN | Cities, regions, global | Fibre-optic trunks, satellite, leased lines | Telecommunications carriers |
+| Peer-to-peer (P2P) | Small workgroup (2–10 nodes) | Direct cable, small switch | Distributed — each user manages shares |
+| Client–server | Enterprise, school, cloud | High-speed switches, routers | Centralised — server controls access |
+
+In a peer-to-peer network, workstations share files and printers
+directly without a dedicated central server. This keeps equipment
+costs low and setup simple for small studios or home offices. When
+an organisation grows, client–server architecture becomes necessary:
+a central server authenticates logins, enforces security policies,
+and manages backups from one place.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A2.1]]
 
 ![[A2.2]]
+
+![[A2.3]]
+
+![[B3.1]]
+
+![[B3.2]]
 %%curriculum-end%%

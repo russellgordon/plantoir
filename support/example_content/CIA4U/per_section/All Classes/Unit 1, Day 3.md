@@ -13,6 +13,7 @@ tags:
 1. Why Models and Data are separate folders: [[How This Site Is Organised]]
 2. What these pages can hold: [[What This Site Can Do]]
 3. Setting up [[Your Economics Notebook]] — definitions, one dated figure a week, citations
+4. Which of that carries a mark and which is practice: [[The Notebook and Portfolio]], read on the day you start
 
 ## Things to do before our next class
 

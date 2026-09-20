@@ -46,6 +46,11 @@ minutes on the day beats an hour in the last week of the semester.
 - Once mid-semester, a [[Showing Growth]] comparison.
 - At the end, [[Final Reflection]].
 
+Three of these are written in class, in a period set aside for them, and
+those three are the only ones that carry a mark: the Unit 1 milestone
+entry, the growth comparison at the end of Unit 2, and the final
+reflection. The rest is yours. See [[Journal Checklist]].
+
 > [!important] Predictions get written down before the measurement
 > Not after. A prediction you record afterwards is not a prediction, and
 > your memory of what you "basically expected" is generous to you in a

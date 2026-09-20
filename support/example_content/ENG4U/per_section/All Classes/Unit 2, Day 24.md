@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. [[The Critical Essay]], day 6 — rewrite; quotations checked; citations
-   checked against [[Citing Sources]]
+1. [[The Critical Essay]], day 6 — rewrite, the row you named first;
+   quotations checked; citations checked against [[Citing Sources]]
 
 ## Things to do before our next class
 

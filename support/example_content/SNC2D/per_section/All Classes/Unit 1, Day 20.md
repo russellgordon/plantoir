@@ -12,9 +12,9 @@ tags:
 
 1. Warm-up: what makes a fair test fair?
 2. Method clinic: variables — independent, dependent, controlled — on
-   three proposed investigations
+   three proposed investigations: [[Writing a Lab Report]]
 3. Rewrite a badly designed procedure so that it would actually answer
-   its question
+   its question: [[Getting Unstuck]]
 
 ## Things to do before our next class
 

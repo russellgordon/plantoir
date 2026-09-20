@@ -12,8 +12,10 @@ tags:
 
 1. Begin [[Moon of the Crusted Snow]] — who Waubgeshig Rice is, and
    where the novel is set
-2. Read the opening chapter aloud
-3. Reading schedule set, and seminar groups formed
+2. Diagnostic, five minutes and not marked: what you expect a story about
+   a power failure to do. I keep these and hand them back on Day 12
+3. Read the opening chapter aloud
+4. Reading schedule set, and seminar groups formed
 
 ## Things to do before our next class
 

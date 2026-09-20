@@ -51,15 +51,23 @@ lose.
 **Say who bore the cost.** Somebody's right gave way. Name them, and say
 what it cost them in practice, not in principle.
 
-**Then judge it.** Would you have decided the same way? Answer in a
-sentence someone could disagree with, and give the strongest objection to
-your own answer immediately afterwards.
+**Consider international conventions and global parallels.** Does an
+international convention — such as the *Universal Declaration of Human
+Rights* (UDHR) or the *UN Convention on the Rights of the Child* — speak to
+this conflict, and how do international institutions respond when such rights
+are violated abroad? (See [[Rights, and What Limits Them]]).
+
+**Then judge it.** Apply the concepts of political thinking: why is this
+decision politically significant, whose perspective prevailed, and how does the
+ruling affect legal stability in Canada? Answer in a sentence someone could
+disagree with, and give the strongest objection to your own answer immediately
+afterwards.
 
 ## What is handed in
 
-Two pages. One reconstructs the reasoning; one gives your judgement and
-its strongest objection. Cite the decision by neutral citation, and cite
-the Charter section by number.
+Two pages. One reconstructs the reasoning and international context; one gives
+your judgement and its strongest objection. Cite the decision by neutral
+citation, and cite the Charter section by number.
 
 > [!warning] Two ways this goes wrong every year
 > The first is deciding the case on sympathy for a party and then
@@ -78,4 +86,10 @@ continues in [[When Should a Right Give Way|When Should a Right Give Way?]] befo
 ![[B3.1]]
 
 ![[B3.4]]
+
+![[B3.5]]
+
+![[B3.6]]
+
+![[A2.3]]
 %%curriculum-end%%

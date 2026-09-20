@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: three phenomena, one model
-2. Consolidation: the unit on one page, built by the room
-3. Look ahead: an experiment the wave model gets exactly wrong
+1. Warm-up: three phenomena, one model: [[Young's Double-Slit Experiment]]
+2. Half the period is yours: the revision list from last class, worked
+   through, with me circulating: [[Wave Optics Practice]]
+3. Consolidation: the unit on one page, built by the room
+4. Look ahead: an experiment the wave model gets exactly wrong
 
 ## Things to do before our next class
 

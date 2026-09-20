@@ -2,16 +2,25 @@
 title: The Macbeth Seminar
 publish: true
 created: __CREATED__
+tags:
+  - tasks
 enableToc: true
 ---
 > [!abstract] At a glance
-> Groups of three · one 30-minute seminar led by your group, plus
-> participation in the others · assessed on Communication, Thinking, and
-> Knowledge
+> Prepared in threes · six periods, three of them seminar days · one
+> 25-minute seminar led by your group, plus speaking in the others ·
+> marked one person at a time, never as a group · assessed on
+> Communication, Thinking, and Knowledge
 
 ## The task
 
 Lead a discussion of one act of *Macbeth* that the room wants to be in.
+
+Six groups, five acts, three seminar days with two groups in each. Act 1
+is taken by two groups on the same day, from different halves of it and
+with different questions — which is not a compromise. Two readings of the
+same act, half an hour apart, is the clearest evidence this course offers
+that a text does not have one meaning waiting to be found.
 
 ## What your group brings
 
@@ -29,10 +38,28 @@ You speak less than a quarter of the time. The moves are on
 [[Seminar Skills]]: open with evidence, build, complicate, invite,
 steelman, concede.
 
-## Participation in other seminars
+## Whose mark is whose
 
-Assessed on the same terms. Attendance with nothing to say is not
-participation; talking over three people is not either.
+The preparation is shared; the mark is not. There is no group mark on
+this task. Each of you owns two things of your own:
+
+1. **A named eight minutes** of the twenty-five, with the passage that goes
+   with it. Say at the start who is leading which.
+2. **Your own one-page write-up**: your question, the passage you led on,
+   what the room did with it, and the answer you did not expect — plus the
+   one thing you would do differently the next time you have the floor.
+   Written in the last part of that same period and handed in before you
+   leave.
+
+## Speaking in the other seminars
+
+Assessed on the same terms, and on what the contribution does: building
+on the sentence just spoken, quoting to complicate rather than to agree,
+asking the question that reopens a room that had closed. Nothing said
+leaves nothing to assess; talking over three people is not it either. It
+is not a mark for enthusiasm or for attendance — it is the oral half of
+reading a play, and for some of you it is where your best reading will
+be.
 
 ## How it is marked
 
@@ -40,7 +67,7 @@ participation; talking over three people is not either.
 | --- | --- |
 | Knowledge | The question and passages show the act has been read closely |
 | Thinking | The discussion goes somewhere it could not have gone without your preparation |
-| Communication | You listen, respond to what was said, and make room |
+| Communication | Your turn answers what was actually said, and leaves a question the next speaker can pick up |
 
 > [!tip] Questions that have worked in this room
 > "Where does the play stop being about ambition?" · "Is Lady Macbeth's
@@ -60,9 +87,55 @@ participation; talking over three people is not either.
 
 ![[A2.3]]
 
+![[A2.4]]
+
 ![[A2.5]]
 
 ![[A2.6]]
 
 ![[A1.7]]
+
+![[A1.2]]
+
+![[A1.8]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Days 12, 14 and 16, the four groups of the six who are
+not leading that day
+  You are not running these periods — the group is — which is what makes
+  the watching possible.
+  Watch for: what a listener does with a claim they think is wrong.
+  Building on the exact words just used is a different act from waiting
+  for a gap and delivering the point they prepared at home. Nothing is
+  ever handed in from listening, so what you miss in the period is gone.
+  Going well: a sentence that begins inside somebody else's sentence.
+  Stuck: three contributions in a row that would have fitted any question.
+  Record: a class list, two columns — built on what was said, arrived with
+  it ready. One mark per student per seminar day, and you are done.
+
+TALK — Unit 2, Day 10, while questions are approved one group at a time
+  Approve the question, then keep them for one more minute. The passages
+  are this evening's homework, so there is nothing to ask about those
+  yet; the act and the question are what exist today.
+  Ask: "Where in your act does the room have to disagree with you, and
+  what is on the page there?"
+  Then: "Nobody else will have read this act as closely as your three
+  have. What is your first two minutes for?"
+  A strong answer treats the twenty-five minutes as something built for a
+  particular room: it knows where the resistance is meant to come from,
+  and what has to happen before anybody will risk an opinion in public.
+  That is A2.3, communicating in a structure and style effective for the
+  purpose, subject matter, and audience. You will hear A2.3 again in the
+  seminar itself, and more fully — but the seminar cannot tell you whether
+  the structure was designed or the room was generous, and this minute
+  can. Two hearings of one expectation, which is what recency and
+  consistency are supposed to rest on.
+  Record: one line per group on the approval sheet, and a plus where the
+  question had already occurred to them.
+
+The product evidence is the seminar the group leads, on Day 12, 14 or 16,
+and the individual write-up each member hands in with it.
+%%

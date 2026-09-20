@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. [[The Independent Study]], checkpoint three: thesis with a mechanism,
+1. [[The Independent Study]], day 4 of 10 — checkpoint three: thesis
+   with a mechanism,
    outline, two sources
 2. Conferences; the rest of the room drafts
 

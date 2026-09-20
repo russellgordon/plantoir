@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Studio time: elements studies
-2. Individual conferences
+2. Individual conferences on elements and composition for [[The Elements Study]]
 3. Clearing up, properly: [[Clearing Up]]
 
 ## Things to do before our next class

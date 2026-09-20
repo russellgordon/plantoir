@@ -18,11 +18,19 @@ import Foundation
 /// no longer matches, so a changed sentence fails HERE, in the same test run
 /// that changed it — not on a Windows machine three weeks later.
 ///
-/// **What it deliberately does NOT generate.** `nearMisses` and `scenarios` in
-/// the cases file are hand-written and are preserved on every run. Nothing in
-/// the code says which near-miss phrasings are worth guarding, or which ORDER
-/// events must happen in — those are decisions, and a decision cannot be read
-/// off the thing it produced.
+/// **What it deliberately does NOT generate.** Five top-level keys of the
+/// cases file are hand-written and are preserved on every run: `nearMisses`,
+/// `scenarios`, `promptHistory`, `deployAtATime` and `windowBinding`. Nothing
+/// in the code says which near-miss phrasings are worth guarding, which ORDER
+/// events must happen in, which spellings of a time a teacher actually types,
+/// or which arguments a window takes back from the model and which it refuses
+/// the turn over — those are decisions, and a decision cannot be read off the
+/// thing it produced.
+/// The list is spelled out rather than summarised because it was already two
+/// short when somebody checked, and a key nobody mentions is a key somebody
+/// deletes believing it was generated. `generatedCaseKeys` below is the one
+/// that decides; this is the sentence a developer reads first, so the two are
+/// kept in step by hand.
 /// Main-actor, because the tool surface is: `AssistToolRunner` is a
 /// `@MainActor` type and its three lists are its properties. Nothing here
 /// waits on anything, so this costs a hop and buys not having a second,
@@ -38,8 +46,21 @@ enum AssistContract {
     /// The placeholder a section number leaves in a generated template.
     static let sectionPlaceholder: String = "{section}"
 
+    /// The OTHER course — the one the model named instead of this window's.
+    ///
+    /// A second course placeholder rather than a second use of `{course}`,
+    /// because the two refusal sentences name both and a rendering that spelt
+    /// them the same way could not be checked against anything.
+    static let otherCoursePlaceholder: String = "{otherCourse}"
+
     /// Stands in for a change's own past-tense clause in the undo sentences.
     static let changePlaceholder: String = "{change}"
+
+    /// The page a teacher named, in the duplicate sentences.
+    static let pagePlaceholder: String = "{page}"
+
+    /// What the copy of that page is called.
+    static let copyPlaceholder: String = "{copy}"
 
     static let wordingFileName: String = "assist-wording.json"
     static let casesFileName: String = "assist-cases.json"
@@ -74,6 +95,46 @@ enum AssistContract {
             "planAccepted": AssistWording.planAccepted,
             "cancelled": AssistWording.cancelled,
             "deployWasCancelled": AssistWording.deployWasCancelled,
+            "rolloverWebsiteQuestion": AssistWording.rolloverWebsiteQuestion,
+            "rolloverSayToStartANewWebsite": AssistCardCommand.rollOverOntoANewWebsite,
+            "rolloverSayToKeepTheSameWebsite": AssistCardCommand.rollOverKeepingTheSameWebsite,
+            "rolloverCouldNotStartANewWebsite": AssistWording.rolloverCouldNotStartANewWebsite(
+                stillPinned: ".netlify_sites/section1.json"
+            ),
+            "rolloverCouldNotTurnOffTheScheduledPublish":
+                AssistWording.rolloverCouldNotTurnOffTheScheduledPublish,
+            "rolloverStartedANewWebsite": AssistWording.rolloverStartedANewWebsite(
+                keptAs: ".netlify_sites/section1.previous-2026-09-08_071500.json"
+            ),
+            "rolloverIsOnANewWebsite": AssistWording.rolloverIsOnANewWebsite,
+            "rolloverHadNoWebsiteYet": AssistWording.rolloverHadNoWebsiteYet,
+            "rolloverKeptTheSameWebsite": AssistWording.rolloverKeptTheSameWebsite,
+            "rolloverWebsiteNotDecided": AssistWording.rolloverWebsiteNotDecided,
+            "rolloverTurnedOffTheScheduledPublish": AssistWording.rolloverTurnedOffTheScheduledPublish,
+            "noCoursesYet": AssistWording.noCoursesYet,
+            "whatPublishingMeans": AssistWording.whatPublishingMeans,
+            "publishingAlreadyExplained": AssistWording.publishingAlreadyExplained(
+                course: course, section: section
+            ),
+            // The classes a publish followed a link onto and left alone. Two
+            // keys for one function, the way `otherClassesWouldMove…` is: one
+            // rendering cannot show both branches.
+            //
+            // The class names are LITERALS rather than `{page}`, for the same
+            // reason `copiedTo` passes a real date. Half of what the other
+            // platform has to match here is the LISTING — the curly quotes and
+            // the word "and" between two names — and a placeholder pair would
+            // have had to borrow `{copy}`, which means something else
+            // entirely.
+            "linkedClassWasLeftAlone": AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(["Unit 2, Day 4"]), count: 1
+            ),
+            "linkedClassesWereLeftAlone": AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(["Unit 2, Day 4", "Unit 2, Day 5"]), count: 2
+            ),
+            "backedUpCourse": AssistWording.backedUpCourse(
+                course: course, to: "{course}_backup_2026-09-08_190000.zip"
+            ),
             "planWasCancelled": AssistWording.planWasCancelled,
             "deployed": AssistWording.deployed(course: course, section: section),
             "couldNotBuildBeforeDeploying": AssistWording.couldNotBuildBeforeDeploying(
@@ -90,6 +151,18 @@ enum AssistContract {
             "previewDidNotBuild": AssistWording.previewDidNotBuild(course: course, section: section),
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
+            "answerWasCutOff": AssistWording.answerWasCutOff,
+            "didNotFollowThat": AssistWording.didNotFollowThat,
+            // A call naming a course that is not this window's. Two keys for
+            // two different facts, not two phrasings of one: the first can
+            // tell a teacher to go and open that course, the second cannot,
+            // because there is no such course to open.
+            "askedAboutAnotherCourse": AssistWording.askedAboutAnotherCourse(
+                course: course, otherCourse: otherCoursePlaceholder
+            ),
+            "askedAboutACourseThatIsNotHere": AssistWording.askedAboutACourseThatIsNotHere(
+                course: course, otherCourse: otherCoursePlaceholder
+            ),
             // Taking something back. The placeholder stands in for the change's
             // own past-tense clause — "unpublished Unit 4, Day 23" — which is
             // what makes these sentences rather than slots: the undo used to
@@ -101,6 +174,46 @@ enum AssistContract {
             "nothingToUndo": AssistWording.nothingToUndo,
             "undoDoesNotReachTheLiveSite": AssistWording.undoDoesNotReachTheLiveSite,
             "aCreatedPageCanBeTakenBack": AssistWording.aCreatedPageCanBeTakenBack,
+            // Duplicating a class. The date is a LITERAL rather than a
+            // placeholder: Windows formats a real date before its own
+            // sentence ever sees it, so "{date}" is a shape that side cannot
+            // render, and `backedUpCourse` above already passes a real file
+            // name for the same reason.
+            "duplicated": AssistWording.duplicated(page: pagePlaceholder, as: copyPlaceholder),
+            "copiedTo": AssistWording.copiedTo(
+                page: pagePlaceholder, as: copyPlaceholder, on: "2026-09-14"
+            ),
+            "wouldBeCopiedTo": AssistWording.wouldBeCopiedTo(
+                page: pagePlaceholder, as: copyPlaceholder, on: "2026-09-14"
+            ),
+            "theCopyStartsHidden": AssistWording.theCopyStartsHidden,
+            // Two keys for one function: a rendering cannot show both
+            // branches, and the branch that says nothing is renamed is the
+            // one the mac did not say at all until 2026-09-19.
+            "otherClassesWouldMoveAndLinksFollow": AssistWording.otherClassesWouldMove(
+                moving: 2, renaming: 1
+            ),
+            "otherClassesWouldMoveKeepingTheirNames": AssistWording.otherClassesWouldMove(
+                moving: 2, renaming: 0
+            ),
+            "otherClassesMoved": AssistWording.otherClassesMoved,
+            "notANumberedClassPage": AssistWording.notANumberedClassPage(page: pagePlaceholder),
+            "thePlaceForTheCopyIsStillTaken": AssistWording.thePlaceForTheCopyIsStillTaken(
+                page: copyPlaceholder, backupNamed: nil
+            ),
+            "thePlaceForTheCopyIsStillTakenNamingTheBackup":
+                AssistWording.thePlaceForTheCopyIsStillTaken(
+                    page: copyPlaceholder,
+                    backupNamed: "{course}_backup_2026-09-08_190000.zip"
+                ),
+            "theCopyCouldNotBeMadeHidden": AssistWording.theCopyCouldNotBeMadeHidden(
+                page: pagePlaceholder, as: copyPlaceholder, backupNamed: nil
+            ),
+            "theCopyCouldNotBeMadeHiddenNamingTheBackup":
+                AssistWording.theCopyCouldNotBeMadeHidden(
+                    page: pagePlaceholder, as: copyPlaceholder,
+                    backupNamed: "{course}_backup_2026-09-08_190000.zip"
+                ),
         ]
         return [
             "note": "Generated from mac-app AssistWording by `Plantoir --write-contracts`. "
@@ -108,10 +221,19 @@ enum AssistContract {
             "placeholders": [
                 "course": "a course code, e.g. ICS3U",
                 "section": "a section number, e.g. 1",
+                "otherCourse": "the course the model named instead of the window's own, "
+                             + "e.g. MCV4U — or, in askedAboutACourseThatIsNotHere, a code "
+                             + "naming no course in the working folder at all",
                 "change": "what was done, as a past-tense clause naming it: "
                         + "\"unpublished Unit 4, Day 23\". Never a bare count — the "
                         + "teacher asked about a class, not about a number of files.",
                 "leftAlone": "how many pages an undo could not put back, here 2",
+                "page": "the page being copied, e.g. Unit 3, Day 2",
+                "copy": "what the copy is called, e.g. Unit 3, Day 3",
+                "moving": "how many later classes move, counted once each even when a page is "
+                        + "both renamed and re-dated — here 2",
+                "renaming": "how many of those are also renamed, here 1 in the "
+                          + "…AndLinksFollow key and 0 in the …KeepingTheirNames one",
             ],
             "wording": table,
         ]
@@ -149,7 +271,114 @@ enum AssistContract {
                   + "Claude Code sees. Point a routing measurement at these rather than at a copy.",
             "local": schemas(for: AssistToolRunner.localTools),
             "mcp": schemas(for: AssistToolRunner.mcpTools),
+            "departures": departures(),
         ]
+    }
+
+    /// Where this surface departs from the Windows server's, and why.
+    ///
+    /// Until 2026-09-08 the only record of these was a doc comment on
+    /// `AssistToolSurface`, so Windows' own contract test kept a hand-written
+    /// array restating them — `AssertOnlyTheDeparturesWeHaveAgreed`, whose
+    /// comment says in as many words that it is waiting for this key. Issue #83.
+    ///
+    /// Only what this side can PROVE is emitted: the shape on its own surface,
+    /// never a claim about what Windows does. Derived from the DECLARATION
+    /// (`Kind.separatedList`), never by matching English in the descriptions.
+    ///
+    /// The reasoning, and the shape that was rejected, is in
+    /// `documentation/10-local-ai-assistant.md` → "Where the two surfaces'
+    /// SCHEMAS differ". Not repeated here.
+    private static func departures() -> [String: Any] {
+        var separators: [String: String] = [:]
+        var surfaces: [String: [String]] = [:]
+        collectListShaped(from: AssistToolRunner.localTools, surface: "local",
+                          separators: &separators, surfaces: &surfaces)
+        collectListShaped(from: AssistToolRunner.mcpTools, surface: "mcp",
+                          separators: &separators, surfaces: &surfaces)
+
+        var names: [String] = []
+        for (name, _) in separators {
+            names.append(name)
+        }
+        names.sort()
+
+        var listShaped: [[String: Any]] = []
+        for name in names {
+            listShaped.append([
+                "parameter": name,
+                "separator": separators[name] ?? "",
+                "surfaces": surfaces[name] ?? [],
+            ])
+        }
+
+        return [
+            "note": "How this surface's schemas differ from the Windows server's. Emitted so that "
+                  + "side can READ them instead of keeping a hand-written copy — the copy is what "
+                  + "made the two surfaces drift in the first place.",
+            "listShapedStringParameters": listShaped,
+            "howToReadThis": "Each entry says a parameter is a string carrying a list, on which "
+                  + "surfaces, and the separator this surface ADVERTISES to the model. It does NOT "
+                  + "say what the other platform does — the mac cannot check that. A suite seeing "
+                  + "both should intersect this list with its own schemas, and there are FOUR "
+                  + "outcomes, not three: an ARRAY there is a real type departure; a string there "
+                  + "with a DIFFERENT separator is a separator difference, worth asserting "
+                  + "deliberately; a string there with the SAME separator is an agreement and "
+                  + "nothing should be asserted about it; anything else is a real disagreement. "
+                  + "Leaving the third case out turns a suite red for an agreement, which is how "
+                  + "this note first read.",
+            "advertisedNotAccepted": "The separator is what the SCHEMA tells the model, not the only "
+                  + "character the runner accepts. AssistToolRunner is deliberately forgiving and "
+                  + "splits on several — pages on semicolon or newline, codes and dates on comma, "
+                  + "semicolon, newline and more. So a difference recorded here is a difference in "
+                  + "what each side TELLS the model, which is worth knowing; it is not necessarily "
+                  + "an incompatibility, and a suite should not assert one from it.",
+            "absentHere": [
+                [
+                    "parameter": "preview",
+                    "why": "On Windows a batch of edits can be made with the preview suppressed and "
+                         + "rebuilt once at the end. Here every change rebuilds, which is what the "
+                         + "assistant's own system prompt promises a teacher, so there is nothing "
+                         + "for the flag to mean.",
+                    "rejected": "Adding it for symmetry. There is no boolean anywhere on this "
+                              + "surface at all; the last was includeLinked, which asked the MODEL "
+                              + "how far a publish or an unpublish should reach — the exact "
+                              + "reasoning this design exists to keep out of a router. The rules "
+                              + "live in AssistPublishPlanner instead, where they are written down "
+                              + "once and tested.",
+                ],
+            ],
+            "notEnumeratedHere": "Arguments the Windows server takes that this surface does not "
+                  + "DECLARE. Mostly extra parameters on tools BOTH platforms serve — re_date_classes "
+                  + "and read_remembered_timetable are the clearest, with the same name and different "
+                  + "parameters on the two servers (GUI-IMPROVEMENTS.md row 447). Said precisely "
+                  + "because the first version of this key said they were tools the mac does not "
+                  + "serve at all, which is false: it serves both. The reason they stay in that "
+                  + "platform's own list is that the mac does not declare those arguments, so it can "
+                  + "neither test them nor notice when they change.",
+        ]
+    }
+
+    /// Every list-shaped string parameter on one surface, by `tool.parameter`.
+    private static func collectListShaped(
+        from definitions: [AssistToolDefinition],
+        surface: String,
+        separators: inout [String: String],
+        surfaces: inout [String: [String]]
+    ) {
+        for definition in definitions {
+            for (parameterName, property) in definition.parameters {
+                if let separator = property.kind.listSeparator {
+                    let key: String = "\(definition.name).\(parameterName)"
+                    separators[key] = separator
+                    var seenOn: [String] = surfaces[key] ?? []
+                    if !seenOn.contains(surface) {
+                        seenOn.append(surface)
+                    }
+                    surfaces[key] = seenOn
+                }
+            }
+        }
     }
 
     private static func schemas(for definitions: [AssistToolDefinition]) -> [[String: Any]] {
@@ -243,8 +472,9 @@ enum AssistContract {
             "note": "Three lists, deliberately. `all` is what the runner can execute; `local` is what the "
                   + "small model is SHOWN (the plan twins and remember_timetable are taken off, because "
                   + "the model never has to name a plan and dates it supplies are dates it may have "
-                  + "invented); `mcpOnly` is offered to Claude Code on top of everything, being the three "
-                  + "that ask for judgement about meaning.",
+                  + "invented); `mcpOnly` is the ten offered to Claude Code on top of everything — three "
+                  + "asking for judgement about meaning, the rest either never needed by a model "
+                  + "scoped to one section or already reachable by it through a fixed phrasing.",
             "all": all,
             "local": local,
             "mcpOnly": mcpOnly,
@@ -279,7 +509,12 @@ enum AssistContract {
         cases["generated"] = [
             "note": "These top-level keys are written by `Plantoir --write-contracts` from the app's own "
                   + "types and will be overwritten: " + generatedCaseKeys.joined(separator: ", ")
-                  + ". The rest — nearMisses, scenarios — is hand-written intent and is preserved.",
+                  + ". Every other top-level key — nearMisses, scenarios, promptHistory, "
+                  + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest — is hand-written "
+                  + "intent and is PRESERVED by a regeneration, so "
+                  + "a case may be proposed from either platform. Listing them rather than naming "
+                  + "two: the list was already two short when this was noticed, and a key nobody "
+                  + "mentions is a key somebody deletes believing it was generated.",
             "keys": generatedCaseKeys,
         ]
         if cases["note"] == nil {

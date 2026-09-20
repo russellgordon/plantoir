@@ -249,9 +249,11 @@ in [[Rate Law Practice]]. The task built on this page is
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.5]]
+
 ![[D2.8]]
 
 ![[D3.5]]
 
-![[A1.5]]
+![[D3.6]]
 %%curriculum-end%%

@@ -2,6 +2,8 @@
 title: Media Analysis Practice
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 Method on [[Media Texts and Their Arguments]].
 
@@ -48,6 +50,17 @@ the task asks for.
 > No fixed answer. The test: does your answer name people who would have
 > spoken, and questions that would have been awkward? "It left out the
 > other side" is not an answer; it is a placeholder.
+
+**Industry.** Take any one of this unit's four texts and answer in two
+sentences each: who paid for it, and what rule — a regulation, a
+disclosure requirement, a libel risk, or the absence of any of them —
+shaped what it could say?
+
+> [!success]- Answer: what a full response does
+> It names a payer specifically enough to be wrong about, not "a company",
+> and it names a constraint that would have changed the text if it were
+> different. "Nothing constrains a podcast" is a complete answer when it
+> is followed by what that permits.
 
 %%curriculum-start%%
 ## Curriculum connection

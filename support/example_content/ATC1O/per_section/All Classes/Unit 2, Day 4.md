@@ -12,8 +12,9 @@ tags:
 
 1. Warm-up: [[The Standard Warm-Up]]
 2. Working period: the phrase
-3. Coaching: is the constraint actually met?
-4. Rehearsal
+3. Coaching: each dancer asked separately — is the constraint actually
+   met?
+4. Rehearsal: the change my note asked for, put in and run twice
 5. Cool-down
 
 ## Things to do before our next class

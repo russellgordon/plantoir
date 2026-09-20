@@ -27,8 +27,8 @@ is what turns a claim into evidence.
 | Sticking with something that was bad for six weeks | Draft two against draft five |
 
 For each row you keep, name the specific artefact — the date, the file, the
-entry. "I got better at taking feedback" is an assertion. "In October I argued
-with a correction and in March I wrote it down and tried it" is a finding.
+entry. "I got better at taking feedback" is an assertion. "Early in the course I argued
+with a correction and later in the course I wrote it down and tried it" is a finding.
 
 ## Where dance actually lives near you
 

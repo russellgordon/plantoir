@@ -25,7 +25,12 @@ is the point.
    answer.
 4. **Your sources.** Listed, with dates.
 
-## What earns marks
+## What makes a case strong
+
+**The debate itself is not marked.** Nobody's mark turns on winning an
+argument, and no classmate's judgement of your case goes anywhere near it —
+see [[How Marks Work]]. What the day is for is the thinking underneath, which
+is the same thinking your [[Design Challenge]] log asks for.
 
 | | Weak | Strong |
 | --- | --- | --- |

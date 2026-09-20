@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Production Run]] — specification and groups
+1. Launch: [[The Production Run]] — specification, criteria, and groups
 2. Designing the process; finding the bottleneck first
 3. Planning on paper
 

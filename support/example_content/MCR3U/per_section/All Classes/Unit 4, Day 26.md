@@ -16,10 +16,11 @@ comment when you reuse the page; comments never appear on the site either. %%
 
 ## Agenda
 
-1. Open clinic: your questions, in the order you bring them
-2. Individual conferences: where you stand, and what a good three hours
+1. Journals and [[Final Reflection]] returned — read what I wrote back
+2. Open clinic: your questions, in the order you bring them
+3. Individual conferences: where you stand, and what a good three hours
    looks like for you
-3. Last word: what MHF4U and MCV4U actually ask of you, and which parts
+4. Last word: what MHF4U and MCV4U actually ask of you, and which parts
    of this course were the preview
 
 ## Things to do before our next class

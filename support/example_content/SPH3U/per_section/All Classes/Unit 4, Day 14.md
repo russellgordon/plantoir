@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: a wave calculation, a resonance length,
-   and a Doppler explanation
+   and a Doppler explanation: [[Wave Properties]] and [[Resonance and Standing Waves]]
 2. Compare answers in pairs
 
 ## Things to do before our next class

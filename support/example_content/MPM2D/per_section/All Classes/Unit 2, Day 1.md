@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Number talk: [[Estimation Duels]] — how far apart are those two
-   points, no ruler allowed?
+   points, no ruler allowed? Unmarked, and the point of it is to show
+   me who already reaches for a right triangle and who counts squares
 2. Random groups — [[The Circle on the Grid]] at the boards
 3. Consolidate: every distance question hides a right triangle
 4. Check your understanding — one distance, found two ways

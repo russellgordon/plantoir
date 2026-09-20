@@ -87,3 +87,34 @@ skipped the interview and gone straight to the specifications?
 
 ![[C3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 12, the requirements-table period
+  Watch for: which end of the row they start from. A student who writes
+  the component first and reverse-engineers a need for it produces a
+  table identical to one built the honest way, so the finished sheet
+  cannot tell you. Standing behind them for thirty seconds can.
+  Going well: they reread their interview notes before each new row,
+  and the terminology is right when they say it aloud.
+  Stuck: the table fills up faster than the notes are consulted.
+  This is where C1.2 is visible — relating a specification to what a
+  particular person actually does, in correct terms. The finished sheet
+  shows the relation; only the period shows whether it was derived or
+  decorated afterwards.
+  Record: a tick or a dot beside each name on your day plan.
+
+TALK — Unit 1, Day 9, while they write the interview up
+  The Reflect section already asks which answer changed their
+  recommendation, so they have that one ready. Ask instead:
+  "What did they say that you have not written down yet?"
+  Then: "What would you have to take away to get this under budget, and
+  what would they stop being able to do?"
+  A strong answer is in the person's own terms and names a consequence
+  for them. A weak one describes a product. The trade-off question is
+  the one the written sheet almost never shows you honestly.
+  Record: one line per student, in the moment.
+
+The product evidence is the sheet handed in on Day 14.
+%%

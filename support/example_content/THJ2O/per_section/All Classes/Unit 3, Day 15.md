@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Production run day 4: finishing the batch
+1. Production run day 4: finishing the batch, with the changes set at
+   the conferences
 2. Packing, labelling, and getting it ready to deliver
-3. Bench care
+3. Bench care, and your bench log judged against the criteria:
+   [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

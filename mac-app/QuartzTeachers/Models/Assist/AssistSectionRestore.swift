@@ -95,6 +95,51 @@ enum AssistSectionRestore {
              + "see it."
     }
 
+    /// What the breadcrumb trail records afterwards — a different audience
+    /// from `doneMessage`, and a different job.
+    ///
+    /// `doneMessage` is read inside the conversation, by a teacher who has
+    /// just pressed the button and knows what they did. This is read months
+    /// later, by somebody looking at a section whose pages are older than the
+    /// changes listed above them, and it is the only line that explains why.
+    ///
+    /// It is a function rather than a string typed at the call site so that a
+    /// test can pin it by NAME. A quoted copy in a test is the one that keeps
+    /// passing after the words change.
+    ///
+    /// The file name and nothing else: which copy it came from is what makes
+    /// the line worth having, and it says nothing about what is written on any
+    /// page — `contracts/shared-rules.json` → `activityTrail.mustRecord`,
+    /// "never a page".
+    static func trailLine(backupFileName: String) -> String {
+        return "put the section back to how it was when this conversation started, from "
+             + backupFileName
+    }
+
+    /// What `trailLine` says when the backup's name is somehow not to hand.
+    /// A restore that got as far as succeeding had a backup — `restore` refuses
+    /// without one — so this is defence rather than a case that happens. A line
+    /// naming no file is still worth more than no line at all.
+    static let unnamedBackup: String = "a copy made when it started"
+
+    /// Writes the restore onto the breadcrumb trail.
+    ///
+    /// Its own function so that the whole line a teacher's problem report will
+    /// carry — the course and section prefix included — can be pinned by a
+    /// test. Calling `ActivityTrail.note`'s two-argument overload by mistake
+    /// would silently drop the `ICS3U/1 · ` prefix that
+    /// `contracts/shared-rules.json` → `activityTrail.mustRecord` requires
+    /// ("which course and section, AND the file name"), and nothing about the
+    /// call site would look wrong.
+    static func noteRestored(courseCode: String, sectionNumber: Int, backupURL: URL?) {
+        ActivityTrail.note(
+            .sectionRestored,
+            trailLine(backupFileName: backupURL?.lastPathComponent ?? unnamedBackup),
+            course: courseCode,
+            section: sectionNumber
+        )
+    }
+
     /// Do it — or refuse, when there is nothing saved to go back to.
     ///
     /// A conversation that has only READ has no backup, which is exactly the

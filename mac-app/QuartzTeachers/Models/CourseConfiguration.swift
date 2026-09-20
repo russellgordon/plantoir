@@ -43,7 +43,14 @@ class CourseConfiguration {
             let stored: String = stringValue(forKey: "deploy_target")
             return stored.isEmpty ? "netlify" : stored
         }
-        set { values["deploy_target"] = newValue }
+        set {
+            values["deploy_target"] = newValue
+            // A destination can never be both primary and additional at
+            // once — deploying to the same place twice makes no sense.
+            additionalDeployTargets = CourseConfiguration.pruningAdditionalTargets(
+                additionalDeployTargets, ofType: newValue
+            )
+        }
     }
 
     /// The folder local-folder deploys publish into; each section lands
@@ -61,6 +68,166 @@ class CourseConfiguration {
     /// True when this course deploys to Cloudflare Pages.
     var deploysToCloudflare: Bool {
         return deployTarget == "cloudflare_pages"
+    }
+
+    /// One additional (non-primary) destination this course also
+    /// publishes to, for redundancy — `deployTarget` remains the primary.
+    /// `type` uses the same spellings as `deployTarget`; `path` is only
+    /// meaningful when `type` is "local_folder".
+    struct AdditionalDeployTarget: Equatable {
+        var type: String
+        var path: String
+    }
+
+    /// The three destinations Plantoir knows how to publish to, in the
+    /// order they are offered — shared by the primary picker and the
+    /// additional-targets list, so "one of each type" has a single place
+    /// that defines what a "type" even is.
+    static let knownDeployTargetTypes: [String] = ["netlify", "cloudflare_pages", "local_folder"]
+
+    /// Extra places this course ALSO publishes to, beyond `deployTarget` —
+    /// for redundancy against one host having a bad day, never a
+    /// replacement for the primary choice: `deployTarget` still decides
+    /// where the "Live URL" link on a finished deploy points.
+    ///
+    /// Empty for every course that has not opted in, which is the
+    /// overwhelming majority: the key is OMITTED from `course_config.json`
+    /// entirely rather than written as `[]`, so a course nobody has
+    /// touched writes the exact same file this app has always written.
+    /// At most one entry per known type, and never a type that already
+    /// IS the primary — `deployTarget` already covers that one.
+    var additionalDeployTargets: [AdditionalDeployTarget] {
+        get {
+            guard let rawList = values["additional_deploy_targets"] as? [[String: Any]] else {
+                return []
+            }
+            var result: [AdditionalDeployTarget] = []
+            for entry in rawList {
+                guard let type = entry["type"] as? String, !type.isEmpty else {
+                    continue
+                }
+                let path = entry["path"] as? String ?? ""
+                result.append(AdditionalDeployTarget(type: type, path: path))
+            }
+            return result
+        }
+        set {
+            if newValue.isEmpty {
+                values.removeValue(forKey: "additional_deploy_targets")
+                return
+            }
+            var encoded: [[String: Any]] = []
+            for target in newValue {
+                var entry: [String: Any] = ["type": target.type]
+                if !target.path.isEmpty {
+                    entry["path"] = target.path
+                }
+                encoded.append(entry)
+            }
+            values["additional_deploy_targets"] = encoded
+        }
+    }
+
+    /// One place this course publishes to — either the primary
+    /// (`deployTarget`) or one of `additionalDeployTargets`, both reduced
+    /// to the same shape so a deploy can walk one plain list instead of
+    /// treating the primary as a special case.
+    struct DeployDestination: Equatable {
+        var type: String
+        var path: String
+    }
+
+    /// Every destination this course publishes to, in deploy order — the
+    /// primary first, then each additional target in the order it was
+    /// added. This is the one list a multi-destination deploy walks; the
+    /// primary is not special beyond going first, which is only how the
+    /// "Live URL" link on a finished deploy is chosen.
+    var allDeployDestinations: [DeployDestination] {
+        var result: [DeployDestination] = [
+            DeployDestination(type: deployTarget, path: deployFolderPath),
+        ]
+        for target in additionalDeployTargets {
+            result.append(DeployDestination(type: target.type, path: target.path))
+        }
+        return result
+    }
+
+    /// Removes `type` from `targets` if present — the one place that knows
+    /// how to keep a primary choice and an additional-targets list from
+    /// ever agreeing on the same destination twice. Used by this class's
+    /// own `deployTarget` setter (so Course Settings, which binds straight
+    /// to this model, can never reach the inconsistent state) and by
+    /// `PublishingChoiceView`'s picker (so the wizard's plain `@State`,
+    /// which is not backed by a `CourseConfiguration` until course
+    /// creation, keeps the same guarantee live on screen). A plain
+    /// function rather than a method on an instance, so it is testable
+    /// without standing up either a model or a rendered view.
+    static func pruningAdditionalTargets(
+        _ targets: [AdditionalDeployTarget], ofType type: String
+    ) -> [AdditionalDeployTarget] {
+        var result: [AdditionalDeployTarget] = []
+        for target in targets where target.type != type {
+            result.append(target)
+        }
+        return result
+    }
+
+    /// Types available to add as an ADDITIONAL target: every known type
+    /// except whichever one is already primary — a course cannot list the
+    /// same destination twice.
+    func availableAdditionalDeployTargetTypes() -> [String] {
+        var result: [String] = []
+        for type in CourseConfiguration.knownDeployTargetTypes where type != deployTarget {
+            result.append(type)
+        }
+        return result
+    }
+
+    /// Whether `type` is currently configured as an additional target.
+    func hasAdditionalDeployTarget(ofType type: String) -> Bool {
+        for target in additionalDeployTargets where target.type == type {
+            return true
+        }
+        return false
+    }
+
+    /// The stored path for an additional local-folder target, or "" when
+    /// that type is not configured (or is not "local_folder", which never
+    /// has one).
+    func additionalDeployTargetPath(ofType type: String) -> String {
+        for target in additionalDeployTargets where target.type == type {
+            return target.path
+        }
+        return ""
+    }
+
+    /// Turns an additional target on or off. Turning one off drops it
+    /// entirely, including any path it carried — re-enabling it later
+    /// starts from a blank path rather than resurrecting the old one, so
+    /// a stale folder from months ago can never come back silently.
+    func setAdditionalDeployTarget(_ enabled: Bool, ofType type: String) {
+        var targets: [AdditionalDeployTarget] = []
+        for target in additionalDeployTargets where target.type != type {
+            targets.append(target)
+        }
+        if enabled {
+            targets.append(AdditionalDeployTarget(type: type, path: ""))
+        }
+        additionalDeployTargets = targets
+    }
+
+    /// Updates the folder path for an additional local-folder target. A
+    /// no-op if that type is not currently enabled as an additional target.
+    func setAdditionalDeployTargetPath(_ path: String, ofType type: String) {
+        var targets: [AdditionalDeployTarget] = []
+        for target in additionalDeployTargets {
+            if target.type == type {
+                targets.append(AdditionalDeployTarget(type: type, path: path))
+            } else {
+                targets.append(target)
+            }
+        }
+        additionalDeployTargets = targets
     }
 
     /// What is wrong with the Cloudflare Account ID, or nil when it is
@@ -169,6 +336,23 @@ class CourseConfiguration {
         return result
     }
 
+    /// What this course calls a unit — "Unit 2, Day 3", or "Module 2, Day 3".
+    /// Absent means "Unit"; see `ClassPageTerm`.
+    var unitWord: String {
+        // Read through `stringValue(forKey:)` like every other string here,
+        // rather than by subscript. Not decoration: `FileFormatsContractTests`
+        // counts the keys this file reads by scanning the SOURCE for that
+        // labelled argument, and compares the count against the contract — so
+        // a key reached only by subscript is invisible to the very check that
+        // exists to stop a config key being added without telling Windows.
+        // Caught by the suite on 2026-09-04, after the key HAD been
+        // documented: the intent was met and the mechanism could not see it.
+        // (Which is also why this comment describes the literal rather than
+        // spelling it out — the scan would count the comment as a key.)
+        get { return ClassPageTerm.cleaned(stringValue(forKey: "unit_word")) }
+        set { values["unit_word"] = ClassPageTerm.cleaned(newValue) }
+    }
+
     var sharedFolders: [String] {
         get { return stringListValue(forKey: "shared_folders") }
         set { values["shared_folders"] = newValue }
@@ -187,6 +371,189 @@ class CourseConfiguration {
     var perSectionFiles: [String] {
         get { return stringListValue(forKey: "per_section_files") }
         set { values["per_section_files"] = newValue }
+    }
+
+    /// What this course calls the folder holding one page per curriculum
+    /// expectation.
+    ///
+    /// Declared by every payload and skeleton manifest and carried into the
+    /// config at creation. The build tries it FIRST and only then falls back to
+    /// scanning for a top-level folder whose name contains "curriculum" — which
+    /// is still the real path for a course made from scratch, but would never
+    /// have found a folder called something else entirely.
+    /// What this course calls the folder holding its class pages. Absent means
+    /// the old guess — the first per-section folder whose name mentions
+    /// "class" — which is what every course made before this key existed
+    /// relies on. See `ClassFolder`.
+    var classFolder: String? {
+        get { return values["class_folder"] as? String }
+        set {
+            if let newValue, !newValue.trimmingCharacters(in: .whitespaces).isEmpty {
+                values["class_folder"] = newValue
+            } else {
+                values.removeValue(forKey: "class_folder")
+            }
+        }
+    }
+
+    var curriculumFolder: String? {
+        get { return values["curriculum_folder"] as? String }
+        set {
+            if let newValue {
+                values["curriculum_folder"] = newValue
+            } else {
+                values.removeValue(forKey: "curriculum_folder")
+            }
+        }
+    }
+
+    /// The folders whose contents count for marks — what makes an expectation
+    /// "assessed" on the Curriculum Coverage map.
+    ///
+    /// **Nil is not empty**, and that distinction is the whole migration.
+    /// Nil means the teacher has never been asked, so the build applies the
+    /// historical rule (any folder whose name contains "task") and every course
+    /// made before this existed keeps exactly the marks it had. `[]` means they
+    /// were asked and cleared it, which is a real answer.
+    ///
+    /// Seeding an existing course with ["Tasks"] would NOT have been safe: the
+    /// exact-name rule is narrower than the substring one, and the skeletons
+    /// ship a family whose folder is "Thinking Tasks" — counted by the old rule,
+    /// not by that pool. See `contracts/shared-rules.json` → `gradedFolders`.
+    var gradedFolders: [String]? {
+        get {
+            guard values["graded_folders"] != nil else {
+                return nil
+            }
+            return stringListValue(forKey: "graded_folders")
+        }
+        set {
+            if let newValue {
+                values["graded_folders"] = newValue
+            } else {
+                values.removeValue(forKey: "graded_folders")
+            }
+        }
+    }
+
+    /// Folders or files excluded from previews and deploys, separated by scope.
+    ///
+    /// Keyed by scope ("shared" and/or "per_section") to match the config's
+    /// structure. ABSENT (not `{}`) when nothing is excluded.
+    var excludedItems: [String: [String]]? {
+        get {
+            guard let dict = values["excluded_items"] as? [String: Any] else {
+                return nil
+            }
+            var result: [String: [String]] = [:]
+            for (scope, items) in dict {
+                if let list = items as? [String], !list.isEmpty {
+                    result[scope] = list
+                }
+            }
+            if result.isEmpty {
+                return nil
+            }
+            return result
+        }
+        set {
+            if let newValue {
+                var cleaned: [String: [String]] = [:]
+                for (scope, items) in newValue {
+                    if !items.isEmpty {
+                        cleaned[scope] = items
+                    }
+                }
+                if cleaned.isEmpty {
+                    values.removeValue(forKey: "excluded_items")
+                } else {
+                    values["excluded_items"] = cleaned
+                }
+            } else {
+                values.removeValue(forKey: "excluded_items")
+            }
+        }
+    }
+
+    /// Excluded items for a specific scope ("shared" or "per_section").
+    func excludedItems(forScope scope: String) -> [String] {
+        if let dict = values["excluded_items"] as? [String: Any] {
+            if let list = dict[scope] as? [String] {
+                return list
+            }
+        }
+        return []
+    }
+
+    /// Checks whether an item name is excluded in a given scope.
+    func isExcluded(_ name: String, inScope scope: String) -> Bool {
+        let items: [String] = excludedItems(forScope: scope)
+        for item in items {
+            if item == name {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Marks an item name as excluded in a given scope.
+    func exclude(_ name: String, inScope scope: String) {
+        var dict: [String: [String]] = [:]
+        if let existing = excludedItems {
+            dict = existing
+        }
+        var list: [String] = []
+        if let existingList = dict[scope] {
+            list = existingList
+        }
+        var alreadyPresent: Bool = false
+        for item in list {
+            if item == name {
+                alreadyPresent = true
+                break
+            }
+        }
+        if !alreadyPresent {
+            list.append(name)
+        }
+        dict[scope] = list
+        excludedItems = dict
+    }
+
+    /// Removes an item name from exclusions in a given scope (re-including it).
+    ///
+    /// Returns true only if the name WAS excluded, so a caller can tell a
+    /// genuine re-inclusion from an ordinary add and record only the former
+    /// on the trail — a line saying a folder was re-included when it never
+    /// was excluded would be believed.
+    @discardableResult
+    func reinclude(_ name: String, inScope scope: String) -> Bool {
+        guard isExcluded(name, inScope: scope) else {
+            return false
+        }
+        guard var dict = excludedItems else {
+            return false
+        }
+        guard let list = dict[scope] else {
+            return false
+        }
+        var updated: [String] = []
+        for item in list {
+            if item != name {
+                updated.append(item)
+            }
+        }
+        if updated.isEmpty {
+            dict.removeValue(forKey: scope)
+        } else {
+            dict[scope] = updated
+        }
+        if dict.isEmpty {
+            excludedItems = nil
+        } else {
+            excludedItems = dict
+        }
+        return true
     }
 
     var hiddenItems: [String] {
@@ -374,19 +741,59 @@ class CourseConfiguration {
         setNestedValue(emoji, forKey: "emojis", childKey: "sections", entryKey: "section\(sectionNumber)")
     }
 
-    /// The teacher's own domain for a section's published site — shown in
-    /// links to the live site in place of the address Netlify assigns.
-    /// Empty when the Netlify address is used as-is.
-    func customDomain(forSection sectionNumber: Int) -> String {
+    /// The teacher's own domain for ONE DESTINATION of a section's
+    /// published site — shown in links to that destination's live site in
+    /// place of the address it would otherwise be assigned (a
+    /// `.netlify.app` or `.pages.dev` subdomain). Empty when that
+    /// destination's own address is used as-is.
+    ///
+    /// Keyed by destination TYPE, not just by section: a course publishing
+    /// to both Netlify and Cloudflare Pages for redundancy may want a
+    /// domain on one and not the other. A single section-wide domain (the
+    /// shape this replaces) had to guess which destination it was for and
+    /// got applied to every destination regardless — the reported bug this
+    /// shape exists to fix ("only Cloudflare, the second deploy target, is
+    /// visible" had a sibling: a Netlify-only domain silently overriding
+    /// the Cloudflare link too).
+    ///
+    /// Reads an OLDER shape too: `custom_domains.sections.sectionN` used
+    /// to be a bare string, written before a course could have more than
+    /// one destination. That value is treated as belonging to the
+    /// section's PRIMARY destination (`deployTarget`) — the only
+    /// destination that existed when it could have been set — and is
+    /// invisible to every other destination type, which is exactly
+    /// correct for a course that has never touched additional
+    /// destinations at all.
+    func customDomain(forSection sectionNumber: Int, destinationType: String) -> String {
         let sectionsMap: [String: Any] = nestedDictionary(forKey: "custom_domains", childKey: "sections")
-        if let stored = sectionsMap["section\(sectionNumber)"] as? String {
-            return stored
+        guard let stored = sectionsMap["section\(sectionNumber)"] else {
+            return ""
+        }
+        if let perDestination = stored as? [String: Any] {
+            return perDestination[destinationType] as? String ?? ""
+        }
+        // Old shape: a bare string, meant for whichever destination was
+        // primary when it was set — never for any other type.
+        if let legacyDomain = stored as? String, destinationType == deployTarget {
+            return legacyDomain
         }
         return ""
     }
 
-    func setCustomDomain(_ domain: String, forSection sectionNumber: Int) {
-        setNestedValue(domain, forKey: "custom_domains", childKey: "sections", entryKey: "section\(sectionNumber)")
+    func setCustomDomain(_ domain: String, forSection sectionNumber: Int, destinationType: String) {
+        let sectionsMap: [String: Any] = nestedDictionary(forKey: "custom_domains", childKey: "sections")
+        let sectionKey: String = "section\(sectionNumber)"
+        var perDestination: [String: Any] = [:]
+        if let existing = sectionsMap[sectionKey] as? [String: Any] {
+            perDestination = existing
+        } else if let legacyDomain = sectionsMap[sectionKey] as? String, !legacyDomain.isEmpty {
+            // A stray old-shape string, meant for the primary destination,
+            // is carried forward into the new shape rather than silently
+            // dropped the first time ANY destination's domain is set here.
+            perDestination[deployTarget] = legacyDomain
+        }
+        perDestination[destinationType] = domain
+        setNestedValue(perDestination, forKey: "custom_domains", childKey: "sections", entryKey: sectionKey)
     }
 
     /// A typed or pasted domain, reduced to just the domain: whitespace
@@ -531,6 +938,69 @@ class CourseConfiguration {
         data.append(contentsOf: [0x0A])
         try data.write(to: url, options: [.atomic])
         lastSavedData = data
+    }
+
+    /// Records a change that has ALREADY happened on disk — a folder rename —
+    /// in both the file and the in-memory copy, without saving anything else.
+    ///
+    /// Settings normally holds edits in memory until Save, and Cancel reverts
+    /// them. A renamed folder cannot be reverted by a Cancel, so the rename
+    /// has to reach the file at once or the two will disagree the moment the
+    /// teacher presses either button. What must NOT reach the file is
+    /// everything else they have typed and not saved, so the change is applied
+    /// to a FRESH read of the file rather than to the in-memory values, and
+    /// then to the in-memory values separately. `lastSavedData` follows the
+    /// file, so Cancel reverts their other edits and leaves the rename alone —
+    /// which is the only honest answer, because the folder really has moved.
+    func recordOnDisk(_ change: ([String: Any]) -> [String: Any], at url: URL) throws {
+        // Read, change, and write only if nothing else wrote in between.
+        //
+        // A build's own `preflight_update_course_config` writes this same file,
+        // and the loser of that race used to be silent — whichever write landed
+        // second simply erased the other's keys. The Python side now does the
+        // same compare-and-swap, so between them a rename and a build can no
+        // longer quietly undo each other; whoever notices re-reads and redoes
+        // its work rather than overwriting.
+        //
+        // Re-applying `change` to the fresh read is safe because it is what
+        // `change` is: a rename of names that either are there or are not.
+        var attempts: Int = 0
+        while true {
+            let before: Data = try Data(contentsOf: url)
+            guard let onDisk = try JSONSerialization.jsonObject(with: before) as? [String: Any] else {
+                throw CourseConfigurationError.notADictionary
+            }
+            let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            var written: Data = try JSONSerialization.data(withJSONObject: change(onDisk), options: options)
+            written.append(contentsOf: [0x0A])
+
+            let nowOnDisk: Data = (try? Data(contentsOf: url)) ?? before
+            if nowOnDisk != before {
+                attempts += 1
+                // Three tries, then write anyway. A folder that has MOVED and a
+                // configuration that does not say so is the worse of the two
+                // states, so this ends by recording the truth rather than by
+                // giving up on it.
+                if attempts < 3 {
+                    continue
+                }
+                // But it writes the FRESHEST computation, not the stale one.
+                // Falling through with `written` — derived from `before`, which
+                // `nowOnDisk` has just proved out of date — would clobber the
+                // other writer's keys, which is the very failure this loop
+                // exists to stop. Apply the change to what is there now.
+                if let latest = try? JSONSerialization.jsonObject(with: nowOnDisk) as? [String: Any] {
+                    written = try JSONSerialization.data(
+                        withJSONObject: change(latest), options: options
+                    )
+                    written.append(contentsOf: [0x0A])
+                }
+            }
+            try written.write(to: url, options: [.atomic])
+            lastSavedData = written
+            values = change(values)
+            return
+        }
     }
 
     /// Reverts all in-memory edits back to the last data read from or

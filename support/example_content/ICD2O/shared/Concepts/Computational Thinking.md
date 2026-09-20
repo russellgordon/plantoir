@@ -55,10 +55,32 @@ The four moves show up in everything this course does: planning
 anything — code or otherwise — the first question is always the same:
 *which of the four moves am I missing?*
 
+## Designing for diverse users and contexts
+
+Computational thinking is not an abstract puzzle — it exists to create
+useful computational artifacts for real people. When decomposing a problem
+and planning an artifact (as in [[The Quiz Machine]],
+[[The Remix Project]], or [[Launch Day]]), deliberate design choices ensure
+the artifact supports diverse users:
+
+- **Input flexibility and forgiveness** — anticipating varied spelling,
+  casing, accents, and typing speeds rather than requiring rigid exactness.
+- **Audience context** — considering whether the user is a child, a language
+  learner, someone using screen magnification, or someone working on a slow
+  connection.
+- **Clear feedback** — providing descriptive, supportive output that explains
+  what occurred rather than cryptic errors.
+
+Designing an artifact that functions only for the person who built it is an
+incomplete solution. True computational design considers the user at every
+step of decomposition and algorithm design.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A1.1]]
 
 ![[A1.2]]
+
+![[A1.3]]
 %%curriculum-end%%

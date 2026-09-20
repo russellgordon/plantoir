@@ -12,7 +12,7 @@ tags:
 
 1. [[The Media Trials]] handed in
 2. Which medium suits which idea — class discussion
-3. Studio time
+3. Studio time: initial thumbnail explorations for [[The Information Piece]]
 
 ## Things to do before our next class
 

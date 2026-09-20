@@ -518,7 +518,19 @@ def main() -> int:
         default=8930,
         help="port for --serve (default 8930; the next free one is tried if busy)",
     )
+    parser.add_argument(
+        "--verify-deploy",
+        action="store_true",
+        help="build nothing; fetch https://plantoir.app and confirm it is serving "
+             "the version in site.json (exit 0 match, 1 unknown/network problem, "
+             "2 confirmed mismatch)",
+    )
     arguments = parser.parse_args()
+    if arguments.verify_deploy:
+        if arguments.check or arguments.deploy or arguments.serve:
+            parser.error("--verify-deploy stands alone: it neither builds nor deploys")
+        import netlify_deploy
+        return {"match": 0, "mismatch": 2, "unknown": 1}[netlify_deploy.verify_live()]
     if arguments.check and (arguments.deploy or arguments.serve):
         parser.error("--check writes nothing, so there is nothing to publish or preview")
     if arguments.deploy and arguments.serve:

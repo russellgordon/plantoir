@@ -10,12 +10,15 @@ tags:
 ---
 ## Agenda
 
-1. [[The Cell Report]], day 3 — working period: the verdict and the safety
+1. [[The Cell Report]], day 3 — working period: act on what yesterday's
+   two minutes raised, then your own verdict and your own safety
    section, including corrosion
 2. Back to [[Corrosion and Electrolysis]]: the same chemistry running
    where nobody wanted it
-3. Trade with another pair; each challenges one claim
+3. In the last twenty minutes: trade with another pair, each challenging
+   one claim, then [[Judging Your Own Work]] against the criteria table,
+   and fix your weakest row before you leave
 
 ## Things to do before our next class
 
-- [ ] Report finished; due next class.
+- [ ] Report in; due next class.

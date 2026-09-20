@@ -40,6 +40,15 @@ being assessed on evidence.
 - [ ] **Working read or write**, in code kept in version control from
       the first commit, structured as
       [[Talking to a Peripheral]] describes.
+- [ ] **Bytes turned into a quantity**, worked on paper before it is
+      written into the code: one reading converted by hand from the
+      datasheet's own format into a number with a unit, and then a
+      second conversion of a value **below zero**, showing the two's
+      complement arithmetic step by step. If your device cannot report
+      a negative quantity, do the negative case on the worked example
+      in [[Talking to a Peripheral]] instead — the arithmetic is the
+      point, not the sensor. **Both partners do this one**; it is
+      paper work and it costs nothing to do twice.
 - [ ] **Signal integrity evidence**: scope captures of the rise time at
       your chosen pull-up value, at the shortest and longest wiring you
       tested, with the measurements marked on the traces.
@@ -67,6 +76,24 @@ connection, supply limits set first, and no probing a powered board with
 loose leads. That standard is in [[Safety in the Lab]] and it does not
 relax because the voltages are small.
 
+## What is marked as yours
+
+You work in pairs and you share one bus, one scope and one set of
+readings. The mark is still individual, so the evidence divides before
+you start: **one of you owns the electrical side** — the level
+comparison, the pull-up calculation, and the rise-time captures at each
+value — and **the other owns the digital side**: the driver code and the
+stress test. The byte conversion is the exception and belongs to both
+of you, for the reason the milestone gives. Say at
+launch which of you has which, and write it at the top of the handover
+note.
+
+Each of you captions your own captures in your own words, writes your
+own half of the handover note under your own name, and answers for the
+whole build — not just your half — at the conference on the second day.
+Neither of you receives a mark for the other's half, and neither of you
+is excused from understanding it.
+
 ## Success criteria
 
 | Quality | What it looks like at your bench |
@@ -76,8 +103,10 @@ relax because the voltages are small.
 | Calculated pull-ups | The value follows from a rise-time calculation you can show |
 | Labelled captures | Address, direction, acknowledgement, and data all identified |
 | A documented breaking point | You know where it fails, and you have the trace |
+| Bytes become a quantity | Both conversions worked by hand, units included, with the two's complement arithmetic shown for the negative one |
 | Code somebody could maintain | Named constants, one place for pin numbers, in version control |
 | An honest handover note | A stranger could rewire it correctly from your page alone |
+| Your half, under your name | Your captures, captioned by you, and the section of the note that is yours |
 | Recorded reasoning | The journal shows what you assumed and what corrected you |
 
 > [!example]- What "scope evidence" actually means here
@@ -102,6 +131,42 @@ relax because the voltages are small.
 ![[B3.4]]
 
 ![[A5.1]]
-
-![[D1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 13, while benches lengthen the ground lead
+  Watch for: one variable at a time. A pair that adds ten centimetres,
+  re-tests, and writes the length down has bracketed the boundary; a
+  pair that swaps in the long cable and raises the bus speed together
+  has found A failure and cannot say which change caused it. Both hand
+  in a trace at the moment it broke, and the two traces look the same.
+  Going well: a short list of lengths with a pass or fail beside each,
+  growing while you watch.
+  Stuck: two hands on two different variables, and nobody writing.
+  Record: bracketed or jumped, one letter per pair on the class list.
+
+TALK — Unit 2, Day 14, while benches make the fix and write the
+handover note
+  The stress test happened yesterday, so both of these have an answer
+  by now; on the Day 12 checkpoint they would not.
+  Ask: "Your partner says this bus is healthy because it answers. Take
+  the other side — using only what is in your own captures, what would
+  worry a reviewer about it?"
+  Then: "What would the trace look like if the device were there but
+  not ready, rather than absent — and which of those two does your code
+  handle today?"
+  A strong first answer argues against its own evidence and finds a
+  real weakness — a rise time with no margin, a capture taken at the
+  shortest wiring only, an acknowledgement nobody checked — which is
+  the half of B3.4 a working device hides completely. A strong second
+  answer separates a refusal from a silence and knows which of the two
+  the code is currently blind to, which is A2.4 held rather than
+  recited.
+  Record: two ticks or two dashes per student, in the margin of your day
+  plan. A minute a pair, while they are working anyway.
+
+The product evidence is the traces, the code and the handover note,
+in at the end of Day 14. Those arrive on their own.
+%%

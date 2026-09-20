@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Studio time: first piece
-2. Conferences
-3. Clearing up
+1. Studio time: first piece — [[The Body of Work]]
+2. Conferences on series concept and material selection for [[The Body of Work]]
+3. Clearing up: [[Clearing Up]]
 
 ## Things to do before our next class
 

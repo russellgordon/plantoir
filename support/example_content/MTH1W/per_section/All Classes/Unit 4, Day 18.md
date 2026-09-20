@@ -11,11 +11,13 @@ tags:
 ## Agenda
 
 1. Celebrate: the boards' greatest hits, chosen by you
-2. Launch: [[Final Reflection]] — begin it in class
-3. Journal collection: [[Journal Checklist]] and [[Showing Growth]] are
-   your last look before handing it in
+2. [[Final Reflection]] — the middle of this period is for writing it,
+   here, in class. It is the last of your marked journal entries
+3. Run the [[Journal Checklist]] and [[Showing Growth]] over the whole
+   journal before it comes in
 4. Circle up one final time
 
 ## Things to do before our next class
 
-- [ ] Finish [[Final Reflection]] and hand in your [[Math Journal]].
+- [ ] Finish [[Final Reflection]] if it needs more time — it comes in
+      with your [[Math Journal]] next class.

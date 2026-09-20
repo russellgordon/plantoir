@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Draft the 'what the market actually did' half.
+- [ ] Draft what the market actually did, against your model.

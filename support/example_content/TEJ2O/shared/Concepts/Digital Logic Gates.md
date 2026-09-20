@@ -49,8 +49,28 @@ and OR followed by NOT, and XOR outputs 1 when its inputs differ.
 [[Predict the Circuit]] will ask you to run gates in your head before
 current settles the argument.
 
+## Combining gates into arithmetic and decision circuits
+
+Individual logic gates combine into functional sub-circuits that perform
+binary arithmetic and control decisions:
+
+- **Half adder:** Combines an XOR gate ($S = A \oplus B$) and an AND
+  gate ($C = A \cdot B$) to add two single binary bits. The XOR gate
+  computes the sum bit, while the AND gate generates the carry bit.
+- **Multiplexer (selector):** Uses AND, OR, and NOT gates to select one
+  of multiple data inputs and route it to a single output line based on
+  control select lines.
+- **Arithmetic logic unit (ALU):** By chaining adders, multiplexers,
+  and logic gates together, the CPU performs additions, subtractions,
+  and logical comparisons at hardware speed.
+
+In [[The Gadget]], you will design circuit logic that translates sensor
+inputs into automated decisions on a breadboard.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A3.2]]
 
 ![[A3.3]]
 

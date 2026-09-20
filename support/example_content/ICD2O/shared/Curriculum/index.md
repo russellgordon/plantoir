@@ -2,7 +2,6 @@
 title: Curriculum
 publish: true
 created: __CREATED__
-enableToc: true
 ---
 Everything we do in this course points at one or more of these
 expectations, from **ICD2O — Digital Technologies and Innovations in

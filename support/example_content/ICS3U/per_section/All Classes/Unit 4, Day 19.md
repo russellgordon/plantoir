@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Hand in [[Final Reflection]] and your [[Code Journal]]
-2. Portfolio review in pairs: read each other's September entry aloud,
-   then the January one
+2. Portfolio review in pairs: read each other's your earliest entry aloud,
+   then the most recent one
 3. Course feedback, written and anonymous: what should change for next
    year's class
 4. Then the last stretch: what the review classes will cover, and what

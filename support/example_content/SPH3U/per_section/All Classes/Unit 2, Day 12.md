@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[Forces in a Real Situation]], day 3 — working period: your situation
+1. [[Forces in a Real Situation]], day 2 — working period: your situation
    chosen, diagram drawn, numbers justified
 2. Conference: is your calculation the one the situation turns on?
 

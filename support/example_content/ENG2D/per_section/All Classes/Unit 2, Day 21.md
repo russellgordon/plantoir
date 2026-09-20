@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. [[The Literary Essay]], day 3 — outline: thesis, three claims, the
-   complication
+   complication, built from the question your conference sharpened
 2. Trade outlines: your partner marks the claim that is really a summary
 
 ## Things to do before our next class

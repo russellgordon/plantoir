@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 4 — a spring across the floor
+1. Start of Unit 4 — a spring across the floor. Before anybody explains
+   anything: what travels along it, and what does not? Nothing here is
+   marked; your answers set how long this unit spends on superposition
 2. [[Waves in a Spring]]: pulses, reflection, superposition
 3. Name it: [[Wave Properties]] and $v = f\lambda$
-4. Hand in [[Model Roller Coaster]]
 
 ## Things to do before our next class
 

@@ -38,18 +38,46 @@ quote a rate from memory: the Bank of Canada publishes the daily average
 as series `FXUSDCAD` each business day by 16:30 Eastern. It stood at
 1.3875 on 14 August 2026 — a dated worked example, not "the" rate.
 
-Then the honest limit. The model says total output rises when countries
-specialise. It says nothing about how the gains are divided — between two
-countries, or between a worker in an exporting industry and one in an
-import-competing plant. That silence is the whole modern argument:
-[[The Tariff Year]] is the live case, [[The Trade Question]] your turn.
+## Trade agreements and international governance
+
+Comparative advantage is a theoretical concept; trade agreements and
+multilateral organizations are how that concept is actually governed and
+implemented in practice.
+
+- **Bilateral and regional trade pacts.** Agreements such as the
+  Canada–United States–Mexico Agreement (CUSMA/NAFTA), the Comprehensive
+  Economic and Trade Agreement (CETA) with the European Union, and the
+  Comprehensive and Progressive Agreement for Trans-Pacific Partnership
+  (CPTPP) set rules of origin, phase out tariffs, reduce non-tariff
+  barriers, and establish preferential terms across regional trading blocs.
+- **Multilateral institutions.** The World Trade Organization (WTO) sets
+  ground rules for global commerce and provides formal dispute-settlement
+  mechanisms to adjudicate anti-dumping actions, subsidies, and retaliatory
+  tariffs. Macroeconomic forums like the G20 coordinate international trade
+  policies and macroeconomic responses to financial shocks.
+- **Objectives and tensions.** While the stated objective of these pacts is
+  expanding market access and raising efficiency, they also constrain
+  domestic industrial policy, limit national regulatory discretion, and
+  generate regional winners and losers.
+
+Then the honest limit. The model formalised by classical theorists such as
+David Ricardo and Adam Smith shows that total output rises when countries
+specialise. It says nothing about how those gains are divided — between two
+trading nations, or between a worker in an expanding export sector and one
+in an import-competing plant whose livelihood was displaced. That silence is
+the whole modern argument: [[The Tariff Year]] is the live case,
+[[The Trade Question]] your turn.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[B4.1]]
 
 ![[E1.1]]
 
 ![[E1.2]]
 
 ![[E1.3]]
+
+![[E1.4]]
 %%curriculum-end%%

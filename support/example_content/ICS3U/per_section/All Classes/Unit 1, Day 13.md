@@ -15,10 +15,13 @@ tags:
    flowchart before anybody types
 3. Compare and name it: nesting, back in [[Making Decisions]] — and why
    a flat chain of `elif` is usually kinder than a staircase
-4. Practise: the nested questions in [[Decisions Practice]], then the
-   Boolean ones in [[Boolean Logic Practice]]
+4. Practise: the nested questions in [[Decisions Practice]]
+5. [[The Spec Sheet]], day 4: act on the conference notes from last
+   class. Judge it against its own criteria first —
+   [[Judging Your Own Work]] — then spend the period on the weakest row
 
 ## Things to do before our next class
 
-- [ ] Finish both practice sets.
-- [ ] [[The Spec Sheet]] is due next class.
+- [ ] Finish [[Decisions Practice]]. [[Boolean Logic Practice]] should
+      already be done from Day 11 — bring whatever is still stuck.
+- [ ] [[The Spec Sheet]] is due next class — the weakest row fixed.

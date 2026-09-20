@@ -32,6 +32,7 @@ final class CourseManagementContractTests: XCTestCase {
             case "backup":
                 XCTAssertNotNil(backup, "\(name) should be read as a backup")
                 XCTAssertNil(archive, "\(name) must NOT also read as an archive")
+                CourseManagementContractTests.assertMoment(backup?.backedUpAt, is: testCase["moment"] as? String, in: name)
                 if let expectedSection = testCase["section"] as? Int {
                     XCTAssertEqual(
                         backup?.maker, .assistant(sectionNumber: expectedSection),
@@ -44,11 +45,92 @@ final class CourseManagementContractTests: XCTestCase {
                 XCTAssertNotNil(archive, "\(name) should be read as an archive")
                 XCTAssertNil(backup, "\(name) must NOT also read as a backup")
                 XCTAssertEqual(archive?.sectionNumber, testCase["section"] as? Int, name)
+                CourseManagementContractTests.assertMoment(archive?.archivedAt, is: testCase["moment"] as? String, in: name)
             default:
                 XCTAssertNil(backup, "\(name) must not be read as a backup")
                 XCTAssertNil(archive, "\(name) must not be read as an archive")
             }
         }
+    }
+
+    /// The moment a name is read as, checked against the contract.
+    ///
+    /// **Taken apart with a GREGORIAN calendar, and never re-spelled with the
+    /// app's own writer.** Asking `ArchiveStamp.text(for:)` to spell the date
+    /// back out and comparing THAT would be a round trip: it stays green
+    /// while the reader and the writer are wrong together, which is exactly
+    /// the state issue #160 found them in. Asking `Calendar.current` would be
+    /// worse again — on a Buddhist-calendar Mac it renders 2026 CE as 2569
+    /// and the test agrees with the bug.
+    private static func assertMoment(_ read: Date?, is expected: String?, in name: String) {
+        guard let expected else {
+            return
+        }
+        guard let read else {
+            XCTFail("\(name) was not read at all, so it has no moment")
+            return
+        }
+        var gregorian: Calendar = Calendar(identifier: .gregorian)
+        gregorian.timeZone = TimeZone.current
+        let pieces: DateComponents = gregorian.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second], from: read
+        )
+        let spelled: String = String(
+            format: "%04d-%02d-%02d %02d:%02d:%02d",
+            pieces.year ?? 0, pieces.month ?? 0, pieces.day ?? 0,
+            pieces.hour ?? 0, pieces.minute ?? 0, pieces.second ?? 0
+        )
+        XCTAssertEqual(spelled, expected, "\(name) is stamped with a moment the contract does not agree with")
+    }
+
+    // MARK: - Whether a stamp could be true
+
+    /// The rule that decides what gets DELETED, so both apps run it.
+    ///
+    /// Every case is ASCII digits read as Gregorian, which is what makes the
+    /// list portable: it means the same thing under `en_US_POSIX` and under
+    /// `CultureInfo.InvariantCulture`. The mac's own migration — reading the
+    /// spellings an older build wrote in the machine's calendar — is
+    /// deliberately not here, and `ArchiveStampTests` covers it.
+    func testWhetherAStampCouldBeTrueIsWhatTheContractSays() throws {
+        let section: [String: Any] = try CourseManagementContractTests.section("zipNames")
+        let rule: [String: Any] = try XCTUnwrap(section["couldHaveBeenStamped"] as? [String: Any])
+
+        // The bounds themselves, so a change to either goes red HERE and on
+        // Windows rather than only in the Swift that happens to hold them.
+        XCTAssertEqual(rule["earliest"] as? String, "2025-01-01 00:00:00")
+        XCTAssertEqual(rule["futureAllowanceDays"] as? Int, 2)
+
+        let secondsPerDay: TimeInterval = 24 * 60 * 60
+        for testCase in try XCTUnwrap(rule["cases"] as? [[String: Any]]) {
+            let expected: Bool = try XCTUnwrap(testCase["expect"] as? Bool)
+
+            if let daysFromNow = testCase["daysFromNow"] as? Int {
+                let moment: Date = Date().addingTimeInterval(secondsPerDay * TimeInterval(daysFromNow))
+                XCTAssertEqual(
+                    ArchiveStamp.couldHaveBeenStamped(moment), expected,
+                    "\(daysFromNow) days from now"
+                )
+                continue
+            }
+
+            let stamp: String = try XCTUnwrap(testCase["stamp"] as? String)
+            let read: Date = try XCTUnwrap(
+                CourseManagementContractTests.readAsGregorian(stamp),
+                "\(stamp) should parse as an ordinary Gregorian stamp, whatever it means"
+            )
+            XCTAssertEqual(ArchiveStamp.couldHaveBeenStamped(read), expected, stamp)
+        }
+    }
+
+    /// The stamp read the one way both platforms read it — no machine
+    /// calendar, no fallback. What the contract's cases are ABOUT.
+    private static func readAsGregorian(_ stamp: String) -> Date? {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = ArchiveStamp.format
+        return formatter.date(from: stamp)
     }
 
     // MARK: - The name a new course starts with
@@ -167,6 +249,20 @@ final class CourseManagementContractTests: XCTestCase {
                 CourseCodeRule.shortProblem(typed, existingCodes: existing, currentCode: current),
                 testCase["expectShort"] as? String,
                 "typed “\(typed)”, short form"
+            )
+        }
+
+        // Whether a code names a club. Contract-run rather than checked in
+        // the wizard, because the wizard is not the only thing that asks —
+        // Windows asks the identical question, and had the identical bug
+        // (its one-line fallback read every BC course as a club).
+        let clubDetection: [String: Any] = try XCTUnwrap(section["clubDetection"] as? [String: Any])
+        for testCase in try XCTUnwrap(clubDetection["cases"] as? [[String: Any]]) {
+            let code: String = try XCTUnwrap(testCase["code"] as? String)
+            XCTAssertEqual(
+                ClubCodeRule.isClub(code),
+                try XCTUnwrap(testCase["expectClub"] as? Bool),
+                "code “\(code)”"
             )
         }
     }

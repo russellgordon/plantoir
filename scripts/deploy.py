@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import base64
 import datetime as dt
 import io
 import json
@@ -29,6 +28,44 @@ from collections import Counter
 
 # ---- Host OS signaling & example command helper -----------------------------
 _HOST_OS = "unknown"
+
+# ---- Publishing with nobody there to answer a question ----------------------
+#
+# A publish a teacher set to happen on its own runs at half six in the morning
+# with the app closed. Every question below is therefore a question NOBODY will
+# answer, and until --non-interactive existed there were two ways that ended,
+# both bad and both measured:
+#
+#   * stdin IS a terminal -> input() blocks, forever. Two harness runs left a
+#     powershell.exe and its python.exe child waiting at the site-name prompt
+#     for 45 minutes. The teacher's site is simply not updated in the morning,
+#     and nothing says why.
+#   * stdin is NOT a terminal -> prompt() returns its DEFAULT silently. The
+#     site is created at whatever address the default suggests, and a name
+#     conflict auto-suffixes. The teacher's site is published to an address
+#     nobody chose, and on a machine with no saved surname the address has no
+#     surname in it either.
+#
+# So under this flag every question REFUSES instead. Exit code 3 means "a
+# question went unanswered" and nothing else; the caller reads it and tells the
+# teacher which section needs one answer before it can publish on its own.
+# Nothing changes when the flag is absent: a teacher at a keyboard gets every
+# prompt they got before.
+NON_INTERACTIVE = False
+
+#: The exit code that means "I had to ask something and there was nobody there".
+#: Distinct from 1 so a caller can tell it from an ordinary failure. Checked
+#: against every other exit in this file (all 1) and against both launchers.
+NEEDS_AN_ANSWER = 3
+
+def refuse_to_ask(question: str, what_to_do: str) -> None:
+    """Say what could not be asked, and stop. Never returns."""
+    print()
+    print("This publish was set to happen on its own, so nobody is here to answer:")
+    print(f"   {question}")
+    print(f" {what_to_do}")
+    print(" Nothing was published.")
+    sys.exit(NEEDS_AN_ANSWER)
 
 def _is_windows(host_os: str) -> bool:
     return (host_os or "").lower() == "windows"
@@ -283,6 +320,11 @@ def get_or_prompt_teacher_last_name() -> str | None:
     ln = load_teacher_last_name()
     if ln:
         return ln
+    if NON_INTERACTIVE:
+        refuse_to_ask(
+            "What is your last name? (it goes in the website's address)",
+            "Publish this section once from Plantoir, where you can answer it. "
+            "It is asked once and then remembered.")
     if not sys.stdin.isatty():
         return None
     try:
@@ -324,6 +366,14 @@ TZ = parse_host_tz()
 NOW = dt.datetime.now(TZ)
 
 def prompt(text: str, default: str | None = None) -> str:
+    # The backstop. main() refuses earlier and with a better sentence, at the
+    # point the situation is actually known; this catches any path nobody has
+    # walked, because a question answered by its own default is the failure
+    # mode that publishes to an address nobody chose.
+    if NON_INTERACTIVE:
+        refuse_to_ask(
+            text,
+            "Publish this section once from Plantoir, where you can answer it.")
     if not sys.stdin.isatty():
         return default or ""
     if default is not None and default != "":
@@ -721,6 +771,37 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
     print(f" Live URL: https://{host}")
     print("\n✅ Deploy complete.")
 
+# ---------- Netlify ad-badge suppression ----------
+# Netlify can inject its own "Powered by Netlify" badge (and a matching
+# pre-launch toolbar) into any public site on a free-tier project — see
+# https://docs.netlify.com/manage/projects/powered-by-netlify-badge/. There
+# is no API field to turn it off (its own OpenAPI spec has nothing named
+# "badge" anywhere on the Site object), and asking every teacher to find the
+# toggle in their own Netlify dashboard, per section, forever, is not a real
+# fix. Netlify's docs name the one lever that IS automatic: the badge only
+# renders through an inline <script> injected at their edge, and a
+# Content-Security-Policy whose script-src omits 'unsafe-inline' makes the
+# browser refuse to run it — "Neither the badge nor the pre-launch toolbar
+# appears, and no other project functionality is affected."
+#
+# The risk with a blanket policy like that is breaking a site's OWN inline
+# scripts. Rather than hand-maintain a fixed allow-list (which would go
+# stale the moment Quartz changes its bundling, or miss a teacher who embeds
+# a <script> of their own), this scans the actual built HTML at deploy time
+# and allows exactly what is really there, by content hash. That is a
+# behaviour, not a fixed list — it holds even if Quartz's own scripts change
+# on a version bump, and it does not depend on knowing in advance what a
+# teacher chose to embed.
+#
+# The scanning logic itself lives in netlify_badge.py (sibling module) — the
+# marketing site's own Netlify deploy (website/netlify_deploy.py) is exposed
+# to the identical badge and shares this implementation rather than carrying
+# a second copy. Re-exported here so this module's own callers, and
+# test_deploy_netlify_headers.py's `deploy._collect_inline_script_policy` /
+# `deploy.write_netlify_headers_file`, keep resolving unchanged.
+from netlify_badge import _collect_inline_script_policy, write_netlify_headers_file  # noqa: E402
+
+
 # ---------- Delta deploy helpers ----------
 def _sha1_bytes(data: bytes) -> str:
     h = hashlib.sha1()
@@ -885,7 +966,7 @@ def _category_for(rel: str) -> str:
     if ext in _MEDIA_EXT: return "media"
     return "other"
 
-def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str, list[tuple[str, str]]], public_dir: Path):
+def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str, list[tuple[str, str]]], public_dir: Path, public_dir_as_named: Path | None = None):
     """
     Summarize and persist the 'required' list from Netlify.
     Writes full, ordered list to: public/_required_last_deploy.txt
@@ -913,11 +994,15 @@ def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str,
         print(f" - {rel} [{sha[:8]}…]")
 
     # Persist full list
+    # Written INTO the built tree, but naming the path the teacher knows:
+    # `.merged_output` is a link out of the working folder on the mac, and the
+    # resolved form is an Application Support path they have never seen.
+    named = public_dir_as_named or public_dir
     out = public_dir / "_required_last_deploy.txt"
     try:
         with out.open("w", encoding="utf-8") as f:
             f.write(f"Required files for last deploy — generated {NOW.isoformat(timespec='seconds')}\n")
-            f.write(f"Public root: {public_dir}\n\n")
+            f.write(f"Public root: {named}\n\n")
             f.write("Count by category:\n")
             for k in ("html","styles","scripts","data","images","fonts","media","other"):
                 if cat.get(k):
@@ -926,7 +1011,10 @@ def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str,
             f.write("Full list (sha remote_path local_rel):\n")
             for sha, remote, rel in items:
                 f.write(f"{sha} {remote} {rel}\n")
-        print(f"\n Wrote full list to: {out}")
+        # The path the teacher knows, not the one it resolves to — the same
+        # rule as every other message here, and the third place it had to be
+        # applied before it was actually true everywhere.
+        print(f"\n Wrote full list to: {named / out.name}")
     except Exception as e:
         print(f"⚠️ Could not write diagnostics file: {e}")
 
@@ -943,6 +1031,9 @@ def main():
     p.add_argument("--section", required=True, help="Section number, e.g., 1")
     p.add_argument("--diagnose", action="store_true",
                    help="Print a breakdown of required files and save list to _required_last_deploy.txt")
+    p.add_argument("--non-interactive", action="store_true",
+                   help="Refuse rather than ask. For a publish set to happen on its own, where "
+                        "nobody is there to answer. Exits 3 if a question comes up.")
     # optional team slug flag (advanced users only)
     p.add_argument("--team", "--team-slug", dest="team", default=None,
                    help="Netlify team slug (advanced). If omitted, your personal team is used.")
@@ -951,22 +1042,36 @@ def main():
     global _HOST_OS
     _HOST_OS = getattr(args, 'host_os', 'unknown')
 
+    global NON_INTERACTIVE
+    NON_INTERACTIVE = bool(getattr(args, 'non_interactive', False))
+
     # Keep .gitignore hygiene and migrate *profile only* from legacy if present.
     _ensure_courses_gitignore()
     # (Do NOT migrate or touch any token stores here; host launcher handles that.)
 
     # Path: /teaching/courses/<COURSE>/.merged_output/section<SECTION>
-    section_dir = (toolchain_paths.merged_output_root(toolchain_paths.COURSES_DIR / args.course) / f"section{args.section}").resolve()
+    # Named and resolved separately. `.merged_output` is a symlink to a builds
+    # folder outside the working folder on the mac, so the resolved path is an
+    # Application Support path a teacher has never seen — while the one they
+    # know, and the one every message and every other script names, is the one
+    # under courses/. Resolve for the work; say the name in the messages.
+    section_dir_as_named = toolchain_paths.merged_output_root(
+        toolchain_paths.COURSES_DIR / args.course
+    ) / f"section{args.section}"
+    section_dir = section_dir_as_named.resolve()
     if not section_dir.exists():
-        print(f"❌ Section directory not found: {section_dir}")
+        print(f"❌ Section directory not found: {section_dir_as_named}")
         print(f" Please run the preview/build first:")
         print(f"{_cmd_example('preview', args.course, args.section, _HOST_OS)}")
         sys.exit(1)
 
     # Require the built site (public/)
     public_dir = section_dir / "public"
+    public_dir_as_named = section_dir_as_named / "public"
     if not public_dir.exists() or not any(public_dir.iterdir()):
-        print(f"❌ Built site not found at: {public_dir}")
+        print(f"❌ Built site not found at: {public_dir_as_named}")
+        print(" If you have just built, check this section still has its front page.")
+        print(" A section without one produces no website, so there is nothing to publish.")
         print(f" Please build before deploying.\n For example:")
         print(f"{_cmd_example('preview', args.course, args.section, _HOST_OS)}")
         sys.exit(1)
@@ -977,17 +1082,38 @@ def main():
     # "access other apps and services on this device". Since previewing is the
     # documented way to produce public/, detect the client and quietly re-emit
     # a production build from the same merged sources before uploading.
-    index_html = public_dir / "index.html"
-    try:
-        is_preview_build = "ws://localhost:" in index_html.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        is_preview_build = False
+    # Every page, not just the front one. Serve mode bakes the client into all
+    # of them and the built tree is replaced file by file, so a clean
+    # `index.html` in front of stale preview pages is a real state — and
+    # reading only the front page meant that state was published without a
+    # rebuild. Stops at the first match, so a genuine preview build costs one
+    # file. Found by review on 2026-09-05.
+    is_preview_build = False
+    for page in public_dir.rglob("*.html"):
+        try:
+            if "ws://localhost:" in page.read_text(encoding="utf-8", errors="ignore"):
+                is_preview_build = True
+                break
+        except OSError:
+            continue
     if is_preview_build:
         print(" Preview build detected (live-reload client) — rebuilding for production…")
         rebuild_for_production(args.course, str(args.section), _HOST_OS)
 
-    # Determine course dir (for stable marker)
-    course_dir = section_dir.parent.parent  # .../<COURSE>/.merged_output/section#
+    # Determine course dir (for stable marker). NOT derived from section_dir's
+    # ancestry (".../<COURSE>/.merged_output/section#", climbing two levels) —
+    # that assumption breaks under Windows' native PLANTOIR_BUILD_ROOT layout,
+    # where merged_output_root() moves the build tree OUT of the working
+    # folder entirely and does not nest a ".merged_output" level, so section_dir
+    # is only one level below the build root rather than two. Climbing two
+    # levels there landed on the build root's OWN parent, not the course —
+    # found because it silently wrote (and looked for) the Netlify/Cloudflare
+    # site marker in the wrong place, so every Windows deploy created a brand
+    # new site instead of reusing the one from last time, and "has this
+    # section ever been deployed" always read false (blocking Schedule a
+    # deploy on a section that plainly just deployed). COURSES_ROOT / course
+    # code is unambiguous regardless of where the build output lives.
+    course_dir = COURSES_ROOT / args.course
 
     # The surname exists ONLY to name a NEW site, so it is merely LOADED
     # here — never prompted for. A deploy to a section that already has its
@@ -1000,7 +1126,11 @@ def main():
     except Exception:
         teacher_last_name = None
 
-    print(f" Deploying from local build: {public_dir}")
+    # The path the teacher knows, not the one it resolves to. On the mac
+    # `.merged_output` is a link out of the working folder, so the resolved
+    # form names an Application Support folder they have never seen — and the
+    # failure explainer's own contract case pins the courses/ spelling.
+    print(f" Deploying from local build: {public_dir_as_named}")
     print(f" Timestamp TZ offset: {NOW.strftime('%z')}")
 
     # Everything above is target-independent: the same built folder is what
@@ -1029,6 +1159,10 @@ def main():
 
     # Discover or create the Netlify site (no repo link)
     site_marker = load_netlify_marker(course_dir, section_dir, args.section)
+    # Remembered before the 404 branch below can clear it: "never published"
+    # and "the site was deleted at the other end" both end with no marker, and
+    # they are different things to tell a teacher.
+    marker_existed = site_marker is not None
     site_id = None
     site_url = None
     if site_marker:
@@ -1053,6 +1187,29 @@ def main():
                     raise
 
     if not site_marker:
+        # REFUSED HERE, rather than three questions later, because this is the
+        # point at which the situation is known and can be described. Two ways
+        # to arrive: the section has never been published to Netlify, or the
+        # site it was pinned to no longer exists at the other end (deleted on
+        # Netlify at some point), and the 404 branch above has just cleared the
+        # marker. The second is the one that stopped a real harness run dead,
+        # and a teacher who reads "has never been published" about a section
+        # they published all last term would go looking in the wrong place.
+        #
+        # ScheduledDeploy.Problem in both apps already refuses to SCHEDULE a
+        # section that has never been deployed, for exactly this reason — so
+        # the first case should be unreachable from a scheduled run and is
+        # covered anyway, because "should be unreachable" is not a thing to
+        # publish somebody's website on.
+        if NON_INTERACTIVE:
+            refuse_to_ask(
+                ("What should this section's website be called?"
+                 if not marker_existed else
+                 "The website this section used to publish to no longer exists. "
+                 "What should the new one be called?"),
+                "Publish this section once from Plantoir, where you can answer it, "
+                "and it can publish on its own after that.")
+
         # A site is about to be NAMED — the one moment the surname is
         # useful. On a terminal this asks (once, then it is saved); anywhere
         # non-interactive it stays None and the name simply omits it.
@@ -1094,6 +1251,16 @@ def main():
     if target_domain:
         ensure_base_url_and_rebuild(section_dir, target_domain, args.course, str(args.section), _HOST_OS)
 
+    # Netlify can add its own "Powered by Netlify" badge to a free-tier
+    # site — this rule keeps it off without touching anything students see.
+    # Must run after any rebuild above and before the manifest below, so the
+    # file it writes is part of what gets uploaded.
+    print("\n Netlify can add its own advertisement badge to free-plan sites.")
+    print(" Writing a website rule that keeps it off your students' pages…")
+    protected_scripts = write_netlify_headers_file(public_dir)
+    print(f" (That rule also checked the {protected_scripts} script(s) already on this")
+    print(" site, so nothing on the page stops working.)")
+
     # Always delta deploy to PRODUCTION (as requested)
     print(" Preparing delta deploy manifest…")
     try:
@@ -1103,7 +1270,7 @@ def main():
         sha_to_pairs = manifest_resp.get("_sha_to_pairs") or {}
         print(f" Netlify requires {len(required)} file(s) for this deploy.")
         if args.diagnose:
-            print_required_diagnostics(required, sha_to_pairs, public_dir)
+            print_required_diagnostics(required, sha_to_pairs, public_dir, public_dir_as_named)
         _upload_required_files(deploy_id, netlify_token, public_dir, required, sha_to_pairs)
         print("✅ Delta deploy created (production).")
         if deploy_id:

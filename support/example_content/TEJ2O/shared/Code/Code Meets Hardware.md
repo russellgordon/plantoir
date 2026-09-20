@@ -70,5 +70,11 @@ every gadget you own is this loop wearing a costume, and
 
 ![[B2.3]]
 
+![[B2.4]]
+
+![[B5.1]]
+
+![[B5.2]]
+
 ![[B5.4]]
 %%curriculum-end%%

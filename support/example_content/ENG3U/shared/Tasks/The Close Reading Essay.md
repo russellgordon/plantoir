@@ -2,10 +2,13 @@
 title: The Close Reading Essay
 publish: true
 created: __CREATED__
+tags:
+  - tasks
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · four class periods · 700 words · assessed on Thinking,
+> Individual · five periods, the last of them the hand-in · 700 words ·
+> assessed on Thinking,
 > Communication, and Knowledge
 
 ## The task
@@ -60,7 +63,36 @@ room for an introduction that clears its throat.
 
 ![[C2.6]]
 
-![[C3.6]]
-
-![[B3.1]]
+![[C2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 12, the period where passages are chosen and ordered
+  Watch for: whether a student goes back into the story to test the claim,
+  or hunts for three quotations that fit a claim already fixed. Both
+  produce an essay with three passages; only one of them is reading.
+  Going well: the claim gets edited in the margin during the period,
+  because a passage would not hold it.
+  Stuck: the claim written on Day 11 is word for word the same at the end
+  of Day 12.
+  Record: a tick or a cross beside each name on the seating plan.
+
+TALK — Unit 1, Day 13, at the conference already on that agenda
+  The agenda promises one question about the first paragraph, so ask it
+  and then keep them for a minute.
+  Ask: "If you read this story aloud, where would you have to slow down,
+  and what is the writing doing to make you?"
+  Then: "What changes for a reader between your second passage and your
+  third?"
+  A strong answer stays inside the story's own sentences and names
+  something the writing does — a tense that shifts, a word that stops
+  being used — rather than restating the theme. That is B2.3, identifying
+  elements of style and explaining how they communicate meaning, heard
+  while the draft is still being written. A student who cannot find it out
+  loud will not find it on paper, and on Day 13 there is still time.
+  Record: one word each on the conference list — style, theme, or plot.
+
+The product evidence is the essay handed in on Day 15.
+%%

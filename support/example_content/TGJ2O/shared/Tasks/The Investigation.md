@@ -7,9 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Pairs or trios · six desk periods plus field reporting, spread over
-> four weeks mid-term · one long-form story plus one audio or video
-> element, published together
+> Pairs or trios · desk periods most classes, plus field reporting,
+> spread over four weeks mid-term · one long-form story plus one audio
+> or video element, published together
 
 ## What you are making
 
@@ -22,6 +22,11 @@ with documents, and with every claim verified.
 You publish long-form plus one audio or video element — an interview
 clip, a narrated walk of the site, a short explainer. People affected
 by the answer get a voice in it — not a courtesy, the job.
+
+You work in pairs or trios and the story publishes under both or all
+three bylines, but the mark is never shared. What is evaluated is
+yours: your own source log, the sections that carry your name, the
+element you built, and what you say when I sit down at your desk.
 
 ## How to work
 
@@ -39,8 +44,10 @@ by the answer get a voice in it — not a courtesy, the job.
 6. Write long-form in the voice of [[Writing for Publication]], build
    the audio or video element, and publish them together.
 
-The desk periods are class time for planning, verifying, and editing,
-and using them well is part of the task — [[How Marks Work]] explains.
+The desk periods are class time for planning, verifying, and
+editing. That is where the story gets made and where I gather half the
+evidence I need; what you chase between classes is reporting, and
+reporting is not marked on its own — see [[How Marks Work]].
 
 ## Success criteria
 
@@ -82,3 +89,47 @@ surprised its reporter is evidence of a question worth asking.
 
 ![[D2.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 13, the fact-check clinic and the desk time after
+it
+  That agenda tells them to fix what the clinic found or cut it, so
+  cutting is not a failure and must not be recorded as one. Watch which
+  of three routes a reporter takes with a claim that will not stand up:
+  go back to the origin, attribute it to whoever said it, or drop it.
+  And watch how long the decision takes — a ten-second cut and a
+  ten-minute trace look identical in the filed story, because the filed
+  story contains only the claims that survived. The criteria row
+  "Everything verified" covers the survivors; this period is the only
+  place the discarded half is visible, and B2.3 is about the searching,
+  not the surviving.
+  Going well: a reporter reopens a document or a transcript before
+  deciding anything.
+  Stuck: hedging — the claim stays and grows a "some people say" in
+  front of it.
+  Record: a tally sheet with three columns, traced / attributed / cut,
+  a stroke per desk as you pass.
+
+TALK — Unit 3, Day 2, the conference already on that agenda
+  Do not ask them to say their question in a sentence — Day 1's
+  homework was to refine it to one, so they arrive with it written.
+  That agenda also prints its own question about what could stop the
+  story. Ask instead:
+  "Say the sentence somebody would use to argue this is the wrong
+  question to chase."
+  Then: "What would have to be true for the answer to be boring?"
+  A strong answer can state the case against its own question and then
+  narrow it until the case no longer lands — "somebody would say the
+  bins are the caretaker's business, so the real question is what the
+  board pays for a contract nobody here has read". A reporter who
+  cannot argue against their own question has not yet defined it in
+  adequate detail, which is exactly what B2.1 asks for, and a pitch
+  written on paper never shows you the difference.
+  Record: write the counter-argument on the pitch board beside their
+  name. If you cannot write one down, the question is not defined yet.
+
+The product evidence is the long-form story and its element, filed on
+Day 18. That one arrives on its own.
+%%

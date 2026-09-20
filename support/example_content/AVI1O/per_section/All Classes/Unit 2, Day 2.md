@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Colour in practice: temperature, mixing greys, and value in colour
+1. Colour in practice: temperature, mixing greys, and value in colour: [[Painting]]
 2. Studio time: a small painting from observation
-3. Clearing up: brushes, water, and what goes in the sink
+3. Clearing up: brushes, water, and what goes in the sink: [[Clearing Up]]
 
 ## Things to do before our next class
 

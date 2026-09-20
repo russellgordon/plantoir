@@ -13,7 +13,7 @@ looks like on the table. Two minutes of setup is the whole difference.
 
 This page is the narrow version: one usable image, for handing in and for
 the site. Documenting a whole body of work — lighting, backgrounds,
-records kept all year — is [[Photographing Your Work]], and that is the
+records kept all semester — is [[Photographing Your Work]], and that is the
 page for building [[The Portfolio]].
 
 ## The phone

@@ -11,8 +11,7 @@ tags:
 ## Agenda
 
 1. Warm-up: leading and lagging, drawn from memory
-2. Random groups — three repair mechanisms, matched to three kinds of
-   damage; then what happens when repair itself fails
+2. Lab bench: [[Extracting DNA]] from plant tissue — the chemistry behind lysis, histones, and alcohol precipitation
 3. Consolidate: back to [[DNA Replication in Detail]] — the error rate,
    and why it is that low
 4. Clinic: [[Molecular Genetics Practice]], first section

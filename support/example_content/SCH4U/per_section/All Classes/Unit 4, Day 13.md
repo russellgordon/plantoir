@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. [[The Buffer Design]], day 4 — working period: your curve, your capacity, and
-   the honest account of where the design fell short
-2. Trade with another pair and challenge one claim each
+1. [[The Buffer Design]], day 4 — working period: your curve, your
+   capacity, the honest account of where the design fell short, and
+   Part 4 begun with your sources in front of you
+2. In the last twenty minutes: trade with another pair and challenge one
+   claim each, then [[Judging Your Own Work]] against the criteria
+   table, and fix your weakest row before you leave
 
 ## Things to do before our next class
 

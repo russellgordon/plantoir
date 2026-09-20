@@ -243,11 +243,63 @@ particular: [[Polymers]]. The reference table:
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.7]]
+
+![[A1.12]]
+
 ![[B1.1]]
 
 ![[B1.2]]
 
 ![[B2.2]]
 
-![[A1.7]]
+![[B3.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 11, the working period on the structure and the
+naming
+  Watch for: how the hand drawing comes into existence. A correct
+  drawing is a correct drawing, and the page cannot tell you whether it
+  was built out of the name or traced off a screen and labelled
+  afterwards. The dossier does give the second one away eventually — the
+  explanation of a property points at the wrong part of the molecule —
+  but that is a period later, with the drawing finished, which is the
+  whole argument for catching it here.
+  Going well: the name said aloud while the chain is numbered; the atoms
+  counted against the molecular formula; a carbon rubbed out because it
+  had five bonds; the groups circled last, after the skeleton is
+  checked.
+  Stuck: an image on the screen and a pencil following it; the groups
+  circled first, from the picture's own colouring; a locant nobody can
+  account for.
+  Record: photograph every drawing at the end of the period, in one
+  pass. You will want them beside the finished dossiers, and a camera is
+  faster than a list.
+
+TALK — Unit 2, Day 12, while the properties are being sourced and
+explained
+  Ask: "Take the name apart for me. Which pieces of it could you have
+  worked out from your own drawing, and which pieces tell you something
+  the drawing does not?"
+  Then: "Name the source you decided not to use, and read me the
+  sentence in it that made you decide."
+  A strong first answer reads the parent chain and the suffix straight
+  off the drawing, uses a locant to say where rather than what, and then
+  notices that the name carries nothing at all about shape or about how
+  the substance behaves — B2.2 used rather than transcribed, and a
+  correctly copied name proves none of it. The second question wants a
+  specific artefact rather than a criterion: a date at the foot of a
+  page, a funder line, an exposure limit that turns out to be for people
+  handling drums. Anyone can recite the reasons a source might be weak;
+  the selecting half of A1.7 is whether they found one of those reasons
+  inside a real document, and a reference list only shows what survived.
+  Record: one word each on the class list — document, or category. The
+  ones who answered "category" are the ones to send back to a source
+  tonight.
+
+The product evidence is the dossier on Day 14, and the drawing inside
+it.
+%%

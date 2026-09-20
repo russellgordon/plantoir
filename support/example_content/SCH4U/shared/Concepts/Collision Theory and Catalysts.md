@@ -119,7 +119,7 @@ from lowering a barrier rather than moving the levels either side of it.
    forward and reverse activation energies by the *same* amount, so both
    directions speed up equally, and the system arrives at the same place
    sooner. There is more on this in
-   [[Le Châtelier's Principle]].
+   [[Le Chatelier's Principle|Le Châtelier's Principle]].
 3. **It does not make an unfavourable reaction happen.** A catalyst can
    only accelerate a reaction that was going to happen anyway.
 

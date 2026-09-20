@@ -80,3 +80,13 @@ point of [[Objects and Classes]].
 > the bugs in [[The Software Project]] will be a value that two
 > objects were quietly sharing, and the print statement that finally
 > revealed it will look exactly like this warm-up.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.1]]
+
+![[A1.2]]
+
+![[A1.3]]
+%%curriculum-end%%

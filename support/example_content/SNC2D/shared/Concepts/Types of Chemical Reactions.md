@@ -21,7 +21,7 @@ which is the thing that lets you predict a reaction you have never seen.
 | Decomposition | $\ce{AB -> A + B}$ | One substance splits into two | $\ce{2H2O2(aq) -> 2H2O(l) + O2(g)}$ |
 | Single displacement | $\ce{A + BC -> AC + B}$ | One element takes another's place | $\ce{Zn(s) + CuSO4(aq) -> ZnSO4(aq) + Cu(s)}$ |
 | Double displacement | $\ce{AB + CD -> AD + CB}$ | Two compounds swap partners | $\ce{AgNO3(aq) + NaCl(aq) -> AgCl(s) + NaNO3(aq)}$ |
-| Combustion | fuel $+\ \ce{O2} \rightarrow$ oxides | A fuel burns in oxygen, releasing energy | $\ce{CH4(g) + 2O2(g) -> CO2(g) + 2H2O(g)}$ |
+| Combustion | $\ce{fuel + O2 -> oxides}$ | A fuel burns in oxygen, releasing energy | $\ce{CH4(g) + 2O2(g) -> CO2(g) + 2H2O(g)}$ |
 
 Two honest complications, because you will meet both and they confuse people
 who were taught the table as if it were airtight.

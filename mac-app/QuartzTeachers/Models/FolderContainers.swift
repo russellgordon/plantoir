@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// The container behind a working folder, and when to let it rest.
@@ -16,22 +15,13 @@ enum FolderContainers {
     // MARK: - Functions
 
     /// The name the launchers give this folder's container.
+    ///
+    /// The identifier itself lives in `BuildOutputLocation`, which needs the
+    /// same eight characters to name the folder a working folder's builds go
+    /// in — one derivation, so a container and its builds folder can never
+    /// disagree about which folder they belong to.
     static func containerName(forFolder path: String) -> String {
-        // POSIX realpath, because it agrees with `pwd -P` exactly.
-        // Foundation's resolvingSymlinksInPath does NOT: it strips the
-        // /private prefix from /var and /tmp paths, where pwd -P keeps it,
-        // and the two sides would hash different strings.
-        var physical: String = path
-        if let resolved = realpath(path, nil) {
-            physical = String(cString: resolved)
-            free(resolved)
-        }
-        let hashed: SHA256.Digest = SHA256.hash(data: Data((physical + "\n").utf8))
-        var hex: String = ""
-        for byte in hashed {
-            hex += String(format: "%02x", byte)
-        }
-        return "teaching-quartz-" + String(hex.prefix(8))
+        return "teaching-quartz-" + BuildOutputLocation.folderIdentifier(forWorkingFolder: path)
     }
 
     /// Everything to run at quit, as one detached script: stop this app's

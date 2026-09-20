@@ -71,4 +71,6 @@ Follow the argument into [[Canada Since 1982]], and use
 ![[E1.5]]
 
 ![[E2.4]]
+
+![[D3.4]]
 %%curriculum-end%%

@@ -49,7 +49,7 @@ sentences and rules regardless of their OS. Three consequences:
   **Worked example, 2026-08-20 — the gate this rule was written for, run.**
   The mac's list was: implement the teacher-made-link explainer case, retire
   the three obsolete WSL-setup cases, run `./verify.sh` against the changed
-  shared scripts, and do the two verifications `MAC-HANDOFF.md` listed. All
+  shared scripts, and do the two verifications Windows asked for. All
   four came back green and **none of them required a behaviour change**, so
   the DMG joined v1.1.0 rather than becoming 1.1.1. The verifications are
   the part worth copying: both were "prove it against the real app", and
@@ -94,12 +94,41 @@ Found while qualifying the mac for v1.1.0. The Windows bundle should adopt
 the same number as its version's fourth field when convenient (its trail
 currently prints the patch digit, which conflates two ideas).
 
+## Landed since v1.1.0 — ships in the next release
+
+Features that are **complete, merged to `dev`, and waiting only for a tag**.
+This is a reading aid, not a source of truth: the release notes are drafted
+from the commits since the last tag, so anything merged is carried whether or
+not it is listed here. What the list buys is the thing commits do not say —
+whether a teacher will notice, and whether both platforms have it.
+
+**Clear this list when the tag goes up**, in the same commit that moves the
+version line. A list that survives its own release is worse than no list.
+
+| Landed | What a teacher sees | Platforms | Log |
+|---|---|---|---|
+
+## Warnings the release notes MUST carry
+
+Separate from the table above, and it has to be: that table is for what a
+teacher gains, and this is for what they must DO — the sentences a teacher has
+to read before updating, not after. The notes are drafted from the commits, and
+a caution buried in a commit body is a caution that gets summarised away.
+
+Same rule as the table: **clear this list when the tag goes up**, in the same
+commit that moves the version line.
+
+| Added | The warning | Why it cannot be left out |
+|---|---|---|
+
 ## The short version
 
 For future-you, mid-school-year, who remembers nothing. The whys are below.
 
 1. **Everything merged and green?** Both sides on `main`; `dotnet test` passes
-   in `windows-app/`; the mac unit suite passes. Then **actually publish a
+   in `windows-app/`; the mac unit suite passes. **Then open
+   `windows-app/Plantoir.Tests/NamedGapLedger.cs`** — green can carry named
+   gaps, and step 2 says what to check in it. Then **actually publish a
    section from an app** — see step 2 for why that is not optional.
 2. **Check the version** in `windows-app/Plantoir/Plantoir.csproj` and
    `mac-app/project.yml`; they must match each other and the tag you are about
@@ -122,16 +151,58 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 2. **Full test pass**: `dotnet test Plantoir.Tests` and the mac unit suite, plus
    a hand smoke of create → preview → publish on a real course.
 
+   > **Check the TOTALS line before calling it green**, or use
+   > `.\run-tests.ps1`, which reads it for you. `dotnet test` exits 1 for a
+   > failing test, for a dead test host and for a project that did not compile,
+   > and a release is exactly the moment that distinction gets waved through.
+
+   > **A green Windows suite can carry NAMED GAPS, so read the ledger too.**
+   > Since 2026-09-18, `windows-app/Plantoir.Tests/NamedGapLedger.cs` lets a
+   > contract key the Windows app has not built yet be held open by name
+   > instead of sitting red — each entry carrying the key, its GitHub issue and
+   > its MILESTONE. **Open that file before cutting and check every entry: its
+   > milestone must be LATER than the release you are cutting, and its issue
+   > must still be open.** An entry whose milestone IS this release means the
+   > work is owed NOW — build it, or move the issue to a later milestone as a
+   > deliberate decision. Never cut over one. The boundary and the reasoning
+   > are in `contracts/README.md` → "Named gaps"; the point of checking here is
+   > that this is the one moment the milestone on an entry means anything.
+
    > The hand smoke is **not optional, and not a formality**. The bundle carries
-   > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, launchers)
+   > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, `contracts/`,
+   > launchers)
    > inside the app, and the xUnit suite deliberately never touches Docker — so
    > a green test run says nothing about the thing teachers actually run.
    > `verify.sh`, the real toolchain gate, is bash and expects `docker` on
    > `PATH`, which does not hold on Windows where Docker Engine lives in WSL2.
-   > **On Windows the hand smoke is the only toolchain verification there is.**
-   > If the release changes anything under `scripts/`, the Dockerfile or a
-   > launcher, smoke the publishing destination(s) it touches — there are three
-   > (Netlify, Cloudflare Pages, a folder) and they take different code paths.
+   > **On Windows the hand smoke is the only DOCKER verification there is.**
+   > (It is no longer the only toolchain verification: since 2026-09-07
+   > `PythonToolchainTests` runs EVERY shared `scripts/test_*.py` file inside
+   > `dotnet test` — the same files `verify.sh` runs on the mac, which nothing
+   > ran here before. They need no Docker, so they cover the shared Python and
+   > say nothing about the image. It DISCOVERS them rather than listing them,
+   > so no number is kept in step by hand; this said "all fifteen" when there
+   > were fifteen, on 2026-09-07, and there are eighteen as of 2026-09-09.)
+
+   **If the release changes anything under `scripts/`, the Dockerfile or a
+   launcher, run the publishing verifier rather than smoking it by hand** —
+   `verify-deploy.ps1` on Windows, `./verify-deploy.sh` on the mac. It is the
+   automation this step used to ask for in prose: it publishes to all three
+   destinations (Netlify, Cloudflare Pages, a folder — different code paths
+   each) and every pairing, then FETCHES EACH SITE BACK and reads it, which is
+   the only way to catch the two failures that have actually shipped here — a
+   preview build reaching a published site, and a publish that reported success
+   having copied the wrong thing or nothing.
+
+   > **Require a run with nothing skipped.** A destination with no credentials
+   > on the machine is skipped and the run still exits 0 — correct for everyday
+   > use, wrong for a release. Read the summary line: `passed, failed, skipped`.
+   > A cut is the moment "Cloudflare was skipped on that laptop" stops being
+   > acceptable, so get the credentials on the machine and run it again.
+   >
+   > It needs three credentials, the network and about twenty minutes, and it
+   > **creates real, globally unique sites that nothing deletes** — so no suite
+   > runs it and none should. Delete the sites it made when you are done.
 3. **Build the signed Windows bundle**:
 
        powershell -File publish.ps1 -Sign

@@ -153,9 +153,11 @@ the scaling rules in [[Enthalpy Practice]] before either.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D2.1]]
+
+![[D2.2]]
+
 ![[D3.1]]
 
 ![[D3.2]]
-
-![[D2.2]]
 %%curriculum-end%%

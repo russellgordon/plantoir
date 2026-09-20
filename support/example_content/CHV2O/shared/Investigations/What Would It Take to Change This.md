@@ -61,11 +61,11 @@ this issue and this timeline. For each, write:
 
 ## What you hand in
 
-A two-page plan: the issue and the four perspectives; the decision point
-and its date; the routes compared; and your chosen route with its
-success criterion written down before you begin. That last sentence is
-what makes an honest report possible in January, because it was written
-when you still did not know the answer.
+A two-page plan: the issue and the four perspectives; the decision point and
+its date; the routes compared; and your chosen route with its success
+criterion written down before you begin. That last sentence is what makes an
+honest report possible at the end of the course, because it was written when
+you still did not know the answer.
 
 %%curriculum-start%%
 ## Curriculum connection

@@ -213,3 +213,15 @@ cards = [102, 118, 134, 155, 167, 189, 203, 221, 240]
 > Naming the condition, the consequence, and the smallest fix is what
 > [[Read the Diff]] is practice for.
 
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.1]]
+
+![[A3.2]]
+
+![[C2.1]]
+
+![[C2.2]]
+%%curriculum-end%%
+

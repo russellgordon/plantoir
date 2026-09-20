@@ -15,7 +15,7 @@ expectations behind all of it.
 | **Techniques** | Tools, measurement, drawings, construction | Before and during shop work |
 | **Safety** | PPE, hazards, safe practice, and the law | Before every practical day |
 | **Growing** | Propagation, soils, watering, planting, harvest | Whenever you are on the bench or the site |
-| **Portfolios** | Your evidence file and skills record | All year |
+| **Portfolios** | Your evidence file and skills record | All semester |
 | **Tasks** | Assessed work, with the criteria | Whenever something is due |
 | **Tutorials** | Using the site, and writing a work record | The first time you need one |
 | **Setup** | How the course runs | Week one |

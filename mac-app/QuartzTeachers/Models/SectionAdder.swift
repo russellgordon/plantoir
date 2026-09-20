@@ -317,7 +317,13 @@ enum SectionAdder {
 
         var addition: [String] = ["createdSection\(sectionNumber): \(created)"]
         if let publish = publishValue(forSection: source, in: lines) {
-            addition.append("publishForSection\(sectionNumber): \(publish)")
+            // An empty value is a null, and `key:` is how YAML spells one —
+            // `key: ` with a trailing space would say the same thing and look
+            // like a typo in the teacher's file.
+            let pair: String = publish.isEmpty
+                ? "publishForSection\(sectionNumber):"
+                : "publishForSection\(sectionNumber): \(publish)"
+            addition.append(pair)
         }
 
         // The pair goes after the last per-section key, so each section's
@@ -358,20 +364,76 @@ enum SectionAdder {
 
     /// Whether a section publishes this page, as the string to write back.
     ///
-    /// Visibility is `publishForSectionN`. `draftSectionN` is the older
-    /// spelling with the OPPOSITE polarity, so a course written before the
-    /// rename is read and inverted — carrying it across unchanged would
-    /// publish a page the teacher had held back.
+    /// The current key's value is COPIED, character for character, comment and
+    /// quotes and all. That is what makes the copy safe: whatever the build
+    /// makes of `publishForSection1: oN`, it makes the same thing of
+    /// `publishForSection2: oN`, so no reader standing between the two can
+    /// invert it by misreading it. The one value that cannot be copied is one
+    /// that runs onto the NEXT line — a block scalar, or a key with the value
+    /// indented beneath it — because the copy would be a key with nothing
+    /// after it. Those are written as held back, for the reason below.
+    ///
+    /// `draftSectionN` is the older spelling with the OPPOSITE polarity, so a
+    /// course written before the rename is read and inverted — carrying it
+    /// across unchanged would publish a page the teacher had held back. That
+    /// inversion is the build's own rule, read by `PageVisibilityReader`:
+    /// until 2026-09-18 it was `value == "true"`, which quietly PUBLISHED a
+    /// `draftSection1: yes` or `draftSection1: On` page into the new section
+    /// while the build went on hiding the original.
+    ///
+    /// A draft value this app cannot read is written as held back. A page
+    /// wrongly held back is one a teacher notices and fixes; a page wrongly
+    /// published is one nobody notices at all.
+    ///
+    /// **Two legacy values started being carried the other way on 2026-09-19**
+    /// (issue #176), because this asks the one reader and the reader was
+    /// corrected: a `draftSectionN` line that LOOKS complete with a value
+    /// indented under it now reads `cannotTell` rather than being read off the
+    /// key's own line. So `draftSection1: false` / `  x` and
+    /// `draftSection1: no` / `  x` are carried as HELD BACK where they used to
+    /// be carried as published. Measured: the site PUBLISHES both of those
+    /// source pages — YAML folds the two lines into the plain scalar
+    /// `"false x"`, which `_as_bool` cannot make a boolean of — so neither
+    /// answer matches the site, and this one errs the safe way, which is also
+    /// the way Windows and `setup_course.per_section_frontmatter` err.
     static func publishValue(forSection sectionNumber: Int, in lines: [String]) -> String? {
-        let publishPrefix: String = "publishForSection\(sectionNumber):"
-        for line in lines where line.hasPrefix(publishPrefix) {
-            return String(line.dropFirst(publishPrefix.count)).trimmingCharacters(in: .whitespaces)
+        // The reader's own matcher and the reader's own LAST-wins rule, so the
+        // value carried across is the value the build reads. A prefix test
+        // missed `"publishForSection1": false` entirely, and stopping at the
+        // first of two copies carried the one PyYAML throws away.
+        if let entry = PageVisibilityReader.lastTopLevelEntry(
+            forKey: "publishForSection\(sectionNumber)", in: lines
+        ) {
+            let value: String = PageVisibilityReader.trimmingYAMLSpaces(entry.value)
+            let continues: Bool = entry.nextLine?.hasPrefix(" ") == true
+                || entry.nextLine?.hasPrefix("\t") == true
+            if continues {
+                return "false"
+            }
+            if value.isEmpty {
+                // A key with nothing after it is a null, which PUBLISHES the
+                // page. Copying the emptiness keeps the new section saying
+                // what the old one says; writing "false" would hide it.
+                return ""
+            }
+            if !PageVisibilityReader.isCompleteOnItsOwnLine(entry.value) {
+                return "false"
+            }
+            return value
         }
 
-        let draftPrefix: String = "draftSection\(sectionNumber):"
-        for line in lines where line.hasPrefix(draftPrefix) {
-            let value: String = String(line.dropFirst(draftPrefix.count)).trimmingCharacters(in: .whitespaces)
-            return value.lowercased() == "true" ? "false" : "true"
+        if let entry = PageVisibilityReader.lastTopLevelEntry(
+            forKey: "draftSection\(sectionNumber)", in: lines
+        ) {
+            let scalar: PageVisibilityReader.ScalarReading = PageVisibilityReader.reading(
+                ofValue: entry.value, followedBy: entry.nextLine
+            )
+            switch PageVisibilityReader.answerFromDraftFamily(scalar) {
+            case .visible:
+                return "true"
+            case .hidden, .cannotTell, .saysNothing:
+                return "false"
+            }
         }
         return nil
     }
@@ -491,25 +553,45 @@ enum SectionAdder {
         return "\(titlePrefix)\(courseName), Section \(sectionNumber)"
     }
 
-    /// The grade named by the course code's fourth character, matching the
-    /// wizard: "ICS3U" → "Grade 11". A club code like "CODING" has no grade
-    /// digit there, so no grade label at all.
+    /// The grade named by the course code, matching the wizard:
+    /// "ICS3U" → "Grade 11", "MCMPR11" → "Grade 11", "MMA--09" → "Grade 9".
+    /// A club code like "CODING" has no grade, so no grade label at all.
     static func gradeLabel(forCourseCode code: String) -> String {
-        let characters: [Character] = Array(code)
-        guard characters.count >= 4 else {
+        let trimmed: String = code.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
             return ""
         }
-        let gradeCharacter: Character = characters[3]
-        guard gradeCharacter.isNumber else {
-            return ""
+
+        // 1. Check for trailing 2-digit grade numbers common in BC (e.g. MCMPR11, MFMP-10, MMA--09)
+        if trimmed.hasSuffix("09") || trimmed.hasSuffix("-09") {
+            return "Grade 9"
         }
-        switch gradeCharacter {
-        case "1": return "Grade 9"
-        case "2": return "Grade 10"
-        case "3": return "Grade 11"
-        case "4": return "Grade 12"
-        default: return "Grade ?"
+        if trimmed.hasSuffix("10") || trimmed.hasSuffix("-10") {
+            return "Grade 10"
         }
+        if trimmed.hasSuffix("11") || trimmed.hasSuffix("-11") {
+            return "Grade 11"
+        }
+        if trimmed.hasSuffix("12") || trimmed.hasSuffix("-12") {
+            return "Grade 12"
+        }
+
+        // 2. Check for Ontario course codes (4th character is digit 1–4)
+        let characters: [Character] = Array(trimmed)
+        if characters.count >= 4 {
+            let gradeCharacter: Character = characters[3]
+            if gradeCharacter.isNumber {
+                switch gradeCharacter {
+                case "1": return "Grade 9"
+                case "2": return "Grade 10"
+                case "3": return "Grade 11"
+                case "4": return "Grade 12"
+                default: return "Grade ?"
+                }
+            }
+        }
+
+        return ""
     }
 
     /// The `created:` timestamp, in the same form the wizard writes:

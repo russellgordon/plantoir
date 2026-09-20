@@ -2,7 +2,8 @@
 title: Reading Non-Fiction
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - concepts
 ---
 Non-fiction argues. Reading it well means locating the argument, testing
 the evidence, and noticing the craft — because good non-fiction persuades

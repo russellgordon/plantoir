@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Day 8 of 8: dress rehearsal
+2. Day 9 of 9: dress rehearsal
 3. Full run with sound and light
 4. Notes, then quiet
 5. Cool-down

@@ -48,8 +48,11 @@ not one.
 The process is deliberately flexible: you will loop backwards, and your first
 reaction will often survive intact. What changes is that you will be able to
 say why. You will run it slowly in [[Describing What You See]] and
-[[Interpreting a Work]], in public in [[The Class Critique]], and in writing
-in [[The Interpretation]].
+[[Interpreting a Work]], in public in [[The Class Critique]], in writing
+in [[The Interpretation]], and once against a work you have never seen
+before, in [[The Portfolio and Reflection]]. Naming the four stages
+correctly is marked — on both of those, and in the terminology row of
+[[The Sketchbook Habit]] — so learn the names as well as the order.
 
 %%curriculum-start%%
 ## Curriculum connection

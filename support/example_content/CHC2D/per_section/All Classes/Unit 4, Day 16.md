@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Period 3 of 8: evidence
-2. Archives, local records, reporting, and who to ask
+1. Period 3 of 8: evidence for [[The Commemoration Inquiry]]
+2. Archives, local records, reporting, and who to ask: [[Where the Records Live]]
 3. Citations recorded as you go
 
 ## Things to do before our next class

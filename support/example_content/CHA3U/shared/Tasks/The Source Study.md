@@ -76,5 +76,45 @@ reach from here.
 
 ![[A1.3]]
 
+![[A1.8]]
+
+![[A1.9]]
+
 ![[B1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 6, the source study work period
+  Watch for: the ten seconds AFTER a student finds their document. Does the
+  reference get written down then — repository, collection, item number,
+  the date they looked — or does the reading simply carry on, with the
+  reference to be recovered later from a browser history? This is the first
+  task of the course and that ten seconds is the habit it exists to build.
+  A footnote reconstructed on Sunday night looks identical on the page to
+  one copied at the moment of discovery, right up until it turns out to be
+  wrong and nobody can check it.
+  Going well: the reference copied before the first sentence is read for
+  meaning.
+  Stuck: a student who, at Day 7's conference, cannot say where the
+  document they are writing about is held.
+  Record: one lap of the room, a tick beside each student who has a
+  reference written down. Do it twice, twenty minutes apart, and the
+  difference between the two laps is the finding.
+
+TALK — Unit 1, Day 7, the source study conferences already on that agenda
+  Ask: "Which sentence in your source can you not explain?"
+  Then: "Why did this survive when so much else from the same place did
+  not — who kept it, and what did keeping it do for them?"
+  A strong answer treats the unexplained sentence as information rather
+  than as a gap, and can name an institution with a reason to preserve —
+  a company, a court, a parish, a state — which is emphasis and omission
+  operating at the level of the archive rather than the page. That is
+  A1.3 heard in conversation; a written study can borrow a purpose from a
+  catalogue record in one line, and this cannot be borrowed.
+  Record: one phrase per student on the class list, while they are still
+  in front of you.
+
+The product evidence is the study handed in on Day 8.
+%%

@@ -12,7 +12,7 @@ tags:
 
 1. Integrated pest management: prevention first
 2. What Ontario's rules actually allow, and the professional boundary
-3. Launch: [[The Pest and Disease Report]]
+3. Launch: [[The Pest and Disease Report]], criteria read at the launch
 
 ## Things to do before our next class
 

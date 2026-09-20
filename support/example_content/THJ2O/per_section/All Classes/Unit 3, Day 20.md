@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Draft two entries with real examples.
+- [ ] Note two moments from this unit worth writing up in class.

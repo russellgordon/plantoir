@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Work period: the postwar argument
-2. Conferences
+1. Work period: [[The Postwar Argument]]
+2. Conferences on historical significance claims and evidence for [[The Postwar Argument]]
 3. Writing clinic: [[The Words Historians Use]]
 
 ## Things to do before our next class

@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 Somebody asked a fair question in class this week: if
 `add_hours(volunteer, 2)` works perfectly well as a plain function,

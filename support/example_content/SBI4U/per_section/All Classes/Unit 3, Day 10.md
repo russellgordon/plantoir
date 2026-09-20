@@ -10,11 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Gel Electrophoresis]] in class, with the standard
-   curve built from the ladder
-2. Skill: [[Graphing Data]] — a log scale, and why the ladder needs one
-3. The forensic scenario, judged from your own gel
+1. Skill: [[Graphing Data]] — a log scale, and why the ladder needs one
+2. The standard curve built from the ladder, and the forensic scenario
+   judged from your own gel
+3. Then write up [[Gel Electrophoresis]] at the bench — write-up three of
+   five on [[Investigation Reports]], handed in at the end of the
+   period
 
 ## Things to do before our next class
 
-- [ ] Report finished; fragment sizes estimated with uncertainty.
+- [ ] Journal: in one sentence, how confident your forensic match really
+      is.

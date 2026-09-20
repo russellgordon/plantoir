@@ -23,7 +23,8 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Draw the state diagram for your control system, including the
-      state it enters when a sensor stops answering.
+- [ ] Sketch a state diagram for any machine in your house that waits
+      for something, including the state it enters when the thing it is
+      waiting for never comes.
 - [ ] Journal: the longest your old code could ignore the world, in
       milliseconds, and what that would mean for a moving machine.

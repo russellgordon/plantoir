@@ -128,3 +128,27 @@ erase, and would they recognise themselves in your recommendation?
 
 ![[B2.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 12, the walking-skeleton period
+  Watch for: whether the program runs end to end on fake data before
+  anything is made correct, or whether the first stage is polished
+  while the rest does not exist. By Day 17 both look finished.
+  Going well: something runs in the first twenty minutes, badly.
+  Stuck: forty minutes on reading the file perfectly.
+  Record: a time against each name — when did theirs first run.
+
+TALK — Unit 2, Day 16, at the conferences already on that agenda
+  Ask: "Show me the row of your test plan that failed, and what you
+  changed because of it."
+  Then: "Which of your prompts would confuse somebody who did not
+  write this?"
+  The second question is B2.5 — designing an interface for a person —
+  and the honest answers only ever arrive in conversation, because the
+  submitted program's prompts always look deliberate.
+  Record: one line per student on the conference sheet.
+
+The product evidence is the digest handed in on Day 17.
+%%

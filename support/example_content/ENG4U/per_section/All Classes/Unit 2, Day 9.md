@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Hamlet Seminar]], day 3 — questions approved, one group at a
-   time; the rest annotate
+1. [[The Hamlet Seminar]], day 3 — questions approved and the
+   thirty-five minutes divided, one group at a time; the rest annotate
 
 ## Things to do before our next class
 
-- [ ] Four passages chosen with act, scene, and line.
+- [ ] Four passages chosen with act, scene, and line, and the form the
+      room will see and hear them in.

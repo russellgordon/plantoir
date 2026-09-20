@@ -17,3 +17,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Read the case, and say which drought the harvest number is evidence of.
+- [ ] Draft [[The Stewardship Argument]] far enough to be worth reading — the natural renewal section at least. The last fifteen minutes tomorrow are for judging it against the criteria.

@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: factor a cubic, sketch from a factored
-   form, and solve one inequality
-2. Compare methods at the boards
+   form, and solve one inequality: [[The Factor Theorem]], [[Zeros and Multiplicity]], and [[Polynomial and Rational Inequalities]]
+2. Compare methods at the boards; practice: [[Factor Theorem Practice]] and [[Polynomial Graphing Practice]]
 
 ## Things to do before our next class
 

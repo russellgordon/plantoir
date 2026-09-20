@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Friction report finished.
+- [ ] Coefficient table and analysis finished; you will need those
+      numbers for [[Forces in a Real Situation]].

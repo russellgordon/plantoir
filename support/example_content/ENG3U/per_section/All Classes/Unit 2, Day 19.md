@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Critical Essay]], day 2 — conferences; the room gathers and
+1. [[The Critical Essay]], day 2 of 7 — conferences; the room gathers and
    paraphrases passages
 
 ## Things to do before our next class

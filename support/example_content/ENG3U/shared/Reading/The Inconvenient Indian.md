@@ -2,6 +2,8 @@
 title: The Inconvenient Indian
 publish: true
 created: __CREATED__
+tags:
+  - reading
 enableToc: true
 ---
 > [!abstract] At a glance
@@ -13,6 +15,27 @@ enableToc: true
 > Colonisation, treaty violation, residential schools, and the
 > representation of Indigenous people in popular culture. King's tone is
 > conversational and frequently funny; the material is not.
+
+## About the writer, before you start
+
+Thomas King published this book as a Cherokee writer, and it was read
+that way — an argument about Indigenous people made from inside. In
+October 2025 King wrote to the Tribal Alliance Against Frauds himself,
+asking to put the question to rest. Their genealogist traced his father's
+ancestry down both branches it could have come through — the King line,
+and the line of Elvin Hunt, the grandfather his father learned about late
+— and found no Cherokee in either. King accepted the
+finding. Writing in the *Globe and Mail* on 24 November 2025 he said
+there was "no Cherokee on the King side. No Cherokee on the Hunt side,"
+and that he would rest in his mother's Greek family.
+
+The book stays on this course. It is still one of the most widely read
+arguments about how North America has told stories about Indigenous
+people, and an argument is tested by its evidence. But it is not read
+here as Indigenous writing, and that changes the reading: some of King's
+moves borrow authority from a position he turns out not to hold. Mark
+those as you go and bring them to [[Who Gets to Tell It]] — a better use
+of this than deciding in advance what it settles.
 
 ## What kind of book it is
 
@@ -38,6 +61,9 @@ jokes doing structural work.
 - **The humour.** Where it lands hardest, and on whom.
 - **The concessions.** Find them. A writer who concedes nothing is
   declaring rather than arguing; King concedes more than students expect.
+- **Where he speaks as an insider.** Find the sentences that assume it —
+  a *we*, an *our*, a memory offered as evidence — and ask what each of
+  them is doing now.
 
 ## Questions we will argue about
 

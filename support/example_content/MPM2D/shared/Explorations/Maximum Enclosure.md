@@ -15,7 +15,7 @@ of it.
 ## The task
 
 Find the dimensions of the rectangular pen with the greatest area,
-and — the harder half — convince a skeptic that *no* rectangle using
+and — the harder half — convince a sceptic that *no* rectangle using
 24 m of fence can beat yours. "We tried lots and this was the best"
 will not survive cross-examination; you need a reason the top is the
 top. Somewhere along the way, your board should show how the area
@@ -57,7 +57,11 @@ in [[The Perfect Arc]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
 ![[A1.3]]
+
+![[A3.5]]
 
 ![[A4.1]]
 %%curriculum-end%%

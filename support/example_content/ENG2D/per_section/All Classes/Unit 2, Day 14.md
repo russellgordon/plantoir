@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. [[The Scene, Staged]], day 6 — performances, second half
-2. Director's notes handed in
+2. Last twenty minutes: finish your own director's note, handed in before
+   the bell
 
 ## Things to do before our next class
 

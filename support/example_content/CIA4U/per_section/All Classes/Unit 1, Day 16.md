@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
+- [ ] Bring your conference notes to Day 20 — the last twenty minutes of that class are for acting on them.
 - [ ] Finish the market model for the presentations next week.

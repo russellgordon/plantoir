@@ -79,6 +79,60 @@ public sealed class CourseConfiguration
         _lastSavedData = data;
     }
 
+    /// <summary>
+    /// Writes ONE change to the file on disk from a fresh read, leaving every
+    /// other unsaved edit in this object unsaved — the recorder a folder
+    /// rename uses, because the folder has really moved and a Cancel that
+    /// appeared to undo it would be a lie. <see cref="Write"/> is left exactly
+    /// as it is: making it read-compare-write would change what
+    /// <see cref="HasUnsavedChanges"/> and <see cref="DiscardChanges"/> mean,
+    /// and Cancel in Course Settings would stop doing what it says.
+    ///
+    /// <para>Read, change, and write only if nothing else wrote in between. A
+    /// build's own <c>preflight_update_course_config</c> writes this same
+    /// file, and the loser of that race used to be silent; the Python side
+    /// does the same compare-and-swap, so a rename and a build can no longer
+    /// quietly undo each other. Three tries, then write anyway — a folder
+    /// that has MOVED with a configuration that does not say so is the worse
+    /// state, so this ends by recording the truth — but from the FRESHEST
+    /// bytes, never the computation the compare just proved stale.</para>
+    ///
+    /// <para>Afterwards the change is applied to this object too, and the
+    /// bytes written become its last-saved state, so Revert keeps the rename
+    /// (it is on disk) and drops only what was never saved.</para>
+    /// </summary>
+    public void RecordOnDisk(Func<JObject, JObject> change, string path)
+    {
+        byte[] before;
+        byte[] written;
+        int attempts = 0;
+        while (true)
+        {
+            before = File.ReadAllBytes(path);
+            written = Serialize(change(ParseObject(before)));
+            byte[] nowOnDisk;
+            try { nowOnDisk = File.ReadAllBytes(path); } catch (IOException) { nowOnDisk = before; }
+            if (nowOnDisk.AsSpan().SequenceEqual(before)) break;
+            attempts++;
+            if (attempts < 3) continue;
+            written = Serialize(change(ParseObject(nowOnDisk)));
+            break;
+        }
+        string temp = path + ".tmp";
+        File.WriteAllBytes(temp, written);
+        File.Move(temp, path, overwrite: true);
+
+        _values = change(_values);
+        _lastSavedData = written;
+    }
+
+    private static JObject ParseObject(byte[] data) =>
+        JToken.Parse(Encoding.UTF8.GetString(data)) as JObject
+        ?? throw new InvalidDataException("course_config.json does not hold a JSON object.");
+
+    private static byte[] Serialize(JObject values) =>
+        new CourseConfiguration(values, Array.Empty<byte>()).SerializedBytes();
+
     /// <summary>The Revert button: put the values back the way the last save left them.</summary>
     public void DiscardChanges()
     {
@@ -129,7 +183,148 @@ public sealed class CourseConfiguration
     public string DeployTarget
     {
         get { var raw = StringValue("deploy_target"); return raw.Length == 0 ? "netlify" : raw; }
-        set => _values["deploy_target"] = value;
+        set
+        {
+            _values["deploy_target"] = value;
+            // A destination can never be both primary and additional at
+            // once — deploying to the same place twice makes no sense.
+            AdditionalDeployTargets = PruningAdditionalTargets(AdditionalDeployTargets, value);
+        }
+    }
+
+    /// <summary>
+    /// One additional (non-primary) destination this course also publishes
+    /// to, for redundancy — <see cref="DeployTarget"/> remains the primary.
+    /// <c>Type</c> uses the same spellings as <see cref="DeployTarget"/>;
+    /// <c>Path</c> is only meaningful when <c>Type</c> is "local_folder".
+    /// </summary>
+    public readonly record struct AdditionalDeployTarget(string Type, string Path);
+
+    /// <summary>One place this course publishes to — either the primary or one of <see cref="AdditionalDeployTargets"/>.</summary>
+    public readonly record struct DeployDestination(string Type, string Path);
+
+    /// <summary>
+    /// The three destinations Plantoir knows how to publish to, in the order
+    /// they are offered — shared by the primary picker and the
+    /// additional-targets list, so "one of each type" has a single place
+    /// that defines what a "type" even is. Mirrors the mac's
+    /// `CourseConfiguration.knownDeployTargetTypes`.
+    /// </summary>
+    public static readonly IReadOnlyList<string> KnownDeployTargetTypes =
+        new[] { "netlify", "cloudflare_pages", "local_folder" };
+
+    /// <summary>
+    /// Removes <paramref name="type"/> from <paramref name="targets"/> if
+    /// present — the one place that knows how to keep a primary choice and
+    /// an additional-targets list from ever agreeing on the same
+    /// destination twice. A plain function rather than an instance method,
+    /// so it is usable both by this class's own <see cref="DeployTarget"/>
+    /// setter and by a wizard's plain in-memory list, which has no
+    /// <see cref="CourseConfiguration"/> to route through until the course
+    /// is actually created.
+    /// </summary>
+    public static List<AdditionalDeployTarget> PruningAdditionalTargets(
+        IReadOnlyList<AdditionalDeployTarget> targets, string type) =>
+        targets.Where(t => t.Type != type).ToList();
+
+    /// <summary>Types available to add as an ADDITIONAL target for a given primary — every known type except that one.</summary>
+    public static List<string> AvailableAdditionalDeployTargetTypes(string primaryType) =>
+        KnownDeployTargetTypes.Where(t => t != primaryType).ToList();
+
+    /// <summary>Whether <paramref name="type"/> is present in <paramref name="targets"/>.</summary>
+    public static bool HasAdditionalDeployTarget(IReadOnlyList<AdditionalDeployTarget> targets, string type) =>
+        targets.Any(t => t.Type == type);
+
+    /// <summary>The stored path for an additional local-folder target, or "" when that type is not configured.</summary>
+    public static string AdditionalDeployTargetPath(IReadOnlyList<AdditionalDeployTarget> targets, string type)
+    {
+        foreach (var target in targets)
+            if (target.Type == type) return target.Path;
+        return "";
+    }
+
+    /// <summary>
+    /// Turns an additional target on or off. Turning one off drops it
+    /// entirely, including any path it carried — re-enabling it later starts
+    /// from a blank path rather than resurrecting the old one, so a stale
+    /// folder from months ago can never come back silently.
+    /// </summary>
+    public static List<AdditionalDeployTarget> SettingAdditionalDeployTarget(
+        IReadOnlyList<AdditionalDeployTarget> targets, bool enabled, string type)
+    {
+        var result = targets.Where(t => t.Type != type).ToList();
+        if (enabled) result.Add(new AdditionalDeployTarget(type, ""));
+        return result;
+    }
+
+    /// <summary>Updates the folder path for an additional local-folder target. A no-op if that type is not currently enabled.</summary>
+    public static List<AdditionalDeployTarget> SettingAdditionalDeployTargetPath(
+        IReadOnlyList<AdditionalDeployTarget> targets, string path, string type) =>
+        targets.Select(t => t.Type == type ? t with { Path = path } : t).ToList();
+
+    /// <summary>
+    /// Extra places this course ALSO publishes to, beyond <see cref="DeployTarget"/> —
+    /// for redundancy against one host having a bad day, never a replacement
+    /// for the primary choice: <see cref="DeployTarget"/> still decides where
+    /// the "Live URL" link on a finished deploy points.
+    ///
+    /// Empty for every course that has not opted in, which is the
+    /// overwhelming majority: the key is OMITTED from course_config.json
+    /// entirely rather than written as [], so a course nobody has touched
+    /// writes the exact same file this app has always written. At most one
+    /// entry per known type, and never a type that already IS the primary.
+    /// </summary>
+    public List<AdditionalDeployTarget> AdditionalDeployTargets
+    {
+        get
+        {
+            var result = new List<AdditionalDeployTarget>();
+            if (_values["additional_deploy_targets"] is not JArray array) return result;
+            foreach (var entry in array)
+            {
+                if (entry is not JObject obj) continue;
+                if (obj["type"] is not JValue { Type: JTokenType.String } typeValue) continue;
+                string type = (string)typeValue!;
+                if (type.Length == 0) continue;
+                string path = obj["path"] is JValue { Type: JTokenType.String } pathValue ? (string)pathValue! : "";
+                result.Add(new AdditionalDeployTarget(type, path));
+            }
+            return result;
+        }
+        set
+        {
+            if (value.Count == 0)
+            {
+                _values.Remove("additional_deploy_targets");
+                return;
+            }
+            var encoded = new JArray();
+            foreach (var target in value)
+            {
+                var entry = new JObject { ["type"] = target.Type };
+                if (target.Path.Length > 0) entry["path"] = target.Path;
+                encoded.Add(entry);
+            }
+            _values["additional_deploy_targets"] = encoded;
+        }
+    }
+
+    /// <summary>
+    /// Every destination this course publishes to, in deploy order — the
+    /// primary first, then each additional target in the order it was
+    /// added. This is the one list a multi-destination deploy walks; the
+    /// primary is not special beyond going first, which is only how the
+    /// "Live URL" link on a finished deploy is chosen.
+    /// </summary>
+    public List<DeployDestination> AllDeployDestinations
+    {
+        get
+        {
+            var result = new List<DeployDestination> { new(DeployTarget, DeployFolderPath) };
+            foreach (var target in AdditionalDeployTargets)
+                result.Add(new DeployDestination(target.Type, target.Path));
+            return result;
+        }
     }
 
     /// <summary>
@@ -220,20 +415,255 @@ public sealed class CourseConfiguration
     public List<string> HiddenItems { get => StringList("hidden"); set => SetStringList("hidden", value); }
     public List<string> ExpandableItems { get => StringList("expandable"); set => SetStringList("expandable", value); }
 
+    // ---- Marks and the curriculum folder --------------------------------
+
+    /// <summary>
+    /// What this course calls the folder holding one page per curriculum
+    /// expectation. Declared by every payload and skeleton manifest and
+    /// carried here at creation; empty for a course made from scratch, which
+    /// has no manifest to declare anything.
+    /// </summary>
+    public string CurriculumFolder
+    {
+        get => StringValue("curriculum_folder");
+        set => _values["curriculum_folder"] = value;
+    }
+
+    /// <summary>
+    /// Which per-section folder holds this course's class pages, or empty when
+    /// the course never recorded one.
+    ///
+    /// <para>ABSENT or unmatched falls back to the old GUESS — see
+    /// <see cref="ClassFolderRule.Name(string?, IEnumerable{string})"/> — which
+    /// is what every course made before this key existed relies on. The key
+    /// exists because the guess quietly decided what a teacher was allowed to
+    /// CALL this folder: a teacher whose vocabulary is "Thread 2, Day 3" would
+    /// sensibly call it "All Days", and under the guess alone that folder is
+    /// found only by the accident of being first — the moment the list is
+    /// ordered the other way, class pages are written somewhere else and the
+    /// curriculum map counts the wrong pages. The map does not FAIL when that
+    /// happens: it falls back to counting every published page, which is a
+    /// wrong map that reports success.</para>
+    ///
+    /// <para>Written by the wizard at creation, and MATERIALISED by a rename —
+    /// renaming the class folder writes this key even on a course that never
+    /// had one, because a rename is the one moment Plantoir witnesses the
+    /// change.</para>
+    /// </summary>
+    public string ClassFolder
+    {
+        get => StringValue("class_folder");
+        set => _values["class_folder"] = value;
+    }
+
+    /// <summary>
+    /// What this course calls the first half of a class page's name — "Unit 2,
+    /// Day 3", or "Module 2, Day 3".
+    ///
+    /// <para>ABSENT means "Unit", which is what every course made before this
+    /// key existed says. Empty means the same, and the two are deliberately
+    /// NOT distinguished the way <see cref="GradedFolders"/> distinguishes
+    /// them: there is no sensible reading of "the teacher cleared the word",
+    /// and a course whose class pages had no name could not be built.</para>
+    ///
+    /// <para>"Day" is deliberately not configurable — a teacher who says
+    /// "Thread" almost certainly still says "Day 3".</para>
+    /// </summary>
+    public string UnitWord
+    {
+        get { var raw = StringValue("unit_word"); return raw.Length == 0 ? ClassPageTerm.DefaultWord : raw; }
+        set => _values["unit_word"] = value;
+    }
+
+    /// <summary>
+    /// The folder this app protects as the curriculum folder, or null.
+    /// Name-only — see <see cref="CurriculumFolderRule"/>.
+    /// </summary>
+    public string? ResolvedCurriculumFolder =>
+        CurriculumFolderRule.Resolve(CurriculumFolder, SharedFolders);
+
+    /// <summary>
+    /// The folders whose contents count for marks, or <b>null</b> when the key
+    /// is ABSENT — a course that has never been asked, to which the historical
+    /// substring rule still applies.
+    ///
+    /// <para>An explicit JSON <c>null</c> reads as a CLEARED list rather than
+    /// an unset one: the key is present, and the absent case is reserved for a
+    /// course nobody has asked. Pinned by <c>gradedFolders</c>'s case "an
+    /// explicit null is a CLEARED list, not an unset one", which exists
+    /// because the two implementations once agreed by accident and nothing
+    /// said which answer was intended.</para>
+    /// </summary>
+    public List<string>? GradedFolders
+    {
+        get
+        {
+            var token = _values["graded_folders"];
+            if (token is null) return null;
+            var result = new List<string>();
+            if (token is JArray array)
+                foreach (var element in array)
+                    if (element is JValue { Type: JTokenType.String } v) result.Add((string)v!);
+            return result;
+        }
+        set
+        {
+            if (value is null) _values.Remove("graded_folders");
+            else _values["graded_folders"] = new JArray(value);
+        }
+    }
+
+    /// <summary>
+    /// The marks pool as a list that can be edited — materialising the pool a
+    /// never-asked course is ALREADY working to, rather than starting from
+    /// empty.
+    ///
+    /// <para>Without this, a teacher's first tick on a legacy course would
+    /// silently narrow it from "every folder mentioning tasks" to the one box
+    /// they touched, taking the assessed marks off every other one. Called on
+    /// the way in to any edit of the pool — a tick, an untick, or a folder
+    /// leaving the list.</para>
+    ///
+    /// <param name="choices">
+    /// Every folder that could hold work counting for marks — normally
+    /// <see cref="GradedFolderChoices.For(CourseConfiguration, string)"/>,
+    /// which walks the course folder.
+    ///
+    /// <para><b>Required rather than defaulted, on purpose.</b> This used to
+    /// infer from <c>shared_folders</c> + <c>per_section_folders</c> alone,
+    /// which is narrower than what the build counts — the build matches a
+    /// folder at ANY depth — so a teacher with <c>Portfolios/Tasks</c> had it
+    /// silently dropped by their first tick. A parameter with a default would
+    /// read as "the pool" and be picked by the next caller without thought,
+    /// which is the same silent narrowing arriving a second time. Passing the
+    /// top-level lists is still a legitimate answer where there is no course
+    /// folder to walk; it just has to be a visible choice at the call
+    /// site.</para>
+    /// </param>
+    /// </summary>
+    public List<string> MaterializedGradedFolders(IEnumerable<string> choices) =>
+        GradedFolders ?? GradedFolderRule.InferredPool(choices);
+
+    /// <summary>Whether a page counts for marks in this course.</summary>
+    public bool CountsForMarks(string relativePath) =>
+        GradedFolderRule.CountsForMarks(GradedFolders, relativePath);
+
+    // ---- Excluded items -------------------------------------------------
+
+    /// <summary>The scope keys inside <c>excluded_items</c>.</summary>
+    public const string SharedScope = "shared";
+    public const string PerSectionScope = "per_section";
+
+    /// <summary>
+    /// How a scope is written on the activity trail. NOT the JSON key: the
+    /// contract asks for "per-section" in a teacher-readable line and
+    /// <c>per_section</c> in the file, and writing the file's spelling into a
+    /// sentence is how machinery leaks in front of a teacher.
+    /// </summary>
+    public static string ScopeInWords(string scope) =>
+        scope == PerSectionScope ? "per-section" : "shared";
+
+    /// <summary>
+    /// Names this course has excluded from previews and deploys, by scope.
+    ///
+    /// <para>An OBJECT keyed by scope rather than a flat list, because the two
+    /// scopes are matched by different scans in the build and the same bare
+    /// name can legitimately exist in both. The key is ABSENT — never
+    /// <c>{}</c> — when nothing is excluded, so a course nobody has touched
+    /// writes the same file it always has.</para>
+    ///
+    /// <para>Matching is EXACT, case included, because
+    /// <c>preflight_update_course_config</c> tests membership of a plain
+    /// Python set. A case-insensitive answer here would have the app believe a
+    /// folder is excluded while the build cheerfully publishes it — the two
+    /// must agree or the feature reports a state that is not real.</para>
+    /// </summary>
+    public List<string> ExcludedItems(string scope)
+    {
+        var result = new List<string>();
+        if (_values["excluded_items"] is JObject map && map[scope] is JArray array)
+            foreach (var element in array)
+                if (element is JValue { Type: JTokenType.String } v) result.Add((string)v!);
+        return result;
+    }
+
+    public bool IsExcluded(string scope, string name) =>
+        ExcludedItems(scope).Contains(name, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Record that a name is excluded. Idempotent.
+    ///
+    /// <para>The CALLER must also take the name out of its copy list
+    /// (<c>shared_folders</c> and friends). Absence from the copy list is the
+    /// actual mechanism of exclusion; this key is what stops preflight putting
+    /// it back. Preflight does reconcile the two, but only at the next build —
+    /// a teacher reading the list in Settings before then would see a folder
+    /// they had just removed.</para>
+    /// </summary>
+    public void Exclude(string scope, string name)
+    {
+        if (string.IsNullOrEmpty(name)) return;
+        var items = ExcludedItems(scope);
+        if (items.Contains(name, StringComparer.Ordinal)) return;
+        items.Add(name);
+        SetExcludedItems(scope, items);
+    }
+
+    /// <summary>
+    /// Stop excluding a name, and say whether it HAD been excluded.
+    ///
+    /// <para>The answer is the point. An ordinary new folder is not a
+    /// re-inclusion, and a trail line saying it was would be believed — the
+    /// caller records "item re-included" only on a true here.</para>
+    /// </summary>
+    public bool ReInclude(string scope, string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        var items = ExcludedItems(scope);
+        int removed = items.RemoveAll(i => string.Equals(i, name, StringComparison.Ordinal));
+        if (removed == 0) return false;
+        SetExcludedItems(scope, items);
+        return true;
+    }
+
+    /// <summary>
+    /// Writes one scope's list, dropping the scope when it empties and the
+    /// whole key when every scope has. Absent, not empty — see the property
+    /// above and <c>contracts/file-formats.json</c>.
+    ///
+    /// <para>Scopes this app does not know about are PRESERVED: handoff item
+    /// 11 promises the object is additive, so a future
+    /// <c>"sections": {"4": [...]}</c> has to survive a teacher removing a
+    /// folder in a build that has never heard of it. An <c>excluded_items</c>
+    /// that is not an object AT ALL is replaced rather than read around —
+    /// there is nothing here that could preserve it meaningfully, and this
+    /// class is a careful guest in the toolchain's file rather than a
+    /// validator of it.</para>
+    /// </summary>
+    private void SetExcludedItems(string scope, IReadOnlyList<string> items)
+    {
+        if (_values["excluded_items"] is not JObject map) { map = new JObject(); }
+
+        if (items.Count == 0) map.Remove(scope);
+        else map[scope] = new JArray(items);
+
+        if (map.Count == 0) _values.Remove("excluded_items");
+        else _values["excluded_items"] = map;
+    }
+
     /// <summary>sharedFolders + sharedFiles + perSectionFolders + perSectionFiles, in that order.</summary>
     public List<string> AllSidebarItems =>
         SharedFolders.Concat(SharedFiles).Concat(PerSectionFolders).Concat(PerSectionFiles).ToList();
 
-    /// <summary>A club has a short code, or a non-digit where a course carries its grade.</summary>
-    public bool IsClub
-    {
-        get
-        {
-            string code = CourseCode;
-            if (code.Length < 4) return true;
-            return !char.IsDigit(code[3]);
-        }
-    }
+    /// <summary>
+    /// Whether this course's code names a club rather than a course —
+    /// delegates to ClubCodeRule, the shared rule both apps ask
+    /// (contracts/course-management.json -> courseCode.clubDetection): the
+    /// catalog is asked first and its answer is final, and only a code the
+    /// catalog has never heard of falls back to the fourth-character guess.
+    /// </summary>
+    public bool IsClub(Plantoir.Core.Catalogs.CourseNameCatalog catalog) =>
+        ClubCodeRule.IsClub(CourseCode, catalog);
 
     // ---- Section numbers (matching the mac app's three tiers) -----------
 
@@ -276,11 +706,75 @@ public sealed class CourseConfiguration
     public void SetEmoji(int section, string emoji) =>
         SetNestedValue("emojis", "sections", SectionKey(section), emoji);
 
-    public string CustomDomain(int section) =>
-        NestedString("custom_domains", "sections", SectionKey(section));
+    /// <summary>
+    /// The teacher's own domain for ONE DESTINATION of a section's published
+    /// site. Keyed by destination TYPE, not just by section, because a course
+    /// publishing to more than one destination for redundancy may want a
+    /// domain on one and not another — mirrors
+    /// `CourseConfiguration.customDomain(forSection:destinationType:)` on the
+    /// mac side; see documentation/08-course-config-reference.md.
+    ///
+    /// Reads an OLDER shape too: `custom_domains.sections.sectionN` used to
+    /// be a bare string, written before a course could have more than one
+    /// destination. That value is treated as belonging to the section's
+    /// PRIMARY destination (<see cref="DeployTarget"/>) — the only
+    /// destination that existed when it could have been set — and is
+    /// invisible to every other destination type.
+    /// </summary>
+    public string CustomDomain(int section, string destinationType)
+    {
+        if (_values["custom_domains"] is not JObject outer) return "";
+        if (outer["sections"] is not JObject sections) return "";
+        var entry = sections[SectionKey(section)];
+        if (entry is JObject perDestination)
+            return perDestination[destinationType] is JValue { Type: JTokenType.String } v ? (string)v! : "";
+        // Old shape: a bare string, meant for whichever destination was
+        // primary when it was set — never for any other type.
+        if (entry is JValue { Type: JTokenType.String } legacy && destinationType == DeployTarget)
+            return (string)legacy!;
+        return "";
+    }
 
-    public void SetCustomDomain(int section, string domain) =>
-        SetNestedValue("custom_domains", "sections", SectionKey(section), NormalizedCustomDomain(domain));
+    /// <summary>Convenience for the primary destination — what a course with a single destination always means.</summary>
+    public string CustomDomain(int section) => CustomDomain(section, DeployTarget);
+
+    /// <summary>
+    /// Writes ONE destination's domain, never clobbering another
+    /// destination's entry. A stray old-shape bare string already on disk
+    /// (set before this course had more than one destination) is carried
+    /// forward into the new per-destination map, attributed to the PRIMARY
+    /// destination, rather than silently discarded the first time any
+    /// destination's domain is set here — found by the 2026-09-06 audit,
+    /// which caught the mac side losing exactly this data before the map
+    /// shape existed. Setting an empty domain removes that destination's own
+    /// entry rather than storing an empty string.
+    /// </summary>
+    public void SetCustomDomain(int section, string destinationType, string domain)
+    {
+        if (_values["custom_domains"] is not JObject outer) { outer = new JObject(); _values["custom_domains"] = outer; }
+        if (outer["sections"] is not JObject sections) { sections = new JObject(); outer["sections"] = sections; }
+        string sectionKey = SectionKey(section);
+
+        JObject perDestination;
+        if (sections[sectionKey] is JObject existing)
+        {
+            perDestination = existing;
+        }
+        else
+        {
+            perDestination = new JObject();
+            if (sections[sectionKey] is JValue { Type: JTokenType.String } legacy && ((string)legacy!).Length > 0)
+                perDestination[DeployTarget] = (string)legacy!;
+            sections[sectionKey] = perDestination;
+        }
+
+        string normalized = NormalizedCustomDomain(domain);
+        if (normalized.Length == 0) perDestination.Remove(destinationType);
+        else perDestination[destinationType] = normalized;
+    }
+
+    /// <summary>Convenience for the primary destination — what a course with a single destination always means.</summary>
+    public void SetCustomDomain(int section, string domain) => SetCustomDomain(section, DeployTarget, domain);
 
     public bool ShowsSectionMarker(int section) =>
         NestedBool("show_section_marker", "sections", SectionKey(section), true);
@@ -347,6 +841,51 @@ public sealed class CourseConfiguration
 
     public static bool CoverageNotesEnabled(bool coverageEnabled, bool notesEnabled) =>
         coverageEnabled && notesEnabled;
+
+    /// <summary>
+    /// Whether the wizard's curriculum-coverage switch is one the teacher can
+    /// actually REACH — which is the only sense in which a blocked-removal
+    /// sentence may name it.
+    ///
+    /// <para><b>All four gates matter, and dropping them deadlocks the
+    /// wizard.</b> The switch is only created when the code has example
+    /// content that includes curriculum, and it is only enabled while
+    /// pre-populate and curriculum pages are both on. The first cut of this
+    /// helper returned the switch value alone, so on the commonest
+    /// from-scratch path — a code with no example content, where the switch is
+    /// never created at all — the ⓘ told a teacher to turn off a control that
+    /// was not on the screen, and there was no way out of it inside the
+    /// wizard. Found by adversarial review, after a real drive of the app had
+    /// walked into it without noticing.</para>
+    ///
+    /// <para><b>A tension worth knowing about, deliberately left alone.</b>
+    /// `NewCourseDialog.BuildConfiguration` writes `include_curriculum_coverage`
+    /// from the raw switch, so a from-scratch course is created with the map
+    /// ON while this returns false — meaning the wizard will let its curriculum
+    /// folder be removed after a confirmation. That is the better failure:
+    /// the build's `curriculumCoverageFoundNothing` health check tells the
+    /// teacher the map could not be built, whereas a deadlock tells them
+    /// nothing and offers no way forward. Changing what the config CARRIES is
+    /// a product decision rather than a port detail, and is raised as an issue
+    /// instead of being taken here.</para>
+    /// </summary>
+    public static bool CurriculumCoverageEnabled(bool hasExampleContent, bool prepopulating,
+                                                 bool contentIncludesCurriculum,
+                                                 bool curriculumPagesSwitchIsOn,
+                                                 bool coverageSwitchIsOn) =>
+        hasExampleContent && prepopulating && contentIncludesCurriculum &&
+        curriculumPagesSwitchIsOn && coverageSwitchIsOn;
+
+    /// <summary>
+    /// The EFFECTIVE value of "include curriculum pages", which unlike the
+    /// coverage map IS gated on there being example content to take them from
+    /// and on the teacher pre-populating with it. Mirrors what
+    /// `NewCourseDialog.BuildConfiguration` writes for
+    /// `include_curriculum_pages`.
+    /// </summary>
+    public static bool CurriculumPagesEnabled(bool hasExampleContent, bool prepopulating,
+                                              bool contentIncludesCurriculum, bool curriculumSwitchIsOn) =>
+        hasExampleContent && prepopulating && contentIncludesCurriculum && curriculumSwitchIsOn;
 
     /// <summary>color_schemes is FLAT — {"color_schemes": {"sectionN": "id"}}, no "sections" wrapper.</summary>
     public string ColourSchemeId(int section) =>

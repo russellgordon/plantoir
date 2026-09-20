@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[The Comparative Response]] — day 5
-2. Discussion: [[What Is Canadian Literature For]]
+1. Hand in [[The Comparative Response]] — day 5 of 5
+2. Discussion: [[What Is Canadian Literature For]] — no marks in it,
+   and no right answer waiting: the definition you write tonight is
+   meant to be broken by the first text that does not fit
 
 ## Things to do before our next class
 

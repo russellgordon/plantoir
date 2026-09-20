@@ -12,7 +12,8 @@ tags:
 
 1. Shop practice: [[Safe Shop and Site Practice]]
 2. Lockout, housekeeping, and moving material safely
-3. Supervised practice
+3. Supervised practice; and what the ticket will ask of you, criteria
+   and all: [[The Safety Ticket]]
 
 ## Things to do before our next class
 

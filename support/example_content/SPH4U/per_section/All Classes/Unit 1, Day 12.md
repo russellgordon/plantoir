@@ -18,4 +18,3 @@ tags:
 ## Things to do before our next class
 
 - [ ] Choose your design for [[Circular Motion Design Challenge]].
-- [ ] [[The Flying Pig]] analysis due next class.

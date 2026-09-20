@@ -47,4 +47,6 @@ adults who stand behind the room when the heat outgrows it.
 ![[C2.5]]
 
 ![[A3.3]]
+
+![[C2.2]]
 %%curriculum-end%%

@@ -4,13 +4,17 @@ import SwiftUI
 /// What the assistant tells a teacher it is good at — kept on screen for
 /// the whole conversation, not just at the start.
 ///
-/// These twelve are not decoration. They are measured — the routing suite
+/// These nineteen are not decoration. They are measured — the routing suite
 /// probes them word for word — and most are matched in code rather than
 /// routed, precisely so that what the window promises is what the window
 /// delivers. A card offering something the assistant is unreliable at is worse
 /// than a card with nothing on it: "What would publishing Unit 3, Day 1
 /// change?" was removed for exactly that reason, having gone to the wrong tool
 /// on both models ten times out of ten.
+///
+/// (It said "twelve" until 2026-09-19, from a shelf that had grown by seven
+/// without the sentence being re-counted. Count the list rather than trusting
+/// a number here, and correct it when you do.)
 ///
 /// **Two tests, and a card has to pass both.** It sat at nine for a while and
 /// was missing things the assistant could genuinely do, so nobody was told
@@ -26,15 +30,22 @@ import SwiftUI
 ///    see a page than the two windows already in front of them.
 ///
 /// The second test is the one that keeps this a list rather than an inventory.
-/// The tool surface is thirteen; the shelf is twelve of a different set, and
+/// The tool surface is thirteen; the shelf is nineteen of a different set, and
 /// the gap is deliberate.
+///
+/// **Sixteen of the nineteen are answered in code and three reach the model**,
+/// measured 2026-09-18 and changed by one on 2026-09-19: "Deploy at 6:30 AM"
+/// was among the four that reached it, and the smaller assistant answered it
+/// with an immediate deploy ten trials out of ten — so it became a parsed
+/// family in `AssistCardCommand` instead (issue #168). Which card is which is
+/// pinned by `AssistPromptShelfTests`, not by this comment.
 ///
 /// **Why it stays, and why it folds.** It used to appear only while the
 /// conversation was empty, which meant the teacher saw the list once, at the
 /// moment they knew least about what to do with it, and never again. But a
 /// list this long sitting open would push the conversation off the screen it
 /// belongs on. So each kind of request is a disclosure group, shut by
-/// default: four short lines a teacher can scan, and open when they want
+/// default: five short lines a teacher can scan, and open when they want
 /// reminding.
 struct AssistPromptShelfView: View {
 
@@ -108,7 +119,10 @@ struct AssistPromptShelfView: View {
             ("Making pages visible", [
                 // No "and everything it links to" any more: publishing a page
                 // publishes what it links to by rule, so the short phrasing is
-                // the true one.
+                // the true one. Still true since #173 — the reach now stops at
+                // another CLASS page, which makes the short phrasing more
+                // accurate rather than less: a teacher who typed "and
+                // everything it links to" would be promised more than they get.
                 "Publish Unit 2, Day 3",
                 "Publish tomorrow's class",
                 // Reads the way a teacher says it, and — unlike the earlier

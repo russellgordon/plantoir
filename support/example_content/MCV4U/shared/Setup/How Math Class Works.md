@@ -72,8 +72,8 @@ your notes hold what YOU need to remember about them.
 
 Class ends with two or three questions you try alone, and your
 [[Math Journal]]. Not collected, not marked — they exist so that you,
-not the quiz next week, are the first to know what stuck and what needs
-[[Getting Help|another pass]].
+and not the checkpoint at the end of the unit, are the first to know what
+stuck and what needs [[Getting Help|another pass]].
 
 > [!tip] If you were away
 > Check the class page in All Classes, try the thinking task before

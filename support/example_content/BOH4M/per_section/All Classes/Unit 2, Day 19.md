@@ -13,6 +13,7 @@ tags:
 1. [[The Negotiation]] — briefs, twenty minutes, then the debrief
 2. Which style did you plan, and which did you use?
 3. Positions and interests, on the board
+4. Last twenty minutes: [[The Leadership Profile]] checkpoint — bring your three decisions and the theory you are defending; one pair of eyes each, and you leave with one change named
 
 ## Things to do before our next class
 

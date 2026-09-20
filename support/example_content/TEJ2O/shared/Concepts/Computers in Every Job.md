@@ -59,6 +59,32 @@ compare them honestly — including the parts that would not suit you.
 [[Finding Answers Online]] applies here too: a recruiter's page and a
 government dataset are not the same kind of source.
 
+## Work before the machine: what changed when computers arrived
+
+Understanding computing's impact requires looking at what work looked
+like before digital systems existed:
+
+- **Engineering and drafting:** Structural calculations took weeks of
+  manual slide-rule arithmetic. Drafting rooms held hundreds of
+  draftspersons drawing blueprints on paper by hand with T-squares.
+  A single design revision required redrawing entire sheet sets.
+- **Aviation and maritime navigation:** Navigators relied on physical
+  nautical charts, dead reckoning, radio beacons, and optical sextant
+  sightings of stars. Bad weather or cloudy skies created severe
+  drift risks, and transatlantic route capacity was strictly limited.
+- **Business and customer tracking:** Retail inventory, customer sales
+  ledgers, and banking transactions were recorded in physical paper
+  journals and reconciled by hand at end-of-day. Tracking stock across
+  multiple stores took days of postal correspondence.
+- **Diagnostics and repairs:** Automotive technicians diagnosed
+  engines purely by ear, vacuum gauges, and mechanical timing lights.
+  Intermittent electrical faults could take days of manual wire-tracing.
+
+Digital tools did not just speed up these jobs — they transformed
+what was possible. Reverting to manual methods today would cause
+transportation networks, healthcare tracking, and industrial
+manufacturing capacity to collapse under the sheer volume of data.
+
 %%curriculum-start%%
 ## Curriculum connection
 

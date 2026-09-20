@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Decision]] handed in
-2. How honest the review of your own strategy has to be
-3. Portfolio entry: what the first three weeks changed
+1. Work period: [[The Decision]]
+2. Documenting the process as you go, not reconstructing it after — and how honest the review at the end has to be
+3. Conferences on your criteria and how you are weighting them — the checkpoint, and you get it in writing
 
 ## Things to do before our next class
 
-- [ ] File the decision and its working in [[Your Career Portfolio]].
+- [ ] Nothing to hand in. The first half of next class is for acting on what the conference found.

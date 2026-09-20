@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: gas stoichiometry, one problem, cold
-2. Molar volume at STP, and using it as one more step in the mole map
+1. Warm-up: gas stoichiometry, one problem, cold: [[Gas Law Practice]]
+2. Molar volume at STP, and using it as one more step in the mole map: [[The Gas Laws]]
 3. Practise: gas stoichiometry problems, in pairs
 
 ## Things to do before our next class

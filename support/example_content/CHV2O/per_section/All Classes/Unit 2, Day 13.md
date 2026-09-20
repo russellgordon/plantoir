@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Work period: [[Whose Voice Is Missing]]
-2. Conferences on whether the figures support the claim
+2. Conferences on whether the figures support the claim — the checkpoint before any of it is marked
 3. Writing a recommendation a chair could actually act on
 
 ## Things to do before our next class
 
-- [ ] Finish the report and the recommendation for next class.
+- [ ] Nothing to hand in. The start of next class is for acting on what the conference found.

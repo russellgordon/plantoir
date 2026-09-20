@@ -2,6 +2,7 @@
 title: Judging Civic Information
 publish: true
 created: __CREATED__
+enableToc: true
 tags:
   - sources
   - unit-1
@@ -55,6 +56,36 @@ documents posted by the bodies that made them. Follow the institutions
 themselves — a council, a ministry, a court, a statistical agency — and
 you get the source rather than the summary.
 
+## Foreign interference and disinformation
+
+Democratic values and public discourse in Canada face targeted manipulation by
+foreign state actors and coordinated online networks:
+
+- **Methods of interference**: Running covert bot networks to amplify extreme
+  positions, spreading fabricated claims during elections, targeting diaspora
+  communities, and financing third-party groups without disclosure.
+- **Strategic objectives**: The goal is often not to secure a specific policy win
+  but to erode democratic trust — making citizens believe elections are rigged,
+  institutions are illegitimate, and participation is futile.
+- **Protecting democratic integrity**: Canada's security agencies and
+  independent public inquiries monitor foreign interference. For citizens,
+  applying lateral reading and verifying claims against primary records is the
+  first line of civic defence.
+
+## Applying political thinking to current events
+
+When analysing any civic news story, apply the four concepts of political
+thinking:
+
+- **Political Significance**: Why does this issue matter, who does it affect, and
+  what precedents does it set?
+- **Political Perspective**: Whose beliefs, values, and economic interests are
+  represented in the report, and whose perspective was omitted?
+- **Stability and Change**: Does this development represent a fundamental policy
+  shift or an ongoing continuation of existing structures?
+- **Objectives and Results**: What was the policy's stated goal, and what were
+  the actual, measurable outcomes?
+
 > [!tip] The thirty-second habit that does most of the work
 > Before you use anything: name the person or body who produced it, the
 > date, and where the underlying evidence is. If you cannot fill all
@@ -74,4 +105,8 @@ This is the skill being examined directly in [[The Issue Examination]].
 ![[A1.3]]
 
 ![[C1.5]]
+
+![[B1.3]]
+
+![[A2.3]]
 %%curriculum-end%%

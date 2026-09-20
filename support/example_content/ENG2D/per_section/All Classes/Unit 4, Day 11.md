@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. The opinion piece form: a position in the first sentence, three
-   reasons, one example each
-2. Written under time, then read against the criteria
+   reasons, one example each: [[The Paragraph]]
+2. Written under time, then read against the criteria: [[The Essay]]
 
 ## Things to do before our next class
 

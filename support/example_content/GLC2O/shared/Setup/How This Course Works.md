@@ -6,7 +6,7 @@ tags:
   - setup
 ---
 Career Studies is short and it is about you, which is an unusual
-combination in a school timetable. Ten weeks from September, in this
+combination in a school timetable. Ten weeks from the first week, in this
 period, and then Civics takes the same period for the rest of the
 semester. That means nothing here is filler — there is not room for any.
 [[Using This Site]] shows you where everything lives.

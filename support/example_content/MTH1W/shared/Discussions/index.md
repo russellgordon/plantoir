@@ -12,7 +12,7 @@ the pushing is done with questions, counterexamples, and "what if" —
 never with anything aimed at the person who floated it. Disagree with
 the idea; be glad someone was brave enough to say it out loud.
 
-Each page below opens a conversation we return to all year:
+Each page below opens a conversation we return to all semester:
 
 - [[When Will I Use This]] — the oldest question in math class, taken
   seriously and answered honestly

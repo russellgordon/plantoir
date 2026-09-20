@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Poem of your own choosing, brought and defended — [[Poetry Unit]]
-2. Portfolio: [[Portfolio Checklist]], and [[Showing Growth]] — the pair
-   chosen and read aloud
+1. Defences finish — the rest of the room, two minutes each
+2. Poem of your own choosing, brought and defended — [[Poetry Unit]]
+3. Portfolio: [[Portfolio Checklist]], and [[Showing Growth]] — the pair
+   chosen and read aloud, in class
 
 ## Things to do before our next class
 
-- [ ] Growth pair finished; three differences named.
+- [ ] Nothing to finish at home — the growth pair was written in class.
+      Bring your three passages per text for tomorrow.

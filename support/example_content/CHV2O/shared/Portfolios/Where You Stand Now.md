@@ -10,6 +10,10 @@ The final portfolio entry, written after [[The Civic Action Project]] is
 handed in. Three parts, about 700 words in total: what you think, what
 this course did to how you think, and where the skill gets paid for.
 
+It is written **in class**, in one period near the end of Unit 3, with
+your notebook open beside you. Bring the earliest entries; part two is
+unwritable without them.
+
 ## Part one — your position, stated properly
 
 Choose one issue from your [[Your Civic Notebook]] and write your own
@@ -32,7 +36,7 @@ you take. Nobody in this course has ever lost a mark for a conclusion.
 
 ## Part two — what changed
 
-Compare this to what you wrote in November. Name one thing you believed
+Compare this to what you wrote in the first week. Name one thing you believed
 then that you no longer believe, or one thing you now hold for different
 reasons than you did.
 
@@ -43,18 +47,18 @@ reasons than you did.
 > that was never examined and simply persisted is worth writing about
 > too, provided you say that is what happened.
 
-Then say what you can now do that you could not in November. Be
+Then say what you can now do that you could not in the first week. Be
 concrete: find who made a decision; read a bill and know whether it is in
 force; check a claim against its original source; state an opposing view
 so its holder would accept it; write to a person in power and get an
 answer. Those are transferable, and they are the actual product of this
 course.
 
-## Part three — where it is paid for
+## Part three — where it is paid for and where it is lived
 
-The obvious ones are real: lawyer, policy analyst, journalist, municipal
-clerk, elected official, union or association staff, public servant. Less
-obvious and closer to what you actually did this term:
+The obvious career pathways are real: lawyer, policy analyst, journalist,
+municipal clerk, elected official, union or association staff, public servant.
+Less obvious and closer to what you actually did this term:
 
 - **Community and constituency staff**, who spend their week finding out
   which government holds a power and getting a decision moved.
@@ -63,13 +67,16 @@ obvious and closer to what you actually did this term:
 - **Consultation and engagement roles**, which exist because
   organisations that skip [[Who Is Missing From the Table|Who Is Missing From the Table?]] get their
   projects stopped.
+- **Youth leadership and service organisations**, where community organising,
+  advisory committee leadership, and ongoing civic commitment create real
+  change (see [[Service and Contribution]]).
 - **Anyone who has to write for a decision-maker** — a nurse manager
   requesting staffing, an engineer writing a submission, a coach asking a
   board for a budget.
 
-Pick one. Describe, in a paragraph, a task that job does in a week which
-you have already practised this term. Describe the work, not the job
-title.
+Pick one career pathway or community leadership role. Describe, in a
+paragraph, a task that role does in a week which you have already practised
+this term. Describe the work, not the job title.
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -81,4 +88,6 @@ title.
 ![[A2.4]]
 
 ![[B1.5]]
+
+![[C1.6]]
 %%curriculum-end%%

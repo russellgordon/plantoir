@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Essay planning under time: three prompts, five-minute plans for each
-2. The plan that would have produced the best essay, chosen by the room
+1. Essay planning under time: three prompts, five-minute plans for each: [[The Essay]]
+2. The plan that would have produced the best essay, chosen by the room: [[Theme and Thesis]]
 
 ## Things to do before our next class
 

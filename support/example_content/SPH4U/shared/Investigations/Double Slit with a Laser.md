@@ -8,8 +8,10 @@ tags:
   - unit-4
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Pairs.** You will measure a length of about 600
-> nanometres with a metre stick.
+> **Time:** one class, written up in the next period and handed in at the
+> bell — the last of the marked [[Investigation Write-Ups]]. **Pairs at
+> the bench, write-up yours alone.** You will measure a length of about
+> 600 nanometres with a metre stick.
 
 ## Safety
 
@@ -39,9 +41,12 @@ tags:
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.4]]
+
 ![[E2.3]]
 
 ![[E2.4]]
 
 ![[E3.2]]
 %%curriculum-end%%
+

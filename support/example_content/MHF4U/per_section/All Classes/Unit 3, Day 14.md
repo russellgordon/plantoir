@@ -16,8 +16,9 @@ tags:
    before any algebra, how many answers must there be?
 3. Consolidate: quadratic disguises, the circle's symmetry, and why
    solutions arrive in families
-4. Task time: [[The Sound of Two Waves]] — trade identity proofs with
-   another pair and attack each other's weakest step
+4. Task time: [[The Sound of Two Waves]], day 2 — play your two tones
+   and time the throb, ears before any algebra, then trade identity
+   proofs with another pair and attack each other's weakest step
 
 ## Things to do before our next class
 

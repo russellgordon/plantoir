@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval clinic — no notes: identify a macromolecule, predict an
-   enzyme's response, and explain one transport mechanism
-2. Compare answers in pairs
+1. First twenty minutes: the note I left on your conclusion, and the row
+   your own check named yesterday — both acted on
+2. Retrieval clinic — no notes: identify a macromolecule, predict an
+   enzyme's response, and explain one transport mechanism: [[Proteins and Enzymes]] and [[Membranes and Transport]]
+3. Compare answers in pairs; practice: [[Biochemistry Practice]]
 
 ## Things to do before our next class
 

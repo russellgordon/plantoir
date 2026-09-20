@@ -68,10 +68,10 @@ contribution visible inside a team project.
 
 ## Log the decision
 
-The last minutes belong to your [[Code Journal]]. This year it asks
+The last minutes belong to your [[Code Journal]]. This semester it asks
 for one thing Grade 11 did not: the decision you made and the options
 you turned down. The code and the commit history will still be there
-in June. The reasons will not, unless you write them.
+at the end of the course. The reasons will not, unless you write them.
 
 ## The thread through all of it
 
@@ -88,3 +88,9 @@ the rest of it.
 > copy of the project *before* you write a line. Starting from a
 > three-day-old copy is the single most reliable way to create a
 > merge conflict nobody enjoys.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D4.4]]
+%%curriculum-end%%

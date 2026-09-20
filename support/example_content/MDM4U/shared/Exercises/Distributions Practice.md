@@ -28,9 +28,14 @@ further.
    $0.1$, nothing otherwise. (a) Find the expected gain per play for
    the player. (b) What prize would make the game fair? (c) What is
    the booth's expected profit over 500 plays?
-4. Two number cubes are rolled and $X$ is the sum. Find $E(X)$ using
-   the full distribution, then explain the answer in one sentence
-   without summing anything.
+4. Two number cubes are rolled and $X$ is the sum. (a) Generate the
+   related probability distribution table. (b) Describe the probability
+   histogram for $X$ (with bars of width 1 centred on each integer sum),
+   determine the total area of the bars, and explain your result.
+   (c) Find $E(X)$ using the full distribution, then explain the answer
+   in one sentence without summing anything. (d) How does this
+   theoretical probability histogram compare with a frequency histogram
+   from 100 actual rolls?
 
 > [!success]- Answer 1
 > (a) The sample space is HH, HT, TH, TT, all equally likely.
@@ -74,14 +79,25 @@ further.
 > cents.
 
 > [!success]- Answer 4
-> The distribution is $\frac{1}{36}, \frac{2}{36}, \ldots,
+> (a) The distribution is $\frac{1}{36}, \frac{2}{36}, \ldots,
 > \frac{6}{36}, \ldots, \frac{2}{36}, \frac{1}{36}$ for sums 2
-> through 12, and
-> $$E(X) = \sum x\,P(X = x) = \frac{1(2) + 2(3) + \cdots + 2(11) + 1(12)}{36} = \frac{252}{36} = 7$$
+> through 12.
+> (b) Each rectangle has a base of width 1 centred on the integer sum
+> $x$ (from $x = 2$ to $x = 12$) and height equal to $P(X = x)$. The area
+> of each bar is $\text{base} \times \text{height} = 1 \times P(X = x) = P(X = x)$.
+> Total area $= \sum P(X = x) = \frac{36}{36} = 1$. The total area
+> equals 1 because the histogram represents a complete probability
+> distribution accounting for all outcomes in the sample space.
+> (c) $$E(X) = \sum x\,P(X = x) = \frac{1(2) + 2(3) + \cdots + 2(11) + 1(12)}{36} = \frac{252}{36} = 7$$
 > The one-sentence version: each cube has expected value $3.5$, and
 > the expected value of a sum is the sum of the expected values, so
 > $3.5 + 3.5 = 7$. The distribution is also symmetric about 7, so
 > the mean has to sit there.
+> (d) A frequency histogram has raw counts on the vertical axis and
+> will show sample variability with 100 rolls. Dividing each count by
+> 100 converts frequencies into relative frequencies, which approximate
+> the symmetric tent shape of the theoretical probability histogram and
+> converge to it as the number of trials increases.
 
 ## Binomial
 
@@ -186,3 +202,25 @@ further.
 > The gap here is about $0.014$, small because 3 cards is a small
 > fraction of 52. Draw 26 cards and the two models would disagree
 > wildly.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.2]]
+
+![[B1.1]]
+
+![[B1.2]]
+
+![[B1.3]]
+
+![[B1.4]]
+
+![[B1.5]]
+
+![[B1.6]]
+
+![[B1.7]]
+
+![[B2.1]]
+%%curriculum-end%%

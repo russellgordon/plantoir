@@ -39,6 +39,26 @@ size or weight of what you have, not the typeface. Every face added
 past two makes a page look less designed, not more, and quietly breaks
 the repetition that holds an issue of [[The Front Page]] together.
 
+## Type anatomy, spacing, and micro-typography
+
+Getting typography right requires mastering the micro-measurements that govern
+readability:
+
+- **Point size and scale.** Body text for print is typically set between 9 pt
+  and 11 pt; headlines scale upward in deliberate mathematical increments (such
+  as 14, 18, 24, 36, 48 pt) to establish a clear hierarchy.
+- **Leading and line length.** Leading (line spacing) should be 120% to 140% of
+  the point size (e.g. 10 pt type on 13 pt leading) so lines do not collide.
+  Keep body columns between 45 and 75 characters wide; lines that are too long
+  exhaust the reader's eye, while lines that are too short cause awkward breaks.
+- **Tracking and kerning.** Tracking adjusts overall letter spacing across a
+  sentence or headline; kerning adjusts the optical gap between specific
+  character pairs (such as "AV" or "To") to ensure visual balance.
+- **Anatomy and proportions.** Letters sit on a common baseline. The height of
+  lowercase letters without ascenders (the x-height) dictates how large a face
+  appears at a given point size; fonts with large x-heights remain legible at
+  smaller sizes and across digital screens.
+
 ## Phones and paper
 
 Legibility changes with the surface. Print is sharp and generous, so

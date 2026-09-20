@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieval clinic: configuration, shape, polarity, and dominant
-   intermolecular force — one substance, four answers, no notes
+   intermolecular force — one substance, four answers, no notes: [[Molecular Shapes]] and [[Intermolecular Forces]]
 2. Compare and correct in pairs
 3. Clinic on whichever of the four the room drops
 

@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 In [[Measure a Circuit]] you took the same simple loop and measured it
 three different ways, and the meter had to be connected differently each

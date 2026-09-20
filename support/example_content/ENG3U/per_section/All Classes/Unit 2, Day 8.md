@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. 3.4: the banquet, staged in the room with chairs
-2. Who sees the ghost, and what the play is doing by choosing
+1. 3.4: the banquet, staged in the room with chairs: [[Macbeth]]
+2. Who sees the ghost, and what the play is doing by choosing: [[Tragedy]]
 
 ## Things to do before our next class
 
-- [ ] Two passages marked for your seminar.
+- [ ] Mark two passages from the banquet scene you would want a room to
+      argue about. Groups and acts are assigned next class.

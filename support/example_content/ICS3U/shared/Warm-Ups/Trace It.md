@@ -49,3 +49,12 @@ and `total` only changed on two of the five passes.
 Tracing by hand is what a debugger automates, as
 [[Using the Debugger]] shows — but doing it on paper first is how you
 learn to read [[Repetition|a loop]] without one.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.5]]
+
+![[B4.5]]
+%%curriculum-end%%
+

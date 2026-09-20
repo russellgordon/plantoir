@@ -57,7 +57,11 @@ later calculation needs.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[A2.5]]
+![[A2.1]]
+
+![[A2.2]]
 
 ![[A2.4]]
+
+![[A2.5]]
 %%curriculum-end%%

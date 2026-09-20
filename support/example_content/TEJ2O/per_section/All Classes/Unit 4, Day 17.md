@@ -22,4 +22,5 @@ tags:
 
 - [ ] Journal: the question a guest asked that you want a better
       answer to.
-- [ ] Bring your [[Tech Journal]] — final collection is next class.
+- [ ] Keep your [[Tech Journal]] safe — the final collection is in our
+      last class, and the reflection is written from it.

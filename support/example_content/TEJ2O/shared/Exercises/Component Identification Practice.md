@@ -27,6 +27,14 @@ did in [[Take It Apart]] — sharpened by the naming drills of
    and calls it "the CPU". Untangle the mix-up.
 8. **Explain your reasoning.** A client says their computer is slow
    — which component would you check first, and why?
+9. **Peripheral and bus identification.** Name two standard input
+   devices and two standard output devices of a computer system. Where
+   does a sound card or dedicated graphics card seat to communicate
+   with the CPU at high bandwidth?
+10. **Advances in computer hardware.** Name two significant advances in
+    electronic semiconductor technology over recent decades, and explain
+    why manufacturers transition from older PCI/SATA buses to modern
+    PCIe bus architectures.
 
 ## Answers
 
@@ -68,10 +76,31 @@ did in [[Take It Apart]] — sharpened by the naming drills of
 > slower drive, and it is the commonest, cheapest fix. Suspect an
 > old spinning drive next.
 
+> [!success]- Answer 9
+> Input devices: keyboard, optical mouse, flatbed scanner, or
+> microphone. Output devices: monitor display, printer, or audio
+> speakers. Dedicated expansion cards seat into high-speed **PCIe
+> (PCI Express)** slots directly wired to the CPU and mainboard
+> chipset.
+
+> [!success]- Answer 10
+> 1. Semiconductor fabrication miniaturisation (shrinking transistor
+>    gate lengths to nanometre scales), allowing billions of transistors
+>    with lower power draw and higher switching frequencies.
+> 2. High-speed serial point-to-point PCIe bus architecture replaces
+>    shared parallel buses (older PCI), multiplying data bandwidth
+>    and eliminating clock skew across long copper traces.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A1.1]]
 
 ![[A1.2]]
+
+![[A1.3]]
+
+![[A1.4]]
+
+![[B2.1]]
 %%curriculum-end%%

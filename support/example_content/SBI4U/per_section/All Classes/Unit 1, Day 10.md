@@ -18,4 +18,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Submit your investigation question and procedure.
-- [ ] [[Enzyme Investigation]] report due at the end of the unit.
+- [ ] [[Enzyme Investigation]] report due on the first class of Unit 2.

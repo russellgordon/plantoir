@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 [[Name That Part]] runs for four minutes at the start of class and it is
 never really about naming. A part on the bench has its identity printed

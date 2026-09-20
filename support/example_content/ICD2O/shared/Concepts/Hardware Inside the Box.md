@@ -54,8 +54,33 @@ keeping gets written to storage. [[Connected Devices]] shows what
 happens when these parts shrink, multiply, and start talking to each
 other.
 
+## Matching hardware specifications to user requirements
+
+When evaluating hardware or preparing a recommendation for a user (as in
+[[The Device Recommendation]]), you assess component capacity against
+real workloads:
+
+- **General productivity and study** — a modest quad-core processor,
+  8–16 GB of RAM, and a 256–512 GB solid-state drive provide snappy
+  performance for web browsing, document writing, and video conferencing.
+- **Media creation and editing** — video production, audio editing, and
+  digital animation demand a multi-core processor, 32+ GB of RAM to hold
+  high-resolution timelines, a dedicated graphics processor (GPU) for
+  hardware-accelerated rendering, and fast multi-terabyte NVMe storage.
+- **Software development and data science** — requires a fast multi-threaded
+  CPU and 16–32 GB of RAM to run compilers, local databases, and test
+  environments without memory bottlenecks.
+- **Accessibility and ergonomic requirements** — selecting specialized
+  input devices (adaptive controllers, ergonomic keyboards, eye-tracking)
+  and high-contrast, low-latency monitors to meet specific physical needs.
+
+Tracing hardware numbers directly to what a user actually does is what turns
+a product specification sheet into sound advice.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[B1.1]]
+
+![[B2.3]]
 %%curriculum-end%%

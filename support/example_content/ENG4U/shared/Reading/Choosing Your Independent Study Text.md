@@ -4,8 +4,8 @@ publish: true
 created: __CREATED__
 enableToc: true
 ---
-[[The Independent Study]] runs from October to April and ends in an oral
-defence. Choose accordingly.
+[[The Independent Study]] runs from the first week to the last and ends in
+an oral defence. Choose accordingly.
 
 ## The rules
 
@@ -18,7 +18,7 @@ defence. Choose accordingly.
 
 ## A starting list
 
-| Text | Writer | Why it rewards six months |
+| Text | Writer | Why it rewards a semester of reading |
 | --- | --- | --- |
 | *Fifteen Dogs* | André Alexis | A philosophical premise executed exactly; Giller Prize, 2015 |
 | *The Break* | Katherena Vermette (Métis) | Multiple narrators, one night, and a community's response |

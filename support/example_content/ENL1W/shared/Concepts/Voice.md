@@ -38,7 +38,8 @@ for. Both are real skills, and knowing when to switch is the point. The
 voice in a group chat, a job application, and a personal essay should be
 recognisably the same person and unmistakably different registers.
 
-That is exactly what [[B1.5]] and [[D2.3]] ask you to be able to do, and
+That is exactly what [[B1.5|adapting word choice for an audience]] and
+[[D2.3|establishing an identifiable voice]] ask you to be able to do, and
 it is worth noticing that nobody thinks a lawyer talking to their friends
 is being unprofessional.
 

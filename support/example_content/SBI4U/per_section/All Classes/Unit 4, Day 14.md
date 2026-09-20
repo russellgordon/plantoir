@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: a loop you have not studied, taken
-   apart into its components
-2. Random groups — predict the disorder from a described failure
+   apart into its components: [[Homeostasis and Feedback]]
+2. Random groups — predict the disorder from a described failure: [[The Endocrine System]]
 
 ## Things to do before our next class
 

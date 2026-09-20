@@ -11,11 +11,12 @@ tags:
 ---
 ## Agenda
 
-1. Open clinic: your questions, in the order you bring them
-2. Individual conferences: where you stand, and what a good three hours
-   looks like for you
+1. Individual conferences: where you stand, and what a good three
+   hours looks like for you: [[Judging Your Own Work]]
+2. Open clinic: the three topics those conferences named most, then
+   your own questions in the order you bring them
 3. Last word: what MCV4U assumes on its first day, and which of those
-   assumptions you can now meet
+   assumptions you can now meet: [[Rates of Change]]
 
 ## Things to do before our next class
 

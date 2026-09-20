@@ -88,9 +88,13 @@ measure of spread that keeps appearing rather than the range.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B2.1]]
+
 ![[B2.2]]
 
 ![[B2.3]]
 
 ![[B2.4]]
+
+![[B2.5]]
 %%curriculum-end%%

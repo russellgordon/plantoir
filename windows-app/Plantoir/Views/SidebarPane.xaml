@@ -16,8 +16,16 @@
                       AutomationProperties.AutomationId="coursesSidebar">
                 <TreeView.ItemTemplate>
                     <DataTemplate x:DataType="views:SidebarRow">
+                        <!-- Menu and the clock badge both need Mode=OneWay: rows are
+                             RECONCILED, not recreated (row 172's own comment), so
+                             Menu is reassigned and ScheduledDeploy re-read on every
+                             Refresh() pass without this row's container ever being
+                             torn down. x:Bind defaults to OneTime — without OneWay
+                             here (and SidebarRow implementing INotifyPropertyChanged
+                             for both), a deploy scheduled after this row was first
+                             shown would be invisible until the app restarted. -->
                         <TreeViewItem ItemsSource="{x:Bind Children}" IsExpanded="{x:Bind IsExpanded}"
-                                      ContextFlyout="{x:Bind Menu}"
+                                      ContextFlyout="{x:Bind Menu, Mode=OneWay}"
                                       AutomationProperties.AutomationId="{x:Bind AutomationId}">
                             <StackPanel Orientation="Horizontal" Spacing="8" ToolTipService.ToolTip="{x:Bind Tooltip}">
                                 <FontIcon Glyph="{x:Bind Glyph}" FontSize="14" />
@@ -26,8 +34,22 @@
                                      Its own tooltip says when: the row's tooltip is about the
                                      section, and "at 6:30 tomorrow" belongs to the clock. -->
                                 <FontIcon Glyph="{x:Bind BadgeGlyph}" FontSize="12" Opacity="0.75"
-                                          Visibility="{x:Bind BadgeVisibility}"
-                                          ToolTipService.ToolTip="{x:Bind BadgeTooltip}" />
+                                          Visibility="{x:Bind BadgeVisibility, Mode=OneWay}"
+                                          ToolTipService.ToolTip="{x:Bind BadgeTooltip, Mode=OneWay}" />
+                                <!-- A warning, only on a section whose scheduled publish did
+                                     not get through. A SECOND icon rather than a second
+                                     meaning for the clock's: Glyph above is OneTime (it is a
+                                     constant, so that is right for it), and rows are
+                                     RECONCILED rather than recreated — so a slot that changed
+                                     from clock to warning after first render would keep the
+                                     clock's picture and take the warning's tooltip. A silently
+                                     wrong icon is worse than two icons. A success gets NO
+                                     badge: one beside every section that published fine
+                                     overnight is a badge nobody reads by Wednesday. -->
+                                <FontIcon Glyph="{x:Bind WarningGlyph}" FontSize="12"
+                                          Visibility="{x:Bind WarningVisibility, Mode=OneWay}"
+                                          ToolTipService.ToolTip="{x:Bind WarningTooltip, Mode=OneWay}"
+                                          AutomationProperties.AutomationId="scheduledPublishWarning" />
                             </StackPanel>
                         </TreeViewItem>
                     </DataTemplate>

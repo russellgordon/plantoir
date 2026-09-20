@@ -12,7 +12,7 @@ tags:
 
 1. The Thirteenth, Fourteenth, and Fifteenth Amendments read in order, as a sequence of decisions
 2. Reconstruction governments, and what Black officeholders achieved in them
-3. Work period
+3. [[Judging Your Own Work]] on your own draft, then the rest of the period to fix the weakest row
 
 ## Things to do before our next class
 

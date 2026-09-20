@@ -12,7 +12,8 @@ tags:
 
 1. Writing clinic: [[Using Evidence]]
 2. Quoting, paraphrasing, and weighing a source in a paragraph
-3. Work period
+3. Work period, with a checkpoint conference on your claim and your evidence —
+   you leave with one written note from me
 
 ## Things to do before our next class
 

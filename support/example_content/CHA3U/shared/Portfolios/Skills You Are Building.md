@@ -6,9 +6,11 @@ tags:
   - portfolios
   - unit-3
 ---
-An honest inventory, written in Unit 3 while there is still term left to act
-on it: what studying history is actually building in you, with a specific
-piece of your own work behind every claim.
+An honest inventory, written in class late in Unit 3 while there is still
+term left to act on it: what studying history is actually building in you,
+with a specific piece of your own work behind every claim. It is marked with
+the rest of [[The Historian's Portfolio]], and the criteria are on that
+page.
 
 Historical investigation is not one skill. It is a chain, and it breaks at
 whichever link you have not practised:
@@ -48,11 +50,14 @@ a source's purpose told you more than its content did.
 
 ## Work habits count as skills
 
-The curriculum names self-regulation and initiative explicitly. Describe one
-occasion this term when you noticed a task going wrong and changed your
-approach — a question you rewrote, a search you abandoned, a draft you
-restarted after an objection you could not answer. Naming that moment is
-harder and more useful than listing what you can do.
+The curriculum names self-regulation and initiative explicitly, and it asks
+for them applied "in everyday contexts" — which is the part that decides
+whether this counts. So describe one occasion OUTSIDE this class: another
+subject, a job, a team, something at home, where you noticed a task going
+wrong and changed your approach in a way you first practised here. Say what
+you changed it to. A habit that only ever appears in history homework has
+not transferred, and naming a real transfer is harder and more useful than
+listing what you can do.
 
 ## Revisit after the culminating task
 

@@ -36,8 +36,20 @@ forward; you accelerate because of the second one.
 > equal only because you are not accelerating. Step into a lift and one of
 > them changes.
 
+## Technologies that apply Newton's laws
+
+- **Friction engineering & athletic performance**: High-performance running shoes and climbing boots optimize static friction coefficients ($\mu_s$) against running tracks and rock faces, whereas low-friction carbon bearings and magnetic levitation reduce mechanical wear and energy loss in high-speed machinery.
+- **Vehicular safety & crumple zones**: Modern vehicles use polymer composite and plastic body panels engineered to crush progressively during impact. By extending the impact duration ($\Delta t$), the net decelerating force ($\vec{F}_{net} = m\Delta\vec{v}/\Delta t$) experienced by passengers is dramatically reduced.
+- **Biomechanical prosthetics**: Carbon-fibre blade prosthetics utilize elastic reaction forces and ground-reaction kinetics to replicate the action-reaction mechanics of human leg tendons.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[C1.1]]
+
+![[C1.2]]
+
+![[C2.2]]
 
 ![[C2.5]]
 

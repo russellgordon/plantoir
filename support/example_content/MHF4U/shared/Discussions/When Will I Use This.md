@@ -20,7 +20,7 @@ market, and every epidemiologist alive; this course walks you to its
 edge, and calculus answers it.
 
 The second answer is about transfer: you may never prove a compound
-angle formula after June, but you will spend a lifetime modelling
+angle formula after this course, but you will spend a lifetime modelling
 messy situations, checking claims before trusting them, and arguing
 from constraints. That training happens here whether the algebra
 resurfaces or not.

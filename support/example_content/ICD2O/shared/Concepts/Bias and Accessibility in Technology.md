@@ -52,8 +52,31 @@ the apologies afterward: who might this exclude, and what would
 include them? Clear wording, readable output, and no assumption that
 everyone sees, hears, or clicks the same way.
 
+## Building inclusive computational artifacts
+
+When authoring your own programs and computational artifacts (such as
+[[The Quiz Machine]], [[The Remix Project]], and [[Launch Day]]),
+accessibility and inclusion are active implementation choices:
+
+- **Readable text and contrast** — ensure high text contrast in terminal
+  and interface displays, avoid using colour alone to convey meaning (such
+  as providing clear text labels like `[SUCCESS]` or `[ERROR]`), and format
+  output with clean line spacing.
+- **Accessible language and cognitive load** — write direct, unambiguous
+  prompts, avoid obscure technical jargon, and allow users to read at their
+  own pace.
+- **Resilient and forgiving input handling** — normalize inputs using
+  `.strip().lower()`, accept common synonyms, and provide helpful error
+  recovery prompts when an unexpected input is entered so users are never
+  stranded by a crash.
+
+Designing with these principles produces computational artifacts that
+genuinely accommodate diverse audiences and contexts.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A1.3]]
 
 ![[A2.4]]
 

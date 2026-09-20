@@ -31,6 +31,25 @@ stay inside one country: moving production to wherever capital is used most
 efficiently can raise measured output while shifting emissions somewhere
 the accounts do not reach.
 
+## Global externalities and citizen action
+
+When economic activity crosses international borders, environmental and
+human costs often fall outside domestic legal protections:
+
+- **International environmental degradation.** Export-driven resource
+  extraction, agricultural deforestation, e-waste dumping in developing
+  nations, and cross-border greenhouse emissions create severe negative
+  externalities borne disproportionately by vulnerable global populations.
+- **Individual and group responses.** Consumers, workers, and advocacy
+  groups attempt to remedy these harms through ethical boycotts and
+  buycotts, fair-trade certifications, supply-chain due diligence, and
+  international environmental litigation.
+- **Assessing effectiveness.** Evaluating these initiatives requires
+  examining whether voluntary certification schemes genuinely change producer
+  behaviour or merely create high-margin niche markets, and whether citizen
+  pressure succeeds in compelling multinational firms to adopt enforceable
+  environmental and labour standards.
+
 ## Before you judge a development proposal
 
 Copy these questions into your notebook and answer them in writing. Nothing
@@ -52,4 +71,6 @@ should be the objective at all is [[Is Growth the Right Goal|Is Growth the Right
 ![[B3.1]]
 
 ![[B3.3]]
+
+![[E2.4]]
 %%curriculum-end%%

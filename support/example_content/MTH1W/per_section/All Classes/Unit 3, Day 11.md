@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Number talk: [[Fraction Talks]]
-2. [[A Data Story]], day 8 — working period: your graph, chosen for what it
+2. [[A Data Story]], day 6 of 9 — working period: your graph, chosen for what it
    shows rather than what looks good
 3. Conference with me: what does your graph NOT show?
 

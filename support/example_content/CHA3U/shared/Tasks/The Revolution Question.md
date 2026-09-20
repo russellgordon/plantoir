@@ -75,3 +75,40 @@ instincts already. For the shape of the essay, see
 
 ![[B3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 18, the working period that follows the self-check
+  Every student named their own weakest row on Day 17. Watch for whether
+  the change they now make is to THAT row, or to an easier one. This is the
+  first time the course asks anybody to act on their own judgement, and it
+  is the only moment you will ever be able to compare a stated intention
+  with the action taken: the essay arrives showing the final state of
+  everything and the history of nothing.
+  Going well: the named row is the one being worked on, and the student can
+  point at the paragraph that changed.
+  Stuck: twenty minutes of tidying footnotes and rereading the opening
+  while the row they called weakest is untouched. Not laziness — it is
+  almost always the row they do not know how to fix, which is exactly the
+  thing to know before you mark them.
+  Record: have them write the row they named at the top of the page on Day
+  17, so that on Day 18 it is in front of you. One tick if the work matches
+  it, and the name of what they did instead if it does not.
+
+TALK — Unit 1, Day 17, the conferences on claims that are not yet arguable
+  Ask: "Who alive in 1776 would be most annoyed by your claim, and what
+  would they say first?"
+  Then: "If they said that, which document would you reach for?"
+  A strong answer produces somebody from the period with an interest — a
+  Loyalist printer, a Mohawk council, a merchant with debts in London, a
+  woman with property she could not hold in her own name — rather than a
+  modern sceptic, and their first move is one the record actually
+  preserves. B1.4 asks for the significance of the political changes to be
+  assessed for DIFFERENT GROUPS, and a student who can only imagine a
+  present-day objector has an opinion about the Revolution rather than a
+  perspective on it. The essay cannot show you the difference.
+  Record: initials and the name of the objector they produced, one line.
+
+The product evidence is the argument handed in on Day 19.
+%%

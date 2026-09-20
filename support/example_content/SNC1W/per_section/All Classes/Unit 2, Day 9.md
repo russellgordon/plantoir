@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: where is the carbon in this room right now?
+1. Warm-up: where is the carbon in this room right now? [[The Carbon Cycle]]
 2. In groups: trace carbon, water, and nitrogen through the site you
-   sampled, on one poster
+   sampled, on one poster: [[The Nitrogen Cycle]] and [[The Water Cycle]]
 3. Consolidate: the cycles interact — the sphere diagram, drawn together
 
 ## Things to do before our next class

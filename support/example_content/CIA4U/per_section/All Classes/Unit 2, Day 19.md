@@ -10,9 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. [[The Intervention Argument]] defended, first half
-2. Each defence takes one hostile question from the floor
-3. Notebook
+1. [[The Intervention Argument]] defended, first half — three minutes each, the hostile question from the floor taken inside the three
+2. Notebook
 
 ## Things to do before our next class
 

@@ -14,10 +14,14 @@ tags:
    at any $x$ at all — then let $x^3$ dare you
 2. Consolidate: the derivative is itself a function — and the answers
    for $x^2$ and $x^3$ hint at a pattern worth naming
-3. Task due: [[The Speed Camera]] — defend your verdict out loud, with
-   [[Showing Your Thinking]] as the standard
-4. Journal collection — [[Journal Checklist]] is your last look before
-   handing in your Unit 1 volume
+3. Task due: [[The Speed Camera]] — three pairs defend to the whole room,
+   drawn at random, with [[Showing Your Thinking]] as the standard; the
+   rest defend to me while the room works. Two minutes, and one question
+   each, answered alone
+4. Last fifteen minutes: your own case note, written here — what sampled
+   data can never quite prove. It belongs to the task and is marked as
+   yours
+5. On the way out: [[Journal Checklist]], then your Unit 1 volume comes in
 
 ## Things to do before our next class
 

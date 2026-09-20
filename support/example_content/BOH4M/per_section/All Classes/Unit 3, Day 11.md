@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Strategic Review]]
+1. Launch: [[The Strategic Review]] — criteria read together, including which half of the written analysis is marked as yours
 2. Scoping conferences: pairs and organizations agreed
 3. Finding the documents; research time
 

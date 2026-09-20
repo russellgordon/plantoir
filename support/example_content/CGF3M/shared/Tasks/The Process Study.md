@@ -6,7 +6,7 @@ tags:
   - tasks
   - unit-1
 ---
-**Launched in the second week of Unit 1, due before the unit ends.**
+**Launched in the third week of Unit 1, due before the unit ends.**
 Individual. About 800 words plus a labelled diagram or profile drawn from
 your own field data.
 
@@ -59,7 +59,45 @@ Whichever you take, you must have your own measurements from
 
 ![[A1.4]]
 
-![[B1.1]]
+![[A1.6]]
 
 ![[B3.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 8, the shoreline field day, while profiles are
+  being surveyed
+  Watch for: whether a pair actually fixes the zero the method asks for,
+  or reads from wherever the water happens to be standing when it is
+  their turn. Both pairs will tell you they surveyed from the water's
+  edge, and both will be telling the truth; only one of them measured
+  from the same place twice. A profile built on a drifting datum plots
+  into a perfectly plausible curve, and nothing in the finished study can
+  show it, because the error is systematic and tidy.
+  Going well: somebody says "from here", puts something on the ground,
+  and the tape starts from it every time.
+  Stuck: the zero end of the tape moves between readings and nobody
+  mentions it.
+  Record: the pairs are already on your trip list — tick, cross or
+  question mark beside each. It takes the walk between two stations.
+
+TALK — Unit 1, Day 19, at the conferences already scheduled while the
+  GIS stacks build
+  Ask: "What would you have had to measure to be wrong about this?" A
+  strong answer names a specific reading and the value it would have had
+  to take. It tells you whether the inference is fastened to the evidence
+  or floating above it.
+  Then: "Somebody surveys your site a year from now and gets exactly the
+  same numbers. Does that support you or embarrass you?" A strong answer
+  works out what their own rate predicts over twelve months and sets it
+  against their measurement error. That is A1.6 heard — findings
+  synthesised into a prediction — and a written study can state a rate
+  without anyone ever having done that arithmetic.
+  Record: three columns in the day plan — name, the falsifier they
+  named, and a tick if the second answer had a number in it.
+
+The product evidence is the study itself, handed in on Unit 1, Day 21.
+That one arrives on its own.
+%%

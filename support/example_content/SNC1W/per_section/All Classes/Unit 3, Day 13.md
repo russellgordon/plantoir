@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[Product Life Cycle Analysis]], day 3 — working period: extraction,
-   manufacture, use, and disposal — the chemistry at each stage
+1. [[Product Life Cycle Analysis]], day 3 — working period, starting from
+   what yesterday's conference turned up: extraction, manufacture, use, and
+   disposal — the chemistry at each stage
 2. Where a skilled trade does this work, named
 
 ## Things to do before our next class

@@ -17,3 +17,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Journal: what the model made obvious that the diagram did not.
+- [ ] Bring [[Biotechnology Brief]] to hand in next class.

@@ -17,7 +17,8 @@ tags:
 3. Bench time: [[Solder a Board]] — joints on scrap until they are
    shiny and concave, then the real board
 4. Launch: [[The Working Circuit]] — calculated before it is built and
-   measured after; the bench periods count, per [[How Marks Work]]
+   measured after. Read its criteria table today; it is published before
+   you start, the way [[How Marks Work]] promises
 5. Photograph every stage as you go: [[Documenting Your Build]]
 
 ## Things to do before our next class

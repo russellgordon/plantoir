@@ -7,8 +7,8 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual research, presented in pairs · researched during Weeks 9–10 ·
-> interviews performed Week 10 · about three minutes each
+> Individual research, presented in pairs · launched on Unit 3, Day 20 ·
+> interviews performed on Unit 4, Day 4 · about three minutes each
 
 ## What you are making
 
@@ -44,6 +44,12 @@ research shows the moment a question goes off script.
    breaking character to say it is not. Your professional has their own
    way of not knowing things.
 
+> [!note] Two of you are in the room, and only one of you is being marked
+> The research is yours and the three minutes in role are yours. I mark
+> those. Your partner's questions are not marked against you, and yours are
+> not marked against them — but a partner who asks lazily gives you nothing
+> to be good at, which is why step 3 matters.
+
 ## Success criteria
 
 | Quality | What it looks like |
@@ -71,3 +77,38 @@ research shows the moment a question goes off script.
 
 ![[C1.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 21, the working period drafting and testing questions
+  Watch for crossings-out. A student drafting questions they actually want
+  answered rejects several on the way; a student writing questions to be
+  safe writes five and stops. The criteria table asks for real questions and
+  on the day you will hear whether they were — what you cannot hear is
+  where they came from. In this period curiosity and safety look completely
+  different; three minutes into an interview they do not.
+  Going well: a page with more struck-through lines than surviving ones,
+  and a partner being asked "would you really answer that?"
+  Stuck: five tidy questions, all of them beginning "what are your".
+  Record: one of three marks against each name on your class list —
+  struck, tidy, blank.
+
+TALK — Unit 4, Day 5, while the companies block on their feet
+  This is the one task whose conversation evidence arrives AFTER the
+  presentation, and it is worth waiting for: by Day 5 every student is
+  holding a real production role, and B3.3 is evaluated again on the
+  culminating anyway. Two minutes each while their company works.
+  Ask: "Which part of this job would people be surprised is part of it?"
+  Then: "Whose job did you have to wait on today, and whose was waiting on
+  you?"
+  A strong answer to the second maps an actual dependency — the stage
+  manager waiting on blocking before the book can be written, the designer
+  waiting on a decision nobody has made — in the words the job uses. That
+  is B3.3 from inside the role rather than performed in it, and C1.3
+  arrives in the same answer if you listen for it instead of asking for it.
+  Record: two words per student on your day plan — the surprise, and the
+  dependency.
+
+The product evidence is the three minutes in role on Unit 4, Day 4.
+%%

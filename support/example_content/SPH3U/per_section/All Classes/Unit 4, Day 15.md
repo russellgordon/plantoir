@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint, on your own: waves and sound
+1. Checkpoint, on your own: waves and sound: [[Waves and Sound Practice]]
 2. Mark your own; revision list written
-3. Look ahead: the last unit, and the one that pays the bills
+3. Look ahead: the last unit, and the one that pays the bills — [[Sound Waves]]
 
 ## Things to do before our next class
 

@@ -109,6 +109,43 @@ load averages it: a motor's inertia and a filter both do, and an
 oscilloscope emphatically does not, which is why PWM looks like a square
 wave on a scope and behaves like a voltage to the motor.
 
+## Why this got cheap
+
+Neither of these promises is new. The mathematics was settled before
+anybody in this room was born, and the reason a phone in your pocket now
+captures fifty megapixels and records twenty-four bit audio is not that
+the theory improved — it is that the *other* parts of a computer caught
+up with it.
+
+Follow one of them through. A 12-megapixel image at 12 bits per colour
+per pixel is about 54 MB before compression. Capturing it means moving
+that off the sensor faster than the shutter interval, holding it while
+the processor works on it, and then storing it somewhere it survives
+losing power. In 1995 each of those three was the binding constraint:
+the bus could not carry it, the memory could not hold it, and the disk
+could not take it quickly enough or often enough. None of them is
+binding now, and the sensor design that was uneconomic then is ordinary.
+
+That is the pattern worth taking out of this course, because it repeats.
+Advances in processors, memory and storage do not stay in the computer —
+they arrive as capability in whatever the computer is attached to. Cheap
+flash storage is why a handheld device can record video at all. Falling
+memory prices are why a camera can hold a burst instead of one frame.
+Processors fast enough to run the arithmetic in real time are why a
+phone can correct a lens's distortion between the shutter and the
+preview. The enabling advance is usually one layer down from the product
+that gets the attention, and it is almost never the part named in the
+advertisement.
+
+Two consequences for the way you specify things. **The constraint moves,
+so date your assumptions** — "too much data to store" is a claim with a
+year attached to it, and a design that was right in 2015 may be
+needlessly cramped now. And **the constraint is somewhere**, so find out
+where before you optimise: the storage question in
+[[Storage Systems and Arrays]] and the measurement discipline in
+[[Firmware and System Optimisation]] both exist because guessing which
+layer is the bottleneck is reliably wrong.
+
 Do the arithmetic in [[Sampling and Resolution Practice]], capture real
 signals in [[Sample a Signal]], and write the sample rate, the reference
 voltage, and the filter cutoff into your build notes. A stored dataset
@@ -117,6 +154,8 @@ picture of some numbers.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A1.3]]
 
 ![[A5.5]]
 

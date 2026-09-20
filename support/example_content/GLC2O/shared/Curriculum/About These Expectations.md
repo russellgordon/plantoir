@@ -24,7 +24,7 @@ of Education and **effective September 2024**.
 
 Career Studies is a **half credit — 55 hours**, normally taken in the
 same semester as Civics and Citizenship rather than across a full one.
-In this example course it runs from September to early November, and the
+In this example course it runs across the first half of the semester, and the
 Civics and Citizenship course (CHV2O) picks up the same period the school
 day after it ends.
 

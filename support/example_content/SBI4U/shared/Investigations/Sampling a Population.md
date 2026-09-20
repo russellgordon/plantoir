@@ -41,9 +41,9 @@ then invertebrates outdoors.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[F2.3]]
-
-![[F2.3]]
-
 ![[A1.5]]
+
+![[F2.2]]
+
+![[F2.3]]
 %%curriculum-end%%

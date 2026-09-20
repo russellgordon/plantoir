@@ -15,8 +15,9 @@ tags:
    of this course
 2. Then the habit that ran through everything: document it, or it did not
    happen
-3. What the final evaluation asks of you: [[The Shop Showcase]], part by
-   part
+3. The one piece of the final evaluation still to come: your
+   [[Final Reflection]], finished in class next period — and what a
+   claim with two dated entries behind it actually reads like
 
 ## Things to do before our next class
 

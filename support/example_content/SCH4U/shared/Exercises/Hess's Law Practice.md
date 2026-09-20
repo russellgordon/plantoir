@@ -54,7 +54,7 @@ $\ce{2H2O(g) -> 2H2O(l)}$?
 >
 > **For the water:** two operations, applied in either order.
 >
-> $\begin{aligned} \text{Reverse:}\quad \ce{H2O(g)} &\rightarrow \ce{H2O(l)} & \Delta H &= -44.0\ \text{kJ} \\ \text{Multiply by 2:}\quad \ce{2H2O(g)} &\rightarrow \ce{2H2O(l)} & \Delta H &= -88.0\ \text{kJ} \end{aligned}$
+> $\begin{aligned} \text{Reverse:}\quad \ce{H2O(g)} &\ce{-> H2O(l)} & \Delta H &= -44.0\ \text{kJ} \\ \text{Multiply by 2:}\quad \ce{2H2O(g)} &\ce{-> 2H2O(l)} & \Delta H &= -88.0\ \text{kJ} \end{aligned}$
 >
 > **$\Delta H = -88.0$ kJ.**
 >
@@ -84,7 +84,7 @@ $\text{(2)}\ \ce{CO(g)} + \tfrac{1}{2}\ce{O2(g) -> CO2(g)} \qquad \Delta H_2 = -
 > Equation (2) has carbon monoxide on the **left** and the target needs
 > it on the right, so **reverse** (2) and flip its sign.
 >
-> $\begin{aligned} \ce{C(s) + O2(g)} &\rightarrow \ce{CO2(g)} & \Delta H &= -393.5\ \text{kJ} \\ \ce{CO2(g)} &\rightarrow \ce{CO(g)} + \tfrac{1}{2}\ce{O2(g)} & \Delta H &= +283.0\ \text{kJ} \end{aligned}$
+> $\begin{aligned} \ce{C(s) + O2(g)} &\ce{-> CO2(g)} & \Delta H &= -393.5\ \text{kJ} \\ \ce{CO2(g)} &\ce{-> CO(g)} + \tfrac{1}{2}\ce{O2(g)} & \Delta H &= +283.0\ \text{kJ} \end{aligned}$
 >
 > Add them. $\ce{CO2}$ appears on the right of the first and the left
 > of the second, so it cancels completely. On the oxygen: one whole
@@ -122,7 +122,7 @@ $\text{(2)}\ \tfrac{1}{2}\ce{N2(g) + O2(g) -> NO2(g)} \qquad \Delta H_2 = +33.2\
 > multiplied by 2. It has **two** $\ce{NO}$ on the left, and (1) makes
 > $\ce{NO}$ on the right, so (1) is reversed **and** multiplied by 2.
 >
-> $\begin{aligned} 2 \times \text{(2)}:\quad \ce{N2(g) + 2O2(g)} &\rightarrow \ce{2NO2(g)} & \Delta H &= 2(+33.2) = +66.4\ \text{kJ} \\ 2 \times \text{reverse (1)}:\quad \ce{2NO(g)} &\rightarrow \ce{N2(g) + O2(g)} & \Delta H &= 2(-90.3) = -180.6\ \text{kJ} \end{aligned}$
+> $\begin{aligned} 2 \times \text{(2)}:\quad \ce{N2(g) + 2O2(g)} &\ce{-> 2NO2(g)} & \Delta H &= 2(+33.2) = +66.4\ \text{kJ} \\ 2 \times \text{reverse (1)}:\quad \ce{2NO(g)} &\ce{-> N2(g) + O2(g)} & \Delta H &= 2(-90.3) = -180.6\ \text{kJ} \end{aligned}$
 >
 > Add. $\ce{N2}$ cancels completely. Oxygen: $\ce{2O2}$ in on the
 > left, $\ce{O2}$ out on the right, leaving one $\ce{O2}$ on the
@@ -241,7 +241,7 @@ $\text{(3)}\ \ce{H2(g)} + \tfrac{1}{2}\ce{O2(g) -> H2O(l)} \qquad \Delta H = -28
 > - $\ce{C2H6}$ is needed on the **right**, and (2) has it on
 >   the left. **Reverse (2).**
 >
-> $\begin{aligned} \ce{C2H4 + 3O2} &\rightarrow \ce{2CO2 + 2H2O} & \Delta H &= -1411\ \text{kJ} \\ \ce{H2} + \tfrac{1}{2}\ce{O2} &\rightarrow \ce{H2O} & \Delta H &= -285.8\ \text{kJ} \\ \ce{2CO2 + 3H2O} &\rightarrow \ce{C2H6} + \tfrac{7}{2}\ce{O2} & \Delta H &= +1560\ \text{kJ} \end{aligned}$
+> $\begin{aligned} \ce{C2H4 + 3O2} &\ce{-> 2CO2 + 2H2O} & \Delta H &= -1411\ \text{kJ} \\ \ce{H2} + \tfrac{1}{2}\ce{O2} &\ce{-> H2O} & \Delta H &= -285.8\ \text{kJ} \\ \ce{2CO2 + 3H2O} &\ce{-> C2H6} + \tfrac{7}{2}\ce{O2} & \Delta H &= +1560\ \text{kJ} \end{aligned}$
 >
 > Cancel across the sum. $\ce{2CO2}$ appears on the right of the
 > first and the left of the third — gone. Water: 2 plus 1 is 3 on the

@@ -104,49 +104,96 @@ final class FileFormatsContractTests: XCTestCase {
 
             The lesson.
             """
+            // Every case carries `sectionLocal`, and the READ deliberately
+            // does not use it: the build consults all four keys on every page
+            // it copies, wherever that page lives. It is unwrapped anyway so
+            // that a case written without it fails here rather than on
+            // Windows, whose writing side still needs it.
+            _ = try XCTUnwrap(
+                testCase["sectionLocal"] as? Bool,
+                "A reading case must still say whether the page is section-local: \(frontmatter)"
+            )
             let visible: Bool = AssistPageVisibility.publishes(
                 in: page,
-                forSection: testCase["section"] as? Int ?? 1,
-                isSectionLocal: try XCTUnwrap(testCase["sectionLocal"] as? Bool)
+                forSection: testCase["section"] as? Int ?? 1
             )
-            XCTAssertEqual(visible, testCase["expectVisible"] as? Bool, frontmatter)
+            var message: String = frontmatter
+            if let reason = testCase["why"] as? String {
+                message = frontmatter + " — " + reason
+            }
+            XCTAssertEqual(visible, testCase["expectVisible"] as? Bool, message)
         }
     }
 
-    /// The writing rules, which are where the legacy spelling actually bites:
-    /// a page written as `draft:` keeps that key, INVERTED.
-    func testTheLegacySpellingIsKeptAndInverted() throws {
-        let old: String = """
-        ---
-        title: Unit 1, Day 1
-        draft: true
-        ---
-
-        The lesson.
-        """
-        let published = AssistPageVisibility.setting(
-            published: true, in: old, forSection: 1, isSectionLocal: true
+    /// The writing rules, run as data rather than restated here.
+    ///
+    /// This test used to assert the OPPOSITE — that a page written as `draft:`
+    /// kept that key, inverted — in sentences typed into this file. The
+    /// contract said migrate, from 2026-09-07; the app kept inverting; and the
+    /// suite stayed green for two days because the test agreed with the code
+    /// instead of with the contract. Reading `writingCases` is what stops that
+    /// happening again.
+    ///
+    /// Windows runs the same list as of 2026-09-19 —
+    /// `FileFormatContractTests.TheWritingCasesInTheContractAreFollowed`,
+    /// issue #138, which replaced five of these cases retyped into that file.
+    /// Until then this comment said Windows did NOT run it, which was true when
+    /// written and is the second time in two days this paragraph has been
+    /// wrong: a claim about what the other side runs is how a divergence
+    /// survives review, so it is worth re-checking rather than repeating.
+    /// (Corrected from the Windows side, 2026-09-19, comment only.)
+    func testTheLegacySpellingIsMigratedToTheCurrentOne() throws {
+        let section: [String: Any] = try FileFormatsContractTests.section("pageVisibility")
+        let group: [String: Any] = try XCTUnwrap(section["writingCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
+        // A FLOOR, not a census — Windows' own runner carries one for the same
+        // reason (`>= 10`, raised here to what the list holds today). A loop
+        // over a list an edit has emptied passes having run nothing, which is
+        // exactly the failure this whole file exists to prevent. Raise it when
+        // cases are added; never lower it to make an edit go through.
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 13,
+            "contracts/file-formats.json → pageVisibility.writingCases has shrunk"
         )
-        XCTAssertTrue(published.changed)
-        XCTAssertTrue(published.text.contains("draft: false"), published.text)
-        XCTAssertFalse(published.text.contains("publish:"),
-                       "The teacher's own spelling is kept — rewriting the key changes a page they did "
-                       + "not ask to have changed.")
 
-        // Writing the value it already has changes nothing, so the file's
-        // modification time is left alone and the next build is not fooled.
-        let again = AssistPageVisibility.setting(
-            published: true, in: published.text, forSection: 1, isSectionLocal: true
-        )
-        XCTAssertFalse(again.changed)
-        XCTAssertEqual(again.text, published.text)
+        for testCase in cases {
+            let before: String = try XCTUnwrap(testCase["before"] as? String)
+            let why: String = (testCase["why"] as? String) ?? ""
+            let result: (text: String, changed: Bool) = AssistPageVisibility.setting(
+                published: try XCTUnwrap(testCase["setVisible"] as? Bool),
+                in: before,
+                forSection: testCase["section"] as? Int ?? 1,
+                isSectionLocal: try XCTUnwrap(testCase["sectionLocal"] as? Bool)
+            )
+            XCTAssertEqual(result.text, try XCTUnwrap(testCase["after"] as? String), why)
+            XCTAssertEqual(result.changed, try XCTUnwrap(testCase["expectChanged"] as? Bool), why)
+        }
+    }
 
-        // A page with no frontmatter at all gets a block of its own.
-        let bare = AssistPageVisibility.setting(
-            published: false, in: "Just a page.", forSection: 1, isSectionLocal: true
+    /// The two properties the case list cannot state as a before-and-after
+    /// pair, both of them about a file this app did not write.
+    func testMigrationLeavesAWindowsWrittenFileAsItFoundIt() throws {
+        // A page saved on Windows carries CRLF. Migrating a line must put the
+        // carriage return back, or that one line quietly becomes LF and the
+        // teacher's next commit shows a whole-file change.
+        let windowsWritten: String = "---\r\ntitle: Day one\r\ndraftSection1: true\r\n---\r\nBody.\r\n"
+        let migrated = AssistPageVisibility.setting(
+            published: true, in: windowsWritten, forSection: 1, isSectionLocal: false
         )
-        XCTAssertTrue(bare.changed)
-        XCTAssertTrue(bare.text.hasPrefix("---\npublish: false\n---\n"), bare.text)
+        XCTAssertTrue(migrated.changed)
+        XCTAssertEqual(
+            migrated.text,
+            "---\r\ntitle: Day one\r\npublishForSection1: true\r\n---\r\nBody.\r\n"
+        )
+
+        // An INDENTED key belongs to some other mapping, not to the page. A
+        // migration that touched it would change something the teacher never
+        // asked about — so the page's own key is added instead.
+        let nested: String = "---\nsomething:\n  draft: true\n---\nBody.\n"
+        let added = AssistPageVisibility.setting(
+            published: false, in: nested, forSection: 1, isSectionLocal: true
+        )
+        XCTAssertEqual(added.text, "---\npublish: false\nsomething:\n  draft: true\n---\nBody.\n")
     }
 
     // MARK: - Has this section ever been deployed to where it is going NOW?

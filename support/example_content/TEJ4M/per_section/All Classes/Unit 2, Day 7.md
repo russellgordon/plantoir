@@ -19,7 +19,8 @@ tags:
    system can see, and the fastest change it can honestly report
 4. Apply it to your own specification: how many millivolts is one
    count, and is that fine enough for the thing you promised?
-5. Practise: [[Sampling and Resolution Practice]]
+5. Practise: [[Sampling and Resolution Practice]], and the bench record
+   in at tools-away
 
 ## Things to do before our next class
 

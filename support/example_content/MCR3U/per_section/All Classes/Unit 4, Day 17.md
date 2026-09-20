@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[Your Financial Future]], day 6 — working period: the recommendation,
-   written for the person whose decision it is
+1. [[Your Financial Future]], day 6 — working period: the page of plain
+   advice to your future self, starting with the row you judged weakest
+   yesterday
 2. Read it aloud to somebody who is not in this course
 
 ## Things to do before our next class
 
-- [ ] Recommendation finished; it is due next class.
+- [ ] Plan finished; it is due next class.

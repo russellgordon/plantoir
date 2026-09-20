@@ -53,7 +53,7 @@ in and the reader can check you. [[The Critical Analysis Process]] sets the
 method out at length, and [[Content and Interpretation]] — what was danced
 against what it communicated — is the distinction most of your paragraphs turn
 on. Practise small: four lines in [[Your Movement Journal]] after every class
-is what makes [[The Dance Review]] possible by March.
+is what makes [[The Dance Review]] possible by the end of the course.
 
 %%curriculum-start%%
 ## Curriculum connection

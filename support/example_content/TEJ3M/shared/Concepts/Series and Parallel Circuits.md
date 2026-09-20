@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 [[The Prediction Contest]] put two circuits side by side with identical
 parts in them, and asked which would draw more current. Half the room got

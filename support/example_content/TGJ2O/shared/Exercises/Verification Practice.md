@@ -67,4 +67,6 @@ find the source, find the date, find the original context — in order.
 ![[B2.3]]
 
 ![[C2.5]]
+
+![[C2.2]]
 %%curriculum-end%%

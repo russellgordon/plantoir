@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] A page of observational drawing.
+- [ ] A page of observational drawing, and the book up to date for the
+      check next class.

@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[Tech Headlines]] — a breach, whoever it was this week
 2. Explore: [[The Phishing Gallery]] — real messages, and the tell in
-   each one
+   each one. Commit to a verdict on paper before anybody talks; what
+   the room commits to is how I find out where this unit starts
 3. Compare and name it: [[Staying Secure Online]] — the layers, and
    which one is actually you
 

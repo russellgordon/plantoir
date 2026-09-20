@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Survey practice indoors: classifying land use from imagery
+1. Survey practice indoors: classifying land use from imagery: [[Land Use in a Community]]
 2. What imagery cannot tell you
-3. Unit 3 consolidation
+3. Unit 3 consolidation: preparing for [[The Land Use Walk]]
 
 ## Things to do before our next class
 

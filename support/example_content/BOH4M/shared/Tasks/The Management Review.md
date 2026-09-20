@@ -7,7 +7,7 @@ tags:
   - unit-4
 ---
 **The culminating task. Eight class periods in Unit 4, ending with the
-hand-over.** Teams of three or four.
+hand-over.** Teams of three or four, marked individually.
 
 A real organization. A real management question. A review, delivered to
 the people who could act on it.
@@ -59,6 +59,19 @@ Every recommendation is checked against [[The Law at Work]] and
 [[The Ground Rules of Change]] before it goes to the client. A
 recommendation that is illegal is not a recommendation.
 
+## What is marked as yours
+
+There is no team mark. On Day 2, when the brief is signed off, each of
+you takes **one recommendation** and it stays yours: you gather the
+evidence for it, you write the section of the review that carries it,
+you defend it at the Day 5 checkpoint, and you take the client's
+questions on it at the hand-over. Three or four people therefore hand
+over one review and leave with three or four marks.
+
+The written review is still one document with one voice — you edit each
+other, and you should. Put a name against each section in the draft so
+that neither you nor I lose track of whose reasoning is whose.
+
 ## How it is marked
 
 | Criterion | What earns the marks |
@@ -67,13 +80,17 @@ recommendation that is illegal is not a recommendation.
 | Analysis | Course tools used where they fit, not sprinkled |
 | Recommendations | Specific, costed, legal, and something this client could actually start |
 | Communication | Twelve minutes that a busy person would find worth their time |
-| Professionalism | The client is treated as a client — on time, prepared, discreet |
+| Fit to the client | YOUR section answers the question the client actually asked, in a form they could use on Monday — not the question that turned out to be easiest to research |
 
 > [!warning] You are guests in someone's organization
 > Anything you are told in confidence stays out of the report unless you
 > have asked. If a recommendation would embarrass a named person, find
-> the version that fixes the system instead. That judgement is part of
-> the mark.
+> the version that fixes the system instead — a recommendation that
+> blames somebody is one no client can act on, so that judgement shows up
+> under Recommendations. Being on time, prepared and discreet is not part
+> of your percentage; it is reported with your learning skills, and it is
+> the condition on which somebody let you through the door. See
+> [[How Marks Work]].
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -94,3 +111,69 @@ recommendation that is illegal is not a recommendation.
 
 ![[E3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 16, Day 3 of 8, the teams working in the room on
+  document analysis and interview practice
+  Watch for: what the questions they are rehearsing are actually about. A
+  team asking who reports to whom will come back with a chart. A team
+  asking what a person's Tuesday contains — what they do first, what
+  they wait for, what they redo — will come back with something they can
+  compare against a job-design approach. The written review can produce a
+  competent job-design paragraph out of the course notes alone and it
+  reads perfectly well, which is precisely why this half hour is the only
+  place the difference shows. That is E2.2 (compare alternative
+  job-design approaches), which cannot be done honestly for a job nobody
+  has described to you.
+  Going well: a rehearsed question that would get a surprising answer,
+  and a team that changes it after hearing itself say it.
+  Stuck: five questions that could all be answered from the
+  organization's website.
+  Record: one line per team on the day plan. Some teams are off-site this
+  period; catch those at the Day 18 checkpoint and note which ones you
+  owe an observation to.
+
+TALK — Unit 4, Day 18, Day 5 of 8, the twelve-minute checkpoint
+  conference with each team — put both questions to each member
+  individually, because these are the marks that differ within the team
+  Ask: "If this client hired one more person tomorrow, which job would
+  you design for them — and which existing job changes?" A strong answer
+  redistributes work rather than adding a helper, and can say which
+  approach it is using and why. That is E2.2 again, heard rather than
+  written. Every team can answer it whatever they scoped, and that is the
+  point: the task asks a team to engage with three of the five areas, so
+  the seven codes on this page are reached by the CLASS's reviews
+  together rather than by each team's. This question is how a team that
+  scoped recruitment still gives you E2.2 — they have spent eight periods
+  inside the place and they know what the jobs contain.
+  Then, and only if a team finishes early: "Which of the current
+  structures is this client closest to — team, network, boundaryless, or
+  none of them — and where has that structure already cost them
+  something?" A strong answer names the structure and then produces the
+  bill: the same decision waiting on the same desk twice a week, two
+  people doing the same job in different departments, a customer who has
+  to be handed on three times. That is E1.2 (assess current
+  organizational structures — e.g., team, network, boundaryless — with
+  respect to the ways in which they increase productivity and competitive
+  advantage), asked from the cost side on purpose. Current Structures has
+  a section headed "What they are buying" and Day 2's agenda says "what
+  each is buying", so the gain side is a page they can recite; the cost
+  side is not written anywhere.
+  Do not ask which tools the evidence calls for. That is printed as the
+  second agenda item on Day 17, the class before this one.
+  Plan for ONE question, not two. Six to eight teams at twelve minutes is
+  longer than the period, which is why the agenda has the other teams
+  testing each other's findings while you work down the list; expect to
+  finish two or three teams in Day 19's working period instead, and write
+  their names down now. The first question is the one that must reach
+  everybody, because it is the mark that differs within a team.
+  Record: a grid on one sheet, teams down and members across, a letter in
+  each cell.
+
+The product evidence is the written review, the one-page implementation
+note, and the twelve-minute hand-over on Day 21. Gather nothing at the
+Day 20 rehearsal or the Day 21 hand-over — you are timing one and hosting
+the client at the other.
+%%

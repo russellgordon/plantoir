@@ -16,8 +16,9 @@ tags:
    the environmental cost, and the Essential Skills
 3. Then the habit that ran through everything: plan it, check it, credit
    it, file it
-4. What the final evaluation asks of you: [[Publication Day]], role by
-   role
+4. Look back at what the final evaluation asked of you:
+   [[Publication Day]], role by role — the evidence your
+   [[Final Reflection]] can now cite
 
 ## Things to do before our next class
 

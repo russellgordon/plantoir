@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: four claims — which one is unsupported?
+1. Warm-up: four claims — which one is unsupported? [[Natural and Human Influences on Climate]]
 2. Consolidation: one climate claim, taken all the way — the mechanism,
    the evidence, the uncertainty, and what it would take to change your
-   mind
+   mind: [[Science in the News]]
 3. Look ahead: the last unit is light, and it behaves itself
 
 ## Things to do before our next class

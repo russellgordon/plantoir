@@ -145,9 +145,13 @@ where one system stops being responsible and another takes over.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.5]]
+
+![[B2.5]]
+
 ![[B2.6]]
 
-![[B3.5]]
+![[B2.7]]
 
-![[A1.5]]
+![[B3.5]]
 %%curriculum-end%%

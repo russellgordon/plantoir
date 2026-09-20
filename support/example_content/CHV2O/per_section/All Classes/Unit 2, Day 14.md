@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[Whose Voice Is Missing]] handed in
+1. The first fifteen minutes: act on what the conference found, then [[Whose Voice Is Missing]] handed in
 2. Recommendations read aloud and tested by the class
 3. Retrieval across Unit 2
 

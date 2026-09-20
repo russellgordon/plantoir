@@ -35,7 +35,13 @@ Paper models of transcription and translation, then deliberate damage.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
+![[D2.1]]
+
 ![[D2.2]]
+
+![[D2.4]]
 
 ![[D3.4]]
 %%curriculum-end%%

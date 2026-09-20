@@ -67,3 +67,41 @@ reader is part of the mark.
 
 ![[C2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 5, where historical air photographs are set
+  against current imagery
+  Watch for: what a student treats as "before". Most will open the
+  oldest photograph the archive holds and start from there. A few will
+  ask what the site was doing before the camera existed, and go to the
+  soil survey, the drainage record or the surveyor's plan for it. The
+  written argument cites the photograph either way, and reads equally
+  confident about a baseline that in one case was established and in the
+  other was simply the earliest thing available.
+  Going well: somebody says out loud that the drainage predates the
+  imagery, and goes looking for what would show it.
+  Stuck: the soil survey the agenda asks for is downloaded and never
+  opened, and the oldest photograph is captioned "the original site".
+  Record: a tick on the shortlist beside anybody who went past the
+  imagery, and the source they went to. One pass down the room.
+
+TALK — Unit 3, Day 12, at the conferences already scheduled that period
+  Ask: "You have written that the modification changed the hazard. Undo
+  the modification — does the hazard go with it?" A strong answer says
+  which part is reversible and which is now permanent, and over what
+  time. That is C2.2 heard: whether the human change increased the
+  possibility of a disaster, or merely arrived at the same time as one.
+  Then: "Something stopped moving on this site — water, sediment, air
+  or roots. Name it, and say where it goes instead." A strong answer
+  gives a mechanism rather than a category, and can point at where the
+  material or the water ended up. That is C2.1, the modification's
+  effect on the natural system, said in one sentence; a written argument
+  can describe the modification at length without ever getting to this.
+  Record: one line per student on the conference list — yes, no or
+  partly for the reversal, and the thing they named as stopped.
+
+The product evidence is the argument itself, handed in on Unit 3,
+Day 13. That one arrives on its own.
+%%

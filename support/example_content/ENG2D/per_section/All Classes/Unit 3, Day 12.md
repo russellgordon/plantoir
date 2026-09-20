@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. The ending, argued: hopeful, ominous, or both, with passages
-2. Aileen on the word "apocalypse", and what it reframes
+1. The ending, argued: hopeful, ominous, or both, with passages: [[Moon of the Crusted Snow]]
+2. Aileen on the word "apocalypse", and what it reframes: [[Theme and Thesis]]
+3. Your five-minute predictions from Day 1, handed back — read them
+   against the book you have just finished
 
 ## Things to do before our next class
 

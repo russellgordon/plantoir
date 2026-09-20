@@ -5,8 +5,8 @@ created: __CREATED__
 tags:
   - number-talks
 ---
-Two options on the board — "be paid $14 per hour, or $9 per hour plus
-a $40 shift bonus?" — and one rule: your preference is worthless until
+Two options on the board — "be paid \$14 per hour, or \$9 per hour plus
+a \$40 shift bonus?" — and one rule: your preference is worthless until
 mathematics backs it. Most good prompts hide a third answer behind the
 two printed ones: *it depends* — and the game is finding on what.
 
@@ -18,7 +18,7 @@ two printed ones: *it depends* — and the game is finding on what.
 
 > [!example]- The shift-bonus duel, argued (click to expand)
 > - "Bonus, always — free money the moment you walk in."
-> - "A four-hour shift pays $56 flat but $76 with the bonus. Short
+> - "A four-hour shift pays \$56 flat but \$76 with the bonus. Short
 >   shifts, take the bonus."
 > - "Set them equal: $14h = 9h + 40$ gives $h = 8$. Eight hours is
 >   the tipping shift; longer than that, the flat rate wins."

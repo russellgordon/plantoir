@@ -10,6 +10,9 @@ than once, with a different question each time.
 Read [[Fieldwork Safety and Ethics]] before the first one — it is the
 agreement that keeps these days possible.
 
+Four of these days end with a marked entry written in the room before
+you leave: [[The Field Record]] says what each one has to do.
+
 **Unit 1 — The land itself**
 
 - [[Fieldwork Safety and Ethics]]

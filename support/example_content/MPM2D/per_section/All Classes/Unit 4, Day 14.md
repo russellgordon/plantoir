@@ -11,10 +11,17 @@ tags:
 ## Agenda
 
 1. Number talk: [[Graph Talks]]
-2. [[The Math Symposium]], day 1 — working period: choose the work you will
-   present, one piece from each unit
-3. Rehearse the two questions every station must answer
+2. [[The Math Symposium]], day 1 — read its criteria table first, then
+   choose your one exhibit: the problem from this course that fought you
+   hardest, re-solved better than you solved it then, or an idea from it
+   carried a step past where class stopped
+3. Working period: rebuild the exhibit, and draft the growth statement
+   beside it — [[Showing Growth]] is the shape it takes, and every claim
+   in it is cited to a dated entry in your [[Math Journal]]
+4. Rehearse the defended conversation with a partner: the questions a
+   visitor will actually ask, not the ones you were hoping for
 
 ## Things to do before our next class
 
-- [ ] Station planned; both questions rehearsed.
+- [ ] Exhibit and growth statement ready to set out; conversation
+      rehearsed.

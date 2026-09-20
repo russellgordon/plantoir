@@ -36,5 +36,7 @@ direction.
 
 ![[F2.6]]
 
+![[F3.1]]
+
 ![[F3.7]]
 %%curriculum-end%%

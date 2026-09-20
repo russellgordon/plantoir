@@ -6,10 +6,23 @@ namespace Plantoir.Core.Models;
 /// </summary>
 public static class BuildFreshness
 {
-    public static bool NeedsRebuild(Course course, int sectionNumber)
+    /// <param name="buildsRoot">
+    /// Where this working folder's built websites are kept —
+    /// <see cref="BuildOutputLocation.BuildsRootFor"/>. Passed in rather than
+    /// derived so that a test can point it at a temporary directory.
+    /// </param>
+    public static bool NeedsRebuild(Course course, int sectionNumber, string buildsRoot)
     {
-        string builtIndex = Path.Combine(course.DirectoryPath, ".merged_output",
-            "section" + sectionNumber, "public", "index.html");
+        // The BUILT SITE, where Windows actually keeps it. This used to read
+        // <course>\.merged_output\section<N>\public\index.html — the place
+        // builds lived before row 290 moved them out of the working folder —
+        // and so it was reading a location this platform had stopped writing
+        // to. Both answers were wrong: for a course made since the move the
+        // file never exists, so it always said "rebuild" (safe, but every
+        // publish rebuilt); for a course carrying a leftover .merged_output
+        // it read THAT, and a leftover newer than the notes made it say "no
+        // rebuild needed" about a file that is not what gets published.
+        string builtIndex = BuildOutputLocation.BuiltIndexFor(buildsRoot, course.Code, sectionNumber);
         DateTime builtDate;
         try { builtDate = File.GetLastWriteTimeUtc(builtIndex); }
         catch { return true; }

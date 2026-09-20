@@ -21,7 +21,7 @@ series — the model is only interesting if it can be checked.
 
 ## What to produce
 
-**A short report (about 1,000 words) and an eight-minute presentation.**
+**A short report (about 1,000 words) and a four-minute presentation.**
 
 Your report has to do four things.
 
@@ -47,6 +47,33 @@ Your report has to do four things.
 - **Honesty about failure.** A pair that says "the model predicted the
   price would fall and it rose, and here is why" scores higher than a pair
   that quietly does not mention it.
+- **Your own paragraphs, initialled.** Every paragraph carries the
+  initials of whoever wrote it, and all four requirements carry
+  paragraphs from both of you. I mark you on the paragraphs with your
+  initials — across all four — and on how you answer for the whole
+  argument when you are questioned at the presentation, judged against
+  the four criteria above exactly as the writing is.
+
+## Working in pairs, marked individually
+
+You work as a pair and you are marked as two people, so there is no
+shared mark on this task and nothing your partner says about your work
+goes into yours.
+
+Both of you work across all four requirements, and the mark is made
+yours by attribution rather than by division: **initial every paragraph
+you wrote**, and make sure each of the four requirements carries
+initialled paragraphs from both of you. How you divide the labour inside
+a requirement is up to you — one of you can calculate the elasticity
+while the other writes what it means for who bears the tax — but neither
+of you hands in a report in which a whole requirement is somebody else's
+work, because then only one of you has shown me the thing that
+requirement exists to show.
+
+The question you take at the presentation goes to you alone and can come
+from anywhere in the argument, not only from the paragraphs with your
+initials on them. That is the other place I hear each of you on your
+own.
 
 > [!warning] Do not choose a market where the price is set by a regulator
 > If a board or a commission sets the price, supply and demand are not
@@ -65,3 +92,39 @@ Build from [[Supply and Demand]], [[Elasticity]] and [[Incentives]].
 
 ![[B2.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 14, the market model work period
+  Watch for: which came first, the diagram or the series. The finished
+  report shows a dated event beside every claimed shift, so it reads the
+  same either way — but a pair who drew a textbook diagram and then went
+  hunting for an event to hang on it produces exactly the shift-versus-
+  movement error the criteria say costs the most marks, and the order is
+  visible only here.
+  Going well: the price series is on screen and the diagram is being
+  redrawn from it, twice.
+  Stuck: a finished, tidy diagram, and a search running for something
+  that happened that year.
+  Record: one letter per pair on your day plan — D if the diagram came
+  first, S if the series did.
+
+TALK — Unit 1, Day 16, the market model conferences already on that
+agenda
+  Ask: "Show me a week where your series moved and neither of you can
+  say why. What would you have to know?"
+  Then, to both of them: "Where did the two of you disagree about this
+  market, and what settled it?"
+  The second is the one that repays the two minutes. A strong answer
+  names a real disagreement — which curve moved, whether demand was
+  elastic, whether an event mattered — and then names the evidence that
+  ended it, which is B2.1 being applied rather than recited. A pair who
+  say they never disagreed have usually divided the work and never read
+  each other's paragraphs, and you now know that before you mark it.
+  Record: initials and a tick against B2.1 on your conference sheet, and
+  a line only where the answer surprised you.
+
+The product evidence is the report and the presentation, on Day 21 or
+Day 22.
+%%

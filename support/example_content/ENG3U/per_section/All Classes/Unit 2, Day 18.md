@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Critical Essay]], day 1 — questions from your own
+1. Launch: [[The Critical Essay]], day 1 of 7 — questions from your own
    annotations
 2. Concept: [[Thesis and Argument]] revisited — mechanism and stake
 

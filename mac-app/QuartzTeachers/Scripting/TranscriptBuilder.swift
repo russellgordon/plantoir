@@ -100,8 +100,13 @@ struct TranscriptBuilder {
             if hasPendingCarriageReturn {
                 hasPendingCarriageReturn = false
                 if scalar == newlineScalar {
-                    // "\r\n": a normal line ending.
-                    lines.append(currentLine)
+                    // "\r\n": a normal line ending — and THE one real output
+                    // takes, because this comes from a PTY. The health-line
+                    // filter has to be here as well as in the plain "\n"
+                    // branch below; it was only below, so every test passed
+                    // (they all supplied "\n") while a real build showed the
+                    // teacher the raw JSON.
+                    appendUnlessMachineReadable(currentLine)
                     currentLine = ""
                     continue
                 }
@@ -110,7 +115,7 @@ struct TranscriptBuilder {
                 currentLine = ""
             }
             if scalar == newlineScalar {
-                lines.append(currentLine)
+                appendUnlessMachineReadable(currentLine)
                 currentLine = ""
                 if lines.count > TranscriptBuilder.maximumRetainedLines {
                     lines.removeFirst(lines.count - TranscriptBuilder.maximumRetainedLines)
@@ -121,6 +126,22 @@ struct TranscriptBuilder {
                 currentLine.unicodeScalars.append(scalar)
             }
         }
+    }
+
+    /// Adds a finished line, unless it is one of the machine-readable ones.
+    ///
+    /// Rule 1: the interface never names the machinery, and a raw JSON blob is
+    /// machinery. Nothing is lost — the toolchain prints the teacher-facing
+    /// sentence separately, and `ScriptRunner.receiveOutput` reads the raw text
+    /// for findings BEFORE handing it here, precisely so this can drop them.
+    ///
+    /// One function called from BOTH line endings, because having the check in
+    /// only one of them is exactly the bug this replaced.
+    private mutating func appendUnlessMachineReadable(_ line: String) {
+        if SiteHealthFinding.isMarkerLine(line) {
+            return
+        }
+        lines.append(line)
     }
 
     /// Removes ANSI escape sequences and stray control characters,

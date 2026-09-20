@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Seminar]], day 1 — groups, dates, and what a real question
-   looks like
+1. Launch: [[The Seminar]], day 1 — the criteria table read, then groups,
+   dates, and what a real question looks like
 2. Each group drafts three candidate questions
 
 ## Things to do before our next class

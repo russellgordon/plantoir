@@ -12,7 +12,8 @@ tags:
 
 1. The evidence habit: [[The Evidence File]] and [[Photographing Your Work]]
 2. Photographing the trial and the file properly
-3. Bench work
+3. Partner check on four entries each: could somebody find this plant
+   from your entry? Then bench work
 
 ## Things to do before our next class
 

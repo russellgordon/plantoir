@@ -17,4 +17,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Method A report finished.
+- [ ] Method A analysis drafted.

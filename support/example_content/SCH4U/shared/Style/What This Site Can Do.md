@@ -352,17 +352,20 @@ know.
 
 This is what makes the site more than a pile of documents.
 
-- A plain link: [[Le Châtelier's Principle]]
+- A plain link: [[Dynamic Equilibrium]]
 - A link with different words:
-  [[Le Châtelier's Principle|what a disturbed system does next]]
+  [[Le Chatelier's Principle|what a disturbed system does next]]
 - A link to a section:
   [[Dynamic Equilibrium#Stopped is the wrong word]]
 
-**How that was made:** double square brackets.
+**How that was made:** double square brackets, with a vertical bar where
+the words on the page should differ from the file name. That is how the
+accent survives here: the file is named without one so that every
+computer can open it, and the bar puts it back for the reader.
 
 ```markdown
-[[Le Châtelier's Principle]]
-[[Le Châtelier's Principle|different words for the link]]
+[[Dynamic Equilibrium]]
+[[Le Chatelier's Principle|Le Châtelier's Principle]]
 [[Dynamic Equilibrium#Stopped is the wrong word]]
 ```
 

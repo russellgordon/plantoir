@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Studio time and research
-2. Sourcing properly: [[Writing About Art]]
-3. Conferences
+1. Sourcing properly: [[Writing About Art]]
+2. Research, and your own half-page on the comparison written here
+3. Conferences on research and slide design for [[Art and Society Study]]
 
 ## Things to do before our next class
 
-- [ ] Draft the comparison.
+- [ ] Choose the images for the half of the presentation that is yours.

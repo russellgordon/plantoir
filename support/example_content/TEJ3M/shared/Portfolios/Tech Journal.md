@@ -69,8 +69,11 @@ needs to know whether the reading was taken with the motor running.
 ## Success criteria and collection
 
 The journal is collected at the end of each unit and read against
-these criteria. [[Journal Checklist]] turns them into a self-check to
-run before you hand it in.
+these criteria. That reading comes back to you as comments, not as a
+percentage — the entries that carry marks are the milestone ones a
+task's own criteria ask for, which [[How Marks Work]] explains.
+[[Journal Checklist]] turns the criteria below into a self-check to
+run before you hand the journal in.
 
 | Quality | What it looks like |
 | --- | --- |
@@ -79,3 +82,11 @@ run before you hand it in.
 | Precision | Values with units and conditions; faults named and located |
 | Evidence | A sketch or a photo of your own work in most entries |
 | Growth | "Try next" items reappear later as things actually tried |
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.4]]
+
+![[D3.6]]
+%%curriculum-end%%

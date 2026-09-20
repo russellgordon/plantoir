@@ -67,4 +67,6 @@ argue it in [[The Wartime Decision]].
 ![[C2.6]]
 
 ![[C3.3]]
+
+![[C3.2]]
 %%curriculum-end%%

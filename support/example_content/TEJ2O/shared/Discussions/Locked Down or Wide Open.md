@@ -43,6 +43,8 @@ decides what kind of technician ends up holding the passwords.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D1.2]]
+
 ![[D2.1]]
 
 ![[D2.2]]

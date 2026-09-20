@@ -98,3 +98,21 @@ is reasoning you can defend from the definition.
 > then the steepest section on the descent. Steepness *is* speed:
 > the graph is steepest exactly where the cyclist is fastest, on the
 > far side of the hill.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D1.2]]
+
+![[D1.3]]
+
+![[D1.4]]
+
+![[D1.5]]
+
+![[D1.6]]
+
+![[D1.8]]
+
+![[D1.9]]
+%%curriculum-end%%

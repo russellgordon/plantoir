@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Indigenous Governance]] — governments that legislate, tax, and negotiate now
-2. Treaty relationships, self-government agreements, and the Crown
-3. The treaty area this school sits in, named
+1. [[Bills and What Happens to Them]] — a proposed law, published in full while it is still being argued about
+2. Readings, committee, and what changes in between
+3. Tracing your own decision back to its document
 
 ## Things to do before our next class
 
-- [ ] Read [[Indigenous Governance]]. Bring one question you want answered.
+- [ ] Find the bill, bylaw, or motion behind the decision you chose.

@@ -126,4 +126,4 @@ once but cannot tell you the shape of any of them.
 > [!tip] Write the settings beside every trace you keep
 > A waveform sketched into your [[Tech Journal]] with no
 > volts-per-division and no time-per-division beside it is a doodle.
-> Two extra numbers turn it into evidence you can still use in April.
+> Two extra numbers turn it into evidence you can still use a year from now.

@@ -19,3 +19,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Opening positions and exits known without asking.
+- [ ] Your group's image-lead list written down — who led which of the
+      five — to hand me before you perform.

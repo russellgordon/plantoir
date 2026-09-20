@@ -23,12 +23,12 @@ for [[Your First Byline]]. A lede has one job — earn the next sentence.
    school spirit that made everyone proud, students packed the gym."
    Which words belong to the reporter, and which to the reader?
 5. Which lede would you run, and why? (a) "The cafeteria will stop
-   selling bottled water in January, after a student petition gathered
+   selling bottled water at the end of the course, after a student petition gathered
    400 signatures." (b) "Change is coming to the cafeteria — and
    students are the reason."
 6. **Challenge.** Write the lede from these notes: robotics club
    placed second at Saturday's qualifier; that earns a spot at the
-   provincial championship in April; a first for the school; coach
+   provincial championship a year from now; a first for the school; coach
    Ms. Arbour: "the rookies carried us."
 
 ## Answers

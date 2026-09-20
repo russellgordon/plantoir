@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Review clinic: an unseen document set, worked together
-2. Provenance in thirty seconds, practised
+1. Review clinic: an unseen document set, worked together — [[The Document Examination]]
+2. Provenance in thirty seconds, practised: [[Reading a Primary Source]]
 3. Looking ahead: history within living memory
 
 ## Things to do before our next class

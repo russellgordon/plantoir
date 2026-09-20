@@ -37,7 +37,7 @@ is most of why a hangover involves thirst.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[E3.3]]
+![[E2.1]]
 
-![[E2.4]]
+![[E3.3]]
 %%curriculum-end%%

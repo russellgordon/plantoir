@@ -16,7 +16,8 @@ tags:
 3. Audit your own evidence: what from this semester would a stranger
    believe, and what would they have to take on faith?
 4. Launch: [[The Engineering Design Project]] — proposal, design
-   review, build log, demonstration, and a handover package
+   review, build log, demonstration, and a handover package, with the
+   criteria table read today rather than at the end of the course
 5. Proposals started before you leave. A device you cannot describe in
    one sentence is not scoped yet
 

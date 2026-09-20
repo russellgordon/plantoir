@@ -34,7 +34,7 @@ Strand A is not a unit. Its own stem reads *throughout this course*, and
 the curriculum says plainly that instruction on strand A is to be
 interwoven with the other four and assessed across the whole course — so
 inquiry, mapping, source judgement and spatial technologies appear in
-every unit here rather than in a block in September.
+every unit here rather than in a block at the start of the course.
 
 Strands B to E each ask a different question of the same planet: how it
 is organised, what we take from it and repair, how its systems reach

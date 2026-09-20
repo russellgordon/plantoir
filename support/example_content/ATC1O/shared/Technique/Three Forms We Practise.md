@@ -7,8 +7,8 @@ tags:
   - unit-3
 ---
 Sampling many forms is useful. Returning to a few is what builds technique.
-This course works in three all year, chosen because they teach different
-things and because a beginner can start any of them in September.
+This course works in three all semester, chosen because they teach different
+things and because a beginner can start any of them at the start of the course.
 
 ## Contemporary
 

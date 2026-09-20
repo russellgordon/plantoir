@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: false
+enableToc: true
 ---
 In [[Talk to the Machine]] you interviewed a chatbot, and the class
 transcript held both wonders and howlers — fluent paragraphs sitting
@@ -40,15 +40,40 @@ examples rather than instructed by a programmer.
 ## Benefits and limits, honestly
 
 These systems are genuinely useful: they translate languages, draft
-and summarize text, flag tumours in medical scans, and make search
+and summarise text, flag tumours in medical scans, and make search
 conversational. They also inherit whatever was in their examples —
 including bias, which [[Can a Machine Be Biased]] digs into — and
 they fail without noticing they have failed. A working rule for now:
 let the machine draft, but let a human decide. Where exactly that
 line should sit is what [[Will AI Take the Jobs]] argues about.
 
+## Emerging innovations and future frontiers
+
+Beyond current conversational agents and pattern matchers lie emerging
+innovations in hardware and software that will shape future everyday life:
+
+- **Neural Processing Units (NPUs) and edge intelligence** — dedicated
+  silicon running machine learning models locally on mobile devices,
+  medical telemetry monitors, and vehicles without requiring cloud data
+  transmission.
+- **Autonomous systems and precision robotics** — combining multi-sensor
+  arrays with real-time decision algorithms to perform precision
+  agricultural harvesting, automated sorting, and adaptive mobility
+  assistance.
+- **Balancing future benefits and limitations** — emerging technologies
+  offer immense potential benefits (personalised assistive tools, rapid
+  scientific modelling, reduced mundane labour) alongside serious
+  limitations (energy and water consumption of server clusters,
+  accelerated electronic waste, cybersecurity vulnerabilities, and
+  algorithmic opacity).
+
+Investigating both the promise and the risks of an emerging innovation is the
+heart of [[The Innovation Brief]].
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[B4.1]]
+
+![[B4.3]]
 %%curriculum-end%%

@@ -11,6 +11,8 @@ tags:
 ## Agenda
 
 1. Discussion: [[Is Delay a Character Trait]]
+2. Last ten minutes: your seminar follow-up, written here in class —
+   the three points are on [[The Hamlet Seminar]]
 
 ## Things to do before our next class
 

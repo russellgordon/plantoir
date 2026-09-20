@@ -12,7 +12,8 @@ tags:
 
 1. Number talk: [[Which One Doesn't Belong]]
 2. [[The Culminating Investigation]], day 7 — working period: the analysis —
-   centre, spread, shape, and the two-variable summary if you have one
+   centre, spread, shape, and the scatter plot of your two attributes,
+   described in words before any coefficient is quoted
 3. Clinic tables: sit at the technique you need
 
 ## Things to do before our next class

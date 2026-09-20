@@ -12,11 +12,13 @@ tags:
 
 1. Number talk: [[Estimation Duels]] — how many times can one sheet of
    paper actually be folded?
-2. Random groups — [[Folding Paper to the Moon]] at the boards
+2. Random groups — [[Folding Paper to the Moon]] at the boards. Nothing
+   here is marked: I am watching for who already trusts a quantity that
+   multiplies and who is still adding, because that decides how long the
+   next three days need to be
 3. Consolidate: growth that adds versus growth that multiplies
 4. Debrief: [[Why Struggle Is the Point]] — nobody taught you this
    first, on purpose
-5. Journal collection — hand it in on your way out
 
 ## Things to do before our next class
 

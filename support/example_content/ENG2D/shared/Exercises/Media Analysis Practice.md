@@ -44,8 +44,8 @@ product? List four categories.
 > intended audience. Also: the product's competitors, and any measure by
 > which it is worse.
 
-**5.** Take one advertisement you like and write the ninety-word analysis
-the task asks for.
+**5.** Take one advertisement you like and write ninety words of
+analysis on it.
 
 > [!success]- Answer 5
 > No fixed answer. The check: does every claim point at something visible
@@ -58,4 +58,10 @@ the task asks for.
 ![[D1.3]]
 
 ![[D1.5]]
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D3.4]]
 %%curriculum-end%%

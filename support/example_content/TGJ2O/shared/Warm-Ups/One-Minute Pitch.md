@@ -42,4 +42,8 @@ on old news is the harder, more honest test of [[News Values]].
 ![[A1.1]]
 
 ![[B1.1]]
+
+![[A3.2]]
+
+![[B2.4]]
 %%curriculum-end%%

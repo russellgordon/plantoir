@@ -19,8 +19,8 @@ tags:
    check what a sensor returns before you trust it with a motor
 4. Discussion: [[Who Owns the Firmware]] — you wrote it, the school
    owns the board, and somebody else will have to service it
-5. Control systems demonstrated and handed in. Journals open:
-   [[Showing Growth]] asks you to set today beside your first entry
+5. Journals open: [[Showing Growth]] asks you to set today's
+   integration failure beside your first entry from the first week
 
 ## Things to do before our next class
 

@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Day 5 of 8: stagecraft decisions
-3. Sound cues, lighting states, costume, spacing — written down
+2. Day 5 of 9: stagecraft decisions
+3. Sound cues, lighting states, costume, spacing, entrances and exits —
+   written down, each one signed by the dancer who owns it
 4. [[Stagecraft]] plans drafted
 5. Cool-down
 

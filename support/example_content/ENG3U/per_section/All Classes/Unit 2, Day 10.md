@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Macbeth Seminar]], day 3 — questions approved, one group at a
+1. [[The Macbeth Seminar]], day 3 of 6 — questions approved, one group at a
    time; the rest annotate
 
 ## Things to do before our next class

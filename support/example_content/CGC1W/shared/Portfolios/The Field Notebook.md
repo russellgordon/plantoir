@@ -49,8 +49,10 @@ differently from anything you found published.
 The notebook travels to [[The Woodlot Study]], [[The Farm Visit]], and
 [[The Land Use Walk]], and every entry is governed by
 [[Fieldwork Safety and Ethics]] — including who owns the ground you stand
-on. Your evidence for [[The Risk Report]] comes from these pages, so
-leave margins wide enough to annotate later.
+on. Four of those entries are the marked ones — [[The Field Record]] says
+which, and what each has to do — and your evidence for
+[[The Risk Report]] comes from these pages too, so leave margins wide
+enough to annotate later.
 
 %%curriculum-start%%
 ## Curriculum connection

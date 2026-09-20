@@ -35,13 +35,56 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
-%%curriculum-start%%
-## Curriculum connection
-
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
+
+This comment sits OUTSIDE the curriculum markers below on purpose. Everything between the curriculum-start and curriculum-end markers is deleted for a teacher who chooses not to install the curriculum pages, so a note kept in there disappears without warning.
 %%
+
+%%curriculum-start%%
+## Curriculum connection
 
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Fill this in for your own task and keep it hidden here, at the very end
+of the page, after the curriculum block. Students never see the text
+between these comment markers. Products arrive on their own;
+observation and conversation are the two kinds of evidence that vanish
+from a real course unless a specific day and a specific question are
+written down in advance.
+
+Three rules that make the difference between a prompt you use and one
+you skip. Name a real day from your own arc and check the agenda on it —
+a working, editing or planning period, never a publication day or a
+performance where you are running the room. Name something visible only
+while students work and invisible in the finished piece, and if the
+success criteria already claim it, say honestly that watching
+corroborates what the work claims rather than replacing it. And write
+questions they have not already read on this page or on that day's
+agenda; a question they have read is a prompt, not a probe.
+
+Write bare expectation codes as plain text here — A1.3, B2.2 — never as
+links or transclusions. Links inside a comment are invisible to readers
+but still counted by the site's curriculum coverage map.
+
+OBSERVE — Unit __, Day __, the period this happens in
+
+  Watch for:
+  Going well:
+  Stuck:
+  Record:
+
+TALK — Unit __, Day __, the conference or check-in already on that agenda
+
+  Ask:
+  Then:
+  A strong answer sounds like:
+  Record:
+
+The product evidence is
+%%

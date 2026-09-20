@@ -14,7 +14,8 @@ tags:
    answer, and a hypothesis with a mechanism in it
 2. Random groups — tighten three vague questions into testable ones
 3. [[Enzyme Investigation]], day 2 — working period: your question and
-   procedure, written for approval
+   procedure, written for approval — and approved at your bench before
+   the period ends
 
 ## Things to do before our next class
 

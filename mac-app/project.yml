@@ -42,6 +42,8 @@ targets:
         buildPhase: resources
       - path: ../support/ontario_secondary_courses.json
         buildPhase: resources
+      - path: ../support/british_columbia_secondary_courses.json
+        buildPhase: resources
       # The launcher scripts, so the app can initialize a brand-new
       # working folder (same files export-scripts would deliver).
       - path: ../setup.sh
@@ -61,6 +63,11 @@ targets:
         type: folder
         buildPhase: resources
       - path: ../support
+        type: folder
+        buildPhase: resources
+      # Read by the scripts themselves (scripts/contracts.py), so it travels
+      # with them into .toolchain/ and into the image's build context.
+      - path: ../contracts
         type: folder
         buildPhase: resources
       - path: ../setup.bat
@@ -99,7 +106,7 @@ targets:
         ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
         # The Icon Composer icon: compiled by the asset tooling, named here.
         ASSETCATALOG_COMPILER_APPICON_NAME: Plantoir
-        MARKETING_VERSION: "1.1.0"
+        MARKETING_VERSION: "1.2.0"
         # A PLACEHOLDER for local builds only. A bundle that leaves this Mac
         # is built by publish.sh, which overrides this with
         # `git rev-list --count HEAD` so that no two artifacts ever share a
@@ -130,6 +137,13 @@ targets:
         SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Plantoir.app/Contents/MacOS/Plantoir"
         BUNDLE_LOADER: "$(TEST_HOST)"
+        # Instantiated when the test bundle loads, before any test class is
+        # enumerated, and all it does is take AppKit's sheet slide animation
+        # out of the test host. Without it the host segfaults inside
+        # NSMoveHelper's nested runloop every few runs and blames an innocent
+        # test — see Tests/QuartzTeachersTests/SheetAnimationSuppressor.swift
+        # for the stack, the measurements, and the levers that do not work.
+        INFOPLIST_KEY_NSPrincipalClass: PlantoirTestBundleSetup
 
   QuartzTeachersUITests:
     type: bundle.ui-testing

@@ -12,10 +12,10 @@ tags:
 
 1. Retrieval clinic — three challenges, no preparation: a tableau from a
    headline, a status scene from two lines, an offer accepted three
-   different ways
+   different ways: [[Tableau]], [[Status]], and [[Yes Lets]]
 2. Compare across groups: same instruction, completely different work
 3. Circle up: which of the three is now automatic, and which still
-   takes thinking
+   takes thinking: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

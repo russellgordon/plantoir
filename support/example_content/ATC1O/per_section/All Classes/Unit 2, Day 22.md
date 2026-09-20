@@ -12,7 +12,7 @@ tags:
 
 1. Warm-up: [[The Standard Warm-Up]]
 2. Retrieval across Units 1 and 2, on our feet
-3. What we can make now that we could not in September
+3. What we can make now that we could not at the start of the course
 4. Looking ahead: dance that belongs to somebody
 5. Cool-down
 

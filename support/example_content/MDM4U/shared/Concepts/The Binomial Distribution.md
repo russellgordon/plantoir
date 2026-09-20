@@ -101,4 +101,6 @@ successes out of a fixed number of tries.
 ![[B1.6]]
 
 ![[B1.7]]
+
+![[B2.7]]
 %%curriculum-end%%

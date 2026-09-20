@@ -42,5 +42,9 @@ actually collected.
 
 ![[F2.2]]
 
+![[F2.3]]
+
 ![[F3.1]]
+
+![[F3.3]]
 %%curriculum-end%%

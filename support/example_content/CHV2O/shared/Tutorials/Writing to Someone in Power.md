@@ -2,6 +2,7 @@
 title: Writing to Someone in Power
 publish: true
 created: __CREATED__
+enableToc: true
 tags:
   - tutorials
   - unit-3
@@ -70,6 +71,22 @@ a rude letter gives the office an easy reason to file it.
 > board's own service report. I would be grateful for a reply, and would
 > gladly speak at the meeting if that is possible."
 
+## Digital channels, social media, and formal deputations
+
+How you deliver your message depends on the decision and the timeline:
+
+- **Constituent email and mail**: Direct, formal, and logged by staff into the
+  official constituent correspondence database.
+- **Online consultation portals**: Many municipalities and ministries run
+  digital portals where citizens submit evidence directly into public
+  consultation records.
+- **Social media advocacy**: Public posts and tagging officials can build broad
+  awareness and demonstrate community concern, but rarely replace a detailed
+  formal submission on complex policy questions.
+- **Public deputations**: Registering to speak for five minutes at a committee
+  meeting places your spoken testimony directly on Hansard or the council
+  record.
+
 ## After you send it
 
 Keep a copy, note the date, and note when a reply arrives. A reply, a
@@ -83,4 +100,6 @@ happened.
 ![[A1.5]]
 
 ![[B3.3]]
+
+![[C1.5]]
 %%curriculum-end%%

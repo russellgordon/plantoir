@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: predict the order of the colours in three situations
+1. Warm-up: predict the order of the colours in three situations: [[The Wave Model of Light]]
 2. In groups: a CD, a soap film, a prism, a sunset — which mechanism
-   separates the colours in each?
+   separates the colours in each? [[Diffraction Gratings and Thin Films]]
 3. Consolidate: four ways white light comes apart, one table
 
 ## Things to do before our next class

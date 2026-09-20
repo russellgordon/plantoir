@@ -1,8 +1,8 @@
 ---
 title: Modelling Energy Flow
-createdSection1: 2026-10-01T07:00:00.000-0400
+createdSection1: 2026-09-30T07:00:00.000-0400
 publishForSection1: true
-createdSection2: 2026-10-02T07:00:00.000-0400
+createdSection2: 2026-10-01T07:00:00.000-0400
 publishForSection2: true
 enableToc: true
 tags:

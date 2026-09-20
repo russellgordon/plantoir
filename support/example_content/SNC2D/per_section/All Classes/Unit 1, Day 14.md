@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[The Systems Case Study]], day 4 — working period: what can be done, and
-   what it costs the person
-2. Trade with another student and challenge one unsourced claim each
+1. First fifteen minutes: your own draft against the criteria table, on your
+   own this time — [[Judging Your Own Work]]
+2. [[The Systems Case Study]], day 4 — working period: your weakest row
+   first, then what can be done and what it costs the person
+3. Trade with another student and challenge one unsourced claim each
 
 ## Things to do before our next class
 

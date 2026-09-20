@@ -14,7 +14,9 @@ tags:
 2. Random groups — three polls whose leads are inside their margins,
    reported as leads. Rewrite each headline honestly
 3. Consolidate: back to [[The Normal Distribution]] — what the margin
-   covers, and the three failures it does not
+   covers, and the three failures it does not. Formative: every group's
+   rewritten headline goes on the board and I read them out without
+   saying whose
 
 ## Things to do before our next class
 

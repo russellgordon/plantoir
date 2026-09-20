@@ -18,4 +18,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Finish your video analysis for two checkpoints.
-- [ ] [[Model Roller Coaster]] analysis due in one week.
+- [ ] [[Model Roller Coaster]] analysis due in three classes.

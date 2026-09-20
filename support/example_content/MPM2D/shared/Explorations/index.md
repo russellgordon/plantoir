@@ -18,6 +18,7 @@ being stuck is the work, as [[Why Struggle Is the Point]] explains.
 | [[The Circle on the Grid]] | Where are all the points exactly 5 from home? |
 | [[The Border Problem]] | How many tiles — and seen how many ways? |
 | [[The Handshake Problem]] | How many handshakes for $n$ people? |
+| [[Squares Against Doubling]] | Two rules, one race: does squaring beat doubling? |
 | [[Maximum Enclosure]] | How much pasture can one fence hold? |
 | [[How Tall Is the Flagpole]] | How do you measure the unclimbable? |
 

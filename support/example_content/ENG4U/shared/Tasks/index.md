@@ -11,6 +11,6 @@ created: __CREATED__
 - [[The Comparative Essay]] — Unit 3. One argument that needs both texts.
 - [[The Adaptation Study]] — Unit 3. Two productions of one scene, read
   as arguments — then one made yourself.
-- [[The Independent Study]] — October to April: a text you choose, an
+- [[The Independent Study]] — the first class to the last: a text you choose, an
   essay at length, and an oral defence.
 - [[Final Examination]] — the final evaluation.

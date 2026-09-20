@@ -11,6 +11,15 @@ set -euo pipefail
 # folder builds from locally.
 #
 # What it does, in order:
+#   0. Runs the shared scripts' pure-Python unit tests (no Docker needed) so a
+#      broken script fails in milliseconds rather than after a full image
+#      build. Step 0 also RUNS deploy.sh AND preview.sh — hollowed out with
+#      --image and a Keychain user that does not exist, so they need no
+#      container, no network and no credentials — because a launcher that is
+#      only ever read is a launcher nobody has started (GitHub issues #129 and
+#      #124). Note that these tests are a written LIST here, not a discovery:
+#      a new scripts/test_*.py must be added below or it runs on Windows (whose
+#      PythonToolchainTests does discover them) and nowhere on the mac.
 #   1. Ensures the container runtime is up (shares an already-running Colima;
 #      never stops it — safe to run alongside other Colima-based toolchains).
 #   2. docker build -t quartz-teacher:dev-test .
@@ -22,7 +31,8 @@ set -euo pipefail
 #      ./preview.sh EXC2O 1 --image quartz-teacher:dev-test --full-rebuild --build-only
 #      so the container is recreated FROM THE DEV-TEST IMAGE and a full static
 #      build of the Example Course runs through the real launcher.
-#   6. Confirms the built site exists and the running container uses the
+#   6. Confirms the built site exists, that it carries and links Plantoir's
+#      own icon rather than Quartz's, and that the running container uses the
 #      dev-test image, then prints a PASS/FAIL summary.
 #
 # Usage:
@@ -50,7 +60,11 @@ while [[ $# -gt 0 ]]; do
     --no-cache)   NO_CACHE="--no-cache"; shift ;;
     --skip-build) SKIP_BUILD="true"; shift ;;
     --help|-h)
-      sed -n '4,36p' "$0" | sed 's/^# \{0,1\}//'
+      # Print the banner by finding its end rather than by a fixed line
+      # number: the range used to be hard-coded, so every line added to the
+      # comment above quietly truncated the help text from the bottom — the
+      # part that says how to install the fixture this script requires.
+      sed -n '4,/^# =\{10,\}$/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'
       exit 0 ;;
     *) echo "❌ Unknown option: $1 (see --help)"; exit 1 ;;
   esac
@@ -72,6 +86,187 @@ if [[ ! -t 0 ]]; then
   echo "   To run it from a script or CI, give it one:"
   echo "     script -q /dev/null ./verify.sh"
   exit 1
+fi
+
+# -------------------- 0.5. Pure-Python unit tests (no Docker needed) --------------------
+# Fast, dependency-free checks that don't need the image — run first so a
+# broken script.py change fails in milliseconds instead of after a full
+# Docker build.
+# No .pyc files. `scripts/` is a folder reference in the app's project, so
+# anything left in it is copied into the bundle, mirrored into every working
+# folder's `.toolchain/`, and hashed into the image tag — which means a test run
+# here would hand teachers a rebuild for bytecode. Windows' PythonToolchainTests
+# sets the same variable.
+export PYTHONDONTWRITEBYTECODE=1
+
+if (cd scripts && python3 test_site_health.py) >/tmp/verify_site_health_test.log 2>&1; then
+  pass "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
+else
+  fail "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
+  cat /tmp/verify_site_health_test.log
+fi
+
+if (cd scripts && python3 test_recipe_folders.py) >/tmp/verify_recipe_folders_test.log 2>&1; then
+  pass "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
+else
+  fail "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
+  cat /tmp/verify_recipe_folders_test.log
+fi
+
+if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
+  pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
+else
+  fail "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
+  cat /tmp/verify_contracts_test.log
+fi
+
+if (cd scripts && python3 test_deploy_netlify_headers.py) >/tmp/verify_deploy_headers_test.log 2>&1; then
+  pass "deploy.py: Netlify ad-badge suppression (scripts/test_deploy_netlify_headers.py)"
+else
+  fail "deploy.py: Netlify ad-badge suppression (scripts/test_deploy_netlify_headers.py)"
+  cat /tmp/verify_deploy_headers_test.log
+fi
+
+if (cd scripts && python3 test_netlify_badge.py) >/tmp/verify_netlify_badge_test.log 2>&1; then
+  pass "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
+else
+  fail "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
+  cat /tmp/verify_netlify_badge_test.log
+fi
+
+if bash scripts/test_build_output_link.sh >/tmp/verify_build_output_link_test.log 2>&1; then
+  pass "the launchers keep built websites outside the working folder, for every state an existing folder can be in (scripts/test_build_output_link.sh)"
+else
+  fail "the launchers keep built websites outside the working folder, for every state an existing folder can be in (scripts/test_build_output_link.sh)"
+  cat /tmp/verify_build_output_link_test.log
+fi
+
+if (cd scripts && python3 test_deploy_course_dir_resolution.py) >/tmp/verify_deploy_course_dir_test.log 2>&1; then
+  pass "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
+else
+  fail "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
+  cat /tmp/verify_deploy_course_dir_test.log
+fi
+
+if (cd scripts && python3 test_deploy_non_interactive.py) >/tmp/verify_deploy_non_interactive_test.log 2>&1; then
+  pass "deploy: a publish nobody is there to answer questions for refuses rather than waiting or guessing (scripts/test_deploy_non_interactive.py)"
+else
+  fail "deploy: a publish nobody is there to answer questions for refuses rather than waiting or guessing (scripts/test_deploy_non_interactive.py)"
+  cat /tmp/verify_deploy_non_interactive_test.log
+fi
+
+# RUNS deploy.sh, where the test above only reads it. That distinction is the
+# reason this exists: the flag was written on a machine with no bash, and
+# starting the script found two things in prompt_for_cf_account that reading it
+# had not (GitHub issue #129). No Docker, no network, no credentials.
+if (cd scripts && python3 test_deploy_sh_questions.py) >/tmp/verify_deploy_sh_questions_test.log 2>&1; then
+  pass "deploy.sh: every question it can ask refuses under the flag, and is still asked without it (scripts/test_deploy_sh_questions.py)"
+else
+  fail "deploy.sh: every question it can ask refuses under the flag, and is still asked without it (scripts/test_deploy_sh_questions.py)"
+  cat /tmp/verify_deploy_sh_questions_test.log
+fi
+
+# The same for preview.sh, which took --non-interactive on 2026-09-09 (GitHub
+# issue #124) because a scheduled publish BUILDS before it publishes. Its own
+# file rather than a class in the one above: this drives a different launcher,
+# and the twin's completeness test only ever asks about deploy.sh's questions.
+if (cd scripts && python3 test_preview_sh_questions.py) >/tmp/verify_preview_sh_questions_test.log 2>&1; then
+  pass "preview.sh: the one question it can ask refuses under the flag, and is still asked without it (scripts/test_preview_sh_questions.py)"
+else
+  fail "preview.sh: the one question it can ask refuses under the flag, and is still asked without it (scripts/test_preview_sh_questions.py)"
+  cat /tmp/verify_preview_sh_questions_test.log
+fi
+
+if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
+  pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
+else
+  fail "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
+  cat /tmp/verify_preflight_exclusions_test.log
+fi
+
+if (cd scripts && python3 test_publishable_site.py) >/tmp/verify_publishable_site_test.log 2>&1; then
+  pass "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
+else
+  fail "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
+  cat /tmp/verify_publishable_site_test.log
+fi
+
+if (cd scripts && python3 test_class_pages.py) >/tmp/verify_class_pages_test.log 2>&1; then
+  pass "class_pages.py: what a course calls a unit, and what the build counts as a class page (scripts/test_class_pages.py)"
+else
+  fail "class_pages.py: what a course calls a unit, and what the build counts as a class page (scripts/test_class_pages.py)"
+  cat /tmp/verify_class_pages_test.log
+fi
+
+if (cd scripts && python3 test_page_visibility.py) >/tmp/verify_page_visibility_test.log 2>&1; then
+  pass "page_visibility.py: whether the built site shows a page, against contracts/file-formats.json (scripts/test_page_visibility.py)"
+else
+  fail "page_visibility.py: whether the built site shows a page, against contracts/file-formats.json (scripts/test_page_visibility.py)"
+  cat /tmp/verify_page_visibility_test.log
+fi
+
+# Runs BEFORE the image build below, on purpose: it answers in a tenth of a
+# second the question the image build answers in three minutes.
+if (cd scripts && python3 test_baked_modules.py) >/tmp/verify_baked_modules_test.log 2>&1; then
+  pass "every module a baked script imports is baked into the image too (scripts/test_baked_modules.py)"
+else
+  fail "every module a baked script imports is baked into the image too (scripts/test_baked_modules.py)"
+  cat /tmp/verify_baked_modules_test.log
+fi
+
+if (cd scripts && python3 test_stop_preview.py) >/tmp/verify_stop_preview_test.log 2>&1; then
+  pass "a build for publishing stops only THIS section's preview (scripts/test_stop_preview.py)"
+else
+  fail "a build for publishing stops only THIS section's preview (scripts/test_stop_preview.py)"
+  cat /tmp/verify_stop_preview_test.log
+fi
+
+if (cd scripts && python3 test_config_write_race.py) >/tmp/verify_config_race_test.log 2>&1; then
+  pass "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
+else
+  fail "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
+  cat /tmp/verify_config_race_test.log
+fi
+
+# A preview build must never reach a published site, and the FOLDER
+# destination is the one that can: it publishes host-side and never enters the
+# container, so deploy.py's own refusal never runs. Structural rather than
+# behavioural — a real preview-then-publish cycle would add minutes to every
+# run of this script — but it catches the guard being deleted, which is how it
+# came to be missing in the first place.
+_folder_guard_ok=true
+for _launcher in deploy.sh deploy.ps1; do
+  if ! grep -q "ws://localhost:" "$_launcher"; then
+    _folder_guard_ok=false
+    echo "   $_launcher does not check for a preview build before publishing to a folder"
+  fi
+done
+if [ "$_folder_guard_ok" = true ]; then
+  pass "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
+else
+  fail "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
+fi
+
+# Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
+# the runs in THIS script, but `scripts/` is a folder reference in the app's
+# project — whatever sits in it is copied into the bundle, mirrored into every
+# working folder's `.toolchain/`, and hashed into the image tag. A `.pyc` there
+# hands teachers a rebuild for nothing, and `.gitignore` hides it from `git
+# status`, so a hand-run test that littered would never be noticed. Ten of them
+# were found in a working folder's `.toolchain/` on 2026-09-09, mirrored from a
+# bundle that had been carrying them for some time. The app's own
+# `copyToolchainFiles` removes extraneous files, so a clean bundle heals a
+# folder on the next touch; this keeps the bundle clean.
+if [ -z "$(find scripts -name '__pycache__' -print -quit 2>/dev/null)" ]; then
+  pass "no bytecode left in scripts/, which ships inside the app"
+else
+  fail "scripts/__pycache__ exists — it would be copied into the app bundle, mirrored into every working folder's .toolchain/, and change the image tag"
+  find scripts -name '__pycache__' -print
+  echo "   Remove it and run again:  rm -rf scripts/__pycache__"
+  echo "   It gets there from running a test file BY HAND — this script exports"
+  echo "   PYTHONDONTWRITEBYTECODE, a bare 'python3 scripts/test_x.py' does not,"
+  echo "   and importing the module under test is what writes the .pyc."
+
 fi
 
 # -------------------- 1. Container runtime (shared Colima) --------------------
@@ -126,6 +321,73 @@ else
     fail "docker build failed"
     exit 1
   fi
+fi
+
+# ---- build_site.py: which folders count for marks ----
+echo ""
+echo "🔎 Checking build_site.py's graded-folder rule against the shared contract…"
+if docker run --rm \
+  -v "$(pwd)/scripts/test_graded_folders.py:/opt/scripts/test_graded_folders.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_graded_folders.py >/tmp/verify_graded_test.log 2>&1; then
+  pass "build_site.py: graded-folder rule matches contracts/shared-rules.json (scripts/test_graded_folders.py)"
+else
+  fail "build_site.py: graded-folder rule matches contracts/shared-rules.json (scripts/test_graded_folders.py)"
+  cat /tmp/verify_graded_test.log
+fi
+
+# ---- build_site.py: the class-folder rule, against the SHARED contract ----
+# Same reason as the domain test below: build_site.py imports `frontmatter`,
+# which lives only inside the container. This one ALSO needs the contract, and
+# reads it from the image's own /opt/contracts — which is the end-to-end check
+# that the contract really travels with the toolchain, not just that the rule
+# is right.
+echo ""
+echo "🔎 Checking build_site.py's class-folder rule against the shared contract…"
+if docker run --rm \
+  -v "$(pwd)/scripts/test_class_folder.py:/opt/scripts/test_class_folder.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_class_folder.py >/tmp/verify_class_folder_test.log 2>&1; then
+  pass "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
+else
+  fail "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
+  cat /tmp/verify_class_folder_test.log
+fi
+
+# ---- Whether the site shows a page: the contract, run down the REAL chain ----
+# The one check here that is not about a rule being implemented right — it is
+# about the rule being TRUE. Both apps are tested against
+# contracts/file-formats.json -> pageVisibility.readingCases, so if that list
+# is wrong they are confidently wrong together and every suite stays green.
+# This runs each case through process_frontmatter (python-frontmatter, PyYAML)
+# and then through the image's OWN gray-matter/js-yaml on JSON_SCHEMA plus
+# patches/publish.ts's expression — which is exactly what Quartz v4.5.0 does.
+# So a PyYAML bump, a Quartz bump or a rewritten patch cannot move the table
+# without this failing.
+echo ""
+echo "🔎 Checking the visibility contract against what the real build does…"
+if docker run --rm \
+  -v "$(pwd)/scripts/check_visibility_against_the_site.py:/opt/scripts/check_visibility_against_the_site.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_visibility_against_the_site.py \
+  >/tmp/verify_visibility_site.log 2>&1; then
+  pass "every pageVisibility reading case agrees with the built site (scripts/check_visibility_against_the_site.py)"
+else
+  fail "every pageVisibility reading case agrees with the built site (scripts/check_visibility_against_the_site.py)"
+  cat /tmp/verify_visibility_site.log
+fi
+
+# ---- build_site.py: custom-domain resolution follows the primary destination ----
+# Needs the real image, not a host run — build_site.py imports `frontmatter`,
+# which lives only inside the container (see Dockerfile's `pip install`), so
+# this cannot join the fast host-side pre-checks above. The test file itself
+# is mounted in rather than baked into the image — it is dev-only, and the
+# image should not carry test fixtures a teacher's build never needs.
+echo ""
+echo "🔎 Checking build_site.py's custom-domain resolution against the real image…"
+if docker run --rm \
+  -v "$(pwd)/scripts/test_build_site_domain_resolution.py:/opt/scripts/test_build_site_domain_resolution.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_build_site_domain_resolution.py >/dev/null 2>&1; then
+  pass "build_site.py: custom-domain resolution follows the primary destination (scripts/test_build_site_domain_resolution.py)"
+else
+  fail "build_site.py: custom-domain resolution follows the primary destination (scripts/test_build_site_domain_resolution.py)"
 fi
 
 # -------------------- 3. export-scripts fidelity --------------------
@@ -185,6 +447,147 @@ else
 fi
 rm -rf "$EXPORT_TMP"
 
+# ---------- 3c. Superseded builder images are removed, and ONLY those ----------
+# The launchers mint a new 'teaching-quartz:src-<hash>' tag on every recipe
+# change, so without this the orphans accumulate forever. The danger is the
+# opposite one: Docker here is SHARED with other projects, so a cleanup that
+# reached past its own tags would delete somebody else's images. This drives
+# the launcher's REAL function (extracted from preview.sh, not retyped) against
+# throwaway fixtures standing in for each case.
+echo ""
+echo "🔎 Checking that a new build removes superseded builder images…"
+PRUNE_SRC="$(mktemp "${TMPDIR:-/tmp}/verify_prune.XXXXXX.sh")"
+awk '/^prune_superseded_images\(\) \{/,/^\}/' preview.sh > "$PRUNE_SRC"
+# The three launchers are standalone scripts sharing hand-copied helper blocks,
+# and the cross-check above only proves each NAME is defined — not that the
+# three bodies still say the same thing. Testing preview.sh's copy while
+# setup.sh's has drifted would be a green suite over a real difference.
+PRUNE_COPIES_MATCH="true"
+for f in setup.sh deploy.sh; do
+  if ! awk '/^prune_superseded_images\(\) \{/,/^\}/' "$f" | cmp -s - "$PRUNE_SRC"; then
+    fail "prune_superseded_images() in $f differs from the copy in preview.sh"
+    PRUNE_COPIES_MATCH="false"
+  fi
+done
+[[ "$PRUNE_COPIES_MATCH" == "true" ]] && pass "prune_superseded_images() is identical in all three launchers"
+
+if [[ ! -s "$PRUNE_SRC" ]]; then
+  fail "Could not extract prune_superseded_images() from preview.sh"
+else
+  # shellcheck source=/dev/null
+  source "$PRUNE_SRC"
+
+  PRUNE_KEEP="teaching-quartz:src-verifykeep"
+  PRUNE_OLD="teaching-quartz:src-verifyold"
+  PRUNE_INUSE="teaching-quartz:src-verifyinuse"
+  PRUNE_OTHER="verify-other-project:latest"
+  PRUNE_CONTAINER="verify-prune-inuse"
+
+  # Distinct image IDs matter: tags sharing one ID cannot tell these cases
+  # apart, because 'docker rmi <tag>' on a shared ID only untags.
+  prune_fixture_image() {
+    printf 'FROM scratch\nLABEL ca.russellgordon.verify=%s\n' "$2" \
+      | command docker buildx build --load -q -t "$1" - >/dev/null 2>&1
+  }
+  prune_image_exists() { command docker image inspect "$1" >/dev/null 2>&1; }
+
+  command docker rm -f "$PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  prune_fixture_image "$PRUNE_KEEP"  keep
+  prune_fixture_image "$PRUNE_OLD"   old
+  prune_fixture_image "$PRUNE_INUSE" inuse
+  prune_fixture_image "$PRUNE_OTHER" other
+  # An explicit command is required even though this container never runs:
+  # 'docker create' refuses an image with no entrypoint, and a container that
+  # was never created would make the in-use case pass vacuously.
+  if ! command docker create --name "$PRUNE_CONTAINER" "$PRUNE_INUSE" /noop >/dev/null 2>&1; then
+    fail "prune: could not create the fixture container — the in-use case was not exercised"
+  fi
+  # The cases below that assert an image SURVIVED cannot pass vacuously — a
+  # fixture that failed to build fails them. The case that proves pruning
+  # HAPPENS is an absence, so it can; prove the fixture exists first.
+  if ! prune_image_exists "$PRUNE_OLD"; then
+    fail "prune: fixture $PRUNE_OLD was never built — the removal case proves nothing"
+  fi
+
+  # Two stubs, in place only while the real function runs.
+  #
+  # 'docker' scopes the IMAGE LISTING to this test's own fixtures. Without it,
+  # sourcing the real function and calling it for effect would delete the
+  # maintainer's genuine 'teaching-quartz:src-*' images as a side effect of
+  # running verify.sh — a multi-minute, network-dependent rebuild in every
+  # working folder, from a command whose banner promises only to check things.
+  # The trade-off, stated plainly: '--filter reference=' is stubbed out and so
+  # is not itself covered. 'verify-other-project:latest' sits in the listing
+  # precisely so the second filter — the in-function prefix test, which runs on
+  # this machine's own data — still has to do its job. The ancestor check, the
+  # age check and the rmi all run unmodified against the real daemon.
+  #
+  # It also rewrites the AGE column, which is otherwise untestable: every
+  # fixture is seconds old, so the real guard would spare all of them and the
+  # removal case could never fire. Setting the age at either extreme tests the
+  # rule in both directions instead of neutralising it.
+  prune_stub_docker() {
+    docker() {
+      if [[ "${1:-}" == "images" ]]; then
+        command docker "$@" \
+          | grep -E "^(teaching-quartz:src-verify|verify-other-project:)" \
+          | sed -E "s/^([^ ]+) .*/\\1 $PRUNE_STUB_AGE/" || true
+      else
+        command docker "$@"
+      fi
+    }
+  }
+  prune_unstub() { unset -f docker; }
+
+  PRUNE_OK="true"
+
+  # (a) Everything is too NEW — the age guard must spare it all.
+  PRUNE_STUB_AGE="2 hours ago"
+  prune_stub_docker; prune_superseded_images "$PRUNE_KEEP"; prune_unstub
+  if ! prune_image_exists "$PRUNE_OLD"; then
+    fail "prune: $PRUNE_OLD was removed despite being only hours old — the age guard is not working, and it is what protects a folder that is mid-recreate"
+    PRUNE_OK="false"
+  fi
+
+  # (b) The tag just built is not one of ours (--image override) — refuse
+  #     to touch anything, rather than treating every real tag as superseded.
+  PRUNE_STUB_AGE="3 weeks ago"
+  prune_stub_docker; prune_superseded_images "quartz-teacher:dev-test"; prune_unstub
+  if ! prune_image_exists "$PRUNE_OLD"; then
+    fail "prune: an --image override deleted $PRUNE_OLD — with a foreign keep-tag the function must do nothing at all"
+    PRUNE_OK="false"
+  fi
+
+  # (c) The real case: superseded, old enough, unreferenced.
+  PRUNE_STUB_AGE="3 weeks ago"
+  prune_stub_docker; prune_superseded_images "$PRUNE_KEEP"; prune_unstub
+  if prune_image_exists "$PRUNE_OLD"; then
+    fail "prune: superseded tag $PRUNE_OLD was NOT removed"
+    PRUNE_OK="false"
+  fi
+  if ! prune_image_exists "$PRUNE_KEEP"; then
+    fail "prune: the tag just built ($PRUNE_KEEP) was removed"
+    PRUNE_OK="false"
+  fi
+  if ! prune_image_exists "$PRUNE_INUSE"; then
+    fail "prune: $PRUNE_INUSE was removed while a container still referenced it"
+    PRUNE_OK="false"
+  fi
+  if ! prune_image_exists "$PRUNE_OTHER"; then
+    fail "prune: removed $PRUNE_OTHER — another project's image is not ours to delete"
+    PRUNE_OK="false"
+  fi
+  [[ "$PRUNE_OK" == "true" ]] && pass "Superseded builder images are removed; the current tag, an in-use tag, a recently-built tag, another project's image, and everything under an --image override are left alone"
+
+  command docker rm -f "$PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  for t in "$PRUNE_KEEP" "$PRUNE_OLD" "$PRUNE_INUSE" "$PRUNE_OTHER"; do
+    command docker rmi -f "$t" >/dev/null 2>&1 || true
+  done
+  unset -f prune_superseded_images prune_fixture_image prune_image_exists \
+           prune_stub_docker prune_unstub
+fi
+rm -f "$PRUNE_SRC"
+
 # -------------------- 4. Baked files match the working tree --------------------
 echo ""
 echo "🔬 Comparing files baked into the image against the working tree…"
@@ -196,14 +599,29 @@ check_baked() {
     fail "Image file $image_path differs from repo $repo_path"
   fi
 }
+check_baked scripts/contracts.py          /opt/scripts/contracts.py
+check_baked scripts/site_health.py        /opt/scripts/site_health.py
+# The contract itself must be IN the image: the container's only bind mount is
+# `courses`, so a rule the scripts read has nowhere else to come from. One file
+# stands for the directory — the Dockerfile copies it wholesale.
+check_baked contracts/class-planning.json /opt/contracts/class-planning.json
+check_baked scripts/page_visibility.py    /opt/scripts/page_visibility.py
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py
+check_baked scripts/netlify_badge.py      /opt/scripts/netlify_badge.py
 check_baked patches/Explorer.tsx          /opt/quartz/quartz/components/Explorer.tsx
 check_baked patches/FolderContent.tsx     /opt/quartz/quartz/components/pages/FolderContent.tsx
 check_baked patches/explorer.inline.ts    /opt/quartz/quartz/components/scripts/explorer.inline.ts
+# Head.tsx carries the <link rel="icon"> tags, so a stale copy in the image is
+# how a site would quietly go back to wearing the Quartz logo.
+check_baked patches/Head.tsx              /opt/quartz/quartz/components/Head.tsx
 check_baked support/Backlinks.tsx         /opt/support/Backlinks.tsx
 check_baked support/colour_schemes.json   /opt/support/colour_schemes.json
+check_baked support/favicon/favicon.ico   /opt/support/favicon/favicon.ico
+check_baked support/favicon/icon.svg      /opt/support/favicon/icon.svg
+check_baked support/favicon/apple-touch-icon.png /opt/support/favicon/apple-touch-icon.png
+check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
 # -------------------- 4b. The hide filter must be IN THE IMAGE --------------------
@@ -214,16 +632,28 @@ check_baked support/colour_schemes.json   /opt/support/colour_schemes.json
 # Learning Goals. Asserted against the IMAGE on purpose: a check that ran in a
 # long-lived container would have passed throughout the whole time this was
 # broken.
+#
+# Structural, not a bare substring grep (tightened 2026-08-23 after an
+# adversarial review of this fix): the marker comment proves nothing on its
+# own if it has drifted away from the `omit` Set it documents — a file can
+# contain the literal string CQ4T-OMIT-ANCHOR while nothing wires the hidden
+# list into `filterFn`. `-Pzo` treats the whole file as one NUL-terminated
+# record so the match can span the single newline between the marker's own
+# line and the `const omit =` line it must sit directly above — deliberately
+# NOT `.` matching across arbitrary further lines, which would let an anchor
+# "match" a Set pages of unrelated code away and defeat the point of asking.
+# The same adjacency `build_site.py`'s `_anchor_is_structurally_wired` now
+# requires — read that function's comment before touching either.
 echo ""
-echo "🔎 Checking the Explorer's hide filter is baked into the image…"
+echo "🔎 Checking the Explorer's hide filter is baked into the image, and wired to a live omit Set…"
 ANCHOR_OK="true"
 for layout in /opt/quartz/quartz.layout.ts /opt/quartz-site/quartz.layout.ts; do
-  if ! docker run --rm "$DEV_TEST_IMAGE" grep -q 'CQ4T-OMIT-ANCHOR' "$layout" 2>/dev/null; then
-    fail "The Explorer's hide filter is missing from $layout in the image — hidden pages would be published"
+  if ! docker run --rm "$DEV_TEST_IMAGE" grep -Pzoq '//[ \t]*CQ4T-OMIT-ANCHOR:[^\n]*\n[ \t]*const[ \t]+omit[ \t]*=[ \t]*new[ \t]+Set' "$layout" 2>/dev/null; then
+    fail "The Explorer's hide filter is missing or structurally detached from $layout in the image — hidden pages would be published"
     ANCHOR_OK="false"
   fi
 done
-[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image (both Quartz copies)"
+[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image and wired to a live omit Set (both Quartz copies)"
 
 # -------------------- 5. Drive the real launcher against the image --------------------
 echo ""
@@ -243,13 +673,280 @@ else
 fi
 
 # -------------------- 6. Post-flight checks --------------------
-SITE_INDEX="courses/EXC2O/.merged_output/section1/public/index.html"
+SITE_PUBLIC="courses/EXC2O/.merged_output/section1/public"
+SITE_INDEX="$SITE_PUBLIC/index.html"
 if [[ -f "$SITE_INDEX" && "$SITE_INDEX" -nt "$STAMP_FILE" ]]; then
   pass "Built site is present and freshly generated ($SITE_INDEX)"
 else
   fail "Built site missing or stale at $SITE_INDEX"
 fi
 rm -f "$STAMP_FILE"
+
+# -------------------- 6a. The built site is OUTSIDE the working folder ------
+# The site above was read through `courses/EXC2O/.merged_output`, which is a
+# LINK. Checked here because every other check in this file would pass just as
+# happily with a real folder in the old place — and the whole point of the
+# change is that the bytes are not in the working folder any more.
+EXPECTED_BUILD_ROOT="${HOME%/}/Library/Application Support/Plantoir/builds/$(pwd -P | shasum -a 256 | cut -c1-8)"
+LINK_TARGET="$(readlink courses/EXC2O/.merged_output 2>/dev/null || true)"
+if [[ -L "courses/EXC2O/.merged_output" && "$LINK_TARGET" == "$EXPECTED_BUILD_ROOT/EXC2O" ]]; then
+  pass "The built site is kept outside the working folder ($LINK_TARGET)"
+else
+  fail "courses/EXC2O/.merged_output is not a link to $EXPECTED_BUILD_ROOT/EXC2O (it is: ${LINK_TARGET:-a real folder})"
+fi
+
+# -------------------- 6b. The site wears Plantoir's icon, not Quartz's --------------------
+# Two halves that fail independently: the FILES have to be emitted (static/ by
+# the Static emitter, the root copy by the Assets emitter out of content/), and
+# the PAGE has to link them. A site can have all four files and still show the
+# Quartz logo if Head.tsx did not make it into the image.
+if [[ -f "$SITE_INDEX" ]]; then
+  ICON_OK="true"
+  for asset in static/icon.svg static/favicon.ico static/apple-touch-icon.png static/icon.png favicon.ico; do
+    if [[ ! -f "$SITE_PUBLIC/$asset" ]]; then
+      fail "Built site is missing $asset"
+      ICON_OK="false"
+    fi
+  done
+  # The root favicon.ico and quartz/static/icon.png must be OURS, byte for byte.
+  # Note what this does NOT prove: build_site.py looks for support/favicon
+  # relative to the container's WORKDIR before /opt/support/favicon, and when
+  # verify.sh runs, that WORKDIR *is* this repo — so these two lines compare
+  # the working tree with itself. What proves the IMAGE carries the right
+  # bytes is the four check_baked lines above; a teacher's working folder has
+  # .toolchain/support rather than support/, so it correctly falls through to
+  # the baked copy.
+  for pair in "favicon.ico:favicon.ico" "static/icon.png:icon.png"; do
+    built="$SITE_PUBLIC/${pair%%:*}"
+    source_file="support/favicon/${pair##*:}"
+    if [[ -f "$built" ]] && ! cmp -s "$built" "$source_file"; then
+      fail "$built is not $source_file — the site is carrying a different icon"
+      ICON_OK="false"
+    fi
+  done
+  for needle in 'static/icon.svg' 'static/favicon.ico' 'apple-touch-icon'; do
+    if ! grep -q "$needle" "$SITE_INDEX"; then
+      fail "index.html does not link $needle"
+      ICON_OK="false"
+    fi
+  done
+  [[ "$ICON_OK" == "true" ]] && pass "Built site carries and links the Plantoir icon (tab, root, Apple touch)"
+fi
+
+# -------------------- 6c. An existing teacher's container is recreated ------
+# Every container that exists today was made WITHOUT the builds mount, and a
+# mount cannot be added to a container that already exists — so the launcher
+# has to notice and recreate it. Nothing else here exercises that branch: the
+# run above starts by REMOVING the container, so the launcher always takes the
+# create-from-new path. This puts a teacher's container back, deliberately
+# without the mount, and asks the launcher to cope.
+echo ""
+echo "🚦 Putting back a container made WITHOUT the builds mount, the way every"
+echo "   existing teacher's is, and building again…"
+docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+# No published ports: this stand-in only has to EXIST without the builds
+# mount, and the launcher replaces it before anything serves. Publishing
+# 8081-8084 here would fail whenever a real preview is running on this Mac —
+# which is the very situation the launcher's own free-port search exists to
+# cope with — and would have read as a fault in the code under test.
+if docker run -dit --name "$CONTAINER_NAME" \
+     -v "$(pwd)/courses":/teaching/courses \
+     "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1; then
+  if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_old_container.log 2>&1; then
+    pass "a build in a container made before the builds mount existed still works"
+  else
+    fail "a build in a container made before the builds mount existed FAILED"
+    tail -30 /tmp/verify_old_container.log
+  fi
+  if docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$CONTAINER_NAME" 2>/dev/null \
+       | grep -Fxq "$EXPECTED_BUILD_ROOT"; then
+    pass "and the container was recreated WITH the builds mount"
+  else
+    fail "the container still has no builds mount, so the link dangles inside it"
+  fi
+  # WHICH branch did it. The mount check above also passes if the launcher
+  # recreated for some OTHER reason — a courses mount that did not match, say —
+  # in which case this section would be reporting a pass for the wrong work and
+  # the branch it exists to exercise would still be untested.
+  if grep -q "so built websites can be kept outside" /tmp/verify_old_container.log; then
+    pass "and it recreated it because the builds mount was missing, not for some other reason"
+  else
+    fail "the container was recreated, but not by the missing-builds-mount branch this checks"
+  fi
+  if [[ -f "$SITE_INDEX" ]]; then
+    pass "and the site is still readable at the path every reader names"
+  else
+    fail "the site is gone from $SITE_INDEX after the recreate"
+  fi
+else
+  fail "could not put back a container without the builds mount"
+fi
+
+# -------------------- 6d. --stop stops this section, and only this one ------
+# Nothing here drove `--stop` before, so the mac's stop path had no automated
+# gate at all: the rule was unit-tested against a snapshot and the LAUNCHER
+# that carries it into the container was never run. Both halves of that are
+# checked here against real processes in the real container.
+#
+# The stand-ins are shells, not node: what the rule reads is the command line
+# and the working directory, and `sh -c "sleep 600" <args>` puts whatever is
+# wanted on the command line while genuinely sleeping. Using the real Quartz
+# CLI would test node's ability to start, which is not what is in question.
+echo ""
+echo "🚦 Driving ./preview.sh EXC2O 1 --stop against real processes…"
+
+_count_matching() {
+  # Skips its OWN process, which is not a nicety: the needle is on this
+  # counter's command line too, so without it every count reads one too high
+  # and every check in this section fails while the code under test is right.
+  docker exec "$CONTAINER_NAME" python3 -c '
+import os, sys
+needle = sys.argv[1]
+mine = str(os.getpid())
+found = 0
+for entry in os.listdir("/proc"):
+    if not entry.isdigit() or entry == mine:
+        continue
+    try:
+        line = open("/proc/%s/cmdline" % entry, "rb").read().replace(b"\x00", b" ").decode("utf-8", "replace")
+    except OSError:
+        continue
+    if needle in line:
+        found += 1
+print(found)
+' "$1" 2>/dev/null || echo 0
+}
+
+_start_stand_ins() {
+  # Serving this section: caught by the directory on its command line.
+  docker exec -d "$CONTAINER_NAME" sh -c \
+    'exec sh -c "sleep 600" /tmp/quartz-builds/EXC2O/section1/quartz/bootstrap-cli.mjs --serve cq4t-probe-serve-1' \
+    >/dev/null 2>&1
+  # Serving ANOTHER section. Must survive: this is the regression that started
+  # the whole rule — publishing section 2 taking section 1's preview down.
+  docker exec -d "$CONTAINER_NAME" sh -c \
+    'exec sh -c "sleep 600" /tmp/quartz-builds/EXC2O/section2/quartz/bootstrap-cli.mjs --serve cq4t-probe-serve-2' \
+    >/dev/null 2>&1
+  # In this section's folder with NOTHING on its command line to say so —
+  # the `npm install` shape, which only a working-directory sweep can see.
+  docker exec -d -w /tmp/quartz-builds/EXC2O/section1 "$CONTAINER_NAME" sh -c \
+    'exec sh -c "sleep 600" cq4t-probe-cwd' >/dev/null 2>&1
+  sleep 1
+}
+
+# Only section 1, which the cwd stand-in needs for `docker exec -w`. NOT
+# section 2: `build_site.py` skips the scaffold copy whenever the output
+# directory already exists, so an empty one left behind here makes a later
+# `./preview.sh EXC2O 2` fail on a missing bootstrap-cli.mjs — in the very
+# container this script leaves running and invites you to poke at. That is
+# the "litter that reads as a broken toolchain" this section warns about,
+# committed by the section itself.
+docker exec "$CONTAINER_NAME" mkdir -p /tmp/quartz-builds/EXC2O/section1 >/dev/null 2>&1 || true
+_start_stand_ins
+if [[ "$(_count_matching cq4t-probe-serve-1)" == "1" && "$(_count_matching cq4t-probe-cwd)" == "1" \
+      && "$(_count_matching cq4t-probe-serve-2)" == "1" ]]; then
+  pass "three stand-in processes are running in the container"
+else
+  fail "could not start the stand-in processes, so --stop was not exercised"
+fi
+
+./preview.sh EXC2O 1 --stop >/tmp/verify_stop.log 2>&1 || true
+sleep 1
+if [[ "$(_count_matching cq4t-probe-serve-1)" == "0" ]]; then
+  pass "--stop ended this section's preview server"
+else
+  fail "--stop left this section's preview server running"
+  tail -10 /tmp/verify_stop.log
+fi
+if [[ "$(_count_matching cq4t-probe-cwd)" == "0" ]]; then
+  pass "--stop ended a process known only by its working directory"
+else
+  fail "--stop missed a process sitting in the section's folder with nothing on its command line"
+fi
+if [[ "$(_count_matching cq4t-probe-serve-2)" == "1" ]]; then
+  pass "--stop left ANOTHER section's preview alone"
+else
+  fail "--stop took down another section's preview — the regression this rule exists to prevent"
+fi
+
+# ---- The same, against a container that predates the shared rule ----------
+# Stop mode must never build anything, so it runs against whatever container
+# is already there — and right after an upgrade that is one built from the
+# PREVIOUS image, with no stop_preview.py baked in. The launcher therefore
+# pipes the recipe's own copy in over stdin. Naming the baked path instead
+# would fail with a message nobody sees: both callers send this launcher's
+# output to the null device and neither checks its exit code, so the teacher
+# would be told nothing while the build carried on running.
+docker exec "$CONTAINER_NAME" rm -f /opt/scripts/stop_preview.py >/dev/null 2>&1 || true
+_start_stand_ins
+if [[ "$(_count_matching cq4t-probe-serve-1)" == "1" ]]; then
+  ./preview.sh EXC2O 1 --stop >/tmp/verify_stop_old.log 2>&1 || true
+  sleep 1
+  if [[ "$(_count_matching cq4t-probe-serve-1)" == "0" ]]; then
+    pass "--stop still works against a container built before the shared rule existed"
+  else
+    fail "--stop cannot stop anything in a container that predates stop_preview.py"
+    tail -10 /tmp/verify_stop_old.log
+  fi
+else
+  fail "could not restart the stand-in process for the older-container check"
+fi
+
+# Leave the container as it was found: the stand-ins ended, and the file this
+# section deleted from it put back. The container is left running on purpose
+# (the summary tells you so), and handing it on with a hole in /opt/scripts
+# would make the NEXT run's older-container check pass for the wrong reason —
+# and, sooner than that, make an ordinary build fail on `import stop_preview`
+# with an error that reads like a broken toolchain rather than like litter.
+#
+# Children too, not only the marked shells: this image's /bin/sh FORKS
+# `sleep 600` rather than exec'ing it, so each stand-in leaves a child whose
+# own command line carries no marker. Matching on the parent as well is what
+# makes "leaves the container as it found it" true rather than nearly true.
+docker exec "$CONTAINER_NAME" python3 -c '
+import os, signal
+# Skip THIS process. Its own command line carries the marker — the script
+# text is the argument — so without this it marks itself, SIGKILLs itself
+# part-way through, prints nothing and leaves the children it was written to
+# collect. That is exactly what happened, and it is the second time
+# self-matching has bitten in this one section: `_count_matching` above needs
+# the same guard for the same reason. A process scanning for a string it is
+# itself carrying is the shape to watch for here.
+mine = os.getpid()
+marked = set()
+for entry in os.listdir("/proc"):
+    if not entry.isdigit() or int(entry) == mine:
+        continue
+    try:
+        line = open("/proc/%s/cmdline" % entry, "rb").read()
+    except OSError:
+        continue
+    if b"cq4t-probe" in line:
+        marked.add(int(entry))
+doomed = set(marked)
+for entry in os.listdir("/proc"):
+    if not entry.isdigit() or int(entry) == mine:
+        continue
+    try:
+        for row in open("/proc/%s/status" % entry, encoding="utf-8", errors="replace"):
+            if row.startswith("PPid:") and int(row.split()[1]) in marked:
+                doomed.add(int(entry))
+                break
+    except (OSError, ValueError, IndexError):
+        continue
+for pid in doomed:
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+' >/dev/null 2>&1 || true
+
+docker cp scripts/stop_preview.py "$CONTAINER_NAME:/opt/scripts/stop_preview.py" >/dev/null 2>&1 || true
+if docker exec "$CONTAINER_NAME" test -f /opt/scripts/stop_preview.py 2>/dev/null; then
+  pass "and the container was left as it was found (the rule put back in /opt/scripts)"
+else
+  fail "the container is still missing /opt/scripts/stop_preview.py — the next build in it will fail on an import, which reads as a broken toolchain rather than as this section's litter"
+fi
 
 RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"
 if [[ "$RUNNING_IMAGE" == "$DEV_TEST_IMAGE" ]]; then

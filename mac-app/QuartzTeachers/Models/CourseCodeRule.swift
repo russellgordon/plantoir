@@ -8,8 +8,8 @@ import Foundation
 /// a teacher create could not necessarily be typed again anywhere else. A
 /// second copy of a rule is a rule that will disagree with itself.
 ///
-/// The rule is narrow on purpose — a single interior space is the only
-/// concession. A course code is not a label the app keeps
+/// The rule is narrow on purpose — a single interior space and a dash are
+/// the only concessions. A course code is not a label the app keeps
 /// to itself: it **is** the folder name under `courses/`, it is written into
 /// `course_config.json` for the shared Python to read, it rides in the name
 /// of every backup and archive zip, and it becomes part of a launchd label
@@ -63,7 +63,7 @@ enum CourseCodeRule {
             case .twoSpacesInARow:
                 return "A course code can’t have two spaces in a row."
             case .charactersThatAreNotAllowed:
-                return "A course code can only use letters, numbers and spaces."
+                return "A course code can only use letters, numbers, spaces and dashes."
             case .tooLong:
                 return "A course code can be at most \(CourseCodeRule.mostCharacters) characters."
             case .alreadyTaken(let code):
@@ -79,7 +79,15 @@ enum CourseCodeRule {
             case .twoSpacesInARow:
                 return "No double spaces"
             case .charactersThatAreNotAllowed:
-                return "Letters, numbers, spaces"
+                // Says less than the full sentence does — spaces are
+                // allowed too — because the sidebar cuts this off around
+                // twenty-five characters and "Letters, numbers, spaces,
+                // dashes" does not survive the trim. A teacher only ever
+                // sees this after typing something that is NOT one of
+                // these, so the shorter list still points the right way,
+                // and the wizard's wide field carries the complete
+                // sentence.
+                return "Letters, numbers, dashes"
             case .tooLong:
                 return "\(CourseCodeRule.mostCharacters) characters at most"
             case .alreadyTaken(let code):
@@ -156,19 +164,30 @@ enum CourseCodeRule {
     }
 
     /// True when this character may appear in a course code: an ASCII letter
-    /// or digit, or a space.
+    /// or digit, a space, or a dash.
     ///
     /// Emoji fail here, and so does an accented letter and every piece of
     /// punctuation. They are refused for the same reason as anything else
     /// awkward: the code is a folder name, a file name and part of a
     /// scheduled publish's identifier, and each of those has its own opinion
-    /// about what it will carry. A space is the one exception, because
-    /// teachers really do name a course "AP CALC" — and everything
-    /// downstream already copes with one (`ScheduledDeploy.sanitizedCode`
-    /// exists precisely so a club named with a space cannot produce a bad
-    /// identifier).
+    /// about what it will carry.
+    ///
+    /// Two exceptions. A SPACE, because teachers really do name a course
+    /// "AP CALC" — and everything downstream already copes with one
+    /// (`ScheduledDeploy.sanitizedCode` exists precisely so a club named
+    /// with a space cannot produce a bad identifier).
+    ///
+    /// And a DASH, since 2026-08-23, because British Columbia's course
+    /// codes contain them: 55 of the 117 codes in
+    /// `support/british_columbia_secondary_courses.json` — MTEL-12,
+    /// MFMP-10, MMA--09 — so the rule was refusing more than half of one
+    /// province's real courses. Russell found it by trying to create one.
+    /// A dash is safe everywhere a code travels: it is legal in a folder
+    /// name, in a zip's name, and in a launchd label. This reverses the
+    /// contract's old `CS-CLUB` case, which refused a hyphen "like any
+    /// other punctuation" — written before BC codes existed here.
     private static func characterIsAllowed(_ character: Character) -> Bool {
-        if character == " " {
+        if character == " " || character == "-" {
             return true
         }
         if !character.isASCII {

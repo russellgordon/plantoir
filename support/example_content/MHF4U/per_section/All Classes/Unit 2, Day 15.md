@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: sketch a rational function, solve a
-   rational inequality, and find one root numerically
-2. Compare methods at the boards
+   rational inequality, and find one root numerically: [[Rational Functions]], [[Asymptotes]], and [[Polynomial and Rational Inequalities]]
+2. Compare methods at the boards; practice: [[Rational Functions Practice]]
 
 ## Things to do before our next class
 

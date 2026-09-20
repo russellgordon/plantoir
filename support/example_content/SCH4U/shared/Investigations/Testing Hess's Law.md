@@ -46,7 +46,7 @@ $\Delta H_2$, within the uncertainty of three cup experiments.
 > the same thing — a sodium hydroxide solution *is* those ions in
 > water.
 >
-> $\begin{aligned} \ce{NaOH(s)} &\rightarrow \ce{Na+(aq) + OH-(aq)} \\ \ce{Na+(aq) + OH-(aq) + HCl(aq)} &\rightarrow \ce{NaCl(aq) + H2O(l)} \\ \hline \ce{NaOH(s) + HCl(aq)} &\rightarrow \ce{NaCl(aq) + H2O(l)} \end{aligned}$
+> $\begin{aligned} \ce{NaOH(s)} &\ce{-> Na+(aq) + OH-(aq)} \\ \ce{Na+(aq) + OH-(aq) + HCl(aq)} &\ce{-> NaCl(aq) + H2O(l)} \\ \hline \ce{NaOH(s) + HCl(aq)} &\ce{-> NaCl(aq) + H2O(l)} \end{aligned}$
 >
 > The ions appear on the right of the first line and the left of the
 > second, so they cancel, and what survives is exactly the direct route.
@@ -251,9 +251,13 @@ is in [[Calorimetry]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
+![[A1.4]]
+
+![[A1.13]]
+
 ![[D2.6]]
 
 ![[D3.4]]
-
-![[A1.13]]
 %%curriculum-end%%

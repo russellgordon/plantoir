@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. [[The Plant Identification File]] handed in
-2. Peer check: could you find this plant from this entry?
-3. Trial results collated
+2. Trial results collated and checked against your log
+3. Feedback on the data, before the write-up rather than after it
 
 ## Things to do before our next class
 

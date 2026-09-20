@@ -12,7 +12,8 @@ tags:
 
 1. Period 6 of 8: the recommendation drafted, with its costs
 2. The strongest opposing view, written out and answered
-3. Conferences
+3. Conferences; then your draft against the task's criteria:
+   [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

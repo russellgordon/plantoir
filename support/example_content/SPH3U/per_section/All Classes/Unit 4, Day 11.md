@@ -10,12 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Discussion: [[Noise and the Right to Quiet]]
-2. Work time on [[Sound in a Space]] with the sound meters
-3. Unit 4 consolidation: one wave idea explains all four labs
-4. Hand in [[Sound in a Space]]
+1. Discussion: [[Noise and the Right to Quiet]] — twenty minutes
+2. [[Sound in a Space]], day 3 — working period with the sound meters:
+   start with whatever last class's conference asked you to measure again
+3. Last fifteen minutes: [[Judging Your Own Work]] against the criteria
+   on [[Sound in a Space]] — your weakest row named, ready for the
+   working period next class
 
 ## Things to do before our next class
 
 - [ ] Journal: the three things you would tell someone starting Unit 4.
-- [ ] Read [[Electric Current and Circuits]] before next class.
+- [ ] Read [[Electric Current and Circuits]] before Unit 5 starts.

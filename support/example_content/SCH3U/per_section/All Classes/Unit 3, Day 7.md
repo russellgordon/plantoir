@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Finding an Empirical Formula]] in class
+1. Bench: write up [[Finding an Empirical Formula]] in class — the
+   third of [[The Lab Reports]]
 2. The uncertainty paragraph: which measurement dominated your error,
    and in which direction
 3. Practise: [[Empirical Formula Practice]]

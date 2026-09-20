@@ -12,7 +12,8 @@ tags:
 
 1. Silent reading, fifteen minutes
 2. [[The Fact Check]], day 3 — the evidence hunt, with sources recorded as
-   you go
+   you go. I come to each pair with one question about the source you are
+   leaning hardest on
 3. Tutorial: [[Citing What You Use]] — so a reader can check you
 
 ## Things to do before our next class

@@ -10,7 +10,7 @@ students. %%
 
 ## Section __SECTION_NUMBER__ — notes to myself
 
-- Book the culminating audiences in October. The councillor and the
+- Book the culminating audiences early in the course. The councillor and the
   historical society both need six weeks; the museum asked for more.
 - Contact the local archive before Unit 2 — the thirties case needs
   their local collection and they cap group visits.

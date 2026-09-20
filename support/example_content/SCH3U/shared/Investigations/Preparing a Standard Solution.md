@@ -215,9 +215,13 @@ before you trusted anything else on the page.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
 ![[E2.3]]
 
 ![[E2.4]]
 
-![[A1.2]]
+![[E3.1]]
+
+![[E3.2]]
 %%curriculum-end%%

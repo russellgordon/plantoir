@@ -14,7 +14,9 @@ tags:
 2. Tour of the site: [[Using This Site]] and [[How This Site Is Organised]]
 3. Read together: [[Safety in the Lab]] and [[Working with Living Things]]
 4. How the course runs: [[How Biology Class Works]], [[How Marks Work]], [[Learning Goals]]
-5. First sort: twelve organisms, your own categories, no rules given
+5. First sort: twelve organisms, your own categories, no rules given.
+   A diagnostic, and not marked: it tells me how this class already
+   groups living things before we name anything
 
 ## Things to do before our next class
 

@@ -14,10 +14,12 @@ tags:
 
 ## What it is for
 
-Everything else this semester was done with a partner, a bench, and time
-to look things up. This is the one piece of evidence that is
-unambiguously yours, and it is the closest thing in this course to how
-SPH4U and first-year physics will assess you.
+Most of this semester was measured or built beside somebody, with the
+bench in front of you and time to look things up. Every one of those
+pages was still marked as yours — the task pages say which part is —
+but this is the one piece written with nothing and nobody to hand, and
+it is the closest thing in this course to how SPH4U and first-year
+physics will assess you.
 
 ## What is on it
 
@@ -79,9 +81,17 @@ work in symbols before substituting numbers.
 ## How this is assessed
 
 Against the same expectations as everything else. Per [[How Marks Work]],
-this examination is part of the final 30% of the course mark alongside
-[[The Energy Report]], so that neither one afternoon nor one report
-decides your grade alone.
+this examination is part of the final thirty per cent of the course mark,
+alongside the [[Motor and Generator Report]], handed in before the
+review classes begin. Those two are deliberately unalike — one a device you built with
+somebody over three weeks, one three hours on paper by yourself — so that
+neither a single afternoon nor a single build decides your grade alone.
+
+It is marked on the same four categories as everything else, and the
+criteria are the ones printed above: the physics before the arithmetic, a
+stated convention, units and significant figures, and diagrams drawn to
+convention. Nothing on this paper is judged by anything that is not on
+this page.
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -100,3 +110,48 @@ decides your grade alone.
 
 ![[F3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+This one is deliberately lopsided, and it is worth saying why rather than
+pretending otherwise. The examination is almost pure product: three hours
+on paper, the same conditions for everybody, and that sameness is the
+only reason it is worth having beside twenty weeks of coursework. The
+observation and conversation for the final thirty per cent live in the
+Motor and Generator Report, whose own block says where. What follows is
+what the review week can honestly give you.
+
+OBSERVE — Unit 5, Days 13 to 15, the three review periods
+  Watch for: who can start a problem whose numbers have been changed, and
+  who is hunting for the one they memorised. The paper shows you where
+  they ended up, never how they began.
+  This is NOT evidence for the examination mark. The paper is that, on
+  its own, for everyone. It is how you decide what Day 16's clinic is
+  actually for, and it is the last chance in the course to fix something
+  cheaply.
+  Going well: the first marks on the page are a diagram and a stated
+  positive direction, before any number is written.
+  Stuck: a formula copied off the Formula Reference before the situation
+  has been read twice.
+  Record: three names on the back of your review plan each period — the
+  ones to find on Day 16.
+
+TALK — Unit 5, Day 16, at the individual conferences already on that
+agenda
+  Ask: "Show me a question from Unit 1 you could not do at the start of the course and
+  can do now. Talk me through it."
+  Then: "Which of the five units would you rather be examined on twice,
+  and why that one?"
+  A strong first answer reconstructs the reasoning rather than reciting
+  the answer, and it is worth more than a memory of it: a grade is
+  supposed to lean on the most recent and most consistent evidence, and a
+  student explaining kinematics fluently at the end of the course is current evidence
+  about B2.7 that the earlier mark cannot see. Where you hear that, it
+  changes the seventy, not the thirty.
+  Record: one line per student, with a star beside anything that should
+  move a Unit 1 or Unit 2 judgement before you calculate the grade.
+
+The product evidence is the paper itself, written in the examination
+period.
+%%

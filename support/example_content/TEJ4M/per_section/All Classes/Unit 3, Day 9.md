@@ -16,8 +16,10 @@ tags:
    make the loop do more work and watch the worst case move
 3. Name it: [[Timing, Interrupts, and Real Time]] — latency, jitter,
    and what "real time" actually promises
-4. Launch: [[The Control System]]. It must hold a setpoint, and you
-   must show the tuning evidence that got it there
+4. Launch: [[The Control System]], criteria table read before anything
+   is wired. It must hold a setpoint, and you must show the tuning
+   evidence that got it there — and pairs say today who owns which
+   half of that evidence
 5. Log your loop period and your worst-case jitter, in microseconds
 
 ## Things to do before our next class

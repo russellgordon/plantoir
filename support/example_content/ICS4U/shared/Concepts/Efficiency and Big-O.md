@@ -95,22 +95,47 @@ honest caveats, all of which you have already met:
 > worth marks in [[The Structure Study]] and
 > [[The Software Project]].
 
+## Theoretical limits and complexity classes
+ 
+Big-O is part of a larger mathematical field: **theoretical computer science**
+and computational complexity theory. Computer scientists classify problems by
+their intrinsic difficulty, independent of hardware:
+ 
+- **Lower bounds on problems**: While an algorithm like insertion sort is
+  $O(n^2)$ and merge sort is $O(n \log n)$, theoretical proofs establish
+  that *any* comparison-based sorting algorithm requires at least $\Omega(n \log n)$
+  comparisons in the worst case. Using a **decision tree model**, sorting $n$ items
+  corresponds to identifying one of $n!$ possible permutations. A binary decision
+  tree with $n!$ leaves must have a minimum height of $\log_2(n!) \approx n \log_2 n - n \log_2 e = \Omega(n \log n)$.
+- **Complexity classes ($P$ vs $NP$)**: Problems solvable in polynomial time
+  (like searching, sorting, and shortest-path graph algorithms) belong to class $P$.
+  Problems whose solutions can be *verified* in polynomial time belong to $NP$.
+  Whether $P = NP$ remains the central open question of theoretical computer science.
+- **Computability and undecidability**: Alan Turing proved that certain problems
+  (like the Halting Problem — determining whether an arbitrary program will
+  eventually stop running) cannot be decided by *any* algorithm.
+ 
+Understanding theoretical bounds helps engineers recognize when a problem is
+provably hard and when an optimal algorithm has already been found.
+ 
 Timing still matters — it is how you find out *which* part of a real
 program is slow, which is almost never the part you guessed.
 [[Profiling and Timing Code]] has the method; the rule is to measure
 before you optimise, and to keep the correct version until the fast
 one passes the same tests.
-
+ 
 Do the counting yourself in [[Efficiency Practice]], watch the shapes
 appear in [[Searching and Timing It]] and [[Sorting and Timing It]],
 and see the exponential case bite in [[Recursion]].
-
+ 
 %%curriculum-start%%
 ## Curriculum connection
-
+ 
 ![[C2.2]]
-
+ 
 ![[C2.3]]
-
+ 
 ![[C2.4]]
+ 
+![[D4.2]]
 %%curriculum-end%%

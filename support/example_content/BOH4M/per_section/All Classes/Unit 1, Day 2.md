@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: three organizations on the board — a hospital ward, a food truck, a student council. What do they have in common?
+1. Diagnostic warm-up, so I know where this class is starting from: three organizations on the board — a hospital ward, a food truck, a student council. What do they have in common? Written, not discussed, and not marked — it tells me which ideas we can move through quickly and which need a period of their own.
 2. Working in threes: what makes each one an organization at all?
 3. Naming it: [[What an Organization Is]]
 4. Where the marks come from this term: [[How Marks Work]], and what

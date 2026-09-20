@@ -11,7 +11,7 @@ front, as things an observer could see in your work — reasoning,
 growth, and communication, never speed, as [[How Marks Work]] explains.
 Every criteria table traces back to our [[Learning Goals]].
 
-## The five tasks
+## The six tasks
 
 - [[The Rollercoaster]] — design a coaster's height profile as a
   polynomial that provably meets every constraint.
@@ -25,3 +25,5 @@ Every criteria table traces back to our [[Learning Goals]].
   included.
 - [[The Functions Symposium]] — the finale: your signature function,
   presented and defended before invited guests.
+- [[Final Examination]] — the written half of the final evaluation:
+  three hours, the whole course, and no part of it a surprise.

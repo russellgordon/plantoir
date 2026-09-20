@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: evaluate three limits, and differentiate
-   one function from the definition
-2. Compare methods at the boards
+   one function from the definition: [[The Limit]] and [[Derivatives from First Principles]]
+2. Compare methods at the boards; practice: [[Limits Practice]]
 
 ## Things to do before our next class
 

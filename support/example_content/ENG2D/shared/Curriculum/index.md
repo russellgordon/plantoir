@@ -2,7 +2,7 @@
 title: Curriculum
 publish: true
 created: __CREATED__
-enableToc: true
+enableToc: false
 ---
 Everything we do in this course points at one or more of these expectations,
 from **ENG2D — English, Grade 10, Academic**. Lesson pages link here so you can always

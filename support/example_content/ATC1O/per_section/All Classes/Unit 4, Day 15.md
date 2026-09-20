@@ -13,9 +13,9 @@ tags:
 1. Warm-up: [[The Standard Warm-Up]]
 2. Watching the recording together
 3. What the audience saw that we did not
-4. Journal: the honest version
+4. Journal, in the studio: the honest version
 5. Cool-down
 
 ## Things to do before our next class
 
-- [ ] Write the journal entry while it is fresh.
+- [ ] Nothing to write tonight — you wrote it in the room.

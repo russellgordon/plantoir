@@ -1,6 +1,6 @@
 ---
-title: Grade 9 Science, Section 1
-created: 2026-08-14T12:24:26.000-0400
+title: Section 1
+created: 2027-01-18T07:00:00.000-0500
 enableToc: false
 excludeBacklinks: true
 publish: true

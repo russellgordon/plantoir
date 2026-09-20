@@ -75,9 +75,13 @@ incremental backup is the whole reason both exist.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B2.3]]
+![[A2.1]]
+
+![[A2.3]]
+
+![[A2.4]]
 
 ![[B2.2]]
 
-![[A2.1]]
+![[B2.3]]
 %%curriculum-end%%

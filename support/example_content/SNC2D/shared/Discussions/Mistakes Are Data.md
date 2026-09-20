@@ -64,7 +64,7 @@ they just refused to discard something they could not explain.
 > exactly what happened — including the run that went badly and what you
 > did next. A careful investigation that names its problems is worth
 > more here than a tidy one that hides them, and
-> [[How Marks Work]] says so in the categories.
+> [[How Marks Work]] says so plainly.
 
 Bring one thing that went wrong in an investigation this unit. We will
 sort the room's examples into the three kinds above and argue about the

@@ -35,7 +35,7 @@ right. "Roots exposed 30 cm above current level" is on the left.
 > [!tip] Measure something, even roughly
 > Paces are a measurement if you know your pace length. A photograph
 > with your notebook in it for scale is a measurement. Precision is
-> less important than having a number to compare against in January.
+> less important than having a number to compare against at the end of the course.
 
 ## The questions we come back to
 

@@ -14,7 +14,9 @@ tags:
    thermostat
 2. Bench: hold a small enclosure at a target temperature using a timer
    and nothing else. Predict how far it will drift in ten minutes,
-   then let it drift and record the truth
+   then let it drift and record the truth. Nothing is marked: those
+   predictions tell me what this room already believes about control,
+   and Days 2 and 3 are set from them
 3. Now put a thermometer in the loop and make yourself the controller.
    Same target, different result — say precisely what changed
 4. Name it: [[Open and Closed Loop Control]] — the difference is

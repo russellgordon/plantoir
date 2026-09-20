@@ -36,7 +36,8 @@ turns a picture into data. Flash off, lens wiped, three of everything.
 
 ## Naming and filing
 
-Rename the same day, in the same shape, so it is findable in June:
+Rename the same day, in the same shape, so it is findable at the end of the
+course:
 
 ```
 lastname-sitename-stage-yyyy-mm-dd

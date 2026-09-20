@@ -20,7 +20,11 @@ Working in pairs along a marked stretch:
 
 1. **Survey a profile.** A side-on section from the water's edge up to
    the vegetation line, with measured distances and height changes. Mark
-   every point where the surface material changes.
+   every point where the surface material changes. Fix your zero before
+   the first reading — a peg or a stone at the waterline, agreed by both
+   of you — because the water moves while you work, and a datum that
+   drifts turns nothing into a perfectly plausible profile. Note where
+   the peg is: we re-occupy these stations in Unit 4.
 2. **Describe the material.** At three stations, record composition —
    sand, gravel, cobble, boulder, bedrock, fill — with a size range for
    the dominant fraction, and note roundness and sorting. Those two
@@ -45,8 +49,8 @@ single observation supports more than one inference.
 > [!tip] A rough number beats no number
 > Paces are a measurement if you know your pace length. A photograph
 > with a metre rule in it is a measurement. Precision matters less than
-> having something you can compare against in January, when we come
-> back and measure the same stretch again.
+> having something you can compare against in Unit 4, when we come back
+> and re-survey the same stations.
 
 ## Questions we return to
 

@@ -17,4 +17,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Problem statement agreed with your partner.
+- [ ] Milestone: the problem statement agreed with your partner in
+      their words, consent recorded, and the scope document submitted
+      with its "deliberately not doing" list.

@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Taking an instrument, and reading your own result critically
-2. Portfolio entry launched: [[Your Management Profile]]
+2. Launch: [[The Management Portfolio]] — the four entries, and the four criteria all of them are marked against; then the first one, [[Your Management Profile]]
 3. The uses and misuses of instruments in hiring
 
 ## Things to do before our next class
 
-- [ ] Draft [[Your Management Profile]] — the two occasions that match, and the one that does not.
+- [ ] Take the instrument if you have not already, and write down its result exactly as it reports it.

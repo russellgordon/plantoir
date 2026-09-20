@@ -13,7 +13,9 @@ tags:
 1. Documentary segment, watched twice: once for content, once for
    technique
 2. What honest and neutral each mean
-3. Reading period with your own book
+3. Practise: [[Media Analysis Practice]] to the end, starting with the
+   documentary question
+4. Reading period with your own book
 
 ## Things to do before our next class
 

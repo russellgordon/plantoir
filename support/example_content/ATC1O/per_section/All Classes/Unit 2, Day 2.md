@@ -13,7 +13,8 @@ tags:
 1. Warm-up: [[The Standard Warm-Up]]
 2. Building a phrase that holds together
 3. When is a phrase finished?
-4. Pairs formed for [[The Phrase]]
+4. Launch: [[The Phrase]] — pairs formed, and the criteria read together
+   before anybody makes anything
 5. Cool-down
 
 ## Things to do before our next class

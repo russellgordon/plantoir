@@ -47,6 +47,38 @@ defaults, because the machine's job is different. A technician who
 installs a desktop edition on a server has not made a small mistake;
 they have made a support commitment somebody else will inherit.
 
+## Running multiple operating systems: dual boot and virtualisation
+
+When a single physical computer must support workloads requiring different
+operating systems, two main architectures exist:
+
+- **Dual-boot configuration:** The storage drive is partitioned with
+  distinct file systems, and a bootloader (such as GRUB or Windows Boot
+  Manager) presents a menu at startup. Each operating system runs with
+  native, bare-metal hardware access and full processor/GPU performance, but
+  switching requires a complete reboot and only one system operates at a time.
+- **Virtual machines (VMs):** A hypervisor runs on top of the host operating
+  system (Type 2 hosted) or directly on bare hardware (Type 1 bare-metal).
+  Guest operating systems run concurrently inside isolated virtual hardware
+  containers. Virtual disks and snapshots make backups and rollbacks trivial,
+  though the guest systems share the host's physical RAM and CPU cores.
+
+## How the OS interacts with firmware and hardware
+
+The handoff between firmware and the operating system is a clean boundary:
+
+1. **Boot handoff:** The BIOS/UEFI discovers and initialises essential
+   motherboard hardware, verifies the boot drive, loads the bootloader, and
+   passes hardware tables (memory maps, ACPI device descriptions) to the OS
+   kernel.
+2. **Driver abstraction:** Once running, the operating system kernel does not
+   call BIOS routines; instead, it uses dedicated **device drivers** to
+   communicate directly with hardware registers, handle interrupts, and manage
+   direct memory access (DMA).
+3. **Firmware coordination:** The operating system continues to query firmware
+   for system-level power management (sleep states, thermal throttling), clock
+   synchronisation, and hardware error logging.
+
 ## Where this touches your work
 
 The choice is not "which is best" but "which fits the requirement".
@@ -58,7 +90,11 @@ both be right.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
 ![[A2.1]]
 
-![[A1.1]]
+![[A2.4]]
+
+![[B2.3]]
 %%curriculum-end%%

@@ -13,7 +13,9 @@ tags:
 1. Warm-up: [[Tech Headlines]] — where the metals come from
 2. Concept: [[E-Waste and the Environment]] — the whole path, not just
    the bin
-3. In groups: one device, traced from mine to landfill
+3. In groups: one device, traced from mine to landfill — with Day 1's
+   tally back on the board beside it, so we can see what the room
+   guessed and what turned out to be true
 
 ## Things to do before our next class
 

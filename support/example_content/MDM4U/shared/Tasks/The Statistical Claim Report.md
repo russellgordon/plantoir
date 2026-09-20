@@ -7,8 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · launched in Unit 4, due two classes later · one claim
-> from the news, traced back to its data and given a verdict
+> Individual · launched on Unit 4, Day 5, with working periods on Days
+> 6 and 7 · due on Unit 4, Day 10 · one claim from the news, traced
+> back to its data and given a verdict
 
 ## What you are making
 
@@ -26,8 +27,16 @@ and what was compared with what. Third, the **verdict**, in one of
 three words — *supported*, *overstated*, or *not proven* — followed by
 the evidence that forces it.
 
-Somewhere in part two you will meet at least one of the tricks from
-[[The Graph Gallery]] or one of the confusions from
+Part two ends with one more move, and it is the one that separates a
+report from an opinion: **look for somebody who studied the same
+relationship and concluded differently.** Cite them in a sentence, or
+state plainly that you looked and found none. Two studies of the same
+question disagreeing is not a scandal — it is the ordinary condition
+of the subject, and a verdict written as though only one study exists
+is weaker than it looks.
+
+Somewhere in part two you will also meet at least one of the tricks
+from [[The Graph Gallery]] or one of the confusions from
 [[Correlation and Causation]]. Name it when you meet it. If the claim
 turns out to be perfectly sound, say so with the same confidence — a
 verdict of *supported* is a real result, and it is worth exactly as
@@ -42,6 +51,8 @@ much.
       compared against what
 - [ ] Any graph in the article reconstructed honestly, or the reason
       it cannot be reconstructed stated
+- [ ] A second study of the same relationship found and cited, or its
+      absence stated after a genuine search
 - [ ] Verdict delivered in one of the three words, with the two or
       three pieces of evidence that decide it
 
@@ -54,7 +65,12 @@ one that says *overstated* because the topic felt suspicious. Where
 the trail runs out — some articles cite nothing findable — that dead
 end **is** the finding, reported plainly. Your [[Math Journal]] entry
 on what you believed about the claim before you traced it, and what
-changed, comes in with the report.
+changed, is the most useful ten minutes you will spend on this task.
+
+This one is yours alone from start to finish. The conference on Day 6
+is where I find out whether the trail is real; Day 7 exists so that
+whatever that conference turns up can still change the report before
+it comes in on Day 10.
 
 ## Success criteria
 
@@ -65,6 +81,7 @@ changed, comes in with the report.
 | Method examined | Sample, selection, comparison, and funding named |
 | Statistics used, not waved | The specific number that decides it |
 | A proportionate verdict | Confidence matching the evidence, either way |
+| Not the only study | A second study of the same question cited, or its absence proven |
 
 > [!question]- If the article cites no source at all
 > Then you have already found something. Search for the researcher,
@@ -78,11 +95,58 @@ changed, comes in with the report.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.1]]
+
 ![[D1.5]]
 
 ![[D3.1]]
 
 ![[D3.2]]
 
-![[C1.1]]
+![[E1.5]]
+
+![[E2.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 7, the working period on what the study was for
+  The moment worth standing near is the one where the original
+  document disagrees with the student. It happens to about a third of
+  them: the study turns out to be smaller, narrower or duller than the
+  headline promised, and the verdict they had already half-written no
+  longer fits. Some rewrite the verdict. Some quietly go looking for a
+  different article about the same topic, and start again with the
+  answer they wanted. The report that arrives on Day 10 reads the same
+  either way, and not one row of the criteria table can tell you which
+  happened. This is D3.2 — assessing validity — as a behaviour rather
+  than a paragraph.
+  Going well: the verdict word changes while the student is still
+  reading, and they say so out loud to whoever is nearest.
+  Stuck: a new tab, a new article, and the original verdict intact.
+  Record: initials in one of two columns in your day plan, headed
+  "verdict moved" and "source swapped". It takes a second, and which
+  column somebody lands in is the single most useful thing you will
+  know about them on this task.
+
+TALK — Unit 4, Day 6, at the conference already on that agenda
+  Once you have established that they can reach the study, ask:
+  "What would this study have had to find for your verdict to flip?
+  Give me the number."
+  Then: "The reporter had the same document in front of them that you
+  have. Where do you think they stopped reading?"
+  A strong answer points at a specific figure — a sample size, an
+  interval that includes zero, a base rate, a comparison group that is
+  not there — rather than at the article's tone or the topic's
+  plausibility. That is D3.1, which asks students to explain how the
+  media use and misuse statistics to promote a point of view, and a
+  student who can only say "it felt exaggerated" has not got there
+  even if the written verdict turns out to be correct.
+  Record: three columns on the class list, traced, trying, stalled,
+  plus the number they named. The stalled column is your Day 7
+  conferencing order.
+
+The product evidence is the report and the three-minute verdict on
+Unit 4, Day 10.
+%%

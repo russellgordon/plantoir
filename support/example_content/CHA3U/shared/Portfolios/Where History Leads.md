@@ -6,9 +6,10 @@ tags:
   - portfolios
   - unit-4
 ---
-The last portfolio entry, written after the culminating inquiry. Two parts:
-what your historical training does to the news you read, and where this kind
-of thinking is paid for.
+The last portfolio entry, written in class in the period where the portfolio
+closes, after the culminating inquiry. Two parts: what your historical
+training does to the news you read, and where this kind of thinking is paid
+for. It is marked with the rest of [[The Historian's Portfolio]].
 
 ## Part one — apply it to something happening now
 

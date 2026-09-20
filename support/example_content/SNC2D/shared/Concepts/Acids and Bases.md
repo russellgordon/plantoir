@@ -111,6 +111,10 @@ before it is released. Practise identifying and predicting these reactions in
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.1]]
+
+![[C1.2]]
+
 ![[C3.6]]
 
 ![[C3.7]]

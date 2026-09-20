@@ -7,9 +7,10 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · launched Unit 1, Day 6 and due Unit 1, Day 7 · one class
-> that models something real, plus the written defence of what you put
-> in it and what you deliberately left out
+> Individual · launched Unit 1, Day 10 and due Unit 1, Day 15 · four
+> working periods · one class that models something real, plus the
+> written defence of what you put in it and what you deliberately left
+> out
 
 ## What you are making
 
@@ -83,11 +84,14 @@ interesting thing in your submission.
 
 ## Milestones
 
-- [ ] **Unit 1, Day 6 — thing chosen.** The real thing, the person you
-      will ask, and three attributes you already suspect are wrong.
-- [ ] **Unit 1, Day 6, before you leave** — three rejected attributes,
-      written down with reasons.
-- [ ] **Unit 1, Day 7 — submitted.** The file runs, the defence is
+- [ ] **Unit 1, Day 10 — thing chosen.** The real thing, the person
+      you will ask, and three attributes you already suspect are wrong.
+- [ ] **Unit 1, Day 10, before you leave** — three rejected
+      attributes, written down with reasons.
+- [ ] **Unit 1, Day 13 — judged against the criteria table**, by you,
+      with your weakest row named and the fix booked into Day 14. The
+      routine is [[Judging Your Own Work]].
+- [ ] **Unit 1, Day 15 — submitted.** The file runs, the defence is
       attached, and the invariant is named.
 
 ## How this is assessed
@@ -147,3 +151,46 @@ person you interviewed be one of them?
 
 ![[A4.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 11, the working period where nouns become
+classes on paper
+  Watch for: what a student does when their interview notes contain a
+  noun that will not sit inside the class they have drawn. Splitting
+  it, folding it in, or writing it onto the rejected list are three
+  different design judgements, and the submitted file shows only
+  whichever one survived. The rejected list corroborates it; watching
+  is how you find out whether the list is a record of thinking or a
+  document assembled afterwards to fill a requirement.
+  Going well: the paper gets a second box drawn on it, or a line
+  crossed out with a reason written beside it.
+  Stuck: every noun from the notes becomes an attribute and the
+  drawing keeps growing.
+  Record: three columns on the day plan — split it, folded it in, kept
+  everything. Initials only; one pass of the room does it.
+  That is C1.1, decomposing a problem into classes using an
+  object-oriented design method, seen while it is still a decision.
+
+TALK — Unit 1, Day 11, at the conference already on that agenda
+  The agenda announces that the conference is about which of your
+  classes is really two, so open past it — they will have that one
+  ready.
+  Ask: "Name a rule about your thing that is true out there in the
+  real world and that you have decided not to enforce in code. Why
+  that one?"
+  Then: "Somebody else's code gets hold of one of your objects. What
+  is the worst thing it could do to it without your class noticing?"
+  The submission names one invariant and where it is enforced. Neither
+  of these questions is that: the first asks what was deliberately
+  left outside the boundary, the second asks what the boundary is
+  actually holding back. A strong answer names a specific caller
+  rather than "anything could, I suppose". That is C1.2, encapsulation
+  applied in design, heard while the design can still change.
+  Record: one line each on the conference sheet, naming the rule they
+  chose to leave unenforced.
+
+The product evidence is the file and the defence handed in on Day 15.
+That one arrives on its own.
+%%

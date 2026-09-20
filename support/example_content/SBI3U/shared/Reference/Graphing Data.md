@@ -6,8 +6,9 @@ enableToc: true
 tags:
   - reference
 ---
-In physics a graph is not an illustration of the answer. It usually IS the
-answer: the slope or the area is the quantity you are after.
+In biology a graph is rarely an illustration of the answer. It is usually
+where the answer becomes visible: the shape of the curve, where it
+flattens, and how far the points scatter around it.
 
 ## The rules that make a graph readable
 

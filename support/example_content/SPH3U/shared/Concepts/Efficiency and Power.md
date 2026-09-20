@@ -41,9 +41,11 @@ than under Energy alone.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D2.5]]
+
 ![[D2.6]]
 
-![[D3.7]]
-
 ![[D3.2]]
+
+![[D3.4]]
 %%curriculum-end%%

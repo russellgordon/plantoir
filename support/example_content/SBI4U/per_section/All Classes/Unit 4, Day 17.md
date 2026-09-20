@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: a loop with a long delay — predict the oscillation
+1. Warm-up: a loop with a long delay — predict the oscillation: [[Homeostasis and Feedback]]
 2. Random groups — why delay causes overshoot, tested on the models
    built for the report
-3. Consolidate: the same behaviour as a thermostat, and as a population
+3. Consolidate: the same behaviour as a thermostat, and as a population: [[Homeostasis Report]]
 
 ## Things to do before our next class
 

@@ -12,7 +12,8 @@ tags:
 ## Agenda
 
 1. Review, part one: counting, permutations and combinations,
-   conditional probability, and expected value
+   mutually exclusive events and "A or B", conditional probability,
+   and expected value
 2. Clinic: your questions at the boards
 3. By request: [[Counting Practice]],
    [[Conditional Probability Practice]]

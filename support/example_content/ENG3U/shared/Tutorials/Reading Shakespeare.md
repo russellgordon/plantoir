@@ -2,7 +2,8 @@
 title: Reading Shakespeare
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - tutorials
 ---
 Shakespeare is not hard because the ideas are hard. He is hard because
 the syntax is inverted, the vocabulary has drifted, and it was written to
@@ -33,21 +34,28 @@ be heard rather than read. All three are fixable.
 Most of the play is **iambic pentameter**: ten syllables, five beats,
 *ba-DUM* five times.
 
-> to-MOR-row AND to-MOR-row AND to-MOR-row
+> this CAS-tle HATH a PLEA-sant SEAT the AIR
 
 Two things to do with that:
 
 - **When the rhythm breaks, something is happening.** A short line is a
-  silence; an extra syllable is a character overflowing.
+  silence; an extra syllable is a character overflowing. Count
+  "Tomorrow, and tomorrow, and tomorrow" (5.5): eleven syllables, and
+  three strong beats where the metre wants five. The most famous line in
+  the play is not written in the play's metre, and it sounds like
+  exhaustion because of it.
 - **Prose versus verse.** Shakespeare switches. Notice who speaks in
   which, and when a character changes — it is never decoration.
 
 ## Rhyme
 
 A rhyming couplet usually closes a scene or a thought — a full stop you
-can hear. And when Macbeth first meet, their shared lines form a
-sonnet between them. Nobody in the audience is told that; it is the
-scene's argument delivered as structure.
+can hear. Macbeth walks out to kill Duncan on one: "Hear it not, Duncan,
+for it is a knell / That summons thee to heaven or to hell." The witches
+rhyme almost everywhere, in a shorter line than anybody else in the play
+speaks, which is why they sound like a charm rather than like people.
+Nobody in the audience is told any of that; it is the scene's argument
+delivered as structure.
 
 > [!tip] The two-column method for a hard speech
 > Left column: the text, line by line. Right column: your own words. Do

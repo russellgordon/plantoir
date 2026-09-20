@@ -11,7 +11,8 @@ tags:
 ---
 ## Agenda
 
-1. Review: the critical analysis process on an unseen work, timed
+1. Review: the critical analysis process on an unseen work and its
+   label, timed
 2. Comparing readings
 3. What the examination period asks for: [[The Portfolio and Reflection]]
 

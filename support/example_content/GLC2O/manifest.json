@@ -39,6 +39,9 @@
     "Tasks"
   ],
   "curriculum_folder": "Curriculum",
+  "graded_folders": [
+    "Tasks"
+  ],
   "class_weekday_step": 1,
   "credit_value": 0.5,
   "final_evaluation_hours": 2.5

@@ -15,7 +15,7 @@ the expectations behind all of it.
 | **Techniques** | How each medium actually behaves in your hands | Before and during a media block |
 | **Studio Time** | The working periods, and what each is for | Whenever you are making |
 | **Critiques** | Looking at work — others' and your own | Before every critique |
-| **Portfolios** | The sketchbook, the portfolio, and how work gets recorded | All year |
+| **Portfolios** | The sketchbook, the portfolio, and how work gets recorded | All semester |
 | **Tasks** | Assessed work, with the criteria | Whenever something is due |
 | **Tutorials** | Using the site, photographing work, writing about art | The first time you need one |
 | **Setup** | How the studio runs, including materials and safety | Week one |

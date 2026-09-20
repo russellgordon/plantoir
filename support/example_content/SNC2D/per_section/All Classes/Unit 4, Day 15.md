@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. [[The Optics Design]], day 4 — working period: the redesign, and the account
-   of why version one fell short
-2. Trade with another group and test each other's device
+1. First fifteen minutes: your work against the criteria table —
+   [[Judging Your Own Work]]
+2. [[The Optics Design]], day 4 — working period: your weakest row first,
+   then the redesign and the account of why version one fell short
+3. Trade with another pair and test each other's device
 
 ## Things to do before our next class
 
-- [ ] Design finished; presented next class.
+- [ ] Design finished. It is presented and defended in two classes' time.

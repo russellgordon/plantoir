@@ -17,8 +17,8 @@ tags:
 3. Consolidate: [[Combining Functions]] — sums, products, and
    composition, with every domain interrogated
 4. Practise: [[Combining Functions Practice]]
-5. Symposium prep: [[The Signature Function]] — dress rehearsal in
-   pairs, one ruthless question each
+5. [[The Functions Symposium]], day 1 — dress rehearsal in pairs on
+   your [[The Signature Function]] work, one ruthless question each
 
 ## Things to do before our next class
 

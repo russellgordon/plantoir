@@ -33,6 +33,14 @@ These questions follow [[First Programs]] and [[Decisions and Loops]]
    ```
 6. **Challenge.** Ask the user for a number, then print `Too high`,
    `Too low`, or `Got it!` compared with a secret value of 7.
+7. **Write an input/output script.** Write a three-line Python program
+   that prompts a technician for their first name, prompts for their bench
+   number, and prints a formatted login message: `Technician <Name> active at Bench <Number>.`
+8. **Calculate with user inputs.** Write a program that asks the user
+   for a circuit's voltage (in volts) and resistance (in ohms), converts
+   them to floats, computes current using Ohm's law ($I = V/R$), and
+   prints the result with unit `A`. If current exceeds $0.02\ \text{A}$
+   ($20\ \text{mA}$), print a warning: `Current exceeds safe LED limit!`
 
 ## Answers
 
@@ -62,10 +70,29 @@ These questions follow [[First Programs]] and [[Decisions and Loops]]
 > `Too low`, `else:` print `Got it!`. The `int(...)` matters —
 > `input` hands back text, and text compares with nothing.
 
+> [!success]- Answer 7
+> ```python
+> name = input("Enter technician name: ")
+> bench = input("Enter bench number: ")
+> print("Technician", name, "active at Bench", bench + ".")
+> ```
+
+> [!success]- Answer 8
+> ```python
+> volts = float(input("Supply voltage (V): "))
+> ohms = float(input("Resistance (ohms): "))
+> current = volts / ohms
+> print("Calculated current:", current, "A")
+> if current > 0.02:
+>     print("Current exceeds safe LED limit!")
+> ```
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[B5.1]]
+
+![[B5.2]]
 
 ![[B5.3]]
 %%curriculum-end%%

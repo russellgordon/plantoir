@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish [[The People Problem]] for early next week.
+- [ ] Bring a draft of [[The People Problem]]; the working period for finishing it is early next unit.

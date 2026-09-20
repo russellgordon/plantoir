@@ -12,9 +12,12 @@ tags:
 
 1. Checkpoint, on your own: data, graphs, chance, and one honest
    critique of a claim
-2. Mark your own; revision list written
-3. Portfolio check-in: [[Showing Growth]]
+2. Mark your own; revision list written. I do not mark this one —
+   [[How Marks Work]] says why
+3. Last fifteen minutes: your milestone journal entry, written here —
+   and [[Showing Growth]] is how you will use it at the end of the course
 
 ## Things to do before our next class
 
-- [ ] Journal: what September-you would have made of today's questions.
+- [ ] Bring your revision list — next class opens with twenty minutes
+      on it.

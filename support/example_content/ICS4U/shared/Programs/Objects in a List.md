@@ -8,7 +8,7 @@ tags:
 One `Volunteer` object is tidy. The homework club has fourteen, and
 the coordinator's questions are always about all of them at once: how
 many are we, how many hours in total, who has done the most, and can
-you take Ali off the list because he graduated in June.
+you take Ali off the list because he graduated at the end of the course.
 
 A list of objects answers all four. Each item in the list is a whole
 volunteer — name, grade, and hours travelling together — and the

@@ -15,7 +15,8 @@ tags:
 2. Trace a message bench to bench by hand, then name what we walked:
    [[How Data Travels]]
 3. [[Network Addressing Practice]] — find your machine's address, then
-   your neighbour's
+   your neighbour's. Nothing is collected; I want to hear which part of
+   the address people reach for first
 4. Planning time: sketch your answer to [[The Network Job]] brief
 5. Log it in your [[Tech Journal]]
 

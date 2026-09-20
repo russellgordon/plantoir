@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Retrieval: four questions from Unit 1
-2. Sorting activity: twenty things in this room — where did the materials come from?
+2. Sorting activity: twenty things in this room — where did the materials
+   come from? A diagnostic, so I know what this class already assumes
+   about where things come from; nothing about it counts
 3. [[Renewable, Non-Renewable, Flow]]
 
 ## Things to do before our next class

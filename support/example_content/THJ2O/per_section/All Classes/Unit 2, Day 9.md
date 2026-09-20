@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Shop Build]] — drawings issued, pairs formed
+1. Launch: [[The Shop Build]] — drawings issued, criteria read, pairs
+   formed
 2. Take-off: quantities and cut list from the drawing
 3. Materials ordered from the store
 

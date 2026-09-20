@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: four cells — which does not belong?
+1. Warm-up: four cells — which does not belong? [[Cells and Specialisation]]
 2. Consolidation: one organ, taken all the way — its cells, its tissues,
-   its system, and what happens when it fails
+   its system, and what happens when it fails: [[The Digestive System]]
 3. Look ahead: next unit, substances turn into other substances
 
 ## Things to do before our next class

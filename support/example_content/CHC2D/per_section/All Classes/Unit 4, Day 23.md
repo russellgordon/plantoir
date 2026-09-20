@@ -11,8 +11,8 @@ tags:
 ---
 ## Agenda
 
-1. Review: an unseen dossier, worked against the clock
-2. Provenance, corroboration, and where sources conflict
+1. Review: an unseen dossier, worked against the clock — [[The Document Examination]]
+2. Provenance, corroboration, and where sources conflict: [[Reading a Primary Source]]
 3. Comparing readings
 
 ## Things to do before our next class

@@ -35,6 +35,14 @@ from [[Predict the Output]]. Trace on paper first; the computer checks.
    favourite number in another, then print a sentence using both.
 6. **Challenge.** Variables `red` and `blue` hold values. Swap them —
    afterwards, each must hold the other's old value.
+7. **Data types.** State the data type (`int`, `float`, `str`, or `bool`)
+   of each: (a) `42`, (b) `3.14`, (c) `"True"`, (d) `True`, (e) `"0"`.
+   Explain why `type("True")` is different from `type(True)` and how each
+   is used in a program.
+8. **Order of operations.** Determine the exact value of each expression,
+   showing the evaluation order: (a) `10 + 4 * 2 ** 3`,
+   (b) `(10 + 4) * 2 ** 3`, (c) `20 - 6 // 2 + 5 % 2`. Explain why
+   parentheses are required when calculating an average `(a + b) / 2`.
 
 ## Answers
 
@@ -63,8 +71,27 @@ from [[Predict the Output]]. Trace on paper first; the computer checks.
 > `spare = red`, `red = blue`, `blue = spare`. Try it *without* the
 > spare and watch a value get overwritten — that is why it exists.
 
+> [!success]- Answer 7
+> (a) `int` (integer), (b) `float` (decimal floating-point number),
+> (c) `str` (text string), (d) `bool` (Boolean truth value),
+> (e) `str` (text string, because quotes surround it). `"True"` is text
+> for printing or matching words; `True` is a boolean truth value used
+> directly in conditionals (`if True:`) to decide execution flow.
+
+> [!success]- Answer 8
+> (a) `42` — exponent first ($2^3 = 8$), then multiply ($4 \times 8 = 32$),
+> then add ($10 + 32 = 42$). (b) `112` — brackets first ($10 + 4 = 14$),
+> exponent ($2^3 = 8$), then multiply ($14 \times 8 = 112$). (c) `18` —
+> division ($6 // 2 = 3$) and modulo ($5 \% 2 = 1$), then left-to-right
+> ($20 - 3 + 1 = 18$). Without brackets in `a + b / 2`, division outranks
+> addition, dividing only `b` by 2 rather than the sum.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[C1.3]]
+
+![[C1.4]]
 
 ![[C2.1]]
 %%curriculum-end%%

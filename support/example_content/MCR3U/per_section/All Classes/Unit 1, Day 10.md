@@ -16,11 +16,13 @@ tags:
 3. Consolidate: [[Quadratic Functions Revisited]] — completing the
    square as a transformation story you already know
 4. Check your understanding — one maximum, found two different ways
-5. Gallery work time — bring questions, not excuses
+5. [[The Transformation Gallery]], day 3 — gallery work time: the first
+   job is whatever your conference asked for yesterday; bring questions,
+   not excuses
 
 ## Things to do before our next class
 
-- [ ] Gallery due next class — run [[Checking Your Own Work]] over it
-      first.
+- [ ] Four portraits captioned — run [[Checking Your Own Work]] over them
+      as you go. One more working period before the gallery is due.
 - [ ] If Grade 10 feels far away, [[Getting Help]] and
       [[How to Study for Math]] are your next stops.

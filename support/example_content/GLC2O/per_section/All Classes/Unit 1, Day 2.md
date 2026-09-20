@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. The site is the course: [[Using This Site]]
-2. Where everything lives: [[How This Site Is Organised]]
-3. What these pages can do: [[What This Site Can Do]]
-4. Where we are going by November: [[Learning Goals]]
+1. The site is the course: [[Using This Site]] and [[How This Site Is Organised]]
+2. What these pages can do: [[What This Site Can Do]]
+3. Where we are going by the end of the course: [[Learning Goals]]
+4. How you are marked, and what is not marked: [[How Marks Work]]
 
 ## Things to do before our next class
 

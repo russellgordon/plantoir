@@ -194,3 +194,13 @@ The idea behind all of this, including what regression means for a
 project after you have gone, is [[Testing and Regression]]. When a
 test tells you something is wrong but not why, the next page is
 [[Reading a Traceback in Someone Else's Code]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.3]]
+
+![[A4.2]]
+
+![[C2.1]]
+%%curriculum-end%%

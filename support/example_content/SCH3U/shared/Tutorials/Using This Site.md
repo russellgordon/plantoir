@@ -40,8 +40,8 @@ rather than decorative.
 This course leans on a handful of tables far more than Grade 10 did. You
 will open [[Polyatomic Ions]], [[Solubility Rules]],
 [[The Activity Series]], and [[Significant Figures and Units]] dozens of
-times between now and January — during class, during homework, and in
-the middle of a lab with wet hands.
+times between now and the end of the course — during class, during homework,
+and in the middle of a lab with wet hands.
 
 They are all short, they are all in the same place, and they are all
 searchable. Learn where they are in the first week and you will save

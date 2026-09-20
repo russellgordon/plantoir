@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Launch: [[The Intervention Argument]]
-2. Choosing an intervention narrow enough to argue in six pages
+2. Choosing an intervention narrow enough to argue in 1,200 words
 3. The strongest opposing case, written before your own
 
 ## Things to do before our next class

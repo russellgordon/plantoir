@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - explorations
-enableToc: true
+enableToc: false
 ---
 On the desk: a loaf of bread, a jar of peanut butter, a jar of jam,
 and a knife. At the front: your teacher, who has just become a robot.

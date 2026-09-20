@@ -2,6 +2,8 @@
 title: Symbol, Motif, and Pattern
 publish: true
 created: __CREATED__
+tags:
+  - concepts
 ---
 A **symbol** carries meaning beyond itself. A **motif** recurs and
 accumulates. A **pattern** is any repetition a reader can track: images,

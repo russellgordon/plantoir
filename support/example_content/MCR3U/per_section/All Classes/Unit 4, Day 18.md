@@ -11,9 +11,11 @@ tags:
 ## Agenda
 
 1. Hand in [[Your Financial Future]] — day 7, and done
-2. Compare across the room: five decisions, and how often the deciding
-   number was the one nobody expected
-3. Log it in your [[Math Journal]]
+2. Compare across the room: five plans, and how often the total interest
+   was the number nobody expected
+3. Ten minutes, in class: your money entry in the [[Math Journal]] — what
+   surprised you most about the mirror. This is the entry that belongs to
+   the task
 
 ## Things to do before our next class
 

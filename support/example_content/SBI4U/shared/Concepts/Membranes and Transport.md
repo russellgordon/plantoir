@@ -30,11 +30,11 @@ possible — see the homeostasis unit.
 
 ## Osmosis, stated carefully
 
-Water moves toward the more concentrated solution. Plant cells in pure
-water become turgid and are fine; animal cells burst. That difference is
-the cell wall, and it is why plant and animal tissues need different
-saline solutions in the lab.
-
+Water moves down its concentration gradient toward the region of higher solute
+concentration. Plant cells in pure water (hypotonic) become turgid and remain
+healthy; animal cells lyse. In hypertonic solutions, plant cells plasmolyse as
+water leaves. In [[Osmosis in Plant Tissue]], you determine the isotonic point
+and water potential of potato tissue across a concentration series.
 
 ## Why this is worth your time
 
@@ -48,6 +48,9 @@ somebody's week:
 - **Dialysis.** A machine substituting for a kidney is doing selective
   transport across a membrane, which is why [[Kidneys and Water Balance]]
   reads like a plumbing problem with a chemistry answer.
+- **Targeted drug delivery.** Engineered liposomes and lipid nanoparticles
+  fuse with target cell membranes or cross the blood-brain barrier to deliver
+  chemotherapeutic agents and mRNA therapies directly into cancer cells.
 - **Sports drinks and cramp.** Concentration gradients, and the
   difference between what marketing claims and what osmosis permits.
 - **Medication.** Whether a drug can cross a membrane — the gut lining,
@@ -59,9 +62,15 @@ has already been relevant to your life for years without asking.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C1.2]]
+![[B1.2]]
+
+![[B2.1]]
+
+![[B2.2]]
+
+![[B2.5]]
 
 ![[B3.6]]
 
-![[B2.5]]
+![[C1.2]]
 %%curriculum-end%%

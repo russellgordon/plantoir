@@ -14,7 +14,8 @@ tags:
    method said out loud and defended
 2. Bench time: four switches, four LEDs, and no explanation. Count from
    nothing to as high as the board will go, then write down the rule
-   your fingers were following
+   your fingers were following. Unmarked, and I read every one — how
+   far this class already gets on its own decides how Day 2 runs
 3. Compare and name it: [[Binary and Hexadecimal]] — place value in base
    two, and why four bits at a time is how humans survive reading it
 4. Practise: [[Number Systems Practice]], first block together

@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Log the cuttings.
+- [ ] Check the cuttings went into the log before you left.

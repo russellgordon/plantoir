@@ -10,9 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. [[The Story Behind the Story]], day 4 — the craft note: what you chose and
-   what it cost
-2. Conference: I read your last paragraph and ask one question
+1. [[The Story Behind the Story]], day 4 — first fifteen minutes, on your
+   own: judge your story against the criteria table, per
+   [[Judging Your Own Work]]
+2. Revision period: the thing your conference asked for, and your own
+   weakest row. Read the middle third aloud to a partner. Anyone I did
+   not reach last class comes to me at the start of it, weakest row
+   already named
+3. The craft note: what you chose and what it cost
 
 ## Things to do before our next class
 

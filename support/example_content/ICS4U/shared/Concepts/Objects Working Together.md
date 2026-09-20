@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 The double-booking bug in the room sheet came back the week after we
 fixed it, in a new disguise. This time the class was fine: `Booking`

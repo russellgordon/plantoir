@@ -10,11 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Analysis period: [[Collisions in Two Dimensions (Lab)]] — vectors
-   resolved, momentum checked component by component
-2. The right-angle result for equal masses, derived rather than asserted
-3. Practise: [[Momentum and Collisions Practice]] to the end
+1. Write-up period, the whole class:
+   [[Collisions in Two Dimensions (Lab)]] — vectors resolved, momentum
+   checked component by component, the right-angle result for equal
+   masses derived rather than asserted the way it was shown to you last
+   class, then the conclusion. The third marked write-up, in at the bell
 
 ## Things to do before our next class
 
-- [ ] Two-dimensional collision analysis finished.
+- [ ] Nothing on the two-dimensional collisions — it went in today.
+- [ ] Skim [[Centripetal Force]] again. The task launched next class
+      starts from it and does not stop to rebuild it.

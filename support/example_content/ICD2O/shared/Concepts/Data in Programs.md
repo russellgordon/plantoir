@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: false
+enableToc: true
 ---
 [[Mad Libs]] and [[The Dice Roller]] look like cousins, but under the
 hood they handle opposite kinds of cargo — one stitches text
@@ -38,6 +38,25 @@ The fix is one honest question: *what kind of data is this, really?*
 Half the mysteries in [[Spot the Bug]] dissolve the moment you ask
 it.
 
+## Expressions and order of operations
+
+When writing expressions that combine numbers, text, or comparisons,
+Python evaluates operators in a strict order of operations:
+
+1. **Parentheses `()`** — evaluate innermost brackets first.
+2. **Exponents `**`** — powers calculated next.
+3. **Multiplication `*`, Division `/`, Floor Division `//`, Modulo `%`** —
+   evaluated left to right.
+4. **Addition `+`, Subtraction `-`** — evaluated left to right (`+` also
+   concatenates strings).
+5. **Comparisons (`<`, `<=`, `>`, `>=`, `==`, `!=`)** — produce boolean
+   `True` or `False`.
+6. **Logical operators (`not`, `and`, `or`)** — evaluate boolean logic.
+
+Understanding precedence prevents subtle logic errors, such as calculating
+an average `(a + b) / 2` versus `a + b / 2`. [[Operators Practice]] drills
+these evaluation rules.
+
 ## Where data comes from
 
 Programs rarely invent their data. It arrives from a person typing at
@@ -52,6 +71,8 @@ routine until it is reflex.
 ## Curriculum connection
 
 ![[C1.3]]
+
+![[C1.4]]
 
 ![[C2.2]]
 %%curriculum-end%%

@@ -16,7 +16,7 @@ comes from.
 | **All Classes** | One page per period — what we did and what to do next | Every day |
 | **Concepts** | The ideas, stated plainly | After the class that met the idea |
 | **Activities** | The things we do in class, with the method written down | On the day, and again when you repeat one alone |
-| **Portfolios** | The three entries that build your final folder | Three times, spread across the ten weeks |
+| **Portfolios** | The record you keep, the entries that build it, and how to judge your own work against the criteria | Several times a unit, and every time something is close to being handed in |
 | **Tasks** | Assessed work, with what earns the marks | Whenever something is due |
 | **Tutorials** | How to do the things this course asks for | The first time you have to do one |
 | **Setup** | How the class runs | Week one, and when you forget |

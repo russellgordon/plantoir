@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Team Project]] — scope, audience, and the charter
+1. Launch: [[The Team Project]] — scope, audience, the charter, and the piece of it that is marked as yours alone
 2. Writing the charter: how you decide, what 'done' means, what happens when someone misses
 3. Running a meeting that ends: [[The Stand-Up]]
 

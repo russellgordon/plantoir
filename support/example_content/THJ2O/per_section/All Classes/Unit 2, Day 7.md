@@ -12,7 +12,7 @@ tags:
 
 1. [[The Safety Ticket]] assessments begin
 2. Others: supervised practice and tool maintenance
-3. Conferences
+3. Conferences on safety protocols and tool operation for [[The Safety Ticket]]
 
 ## Things to do before our next class
 

@@ -14,7 +14,11 @@ tags:
 2. [[The Remix Project]], day 7 — working period: a play-test by somebody who
    has never seen it. Watch; say nothing
 3. Fix the two things you watched them stumble over
+4. Last twenty minutes: finish your before-and-after write-up here, on
+   your own — separately from your partner, in your own words
 
 ## Things to do before our next class
 
 - [ ] Both fixed. Comments written for the next reader.
+- [ ] Bring your remix demo-ready tomorrow: original behaviour first,
+      then yours, with a thirty-second explanation of what you changed.

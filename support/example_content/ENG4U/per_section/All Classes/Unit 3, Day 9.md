@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. The ending of the testimony: escape, capture, or the tape running out
-2. Five minutes of writing before discussion
+1. The ending of the testimony: escape, capture, or the tape running out: [[The Handmaid's Tale]]
+2. Five minutes of writing before discussion: [[Narration and Testimony]]
 
 ## Things to do before our next class
 

@@ -236,6 +236,42 @@ stopped."* Respond to each.
 > it was — a series that stops early hides in exactly the same way as
 > one that starts late.
 
+**9.** Classify the climate of **your own region**, using a named system
+rather than an impression — the **Ecoregions of Canada** framework and the
+**Köppen–Geiger** classification are the two we use, and both publish the
+criteria they classify on. State which system you used, which class your
+region falls into, and the two or three measured quantities that decision
+rests on. Then set your region beside **one other in Canada** and **one
+outside it**, and say what is different and what is doing the differing.
+
+> [!success]- Answer 9
+> The answer is a method, not a place name, so check yours against these
+> four moves rather than against a specific class.
+>
+> **Name the system first.** "Humid continental" means something precise
+> under Köppen–Geiger — thresholds on the coldest month, the warmest
+> month, and how the precipitation is spread through the year. "Cold and
+> snowy" means nothing anybody can check.
+>
+> **Quote the quantities that decide it.** Long-term monthly means for
+> temperature and precipitation, from the station nearest you, over a
+> stated normal period. A classification without its numbers is a label
+> you copied.
+>
+> **Compare on the quantity, not on the feeling.** A place in southern
+> Ontario and a place on the coast of British Columbia can sit at nearly
+> the same latitude and land in different classes, and the reason is
+> almost always something structural: an ocean alongside, a mountain
+> range upwind, a large lake, or an elevation difference. Name the
+> mechanism, and remember that water moderates a climate for the same
+> reason it warmed and cooled slowest on your bench in
+> [[Modelling the Greenhouse Effect]].
+>
+> **Say what the classification cannot tell you.** It describes a
+> long-term average, so it says nothing about any particular year, and a
+> region can shift class over decades without a single day feeling
+> different at the time.
+
 Reference: [[Natural and Human Influences on Climate]],
 [[Reading a Graph Honestly]], and [[Feedback Loops in Climate]]. You
 will need all of this for [[The Climate Brief]].
@@ -243,11 +279,15 @@ will need all of this for [[The Climate Brief]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.9]]
+
 ![[D2.1]]
 
 ![[D2.3]]
 
+![[D2.4]]
+
 ![[D2.8]]
 
-![[A1.9]]
+![[D2.9]]
 %%curriculum-end%%

@@ -21,7 +21,7 @@ not, you have the sentence above ready when I arrive.
 ## Outside class
 
 [[Help Sessions]] has the times. You do not need a question prepared;
-sitting in the same room as other people doing physics is a legitimate
+sitting in the same room as other people doing biology is a legitimate
 reason to come, and it is how most people use it.
 
 ## From each other

@@ -12,8 +12,11 @@ tags:
 ## Agenda
 
 1. Review, part one: write a class from a specification, choose and
-   justify a container, and trace a recursive call
-2. Clinic: your questions on the board
+   justify a container, trace a recursive call, and walk a grid row by
+   row
+2. Clinic: your questions on the board. [[Final Examination]] is the
+   full statement of what is on the paper — bring what you cannot yet
+   do.
 3. By request: [[Classes and Objects Practice]], [[Recursion Practice]]
 
 ## Things to do before our next class

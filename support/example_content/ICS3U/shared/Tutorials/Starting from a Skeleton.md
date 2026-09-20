@@ -40,7 +40,7 @@ a program whose failures stay small.
   are skeletons: a working shape you adapt rather than copy blindly.
 - **Your editor's snippets.** Type `for` and take the offered
   structure, then rename its variables to mean something.
-- **Your own previous work.** By December you will have a file that
+- **Your own previous work.** By the end of the course you will have a file that
   reads a data file, loops over it, and prints a summary. That file is
   your best skeleton, because you already understand every line of it.
 

@@ -38,12 +38,25 @@ Because heat is where energy goes to become unrecoverable. Every
 efficiency figure in [[Efficiency and Power]] is really a statement about
 how much energy left as heat.
 
+## Thermal energy transfer technologies
+
+- **Heat pumps and air conditioners**: Use the refrigeration cycle and the latent heat of vaporization/condensation ($Q = mL_v$) of refrigerants to move thermal energy against a temperature gradient from indoors to outdoors (or vice versa).
+- **Thermal power generation**: Nuclear and fossil stations transfer thermal energy from fuel rods or combustion gases into water via heat exchangers, transforming liquid water to high-pressure steam ($Q = mc\Delta T + mL_v$) to drive generator turbines.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[D1.1]]
+
+![[D2.1]]
 
 ![[D2.9]]
 
 ![[D2.10]]
 
-![[D3.9]]
+![[D3.3]]
+
+![[D3.7]]
+
+![[D3.8]]
 %%curriculum-end%%

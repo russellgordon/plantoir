@@ -82,4 +82,12 @@ finished layouts take two periods and somebody's feelings.
 ![[B2.5]]
 
 ![[B2.1]]
+
+![[B1.1]]
+
+![[B2.4]]
+
+![[A3.1]]
+
+![[A3.2]]
 %%curriculum-end%%

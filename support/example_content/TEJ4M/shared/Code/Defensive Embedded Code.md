@@ -184,4 +184,6 @@ you to demonstrate rather than describe.
 ![[B3.4]]
 
 ![[B5.2]]
+
+![[B5.4]]
 %%curriculum-end%%

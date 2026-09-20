@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Portfolio checkpoint: [[A Map of Your Own]] — the thematic or overlay map submitted with its reflection
-2. [[Your Field Notebook]] checked: three field days, headers complete, the two columns kept apart
-3. Gaps found now rather than in June, while there is still a field day left to fix them in
+1. First twenty minutes: [[The Land Use Question]] written position revised in the light of the hearing and the line you took away from Day 18, then handed in
+2. Portfolio checkpoint for [[The Field and Map Portfolio]]: [[A Map of Your Own]] — the thematic or overlay map submitted, and its reflection written here rather than brought
+3. While you write those, [[Your Field Notebook]] checked at your desk: three field days, headers complete, the two columns kept apart. One line back from me on each
+4. Gaps found now rather than at the hand-in, while there is still a field day left to fix them in
 
 ## Things to do before our next class
 
-- [ ] Repair whichever of the two portfolios came off worse.
+- [ ] Nothing tonight. Tomorrow opens with fifteen minutes for the repair my line asks for.

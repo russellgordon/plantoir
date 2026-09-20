@@ -65,5 +65,9 @@ into [[What Held the Union Together|What Held the Union Together?]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.4]]
+
+![[C2.1]]
+
 ![[C2.3]]
 %%curriculum-end%%

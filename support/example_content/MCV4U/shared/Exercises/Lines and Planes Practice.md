@@ -109,3 +109,25 @@ you know is on it.
 > zero, the farther from the plane. Dividing by $|\vec{n}| = 3$
 > converts that raw imbalance into metres of perpendicular
 > clearance: the certification step of [[The Flight Path]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C3.1]]
+
+![[C3.2]]
+
+![[C3.3]]
+
+![[C4.1]]
+
+![[C4.2]]
+
+![[C4.3]]
+
+![[C4.4]]
+
+![[C4.5]]
+
+![[C4.6]]
+%%curriculum-end%%

@@ -17,6 +17,14 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // BEFORE the first log line, because that line resolves where it
+        // goes the moment it is written. `--state-dir` is read here as well as
+        // in OnLaunched: Main logs four times per launch, so a redirect that
+        // waited for OnLaunched would already have written to the teacher's
+        // own startup log. Setting it twice is harmless - the same value.
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i] == "--state-dir") { Plantoir.Core.Models.AppDataRoot.RedirectTo(args[i + 1]); break; }
+
         App.LogDiagnostic($"Program.Main starting with {args.Length} args");
         try
         {
@@ -24,8 +32,7 @@ public static class Program
             SetDllDirectory(baseDir);
             Environment.CurrentDirectory = baseDir;
 
-            string localAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir");
-            string webView2Dir = Path.Combine(localAppData, "WebView2");
+            string webView2Dir = Plantoir.Core.Models.AppDataRoot.Combine("WebView2");
             Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", webView2Dir);
 
             ComWrappersSupport.InitializeComWrappers();

@@ -17,6 +17,11 @@ justify each decision with evidence.
 > [!danger] Safety
 > Goggles the entire time. Station 4 uses dilute acid — rinse spills with plenty
 > of water and tell me. Never lean over an open flame.
+>
+> **Disposal, and it differs by station.** The precipitate from station 6 goes
+> in the labelled waste jar, never the sink. Station 4's contents are rinsed
+> away with plenty of running water. Wax goes in the bin once it has set solid.
+> Read this before you start, not when you have finished.
 
 ## Stations
 

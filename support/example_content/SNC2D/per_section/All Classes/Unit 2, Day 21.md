@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: four reactions — which does not belong?
+1. Warm-up: four reactions — which does not belong? [[Types of Chemical Reactions]]
 2. Consolidation: from two substances, predict whether they react, name
-   the products, balance it, and say what you would SEE
+   the products, balance it, and say what you would SEE: [[Chemical Equations]]
 3. Look ahead: the next unit is the biggest system there is
 
 ## Things to do before our next class

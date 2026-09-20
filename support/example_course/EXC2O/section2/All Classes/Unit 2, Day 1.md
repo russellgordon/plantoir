@@ -10,9 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. Concept: [[Ecosystems and Sustainability]]
-2. Concept: [[Biotic and Abiotic Factors]]
-3. Prepare for tomorrow's field work
+1. Diagnostic, ten minutes: the field outside, drawn as a system — what is
+   alive, what is not, and what connects them. In your notebook, no marks
+   and nothing handed in. I read over shoulders while you draw, and what I
+   see decides which of the next three classes needs longer
+2. Concept: [[Ecosystems and Sustainability]]
+3. Concept: [[Biotic and Abiotic Factors]]
+4. Prepare for tomorrow's field work
 
 ## Things to do before our next class
 

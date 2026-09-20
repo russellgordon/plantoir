@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: three organisms, three metabolic strategies
-2. Clinic: the metabolism question the room found hardest, at the board
-3. Then alone: two of the same kind, marked together
+1. First twenty minutes: the note I left on your "what changes" section,
+   acted on
+2. Warm-up: three organisms, three metabolic strategies: [[Cellular Respiration]]
+3. Clinic: the metabolism question the room found hardest, at the board — [[Metabolism Practice]]
+4. Then alone: two of the same kind, marked together
 
 ## Things to do before our next class
 

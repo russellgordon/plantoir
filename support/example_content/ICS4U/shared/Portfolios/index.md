@@ -25,6 +25,7 @@ the order you will need them:
 | [[Your First Entry]] | Week one, facing a blank page |
 | [[What a Strong Entry Looks Like]] | Once the habit exists |
 | [[Journal Checklist]] | Before each unit's collection |
+| [[Judging Your Own Work]] | Mid-task, while there is still time to fix it |
 | [[Showing Growth]] | Mid-course, when old entries become evidence |
 | [[Final Reflection]] | The last week, reading the whole record |
 

@@ -17,7 +17,10 @@ workshop day. Entries are short — ten honest minutes beats thirty performed
 ones — and they are **private**. I read them; other students never do. That
 privacy is deliberate. The journal only works if you can admit in it what
 you would not say aloud: that a rehearsal went badly, that you froze, that
-a group decision worried you.
+a group decision worried you. Nothing you admit in an ordinary entry can
+cost you anything, because ordinary entries are not marked. What carries a
+mark is [[Milestone Journal Entries]] — four entries written in class, one
+at the end of each unit — and those are built out of the honest ones.
 
 ## How to work
 

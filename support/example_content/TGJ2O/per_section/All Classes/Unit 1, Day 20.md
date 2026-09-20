@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Standup
-2. Consolidation: what makes a story, on one page, built by the room
+1. Standup: [[Record a Standup]]
+2. Consolidation: what makes a story, on one page, built by the room: [[News Values]]
 3. Look ahead: next unit the story arrives in pictures and sound
 
 ## Things to do before our next class

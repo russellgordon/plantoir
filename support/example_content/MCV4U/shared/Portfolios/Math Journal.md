@@ -7,7 +7,8 @@ tags:
 ---
 > [!abstract] At a glance
 > Individual · ongoing all course · one entry after every class ·
-> collected at the end of each unit
+> collected at the end of each unit · read and written back to, not
+> scored
 
 ## What you are making
 
@@ -44,6 +45,12 @@ yours.
 
 The journal comes in each unit, read against these criteria —
 [[Journal Checklist]] turns them into a self-check before handing in.
+Read, and written back to, and not scored: the volume itself never
+becomes a number, and [[How Marks Work]] explains why. The one exception
+is the entry I set in class at the close of each unit task — the one
+about what your evidence or your model could not settle. That entry is
+written in the period, it belongs to that task, and it is the piece of a
+pair's work that is unmistakably yours.
 
 | Quality | What it looks like |
 | --- | --- |

@@ -10,9 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. [[The Lens Essay]], day 4 — workshop: partner marks anywhere theory
+1. First ten minutes, together: the criteria on [[The Lens Essay]] read
+   against a paragraph nobody in this room wrote — the method is
+   [[Judging Your Own Work]]
+2. [[The Lens Essay]], day 4 — workshop: partner marks anywhere theory
    replaced evidence
-2. Rewrite the weakest section in class
+3. Last twenty minutes: your own judgement, weakest row named, that
+   section rewritten here
 
 ## Things to do before our next class
 

@@ -21,7 +21,7 @@ from the person who owns the place followed at once and without argument.
 Safety instructions are not open to negotiation in the moment. If you
 disagree with one, say so afterwards and you will get a real answer.
 Everything specific is in [[Fieldwork Safety]], and it is read before
-each field day, not once in September.
+each field day, not once at the start of the course.
 
 ## In seminars
 

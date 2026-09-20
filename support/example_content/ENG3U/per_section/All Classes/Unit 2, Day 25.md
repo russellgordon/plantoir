@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. [[The Independent Study]], checkpoint one: your text, approved
-2. [[Choosing Your Independent Study Text]] — the list and the pitch
-3. Reading period
+1. [[Choosing Your Independent Study Text]] — the list, the rules, and how
+   to pitch a book that is not on it
+2. [[The Independent Study]], day 2 of 10 — first conversations about what
+   you are drawn to. Checkpoint one is approved next class, once you have
+   had a night with the list
+3. Reading period: exploring candidate texts and opening chapters for [[The Independent Study]]
 
 ## Things to do before our next class
 

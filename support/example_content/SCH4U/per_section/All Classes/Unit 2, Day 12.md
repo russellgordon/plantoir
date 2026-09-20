@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[The Molecule Dossier]], day 3 — working period: the properties, predicted
-   from structure and then checked against published values
+1. [[The Molecule Dossier]], day 3 — working period: act on what the
+   conference asked for, then the properties, predicted from structure
+   and checked against published values
 2. Where your prediction and the literature disagree: whose
    uncertainty covers it?
 

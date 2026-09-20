@@ -54,6 +54,26 @@ in colour codes, in the
 [[The Gadget]] is where reading a value in three bases stops being a
 party trick and starts being Tuesday.
 
+## Representing characters, images, and audio
+
+Computers represent all forms of information using binary encoding
+schemes:
+
+- **Text:** Characters map to numeric values. In the ASCII standard,
+  the capital letter `A` is $65_{10} = 01000001_2$, `B` is
+  $66_{10} = 01000010_2$, and a space is $32_{10} = 00100000_2$.
+- **Colours and images:** A pixel is commonly stored as three bytes
+  for Red, Green, and Blue (RGB). Pure red is $(255, 0, 0)$ or
+  $\mathrm{\#FF0000}_{16}$; white is $(255, 255, 255)$ or
+  $\mathrm{\#FFFFFF}_{16}$.
+- **Audio:** Analogue sound waves are measured thousands of times per
+  second (sampled) and converted into binary integers by an
+  analogue-to-digital converter.
+
+The computer does not "know" whether a byte represents a character, a
+colour, an audio sample, or a CPU instruction. Only the software reading
+it decides the meaning.
+
 %%curriculum-start%%
 ## Curriculum connection
 

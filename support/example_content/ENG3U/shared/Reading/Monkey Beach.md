@@ -2,6 +2,8 @@
 title: Monkey Beach
 publish: true
 created: __CREATED__
+tags:
+  - reading
 enableToc: true
 ---
 > [!abstract] At a glance

@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Random groups — [[The Slope Detective]] at the boards: the graph
-   you are given is $f'$; the function that made it has gone missing
+   you are given is $f'$; the function that made it has gone missing.
+   This is the unit's diagnostic — what survived from Units 1 and 2 is
+   what I build the next fortnight from
 2. Discuss: how much of $f$'s story can the witness pin down — and how
    many innocent functions fit the evidence?
 3. Consolidate: the sign of $f'$ tells direction, the zeros of $f'$

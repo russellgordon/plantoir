@@ -104,3 +104,13 @@ Spreadsheets are excellent at arithmetic on thousands of rows and
 completely indifferent to whether the arithmetic means anything. The
 function will always return a number. Deciding whether that number
 deserves to be in your conclusion is the part that is yours.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D1.1]]
+
+![[D2.1]]
+
+![[D2.4]]
+%%curriculum-end%%

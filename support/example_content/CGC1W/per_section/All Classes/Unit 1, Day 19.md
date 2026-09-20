@@ -12,7 +12,7 @@ tags:
 
 1. Seminar: [[Who Should Pay for the Damage|Who Should Pay for the Damage?]]
 2. [[How Communities Value Land and Water]]
-3. Working period
+3. Working period: the changes yesterday's conference named
 
 ## Things to do before our next class
 

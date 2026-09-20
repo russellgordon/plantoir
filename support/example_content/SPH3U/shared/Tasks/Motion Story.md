@@ -9,7 +9,8 @@ tags:
 ---
 > [!abstract] At a glance
 > **Format:** a 20-second video plus one page of graphs and analysis.
-> **Individually or in pairs.** Due at the end of Unit 1.
+> **Filmed alone or in pairs; the page you hand in is yours.**
+> Due at the end of Unit 1.
 > **Assessed on:** Knowledge, Thinking and Investigation, Communication.
 
 Find a real motion in the world, film it, and tell its story three times —
@@ -35,6 +36,12 @@ in words, in graphs, and in numbers.
 - Your graphs must be built from your own measurements, not sketched.
 - State your positive direction and origin. Hold them.
 
+If you film in a pair, shoot and digitise together — a second pair of
+hands makes for a steadier camera and a better argument about where the
+frames should be clicked. The page is then written and handed in
+separately by each of you: the data may be shared, but the graphs you
+draw and your answer to step 4 are yours.
+
 ## How it is marked
 
 | Category | What I am looking for |
@@ -52,13 +59,51 @@ in words, in graphs, and in numbers.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B1.1]]
+
+![[B2.1]]
+
 ![[B2.2]]
 
 ![[B2.6]]
 
-![[B3.3]]
+![[B3.1]]
 
-![[B1.1]]
+![[B3.2]]
 
-![[B1.2]]
+![[A1.11]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 17, the filming and frame-analysis period
+  Watch for: WHEN the positive direction and the origin get decided. The
+  page states them either way, because the requirements demand it — what
+  the period shows you is whether they were written down before the first
+  frame was clicked, or chosen afterwards, once it was clear which choice
+  made the slope come out positive. A convention picked to flatter the
+  graph is the commonest quiet failure in Unit 1 and it leaves no mark on
+  the product.
+  Going well: axes and origin written on the page, out loud, before the
+  video is opened — and then held, even when the phase change comes out
+  negative.
+  Stuck: frames digitised, graph drawn, and only then somebody asks which
+  way is positive.
+  Record: a tick against each name on the class list at the moment their
+  axes are declared. Thirty seconds for the room, once.
+
+TALK — Unit 1, Day 17, at the conference already on that agenda
+  Ask: "Cover your velocity-time graph with your hand. Looking only at
+  the position-time graph, where is the velocity changing fastest, and
+  how can you tell?"
+  Then: "If you had filmed this from the other side of the room, which of
+  your numbers would change sign and which would not?"
+  A strong first answer points at curvature rather than steepness — the
+  tangent slope is changing fastest where the bend is tightest. That is
+  B2.2 heard in conversation, and a submitted pair of graphs shows the
+  right answer whether or not the student could generate it.
+  Record: two columns on the conference list, a tick in each.
+
+The product evidence is the video and the page, handed in on Day 19.
+%%

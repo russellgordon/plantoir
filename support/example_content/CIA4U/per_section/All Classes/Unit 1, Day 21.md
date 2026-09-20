@@ -10,10 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[The Market Model]] presented — the model first, then what the market really did
-2. The pair whose model was wrong explains why, which is the interesting part
-3. Launch: [[A Model of Your Own]] for the portfolio
+1. [[The Market Model]] presented, the first two thirds of the pairs — the model first, then what the market really did
+2. Each partner takes one question of their own, and it can come from anywhere in the argument rather than only from the paragraphs they wrote
 
 ## Things to do before our next class
 
-- [ ] Choose the decision you will model yourself.
+- [ ] Prepare if you have not yet presented.

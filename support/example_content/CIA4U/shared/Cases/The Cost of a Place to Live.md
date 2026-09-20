@@ -60,9 +60,17 @@ demand-side measures move prices faster than they move construction.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.5]]
+
+![[B4.3]]
+
 ![[C2.1]]
 
+![[C2.3]]
+
 ![[C2.4]]
+
+![[D2.1]]
 
 ![[D2.4]]
 %%curriculum-end%%

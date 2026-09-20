@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieval clinic: a titration calculation from raw burette readings,
-   cold — moles, ratio, concentration
+   cold — moles, ratio, concentration: [[Titrating an Acid]] and [[Water and Solutions]]
 2. Compare methods across the room
 3. Clinic on whichever step the room drops
 

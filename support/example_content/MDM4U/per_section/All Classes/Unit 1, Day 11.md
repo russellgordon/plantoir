@@ -15,6 +15,8 @@ tags:
    the rule each pair needs
 3. Consolidate: why the complement is often the easy route
 4. Practise: [[Conditional Probability Practice]], first section
+5. Exit ticket, not marked: one probability computed two ways, on a
+   card — I read them tonight, and Day 12 starts wherever they land
 
 ## Things to do before our next class
 

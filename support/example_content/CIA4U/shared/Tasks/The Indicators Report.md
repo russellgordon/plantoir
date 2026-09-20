@@ -59,11 +59,47 @@ Build from [[Measuring an Economy]], [[Aggregate Supply and Demand]],
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B3.3]]
-
 ![[D1.1]]
 
 ![[D1.2]]
 
 ![[D1.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 9, the indicators report work period, whose second
+item puts the release calendar in front of the class
+  Watch for: who actually opens the calendar, and who is still working
+  from the figure they retrieved on Day 4. Currency of the data is the
+  single largest thing this report is marked on, and the finished report
+  cannot show you the difference: a figure that was current when written
+  and a figure nobody rechecked look identical on the page.
+  Going well: the calendar is open beside the draft, with a release
+  landing before the hand-in circled.
+  Stuck: the calendar has not been opened, and the draft still carries a
+  Day 4 number as though it were today's.
+  Record: one tick per name for "calendar open" on the sourcing
+  conference sheet you are already carrying.
+
+TALK — Unit 3, Day 13, the last twenty minutes, while the class drafts
+section three and you move between desks
+  Ask: "You placed Canada at that point in the cycle. Which indicator
+  pushed hardest for the placement, and which one did you have to argue
+  past?"
+  Then: "Your Gini figure and your Market Basket figure disagree about
+  whether things got better. Which of them is answering the question you
+  actually asked?"
+  The first is D1.1 — the business cycle model and the indicators behind
+  it — heard as a decision the student made rather than a definition
+  recited, and the report shows only the placement that survived. The
+  second is D1.3, how economists measure and represent standards of
+  living and distribution of income; a strong answer says what each
+  measure is a measure OF instead of arguing that one is more accurate.
+  Yesterday's lesson is what makes this question answerable, which is
+  why it sits here and not in the Day 9 conference.
+  Record: two boxes per name — indicator named, measures distinguished.
+
+The product evidence is the report handed in on Day 14.
+%%

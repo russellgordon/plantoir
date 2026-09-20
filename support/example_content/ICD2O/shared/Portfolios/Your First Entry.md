@@ -52,4 +52,6 @@ a real moment and stays with it — which already beats a page of
 ## Curriculum connection
 
 ![[A1.1]]
+
+![[B2.1]]
 %%curriculum-end%%

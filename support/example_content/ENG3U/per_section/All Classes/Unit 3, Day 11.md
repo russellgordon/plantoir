@@ -12,7 +12,7 @@ tags:
 
 1. The novel's withholding: what we are not told, and when
 2. Concept: [[Ambiguity and Irony]] — refusal as a decision
-3. Reading period
+3. Reading period: reading final chapters and tracking narrative resolution
 
 ## Things to do before our next class
 

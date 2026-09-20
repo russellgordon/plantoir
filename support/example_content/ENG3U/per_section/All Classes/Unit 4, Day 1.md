@@ -10,9 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. Concept: [[Media Texts and Their Arguments]] — the five questions
-2. The documentary segment, watched twice: once for content, once for
-   technique — see [[Media Texts We Study]]
+1. The documentary segment watched cold, then written about for five
+   minutes — not marked: it shows me what this class already notices
+   without being told what to look for
+2. Concept: [[Media Texts and Their Arguments]] — the five questions,
+   named after the watching rather than before it
+3. The same segment watched again, this time for technique — see
+   [[Media Texts We Study]]
 
 ## Things to do before our next class
 

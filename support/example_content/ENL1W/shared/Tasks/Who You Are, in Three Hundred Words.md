@@ -74,4 +74,52 @@ between drafting and editing impossible to fake.
 ![[D2.2]]
 
 ![[B3.1]]
+
+![[D1.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 13, the cutting period
+  The handwritten draft comes in attached to the final piece, so you will
+  be able to see WHAT went. What you cannot see afterwards is the order
+  it went in, or whether anything was read back once it had gone.
+  Watch for: which kind of cut comes first. A piece cut by deleting whole
+  sentences that were explaining what the story already showed, or one
+  cut by shaving an adjective out of every line until the counter says
+  300.
+  Going well: a whole sentence goes, and the writer reads the two
+  sentences either side of the gap out loud to hear whether they still
+  join.
+  Stuck: word-by-word trimming with a running word count and no
+  re-reading; or a writer who cuts the concrete detail and keeps the
+  explanation, which is the wrong one every time.
+  Record: three columns on the seating plan — sentences, shaving, read it
+  back. Initials only.
+  That is D2.5 watched: adding, deleting and reorganizing to improve
+  clarity and focus is a set of moves, and the 300-word piece shows you
+  the result rather than the moves.
+
+TALK — Unit 1, Day 9, the round of desks already on that agenda
+  Ask: "You wrote this moment twice last class, once flat and once with
+  the mood built in. Which version is closer to what happened, and which
+  is closer to how it felt?"
+  Then: "Who is this written for — somebody who knows you, or a stranger?
+  What changes if it is the other one?"
+  A strong first answer separates the two and says which one the reader
+  needs; a weak one says the second version is "better". A strong second
+  answer names a concrete change — a name they would have to explain, a
+  detail they could stop justifying.
+  Both of those are D1.1, whose last clause is "and justify their
+  choices" — the justifying is the part that only ever happens out loud.
+  Do NOT write these down as D2.3: that expectation is about
+  establishing a voice IN THEIR TEXTS, so the draft evidences it and a
+  conversation cannot. What the conversation adds is that the voice on
+  the page was chosen rather than arrived at.
+  Record: one line per student on the seating plan, D1.1, with a tick
+  for which of the two answers was the strong one.
+
+The product evidence is the 300 words handed in on Day 14, with the
+handwritten draft attached.
+%%

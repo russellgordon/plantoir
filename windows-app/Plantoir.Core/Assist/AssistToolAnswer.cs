@@ -39,8 +39,18 @@ namespace Plantoir.Core.Assist;
 /// explanation of why nothing can be done — and in the mac transcript that
 /// prompted the rule, four times in a row.
 /// </param>
-public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan = false)
+public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan = false,
+                                      string? ConversationBackupPath = null)
 {
+    /// <summary>
+    /// The <c>_meta</c> key carrying the copy saved before this conversation's
+    /// first change. The tools run in a separate process from the window that
+    /// shows "Restore Section N…", and the answers are the one channel between
+    /// them; every answer after the first change carries it, so the window
+    /// can offer the way back without a tool of its own to ask.
+    /// </summary>
+    public const string ConversationBackupKey = "plantoir.app/conversationBackup";
+
     /// <summary>
     /// The <c>_meta</c> key the teacher's line travels under. Prefixed with
     /// the product's own domain, as the protocol asks, so it can never

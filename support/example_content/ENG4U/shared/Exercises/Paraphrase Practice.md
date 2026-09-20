@@ -61,4 +61,6 @@ paraphrase them in the right-hand column. Mark the two you could not do.
 ![[B3.1]]
 
 ![[B3.2]]
+
+![[C3.1]]
 %%curriculum-end%%

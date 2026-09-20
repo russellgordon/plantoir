@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Redesigning the job description you brought — four approaches
+1. Redesigning the job description you brought — four approaches: [[Designing a Job]]
 2. Enlargement is not enrichment: the test
-3. What the redesign does for accessibility and accommodation
+3. What the redesign does for accessibility and accommodation: [[The Human-Resource Process]]
 
 ## Things to do before our next class
 

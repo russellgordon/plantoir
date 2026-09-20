@@ -27,7 +27,7 @@ somewhere tender. These are the agreements that make that survivable.
 
 ## The texts, and why some of them are hard
 
-Several texts this year deal with residential schools, racism, and loss.
+Several texts in this course deal with residential schools, racism, and loss.
 They are here because they are true, because they are well written, and
 because
 [[A3.3|the course asks us to learn from First Nations, Métis, and Inuit voices]]

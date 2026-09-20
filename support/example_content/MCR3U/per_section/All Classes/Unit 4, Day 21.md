@@ -12,13 +12,16 @@ tags:
 
 1. [[The Functions Symposium]] — present your function to our invited
    guests
-2. Guests circulate; every group answers the same question: why is this
-   the right model, and where does it stop being one?
-3. Launch [[Final Reflection]] — begin it while the symposium is fresh
-4. Journal collection — [[Journal Checklist]] and [[Showing Growth]]
-   are your last look before handing it in
-5. Circle up one final time
+2. Guests circulate and ask what they like; nothing a guest says is part
+   of anybody's mark. Every group answers the same two questions: why is
+   this the right model, and where does it stop being one?
+3. I come round to each of you once, with one question about the panel
+   that carries your name — that answer is yours alone
+4. Circle up one final time, and read [[Final Reflection]] together —
+   you write it before next class, with [[Journal Checklist]] and
+   [[Showing Growth]] beside you
 
 ## Things to do before our next class
 
-- [ ] Finish [[Final Reflection]] and hand in your [[Math Journal]].
+- [ ] Write [[Final Reflection]]. It and your [[Math Journal]] both come
+      in next class.

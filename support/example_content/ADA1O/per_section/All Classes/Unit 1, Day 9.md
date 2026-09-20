@@ -12,10 +12,10 @@ tags:
 
 1. Warm-up: statues in threes, one sculptor
 2. [[Tableau Story Sequence]], day 2 — working period: your story chosen and
-   its three moments named on paper before anybody stands up
+   its five moments named on paper before anybody stands up
 3. Conference with me: each group, two minutes, on the moment you have
    chosen for your climax
 
 ## Things to do before our next class
 
-- [ ] Three moments written down, in order.
+- [ ] Five moments written down, in order.

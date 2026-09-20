@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Literary Essay]], day 1 — questions drawn from your own
-   annotations
+1. Launch: [[The Literary Essay]], day 1 — the criteria table read, then
+   questions drawn from your own annotations
 2. Concept: [[The Essay]] — thesis, order, complication
 
 ## Things to do before our next class

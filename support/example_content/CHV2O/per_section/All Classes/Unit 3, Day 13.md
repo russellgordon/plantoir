@@ -11,10 +11,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Where You Stand Now]] — your own position, stated properly
-2. The notebook closed: what November thought, and what January thinks
-3. How [[The Issue Examination]] works
+1. The notebook closed: reread your first entries, and see what you think now
+2. [[Where You Stand Now]] — the final portfolio entry, your own position stated properly, written here this period
+3. How [[The Issue Examination]] works, and what to bring to it
 
 ## Things to do before our next class
 
-- [ ] Write the final portfolio entry.
+- [ ] Nothing to write. Bring your notebook to the last class.

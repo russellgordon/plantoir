@@ -23,5 +23,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Investigation milestone: all of your data collected by next
-      class — cleaned, organized, and ready to be summarized.
+- [ ] Investigation: your data collected in time for the checkpoint on
+      Day 15. Bring it raw — the cleaning is a working period on Day 17
+      and does not happen at home.

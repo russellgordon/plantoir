@@ -2,6 +2,8 @@
 title: Structure and Time
 publish: true
 created: __CREATED__
+tags:
+  - concepts
 ---
 Structure is the order a writer chose. Time is the raw material they
 arranged. At this level, "the plot" is rarely the point; the arrangement

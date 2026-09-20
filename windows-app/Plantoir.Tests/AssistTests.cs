@@ -717,11 +717,14 @@ public class AssistWorkspaceTests : IDisposable
         var workspace = Open();
         var course = workspace.Course("ICS3U");
 
-        string? kept = workspace.ReleaseSite(course, 1);
+        var release = workspace.ReleaseSite(course, 1);
 
-        Assert.NotNull(kept);
+        Assert.True(release.ReleasedAnything);
+        Assert.False(release.SomethingIsStillPinned);
         Assert.False(File.Exists(Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section1.json")));
-        string keptFull = Path.Combine(_folder, kept!.Replace('/', Path.DirectorySeparatorChar));
+        string keptFull = Path.Combine(
+            _folder, "courses", "ICS3U", ".netlify_sites",
+            Path.GetFileName(Assert.Single(release.KeptFiles)));
         Assert.True(File.Exists(keptFull));
         Assert.Contains("ics3u-s1-2026-gordon", File.ReadAllText(keptFull));
     }
@@ -731,7 +734,12 @@ public class AssistWorkspaceTests : IDisposable
     {
         File.Delete(Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section2.json"));
         var workspace = Open();
-        Assert.Null(workspace.ReleaseSite(workspace.Course("ICS3U"), 2));
+        var release = workspace.ReleaseSite(workspace.Course("ICS3U"), 2);
+        Assert.False(release.ReleasedAnything);
+        // And NOT "still pinned" — a section that was never published is a
+        // different answer from one that could not be released, and the two
+        // get opposite sentences.
+        Assert.False(release.SomethingIsStillPinned);
     }
 
     // ---- A session locked to one course ----------------------------------
@@ -1353,7 +1361,10 @@ public class AssistWorkspaceTests : IDisposable
         var result = await workspace.Deploy("ICS3U", 1);
 
         Assert.True(result.Succeeded);
-        Assert.Contains("Students can see it now.", result.Message);
+        // Contract wording (assist-wording.json → "deployed"), not the
+        // bespoke sentence this used to say — found to have drifted from
+        // the contract while porting multi-destination deploy (entry 305).
+        Assert.Equal(AssistWording.Deployed("ICS3U", "1"), result.Message);
         Assert.Equal(new[] { "preview", "preview", "deploy" }, _launcher.Runs.Select(r => r.Launcher));
     }
 
@@ -1396,17 +1407,106 @@ public class AssistWorkspaceTests : IDisposable
     }
 
     [Fact]
+    public async Task PublishingWithPreviewFalseBuildsNothing()
+    {
+        // AssistAgent sets preview=false for publish_pages/unpublish_pages
+        // whenever the chat window is about to put its OWN visible rebuild on
+        // screen — see EditsPages/TakesPreviewFlag there. If Apply() built a
+        // preview anyway, that hidden build would race the app's visible one
+        // for the same output folder, and a failure from it would hand the
+        // model raw launcher output to restate in the chat — the bug where
+        // every line of the build spewed into the assistant's reply on a
+        // "Publish" that followed a preview.
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        var workspace = Open();
+
+        var result = await workspace.Apply(
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false), preview: false);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(_launcher.Runs);
+        Assert.Contains("published", result.Message.ToLowerInvariant());
+    }
+
+    [Fact]
+    public async Task APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog()
+    {
+        // The other half of the same bug: even when Apply() is told to
+        // build (preview: true, the default a caller with no window on
+        // screen would use), a failed build must not glue the launcher's
+        // raw stdout/stderr onto the message the model reads back to the
+        // teacher.
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        _launcher.FailOn = "preview";
+        var workspace = Open();
+
+        var result = await workspace.Apply(
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(AssistWording.WhereTheOutputIs, result.Message);
+        Assert.DoesNotContain("Last output:", result.Message);
+    }
+
+    [Fact]
     public void TheTermsAreExplainedOncePerSectionAndThenRemembered()
     {
         // A teacher told "I've published tomorrow's class" will reasonably
         // hear "students can see it now". Said plainly the first time, and
-        // never again — a tool that re-explains itself gets skimmed.
-        Assert.False(Briefing.AlreadyExplained(_folder, "ICS3U", 1));
+        // not twice in the same conversation — a tool that re-explains itself
+        // gets skimmed.
+        var workspace = Open();
 
-        Briefing.MarkExplained(_folder, "ICS3U", 1);
+        Assert.False(workspace.NoteExplainedThisConversation("ICS3U", 1));
+        Assert.True(workspace.NoteExplainedThisConversation("ICS3U", 1));
+        Assert.False(workspace.NoteExplainedThisConversation("ICS3U", 2));   // per section, not per course
+    }
 
-        Assert.True(Briefing.AlreadyExplained(_folder, "ICS3U", 1));
-        Assert.False(Briefing.AlreadyExplained(_folder, "ICS3U", 2));   // per section, not per course
+    /// <summary>
+    /// The memory is per CONVERSATION, and a new one starts clean.
+    /// </summary>
+    /// <remarks>
+    /// It used to be a marker file under <c>courses/.internal/assist/</c>, so
+    /// a section briefed once was never briefed again in that folder — and
+    /// once "what does publishing mean?" became a fixed phrasing, that meant a
+    /// teacher who ASKED the question got a brush-off instead of an answer,
+    /// once per folder for ever. This asserts the file is gone as much as it
+    /// asserts the behaviour: a leftover marker would restore the old bug
+    /// silently.
+    /// </remarks>
+    [Fact]
+    public void TheBriefingIsOfferedAgainInTheNextConversation()
+    {
+        Assert.False(Open().NoteExplainedThisConversation("ICS3U", 1));
+        Assert.True(Open().NoteExplainedThisConversation("ICS3U", 1) is false);
+
+        Assert.False(Directory.Exists(Path.Combine(_folder, "courses", ".internal", "assist")),
+            "the briefing is remembered in the conversation, not on disk");
+    }
+
+    /// <summary>
+    /// The second asking is answered with a sentence written for the TEACHER.
+    /// </summary>
+    /// <remarks>
+    /// It used to read "Don’t repeat it — carry on with what the teacher
+    /// asked", which is an instruction to a model. That was invisible while
+    /// <c>explain_publishing</c> was MCP-only; a fixed phrasing lets a teacher
+    /// call it directly, and a tool result is rendered as an ordinary
+    /// assistant bubble. There is no channel here only a model sees.
+    /// </remarks>
+    [Fact]
+    public void AskedTwiceInOneConversation_TheAnswerIsForTheTeacher()
+    {
+        var workspace = Open();
+        var tools = new Plantoir.Mcp.PlantoirTools(workspace);
+
+        string first = tools.ExplainPublishing("ICS3U", 1);
+        Assert.Contains("built into your site", first);
+
+        string second = tools.ExplainPublishing("ICS3U", 1);
+        Assert.Equal(AssistWording.PublishingAlreadyExplained("ICS3U", "1"), second);
+        Assert.DoesNotContain("the teacher", second);
+        Assert.DoesNotContain("Don’t repeat", second);
     }
 
     [Fact]
@@ -1568,17 +1668,28 @@ public class AssistWorkspaceTests : IDisposable
     public void ReadRememberedTimetable_FormatsUpcomingClasses()
     {
         Page("ICS3U", "section1/All Classes/Unit 1, Day 1.md", draft: false);
-        var dates = new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 10), new DateOnly(2026, 9, 12) };
-        TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", new DateOnly(2026, 9, 1));
+
+        // RELATIVE to today, and that is the whole point of this change. The
+        // dates used to be written down — 2026-09-08, -10 and -12 — and
+        // "upcoming" means `date >= today` in PlantoirTools, so on the morning
+        // of 2026-09-09 the first of them stopped being upcoming and this test
+        // began failing for everybody, every run, having passed for a day. A
+        // fixture that names absolute days when the code under test compares
+        // against the clock has an expiry date baked into it, and the failure
+        // arrives looking exactly like a product fault.
+        //
+        // Starts at tomorrow rather than today so that a run crossing midnight
+        // cannot lose the first date either.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var dates = new[] { today.AddDays(1), today.AddDays(3), today.AddDays(5) };
+        TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", today.AddDays(-7));
 
         var tools = new Plantoir.Mcp.PlantoirTools(Open());
         var answer = tools.ReadRememberedTimetable("ICS3U", 1);
         string detail = answer.Detail();
 
         Assert.Contains("ICS3U Section 1", detail);
-        Assert.Contains("2026-09-08", detail);
-        Assert.Contains("2026-09-10", detail);
-        Assert.Contains("2026-09-12", detail);
+        foreach (var date in dates) Assert.Contains(date.ToString("yyyy-MM-dd"), detail);
         Assert.Contains("Where they came from: test sheet", detail);
     }
 

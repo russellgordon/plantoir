@@ -29,12 +29,12 @@ longer than the weak ones. Specific is not the same as long.
 ## Feelings are welcome — anchored to moments
 
 The journal is not a lab report; nervous, proud, embarrassed, and thrilled
-all belong in it. The rule is that a feeling arrives *attached to the
-moment that caused it*. "I felt frustrated" floats free and teaches you
-nothing in January. "I felt frustrated when we restarted the scene for the
-fourth time because I was the one forgetting the cue" is a feeling with an
-address — you can go back to it, and next time you reread it you will know
-exactly what it was about.
+all belong in it. The rule is that a feeling arrives *attached to the moment
+that caused it*. "I felt frustrated" floats free and teaches you nothing at
+the end of the course. "I felt frustrated when we restarted the scene for
+the fourth time because I was the one forgetting the cue" is a feeling with
+an address — you can go back to it, and next time you reread it you will
+know exactly what it was about.
 
 This is the same describe-first habit as [[Writing About Drama]], turned
 on your own days instead of someone else's scene: say what happened, then

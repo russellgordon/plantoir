@@ -16,6 +16,9 @@ tags:
    how to run it, what to do when it complains
 3. Read a classmate's handover and try to run their program from it
    alone
+4. Then judge the whole project against the criteria on
+   [[The Community App]] — [[Judging Your Own Work]]. Next class is the
+   last period before your client is in the room
 
 ## Things to do before our next class
 

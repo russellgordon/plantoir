@@ -39,6 +39,8 @@ not a lucky accident, and it is worth naming as one.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D3.2]]
+
 ![[D3.4]]
 
 ![[D2.4]]

@@ -38,12 +38,37 @@ Fermentation regenerates NAD⁺ so glycolysis can continue: lactic acid in
 animals, ethanol and $\ce{CO2}$ in yeast. The yield collapses to 2 ATP per
 glucose, which is why sprinting is short.
 
+## Exercise physiology, diet, and health
+
+Understanding respiration directly informs training and medicine:
+- **Lactate threshold:** endurance training increases capillary density and
+  mitochondrial volume in muscle, delaying the shift to lactic fermentation.
+- **Mitochondrial disorders:** genetic defects in respiratory complex proteins
+  (e.g., Leigh syndrome, MELAS) impair ATP synthesis, severely impacting
+  high-energy neurological and muscular systems.
+- **Metabolic uncouplers:** compounds like DNP or thermogenin in brown fat
+  dissipate the proton gradient as heat without generating ATP.
+
+## Microbial metabolism in ecosystems and industry
+
+Microbial respiration drives critical abiotic–biotic cycling:
+- **Bioremediation:** aerobic bacteria (e.g., *Pseudomonas*) oxidise petroleum
+  hydrocarbons into carbon dioxide and water following oil spills.
+- **Wastewater treatment:** anaerobic digestion by methanogenic archaea breaks
+  down complex organic sludge in pulp mills and municipal facilities.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[C1.1]]
+
+![[C1.2]]
+
+![[C2.2]]
 
 ![[C3.1]]
 
 ![[C3.2]]
 
-![[C2.2]]
+![[C3.4]]
 %%curriculum-end%%

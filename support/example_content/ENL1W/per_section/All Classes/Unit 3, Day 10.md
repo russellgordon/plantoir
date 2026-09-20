@@ -13,6 +13,8 @@ tags:
 1. Silent reading, fifteen minutes
 2. Practise: [[Word Parts Practice]] to the end
 3. Vocabulary page checked and topped up
+4. Last fifteen minutes: the change I asked for yesterday, and the row
+   you judged weakest — both rehearsed out loud, standing up
 
 ## Things to do before our next class
 

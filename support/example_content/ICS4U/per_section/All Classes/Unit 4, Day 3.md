@@ -15,9 +15,11 @@ tags:
    write, and failed the one nobody did
 3. Compare and name it: [[Testing and Regression]] — edge cases, and
    the test you write *before* the fix
-4. Hand in [[The Maintenance Sprint]]
-5. Project milestone: tests over the parts of your team's build that
+4. Project milestone: tests over the parts of your team's build that
    you did not personally write
+5. Last twenty minutes: finish and hand in [[The Maintenance Sprint]] —
+   the fix, the extension, the tests, a change log from each of you, and
+   the note you leave behind
 
 ## Things to do before our next class
 

@@ -8,6 +8,8 @@ from pathlib import Path
 # be added by hand before sibling imports. Harmless everywhere else.
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
+import class_pages
+import page_visibility
 import toolchain_paths
 import re
 import sys
@@ -36,6 +38,52 @@ _HOST_OS = "unknown"  # set from --host-os at runtime
 
 def _is_windows(host_os: str) -> bool:
     return (host_os or "").lower() == "windows"
+
+def graded_folders_for(manifest: dict, shared_folders: list, per_section_folders: list) -> list:
+    """
+    Which of this course's folders hold work that counts for marks.
+
+    A payload or skeleton says so itself; anything else is worked out from the
+    folders the course actually has, using the same rule the build has always
+    applied — a folder whose name mentions tasks. So a brand-new course starts
+    with exactly the marks it would have had before this key existed, written
+    down explicitly instead of inferred every build.
+
+    Writing it explicitly is safe HERE and only here: a new course has no marks
+    to lose. Existing courses are deliberately left with no key at all, which is
+    what tells the build to keep applying the historical rule — see
+    contracts/shared-rules.json -> gradedFolders.absentIsNotEmpty.
+
+    Whatever the source, the result is RECONCILED against the folder lists the
+    course actually ends with: a declared name the teacher removed in the
+    wizard is dropped, and a pool left with nothing is returned as `[]` — the
+    honest "asked, and nothing counts" state, which the build then warns about
+    (site_health `noGradedFolders`) rather than the absent key, which would
+    read as "never asked" and match nothing just as silently.
+    """
+    actual_list = list(shared_folders or []) + list(per_section_folders or [])
+    actual_folders = {str(name) for name in actual_list if name}
+    actual_lookup = {str(name).lower(): str(name) for name in actual_list if name}
+    if manifest and "graded_folders" in manifest:
+        declared = manifest.get("graded_folders") or []
+        reconciled = []
+        for name in declared:
+            if not name:
+                continue
+            target_name = None
+            if str(name) in actual_folders:
+                target_name = str(name)
+            elif str(name).lower() in actual_lookup:
+                target_name = actual_lookup[str(name).lower()]
+            if target_name and target_name not in reconciled:
+                reconciled.append(target_name)
+        return reconciled
+    found = []
+    for name in actual_list:
+        if name and "task" in str(name).lower() and str(name) not in found:
+            found.append(str(name))
+    return found
+
 
 def _cmd_example(script_base: str, course, section, host_os: str) -> str:
     """
@@ -83,7 +131,15 @@ DEFAULT_PER_SECTION_FILES = [
 # are never published, and stay that way unless the teacher flips them.
 UNPUBLISHED_PER_SECTION_FILES = {"Private Notes.md", "Scratch Page.md"}
 
-COURSE_LOOKUP_PATH = toolchain_paths.SUPPORT_DIR / "ontario_secondary_courses.json"
+# Two jurisdictions, both resolved through toolchain_paths rather than by
+# hard-coded prefix: a native Windows run has no /opt, and SUPPORT_DIR is
+# what already knows where the bundled support/ tree landed. Order matters
+# only in that the first file holding the code wins, and no code appears in
+# both.
+COURSE_LOOKUP_PATHS = [
+    toolchain_paths.SUPPORT_DIR / "ontario_secondary_courses.json",
+    toolchain_paths.SUPPORT_DIR / "british_columbia_secondary_courses.json",
+]
 
 # ---------- NEW: Backup exclusion set ---------------------------------------
 BACKUP_DEFAULT_EXCLUDES = {
@@ -367,8 +423,11 @@ def prompt_type_list(prompt_text, default_list=None, add_md_extension=False, for
     # Remove forbidden names from provided list and warn
     cleaned = []
     removed = []
+    lowered_forbidden = {str(item).strip().lower() for item in forbidden_names}
     for name in raw:
-        if name in forbidden_names:
+        # Case-insensitively: the filesystem is, so "media" typed here used to
+        # be accepted and then collided with the folder Plantoir manages.
+        if name.strip().lower() in lowered_forbidden:
             removed.append(name)
             continue
         cleaned.append(name + ".md" if add_md_extension and not name.endswith(".md") else name)
@@ -379,15 +438,24 @@ def prompt_type_list(prompt_text, default_list=None, add_md_extension=False, for
     return cleaned
 
 def get_course_name_from_json(course_code):
-    if not COURSE_LOOKUP_PATH.exists():
-        return None
-    try:
-        with open(COURSE_LOOKUP_PATH, "r", encoding="utf-8") as f:
-            course_data = json.load(f)
-        course_info = course_data.get(course_code.upper())
-        if not course_info:
-            return None
+    course_info = None
+    for path in COURSE_LOOKUP_PATHS:
+        if not path.exists():
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                course_data = json.load(f)
+            info = course_data.get(course_code.upper())
+            if info:
+                course_info = info
+                break
+        except Exception:
+            continue
 
+    if not course_info:
+        return None
+
+    try:
         print(f"\n🔎 Found course info for {course_code}:")
         formal = course_info["formal_name"]
         short = course_info["short_name"]
@@ -1588,6 +1656,21 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     `draft:` that came out unsplit would silently share one publish state
     across every section, which is the bug this function exists to prevent.
 
+    A `publish:` value is COPIED, character for character, comment and quotes
+    and all: whatever the build makes of `publish: oN`, it makes the same
+    thing of `publishForSection1: oN`, so no reader standing between the two
+    can invert it. A `draft:` value cannot be copied — it has to be turned
+    round — so it is read with the build's own rule (`page_visibility`), which
+    until 2026-09-18 was `value.strip().lower() == "true"` here and so
+    PUBLISHED a `draft: yes` or `draft: On` page into every section while the
+    build went on hiding the unsplit original.
+
+    A value this cannot read — one that runs onto the NEXT line, or a draft
+    flag written as a tag or an alias — is written as HELD BACK, and the
+    continuation lines go with it rather than being orphaned under whatever
+    key follows. A page wrongly held back is one a teacher notices and fixes;
+    a page wrongly published is one nobody notices at all.
+
     Only the frontmatter block is touched — a `draft: true` shown inside a
     fenced code block on a tutorial page is documentation, not metadata.
     """
@@ -1599,18 +1682,100 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     head = text[4:end]
     rest = text[end:]
 
-    values = {}
-    for line in head.split("\n"):
-        match = re.match(r"^(created|draft|publish):[ \t]*(.*)$", line)
-        if match:
-            values.setdefault(match.group(1), match.group(2))
+    head_lines = head.split("\n")
+
+    def trim(line):
+        return page_visibility.trim(line)
+
+    def is_comment(line):
+        return page_visibility.is_comment_line(line)
+
+    # The reader's own key shapes: `publish :` and `"publish":` are the same
+    # key to YAML, and `publish:x` is NOT a key at all — it is one plain
+    # scalar. The LAST line naming a key wins, because that is the one PyYAML
+    # keeps when a page carries the same key twice; taking the first carried
+    # the value the build throws away.
+    key_line = re.compile(r"^[\"']?(created|draft|publish)[\"']?[ \t]*:(?=[ \t]|$)(.*)$")
+
+    values = {}          # key -> (raw value, does it run onto the next line?)
+    taken = set()        # line numbers this function is responsible for
+    for index, line in enumerate(head_lines):
+        match = key_line.match(line)
+        if not match:
+            continue
+        key, raw = match.group(1), match.group(2)
+        taken.add(index)
+        # A value written BELOW the key, indented under it, belongs to the key
+        # — and cannot be copied onto another key's line. Those lines are
+        # taken too: leaving them behind orphans an indented scalar under
+        # whatever key happens to follow, which stops the build.
+        #
+        # Blank lines and COMMENTS AT ANY INDENT are stepped over rather than
+        # stopping the scan, because YAML steps over them: `draft:` then a
+        # blank line then an indented `true` hides the page, measured, and a
+        # scan that stopped at the blank called the key null and published it
+        # into every section. A comment is not a value, so a complete value
+        # followed by an indented `# note` does NOT continue — and the note
+        # is the teacher's, so it stays where they wrote it.
+        #
+        # "At any indent" was `line_below[:1] in (" ", "\t") and
+        # is_comment(...)` until 2026-09-19, so a COLUMN-0 note between a key
+        # and its value ended the scan. Measured: `publish:` / `# note` /
+        # `  false` is HIDDEN before the split and VISIBLE in section 1 after
+        # it, and `publish: false` / `# note` / `  false` — a page that
+        # already does not build — is split into two that still do not. The
+        # reader (`page_visibility.read_scalar`, via `build_site`) and the mac
+        # and Windows writers all step over a comment at any indent; this was
+        # the fourth implementation and the odd one out. The consequence to
+        # know: a column-0 note BETWEEN a key and its value is now taken WITH
+        # the value, which is what the rule already said — a note with a real
+        # value under it goes with the value — while a note with nothing under
+        # it is still left exactly where the teacher wrote it.
+        continues = False
+        follow = index + 1
+        last_value_line = index
+        while follow < len(head_lines):
+            line_below = head_lines[follow]
+            if trim(line_below) == "" or is_comment(line_below):
+                follow += 1
+                continue
+            if line_below[:1] not in (" ", "\t"):
+                break
+            continues = True
+            last_value_line = follow
+            follow += 1
+        for swallowed in range(index + 1, last_value_line + 1):
+            taken.add(swallowed)
+        values[key] = (raw, continues)
     if not values:
         return text
 
     if "publish" in values:
-        publish = values["publish"]
+        raw, continues = values["publish"]
+        if continues:
+            # The value is on the line below, which cannot be copied onto
+            # another key's line, so it is written as held back.
+            publish = "false"
+        elif page_visibility.trim(raw) == "":
+            # `publish:` with nothing after it is a null, which PUBLISHES the
+            # page. Copying the emptiness keeps it that way; writing "false"
+            # here would hide a page at course setup that the teacher's own
+            # file publishes.
+            publish = ""
+        elif not page_visibility.is_complete_on_its_own_line(raw):
+            publish = "false"
+        else:
+            # Copied character for character: whatever the build makes of the
+            # original it makes of the copy, so nothing between them can
+            # invert it.
+            publish = page_visibility.trim(raw)
     elif "draft" in values:
-        publish = "false" if values["draft"].strip().lower() == "true" else "true"
+        raw, continues = values["draft"]
+        if continues:
+            publish = "false"
+        else:
+            draft_answer = page_visibility.draft_family_answer(raw)
+            publish = "true" if draft_answer == page_visibility.VISIBLE else "false"
     else:
         publish = None
 
@@ -1619,19 +1784,74 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     block = []
     for number in section_numbers:
         if "created" in values:
-            block.append(f"createdSection{number}: {values['created']}")
+            created = page_visibility.trim(values["created"][0])
+            block.append(f"createdSection{number}: {created}".rstrip())
         if publish is not None:
-            block.append(f"publishForSection{number}: {publish}")
+            block.append(f"publishForSection{number}: {publish}".rstrip())
 
     out = []
-    for line in head.split("\n"):
-        if re.match(r"^(created|draft|publish):", line):
+    for index, line in enumerate(head_lines):
+        if index in taken:
             if block:
                 out.extend(block)
                 block = []
             continue
         out.append(line)
     return "---\n" + "\n".join(out) + rest
+
+
+def prompt_unit_word(saved_config: dict, has_been_set_up_before: bool) -> str:
+    """
+    Ask what this course calls a unit, defaulting to "Unit".
+
+    Only the first word is offered. A teacher who says "Thread" almost
+    certainly still says "Day 3", and a second configurable word would double
+    the migration for something nobody asked for.
+
+    **Not asked at all once the course has a configuration.** The word is applied to the
+    ready-made pages as they are POURED, so changing it on a re-run would
+    rewrite the configuration and rename nothing: the pages would still say
+    "Unit 2, Day 3" and the build would have stopped recognising them —
+    "built, and then recognised by nothing", the exact state this whole piece
+    exists to prevent. Renaming a course already in use is the app's job
+    (Course Settings → Rename…, since 2026-09-10): it renames every class
+    page, retitles it and follows the links, with a backup first. This
+    launcher only says where to go.
+    """
+    current = class_pages.word_from_config(saved_config)
+    if has_been_set_up_before:
+        if current != class_pages.DEFAULT_UNIT_WORD:
+            print(f"\n📘 This course calls its units “{current}”. To change that, use "
+                  f"Rename… beside the word in Plantoir's Course Settings, which renames "
+                  f"the class pages too.")
+        return current
+    print("\nClass pages are named like “Unit 1, Day 1”.")
+    print("Some teachers organise by Module or Thread instead.")
+    entry = input(f"What do you call a unit? [Default: {current}]: ").strip()
+    chosen = entry if entry else current
+    # A word with a digit in it would make "Module2 1, Day 1", and a word with
+    # a comma would make a name no rule can read back. Refusing is kinder than
+    # accepting and producing pages nothing recognises.
+    if not chosen or any(character.isdigit() for character in chosen) or "," in chosen:
+        print("That name would make class pages Plantoir cannot read back. Using "
+              f"“{class_pages.DEFAULT_UNIT_WORD}”.")
+        return class_pages.DEFAULT_UNIT_WORD
+    return chosen
+
+
+def renamed_for_unit_word(destination: Path, unit_word: str) -> Path:
+    """
+    Where a payload page lands once the course's own word is applied.
+
+    Only the file's own NAME changes, never a folder along the way: payload
+    folders are called things like "All Classes" and "Tasks", and a folder
+    beginning with the word would be renamed by the page rule for no reason.
+    The date lookup upstream keys off the SOURCE stem, so renaming the
+    destination cannot disturb which class date a page is given.
+    """
+    if unit_word == class_pages.DEFAULT_UNIT_WORD:
+        return destination
+    return destination.with_name(class_pages.renamed(destination.name, unit_word))
 
 
 def install_payload_file(source: Path, destination: Path, now_str: str,
@@ -1643,11 +1863,18 @@ def install_payload_file(source: Path, destination: Path, now_str: str,
                          course_code: str | None = None,
                          course_name: str | None = None,
                          weekday_step: int = DEFAULT_CLASS_WEEKDAY_STEP,
-                         start_school_day: int = 1) -> bool:
+                         start_school_day: int = 1,
+                         unit_word: str = class_pages.DEFAULT_UNIT_WORD) -> bool:
     """
     One file from payload to course. Markdown is adjusted on the way
     through; everything else is copied as-is. Existing files are never
     touched. Returns True when a file was written.
+
+    `unit_word` is the teacher's word for a unit. A course that says "Module"
+    gets its pages named, titled and linked "Module 2, Day 3" as they are
+    poured, so nothing needs renaming afterwards. Changing the word once the
+    course is in use is Plantoir's Course Settings → Rename…, which renames
+    the class pages and follows the links; it is not this launcher's job.
     """
     if destination.exists():
         return False
@@ -1672,6 +1899,7 @@ def install_payload_file(source: Path, destination: Path, now_str: str,
         text = text.replace("__COURSE_CODE__", course_code)
     if course_name:
         text = text.replace("__COURSE_NAME__", course_name)
+    text = class_pages.rewritten(text, unit_word)
     text = strip_curriculum_blocks(text, keep_content=include_curriculum)
     if not include_curriculum:
         text = unlink_curriculum_references(text, page_names)
@@ -1689,7 +1917,8 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
                             per_section_folders: list, per_section_files: list,
                             reference=None,
                             course_code: str | None = None,
-                            course_name: str | None = None) -> int:
+                            course_name: str | None = None,
+                            unit_word: str = class_pages.DEFAULT_UNIT_WORD) -> int:
     """
     Pour the payload into the course. Only top-level items the teacher kept
     in the structure lists are installed; the curriculum folder also needs
@@ -1730,13 +1959,16 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
             for source in sources:
                 if source.is_dir():
                     continue
-                destination = course_path / source.relative_to(shared_root)
+                destination = renamed_for_unit_word(
+                    course_path / source.relative_to(shared_root), unit_word
+                )
                 if install_payload_file(source, destination, now_str,
                                         include_curriculum, page_names,
                                         first_use_date=class_use_dates.get(source.stem) or first_class_date,
                                         shared_sections=section_numbers,
                                         course_code=course_code,
-                                        course_name=course_name):
+                                        course_name=course_name,
+                                        unit_word=unit_word):
                     written += 1
 
     per_section_root = payload_dir / "per_section"
@@ -1750,7 +1982,9 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
                 for source in sources:
                     if source.is_dir():
                         continue
-                    destination = section_path / source.relative_to(per_section_root)
+                    destination = renamed_for_unit_word(
+                        section_path / source.relative_to(per_section_root), unit_word
+                    )
                     if install_payload_file(source, destination, now_str,
                                             include_curriculum, page_names,
                                             section_number=sec,
@@ -1759,7 +1993,8 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
                                             course_code=course_code,
                                             course_name=course_name,
                                             weekday_step=weekday_step,
-                                            start_school_day=start_school_day):
+                                            start_school_day=start_school_day,
+                                            unit_word=unit_word):
                         written += 1
 
     return written
@@ -2058,6 +2293,22 @@ def setup_course(no_backup: bool = False):
             else:
                 skeleton_manifest = None
 
+    # ---------- What this course calls a unit -------------------------------
+    # Asked of EVERY course, ready-made or not: the payload is poured in the
+    # teacher's own word rather than renamed afterwards. Changing it on a
+    # course already in use is the app's Course Settings → Rename…, which
+    # renames the class pages and follows the links (since 2026-09-10).
+    # Whether this course has been set up BEFORE — which is not the same as
+    # whether its folder exists. `course_path.mkdir` runs a couple of hundred
+    # lines above, so testing the folder made the answer always "yes" and a
+    # teacher setting up from the command line could never choose the word at
+    # all. Found by adversarial review, 2026-09-01, having been introduced as
+    # the fix for the opposite problem. A saved CONFIGURATION is what "has been
+    # set up before" means — and it is also what the macOS app leaves behind
+    # before it runs this script, which is exactly right: the app has already
+    # asked, so its answer is read rather than asked for a second time.
+    chosen_unit_word = prompt_unit_word(saved_config, has_been_set_up_before=bool(saved_config))
+
     # ---------- Structure: from the example content, or from prompts --------
     if example_manifest:
         # The example content decides the structure WHOLE: which folders and
@@ -2224,6 +2475,15 @@ def setup_course(no_backup: bool = False):
         "per_section_files": per_section_files,
         "hidden": hidden_items,
         "expandable": expandable_items,
+        # What this course calls its curriculum folder. Declared by every
+        # payload and skeleton manifest, and until now read only at install
+        # time — so the build fell back to scanning for the word "curriculum"
+        # and would never have found a folder that does not contain it.
+        "curriculum_folder": (
+            (example_manifest or {}).get("curriculum_folder")
+            if prepopulate_example
+            else (skeleton_manifest or {}).get("curriculum_folder")
+        ),
         # NEW: global Explorer expansion behaviour for this course
         "expandOnFolderClick": expand_on_click,
         "footer_html": footer_html,
@@ -2233,6 +2493,21 @@ def setup_course(no_backup: bool = False):
         "fonts": fonts_config,
         # NEW: per-section section-marker visibility for site title
         "show_section_marker": section_marker_config,
+        # What this course calls a unit, so the build's idea of a class page
+        # follows the teacher rather than the other way round. ABSENT means
+        # "Unit", which is what every course made before this key existed
+        # says — see contracts/file-formats.json.
+        "unit_word": chosen_unit_word,
+        # Which per-section folder holds class pages, RECORDED rather than left
+        # to be guessed from the word "class". A teacher whose vocabulary is
+        # "Thread 2, Day 3" would sensibly call it "All Days"; under the guess
+        # alone that folder is not found and the curriculum map counts the
+        # wrong pages without failing. Written from the same rule that used to
+        # do the guessing, so a course made today records what it would have
+        # been given anyway.
+        "class_folder": class_pages.folder_name(
+            {"per_section_folders": per_section_folders}
+        ),
         # NEW: example-content choices, remembered for future re-runs
         "prepopulate_example_content": prepopulate_example,
         "use_skeleton": use_skeleton,
@@ -2249,6 +2524,22 @@ def setup_course(no_backup: bool = False):
     else:
         # No schemes available now; keep whatever was previously saved
         config["color_schemes"] = previous_map
+
+    # Which folders hold work that counts for marks. Written explicitly for
+    # a NEW course because there are no marks to lose; an EXISTING course
+    # deliberately has no such key if never configured, which is what tells
+    # the build to keep applying the historical rule.
+    if saved_config:
+        if "graded_folders" in saved_config:
+            config["graded_folders"] = graded_folders_for(
+                {"graded_folders": saved_config["graded_folders"]},
+                shared_folders, per_section_folders
+            )
+    else:
+        config["graded_folders"] = graded_folders_for(
+            example_manifest if prepopulate_example else (skeleton_manifest or {}),
+            shared_folders, per_section_folders
+        )
 
     # Keys this wizard does not own — the desktop apps' publishing choice
     # (deploy_target, deploy_folder_path), and anything a future version
@@ -2273,6 +2564,14 @@ def setup_course(no_backup: bool = False):
         now_dt = datetime.now().astimezone()
     now_str = now_dt.strftime("%Y-%m-%dT%H:%M:%S.000%z")
 
+    # Written into the configuration above; re-read from it so a value the
+    # desktop apps put there wins over this script's own prompt, which they
+    # never run.
+    chosen_unit_word = class_pages.word_from_config(config)
+    if chosen_unit_word != class_pages.DEFAULT_UNIT_WORD:
+        print(f"\n📘 This course calls its units “{chosen_unit_word}”, so its class pages "
+              f"will be named “{chosen_unit_word} 1, Day 1” and so on.")
+
     # ---------- Install example content (before scaffolding) ----------------
     # The payload lands first so the scaffold below, which only writes files
     # that do not exist yet, fills in around it rather than over it.
@@ -2285,7 +2584,8 @@ def setup_course(no_backup: bool = False):
                 per_section_folders, per_section_files,
                 reference=now_dt,
                 course_code=course_code,
-                course_name=course_name
+                course_name=course_name,
+                unit_word=chosen_unit_word
             )
             if files_written > 0:
                 print(f"\n📖 Example content installed: {files_written} pages.")
@@ -2308,7 +2608,8 @@ def setup_course(no_backup: bool = False):
                 per_section_folders, per_section_files,
                 reference=now_dt,
                 course_code=course_code,
-                course_name=course_name
+                course_name=course_name,
+                unit_word=chosen_unit_word
             )
             if files_written > 0:
                 print(f"\n🧱 Starting pages added: {files_written}.")

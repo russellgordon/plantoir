@@ -44,9 +44,10 @@ including your teacher.
   beings who are not in the room to object. We name our sources, we
   say who is missing, we do not re-identify anyone, and we do not
   collect from classmates what we would not want collected about us.
-  This norm is not decoration; it is graded, and it is the reason
-  [[The Culminating Investigation]] asks for a limitations section
-  rather than a victory lap.
+  This norm is not decoration: the ethics of collection are part of
+  what [[The Survey Autopsy]] and [[The Culminating Investigation]]
+  are marked on, and it is the reason the investigation asks for a
+  limitations section rather than a victory lap.
 - **Help means questions, not answers.** When a tablemate is stuck,
   ask them something; handing over your answer robs them of the
   finish.

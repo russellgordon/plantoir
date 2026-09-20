@@ -11,11 +11,13 @@ tags:
 ## Agenda
 
 1. [[The Reaction Investigation]] submitted at the start of class
-2. Five-minute defences: your claim, your evidence, your limitations
-3. Questions from the floor, and honest answers to them
-4. [[Showing Growth]] — read your first journal entry beside this week's
+2. Defences in fours, all groups running at once, five minutes each: your
+   claim, your evidence, your limitations, and honest answers to what comes
+   back
+3. Last fifteen minutes: the [[Showing Growth]] entry, written here — your
+   first entry beside this week's. It is marked, which is why it is written
+   in class
 
 ## Things to do before our next class
 
-- [ ] Write the growth entry described on [[Showing Growth]].
 - [ ] Rest. The next unit starts with two jars and a lamp.

@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Re-read your September notebook entries.
+- [ ] Re-read your earliest notebook entries.

@@ -5,14 +5,14 @@ created: __CREATED__
 tags:
   - tasks
 ---
-Every task here runs over several classes, and using that working time
-well is part of the evidence. Each page states its success criteria up
-front, as things an observer could see in your work — reasoning,
-honesty about uncertainty, and communication, never speed, as
-[[How Marks Work]] explains. Every criteria table traces back to our
-[[Learning Goals]].
+Every task here but the last runs over several classes, and using that
+working time well is part of the evidence. Each page states its
+success criteria up front, as things an observer could see in your
+work — reasoning, honesty about uncertainty, and communication, never
+speed, as [[How Marks Work]] explains. Every criteria table traces
+back to our [[Learning Goals]].
 
-## The five tasks
+## The six tasks
 
 - [[The Fair Game Audit]] — design or dismantle a game of chance, and
   defend the price that would make it fair.
@@ -25,10 +25,15 @@ honesty about uncertainty, and communication, never speed, as
   underneath everything else.
 - [[The Data Symposium]] — the finale: investigations presented to the
   room and to guests, then critiqued in writing by your peers.
+- [[The Final Examination]] — three hours on paper, reaching back
+  across the whole course rather than the last unit of it.
+
+The last two are the thirty per cent [[How Marks Work]] describes; the
+first four are part of the seventy.
 
 One of these is not like the others. [[The Culminating Investigation]]
 is launched in Unit 2 and collects a milestone every few classes right
-through to the last day, so its deadlines appear inside "Things to do
+through to the symposium, so its deadlines appear inside "Things to do
 before our next class" long before the other tasks are finished. Treat
 those milestones as the project arriving in pieces you can carry —
 because the alternative is carrying all of it in the final week.

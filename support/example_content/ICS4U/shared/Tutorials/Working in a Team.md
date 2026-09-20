@@ -150,3 +150,19 @@ project: what did I actually do?
 The project this is all for is [[The Software Project]]; the planning
 side of it, including milestones and scope, is
 [[Software Project Management]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B1.2]]
+
+![[B1.4]]
+
+![[B1.7]]
+
+![[B2.1]]
+
+![[B2.2]]
+
+![[B2.3]]
+%%curriculum-end%%

@@ -14,7 +14,9 @@ tags:
 2. Compare and name it: [[What a Statistical Study Is For]] — describe,
    compare, predict, decide, and what each demands of the data
 3. Random groups — four published claims, and which job each study was
-   doing
+   doing. A diagnostic, not a test: what this room already notices
+   about a published study — and what it walks straight past — decides
+   how much of Days 2 and 3 goes on frames and on wording
 
 ## Things to do before our next class
 

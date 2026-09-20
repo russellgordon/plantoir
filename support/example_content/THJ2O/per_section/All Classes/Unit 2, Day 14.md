@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish the build log.
+- [ ] Check the build log matches what you actually did.

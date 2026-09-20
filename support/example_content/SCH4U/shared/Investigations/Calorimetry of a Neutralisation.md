@@ -262,9 +262,13 @@ has earned you.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.6]]
+
 ![[D2.4]]
 
-![[D3.3]]
+![[D3.1]]
 
-![[A1.6]]
+![[D3.2]]
+
+![[D3.3]]
 %%curriculum-end%%

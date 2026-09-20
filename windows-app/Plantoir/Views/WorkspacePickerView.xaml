@@ -18,7 +18,32 @@
 
         <!-- Empty-folder confirmation -->
         <StackPanel x:Name="InitializeOffer" Spacing="16" Visibility="Collapsed">
-            <BreadcrumbBar x:Name="ChosenCrumbs" HorizontalAlignment="Center" MaxWidth="520" />
+            <!-- The same bar as the main window's (MainWindow.xaml), because
+                 it shows the same thing to the same teacher: icon, tooltip,
+                 double-click to open, right-click to reveal — and a plain
+                 click that does nothing, as everywhere else. The template
+                 supplies the container's CONTENT only, never a nested
+                 BreadcrumbBarItem (nesting one broke rendering entirely). -->
+            <BreadcrumbBar x:Name="ChosenCrumbs" HorizontalAlignment="Center" MaxWidth="520"
+                           ItemClicked="ChosenCrumbs_ItemClicked"
+                           AutomationProperties.AutomationId="pickerPathBar">
+                <BreadcrumbBar.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6"
+                                    ToolTipService.ToolTip="{Binding Path}"
+                                    DoubleTapped="Crumb_DoubleTapped">
+                            <StackPanel.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="Show in File Explorer" Click="CrumbShowInExplorer_Click" />
+                                    <MenuFlyoutItem Text="Open Folder" Click="CrumbOpenFolder_Click" />
+                                </MenuFlyout>
+                            </StackPanel.ContextFlyout>
+                            <Image Source="{Binding Icon}" Width="16" Height="16" VerticalAlignment="Center" Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DataTemplate>
+                </BreadcrumbBar.ItemTemplate>
+            </BreadcrumbBar>
             <TextBlock MaxWidth="460" TextWrapping="Wrap" TextAlignment="Center"
                        Text="This folder is empty. Set it up as your new working folder? Everything needed will be added for you, and you can create your first course right away." />
         </StackPanel>

@@ -1,0 +1,529 @@
+#!/usr/bin/env python3
+"""
+Drives the REAL `deploy.sh` to every question it can ask, and back out again.
+
+`scripts/test_deploy_non_interactive.py` next door tests `deploy.py` and reads
+`deploy.sh` as TEXT. This file RUNS the launcher. The distinction is the whole
+reason it exists: `deploy.sh` gained `--non-interactive` on a Windows machine
+with no bash and no Docker, was syntax-checked and reasoned through, and had
+never been executed when GitHub issue #129 asked the mac to run it. Running it
+found two things reading could not (below), so "it was reviewed carefully" is
+not a substitute for starting the script and watching what it says.
+
+**No Docker, no network, no credentials, and nothing of the teacher's is
+touched.** Three things make that true, and each is load-bearing:
+
+  * `--image <tag>` skips resolving the build recipe, so the script gets past
+    its Docker setup without one. Every question below is asked BEFORE the
+    first `docker` call, so the run never needs a container.
+  * `USER` is set to an account name that does not exist, so the Keychain
+    lookups (`/usr/bin/security ... -a "$USER"`) find nothing and the
+    questions fire. **Nothing is ever written to the Keychain**, checked by
+    replacing `/usr/bin/security` with a logging stub and reading what the
+    runs actually called: under the flag the script exits at the refusal long
+    before any `set_..._keychain`, and a run WITHOUT the flag makes exactly
+    one call — a `find-generic-password` that fails — because it then dies at
+    `read -rsp` on an exhausted stdin under `set -e`, before even the network
+    check. The one test that could get further stubs the writer outright.
+  * A COPY of the launcher runs, in a scratch folder, because `deploy.sh`'s
+    second line is `cd "$(dirname "$0")"` — the repository's own copy would
+    ignore `cwd` and walk into the real working folder.
+
+WHAT THE RUN FOUND, both in `prompt_for_cf_account` and both invisible to a
+reader (issue #129, 2026-09-09):
+
+  1. Its six-step "where to find your Account ID" instructions and its "that
+     doesn't look like an Account ID" error went to STDOUT, and it is called
+     as `CF_ACCOUNT="$(prompt_for_cf_account)"` — a subshell that captures
+     stdout. Driven through a pseudo-terminal, a teacher was asked to paste a
+     code with no hint where it lives, and saw NOTHING AT ALL when they got it
+     wrong. Same trap that issue #92 fixed for the refusal; these two were
+     left behind because nobody had run the script this far.
+  2. Worse, and only visible once (1) was understood: on the SUCCESS path the
+     captured value was the instructions AND the ID — **519 characters (521
+     bytes) where 32 were meant**. That blob went to `set_cf_account_keychain`, so it was
+     remembered
+     and every later run skipped the question and reused it, and to wrangler
+     as `CLOUDFLARE_ACCOUNT_ID`. First-time Cloudflare publishing from the
+     command line did not work, and stayed broken until the Keychain entry was
+     cleared by hand.
+
+Both are fixed by writing to stderr, which is where `read -rp` already puts
+its own prompt. `test_the_account_question_returns_the_id_and_nothing_else`
+pins it by running the real function out of the real file, so it cannot rot.
+
+Pure stdlib. Run with:
+
+    python3 scripts/test_deploy_sh_questions.py
+"""
+
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+
+# A user name no account has, so every Keychain lookup comes back empty and the
+# questions are reached. Never written to: see the module docstring.
+NOBODY = "plantoir-no-such-user-129"
+
+# `deploy.sh` exits 1 with "This script targets macOS" before any credential
+# question, so those tests have nothing to drive anywhere else. The course-code
+# guard comes first and runs wherever bash does.
+ON_A_MAC = sys.platform == "darwin"
+
+
+def _a_bash_that_can_reach_a_scratch_folder() -> bool:
+    """Is there a bash here that can open the folders these tests build?
+
+    `shutil.which("bash")` is not enough on Windows. A machine with WSL
+    enabled has `C:\\Windows\\System32\\bash.exe` on PATH, which launches
+    into the Linux filesystem and cannot open a Windows `...\\Temp\\...` path
+    at all — so every test here would FAIL rather than skip, inside
+    `dotnet test`, which has been a gate on that side since 2026-09-07.
+    CLAUDE.md rule 4 is explicit that a red suite on the other platform must
+    arrive as a written request rather than as damage, and this one would be
+    neither deliberate nor filed.
+
+    So the question is asked properly: hand a real temporary directory to a
+    real bash and see whether it can `cd` there. A bash that cannot is not a
+    bash these tests can use, and skipping says so honestly.
+    """
+    if shutil.which("bash") is None:
+        return False
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            probe = subprocess.run(
+                ["bash", "-c", 'cd "$1" && printf reachable', "_", str(tmp)],
+                capture_output=True, timeout=60,
+            )
+            return probe.stdout.decode("utf-8", "replace").strip() == "reachable"
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+HAS_BASH = _a_bash_that_can_reach_a_scratch_folder()
+
+# What `assert_can_ask` prints, and the exit code it means. Pinned in
+# contracts/app-rules.json -> launcherFlags.nonInteractive; the SENTENCES are
+# free to change, so only the parts a caller depends on are asserted here.
+NEEDS_AN_ANSWER = 3
+REFUSAL_HEADLINE = "nobody is here to answer"
+
+
+def a_working_folder(tmp: str, course: str = "ICS3U", section: int = 1) -> Path:
+    """A scratch folder holding just enough for `deploy.sh` to reach its
+    questions: the launcher itself, and a built site to publish."""
+    folder = Path(tmp)
+    shutil.copy2(REPOSITORY_ROOT / "deploy.sh", folder / "deploy.sh")
+    built = folder / "courses" / course / ".merged_output" / f"section{section}" / "public"
+    built.mkdir(parents=True)
+    (built / "index.html").write_text("<html>a built site</html>", encoding="utf-8")
+    return folder
+
+
+def run_launcher(folder: Path, arguments: list, answer: str = "",
+                 launcher: str = "deploy.sh"):
+    """Runs the copied launcher with a hollowed-out environment.
+
+    `answer` is fed on stdin. Note that bash only DISPLAYS a `read -rp` prompt
+    when stdin is a terminal, so a test that wants to see the question itself
+    has to look at what the script echoes afterwards (or use a terminal); the
+    answer is still read from a pipe either way.
+
+    **The answer is sent as BYTES, and that is not a style choice.** With
+    `text=True`, `subprocess` wraps stdin in an `io.TextIOWrapper` whose
+    default `newline=None` translates every "\n" to `os.linesep` on the way
+    out — so on Windows the launcher would receive "y\r\n", `read` would put
+    `y\r` in `_ans`, and `[[ "$_ans" =~ ^[Yy]$ ]]` would not match. An empty
+    answer would arrive as "\r", which is not empty, so `${_ans:-Y}` would
+    never apply its default either. Measured on this mac by sending the two
+    endings to the real script: LF corrects the course code, CRLF silently
+    does not. Sending bytes means the test asks the same question on every
+    platform.
+    """
+    import os
+    environment = dict(os.environ, USER=NOBODY)
+    result = subprocess.run(
+        ["bash", str(folder / launcher)] + arguments,
+        capture_output=True, timeout=180, cwd=str(folder),
+        input=answer.encode("utf-8"), env=environment,
+    )
+    return subprocess.CompletedProcess(
+        result.args, result.returncode,
+        result.stdout.decode("utf-8", "replace"),
+        result.stderr.decode("utf-8", "replace"),
+    )
+
+
+def with_credentials_stubbed(folder: Path, remembered: str = "") -> str:
+    """Writes a second copy of the launcher whose Keychain and Cloudflare
+    lookups are stubbed, and returns its name.
+
+    Needed for ONE question — the Cloudflare Account ID — which is reached
+    only when a token is already saved and no account could be discovered.
+    Getting there for real would mean putting a token in the teacher's
+    Keychain and calling Cloudflare. Four of the five stubs are credential and
+    network LOOKUPS; the fifth, `set_cf_account_keychain`, is a WRITER, and is
+    stubbed so that this file cannot put anything in the teacher's Keychain
+    even if a future edit got that far. `assert_can_ask`, the call site and
+    `prompt_for_cf_account` — everything under test — are untouched, and the
+    marker is asserted so a rename fails the test rather than skipping it.
+    """
+    marker = "# -------------------- Cloudflare token and account ---------------------\n"
+    text = (folder / "deploy.sh").read_text(encoding="utf-8")
+    if text.count(marker) != 1:
+        raise AssertionError(
+            "deploy.sh no longer carries the Cloudflare section marker this test "
+            "inserts its stubs before, so it cannot reach the Account ID question."
+        )
+    remembered_file = folder / "remembered-account.txt"
+    remembered_file.write_text(remembered, encoding="utf-8")
+
+    stubs = (
+        "get_cf_token_keychain() { printf '%s' 'stub-token-never-leaves-this-test'; }\n"
+        "validate_cf_token() { return 0; }\n"
+        "discover_cf_account() { printf '%s' ''; }\n"
+        # Read from a FILE rather than interpolated: what the old bug saved
+        # carries newlines, quotes and parentheses, and inlining it into the
+        # stub is a syntax error rather than a test.
+        f"get_cf_account_keychain() {{ cat {str(remembered_file)!r}; }}\n"
+        "set_cf_account_keychain() { :; }\n"
+        "delete_cf_account_keychain() { echo 'FORGOT-THE-REMEMBERED-ACCOUNT'; }\n"
+    )
+    (folder / "deploy_stubbed.sh").write_text(text.replace(marker, stubs + marker),
+                                              encoding="utf-8")
+    return "deploy_stubbed.sh"
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can reach a scratch folder")
+class EveryQuestionRefusesUnderTheFlag(unittest.TestCase):
+    """With `--non-interactive`, every question exits 3 and says which one."""
+
+    def assert_refused(self, result: subprocess.CompletedProcess, question: str):
+        everything = result.stdout + result.stderr
+        self.assertEqual(
+            NEEDS_AN_ANSWER, result.returncode,
+            f"Refusing {question!r} must exit {NEEDS_AN_ANSWER}, so a scheduled "
+            f"publish can tell it from an ordinary failure. Got {result.returncode}.\n"
+            f"{everything[-2000:]}",
+        )
+        self.assertIn(REFUSAL_HEADLINE, everything,
+                      "The refusal has to be SAID, not only exited")
+        self.assertIn(question, everything,
+                      "The refusal names the question it could not ask")
+        self.assertIn("Nothing was published.", everything)
+
+    def test_the_course_code_question_refuses(self):
+        """The 'Open' course-code guard — the one that asks BEFORE the flag
+        loop runs, which is why deploy.sh pre-scans its arguments for the flag
+        and deploy.ps1 does not need to."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_working_folder(tmp)
+            # ICS30 ends in a zero, so the guard offers ICS3O and asks.
+            result = run_launcher(folder, ["ICS30", "1", "--image", "unused:tag",
+                                           "--non-interactive"])
+            self.assert_refused(result, "Fix course code to 'ICS3O'?")
+
+    @unittest.skipUnless(ON_A_MAC, "deploy.sh stops at 'This script targets macOS' first")
+    def test_the_netlify_token_question_refuses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_working_folder(tmp)
+            result = run_launcher(folder, ["ICS3U", "1", "--image", "unused:tag",
+                                           "--non-interactive"])
+            self.assert_refused(result, "Paste Netlify token")
+
+    @unittest.skipUnless(ON_A_MAC, "deploy.sh stops at 'This script targets macOS' first")
+    def test_the_cloudflare_token_question_refuses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_working_folder(tmp)
+            result = run_launcher(folder, ["ICS3U", "1", "--image", "unused:tag",
+                                           "--target", "cloudflare", "--non-interactive"])
+            self.assert_refused(result, "Paste Cloudflare token")
+
+    @unittest.skipUnless(ON_A_MAC, "deploy.sh stops at 'This script targets macOS' first")
+    def test_the_cloudflare_account_question_refuses_ON_THE_SCREEN(self):
+        """The one that was wrong, and the reason the guard sits at the call
+        site rather than inside the function.
+
+        A refusal printed inside `prompt_for_cf_account` would land in
+        `$CF_ACCOUNT` and its `exit 3` would end only the subshell, leaving
+        `|| exit 1` to report an ordinary failure — nothing on screen, wrong
+        code, and a scheduled publish that records the wrong reason. So this
+        asserts the refusal is VISIBLE, not merely that the run stopped.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_working_folder(tmp)
+            stubbed = with_credentials_stubbed(folder)
+            result = run_launcher(folder, ["ICS3U", "1", "--image", "unused:tag",
+                                           "--target", "cloudflare", "--non-interactive"],
+                                  launcher=stubbed)
+            self.assert_refused(result, "Paste Cloudflare Account ID")
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can reach a scratch folder")
+@unittest.skipUnless(ON_A_MAC, "deploy.sh is the mac's launcher; a foreign bash "
+                               "reads a pipe in ways this machine cannot check")
+class WithoutTheFlagNothingChanged(unittest.TestCase):
+    """The important half. A teacher at a keyboard must be asked exactly what
+    they were asked before, and their answer must be taken.
+
+    Gated to macOS deliberately, though `deploy.sh` reaches the course-code
+    guard on any bash. What these assert is how the MAC launcher reads an
+    answer, and a Windows machine running them is testing a bash nobody here
+    can inspect — which is how a red suite arrives on the other side as a
+    surprise rather than as a request (CLAUDE.md rule 4). The bytes fix in
+    `run_launcher` means they would now pass there; that is a reason to let
+    Windows un-gate them if they want the coverage, not a reason for the mac
+    to assume it.
+    """
+
+    def ask_the_course_code_question(self, answer: str) -> subprocess.CompletedProcess:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_working_folder(tmp)
+            return run_launcher(folder, ["ICS30", "1", "--image", "unused:tag"],
+                                answer=answer + "\n")
+
+    def test_answering_yes_corrects_the_course_code(self):
+        result = self.ask_the_course_code_question("y")
+        self.assertIn("Using corrected course code: ICS3O", result.stdout + result.stderr)
+
+    def test_answering_no_keeps_what_was_typed(self):
+        result = self.ask_the_course_code_question("n")
+        self.assertIn("Continuing with: ICS30", result.stdout + result.stderr)
+
+    def test_an_empty_answer_still_takes_the_default(self):
+        """`${_ans:-Y}` — pressing return means yes, as it always did. Pinned
+        because the flag's whole point is that this is what must NOT happen
+        when nobody is there, so the two behaviours are asserted together."""
+        result = self.ask_the_course_code_question("")
+        self.assertIn("Using corrected course code: ICS3O", result.stdout + result.stderr)
+
+    def test_no_ordinary_failure_ever_exits_three(self):
+        """Exit 3 means "a question went unasked" and nothing else, so a
+        wrapper can act on it. These runs all fail for ordinary reasons."""
+        for answer in ("y", "n", ""):
+            with self.subTest(answer=answer):
+                result = self.ask_the_course_code_question(answer)
+                self.assertNotEqual(NEEDS_AN_ANSWER, result.returncode)
+                self.assertEqual(1, result.returncode)
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can reach a scratch folder")
+class TheAccountQuestionSaysWhatItMeansTo(unittest.TestCase):
+    """`prompt_for_cf_account`'s stdout is its RETURN VALUE, and everything it
+    says to the teacher goes to stderr.
+
+    Run against the function lifted out of the real `deploy.sh`, so it cannot
+    drift from the file. Both halves of the bug issue #129 found are here.
+    """
+
+    def the_real_function(self) -> str:
+        """The function's own text, taken from deploy.sh rather than copied."""
+        text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        match = re.search(r"^prompt_for_cf_account\(\) \{\n.*?^\}\n", text,
+                          re.DOTALL | re.MULTILINE)
+        self.assertIsNotNone(
+            match, "prompt_for_cf_account is not in deploy.sh in the shape this "
+                   "test lifts it out with, so nothing below tested anything.")
+        return match.group(0)
+
+    def test_the_call_site_really_does_capture_it(self):
+        """`call_it` below writes the call site out by hand, so it would keep
+        passing against a fiction if the real one stopped capturing.
+
+        That is not idle: dropping the command substitution — having the
+        function set CF_ACCOUNT itself — was the REJECTED alternative here,
+        and it would make every test in this class meaningless while green.
+        Windows' EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel
+        also depends on this exact shape, and no mac can run that suite.
+        """
+        text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            'CF_ACCOUNT="$(prompt_for_cf_account)"', text,
+            "deploy.sh no longer calls prompt_for_cf_account through a command "
+            "substitution. That may well be an improvement — but this class "
+            "reproduces the capture by hand, so it now proves nothing, and the "
+            "Windows guard test finds its single caller by that same text.",
+        )
+
+    def call_it(self, typed: str):
+        """Calls it exactly as deploy.sh does — captured — and returns what
+        the caller would get and what the teacher would see."""
+        script = self.the_real_function() + (
+            '\nCF_ACCOUNT="$(prompt_for_cf_account)" || true\n'
+            'printf "CAPTURED:%s:END" "$CF_ACCOUNT" >&2\n'
+        )
+        result = subprocess.run(["bash", "-c", script], input=typed + "\n",
+                                capture_output=True, text=True, timeout=60)
+        captured = re.search(r"CAPTURED:(.*):END", result.stderr, re.DOTALL)
+        self.assertIsNotNone(captured, result.stderr)
+        seen_by_the_teacher = result.stderr[:captured.start()]
+        return captured.group(1), seen_by_the_teacher
+
+    def test_a_good_id_is_captured_and_nothing_else_is(self):
+        """The failure this closes: the caller got the instructions AND the
+        id — 519 characters (521 bytes) where 32 were meant, measured by
+        lifting the pre-fix
+        function out of 07952399^ and calling it the way the call site does —
+        which was then remembered in the Keychain and handed to wrangler as
+        CLOUDFLARE_ACCOUNT_ID."""
+        identifier = "0123456789abcdef0123456789abcdef"
+        captured, _ = self.call_it(identifier)
+        self.assertEqual(identifier, captured,
+                         "Everything this function writes to stdout is its return "
+                         "value, because the call site captures it.")
+
+    def test_the_instructions_reach_the_teacher(self):
+        _, seen = self.call_it("0123456789abcdef0123456789abcdef")
+        self.assertIn("dash.cloudflare.com", seen,
+                      "A teacher asked to paste an Account ID is told where to find it")
+
+    def test_a_bad_id_is_explained_rather_than_swallowed(self):
+        captured, seen = self.call_it("not-an-account-id")
+        self.assertEqual("", captured, "A refused id returns nothing to the caller")
+        self.assertIn("look like an Account ID", seen,
+                      "Before this was fixed the teacher saw nothing at all and the "
+                      "script exited 1 in silence.")
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can reach a scratch folder")
+@unittest.skipUnless(ON_A_MAC, "deploy.sh stops at 'This script targets macOS' first")
+class ATeacherAlreadyBittenGetsOutOfIt(unittest.TestCase):
+    """A remembered Account ID that is not 32 hex characters is thrown away
+    and the question asked again.
+
+    Fixing the printing does nothing for a teacher the bug already reached:
+    `set_cf_account_keychain` had written the whole instruction block plus
+    their id, and the remembered value was handed back unchecked on every
+    later run, so the question was never asked again and wrangler kept getting
+    nonsense. Two released versions can have done this, which is why the entry
+    is examined rather than assumed good — and why this is tested with the
+    exact shape the old bug produced rather than with a tidy short string.
+    """
+
+    def poisoned_value(self) -> str:
+        """What the old bug actually wrote: the instructions, then the id."""
+        old = subprocess.run(
+            ["git", "show", "07952399^:deploy.sh"],
+            capture_output=True, text=True, cwd=str(REPOSITORY_ROOT), timeout=60,
+        )
+        if old.returncode != 0:
+            self.skipTest("the pre-fix commit is not in this clone")
+        function = re.search(r"^prompt_for_cf_account\(\) \{\n.*?^\}\n",
+                             old.stdout, re.DOTALL | re.MULTILINE)
+        self.assertIsNotNone(function, "could not lift the pre-fix function")
+        produced = subprocess.run(
+            ["bash", "-c", function.group(0) + '\nprompt_for_cf_account\n'],
+            input=b"0123456789abcdef0123456789abcdef\n", capture_output=True, timeout=60,
+        )
+        return produced.stdout.decode("utf-8", "replace")
+
+    def test_the_blob_the_old_bug_saved_is_thrown_away(self):
+        poisoned = self.poisoned_value()
+        self.assertGreater(len(poisoned), 100,
+                           "this is meant to be the whole instruction block plus the id")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_working_folder(tmp)
+            stubbed = with_credentials_stubbed(folder, remembered=poisoned)
+            result = run_launcher(folder, ["ICS3U", "1", "--image", "unused:tag",
+                                           "--target", "cloudflare", "--non-interactive"],
+                                  launcher=stubbed)
+            everything = result.stdout + result.stderr
+            self.assertIn("FORGOT-THE-REMEMBERED-ACCOUNT", everything,
+                          "A remembered value that cannot be an Account ID must be "
+                          "removed, or the teacher is stuck with it for ever.")
+            self.assertIn("Paste Cloudflare Account ID", everything,
+                          "Having thrown it away, it must ask again — which under "
+                          "this flag means refusing, and saying so.")
+            self.assertEqual(NEEDS_AN_ANSWER, result.returncode)
+
+    def test_a_good_remembered_account_is_still_used_without_asking(self):
+        """The other half: the repair must not re-ask everybody."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_working_folder(tmp)
+            stubbed = with_credentials_stubbed(
+                folder, remembered="0123456789abcdef0123456789abcdef")
+            result = run_launcher(folder, ["ICS3U", "1", "--image", "unused:tag",
+                                           "--target", "cloudflare", "--non-interactive"],
+                                  launcher=stubbed)
+            everything = result.stdout + result.stderr
+            self.assertNotIn("FORGOT-THE-REMEMBERED-ACCOUNT", everything)
+            self.assertNotIn("Paste Cloudflare Account ID", everything,
+                             "A teacher who answered this once must not be asked again.")
+
+
+# Deliberately NOT gated on bash: this one reads JSON and deploy.sh as text.
+# A live check on whether the contract and this file have come apart should not
+# quietly disappear on a machine that merely lacks a usable shell.
+class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
+    """The four above are the four the contract names — asserted, not assumed.
+
+    Without this the file would quietly stop being "every question it can ask"
+    the day a fifth is added: the tests would still pass, and the new question
+    would be the one nobody had driven. `launcherFlags.nonInteractive.refusals`
+    is the register of what the flag must refuse, so it is the list to check
+    against rather than a count kept in step by hand.
+    """
+
+    # Keyed by the contract's own wording so a renamed question fails here
+    # rather than silently dropping out of the comparison.
+    DRIVEN_ABOVE = {
+        "Fix course code to '<CODE>'? [Y/n]": "test_the_course_code_question_refuses",
+        "Paste Netlify token": "test_the_netlify_token_question_refuses",
+        "Paste Cloudflare token": "test_the_cloudflare_token_question_refuses",
+        "Paste Cloudflare Account ID":
+            "test_the_cloudflare_account_question_refuses_ON_THE_SCREEN",
+    }
+
+    def test_the_four_questions_driven_are_the_four_the_contract_names(self):
+        import json
+        rules = json.loads(
+            (REPOSITORY_ROOT / "contracts" / "app-rules.json").read_text(encoding="utf-8")
+        )
+        refusals = rules["launcherFlags"]["nonInteractive"]["refusals"]
+
+        # `where: "launcher"` does not say WHICH launcher, and `preview.sh`
+        # takes this flag too (issue #124). So the list is narrowed by asking
+        # deploy.sh itself whether it carries the question, rather than by a
+        # rule that would go stale: a preview-only question then belongs to a
+        # preview test, and this file does not go red demanding a deploy.sh
+        # test for a question deploy.sh never asks.
+        launcher_text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+
+        named = set()
+        for refusal in refusals:
+            if refusal.get("where") != "launcher":
+                continue          # deploy.py's own questions; tested next door.
+            if refusal["question"].startswith("(not a question)"):
+                continue          # a rule about a saved credential, not a prompt.
+            # The contract spells a question out with its explanation after an
+            # em dash; the part before it is the question itself.
+            question = refusal["question"].split(" — ")[0].strip()
+            # The course-code guard is spelled with a placeholder in the
+            # contract because the code varies; match its fixed opening.
+            probe = question.split("<")[0].strip() or question
+            if probe not in launcher_text:
+                continue          # another launcher's question.
+            named.add(question)
+
+        self.assertTrue(named, "Nothing in the contract was matched to deploy.sh "
+                               "at all, which means this comparison is vacuous.")
+
+        self.assertEqual(
+            set(self.DRIVEN_ABOVE), named,
+            "The questions this file drives and the ones the contract says "
+            "--non-interactive must refuse have come apart. Either a question "
+            "was added to the contract and nothing here starts the script to "
+            "check it, or one was renamed. Both end the same way: a question "
+            "nobody has ever seen refused.",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

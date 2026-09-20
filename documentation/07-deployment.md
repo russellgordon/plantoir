@@ -1,6 +1,14 @@
 # 7. Publishing a built section (`deploy.py`)
 
-> A course chooses **where** it publishes with the `deploy_target` key
+> A course chooses **where** it publishes with the `deploy_target` key —
+> which the APP reads and turns into a `--target` argument. **No launcher
+> reads that key**: `deploy.sh`, `deploy.ps1` and `deploy.py` all default to
+> Netlify and change destination only on `--target`, so anything driving a
+> launcher directly — a script, a test harness, a scheduled wrapper — has to
+> pass the flag itself. Setting the key and calling the launcher publishes to
+> Netlify, silently; that is exactly how a deploy harness came to verify a
+> `netlify.app` address three times over and report three green Cloudflare
+> publishes (GUI-IMPROVEMENTS row 419)
 > (see [the config reference](08-course-config-reference.md)). There are
 > three destinations, and most of this page describes the first:
 >
@@ -13,6 +21,16 @@
 > Whichever is chosen, the thing published is the same built
 > `public/` folder; only the transport differs. The two newer
 > destinations are described at the end of this page.
+>
+> **A course can publish to more than one destination now, for
+> redundancy** — see `additional_deploy_targets` in
+> [the config reference](08-course-config-reference.md). `deploy.py`
+> itself is unaware of this: it still does exactly one destination per
+> invocation, exactly as below. Redundancy is entirely an APP-layer
+> concern — the app (or the scheduled-deploy shell script it writes)
+> simply invokes `deploy.py` once per configured destination, in
+> sequence, and one destination failing does not stop the others. See
+> `mac-app/QuartzTeachers/Scripting/MultiDestinationDeployRunner.swift`.
 
 [◀ Previous: Quartz Customizations](06-quartz-customizations.md) · [Back to index](README.md) · [Next: course_config.json Reference ▶](08-course-config-reference.md)
 
@@ -27,7 +45,11 @@ over the deploy method.
 - The static site must already exist at
   `courses/<CODE>/.merged_output/section<N>/public/`. The deploy launcher
   never builds it: if that folder is missing or empty it stops and tells the
-  teacher to run preview with `--build-only` first.
+  teacher to run preview with `--build-only` first. On macOS that path is a
+  shortcut out of the working folder (see
+  [the build pipeline](05-build-pipeline.md)); `deploy.py` follows it for the
+  work but names the `courses/…` spelling in everything it says, because that
+  is the path the teacher knows.
 - `NETLIFY_AUTH_TOKEN` must be in the environment. The deploy **launcher**
   owns the token (macOS Keychain / Windows Credential Manager — see
   [launcher scripts](03-launcher-scripts.md#deploysh)) and injects it; the
@@ -45,10 +67,39 @@ site name encodes everything a teacher needs to recognize it later:
 
 - The teacher's last name is asked once and cached in
   `courses/.internal/profile.json` (a hidden folder that deploy also adds to
-  `courses/.gitignore`, along with `_backups/`).
+  `courses/.gitignore`, along with `_backups/`). It is asked for only at the
+  moment a NEW site or project is being named, never on a repeat publish —
+  and never at all under `--non-interactive`.
 - Names are sanitized to Netlify's subdomain rules, and name collisions
   (Netlify site names are global) trigger a retry prompt with an
   auto-suggested `-02`, `-03`, … suffix.
+
+**None of those questions may be asked of a publish that runs on its own**, and
+`--non-interactive` is how that is enforced. A scheduled publish runs at half
+six with the app closed, so a question it puts to a teacher is put to nobody,
+and both ways that ended have been seen: with a terminal `input()` BLOCKS —
+measured at 45 minutes, the site simply not updated in the morning with nothing
+to say why — and without one `prompt()` returns its DEFAULT silently, so the
+site is created at an address nobody chose, and on a machine with no saved
+surname an address with no surname in it.
+
+Under the flag every question refuses instead, saying which one it could not
+ask and exiting **3**, a code that means that and nothing else. Naming a site
+is the question with no safe default: the address is what students type, it is
+global to all of Netlify, and changing it later breaks every existing link. It
+is reached in two states and both stop — a section that has never been
+published (which the app already refuses to SCHEDULE, for the same reason), and
+the one that cannot be foreseen: a site that existed when the alarm was set and
+has since been deleted at Netlify, so the lookup comes back 404 and falls
+through to creating a fresh one. That second state is what this whole feature
+was opened on.
+
+Both launchers take the flag and FORWARD it, since the site-name question lives
+in the Python; both also guard their own prompts with it. Nothing changes
+without the flag: a teacher at a keyboard gets every prompt they got before.
+See [launcher scripts](03-launcher-scripts.md#deploysh),
+`contracts/app-rules.json` → `launcherFlags.nonInteractive` for what is
+refused, and `launcherFlags.deployExtras` for the flag itself.
 
 The created site's identity is saved as a **marker file** at
 `courses/<CODE>/.netlify_sites/section<N>.json` so subsequent deploys go to
@@ -56,6 +107,17 @@ the same site. (An older layout stored the marker inside the merged output —
 which gets wiped by `--full-rebuild`; markers found there are silently
 migrated to the stable location. This is also why marker storage lives under
 the *course* folder, not the *output* folder.)
+
+**One thing removes that marker, and only on purpose.** Rolling a section over
+to a new year asks the teacher whether this should be a new website or last
+year's, and on "a new website" the marker is **renamed aside**, never deleted —
+it holds the site id and admin address, and is the only way back. The next
+deploy then finds no marker and asks what to call the new site, exactly as a
+first deploy does. Every destination type is released, not just the one the
+course is configured for now, because a section pinned to a destination it no
+longer uses would otherwise keep publishing there. Rolling over also turns off
+any publish scheduled to run on its own: a released section has no agreed site
+to publish to, and an unattended run has nobody to ask what to call one.
 
 The `*.netlify.app` address need not be the address anyone shares: a
 teacher can attach a **custom domain** to the site in Netlify and record
@@ -92,6 +154,45 @@ updating for the deployed domain) and automatically re-executes a clean static
 build inside the container-internal workspace (`/tmp/quartz-builds/...`),
 mirroring the production assets back to `public/` before uploading.
 
+**`deploy.py` does not cover every destination, and the gap was real.**
+Publishing to a folder never enters the container — the built site already sits
+on the host, so `deploy.sh` / `deploy.ps1` mirror it across directly and
+`deploy.py` is never reached. That destination therefore had no such check at
+all until 2026-09-05, and publishing straight after a preview shipped the
+live-reload client: measured at 230 of 244 files. The app was never exposed,
+because build freshness (`contracts/app-rules.json` → `buildFreshness`) forces a
+rebuild when the built site was made by a preview — but from the command line nothing did.
+The launchers now make the check themselves before mirroring, and rebuild.
+
+Two details of that guard are worth knowing, because both were got wrong once:
+
+- **It waits on the WHOLE TREE, not the front page.** Serve mode bakes the
+  client into every page and the host mirror is replaced file by file, so a
+  clean front page can sit in front of hundreds of stale preview pages.
+  Publishing that mixture is worse than publishing the preview wholesale,
+  because the front page looks right and nobody looks further.
+- **The rebuild stops a preview that is still serving that section**, because
+  the preview's sync watcher mirrors the serve build to the host every second
+  and would otherwise overwrite the rebuild within a second of it finishing.
+  See [the build pipeline](05-build-pipeline.md#a-build-for-publishing-stops-that-sections-preview).
+
+Both guards are exercised by `verify-deploy.sh`, which publishes to every
+destination and then fetches each site back and reads it. **It is bash, and it
+runs on the mac only** — so the PowerShell half of these guards is not covered
+by it, which is how the next paragraph's defect survived.
+
+**A third detail, learned the expensive way on Windows.** The PowerShell port
+of the tree check was written from the mac, where it could not be run, and it
+used `Select-String -Quiet` on a pipeline of files. That returns one result
+PER FILE rather than one answer for the tree, and a non-empty array is TRUE in
+PowerShell whatever is in it — so the check was true for any site with two or
+more pages, which is every real site. Publishing to a folder therefore could not succeed on Windows at
+all: it always claimed the site was a preview build, always rebuilt, always
+waited the full timeout, and always refused. It is now `Test-CarriesLiveReload`
+in `deploy.ps1`, which tests for a match object rather than a Boolean. The
+general rule for PowerShell written from the mac: `-Quiet` is not a scalar when
+the input is a pipeline.
+
 ### Why determinism matters
 
 The delta algorithm is the reason several build-side customizations exist:
@@ -115,6 +216,60 @@ fonts / …) of what Netlify requested and writes the full ordered list to
 `public/_required_last_deploy.txt`. This exists to answer the question "why
 did that deploy upload 400 files?" — the usual culprit being some
 nondeterminism reintroduced into the build.
+
+### Suppressing Netlify's own ad badge
+
+Netlify can inject a "Powered by Netlify" badge — and a matching pre-launch
+toolbar — into any public site on a free-tier project (rollout confirmed
+2026-08-21). There is no API field to turn it off: its published OpenAPI
+spec has nothing named `badge`, `powered_by`, or `premium` anywhere on the
+`Site` object, so the only documented control is a per-project dashboard
+toggle — not something that scales to hundreds of teachers' class sites.
+
+Netlify's own docs name the one lever that *is* automatic: the badge only
+renders through an inline `<script>` injected at their edge, and a
+Content-Security-Policy whose `script-src` omits `'unsafe-inline'` makes the
+browser refuse to run it
+(<https://docs.netlify.com/manage/projects/powered-by-netlify-badge/>):
+"Neither the badge nor the pre-launch toolbar appears, and no other project
+functionality is affected."
+
+A fixed CSP would be fragile — Quartz's own build does emit a few inline
+`<script>` blocks (a search-index prefetch trigger, a callout-collapse
+handler, a Mermaid pan/zoom script), and a hardcoded allow-list would go
+stale on a Quartz upgrade or silently break a teacher's own embedded
+`<script>`. So `write_netlify_headers_file()` scans the actual built
+`public/` folder at deploy time — every `.html` file, every unique inline
+`<script>` body, SHA-256-hashed — and writes `public/_headers` with a policy
+built from what is really there:
+
+```
+/*
+  Content-Security-Policy: script-src 'self' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
+```
+
+Only `script-src` is set, never `default-src` — nothing else about a page
+(images, fonts, styles, network requests) is restricted. This runs on the
+Netlify path only, right after any production rebuild above and right
+before the delta-deploy manifest is built, so `_headers` rides along in the
+same SHA-1 manifest as every other file. It is deterministic build to build
+(same content ⇒ same hashes ⇒ same file), which matters for the same reason
+covered under "Why determinism matters" above. Tested in
+`scripts/test_deploy_netlify_headers.py` (no Docker needed — `verify.sh`
+runs it before the image build).
+
+**Cloudflare Pages and `local_folder` pay nothing for this.** It is a
+problem Netlify created, so only a Netlify deploy should carry the cost —
+Cloudflare's `publish_to_cloudflare()` returns from `main()` before this
+code is even reachable, and `local_folder` never invokes `deploy.py` at
+all. No extra file, no extra console line, no extra time on either path.
+This also keeps them a clean control group: deploying identical content to
+both Netlify and Cloudflare is a direct way to check whether a suspected
+breakage on a site is caused by this feature specifically, rather than by
+the build itself. Pinned structurally in
+`CloudflareIsNeverTouchedTests` in `scripts/test_deploy_netlify_headers.py`,
+so a future refactor that moves the badge-suppression call earlier fails
+that test rather than shipping a silent regression.
 
 ### Rate limiting
 
@@ -155,7 +310,104 @@ Two things are needed, and only one comes from the teacher directly:
   against `/user/tokens/verify`, and the account is resolved by trying
   discovery, then a remembered value, then asking once. The GUI collects it
   up front, because an app publishing in the background has nothing attached
-  that could answer a console prompt.
+  that could answer a console prompt — and under `--non-interactive` that
+  last "asking once" is a refusal instead, naming the Account ID and pointing
+  at the course's own settings.
+
+### Asking once, and the subshell that ate the question (2026-09-09)
+
+That "asking once" is `prompt_for_cf_account`, and until issue #129 it did
+not work from the command line. It is called as
+
+```bash
+CF_ACCOUNT="$(prompt_for_cf_account)" || exit 1
+```
+
+and a command substitution is a **subshell that captures stdout**, so the
+function's stdout is its RETURN VALUE — nothing else may go there. Its
+six-step "where to find your Account ID" instructions and its "that doesn't
+look like an Account ID" error both went to stdout anyway. Two consequences,
+both measured on 2026-09-09 by driving the real `deploy.sh` through a
+pseudo-terminal rather than reasoning about it:
+
+- A teacher was asked to paste a code **with no hint where it lives** — the
+  instructions were invisible — and when they mistyped it they saw **nothing
+  at all** before the script exited 1.
+- On the SUCCESS path the captured value was the instructions **and** the id:
+  **519 characters — 521 bytes — where 32 were meant** (the instruction block
+  is 489 bytes of it; the two-byte gap between the counts is one em dash). That blob went to `set_cf_account_keychain`,
+  so it was remembered and every later run skipped the question and reused
+  it, and to wrangler as `CLOUDFLARE_ACCOUNT_ID`. First-time Cloudflare
+  publishing from the command line did not work, and stayed broken until the
+  Keychain entry was cleared by hand.
+
+**Only the command line was exposed.** The GUI passes `--account` (see
+`DeployCommand`), and a scheduled publish carries it in the plist, so neither
+reaches this question; and the common case never reaches it either, because
+discovery usually answers first. `deploy.ps1` never had it, and avoids it a different way than "at top level",
+which is worth stating precisely because a Windows reader will go looking:
+`Read-CloudflareAccountId` says both of these inside the function too, but
+pipes them to `Out-Host` / `Write-Host`, which bypass the success stream that
+`$CF_ACCOUNT = Read-CloudflareAccountId` captures. PowerShell's host stream is
+doing the job stderr does here — so after this fix the two launchers solve the
+problem the same way rather than differently.
+
+Fixed by sending both to **stderr**, which is where `read -rp` already writes
+its own prompt, so the instructions now sit with the question they belong to.
+
+**Rejected: making the function set `CF_ACCOUNT` directly** and dropping the
+command substitution. It is the more structural fix — it removes the trap
+rather than documenting it — but the call site is parsed as TEXT by Windows'
+`PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`,
+which finds the single caller by searching for `prompt_for_cf_account)`. A
+mac with no `dotnet` cannot check that suite, so the change would have turned
+it red for a reason it has no way to verify. The invariant that matters — a
+question inside a function whose output is captured — is already gated by
+that test, which is what makes stderr sufficient here.
+
+**Fixing the printing does nothing for a teacher the bug already reached, and
+that is a separate repair.** The blob was written to the Keychain by
+`set_cf_account_keychain`, and the line that reads it back —
+`CF_ACCOUNT="$(get_cf_account_keychain)"` — trusted it without looking. So a
+teacher who answered the question correctly *once*, on a released build, would
+have had the question never asked again and wrangler handed nonsense on every
+run for ever. **Both released versions can have done this** (v1.0.0,
+2026-08-19; v1.1.0, 2026-08-20). The remembered value is therefore CHECKED
+before it is used: anything that is not 32 hex characters is discarded, the
+Keychain entry removed, and the question asked again — which is the state the
+teacher would have been in had the bug never happened.
+
+The repair is deliberately silent. "Your saved Account ID was wrong" invites a
+support question about something already put right, and the very next line asks
+for the ID anyway. If somebody needs to do it by hand, the entry is
+`containerized-quartz-cloudflare-account`:
+
+```bash
+security delete-generic-password -s containerized-quartz-cloudflare-account
+```
+
+`ATeacherAlreadyBittenGetsOutOfIt` in `scripts/test_deploy_sh_questions.py`
+pins both halves, and pins them against the REAL blob — it lifts the pre-fix
+function out of `07952399^`, runs it, and feeds what it actually produced back
+in as the remembered value, rather than a tidy short string that would not
+have caught this.
+
+**This is the same trap issue #92 fixed**, one function along. That issue
+moved the `--non-interactive` REFUSAL out to the call site for exactly this
+reason; the instructions and the error were left behind, because nobody had
+started the script and watched it. Which is the real lesson: `deploy.sh`
+changed on a machine with no bash, was syntax-checked and reviewed carefully,
+and reading it found neither of these. `scripts/test_deploy_sh_questions.py`
+now RUNS the launcher to every question it can ask — no Docker, no network,
+no credentials — and `verify.sh` runs it at step 0.
+
+Naming a NEW project asks the teacher nothing, and that is the one place this
+path differs from Netlify's: the project name is derived (course, section,
+year, surname) rather than offered for editing. So under `--non-interactive`
+there is nothing to refuse here **unless the surname has never been saved on
+this computer**, which is the single question on the path — and that one is
+refused. See `contracts/app-rules.json` → `launcherFlags.nonInteractive`,
+which records the asymmetry so neither app "tidies" it away.
 
 Per-section state lives in `courses/<CODE>/.cloudflare_sites/section<N>.json`,
 mirroring the Netlify marker, so re-publishing reuses the same project rather
@@ -179,7 +431,15 @@ and bandwidth are unmetered on the free plan.
 Chosen with `deploy_target: "local_folder"` plus `deploy_folder_path`. This
 one never reaches the container: the launcher mirrors the already-built
 `public/` folder into `<chosen folder>/section<N>` on the host, copying only
-what changed and propagating deletions. It exists for teachers whose board or
+what changed and propagating deletions.
+
+**Never reaching the container is the thing to remember about this
+destination.** Everything `deploy.py` does for the other two — most importantly
+[refusing to publish a preview build](#automatic-production-rebuilds-live-reload-detection)
+— simply does not happen here, and each such guard has to be repeated in
+`deploy.sh` and `deploy.ps1` or it does not exist for this path. That is not
+hypothetical: the preview-build refusal was missing here for as long as the
+destination has existed. It exists for teachers whose board or
 university already gives them web space — they upload the folder however they
 normally do (SFTP, a network share, a sync client), and no third-party
 account is involved at all.
@@ -189,6 +449,566 @@ rather than a live URL, and the apps show a "copied to its publishing folder"
 panel with a reveal-in-file-manager button instead of a link — plus a note
 that pages opened straight from disk won't look right, since the site expects
 to be served over HTTP.
+
+## Publishing while a preview is running — the race, and the harness that found it
+
+Two defects on 2026-09-05, both in the publish path, both invisible to every
+test that does not publish and then LOOK at what came out.
+
+**The race, which is the one that matters.** Killing the preview LAUNCHER does
+not stop the preview. On the mac the Python and the node server both live
+inside the container, and `_start_public_sync_watcher` keeps mirroring the
+SERVE build to the host every second — so a build for publishing lands and the
+preview overwrites it within a second, and what gets published is the preview,
+live-reload client and all. `kill_existing_quartz` was only ever called from
+the SERVE branch, so `--build-only` never stopped anything.
+
+`build_site.py`'s `--build-only` now stops the preview serving THIS SECTION
+before building, matched by the section's own build directory.
+**That is shared Python and both platforms inherit it.**
+
+**It was written by PORT first, and that was wrong — do not go back to it.**
+`kill_existing_quartz(port)` looked like the obvious tool and is the right one
+for the SERVE path, where the port is known and leased. A build-only run is
+never given a port: `preview.sh` defaults it to 8081 and the app's deploy
+passes no `--port` at all. So the first version killed whatever was serving on
+8081 — the first section to have previewed in that working folder, which is
+usually a DIFFERENT section from the one being published. Measured 2026-09-05
+by doing it: previewing section 1 and publishing section 2 printed "Killed
+existing process on port 8081" and section 1 stopped answering. A scheduled
+overnight deploy would have done the same to any preview left running.
+
+What works instead is the section's BUILD DIRECTORY, which is on the serve
+process's command line because the launcher runs the Quartz CLI by absolute
+path. It identifies exactly one preview and cannot collide with another. One
+detail that is easy to miss: match on the directory plus a trailing separator,
+or `section1` also matches `section10`.
+
+Two things worth checking per platform rather than assuming:
+
+- **A Windows preview is not in a container**, so an orphaned server is a plain
+  Windows process. Check that killing the launcher actually stops the node
+  server — on the mac it demonstrably does not, and that is exactly the kind of
+  difference that is assumed rather than measured.
+- **The matching algorithm exists on both sides — do not write a third copy.**
+  `preview.ps1`'s `--stop` block finds this section's processes by COMMAND
+  LINE (this paragraph said WORKING DIRECTORY until 2026-09-05, and that was
+  simply wrong — `Win32_Process` exposes no working directory) and walks their
+  descendants; the descendant walk is the half Windows had and the mac did not.
+
+  The mac could not simply call `preview.sh --stop`, because `build_site.py`
+  runs INSIDE the container and `--stop` is a host script — which is why a
+  third copy of this rule once existed. **Resolved 2026-09-05: the rule lives
+  once**, in `contracts/shared-rules.json` → `stopPreview` and
+  `scripts/stop_preview.py`, whose `read_snapshot()` dispatches on the platform
+  — `/proc` on Linux and in the container, `Get-CimInstance Win32_Process`
+  natively on Windows. See
+  [`03-launcher-scripts.md`](03-launcher-scripts.md) → "One rule for stopping
+  a section's preview" for the full design and what was rejected.
+
+- **What is and is not exposed.** The Windows APP already stops a
+  running preview before deploying (`SectionDetailView.xaml.cs`), exactly as
+  the mac's does — so the app is safe on both platforms and always was. The
+  hole was the COMMAND LINE, on both.
+
+  **On Windows that hole was open until 2026-09-05, and this page described it
+  as open for longer.** `read_proc_snapshot()` reads `/proc` and native Windows
+  has none, so it returned an empty list and `stop_preview_serving()` stopped
+  nothing. The fix went one level DEEPER than "call `preview.ps1`'s matcher
+  from the build-only path" — that route was considered and rejected, because
+  `deploy.py` reaches `build_site.py --build-only` directly and never passes
+  through the launcher, so a fix living in `preview.ps1` would leave the
+  Netlify and Cloudflare route still racing. `read_snapshot()` is a dispatcher
+  instead. The watcher that causes the race runs everywhere regardless:
+  `_start_public_sync_watcher` is started unconditionally in the SERVE branch,
+  so a Windows preview mirrors over a Windows publish exactly as a mac one
+  does.
+
+- **The wait is bounded at 30 seconds** (150 × 0.2 s), not the 15 that
+  `GUI-IMPROVEMENTS.md` row 392 says — that row predates the change and the log
+  is append-only, so this is the current number.
+
+**The other one was a partial fix of mine, and is worth knowing as a shape.**
+The first version of the preview guard in `deploy.sh` waited for `index.html`
+to lose the live-reload client. Serve mode bakes that client into EVERY page
+and the mirror is replaced file by file, so a clean front page can sit in front
+of two hundred stale preview pages. Publishing that MIXTURE is worse than
+publishing the preview wholesale, because the front page looks fine and nobody
+looks further. Wait on the whole tree; `deploy.ps1` already does.
+
+## `verify-deploy.sh` — the publishing harness, and why it is not in the gate
+
+New on 2026-09-05, at the repository root. It publishes to a folder, to Netlify
+and to Cloudflare, and runs all three primary+secondary pairings, then **fetches
+every published site back and reads it** — the launcher's own output only
+proves the launcher is happy with itself.
+
+**First run on the mac: 2026-09-09, 44 passed, 0 failed, 0 skipped** — the run
+`RELEASING.md` requires with nothing skipped, and the one issue #129 was really
+asking for, since `deploy.sh` had gained `--non-interactive` on a machine that
+could not execute it. **Run again the same day, after Windows' issue #130
+merged, with the same result** — 44 passed, 0 failed, 0 skipped. That merge
+brought the fix for `deploy.sh`'s dead exit-3 pass-through, which is in the
+publishing path, so the pre-commit hook asked for it and it was owed rather
+than optional. All three destinations published for real and fetched
+back (folder 244 files, `ada1o-s1-2026-testing.netlify.app`,
+`ada1o-s1-2026-testing.pages.dev`), all three pairings, no live-reload client
+on any of them, and the no-front-page case refused and shipped nothing stale.
+Nothing about a teacher at a keyboard changed. The Windows counterpart
+`verify-deploy.ps1` was run before the merge: 36 passed, 0 failed, 0 skipped.
+The two counts differ because the suites are not identical, not because
+anything was skipped — count the cases in each script rather than comparing
+the numbers.
+
+**It is deliberately NOT part of `verify.sh`.** The gate must be runnable at any
+moment, on any machine, without credentials and without touching anything
+outside the repository. This needs a Netlify token, a Cloudflare token and an
+account ID, it needs the network, and it CREATES REAL SITES. Build the Windows
+equivalent the same way — opt-in, run when the publishing path changes — rather
+than folding it into whatever else gates a commit.
+
+One thing it does NOT cover, stated so nobody assumes otherwise:
+`additional_deploy_targets` is not handled by `deploy.sh` at all — the APP loops
+and calls the launcher once per destination. The harness exercises the pairings
+by running that same sequence, which tests the launcher half; that the app
+produces exactly those argument lists is pinned separately by
+`app-rules.json` → `deployArguments`, which both suites run. Between the
+two the pairing is covered; neither half covers it alone.
+
+## The scheduled task never refuses over FOLDER PROBLEMS
+
+Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map
+is a paper cut, an unpublished site update a teacher was counting on is a broken
+nose."* Pinned as `siteHealth.scheduledDeployPublishesAnyway` and asserted by a
+mac test so it cannot be quietly softened later.
+
+So: publish, then stash what was found for the next time somebody is there. You
+already have the shape — `ScheduledDeployCompletion.cs` stashes a completion
+sentinel exactly this way. Two properties the mac's version has that any port should
+too: the record is CONSUMED when read, so a problem is reported once rather than
+every time the app opens; and a CLEAN run clears it, so a problem the teacher has
+put right stops being reported.
+
+**That second property is harder than it looks, and this section claimed it
+before it was true.** launchd opens the scheduled log with O_APPEND and nothing
+rotates or truncates it, so reading the whole file re-finds LAST week's marker
+lines every night: the sentinel is rewritten with stale findings forever, and the
+"nothing wrong this time" branch becomes unreachable the moment a single problem
+has ever been logged. A teacher who fixed the folder would have been told about
+it every morning until somebody deleted the log.
+
+The mac now records the log's SIZE before the run and reads only from that offset
+afterwards. A task runner that captures output per run may not have this
+problem at all — but check rather than assume. And note how it got through: the
+test that was supposed to cover it faked the append by rewriting the file, so it
+passed against broken code.
+
+One platform difference worth knowing: the mac reads the findings back out of the
+scheduled run's LOG FILE rather than from a pipe, because `runScheduled`
+deliberately does not capture the child's output — launchd points stdout at that
+log and the process inherits it, and an unread pipe is what wedged the
+assistant server once. Where a task runner already captures output, use that;
+the log-scrape is a workaround for a constraint not every platform shares.
+
+## Deploys with several destinations
+
+Take the findings from the FIRST leg only. Every destination publishes the same
+built site, so a second leg repeats them.
+
+## When a scheduled publish does not get through
+
+Added 2026-09-09. `--non-interactive` stops an overnight publish hanging or
+guessing; this is the other half — making sure the teacher finds out.
+
+**The failure it closes.** A scheduled publish runs at half six with the app
+closed. Before this, a run that did not get through said so in the section's
+own log and nowhere else, so it was indistinguishable from a run that was never
+scheduled. That is the shape of *"my site did not update on Tuesday and I do not
+know why"*, and it had no answer.
+
+**How the handover works.** The wrapper writes a small record, and the app reads
+it — the moment it lands if the teacher is looking at that section, and
+otherwise the next time they open it. (Reading it only on opening was all this
+did until 2026-09-19; the sub-section "The notice has to arrive while the
+teacher is looking" below is what changed, and why it needed a change to the
+wrapper as well.) The trail line is a
+separate matter and is written by the RUN — see below; this paragraph used to
+say the wrapper "runs with nothing of ours loaded", and that was never true on
+this side. **The launchd agent runs Plantoir**, which runs the wrapper and then
+does its own post-run work.
+
+- The launchd wrapper captures the BUILD's exit code and then each
+  destination's. On a non-zero one it writes `~/Library/Application Support/
+  Plantoir/scheduled/stopped/<CODE>-section<N>.txt` — first line the kind,
+  second the destination. It assembles both lines in
+  `…/scheduled/<CODE>-section<N>.txt.partial` and **moves** the finished file
+  into place; the sub-section below is the whole reason, and it is not a
+  tidiness preference.
+- **Exit 3 is tested before the general non-zero branch**, because it is also
+  non-zero. Three means `NEEDS_AN_ANSWER` and nothing else; anything else is an
+  ordinary failure.
+- **Which LEG stopped decides the kind, not just the code.** Exit 3 from the
+  build is `buildNeededAnAnswer`; exit 3 from a destination is
+  `neededAnAnswer`. See the section below.
+- The **first** destination that stopped is the one kept. A course can publish
+  to several and only one may have gone wrong, so *"it published to the folder
+  and not to Netlify"* is the report a teacher makes; overwriting would tell
+  them about the last thing rather than the first.
+- The record is cleared by a run that got **all** the way through, or by the
+  teacher dismissing it.
+- **The RUN writes the trail line, not the app, and the record carries no
+  "noted" mark at all.** `ScheduledDeploy.runScheduled` calls
+  `ScheduledPublishOutcome.noteOnTrail` as soon as the wrapper finishes, so the
+  line is written once because the run happens once, and it is dated to when
+  the run wrote its record rather than to when anybody read it — otherwise an
+  overnight problem is filed under the morning somebody noticed it.
+
+  An earlier draft did have the app note it on opening and mark the record as
+  noted, and it was wrong three ways: the mark had to be written back into the
+  record, which changed its modification date — the very date the notice shows;
+  a teacher who never opened that section, who is exactly the teacher who
+  reports that their site did not update, got no line at all; and its premise,
+  that nothing of ours is loaded when the wrapper runs, was false. **This page
+  described the withdrawn draft as though it were the code until 2026-09-09**,
+  which is how the Windows side came to design a `.noted` sidecar against a
+  mark this side does not keep.
+
+  **Windows still needs a mark, and that is a real difference rather than a
+  copied one.** This paragraph used to say the sidecar existed because writing
+  a mark into the record would repeat "the mistake an earlier draft here made
+  and undid" — which drew a contrast with a mac behaviour that no longer
+  exists. It was written against the stale description above, and #135 is where
+  the mac said so.
+
+  The honest version: **this side needs no mark at all**, because the run IS
+  Plantoir and writes the line once as it finishes. Windows cannot do that —
+  Task Scheduler runs plain PowerShell with nothing of the app loaded — so the
+  line is written by a sweep when the app next opens, and a sweep with no memory
+  would write it again every launch. Hence a `.noted` sidecar, kept beside the
+  record rather than inside it because the record's modification time is what
+  dates the notice. Two platforms, one property — a line per run, dated to the
+  run — reached the only way each of them can.
+
+**Where a teacher meets it.** The sentence sits at the top of the section, above
+the console — a teacher opening a section after a failed overnight publish is
+looking for why their site is out of date, and the console is about what they
+are doing now. A warning badge also appears beside that section in the sidebar,
+because **a teacher who does not know which section failed cannot open the right
+one**, and not knowing is the whole problem. The sentence and the badge appear
+at the **same moment**, because since 2026-09-19 both follow one counter — the
+section's band is re-read and the sidebar row re-rendered off
+`ScheduledPublishWatcher.generation`, in both directions: a run finishing moves
+it, and so does the teacher dismissing the notice.
+
+### The notice has to arrive while the teacher is looking
+
+Added 2026-09-19 for [issue
+#216](https://github.com/russellgordon/plantoir/issues/216), found in Russell's
+hand smoke of the v1.2.0 build. Schedule a deploy a few minutes ahead, stay on
+that section, and watch the run finish: **nothing changed on screen** until you
+clicked up to the course and back down again. Both places that read the record
+read it only when they were built — the section's `.onAppear` and the sidebar
+row's own render — and the run is a separate process, so nothing told an open
+window that the file had changed. A teacher who stays put was never told.
+
+**The file is the event, so the file is what is watched.**
+`ScheduledPublishWatcher` opens one watch on the record folder and moves a
+single counter; every observer then re-reads its OWN record. One watcher for the
+whole app, not one per window: the folder hangs off the home folder alone, so a
+watcher per window would be several watchers and several counters for one global
+truth, and a second window's sidebar would go stale. The counter carries no
+payload on purpose — two sections finishing in the same millisecond produce one
+bump and two correct notices, and a coalesced event is therefore never a lost
+one. `workspace.stoppedPublishGeneration`, which until now only Dismiss moved,
+was retired into it.
+
+**The measurement that decided the shape of the wrapper.** A watch on a
+DIRECTORY fires when an entry is created, removed or renamed. It does *not* fire
+when a file that is already there grows. Measured on this Mac (Apple silicon,
+APFS, 2026-09-19), with a real vnode source reading the record inside the event
+handler exactly as the app does, 40 trials each:
+
+| how the wrapper writes the record | events | first event carried a readable record |
+|---|---|---|
+| two `echo`s — what it used to do | 1 | **0 of 40** |
+| one `printf` of both lines | 1 | **0 of 40** |
+| temporary file INSIDE the watched folder, then `mv` | 3 | 2 of the 3 carried nothing |
+| temporary file in the PARENT, then `mv` | **1** | **40 of 40** |
+
+The losing shapes lose for one reason: the event is the directory entry being
+created, which happens before any bytes are written, and the write that finishes
+the file changes no directory entry — so there is no second event to catch it
+with. **A watcher shipped against the old wrapper would not have been flaky; it
+would have done nothing, every time.** Hence `recordCompletionLines` in
+`ScheduledDeploy`, and `ScheduledPublishOutcome.partialRecordURL` beside the
+folder rather than in it. `/bin/mv` within one filesystem is `rename(2)`, and
+both paths are under Application Support by construction, so the move is atomic.
+Nothing about failure changed: the wrapper has no `set -e`, so a failed write
+leaves an empty temporary file which `mv` installs, and an empty record reads as
+no record — exactly what a failed `echo` produced before.
+
+**A job scheduled by an OLDER build still shows its notice live**, and this is
+the part that is easy to skip. The wrapper is written to disk when the section is
+scheduled and is not rewritten until it is scheduled again, so a job already
+installed keeps writing two `echo`s however this app now generates them. When a
+folder event turns up a record that is there but cannot be read yet, the watcher
+opens a second watch on **that file** — which does see the completing write —
+and closes it as soon as the record reads or goes away. An event, not a timer.
+**Rejected:** rewriting every pending job's wrapper at launch. It is more code,
+it edits files launchd is about to run — including, unavoidably, one that may be
+running at that moment — and it would only ever fix wrappers this app wrote,
+where the file watch covers any two-step writer, a record restored from a
+backup included.
+
+**Also rejected, and why:**
+
+- **Polling on a timer.** A guessed number either way: fast enough to feel live
+  is a filesystem read every second for ever, against an event that happens once
+  a day; slow enough to be polite is not "while the teacher is looking". The
+  thing being waited for is directly observable.
+- **A distributed notification from the run.** `runScheduled` *is* Plantoir and
+  could post one. It is a second channel that can disagree with the file, and it
+  covers only writers that are Plantoir — not a record removed by hand, not a
+  restore, not another window.
+- **`NSFilePresenter`/`NSFileCoordinator`.** It observes *coordinated* writes,
+  and a `mv` from `/bin/bash` is not one. It would never fire at all.
+- **FSEvents** needs a dispatch queue too, plus a C callback and an `Unmanaged`
+  context, and coalesces with a delay: more Dispatch, three times the code,
+  later events. **A raw `kevent()` loop** needs a thread of its own blocked in
+  the kernel.
+- **Widening the watch** to the findings sentinel beside the record. Genuinely
+  worth doing and not here: it raises whether an overnight folder problem should
+  throw a dialog at a teacher mid-lesson, which is a product decision.
+
+**The one use of Dispatch in this app**, and it is commented as such where it
+lives. `DispatchSource.makeFileSystemObjectSource` is the kernel's own
+file-system event source and takes a queue as a required parameter — the queue
+is a delivery channel, not somewhere work is thrown. Nothing is deferred,
+nothing waits, and the events are consumed with `for await` on the main actor.
+Both watches are armed *before* `start()` returns, which is what lets the tests
+be deterministic: `ScheduledPublishWatcherTests` has **no sleeps at all** — every
+wait is an expectation re-checked when the counter moves, and its seven cases run
+in under half a second.
+
+**A preview showing is the state that matters most, and it took a second piece
+of work to get right.** The notice first shipped in the base layer of the
+section's `ZStack`, underneath the full-bleed web view, and that was recorded
+here as deliberate — a band that "waits until the preview closes". It is not
+acceptable, and Russell said so the same evening after his smoke test: with a
+preview up, all a teacher sees is a green tint bleeding through the toolbar, and
+a teacher looking at their preview is exactly who needs telling. That is
+[issue #219](https://github.com/russellgordon/plantoir/issues/219).
+
+The band now sits ABOVE the whole stack — one band, in one place, in every
+state — and the site takes the room that is left. Two things decided that shape
+over the alternatives:
+
+- **The band must not be written twice.** `.safeAreaInset(edge: .top)` on the
+  web view, or a second copy of the band inside a cover-layer `VStack`, both put
+  it inside the branch that exists only while a preview is up, so the no-preview
+  case needs its own copy — two places to keep in step for one sentence.
+- **The web view must not move between containers.** It is a live `WKWebView`
+  showing a page the teacher has scrolled and navigated; `WebPreviewController`
+  owns the instance and `loadIfNeeded` is idempotent, but shifting the view
+  between branches as notices come and go is how a page gets thrown away.
+  It stays in the one branch it has always been in.
+
+Measured by hand (2026-09-19, dark and light, a real preview showing): with the
+band arriving, the page the teacher was on is **100% identical across 5,525
+sampled points once shifted down by the band's 57 points** — the same page,
+simply moved, not reloaded — and when the record goes, the site's pixels match
+what they were before the band arrived, 8,250 of 8,250. (That second half is the
+record being REMOVED, which is the watcher's path; pressing Dismiss by hand was
+not driven, and the unit test below is what covers it.) What a test can pin is
+the same property without a browser: `ProgressViewSizeTests` measures the room
+the site is OFFERED, with a stand-in that answers `sizeThatFits` exactly as
+`WebPreviewView` does. 720 points with no notice; less with one. On the old
+arrangement it was 720 either way, which is the fault stated as a number.
+
+**The toolbar must not take the band's colour, either, and that is a SECOND
+mechanism rather than a consequence of the first.** A `.background(_:)` ignores
+every safe-area edge by default, so the band's fill reached up into the strip
+the window's toolbar sits in — and a toolbar is a translucent material that
+samples what is behind it. `.background(bandColour.opacity(0.12),
+ignoresSafeAreaEdges: [])` stops the colour at the band's own edges. The band's
+LAYOUT was never the problem; the background was.
+
+**Do not delete that `[]` on the strength of a clean screenshot.** Measured by
+rendering the content view — which under a full-size content window includes the
+strip behind the titlebar — and reading its top rows back: with the default
+background the green is painted up there in BOTH the old arrangement and the
+new one, and with `ignoresSafeAreaEdges: []` nothing is painted there at all.
+Moving the band above the stack did not stop the bleed; this did. Whether the
+bleed SHOWS depends on the state of the toolbar's material, which is why it is
+hard to catch by eye: two captures of the same shape on the pre-#219 build
+disagree, one grey and one green.
+
+Measured after the change, dark and light, with a preview showing and without:
+the toolbar above the detail column is identical with a band and without one —
+a mean of **(34.7, 34.7, 34.7) in dark and (240.7, 240.7, 240.7) in light**,
+over 2,812 points sampled between x = 350 and x = 1090 and y = 6 and y = 44 in
+window coordinates.
+
+**And it now sits where it belongs.** In the same smoke Russell found the band
+floating in the MIDDLE of an empty window. The cause was that the base layer hugged
+its content: measured at 800 × 720, the "No Preview Running" placeholder claimed
+189 points and the layer with the notice 246, so the `ZStack` centred it and put
+237 points of nothing above the notice. The placeholder (now
+`NoPreviewPlaceholderView`) fills the height it is offered, which puts the notice
+flush under the toolbar and still centres the placeholder in what is left. **Not
+a fixed height** — a rigid height in that column is the failure class issue #211
+closed, and `ProgressViewSizeTests` measures both properties side by side. The
+console branch had always filled, by way of the `Spacer(minLength: 0)` at the
+bottom of `consoleArea`, which is why the notice sat correctly whenever anything
+was running and wrongly when nothing was.
+
+### A build that stopped for a question is its own outcome
+
+Proposed from Windows as [issue
+#132](https://github.com/russellgordon/plantoir/issues/132) and adopted here on
+2026-09-09. **A scheduled publish builds before it publishes**, and since
+`--non-interactive` the build can refuse: `preview.sh` has one question of its
+own — the 'Open' course-code guard — and refuses it with the same exit 3
+`deploy.py` uses. Nothing has been contacted at that point.
+
+This side already recorded that run, and recorded it as the wrong thing. It was
+`neededAnAnswer` with `buildDestinationName` standing in for a destination, so
+the teacher read:
+
+> …it stopped because publishing to **your website (it could not be built)**
+> needed an answer nobody was there to give. **Publish** this section once
+> yourself…
+
+Both halves are wrong. It names a destination nothing had contacted, and it
+sends the teacher to the button that does not ask the question. The fourth kind
+says neither:
+
+> …it stopped **before it started**, because building the pages needed an
+> answer nobody was there to give. **Preview** this section once yourself,
+> answer the question, and it can publish on its own after that.
+
+**Rejected, and recorded so it is not proposed again:** filling the destination
+in with the section's first configured one. It reads correctly and it is false.
+
+**No fourth trail event.** It files under `scheduled publish needed an answer`,
+which is about a question going unasked — which is what happened. A fourth
+event would put a distinction on the trail that means nothing to the person
+reading it. The line names no destination, and
+`activityTrail.mustRecord` → that event's `carries` says so.
+
+**The record's second line is still written and never shown.** Every record has
+one shape — the kind, then a name — because it is a shell script writing two
+`echo` lines at half six, and `stopped(inHomeFolder:course:section:)` refuses a
+record whose second line is empty. A build that failed OUTRIGHT still puts that
+name in the teacher's sentence.
+
+**A section already scheduled keeps the wrapper it was scheduled with.**
+`oneShotCommand` is called from `scheduleDeploy` and nowhere else, and nothing
+rewrites an existing `<CODE>.section<N>.sh` on launch the way the app refreshes
+the launchers. So a teacher with a publish already pending when they update
+reads the old sentence once, for that run. Records already on disk stay
+readable — the old kind is still a kind — which is why the fix could be made
+without a migration.
+
+### The two widenings, and what still differs between the platforms
+
+Recorded in `contracts/shared-rules.json` → `scheduledPublishStopped`
+→ `platformDifferences`, which is where the two apps are compared.
+
+Russell decided both on 2026-09-09, and both are now on **both** platforms
+(Windows landed them the same day, GitHub issue #130):
+
+1. **ANY failed scheduled publish is recorded, not only "needed an answer".**
+   A teacher should learn their overnight publish did not happen whatever the
+   reason — a revoked token, a network that was down — because **the silence is
+   the complaint, not the cause**. Recording only exit 3 leaves an ordinary
+   overnight failure just as silent as before, which is the same complaint in a
+   different coat.
+2. **The teacher can dismiss it.** Clearing only on a successful run leaves the
+   message standing after somebody has already fixed the problem by hand, and
+   the next scheduled run that would clear it could be a week away.
+
+**The fourth outcome is on both sides too**, as of the same day —
+`buildNeededAnAnswer`, proposed to the contract from Windows and adopted here
+in issue #132's work, described in full in the section above. That sentence
+used to end "this suite is red on `kinds`/`sentences` until the mac adopts it",
+which was true when it was written on the Windows branch and stopped being true
+the moment these two merged.
+
+**One difference remains, and it is deliberate: who writes the trail line,
+which cannot be the same on both.** Here the
+launchd agent runs Plantoir, so the RUN writes it, as the `trail` key describes.
+On Windows Task Scheduler runs plain PowerShell with no app process alive, so
+that side sweeps every record when the app next opens, dating each line from the
+record rather than from the reading. Writing it from the wrapper's own shell was
+rejected there for the same reason it was rejected here — see below. The
+property the contract is actually asking for survives either way: **a teacher
+who never opens the failed section still gets the line**, and that teacher is
+precisely the one who writes in to say their site did not update.
+
+### What was rejected
+
+**Writing the trail from the wrapper's own shell.** Not because nothing of
+ours is loaded — Plantoir runs the wrapper — but because a shell script
+appending to the trail would put the line's format in a second home, in
+generated bash, where nothing tests it and `LogRedactor` does not reach. That
+is the one thing that must not be reimplemented: it is what keeps a teacher's
+own words off the trail. The app writes the line itself the moment the wrapper
+returns, which has the same property the wrapper would have had — a teacher who
+never opens the section still gets it.
+
+**Naming the question on the trail.** The question's text comes from a
+launcher's console; a line naming a credential prompt would put a teacher's own
+words there. The trail carries the course, the section and the destination that
+stopped — or, when the BUILD stopped, that it stopped before any destination
+was reached, because none was.
+
+**Clearing the record inside the destination loop.** A course publishing to two
+places whose Netlify leg stopped and whose folder leg succeeded would have had
+the note cleared by the second leg. It is cleared only after every destination
+has run, and only when every one succeeded.
+
+### How it is tested, and the honest limit
+
+`ScheduledPublishOutcomeTests` **runs the generated shell** rather than reading
+it — a stub workspace, the real script through `/bin/bash`, and then a look at
+the file it left. A test that only asserts the generated TEXT proves the string
+is what we meant to write and nothing about what bash does with it.
+
+The limit worth stating: those runs use **stub launchers** that exit with a
+chosen code. That the real `deploy.sh` exits 3 in the states we think it does is
+proved separately — by `scripts/test_deploy_non_interactive.py`, which reads the
+launcher, and since 2026-09-09 by `scripts/test_deploy_sh_questions.py`, which
+RUNS it to each of the four questions it can ask and checks the refusal is
+visible as well as the code being 3 — and end to end only by
+`verify-deploy.sh`, which publishes to real Netlify. The BUILD leg's exit 3 is
+proved the same way from the same date, by
+`scripts/test_preview_sh_questions.py`, which runs `preview.sh` to its one
+question — including in the flag ORDER the launchd wrapper writes, which is
+the shape a parser bug would hide.
+
+**One narrow path can still produce the sentence #132 removed**, and it is
+filed as [issue #136](https://github.com/russellgordon/plantoir/issues/136)
+rather than fixed. **Publishing to a FOLDER, and only to a folder**, reruns the
+build itself: `deploy.sh` greps the section's whole `public/` tree for
+`ws://localhost:` and, finding it, runs `preview.sh --build-only` and passes its
+exit 3 straight through (`deploy.sh:472` opens the `TO_FOLDER` branch the rerun
+sits in). The wrapper can only see that as the folder's own question, because
+the exit code is the only thing it gets. Netlify and Cloudflare do not reach it
+at all — they go through `deploy.py`, whose `rebuild_for_production` runs
+`build_site.py` directly, asks nothing, and fails with 1, so those land in
+`didNotFinish` naming the destination, which is honest.
+
+Reaching even the folder case needs the wrapper to have skipped its own build,
+and that is possible because the wrapper's staleness check is
+`BuildFreshness.needsRebuild` written out in shell: it looks at `index.html`
+**alone**, while `deploy.sh` greps the tree. A clean front page in front of a
+stale preview page is the gap, and `deploy.sh`'s own comment records that the
+index-only check was found insufficient on 2026-09-05 — the launcher has been
+quietly compensating for the app's narrower one ever since. Closing it means
+changing `BuildFreshness`, which the Deploy button uses too, so it is its own
+piece of work with its own measurement; giving the rebuild its own exit code
+was rejected as a launcher contract change Windows shares.
 
 ---
 

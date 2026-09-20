@@ -9,7 +9,7 @@ tags:
 Staring at an empty studio floor with forty minutes to make a phrase is a
 horrible feeling, and it is entirely avoidable. You already know twenty or
 thirty movements by heart — the ones you have done at the start of every
-class since September. They are the shortest route from exercise to
+class since the first week. They are the shortest route from exercise to
 composition, because you can stop thinking about how to do them and spend
 all of your attention on choices instead.
 

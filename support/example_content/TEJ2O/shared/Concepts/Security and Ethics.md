@@ -39,6 +39,21 @@ that, the same way [[Our Classroom Norms]] is for the room.
 > a policy violation second, and in many cases a crime third — and
 > "just to see if I could" has never once made it otherwise.
 
+## Your own identity is a system too
+
+Machines are not the only thing with a way in. Information about a
+person — name, birthday, address, the school you attend, the answers
+to security questions — is worth money to somebody, and identity theft
+is assembled out of small true details rather than stolen in one
+piece. So: check what a privacy policy says a service will do with what
+you give it before you give it; assume anything sent over a network can
+be read unless it was encrypted; and treat a request for personal
+details, however friendly, the way a technician treats an unlabelled
+cable. Harassment that follows a person from account to account is the
+same failure seen from the other side — it works because the details
+were available. Report it rather than arguing with it — to the
+platform, to an adult you trust, or to both.
+
 ## The ethics of access
 
 Break-ins are not the whole story. Ethical computer use also means
@@ -56,4 +71,6 @@ this course argues it.
 ![[D2.1]]
 
 ![[D2.2]]
+
+![[D1.2]]
 %%curriculum-end%%

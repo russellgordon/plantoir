@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Journal: what September-you would have made of today's questions.
+- [ ] Journal: what the you who started this course would have made of today's questions.

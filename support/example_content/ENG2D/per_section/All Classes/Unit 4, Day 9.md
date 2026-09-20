@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Hand in [[The Media Deconstruction]] — day 5
-2. Gallery: every made text on the wall, audiences guessed and checked
+2. Gallery: every pair's paired texts on the wall, both audiences and
+   purposes guessed and checked
 
 ## Things to do before our next class
 

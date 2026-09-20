@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Sketchbook check, third of three
-2. Studio time
-3. Conferences
+1. Sketchbook check, third of three: [[The Sketchbook Habit]]
+2. Studio time: [[How a Studio Period Works]]
+3. Conferences on critical analysis reflection and sketchbook progress for [[The Sketchbook Habit]]
 
 ## Things to do before our next class
 

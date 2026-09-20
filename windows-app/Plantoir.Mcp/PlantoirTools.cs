@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
@@ -6,6 +7,7 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Mcp;
 
@@ -40,10 +42,24 @@ namespace Plantoir.Mcp;
 [McpServerToolType]
 public sealed class PlantoirTools(AssistWorkspace workspace)
 {
+    /// <summary>
+    /// Today, read at the moment a tool runs rather than when this was built.
+    /// </summary>
+    /// <remarks>
+    /// <para>A property so a test can pin the day; a FUNCTION rather than a
+    /// stored date because this server outlives a calendar day. One
+    /// <c>plantoir-mcp</c> can stay open for as long as an editor session
+    /// does, and a stored "today" would have it publishing "tomorrow's class"
+    /// against the day the process STARTED - a wrong day that reports success.
+    /// </para>
+    /// </remarks>
+    internal Func<DateOnly> Today { get; init; } = () => DateOnly.FromDateTime(DateTime.Now);
+
     // ---- Looking around --------------------------------------------------
 
     [McpServerTool(Name = "list_courses", Title = "List courses", ReadOnly = true, Destructive = false)]
-    [Description("List the teacher's courses in this working folder: code, name, sections, and where each one publishes to. " +
+    [Description("TEACHERS SAY: \"what courses do I have?\", \"list my courses\". " +
+                 "List the teacher's courses in this working folder: code, name, sections, and where each one publishes to. " +
                  "Call this first when the teacher mentions a course but you are not certain of its exact code.")]
     public string ListCourses()
     {
@@ -162,9 +178,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                    Destructive = false, Idempotent = true)]
     [Description("Call this FIRST, before doing anything else with a section. It returns a short explanation of " +
                  "what publishing and deploying mean in Plantoir — say it to the teacher word for word. " +
-                 "It only returns the explanation the first time for a given section; after that it says so and " +
-                 "you should get straight on with what they asked. Never re-explain a section you have been told " +
-                 "is already covered.")]
+                 "It only returns the explanation the first time for a given section in this conversation; after " +
+                 "that it says so and you should get straight on with what they asked. Never re-explain a section " +
+                 "you have been told is already covered.")]
     public string ExplainPublishing(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section)
@@ -172,15 +188,18 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var found = workspace.Course(course);
             int number = workspace.Section(found, section);
-            if (Briefing.AlreadyExplained(workspace.FolderPath, found.Code, number))
-                return $"{found.Code} Section {number} has had this explained already. " +
-                       "Don’t repeat it — carry on with what the teacher asked.";
+
+            // Said once per section per CONVERSATION, and the sentence for the
+            // second asking is written for a TEACHER: "what does publishing
+            // mean?" is a fixed phrasing now, matched in code, so the caller
+            // here need not be a model at all.
+            if (workspace.NoteExplainedThisConversation(found.Code, number))
+                return AssistWording.PublishingAlreadyExplained(found.Code, number.ToString());
 
             // The SAME answer a deploy gives, so the briefing cannot promise
             // one destination while the deploy uses another — and a folder is
             // named rather than described, since "the folder you publish into"
             // tells a teacher with two courses nothing at all.
-            Briefing.MarkExplained(workspace.FolderPath, found.Code, number);
             return Briefing.Words(found.Code, number, AssistWorkspace.DestinationOf(found));
         });
 
@@ -340,9 +359,16 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
             var plan = workspace.PlanScheduledDeploy(course, section, moment);
-            var deployArgs = DeployCommand.Arguments(plan.CourseCode, plan.SectionNumber, workspace.Course(plan.CourseCode).Configuration);
+            // The Cloudflare Account ID is a per-teacher, machine-global
+            // setting, read the same way PlanScheduledDeploy's own refusal
+            // check does — omitting it here would schedule a Cloudflare
+            // deploy with an empty --account, even once the refusal check
+            // above had already confirmed a real one was configured.
+            string cloudflareAccountId = AppSettings.Load().CloudflareAccountId;
+            var scheduledCourse = workspace.Course(plan.CourseCode);
             if (TaskScheduling.Schedule(plan.TaskName, workspace.FolderPath,
-                                        plan.CourseCode, plan.SectionNumber, moment, deployArgs) is { } problem)
+                                        plan.CourseCode, plan.SectionNumber, moment, scheduledCourse.DirectoryPath,
+                                        scheduledCourse.Configuration.AllDeployDestinations, cloudflareAccountId) is { } problem)
                 throw new AssistRefusal($"Nothing was scheduled. {problem}");
 
             // The caution about the computer being awake is on the card the
@@ -436,13 +462,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "course installed without curriculum still builds. Call plan_curriculum_mentions FIRST and get " +
                  "the teacher's agreement to the specific codes. Changes nothing else on the page, and changes " +
                  "no page's visibility. The course is backed up first.")]
-    public string AddCurriculumMentions(
+    public CallToolResult AddCurriculumMentions(
         [Description("The course code, for example ADA1O.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("The page title, for example \"Movement Concepts\".")] string page,
         [Description("The expectation codes to add, separated by commas — for example \"A1.1, A2.2\".")]
         string codes)
-        => Guarded(() =>
+        => GuardedResult(() =>
         {
             var plan = workspace.PlanCurriculumMentions(course, section, page,
                 codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -450,6 +476,27 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         });
 
     private const string UnitHelp = "The unit number these classes belong to, for example 2.";
+
+    /// <summary>
+    /// The argument behind "duplicate Unit 3, Day 2 as my next class".
+    ///
+    /// <para>Declared on both halves of <c>add_next_class</c> and DECLARED is
+    /// the operative word: the MCP binder drops an argument the method does
+    /// not take rather than refusing it, so before this existed the sentence
+    /// the prompt shelf offers ran as a plain "add the next class" and made a
+    /// BLANK page where a teacher had asked for a copy of a lesson, with
+    /// nothing anywhere reporting a fault (issue #149).</para>
+    ///
+    /// <para>The local model never sees it — <c>AssistAgent.CardOnlyArguments</c>
+    /// strips it from the narrowed schema — because <c>add_next_class</c> IS in
+    /// that model's thirteen tools and an argument it can invent is a routing
+    /// change nobody measured. The fixed phrasing fills it in code, which is
+    /// the only way it is ever set.</para>
+    /// </summary>
+    private const string DuplicateHelp =
+        "The title of a numbered class page to copy, for example \"Unit 3, Day 2\". The copy becomes that " +
+        "page's next day, dated to the day the section next meets, and starts hidden. Leave empty for an " +
+        "ordinary blank next class page.";
 
     [McpServerTool(Name = "plan_make_room_for_classes", Title = "Plan making room for classes",
                    ReadOnly = true, Destructive = false)]
@@ -460,29 +507,45 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "\n\nThis is the most far-reaching change there is — it renames pages other pages link to — so " +
                  "read the whole plan to the teacher, word for word, and wait. The link count especially: they " +
                  "cannot check that themselves without opening every page in the course.")]
-    public string PlanMakeRoomForClasses(
+    public CallToolResult PlanMakeRoomForClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
         [Description("The day number the new class takes. Existing days from here on are renumbered.")] int atDay,
         [Description("How many classes to make room for. 1 unless the teacher asked for more.")] int howMany = 1)
-        => Guarded(() => workspace.PlanInsertClasses(course, section, unit, atDay, howMany).Describe());
+        // MARKED as a plan, which a bare string is not. Until 2026-09-09 this
+        // returned one, and that was invisible while only an MCP client called
+        // it — Claude Code reads the words either way. Plantoir's own window
+        // does not: AssistAgent.ShowPlan reads an unmarked answer as a REFUSAL,
+        // prints it, and never offers Go. So the moment "make room for a class
+        // at Unit 3, Day 4" became a fixed phrasing with a plan twin, an
+        // unmarked plan would have made the tool unrunnable from the app — a
+        // plan a teacher could read and never accept.
+        => Guarded(() =>
+        {
+            var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
+            return plan.ChangesNothing
+                ? Answering(plan.Describe())
+                : Proposing(plan.Describe());
+        });
 
     [McpServerTool(Name = "make_room_for_classes", Title = "Make room for classes",
                    Destructive = false, Idempotent = false)]
-    [Description("Insert one or more classes part-way through a unit: rename the later days of that unit, " +
+    [Description("TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". " +
+                 "Insert one or more classes part-way through a unit: rename the later days of that unit, " +
                  "update every link that pointed at them, move the classes that follow onto later class days, " +
                  "and create the new pages unpublished. " +
                  "\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is " +
-                 "backed up first and undo_last_change reverses the whole thing. Afterwards, tell them to look " +
+                 "backed up first, and the backup is the way back: because this moves and renames many pages " +
+                 "at once, undo_last_change does NOT reverse it. Afterwards, tell them to look " +
                  "the section over in Plantoir before deploying — many pages moved at once.")]
-    public string MakeRoomForClasses(
+    public CallToolResult MakeRoomForClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
         [Description("The day number the new class takes. Existing days from here on are renumbered.")] int atDay,
         [Description("How many classes to make room for. 1 unless the teacher asked for more.")] int howMany = 1)
-        => Guarded(() =>
+        => GuardedResult(() =>
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
             return workspace.ApplyInsertClasses(plan).Message;
@@ -495,37 +558,52 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "\"add Unit 2 Days 1 through 10\". Dates come from the section's remembered timetable, skipping " +
                  "days already taken by an existing class, so the new unit follows on from the work already there. " +
                  "Show the teacher what it says, word for word, then wait.")]
-    public string PlanAddClasses(
+    public CallToolResult PlanAddClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
-        [Description("How many class pages to add.")] int howMany,
-        [Description("The day number to start at within the unit. 1 unless the earlier days already exist.")]
-        int firstDay = 1)
-        => Guarded(() => workspace.PlanAddClasses(course, section, unit, firstDay, howMany).Describe());
+        [Description("How many class pages to add.")] int howMany)
+        // MARKED, for the reason `plan_make_room_for_classes` is: a bare
+        // string cannot carry the mark, and `AssistAgent.ShowPlan` reads an
+        // unmarked answer as a REFUSAL. `add_classes` is reached by no fixed
+        // phrasing today, so no teacher can meet it — which is exactly the
+        // state the make-room twin was in until the day it gained one.
+        => Guarded(() =>
+        {
+            var plan = workspace.PlanAddClasses(course, section, unit,
+                                                workspace.DayToCarryOnFrom(course, section, unit), howMany);
+            return plan.ChangesNothing
+                ? Answering(plan.Describe())
+                : Proposing(plan.Describe());
+        });
 
     [McpServerTool(Name = "add_classes", Title = "Add class pages", Destructive = false, Idempotent = false)]
-    [Description("Create the class pages for a unit, dated to the days the section actually meets. " +
+    [Description("TEACHERS SAY: \"add five more days to Unit 4\". " +
+                 "Create the class pages for a unit, dated to the days the section actually meets. " +
                  "Call plan_add_classes FIRST and show the teacher what it said. " +
                  "\n\nThe pages are created UNPUBLISHED — empty skeletons for the teacher to write, which stay out " +
                  "of the site until they publish them. An existing page is never written over. The course is " +
                  "backed up first, and undo_last_change removes what this created.")]
-    public string AddClasses(
+    public CallToolResult AddClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
-        [Description("How many class pages to add.")] int howMany,
-        [Description("The day number to start at within the unit. 1 unless the earlier days already exist.")]
-        int firstDay = 1)
-        => Guarded(() =>
+        [Description("How many class pages to add.")] int howMany)
+        => GuardedResult(() =>
         {
-            var plan = workspace.PlanAddClasses(course, section, unit, firstDay, howMany);
+            // Where the unit CARRIES ON from, worked out here rather than
+            // asked of the caller — see AssistWorkspace.DayToCarryOnFrom for
+            // what the argument this replaced got wrong.
+            var plan = workspace.PlanAddClasses(course, section, unit,
+                                                workspace.DayToCarryOnFrom(course, section, unit), howMany);
             return workspace.ApplyAddClasses(plan).Message;
         });
 
     [McpServerTool(Name = "plan_add_next_class", Title = "Plan adding the next class",
                    ReadOnly = true, Destructive = false)]
-    [Description("Work out what the next class page would be called and what date it would land on, " +
+    [Description("TEACHERS SAY: \"what would the next class page be?\", \"which day comes next?\", " +
+                 "\"show me before you add it\". " +
+                 "Work out what the next class page would be called and what date it would land on, " +
                  "changing nothing. Use this for \"add the next class\" or \"start a new unit for the next class\". " +
                  "The title continues the highest unit's count; the date is the next unused day in the section's timetable.")]
     public CallToolResult PlanAddNextClass(
@@ -534,9 +612,18 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("Pass \"next\" to start a new unit. Leave empty to continue the current unit.")]
         string unit = "",
         [Description("Pass a number to add that many days to the specified unit number. Leave 0 for a single class.")]
-        int days = 0)
+        int days = 0,
+        [Description(DuplicateHelp)] string duplicate = "")
         => Guarded(() =>
         {
+            // FIRST, and the reason is that plan mode is ON unless a teacher
+            // has turned it off: the card's arguments reach the TWIN before
+            // they reach the write, so a twin that cannot see `duplicate`
+            // proposes an ordinary next class and the teacher approves
+            // something other than what runs.
+            if (!string.IsNullOrWhiteSpace(duplicate))
+                return Proposing(workspace.PlanDuplicateClass(course, section, duplicate).Describe());
+
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
             return plan.ChangesNothing
                 ? Answering("The next class page already exists.", plan.Describe())
@@ -544,7 +631,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         });
 
     [McpServerTool(Name = "add_next_class", Title = "Add the next class page", Destructive = false, Idempotent = false)]
-    [Description("Create the next class page, dated to the day the section next meets. " +
+    [Description("TEACHERS SAY: \"add an entry for the next class\", \"add tomorrow's class page\", " +
+                 "\"start the next class\", \"add the next class\", \"make a page for our next class\", " +
+                 "\"set up next day's lesson\". " +
+                 "Create the next class page, dated to the day the section next meets. " +
                  "Call plan_add_next_class FIRST and show the teacher what it said. " +
                  "The page starts UNPUBLISHED — an empty skeleton for the teacher to write, which stays out of the site " +
                  "until they publish it. An existing page is never written over.")]
@@ -554,9 +644,21 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("Pass \"next\" to start a new unit. Leave empty to continue the current unit.")]
         string unit = "",
         [Description("Pass a number to add that many days to the specified unit number. Leave 0 for a single class.")]
-        int days = 0)
+        int days = 0,
+        [Description(DuplicateHelp)] string duplicate = "")
         => Guarded(() =>
         {
+            // Branches FIRST, like the twin; `unit` and `days` mean nothing to
+            // a duplicate, which takes its unit and its day from the page
+            // being copied.
+            if (!string.IsNullOrWhiteSpace(duplicate))
+            {
+                var copying = workspace.PlanDuplicateClass(course, section, duplicate);
+                var duplicated = workspace.ApplyDuplicateClass(copying);
+                return Answering(ClassChangeWording.Duplicated(copying.SourceTitle, copying.NewTitle),
+                                 duplicated.Message);
+            }
+
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
             if (plan.ChangesNothing)
                 return Answering("Nothing needed adding — that page already exists.",
@@ -612,7 +714,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "read_remembered_timetable", Title = "What dates this section meets",
                    ReadOnly = true, Destructive = false)]
-    [Description("Read the class meeting dates Plantoir already knows for a section, changing nothing. " +
+    [Description("TEACHERS SAY: \"when does this class meet?\", \"what dates do you have for us?\", " +
+                 "\"do you know our timetable?\", \"how many class days are left?\". " +
+                 "Read the class meeting dates Plantoir already knows for a section, changing nothing. " +
                  "CALL THIS FIRST whenever you need to know when a section's classes fall — before asking the " +
                  "teacher for a timetable, and before any tool that needs dates. It is remembered from the last " +
                  "time they gave one.")]
@@ -759,17 +863,19 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "remember_timetable", Title = "Remember when a section meets",
                    Destructive = false, Idempotent = true)]
-    [Description("Write down the dates a section's classes fall on, so nobody has to ask again. Call this as soon " +
+    [Description("TEACHERS SAY: \"here are the days we meet\", \"remember our timetable\", " +
+                 "\"these are our class dates\", \"save these dates\". " +
+                 "Write down the dates a section's classes fall on, so nobody has to ask again. Call this as soon " +
                  "as a teacher tells you when their class meets, however they say it. Replaces anything recorded " +
                  "before, so send the WHOLE list every time, not just new dates. Dates are YYYY-MM-DD, separated " +
                  "by commas or spaces.")]
-    public string RememberTimetable(
+    public CallToolResult RememberTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("Every date this section meets, as YYYY-MM-DD, separated by commas.")] string dates,
         [Description("Where these came from, in the teacher's words — \"timetable.xlsx, block H\", \"typed in by hand\".")]
         string source = "the teacher")
-        => Guarded(() =>
+        => GuardedResult(() =>
         {
             var found = workspace.Course(course);
             int number = workspace.Section(found, section);
@@ -863,8 +969,32 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The first day of class, as YYYY-MM-DD. Meetings before it are ignored — a block runs all year, a section does not. Leave empty to use the whole block.")]
         string firstDay = "",
         [Description("The calendar year the school year starts in. Leave empty to work it out from today's date.")]
-        int startYear = 0)
-        => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: false, firstDay, cancellation);
+        int startYear = 0,
+        [Description("Either \"new\" or \"same\", when a teacher rolling this section over to a new year has said which website they want. Leave empty otherwise.")]
+        string website = "",
+        // `rollover` is on THIS server's schema and not on the mac's, and the
+        // reason is a platform fact rather than a preference. Plantoir's own
+        // assistant window reaches these tools through this process over
+        // JSON-RPC (McpClient.CallTool sends AssistCardCommand.ToJsonObject
+        // verbatim), and an argument the tool does not DECLARE is dropped by
+        // the SDK's binder — measured against ModelContextProtocol 2.2.0 by
+        // sending a made-up key: the call completed, IsError false, the key
+        // gone. So leaving `rollover` off the schema here would make the
+        // rollover phrasing run as an ordinary re-date, with nothing anywhere
+        // reporting a fault. The mac's card and its runner share a process, so
+        // no binder stands between them and it can keep the key off.
+        //
+        // Not avoidable by folding it into `website` either: cardPhrasings in
+        // contracts/assist-cases.json pins {"rollover":"yes"} on all three
+        // phrasings and AssistCardCommandTests asserts every key and value.
+        //
+        // Costs no routing accuracy — re_date_classes and its twin are not in
+        // AssistAgent.ForTheLocalModel, so no local model reads either schema.
+        // Recorded in AssistSurfaceContractTests' agreed departures.
+        [Description("Pass \"yes\" when this is a rollover to a new year rather than an ordinary re-dating, so the teacher is asked which website it should publish to.")]
+        string rollover = "")
+        => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: false, firstDay,
+                  cancellation, website, rollover);
 
     [McpServerTool(Name = "roll_over_section", Title = "Roll a section over to a new year",
                    Destructive = false, Idempotent = false)]
@@ -901,13 +1031,24 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var result = workspace.ApplyReDate(plan);
 
             var found = workspace.Course(course);
-            string? released = workspace.ReleaseSite(found, section);
 
+            // ONE code path with re_date_classes, not a second one saying the
+            // same things in the same order. The first draft of this had its
+            // own copy and got it wrong in the way a copy does: a marker that
+            // existed and could NOT be moved produced "this section had not
+            // been published anywhere yet" and "I could not move this section
+            // off ..." one after the other - two sentences contradicting each
+            // other about the one fact the feature turns on - and then wrote a
+            // trail line saying the section had been rolled onto a new website
+            // while it was still pinned to last year's. Found by review, not by
+            // testing, because no test drove that branch of THIS tool.
+            //
+            // `website: "new"` because that is what this tool IS: its own
+            // description promises it cuts the section loose, and a Claude Code
+            // session calling it has chosen already. The QUESTION belongs to
+            // the card phrasing, which reaches re_date_classes instead.
             var text = new StringBuilder(result.Message);
-            text.Append(released is null
-                ? "\nThis section had no website yet, so there was nothing to cut it loose from."
-                : $"\nCut loose from last year's website — the old details are kept at {released}. " +
-                  "Publishing this section from Plantoir will ask what to call the new site.");
+            text.Append("\n" + SettleTheWebsiteAfterARollover(found, section, "new", "yes"));
             text.Append("\n\nNothing was hidden. Preview the section and check the dates and structure look right, " +
                         "then decide what students should see.");
             if (plan.Problems.Count > 0)
@@ -927,7 +1068,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "class dates on file, by POSITION — the first class takes the first date — and move " +
                  "the pages each class uses onto that class's day with it. Pages this section's Key " +
                  "Links points at move to the first day of class. Curriculum pages are left alone, " +
-                 "because Plantoir dates those itself on every build.")]
+                 "because Plantoir dates those itself on every build. " +
+                 "Set `website` when the teacher is rolling a section over to a NEW YEAR and has said " +
+                 "which website they want: \"new\" starts a fresh one, so publishing no longer replaces " +
+                 "last year's site, and \"same\" keeps last year's address. Ask them first — never choose " +
+                 "for them, and leave it out for an ordinary re-dating.")]
     public Task<CallToolResult> ReDateClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -941,12 +1086,37 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The first day of class, as YYYY-MM-DD. Meetings before it are ignored — a block runs all year, a section does not. Leave empty to use the whole block.")]
         string firstDay = "",
         [Description("The calendar year the school year starts in. Leave empty to work it out from today's date.")]
-        int startYear = 0)
-        => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: true, firstDay, cancellation);
+        int startYear = 0,
+        [Description("Either \"new\" or \"same\", when a teacher rolling this section over to a new year has said which website they want. Leave empty otherwise.")]
+        string website = "",
+        // `rollover` is on THIS server's schema and not on the mac's, and the
+        // reason is a platform fact rather than a preference. Plantoir's own
+        // assistant window reaches these tools through this process over
+        // JSON-RPC (McpClient.CallTool sends AssistCardCommand.ToJsonObject
+        // verbatim), and an argument the tool does not DECLARE is dropped by
+        // the SDK's binder — measured against ModelContextProtocol 2.2.0 by
+        // sending a made-up key: the call completed, IsError false, the key
+        // gone. So leaving `rollover` off the schema here would make the
+        // rollover phrasing run as an ordinary re-date, with nothing anywhere
+        // reporting a fault. The mac's card and its runner share a process, so
+        // no binder stands between them and it can keep the key off.
+        //
+        // Not avoidable by folding it into `website` either: cardPhrasings in
+        // contracts/assist-cases.json pins {"rollover":"yes"} on all three
+        // phrasings and AssistCardCommandTests asserts every key and value.
+        //
+        // Costs no routing accuracy — re_date_classes and its twin are not in
+        // AssistAgent.ForTheLocalModel, so no local model reads either schema.
+        // Recorded in AssistSurfaceContractTests' agreed departures.
+        [Description("Pass \"yes\" when this is a rollover to a new year rather than an ordinary re-dating, so the teacher is asked which website it should publish to.")]
+        string rollover = "")
+        => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: true, firstDay,
+                  cancellation, website, rollover);
 
     private async Task<CallToolResult> ReDate(string course, int section, string timetable, string block,
                                               string[]? pages, int[]? meetings, int startYear, bool apply,
-                                              string firstDay, CancellationToken cancellation)
+                                              string firstDay, CancellationToken cancellation,
+                                              string website = "", string rollover = "")
     {
         try
         {
@@ -971,20 +1141,66 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var plan = workspace.PlanReDate(course, section, parsed,
                 pages ?? Array.Empty<string>(), meetings ?? Array.Empty<int>());
 
+            bool isRollover = IsARollover(website, rollover);
+            string already = $"Every page in {found.Code} Section {number} is already on the day it should be.";
+
             if (!apply)
             {
+                // A ROLLOVER carrying an answer is still a PLAN even when the
+                // dates are already right, and this is what makes the answer
+                // turn work at all under plan mode — which is ON unless a
+                // teacher has turned it off. AssistAgent.ShowPlan returns early
+                // whenever the twin hands back something that is not a plan, so
+                // answering "already on the day it should be" here means the
+                // real call never runs and the website is never settled. In the
+                // default configuration that makes the release unreachable.
                 if (plan.ChangesNothing)
                 {
-                    string already = $"Every page in {found.Code} Section {number} is already on the day it should be.";
-                    return Answering(already);
+                    if (!isRollover) return Answering(already);
+                    // A ROLLOVER with no answer yet, on a section whose dates
+                    // are already right. Found by review, and it is the mirror
+                    // of the trap above: with confirmation ON - the default -
+                    // the plan twin is where the request STOPS, so a plan that
+                    // says nothing about the website means the question is
+                    // never asked at all. The teacher reads "everything is
+                    // already on the right day" and the section stays pinned to
+                    // last year's site. It is exactly the state a teacher
+                    // reaches on their SECOND attempt: roll over, ignore the
+                    // question, come back and ask again.
+                    //
+                    // Answered rather than proposed, because there is nothing
+                    // to say yes to: the dates need no change, and the website
+                    // is settled by saying one of the two sentences rather than
+                    // by pressing Go. The mac had this hole too and closed it
+                    // on 2026-09-09 (issue #120); its shape matches this one.
+                    if (!AnAnswerWasGiven(website))
+                        return Answering(already + "\n\n" + AskingWhichWebsite(),
+                                         already + "\n\n" + AskingWhichWebsite());
+                    return Proposing(already + "\n\n" + WhatSettlingTheWebsiteWouldDo(website));
                 }
-                return Proposing(plan.Describe());
+                // Dates DO change, so Go is a real decision and the question
+                // arrives with the result afterwards - which is what the mac
+                // does, and why nothing is added here for the bare phrasing.
+                return Proposing(isRollover && WouldStartANewWebsite(website)
+                    ? plan.Describe() + "\n\nIt would also " + WhatStartingANewWebsiteDoes()
+                    : plan.Describe());
             }
 
             if (plan.ChangesNothing)
             {
-                string already = $"Every page in {found.Code} Section {number} is already on the day it should be.";
-                return Answering(already);
+                // The website is settled HERE TOO, and this is the SECOND TURN
+                // of the conversation. A teacher answers the website question by
+                // saying one of the two sentences, which comes back through this
+                // same tool — and by then the pages are already on their dates,
+                // so the plan changes nothing. Returning early made the answer a
+                // no-op: the reply talked about dates, never mentioned the
+                // website, and left the section pinned to last year's. An offer
+                // that looks like it worked is worse than no offer at all.
+                string aboutTheWebsiteOnly = SettleTheWebsiteAfterARollover(
+                    found, number, website, rollover);
+                if (aboutTheWebsiteOnly.Length == 0) return Answering(already);
+                string bothHalves = already + "\n\n" + aboutTheWebsiteOnly;
+                return Answering(bothHalves, bothHalves);
             }
 
             var result = workspace.ApplyReDate(plan);
@@ -997,11 +1213,219 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                             $"\n\n{AssistWorkspace.BackedUpNote}" +
                             "\n\nNothing was published or hidden, so students see no change until you deploy.";
 
+            // The website goes in the SUMMARY as well as the detail: the
+            // summary is the one line the teacher reads in the chat window, and
+            // this is the part they have to answer. Put only in `detail` it
+            // would work over MCP and be invisible in the app.
+            string aboutTheWebsite = SettleTheWebsiteAfterARollover(found, number, website, rollover);
+            if (aboutTheWebsite.Length > 0)
+            {
+                summary += "\n\n" + aboutTheWebsite;
+                detail += "\n\n" + aboutTheWebsite;
+            }
+
             return Answering(summary, detail);
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return Answering(refusal.Message); }
     }
+
+    // ---- The one question a rollover asks --------------------------------
+
+    /// <summary>
+    /// Whether this call is a rollover at all.
+    /// </summary>
+    /// <remarks>
+    /// Either the app's card phrasing said so, or a caller answered the
+    /// question outright. Over MCP there is no card, so <c>website</c> alone
+    /// has to be enough — otherwise the one surface that cannot show a sheet
+    /// also cannot roll a section over, which is the hole this design closes.
+    /// An ordinary re-date sets neither and is untouched: three of the four
+    /// phrasings reaching this tool are a snow day or a shifted timetable, and
+    /// asking THOSE about websites would let a teacher answer "a new website"
+    /// mid-semester and abandon the address students are reading right now.
+    /// </remarks>
+    private static bool IsARollover(string website, string rollover) =>
+        string.Equals(rollover, "yes", StringComparison.OrdinalIgnoreCase)
+        || !string.IsNullOrWhiteSpace(website);
+
+    private static bool AnAnswerWasGiven(string website) =>
+        string.Equals(website, "new", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(website, "same", StringComparison.OrdinalIgnoreCase);
+
+    private static bool WouldStartANewWebsite(string website) =>
+        string.Equals(website, "new", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The half-sentence the two plan wordings share.</summary>
+    /// <remarks>
+    /// Word for word the mac's, so a teacher reading a plan on either app
+    /// reads the same thing. NEITHER app's copy is in
+    /// <c>contracts/assist-wording.json</c> - the generator does not reach a
+    /// tool runner's plan prose - which is GitHub issue #127 rather than
+    /// papered over with a second home for the string here. (#83 landed the
+    /// generator change for tool SCHEMA departures; it does not reach this.)
+    /// </remarks>
+    private static string WhatStartingANewWebsiteDoes() =>
+        "start a new website for this section, so publishing it no longer replaces last year's. " +
+        "Last year's details are kept, and any publish set to happen on its own is turned off.";
+
+    /// <summary>What a plan says the website half would do.</summary>
+    private static string WhatSettlingTheWebsiteWouldDo(string website) =>
+        WouldStartANewWebsite(website)
+            ? "Start a new website for this section, so publishing it no longer replaces last " +
+              "year's. Last year's details are kept, and any publish set to happen on its own " +
+              "is turned off."
+            : "Keep publishing this section to the same website as last year.";
+
+    /// <summary>
+    /// The question, the two sentences that answer it, and the plain statement
+    /// that nothing about the website has changed.
+    /// </summary>
+    /// <remarks>
+    /// One home, because it is said from TWO places: the plan twin, when the
+    /// dates are already right and the twin is where the request stops, and the
+    /// write itself. A second copy is the one that keeps saying the old words
+    /// after the product changes them.
+    /// </remarks>
+    private static string AskingWhichWebsite() =>
+        AssistWording.RolloverWebsiteQuestion + "\n\n"
+        + $"Say \u201c{AssistWording.RolloverSayToStartANewWebsite}\u201d or "
+        + $"\u201c{AssistWording.RolloverSayToKeepTheSameWebsite}\u201d.\n\n"
+        + AssistWording.RolloverWebsiteNotDecided;
+
+    /// <summary>
+    /// What a rollover says about the website, and what it does about it.
+    /// Returns the empty string for an ORDINARY re-date, which must never be
+    /// asked.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>The question is answered by SAYING one of two things, not by a
+    /// dialog, and that is the whole design.</b> A dialog cannot appear for a
+    /// request arriving over MCP — and this server advertises the rollover
+    /// phrasing to Claude Code — so a dialog would leave that path silently
+    /// pinned to last year's site with the write already done. Answering in
+    /// words works identically in both clients, and the reply always states
+    /// which of the two happened, so a question nobody answers is visible
+    /// rather than silent.</para>
+    /// </remarks>
+    private string SettleTheWebsiteAfterARollover(
+        Course course, int sectionNumber, string website, string rollover)
+    {
+        if (!IsARollover(website, rollover)) return "";
+
+        if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase))
+        {
+            ActivityTrail.Note(
+                ActivityTrail.Event.SectionKeptItsWebsite,
+                "kept last year's website when rolling the section over",
+                course.Code, sectionNumber);
+            return AssistWording.RolloverKeptTheSameWebsite;
+        }
+
+        if (!WouldStartANewWebsite(website))
+        {
+            // Asked, and NOT acted on. The sentence says both halves: what was
+            // not changed, and how to change it.
+            //
+            // Reached by a bare rollover AND by a `website` value that is
+            // neither "new" nor "same" - a caller sending "a new one", which is
+            // an ordinary thing for a model to do, gets the question back
+            // rather than an ordinary re-date with the website silently
+            // untouched. That is the same silent-drop failure the schema
+            // argument above is about, one layer up. Shared with the mac.
+            return AskingWhichWebsite();
+        }
+
+        var released = workspace.ReleaseSite(course, sectionNumber);
+        if (!released.ReleasedAnything)
+        {
+            // Still pinned is NOT the same as never published, and telling a
+            // teacher the wrong one of those is telling them the opposite of
+            // the truth about the only fact this feature turns on.
+            if (released.SomethingIsStillPinned)
+                return AssistWording.RolloverCouldNotStartANewWebsite(
+                    string.Join(", ", released.StillPinned));
+
+            NoteTheWebsiteOnTheTrail(released, course.Code, sectionNumber);
+            return AssistWording.RolloverHadNoWebsiteYet;
+        }
+
+        string said = AssistWording.RolloverStartedANewWebsite(string.Join(", ", released.KeptFiles));
+        // Some destinations released and others not: say so, rather than
+        // letting the success sentence stand for the whole section.
+        if (released.SomethingIsStillPinned)
+            said += "\n\n" + AssistWording.RolloverCouldNotStartANewWebsite(
+                string.Join(", ", released.StillPinned));
+
+        switch (TurnOffAnyScheduledPublish(course.Code, sectionNumber))
+        {
+            case ScheduledPublishOutcome.NoneWasSet: break;
+            case ScheduledPublishOutcome.TurnedOff:
+                said += "\n\n" + AssistWording.RolloverTurnedOffTheScheduledPublish; break;
+            case ScheduledPublishOutcome.CouldNotTurnOff:
+                said += "\n\n" + AssistWording.RolloverCouldNotTurnOffTheScheduledPublish; break;
+        }
+
+        NoteTheWebsiteOnTheTrail(released, course.Code, sectionNumber);
+        return said;
+    }
+
+    /// <summary>
+    /// One trail line per rollover that started a new website, saying where
+    /// last year's details went — or that there were none.
+    /// </summary>
+    /// <remarks>
+    /// Recorded HERE rather than in the app, because this server is the single
+    /// place both Windows surfaces reach: Plantoir's own assistant window
+    /// drives it over stdio exactly as Claude Code does, so a line written in
+    /// the app would miss every request arriving from a terminal. (The mac
+    /// records the same two events from its own runner, which on that platform
+    /// IS the app.) This server already wrote the trail before these two
+    /// events — <c>LauncherRunner</c> does — so the known limit that comes
+    /// with it is pre-existing rather than introduced here:
+    /// <c>AppDataRoot</c> is per-process, so a run started with
+    /// <c>--state-dir</c> does not redirect this server's copy.
+    /// </remarks>
+    private static void NoteTheWebsiteOnTheTrail(
+        AssistWorkspace.SiteRelease released, string courseCode, int sectionNumber)
+    {
+        ActivityTrail.Note(
+            ActivityTrail.Event.SectionStartedANewWebsite,
+            released.ReleasedAnything
+                ? "rolled the section over onto a new website — last year's details kept at "
+                  + string.Join(", ", released.KeptFiles)
+                : "rolled the section over onto a new website — it had not been published anywhere yet",
+            courseCode, sectionNumber);
+    }
+
+    /// <summary>
+    /// Turn off a publish that was set to happen on its own, and say whether
+    /// there was one.
+    /// </summary>
+    /// <remarks>
+    /// <b>Not politeness — the alternative is a website nobody named going
+    /// live.</b> A section cut loose has no agreed website to publish TO, and a
+    /// scheduled run has nobody to ask: the wrapper re-checks nothing, and
+    /// <c>deploy.py</c>'s name prompt returns its DEFAULT when there is no
+    /// terminal rather than failing. So the overnight run would create
+    /// <c>&lt;code&gt;-s&lt;n&gt;-&lt;year&gt;-&lt;name&gt;</c> and publish there,
+    /// while the address the teacher's students actually read quietly stopped
+    /// updating.
+    /// </remarks>
+    private static ScheduledPublishOutcome TurnOffAnyScheduledPublish(string courseCode, int sectionNumber)
+    {
+        string taskName = TaskScheduling.NameFor(courseCode, sectionNumber);
+        if (!TaskScheduling.Exists(taskName)) return ScheduledPublishOutcome.NoneWasSet;
+        // The failure is REPORTED, never swallowed: a task left behind runs at
+        // its appointed time, with nobody to ask what the new website should be
+        // called — the whole thing turning it off exists to prevent.
+        return TaskScheduling.Cancel(taskName) is null
+            ? ScheduledPublishOutcome.TurnedOff
+            : ScheduledPublishOutcome.CouldNotTurnOff;
+    }
+
+    /// <summary>What became of a publish that was set to happen on its own.</summary>
+    private enum ScheduledPublishOutcome { NoneWasSet, TurnedOff, CouldNotTurnOff }
 
     private static async Task<Timetable> Load(string timetable, string block, int startYear,
                                               CancellationToken cancellation, string firstDay = "")
@@ -1036,12 +1460,12 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("Set the date of the pages a class links to, to match that class. The course is backed up first, " +
                  "automatically. Only call this after plan_sync_page_dates and after the teacher has agreed. " +
                  "This changes dates only — nothing is published, and no page's visibility changes.")]
-    public string SyncPageDates(
+    public CallToolResult SyncPageDates(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("Class page titles whose linked pages should be brought into date. Leave empty for all.")]
         string[]? classes = null)
-        => Guarded(() =>
+        => GuardedResult(() =>
         {
             var plan = workspace.PlanSyncDates(course, section, classes ?? Array.Empty<string>());
             var result = workspace.ApplySyncDates(plan);
@@ -1107,7 +1531,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private CallToolResult? WholeUnitPlan(string course, int section, string[]? pages, bool publishing)
     {
         if (pages == null || pages.Length != 1) return null;
-        int? unit = PublishPlan.UnitNamed(pages[0]);
+        int? unit = PublishPlan.UnitNamed(pages[0], workspace.UnitWordForCourse(course));
         if (unit == null) return null;
 
         var result = workspace.PlanWholeUnit(course, section, unit.Value, publishing);
@@ -1137,7 +1561,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                    ReadOnly = true, Destructive = false)]
     [Description("List what this conversation has changed, newest first, so the teacher can see what could be " +
                  "taken back. This history is only kept while this conversation is open. Anything older lives in " +
-                 "Plantoir's Backups list, which is made before every change.")]
+                 "Plantoir's Backups list, which is made before a conversation's first change.")]
     public string ListRecentChanges()
     {
         var entries = workspace.History?.Entries;
@@ -1166,7 +1590,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "else. Can be called more than once to step further back. " +
                  "\n\nOnly changes made in THIS conversation can be undone this way; the history is not kept " +
                  "afterwards. For anything older, Plantoir's Backups list has a full copy of the course taken " +
-                 "before each change. " +
+                 "before the conversation's first change. " +
                  "\n\nIf the teacher had already published the section themselves, undoing the pages does not " +
                  "un-publish the live site — they need to publish again in Plantoir to bring it back in step.")]
     public CallToolResult UndoLastChange()
@@ -1232,7 +1656,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(ClassDateHelp)] string date)
-        => Guarded(() => Proposing(PlanForDay(course, section, date, publishes: true)));
+        => Guarded(() => Proposing(PlanForDay(course, section, DayFor(date), publishes: true)));
 
     [McpServerTool(Name = "publish_class_on", Title = "Publish a day's class",
                    Destructive = false, Idempotent = true)]
@@ -1256,10 +1680,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     {
         try
         {
-            var plan = PlanForDay(course, section, date, preview);
+            var day = DayFor(date);
+            var plan = PlanForDay(course, section, day, preview);
             if (plan.NothingToDoSentence is { } already) return Answering(already);
 
-            var result = await workspace.Apply(plan, Relay(progress), cancellation);
+            var result = await workspace.Apply(plan, preview, Relay(progress), cancellation);
 
             var text = new StringBuilder(result.Message);
             if (plan.Index is { WillChange: true } index)
@@ -1268,20 +1693,45 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // The teacher named a DAY, so the day is what they are told about.
             // Which pages that turned out to mean, and what happened to the
             // section's front page, are the model's business.
+            // The DAY that was settled on, never the word that was sent. A
+            // caller saying "tomorrow" would otherwise be told "Published the
+            // class on tomorrow", which is not a date anybody can check
+            // against their timetable a week later.
             return result.Succeeded
-                ? Answering($"Published the class on {date}.", text.ToString())
+                ? Answering($"Published the class on {day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.",
+                            text.ToString())
                 : Answering(text.ToString());
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
     }
 
-    private PublishPlan PlanForDay(string course, int section, string date, bool publishes)
+    /// <summary>
+    /// The class taught on a day, planned.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>A relative day is understood here too.</b> Plantoir's own
+    /// window settles "tomorrow" into a date before it ever reaches this
+    /// server (<c>AssistCardCommand.ToJsonObject</c>), so the words arrive
+    /// only from an MCP client - Claude Code, say - where nothing renames or
+    /// resolves anything. The mac's runner has always forgiven whatever
+    /// arrives; without this the two MCP surfaces would answer the same
+    /// sentence differently. It is the same shared reader the window uses, so
+    /// "monday" means one thing in this product.</para>
+    ///
+    /// <para>Tried BEFORE <see cref="ParseDate"/> and harmless: the reader is
+    /// strict, and hands back null for anything that is not one of its words
+    /// or a <c>yyyy-MM-dd</c> date.</para>
+    /// </remarks>
+    private DateOnly DayFor(string date) =>
+        SectionScheduleSource.ReadRelativeDay(date, Today())
+            ?? ParseDate(date, "date")
+            ?? throw new AssistRefusal("No date was given for the class to publish.");
+
+    private PublishPlan PlanForDay(string course, int section, DateOnly when, bool publishes)
     {
         var found = workspace.Course(course);
         int number = workspace.Section(found, section);
-        var when = ParseDate(date, "date")
-            ?? throw new AssistRefusal("No date was given for the class to publish.");
         string page = workspace.ClassOn(found, number, when);
 
         return workspace.PlanPublish(course, number,
@@ -1363,9 +1813,12 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("Make a full backup of one course, which the teacher can restore from inside Plantoir. " +
                  "Do this before any bulk editing of a course's files — including edits you make directly rather than " +
                  "through these tools. Course folders are not in version control, so a backup is the only undo.")]
-    public string BackUpCourse(
-        [Description("The course code, for example ICS3U.")] string course)
-        => Guarded(() => $"Backed up to {workspace.BackUp(course)}");
+    public CallToolResult BackUpCourse(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description("The section number, for example 1.")] int section)
+        => GuardedResult(() => AssistWording.BackedUpCourse(
+            workspace.Course(course).Code,
+            System.IO.Path.GetFileName(workspace.BackUp(course, section))));
 
     // ---- Shared ----------------------------------------------------------
 
@@ -1394,7 +1847,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             string verb = plan.Hiding ? "Unpublished" : "Published";
             string word = changing == 1 ? "page" : "pages";
 
-            var result = await workspace.Apply(plan, Relay(progress), cancellation);
+            var result = await workspace.Apply(plan, preview, Relay(progress), cancellation);
             return result.Succeeded
                 ? Answering($"{verb} {changing} {word}.", result.Message)
                 : Answering(result.Message);
@@ -1408,7 +1861,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         IProgress<ProgressNotificationValue> progress, CancellationToken cancellation)
     {
         if (pages == null || pages.Length != 1) return null;
-        int? unit = PublishPlan.UnitNamed(pages[0]);
+        int? unit = PublishPlan.UnitNamed(pages[0], workspace.UnitWordForCourse(course));
         if (unit == null) return null;
 
         var result = await workspace.ApplyWholeUnit(course, section, unit.Value, publishing, preview,
@@ -1466,24 +1919,52 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// teacher's chat window: one string cannot be short for a person and
     /// complete for a model at the same time.
     /// </summary>
-    private static CallToolResult Answering(string summary, string detail) => new()
+    private CallToolResult Answering(string summary, string detail) => CarryingTheConversationBackup(new()
     {
         Content = [new TextContentBlock { Text = detail }],
         Meta = new JsonObject { [AssistToolAnswer.TeacherSummaryKey] = summary },
-    };
+    });
 
     /// <summary>
     /// An answer that is the same words to both — every refusal, and every
     /// tool whose whole reply is already one sentence. No <c>_meta</c> is
     /// sent, and the client reads that absence as "show what you were given".
     /// </summary>
-    private static CallToolResult Answering(string both) => new()
+    private CallToolResult Answering(string both) => CarryingTheConversationBackup(new()
     {
         Content = [new TextContentBlock { Text = both }],
-    };
+    });
+
+    /// <summary>
+    /// Every answer after this conversation's first change names the copy
+    /// saved before it, under <see cref="AssistToolAnswer.ConversationBackupKey"/>.
+    /// Stamped by the two <c>Answering</c> builders and both <c>Proposing</c>
+    /// ones — the ONLY ways an answer is made here — rather than by
+    /// <c>Guarded</c>, because five tools (publish, whole-unit, publish-on,
+    /// re-date, roll-over's helpers) build their answers from their own
+    /// try/catch and never pass through it; a first draft stamped in
+    /// <c>Guarded</c> and the banner never appeared for a publish. The window
+    /// reads it to offer "Restore Section N…"; a refusal carries it too,
+    /// because the copy exists whether or not this call changed anything, and
+    /// Claude Code ignores <c>_meta</c> it does not know.
+    /// </summary>
+    private CallToolResult CarryingTheConversationBackup(CallToolResult result)
+    {
+        if (workspace.ConversationBackupPath is not { } backup) return result;
+        result.Meta ??= new JsonObject();
+        result.Meta[AssistToolAnswer.ConversationBackupKey] = backup;
+        return result;
+    }
+
+    /// <summary>
+    /// A WRITE tool that answers in one string. Wrapped into a result here
+    /// rather than left to the SDK, so the conversation's backup can ride in
+    /// <c>_meta</c> on its answer -- a string return has no <c>_meta</c>.
+    /// </summary>
+    private CallToolResult GuardedResult(Func<string> work) => Guarded(() => Answering(work()));
 
     /// <summary><see cref="Guarded(Func{string})"/>, for a tool that answers in two halves.</summary>
-    private static CallToolResult Guarded(Func<CallToolResult> work)
+    private CallToolResult Guarded(Func<CallToolResult> work)
     {
         try { return work(); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
@@ -1505,7 +1986,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// ahead" was being addressed as though they were the model, about
     /// machinery, directly above the asking it described.
     /// </summary>
-    private static CallToolResult Proposing(PublishPlan plan) =>
+    private CallToolResult Proposing(PublishPlan plan) =>
         plan.NothingToDoSentence is { } already
             ? Answering(already)
             : (plan.ChangesNothing && plan.UnknownNames.Count > 0)
@@ -1527,7 +2008,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// can be done invites a teacher to approve a dead end. The mac transcript
     /// that produced this rule shows them declining one four times in a row.
     /// </summary>
-    private static CallToolResult Proposing(string plan) => new()
+    private CallToolResult Proposing(string plan) => CarryingTheConversationBackup(new()
     {
         Content = [new TextContentBlock { Text = plan + "\n\n" + AskBeforeGoingAhead }],
         Meta = new JsonObject
@@ -1535,7 +2016,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             [AssistToolAnswer.TeacherSummaryKey] = plan,
             [AssistToolAnswer.IsPlanKey] = true,
         },
-    };
+    });
 
     /// <summary>Said to a caller that has no Go and Cancel of its own. Never to a teacher.</summary>
     private const string AskBeforeGoingAhead =

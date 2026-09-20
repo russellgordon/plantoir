@@ -11,9 +11,11 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Tech Headlines]] — security edition
-2. Explore: [[The Phishing Gallery]] — real or fake? Commit before you
-   check
-3. Compare and name it: [[Staying Secure Online]]
+2. Cold start: the message you brought from home. Real or fake,
+   committed on paper before anybody talks — four months on from
+   [[The Phishing Gallery]], that is how I find out which tells stuck
+3. Back to [[Staying Secure Online]]: the layer that is actually you,
+   and the tells the room still walks past
 4. Notes to your future self — the tell you will never unsee
 5. Log it in your [[Dev Journal]]
 

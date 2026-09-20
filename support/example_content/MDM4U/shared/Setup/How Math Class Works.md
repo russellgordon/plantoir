@@ -25,11 +25,17 @@ graph LR
 
 ## Number talk
 
-We open with ten minutes of mental mathematics — a
+Most classes open with ten minutes of mental mathematics — a
 [[Number Talks/index|number talk]] — done in heads, defended out
 loud. No pencils, no calculators, no single right method. The method
 you defend today becomes the method someone else reaches for
 tomorrow.
+
+About four classes in five have one. The days that do not are the ones
+that need every minute for something else: the retrieval clinics and
+the checkpoints at the end of each unit, the revision-and-journal day
+that follows each checkpoint, the symposium, and the review classes at
+the very end.
 
 ## Random groups, every day
 
@@ -78,10 +84,13 @@ in exam week having forgotten today. The
 
 ## Check your understanding, and the long thread
 
-Class ends with two or three questions you try alone, and your
-[[Math Journal]]. Not collected, not marked — they exist so that you,
-not the quiz next week, are the first to know what stuck and what
-needs [[Getting Help|another pass]].
+Class ends with two or three questions you try alone, and an entry in
+your [[Math Journal]] the same evening. Neither is marked — the
+journal entry that carries a mark is the milestone one you write in
+class at the end of each unit, and [[How Marks Work]] sets out why.
+The nightly pair exist so that you, not the checkpoint next week, are
+the first to know what stuck and what needs
+[[Getting Help|another pass]].
 
 One thing runs underneath all of it from the second unit onward:
 [[The Culminating Investigation]]. It is not a final assignment; it

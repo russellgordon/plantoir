@@ -140,3 +140,11 @@ size applies to your program too.
 > [[Writing About Data]] holds you to. And when an exact method
 > exists, the honest workflow is to do both and make them agree,
 > the way [[Checking Your Own Work]] insists.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.4]]
+
+![[B1.1]]
+%%curriculum-end%%

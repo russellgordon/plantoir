@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Predict which of the eight will dissolve, and commit it to paper
+1. Predict which of the eight will dissolve, and commit it to paper —
+   before any teaching, and not marked. Your predictions tell me which
+   part of Unit 1 survived the last two months
 2. Test all eight in water, then in the two other solvents provided
 3. Sort your results — what do the dissolvers have in common?
 4. Name it: [[Water and Solutions]] — polarity, read against your sorting

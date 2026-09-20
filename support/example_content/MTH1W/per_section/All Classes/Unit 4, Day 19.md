@@ -11,10 +11,11 @@ tags:
 ---
 ## Agenda
 
-1. Review, part one: fractions, percents, integers, powers — then
+1. Hand in your [[Math Journal]], with the [[Final Reflection]] in it
+2. Review, part one: fractions, percents, integers, powers — then
    expressions, equations, and lines
-2. Worked in random groups at the boards, then alone on paper
-3. By request: [[Fraction and Percent Practice]], [[Integer Practice]],
+3. Worked in random groups at the boards, then alone on paper
+4. By request: [[Fraction and Percent Practice]], [[Integer Practice]],
    [[Equation Practice]]
 
 ## Things to do before our next class

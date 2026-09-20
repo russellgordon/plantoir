@@ -15,7 +15,9 @@ tags:
    graph be saying?
 3. Read together: [[Our Classroom Norms]], then a quick tour with
    [[Using This Site]]
-4. Random groups — [[The Function Machine]] at the boards
+4. Random groups — [[The Function Machine]] at the boards. Nothing today
+   is marked: this is how I find out what Grade 10 actually left you with,
+   so the next fortnight can start where this room really is
 5. Consolidate: [[What Is a Function]] — and [[Function Notation]], the
    shorthand your group nearly invented on its own
 6. The daily rhythm we will live by: [[How Math Class Works]] — and

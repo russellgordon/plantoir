@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. **Period 5 of 10:** checkpoint — the plan approved, or sent back
+1. **Period 5 of 10:** the checkpoint — every plan read against the criteria and approved, or sent back in writing for [[The Civic Action Project]]
 2. Conferences, group by group
-3. Fixing whatever the checkpoint found
+3. The rest of the period is for fixing whatever the checkpoint found: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 
-- [ ] Revise the plan if it came back.
+- [ ] Nothing to write. If your plan came back, the first block of next period is for it.

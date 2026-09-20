@@ -83,6 +83,10 @@ actually evidence of.
    makes the report four times faster. All existing tests pass. Write
    the review comment you would leave, and say what would have to be
    true before you approve it.
+10. **Theoretical bounds.** Why is it impossible for any
+    comparison-based sorting algorithm to achieve a worst-case time
+    better than $O(n \log n)$? Model comparison sorting as a binary
+    decision tree and prove that the tree's height must be $\Omega(n \log n)$.
 
 ## Answers
 
@@ -219,4 +223,40 @@ actually evidence of.
 > is only safe once somebody has checked the assumption holds — the
 > argument in [[Testing and Regression]] and the whole point of
 > [[Read the Diff]].
+
+> [!success]- Answer 10
+> A comparison sort determines the permutation of $n$ distinct elements
+> by making binary comparisons ($a_i \le a_j$).
+>
+> 1. **Decision tree model**: Any comparison sort can be represented
+>    as a binary tree where each internal node is a comparison and each
+>    leaf is one permutation of the input.
+> 2. **Number of leaves**: There are $n!$ possible permutations of $n$
+>    items. To sort correctly, the tree must have at least $n!$ leaves
+>    ($L \ge n!$).
+> 3. **Tree height and comparisons**: A binary tree of height $h$ has
+>    at most $2^h$ leaves ($2^h \ge L \ge n!$). Taking the base-2
+>    logarithm of both sides:
+>    $$h \ge \log_2(n!)$$
+> 4. **Stirling's approximation**:
+>    $$\log_2(n!) = \sum_{i=1}^n \log_2 i \ge \sum_{i=n/2}^n \log_2(n/2) = \frac{n}{2}(\log_2 n - 1) = \Omega(n \log n)$$
+>
+> The height $h$ represents the worst-case number of comparisons.
+> Therefore, no comparison-based sort can have a worst-case time better
+> than $\Omega(n \log n)$. This is a **problem lower bound** (a limit
+> on *any* comparison sort) rather than an upper bound on one algorithm.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C2.1]]
+
+![[C2.2]]
+
+![[C2.3]]
+
+![[C2.4]]
+
+![[D4.2]]
+%%curriculum-end%%
 

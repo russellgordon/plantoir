@@ -62,7 +62,13 @@ then put the whole question to work in [[Whose Story Gets Taught|Whose Story Get
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D3.2]]
+
+![[D3.3]]
+
 ![[D3.5]]
+
+![[E1.3]]
 
 ![[E3.4]]
 

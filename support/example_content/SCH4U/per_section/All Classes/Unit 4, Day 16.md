@@ -13,6 +13,8 @@ tags:
 1. Retrieval clinic: an ICE calculation, a pH from a weak acid, and a
    buffer ratio — no notes
 2. Compare routes on the board
+3. In the last twenty minutes: the [[Showing Growth]] comparison,
+   written in class — the two pieces you chose, side by side
 
 ## Things to do before our next class
 

@@ -29,9 +29,9 @@ exactly what [[Math Journal]] asks the "what is foggy" prompt to do.
 ## Feelings are welcome — anchored to a moment and a method
 
 The journal is not a lab report; frustrated, proud, embarrassed, and
-delighted all belong in it. The rule is that a feeling arrives
-*attached to the moment that caused it and the method involved*.
-"I felt dumb" floats free and teaches you nothing in January. "I felt
+delighted all belong in it. The rule is that a feeling arrives *attached to
+the moment that caused it and the method involved*. "I felt dumb" floats
+free and teaches you nothing at the end of the course. "I felt
 dumb when everyone else had $4n + 3$ while I was still counting — so I
 asked Priya how she saw it" is a feeling with an address and an exit.
 The feeling is real data about you; the method is the handle you can

@@ -13,7 +13,7 @@ tags:
 1. [[Collisions in Two Dimensions (Lab)]] on the air table
 2. Resolving four velocity vectors — [[Collisions in Two Dimensions]]
 3. The right-angle result, and why it happens
-4. Video analysis time
+4. Video analysis: [[Analysing Video of Motion]]
 
 ## Things to do before our next class
 

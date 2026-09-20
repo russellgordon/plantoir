@@ -44,10 +44,10 @@ minutes down the road. These pages are what you read before and after.
 Turn up ready to work, boots on and phone away. Ask for the training
 before you touch the tool — nobody expects you to already know. Stop when
 something is wrong and say so, which is the most professional thing you
-will do all year. Keep [[The Evidence File]] current from week one. And
+will do all semester. Keep [[The Evidence File]] current from week one. And
 look after the person working next to you.
 
-## The shape of the year
+## The shape of the semester
 
 Four units: how living things grow; tools, measurement, and making;
 growing and producing; and the industry around us. It ends in

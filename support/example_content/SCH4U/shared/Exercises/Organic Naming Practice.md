@@ -350,4 +350,6 @@ of this: [[The Molecule Dossier]].
 ![[B2.1]]
 
 ![[B2.2]]
+
+![[B3.3]]
 %%curriculum-end%%

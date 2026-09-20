@@ -14,7 +14,6 @@ tags:
 2. [[Dance and Community Task]] presentations, first half
 3. Learning each other's eight counts
 4. Cool-down
-5. Cool-down
 
 ## Things to do before our next class
 

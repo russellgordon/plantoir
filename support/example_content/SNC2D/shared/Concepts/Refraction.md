@@ -125,7 +125,13 @@ put curved surfaces on the glass and see what happens in
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E1.1]]
+
+![[E1.2]]
+
 ![[E3.4]]
 
 ![[E3.7]]
+
+![[E3.8]]
 %%curriculum-end%%

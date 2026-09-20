@@ -16,6 +16,8 @@ tags:
 3. Consolidate: expected value as the mean of a distribution, not a
    prediction of any single outcome
 4. Practise: [[Distributions Practice]], first section
+5. Exit ticket, not marked: one distribution table built from a
+   two-line situation — it tells me who I sit with on Day 4
 
 ## Things to do before our next class
 

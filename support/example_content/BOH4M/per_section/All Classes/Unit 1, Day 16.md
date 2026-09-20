@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Ethics Brief]]
+1. Launch: [[The Ethics Brief]] — the criteria table read together before anyone chooses a company
 2. Stakeholder analysis applied to your own chosen issue
 3. Finding the documents: filings, releases, and what each is evidence of
-4. Research time
+4. Research time: gathering corporate filings and stakeholder evidence for [[The Ethics Brief]]
 
 ## Things to do before our next class
 

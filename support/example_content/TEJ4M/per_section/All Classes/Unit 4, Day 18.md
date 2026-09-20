@@ -10,10 +10,15 @@ tags:
 ---
 ## Agenda
 
-1. [[The Deployment]], day 6 — the client defence: fifteen minutes of
-   questions from another bench and from me
-2. Fix what you could not answer, then hand in
+1. First fifteen minutes: the fix each of you wrote for yourself
+   yesterday, done before the client arrives
+2. [[The Deployment]], day 6 — the client defence: fifteen minutes of
+   questions from another bench and from me, each of you answering for
+   your own area
+3. Fix what you could not answer, then hand in at the end of the
+   period
 
 ## Things to do before our next class
 
-- [ ] [[The Deployment]] submitted.
+- [ ] Journal: the client question you were least ready for, and what
+      you would have had to write down to be ready for it.

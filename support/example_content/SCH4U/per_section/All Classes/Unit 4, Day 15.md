@@ -20,6 +20,7 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Read [[Showing Growth]] and pick two entries that demonstrate it.
+- [ ] Bring the two pieces you chose for your [[Showing Growth]]
+      comparison; you write it next class.
 - [ ] Journal: the equilibrium idea you would use to explain this unit to
       a Grade 11 student.

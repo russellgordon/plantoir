@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval across Unit 3
+1. Retrieval across Unit 3: [[Systems That Do the Work]]
 2. Bench wind-down and clean
-3. Looking ahead: the industry around us
+3. Looking ahead: the industry around us: [[The Industry Nearby]]
 
 ## Things to do before our next class
 

@@ -61,7 +61,13 @@ for the conclusions they reached before they looked.
 
 ![[A1.1]]
 
+![[A1.2]]
+
 ![[A1.3]]
+
+![[A1.4]]
+
+![[A1.6]]
 
 ![[A1.9]]
 %%curriculum-end%%

@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Presentations: [[Motor and Generator Report]] — day 4
-2. One question from the floor for each group
-3. Consolidate: induction, transformers, and the grid outside the window
+1. Ten minutes to rehearse on another pair
+2. Presentations: [[Motor and Generator Report]] — day 4, and hand in
+   your report
+3. One question from me for each of you, answered on your own, then one
+   from the floor for the pair
+4. Consolidate: induction, transformers, and the grid outside the window
 
 ## Things to do before our next class
 

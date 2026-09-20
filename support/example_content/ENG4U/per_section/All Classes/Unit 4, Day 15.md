@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Comparative openings: three prompts, fifteen minutes each
-2. The opening the room judges strongest, and why
+1. Comparative openings: three prompts, fifteen minutes each: [[Comparative Argument]]
+2. The opening the room judges strongest, and why: [[The Comparative Essay]]
 
 ## Things to do before our next class
 

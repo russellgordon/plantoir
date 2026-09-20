@@ -18,4 +18,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Get your motor running if it is not yet.
-- [ ] Read [[Electromagnetic Induction]] before the last class.
+- [ ] Read [[Electromagnetic Induction]] before we run the motor
+      backwards, two classes from now.

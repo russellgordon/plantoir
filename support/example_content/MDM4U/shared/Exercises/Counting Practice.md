@@ -133,3 +133,15 @@ sentence right is the whole skill.
 > everything, so add them. That argument is the addition rule of
 > Pascal's triangle, and it is a proof about people rather than
 > algebra.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.1]]
+
+![[A2.2]]
+
+![[A2.3]]
+
+![[A2.4]]
+%%curriculum-end%%

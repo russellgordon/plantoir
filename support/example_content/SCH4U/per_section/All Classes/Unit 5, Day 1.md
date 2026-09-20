@@ -12,7 +12,9 @@ tags:
 
 1. Investigation: [[Building a Galvanic Cell]] — build it, then measure it
 2. Swap one metal at a time and build a ranking out of your own voltages
-3. Post the room's rankings — where do they agree, and where do they not?
+3. Post the room's rankings — where do they agree, and where do they
+   not? The disagreements are the diagnostic, and they set what Day 2
+   has to fix
 4. Only now open [[Reading a Reduction Potential Table]] and compare
 5. What your voltmeter measured that the table does not tell you
 

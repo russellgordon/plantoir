@@ -7,8 +7,8 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · ongoing all course · one entry after every class ·
-> collected at the end of each unit
+> Individual · ongoing all course · one entry after every class · one
+> milestone entry written in class at the end of each unit
 
 ## What you are making
 
@@ -41,15 +41,25 @@ and yours.
 
 ## Success criteria and collection
 
-The journal comes in each unit, read against these criteria —
-[[Journal Checklist]] turns them into a self-check before handing in.
+The **milestone entry** is the one that is evaluated: the last ten
+minutes of each unit's collection day, written here in class, looking
+back over the unit with the whole journal open in front of you. That is
+deliberate — an entry that counts towards your mark is written where I
+can see the work is yours and where you have the evidence to hand. The
+daily entries you write between classes are the raw material for it, and
+they are yours; per [[How Marks Work]], practice done at home is
+practice, and I do not mark it.
+
+The whole journal comes in alongside it, so that the milestone entry can
+point at things in it. Here is what the milestone entry is read against —
+[[Journal Checklist]] turns these into a self-check before handing in.
 
 | Quality | What it looks like |
 | --- | --- |
-| Regularity | An entry for every class, written close to the day |
+| Grounded | Claims point at dated entries, not at a general impression |
 | Honesty | Real fog named, not just victories |
 | Precision | Foggy things located, not just felt |
-| Growth | "What I would try" items reappear as things actually tried |
+| Growth | A "what I would try" item is traced to what happened when you tried it |
 
 %%curriculum-start%%
 ## Curriculum connection

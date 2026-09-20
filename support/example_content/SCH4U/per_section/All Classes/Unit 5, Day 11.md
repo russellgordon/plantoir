@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Showcase preparation, day 2: the questions you expect, and the ones
-   you would rather not be asked
+   you would rather not be asked — [[The Chemistry Showcase]]
 2. Practise being questioned: another group interrogates your numbers
-3. Fix the weakest answer
+3. Fix the weakest answer: [[The Cell Report]]
 
 ## Things to do before our next class
 

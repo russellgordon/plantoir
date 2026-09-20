@@ -15,10 +15,8 @@ tags:
    examination
 3. Consolidate: $y = a\sin(k(x - d)) + c$ — amplitude, period, phase
    shift, and axis, each by name
-4. Launch: [[The Tide Problem]] — real water, real clock
 
 ## Things to do before our next class
 
-- [ ] Read [[The Tide Problem]] and bring one question about the data.
 - [ ] Journal: which of the four letters your group trusts least, and
       why.

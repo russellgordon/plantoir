@@ -12,7 +12,7 @@ tags:
 
 1. [[The Interpretation]] handed in
 2. Two readings compared in class
-3. Studio time
+3. Studio time: sketchbook response reflecting on cultural perspectives and function in art
 
 ## Things to do before our next class
 

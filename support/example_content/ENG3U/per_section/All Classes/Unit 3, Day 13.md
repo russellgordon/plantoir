@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Comparative Response]], day 1 — the shape that is not
+1. Launch: [[The Comparative Response]], day 1 of 5 — the shape that is not
    alternation
 2. One question, two answers: drafting the claim that needs both texts
 

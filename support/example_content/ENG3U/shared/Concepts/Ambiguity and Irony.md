@@ -2,7 +2,8 @@
 title: Ambiguity and Irony
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - concepts
 ---
 Ambiguity is not vagueness and irony is not sarcasm. Both are precise
 tools for saying two things at once, and Grade 11 is where readers stop

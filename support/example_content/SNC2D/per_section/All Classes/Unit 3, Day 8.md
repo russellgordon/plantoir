@@ -12,7 +12,9 @@ tags:
 
 1. Warm-up: judge one graph in ninety seconds
 2. Practise: [[Climate Data Practice]] — real records, read honestly
-3. The tricks list, extended: axis, baseline, window, and the smoothed
+3. Classify our own region against a named system, and set it beside one
+   other in Canada and one outside it — question 9 on that page
+4. The tricks list, extended: axis, baseline, window, and the smoothed
    line nobody explained
 
 ## Things to do before our next class

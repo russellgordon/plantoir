@@ -273,4 +273,6 @@ these relationships yourself: [[Measuring a Gas Law]].
 ![[F2.3]]
 
 ![[F2.4]]
+
+![[F3.3]]
 %%curriculum-end%%

@@ -6,10 +6,11 @@ created: __CREATED__
 By the end of this course, you will be able to think computationally,
 understand the hardware and software woven through your life, write
 real programs in Python — and reason about what technology is doing to
-the world, not just in it. In the curriculum's own words, the three big
-threads are:
+the world, not just in it.
 
 %%curriculum-start%%
+In the curriculum's own words, the three big threads are:
+
 ![[A1. Computational Thinking, Planning, and Purpose]]
 
 ![[B4. Innovations in Digital Technology]]

@@ -34,9 +34,9 @@ starting the real thing three times.
 
 ## Date everything, keep the failures
 
-Put the date on every page. It costs two seconds and it turns the book
-into a record of change — by March you will be able to open it to October
-and see, precisely, what you could not do yet.
+Put the date on every page. It costs two seconds and it turns the book into
+a record of change — by the end of the course you will be able to open it to
+your earliest pages and see, precisely, what you could not do yet.
 
 Tearing out a page you dislike removes the evidence that you improved. This
 course expects your portfolio to show how your thinking changed, and a
@@ -49,7 +49,9 @@ picture into a document.
 
 Little and often beats a panicked evening. Ten minutes a day drawing the
 uninteresting things in front of you will do more for your hand than a
-weekend of effort, and [[The Sketchbook Habit]] is how it gets assessed.
+weekend at it. None of that is marked — [[The Sketchbook Habit]] is
+assessed on the pages made in studio periods, and it says which ones —
+but it is what makes those pages worth reading.
 
 Everything in this book eventually feeds [[The Portfolio]].
 [[Making Marks]] is where the loosest pages come from, and

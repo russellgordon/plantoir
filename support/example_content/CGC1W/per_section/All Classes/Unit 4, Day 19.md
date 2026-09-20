@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. **Day 2 of 4:** evidence
+1. **Day 2 of 4:** evidence for [[The Local Inquiry]]
 2. Site visits and data gathering — groups off-site or in the lab
-3. Recording sources as you go
+3. Recording sources as you go: [[Finding the Right Data]]
 
 ## Things to do before our next class
 

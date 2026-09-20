@@ -65,4 +65,8 @@ test the film itself in [[Reading a Primary Source]].
 ## Curriculum connection
 
 ![[B1.2]]
+
+![[D1.2]]
+
+![[E1.2]]
 %%curriculum-end%%

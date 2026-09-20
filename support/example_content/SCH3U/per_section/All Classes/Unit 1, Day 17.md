@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: four compounds on the board — which one does not belong,
-   and on what grounds?
+   and on what grounds? [[Naming and Formulas]]
 2. Consolidation: from an unknown element's position in the table,
-   predict its bonding, its formula with oxygen, and its name
+   predict its bonding, its formula with oxygen, and its name: [[The Periodic Table as an Argument]]
 3. Look ahead: from next class, substances start changing into other
    substances
 

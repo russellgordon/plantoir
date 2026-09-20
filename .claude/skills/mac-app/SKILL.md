@@ -9,31 +9,139 @@ Russell tests by **running the app on this Mac**, not by reading a diff and
 not inside Xcode's test runner. So a change is not delivered until the app is
 built and he has been told, in one line, what he has to do to see it.
 
-**Build it and LEAVE IT QUIT. Do not relaunch it for him.** This reverses the
-standing authorisation given on 2026-08-15, and the reason is worth keeping
-because it is not obvious from the code: **relaunching makes the app jump in
-front of whatever he is doing.** `open` activates, so a rebuild he did not ask
-for at that second steals focus from the window he was typing in. He launches
-from the Dock when he is ready to test, and that launch is his.
+**Standing order, 2026-08-22 — supersedes everything below about launching.**
+Russell has turned "Keep in Dock" on for Plantoir, so the app lives in his
+Dock permanently now. That changes the delivery mechanism entirely:
 
-Quit any copy YOU were driving, gracefully, so the app can stop its containers
-on the way out — then stop:
+- **Never launch it for him — not even if he asks you to.** This is
+  stronger than the old "leave it quit" default, which still had an
+  explicit exception for "he asked you to run it." That exception is
+  GONE. `open` steals focus from whatever he's doing, which was always the
+  reason not to relaunch unprompted — now it's the reason not to launch AT
+  ALL, because there's a better way: he clicks the SAME Dock icon he
+  already has, whenever he's ready.
+- **Instead, always make sure that Dock icon points at what you just
+  built.** See "Keep the Dock icon linked" below — most of the time this
+  needs no action, since `xcodebuild` keeps writing to the same
+  DerivedData path across ordinary rebuilds, but verify rather than
+  assume: it has silently drifted before.
+- **It's fine to force-quit a running copy while iterating, without
+  asking.** Russell settled this directly, 2026-08-22: "It's OK to close
+  Plantoir out from under my feet while we are iterating on a feature."
+  This replaces the earlier caution about a copy he might be actively
+  using — a `quit app "Plantoir"` that comes back "User canceled" (a sheet
+  is blocking a graceful quit) can be followed by
+  `pkill -f "Plantoir.app/Contents/MacOS/Plantoir"` without hesitating or
+  asking first.
 
-```bash
-osascript -e 'quit app "Plantoir"' 2>/dev/null
-```
+Two conditions still hold regardless:
 
-Two conditions still hold:
-
-- **Only after a build that SUCCEEDED**, with the bundle confirmed present.
-  Quitting his working copy to replace it with nothing is the one genuinely
-  damaging move available here.
+- **Only quit into a build that SUCCEEDED**, with the bundle confirmed
+  present. Quitting his last working copy to replace it with nothing is
+  still the one genuinely damaging move available here.
 - **Say what quitting discarded, if it plausibly did.** A conversation's
   undo history dies with its window, an unsaved settings form is lost, and a
-  running preview stops. He accepted that trade for a faster loop; he did
-  not accept being surprised by it. If he had an assistant window open, a
-  single line — "the open conversation's undo history went with it" — is
-  the whole of what is owed.
+  running preview stops. If he had an assistant window open, a single line
+  — "the open conversation's undo history went with it" — is the whole of
+  what is owed.
+
+## Keep the Dock icon linked
+
+The Dock's "persistent-apps" entry for Plantoir carries an exact path
+(`_CFURLString`, plus a `book` bookmark blob Finder can fall back to). As
+long as that path matches wherever `xcodebuild` just wrote the app, the
+Dock icon opens today's build with no action from you. It stops matching
+only when Xcode starts writing to a DIFFERENT DerivedData folder — which
+does happen: **three** coexisted on this Mac as of 2026-08-22
+(`Plantoir-bkxkcvxkinauqaehkgqfmwlzvsgj`, `-gxelrpkcqxwjneexjwsrbamdmvmm`,
+`-bzuacszrcleopbgiavzdpqasfyky`, the oldest from 2026-08-10). A stale link
+is a SILENT failure — Russell clicks the Dock, believes he's testing
+today's fix, and is actually looking at a build from days ago.
+
+**After every build, confirm the Dock target matches the newest build**, by
+dylib modification time (never a bare `head -1` on a glob — see the
+resolution snippet used throughout this file, e.g. in "When a clean build
+is required" below):
+
+```bash
+APP=$(for a in ~/Library/Developer/Xcode/DerivedData/Plantoir-*/Build/Products/Debug/Plantoir.app; do
+  d="$a/Contents/MacOS/Plantoir.debug.dylib"
+  [ -f "$d" ] && echo "$(stat -f '%m' "$d") $a"
+done | sort -rn | head -1 | cut -d' ' -f2-)
+DOCK_TARGET=$(defaults read com.apple.dock persistent-apps 2>/dev/null | python3 -c '
+import sys, re
+text = sys.stdin.read()
+m = re.search(r"ca\.russellgordon\.Plantoir.*?_CFURLString\"\s*=\s*\"(file://[^\"]+)\"", text, re.S)
+print(m.group(1) if m else "NONE")
+')
+if [ "$DOCK_TARGET" = "file://${APP}/" ]; then
+  echo "Dock already linked to the newest build."
+else
+  echo "MISMATCH — relink needed (see below)."
+fi
+```
+
+**If it mismatches, relink it** — but do not hand-edit
+`~/Library/Preferences/com.apple.dock.plist` directly: `cfprefsd` caches the
+domain in memory and can silently overwrite a raw file edit on its own next
+write. Go through `defaults import` on the WHOLE `com.apple.dock` domain
+instead, changing only the Plantoir entry, and regenerate its `book`
+bookmark data properly rather than leaving it stale — Finder can fall back
+to the bookmark even after `_CFURLString` is corrected, so a half-fixed
+entry can still open the old build:
+
+```bash
+NEW_URL="file://${APP}/"
+
+swift - "$APP" <<'SWIFT' > /tmp/plantoir_dock_bookmark.bin
+import Foundation
+let url = URL(fileURLWithPath: CommandLine.arguments[1])
+let data = try! url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+FileHandle.standardOutput.write(data)
+SWIFT
+
+defaults export com.apple.dock /tmp/dock.plist
+
+python3 - "$NEW_URL" <<'PY'
+import plistlib, sys
+new_url = sys.argv[1]
+with open('/tmp/dock.plist', 'rb') as f:
+    dock = plistlib.load(f)
+with open('/tmp/plantoir_dock_bookmark.bin', 'rb') as f:
+    bookmark = f.read()
+found = False
+for entry in dock.get('persistent-apps', []):
+    td = entry.get('tile-data', {})
+    if td.get('bundle-identifier') == 'ca.russellgordon.Plantoir':
+        td['file-data']['_CFURLString'] = new_url
+        td['book'] = bookmark
+        found = True
+if not found:
+    sys.exit("Plantoir entry not found in Dock — stop, ask Russell rather than adding one")
+with open('/tmp/dock_fixed.plist', 'wb') as f:
+    plistlib.dump(dock, f)
+PY
+
+defaults import com.apple.dock /tmp/dock_fixed.plist
+killall Dock
+```
+
+`killall Dock` is safe (the Dock restarts immediately and keeps its
+entries — already noted below for the icon-cache case) but say that you did
+it, since the screen flickers. **Read the entry back afterward** to confirm
+the relink actually took, the same way any other change here is verified
+rather than assumed:
+
+```bash
+defaults read com.apple.dock persistent-apps | grep -A3 -i plantoir
+```
+
+This has not needed to fire yet in practice (the Dock was still correctly
+linked the one time this was checked, 2026-08-22) — treat the relink
+script with the same care as anything else that writes to a user's real
+system preferences: confirm the match check is genuinely a mismatch before
+running it, and read the result back rather than trusting the script
+silently.
 
 ## Every iteration ends the same way
 
@@ -52,10 +160,15 @@ Two conditions still hold:
      -destination 'platform=macOS' -only-testing:QuartzTeachersTests test
    ```
 
-3. **Check the bundle exists, then leave the app quit for him.**
+3. **Check the bundle exists, leave the app quit, and confirm the Dock link.**
 
    ```bash
-   APP=$(ls -d ~/Library/Developer/Xcode/DerivedData/Plantoir-*/Build/Products/Debug/Plantoir.app | head -1)
+   # Resolved by dylib mtime, not alphabetically — see "Keep the Dock icon
+   # linked" above for why a plain `head -1` isn't safe here either.
+   APP=$(for a in ~/Library/Developer/Xcode/DerivedData/Plantoir-*/Build/Products/Debug/Plantoir.app; do
+     d="$a/Contents/MacOS/Plantoir.debug.dylib"
+     [ -f "$d" ] && echo "$(stat -f '%m' "$d") $a"
+   done | sort -rn | head -1 | cut -d' ' -f2-)
    [ -d "$APP" ] || { echo "NOT BUILT — stop; do not quit his running copy"; exit 1; }
    osascript -e 'quit app "Plantoir"' 2>/dev/null
    ```
@@ -64,10 +177,10 @@ Two conditions still hold:
    below), and quitting his working copy to replace it with nothing is the one
    genuinely damaging move available here.
 
-   **And do not `open` it afterwards.** `open` activates, so it makes the app
-   jump in front of whatever he is doing. His Dock entry points straight at
-   that build path — nothing needs copying or re-pointing, and the icon opens
-   whatever was last built, when he chooses.
+   **Never `open` it afterwards** — see "Keep the Dock icon linked" above,
+   the standing order as of 2026-08-22. Instead, verify the Dock's Plantoir
+   entry still points at `$APP` (same section), relinking it only if it has
+   drifted.
 
 **If you drove the interface to check the change** — activating the app,
 sending keystrokes, taking screenshots — bring the terminal back to the front
@@ -91,6 +204,39 @@ The one-line summary is the part that saves him time. It is one of:
 > Rebuilt and quit — you will need a NEW COURSE (code XYZ) to see this.
 > Rebuilt and quit — you will need a NEW WORKING FOLDER to see this.
 > Rebuilt and quit — note the open conversation's undo history went with it.
+
+## Leave no zombie containers behind
+
+**Check this at the end of every session that previewed, deployed or ran
+`verify.sh`.** Each working folder gets its own container, named
+`teaching-quartz-<hash of the folder path>`, and they are STOPPED rather than
+removed when the app quits. They accumulate silently: a count of **75** had
+built up by 2026-08-20, one per working folder ever previewed, going back
+months. Nothing breaks — a stopped container costs only disk — but it hides
+the one container that matters when you are debugging, and `docker ps -a`
+becomes unreadable.
+
+```bash
+docker ps -a --filter status=exited --filter status=created \
+  --format '{{.Names}}' | grep '^teaching-quartz-' | xargs -r docker rm -f
+```
+
+Three conditions, and they matter more than the cleanup does:
+
+- **Only STOPPED ones.** A running `teaching-quartz-*` is a live preview —
+  possibly Russell's, possibly another agent's in a second window. The
+  filters above are what keep it safe; do not simplify them to a bare
+  `docker ps -aq`.
+- **Only `teaching-quartz-*`.** Colima is shared with his other projects
+  (Supabase local dev, among others) — `docker system prune` is the wrong
+  tool here and would take those with it.
+- **Never `colima stop`**, which is rule 7 in [`CLAUDE.md`](../../../CLAUDE.md)
+  and unchanged by any of this.
+
+The next `setup.sh` or `preview.sh` in a folder recreates its container
+automatically, so removing one costs a teacher nothing and costs you a few
+seconds of container start on the next preview. Say how many you removed —
+if the number is large, that is worth him knowing.
 
 ## When a clean build is required
 
@@ -131,7 +277,10 @@ while the app was missing, and rebuilding does not invalidate that cache. Fix
 it as part of the clean rather than leaving him with an unlabelled square:
 
 ```bash
-APP=$(ls -d ~/Library/Developer/Xcode/DerivedData/Plantoir-*/Build/Products/Debug/Plantoir.app | head -1)
+APP=$(for a in ~/Library/Developer/Xcode/DerivedData/Plantoir-*/Build/Products/Debug/Plantoir.app; do
+  d="$a/Contents/MacOS/Plantoir.debug.dylib"
+  [ -f "$d" ] && echo "$(stat -f '%m' "$d") $a"
+done | sort -rn | head -1 | cut -d' ' -f2-)
 touch "$APP"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
 killall Dock
@@ -232,14 +381,15 @@ So a macOS change is not finished until BOTH of these are true:
    differently, what it can inherit unchanged, and — most valuable — the trap
    that would look correct in review. "Shared Python, nothing to mirror" is a
    fine note when true; an empty cell never is.
-2. **Anything architectural also gets a section in `WINDOWS-HANDOFF.md`.** A
-   log row records a decision; the handoff explains it well enough to
+2. **Anything architectural also gets a section in the `documentation/` page
+   that owns its subject.** A
+   log row records a decision; the deep dive explains it well enough to
    implement. Rule of thumb: if you needed more than a sentence of reasoning
    to get it right, they will too.
 
 **Corrections count as improvements.** When a change makes existing Windows
 guidance WRONG, fixing that guidance is part of the change. This has already
-bitten twice in one night: the handoff still told Windows "the visible verb
+bitten twice in one night: the write-up still told Windows "the visible verb
 is Publish, never Deploy" long after rows 140 and 143 reversed it, and the
 per-conversation backup rule silently invalidated the pruning advice above
 it. Stale guidance is worse than none — they will follow it.
@@ -264,7 +414,7 @@ would look like clutter to somebody who did not know why:
 - why there is no delete tool at all.
 
 So: when a decision has a reason that is not obvious from reading the code,
-the reason goes in `WINDOWS-HANDOFF.md` in the same change that makes the
+the reason goes in the `documentation/` page that owns it, in the same change that makes the
 decision. Not afterwards, not in a batch, and **not only when Russell asks —
 he has said plainly that he will forget to, and it is not his job to
 remember.** Record the roads NOT taken too, and why: an option rejected for
@@ -295,7 +445,7 @@ windows, quantisation, Metal, GPU layers, inference. If a sentence would only
 make sense to somebody who has read the source, it is not ready to show.
 
 Two exceptions, both non-teacher-facing: `GUI-IMPROVEMENTS.md` and the
-handoffs record what was measured and must name models precisely, and code
+write-ups record what was measured and must name models precisely, and code
 comments should too. The rule is about what appears on screen.
 
 ## Open investigations — read these before touching the area

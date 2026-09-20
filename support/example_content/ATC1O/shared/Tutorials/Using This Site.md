@@ -7,7 +7,8 @@ tags:
   - unit-1
 ---
 Everything for this course lives here, and it is built to be used in a
-particular way. Five minutes now saves you an hour of hunting in March.
+particular way. Five minutes now saves you an hour of hunting later in the
+course.
 
 ## Start where the site starts
 

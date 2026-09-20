@@ -15,6 +15,7 @@ tags:
    equation, graph, prediction, and the limits of the prediction
 3. Look ahead: next unit, triangles — and then the same four parameters
    again
+4. Journal collection — hand it in on your way out
 
 ## Things to do before our next class
 

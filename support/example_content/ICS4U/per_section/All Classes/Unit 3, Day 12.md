@@ -22,7 +22,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Milestone: partner confirmed, consent recorded, roles agreed in
-      writing and posted where the whole team can see them.
-- [ ] Milestone: scope document, including the "deliberately not doing"
-      list your team will be held to.
+- [ ] Milestone: one partner confirmed, and roles agreed in writing and
+      posted where the whole team can see them. Consent and scope come
+      next class, in writing, before any design.

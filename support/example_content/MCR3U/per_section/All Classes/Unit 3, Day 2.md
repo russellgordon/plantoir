@@ -15,6 +15,7 @@ tags:
    used for six exact ratios with no calculator
 3. Consolidate: back to [[Special Angles]] — and why exact beats
    decimal in every later calculation
+4. Journals returned — read what I wrote back before you leave
 
 ## Things to do before our next class
 

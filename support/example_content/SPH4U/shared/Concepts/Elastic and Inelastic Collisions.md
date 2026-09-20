@@ -21,6 +21,24 @@ Into deformation, heat, and sound. A car crash converts an enormous
 fraction of the kinetic energy into bending metal — which is the point of
 crumple zones, and the reason a "perfectly elastic" car would be lethal.
 
+## Engineering applications: protecting human life
+
+Understanding energy dissipation and momentum transfer allows engineers to
+design and improve life-saving technologies:
+
+- **Automotive crumple zones & airbags:** Prolong impact duration $\Delta t$,
+  reducing the peak force $\bar{F} = \Delta p / \Delta t$ while plastic deformation
+  permanently absorbs kinetic energy.
+- **Athletic helmets and protective padding:** Multi-density EPS foams crush
+  progressively during impact, dissipating translational and rotational kinetic
+  energy away from the skull and brain.
+- **Roadside crash attenuators (impact cushions):** Water- or sand-filled barrels
+  and telescoping steel guardrail terminals absorb vehicle momentum through
+  inelastic fluid displacement and controlled deformation rather than rigid rebound.
+- **Controlled structural demolition:** Blasting charges remove support pillars,
+  allowing gravitational potential energy to convert into kinetic energy that
+  pulverizes the structure in a controlled downward collapse without lateral debris ejection.
+
 ## Two equations, two unknowns
 
 An elastic collision gives you both conservation laws, which is exactly
@@ -37,7 +55,10 @@ went down, say by how much and where it went.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C3.3]]
+![[C1.1]]
 
 ![[C2.6]]
+
+![[C3.3]]
 %%curriculum-end%%
+

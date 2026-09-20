@@ -36,6 +36,8 @@ bat, bird.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
 ![[C2.2]]
 
 ![[C3.1]]

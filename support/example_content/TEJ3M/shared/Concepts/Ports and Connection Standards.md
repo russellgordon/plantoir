@@ -53,6 +53,27 @@ wires of a pair equally.
 > between two standards that need an active one produce three faults
 > that all look like hardware failure and are none of them.
 
+## Hardware development trends: speed, capacity, and resolution
+
+The history of connection standards is a continuous race against physical
+bandwidth and physical space:
+
+- **Processors and memory:** Internal bus speeds shifted from wide, slow
+  parallel buses to multi-lane serial interconnects (PCI Express scaling from
+  $250\ \text{MB/s}$ per lane in Gen 1 to over $4\ \text{GB/s}$ in Gen 5),
+  while memory moved from DDR4 ($2400\text{--}3200\ \text{MT/s}$) to DDR5
+  exceeding $6400\ \text{MT/s}$.
+- **Video resolution:** As display standards leaped from standard definition
+  to $1080\text{p}$, $4\text{K}$, and $8\text{K}$, uncompressed video streams
+  demanded enormous bandwidth jumps — driving HDMI and DisplayPort interfaces
+  from $4.95\ \text{Gbps}$ to over $40\text{--}80\ \text{Gbps}$.
+- **Storage media and density:** Optical media (CDs at $700\ \text{MB}$, DVDs
+  at $4.7\ \text{GB}$, and Blu-ray disks at $25\text{--}50\ \text{GB}$)
+  provided portable mass storage for decades, but gave way to solid-state
+  drives (SSDs). Moving from SATA III ($600\ \text{MB/s}$) to PCIe NVMe M.2
+  format pushed transfer speeds past $7000\ \text{MB/s}$ in a form factor the
+  size of a stick of chewing gum.
+
 ## Reading it off a datasheet
 
 Every connector on a board is named in its datasheet with the standard
@@ -64,6 +85,8 @@ find the line; the revision matters, because "USB 3.2 Gen 2x2" and
 ## Curriculum connection
 
 ![[A1.2]]
+
+![[A1.3]]
 
 ![[A1.1]]
 %%curriculum-end%%

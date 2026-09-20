@@ -52,4 +52,8 @@ stays with it — which already beats "class was fun, I learned a lot."
 ## Curriculum connection
 
 ![[B1.2]]
+
+![[A1.1]]
+
+![[D1.1]]
 %%curriculum-end%%

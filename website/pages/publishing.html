@@ -1,0 +1,82 @@
+---
+title: Publishing — Plantoir
+description: Where a class site can go, how to choose, and how to set up each destination — Netlify, Cloudflare Pages, or a folder on your own web space.
+nav_label: Publishing
+---
+
+<div class="page-head">
+  <h1>Publishing</h1>
+  <p class="standfirst">A built section can go to three different places. This page covers the choice properly — the in-app picker only has room for a caption.</p>
+</div>
+
+<hr class="rule">
+
+<section>
+  <h2>The three destinations</h2>
+  <p>Whichever you choose, what gets published is the same site — the exact pages you previewed. Only where it ends up differs, and you can change your mind later without rewriting anything.</p>
+
+  <div class="note">
+    <h3>Netlify — the default</h3>
+    <p>A free hosting account, one site per section, at an address like <code>ics3u-s1-2025-gordon.netlify.app</code>. The address is suggested once and stays fixed after that, so a link handed out in September still works in June.</p>
+    <p>This is the right choice for most teachers starting out — the app does the account creation for you the first time you publish. The one thing worth knowing: Netlify's free-tier API can get rate-limited if a whole staff room publishes at once, say at a workshop. It resolves itself in a few minutes; nothing is lost.</p>
+  </div>
+
+  <div class="note">
+    <h3>Cloudflare Pages — for unmetered bandwidth, or a free address per section</h3>
+    <p>Also free, also one project per section, at an address like <code>ics3u-s1-2025-gordon.pages.dev</code>. Worth choosing if a class page carries a lot of images or embedded documents and you'd rather not think about bandwidth limits — Cloudflare's free plan doesn't meter static traffic.</p>
+    <p>Setup asks for two things instead of one — see below.</p>
+  </div>
+
+  <div class="note">
+    <h3>A folder on this computer — for a board or university web space</h3>
+    <p>No hosting account at all. The app copies the built site into a folder you choose, one <code>sectionN</code> subfolder per class, and only changed files are copied on later publishes — a page you remove locally is removed there too. You upload that folder to wherever your board or university already gives you space — over SFTP, a network share, whatever you normally use.</p>
+    <p>Because nothing is uploaded by the app itself, there's a page opened straight from that folder won't look quite right locally — the site expects to be served over the web, not read off disk. Once it's on your host, it looks the same as the other two.</p>
+  </div>
+
+  <p>A section can also publish to more than one of these at once, for redundancy — set that up once and every publish after it goes to both.</p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Setting up Netlify</h2>
+  <p>Nothing to set up ahead of time. Publish a section for the first time and the app asks for your last name (used once, to build the site's address) and walks you through connecting a Netlify account. After that, every publish for that section reuses the same site.</p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Setting up Cloudflare Pages</h2>
+  <p>Two things, and only one comes from you directly.</p>
+  <div class="note">
+    <h3>An API token</h3>
+    <p>Create one in the Cloudflare dashboard with exactly one permission: <strong>Account → Cloudflare Pages → Edit</strong>. Nothing broader is needed, and nothing broader is asked for.</p>
+    <h3>An account ID</h3>
+    <p>A token scoped this narrowly can't look up its own account — that's a Cloudflare limitation, not an app one — so the app asks for your Cloudflare Account ID once, up front, rather than mid-publish. It's on the same dashboard page as the token.</p>
+  </div>
+  <p>Enter both once and every Cloudflare course you publish afterward reuses them.</p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Setting up a folder</h2>
+  <p>Choose the destination folder once in the section's publishing settings. No account, no token — the app just needs to know where to copy files.</p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>The one real limit</h2>
+  <p>Cloudflare Pages won't accept a single file larger than <strong>25 MB</strong>. Netlify and a folder on your own web space don't share that limit.</p>
+  <p>In practice it rarely matters. Documents, images and slide decks are comfortably under it. Long-form video is the exception — which is exactly why most teachers embed video from YouTube or Vimeo rather than uploading it. That sidesteps the limit for any destination, not just Cloudflare's.</p>
+  <p>If a file is too large for Cloudflare, the app tells you which one before it uploads anything, rather than failing partway through.</p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Some real class sites</h2>
+  <p>Built from ready-made course material and published exactly the way described above.</p>
+  {{demo_links}}
+</section>

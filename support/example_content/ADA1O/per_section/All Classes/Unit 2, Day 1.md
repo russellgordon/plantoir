@@ -14,7 +14,9 @@ tags:
 2. Warm-up: [[Zip Zap Zop]], fast rounds
 3. Concept: offers — every scene starts with one
 4. Play: [[Yes Lets]] — accept everything for ten minutes
-5. Debrief: what happened the moment someone blocked?
+5. Debrief: what happened the moment someone blocked? I am listening for
+   what this class already does without being taught, so I know which
+   games we need most of
 
 ## Things to do before our next class
 

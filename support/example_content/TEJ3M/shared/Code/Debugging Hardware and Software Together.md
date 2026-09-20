@@ -117,12 +117,12 @@ be.** That is not a school exercise; it is what maintenance
 documentation is, and being able to produce it on demand is one of the
 things that separates a technician from a hobbyist.
 
-Two reasons it pays immediately. Half the faults you meet in June will be
-faults you already solved in March, and your log is the only place that
-memory survives. And when you are genuinely stuck, writing the four lines
-out forces you to state what you have actually tested — which is
-frequently the moment the answer arrives, before anyone else has read a
-word of it. [[Getting Unstuck]] takes it from there.
+Two reasons it pays immediately. Half the faults you meet at the end of the
+course will be faults you already solved weeks ago, and your log is the only
+place that memory survives. And when you are genuinely stuck, writing the
+four lines out forces you to state what you have actually tested — which is
+frequently the moment the answer arrives, before anyone else has read a word
+of it. [[Getting Unstuck]] takes it from there.
 
 > [!question] The two questions to answer before you ask for help
 > What did you expect, and what did you measure? Bring the numbers. A

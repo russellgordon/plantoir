@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[The Reaction Investigation]], day 3 — working period: approved procedures
-   revised, unapproved ones redesigned with me
+1. [[The Reaction Investigation]], day 3 — working period: approved
+   procedures revised where my notes ask for it, unapproved ones redesigned
+   with me. Every group gets two minutes with me, either way
 2. Plan your mass measurements: before, after, and the vessel
 
 ## Things to do before our next class

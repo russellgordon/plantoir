@@ -41,11 +41,16 @@ law, computing, agriculture, public health. The pairing is the career.
 
 ## Your entry for the portfolio
 
-Write half a page, at the end of the course, that does three things: names
-two skills from the table you can evidence with specific work you did;
-describes one occasion outside this classroom where you used something
-from this course; and names one career from the list, or beyond it, that
-you now know enough about to say why it interests you or does not.
+Write half a page, in class in the last week of the course, that does
+three things: names two skills from the table you can evidence with
+specific work you did; describes one occasion outside this classroom
+where you used something from this course; and names one career from the
+list, or beyond it, that you now know enough about to say why it
+interests you or does not.
+
+It is the closing entry of [[The Field and Map Portfolio]], and the
+period it is written in is on the schedule, so bring the work you intend
+to point at.
 
 > [!tip] Evidence, not adjectives
 > "I improved my mapping" is worth nothing to a reader. "My first field

@@ -1,0 +1,1177 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Text.Json.Nodes;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
+using Plantoir.Core.Assist;
+using Plantoir.Mcp;
+
+namespace Plantoir.Tests;
+
+/// <summary>
+/// The assistant's SURFACE — the tools each client is shown, and what a
+/// teacher is told about which assistant they are running.
+///
+/// <para>Adding a tool is a routing change, and more choices is the classic
+/// way a router degrades, so the shape of this surface is a product decision
+/// rather than an implementation detail. `assist-cases.json` →
+/// <c>toolSchemas</c> carries the definitions as each client really sends
+/// them, and nothing on this side read them (documentation/10-local-ai-assistant.md).</para>
+///
+/// <para><b>The descriptions are deliberately NOT asserted, and that is the
+/// interesting part.</b> This app has no local tool definitions of its own:
+/// <c>AssistAgent.NarrowToLocal</c> takes the MCP server's schemas, keeps
+/// thirteen by name and rewrites every description through <c>Briefly()</c>,
+/// which strips all but the routing phrasings — a measured decision, not a
+/// stylistic one. Asserting the mac's wording here would be red on all
+/// thirteen, and "fixing" it would change the text the local model routes on,
+/// which needs the routing suite re-run rather than a test edited. So what is
+/// pinned is the part that is shared by construction: WHICH tools, and what
+/// each one's arguments are.</para>
+/// </summary>
+public class AssistSurfaceContractTests
+{
+    /// <summary>
+    /// Every tool this app's MCP server declares, by name, with its parameters
+    /// read off the real method signature.
+    ///
+    /// <para>Reflection over <see cref="PlantoirTools"/> rather than starting
+    /// the server and asking it: driving <c>plantoir-mcp</c> over stdio works
+    /// and leaves a process holding <c>Plantoir.Core.dll</c> open if anything
+    /// goes wrong, which then fails the NEXT build with a file-lock error that
+    /// reads as "the app is open" when the app is not open at all.</para>
+    /// </summary>
+    private static Dictionary<string, MethodInfo> ServedTools()
+    {
+        var tools = new Dictionary<string, MethodInfo>(StringComparer.Ordinal);
+        foreach (var method in typeof(PlantoirTools).GetMethods(BindingFlags.Public | BindingFlags.Instance))
+        {
+            var attribute = method.GetCustomAttribute<McpServerToolAttribute>();
+            if (attribute is null) continue;
+            // The SDK falls back to the method name when the attribute gives
+            // none; matching that means a tool declared without a Name is
+            // COUNTED rather than silently skipped, which would otherwise read
+            // as the contract and the server agreeing.
+            tools[attribute.Name ?? method.Name] = method;
+        }
+        return tools;
+    }
+
+    /// <summary>The JSON schema type a parameter of this CLR type is sent as.</summary>
+    private static string SchemaType(Type type)
+    {
+        var underlying = Nullable.GetUnderlyingType(type) ?? type;
+        if (underlying == typeof(string)) return "string";
+        if (underlying == typeof(bool)) return "boolean";
+        if (underlying == typeof(int) || underlying == typeof(long)) return "integer";
+        if (underlying == typeof(double) || underlying == typeof(float)) return "number";
+        if (underlying.IsArray || (underlying.IsGenericType
+            && typeof(System.Collections.IEnumerable).IsAssignableFrom(underlying))) return "array";
+        return "object";
+    }
+
+    /// <summary>
+    /// The parameters the server really puts in a tool's schema.
+    ///
+    /// <para>Three approximations, none of which can pass silently: the SDK
+    /// also binds any parameter whose type is a registered service, so a future
+    /// injected argument would be counted here as required and fail loudly
+    /// rather than quietly; a nullable array goes on the wire as
+    /// <c>["array","null"]</c> and is called <c>array</c> here; and a tool
+    /// declared with no <c>Name</c> is matched by its method name above.</para>
+    /// </summary>
+    private static (List<string> Required, Dictionary<string, string> Types) Parameters(MethodInfo method)
+    {
+        var required = new List<string>();
+        var types = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var parameter in method.GetParameters())
+        {
+            // The server injects these; they are not part of the tool's schema,
+            // and no model is ever shown them. IProgress<T> is the one that is
+            // easy to miss — it lives in System, not in the MCP namespace, so a
+            // namespace filter alone lets it through and every long-running
+            // tool then reads as taking an undocumented argument.
+            if (parameter.ParameterType == typeof(CancellationToken)) continue;
+            if (parameter.ParameterType.IsGenericType
+                && parameter.ParameterType.GetGenericTypeDefinition() == typeof(IProgress<>)) continue;
+            if (parameter.ParameterType.Namespace?.StartsWith("ModelContextProtocol", StringComparison.Ordinal) == true)
+                continue;
+
+            types[parameter.Name!] = SchemaType(parameter.ParameterType);
+            if (!parameter.HasDefaultValue) required.Add(parameter.Name!);
+        }
+        return (required, types);
+    }
+
+    private static (List<string> Required, Dictionary<string, string> Types) Expected(JsonNode tool)
+    {
+        var function = tool["function"]!;
+        var required = new List<string>();
+        if (function["parameters"]?["required"] is JsonArray names)
+            foreach (var name in names) required.Add(name!.ToString());
+
+        var types = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (function["parameters"]?["properties"] is JsonObject properties)
+            foreach (var (name, schema) in properties)
+                types[name] = schema?["type"]?.ToString() ?? "object";
+
+        return (required, types);
+    }
+
+    /// <summary>
+    /// The parameters whose TYPE differs between the two apps by design, and
+    /// nothing else.
+    ///
+    /// <para>The mac's client speaks a schema with strings, integers and
+    /// booleans and <b>no arrays</b>, so a list of page titles reaches it as
+    /// one semicolon-separated string — semicolons rather than commas because
+    /// "Unit 2, Day 3" is the name nearly every class page in these courses
+    /// has, and a comma-separated list would cut it in half. This app's server
+    /// has arrays and uses them. The reason is written down in
+    /// <c>mac-app/…/AssistToolSurface.swift</c>, which calls it one of "two
+    /// deliberate departures from the Windows schema".</para>
+    ///
+    /// <para><b>That it is written down in a Swift comment is the problem.</b>
+    /// <c>toolSchemas</c> is a GENERATED key, so the departure cannot be
+    /// recorded beside the schemas it applies to, and this list is now its
+    /// second home — the very thing `contracts/` exists to prevent. Asked for
+    /// in issue #83: have the generator emit the departures alongside the
+    /// schemas, and this reads them instead of restating them.</para>
+    ///
+    /// <para>Asserted as an exact set rather than an allow-list, so a NEW
+    /// departure fails, and so does a departure that has been resolved and not
+    /// deleted from here.</para>
+    /// </summary>
+    private static void AssertOnlyTheDeparturesWeHaveAgreed(
+        List<string> differing, List<string> onlyHere,
+        IReadOnlyDictionary<string, string> typesHere, IEnumerable<string> onThisSurface)
+    {
+        var tools = onThisSurface.ToHashSet(StringComparer.Ordinal);
+
+        // The arguments this server takes that the contract does not describe.
+        //
+        // `preview` is the SECOND of the two departures AssistToolSurface.swift
+        // names: on the mac every change rebuilds, which is what the assistant's
+        // system prompt promises a teacher, so there is no flag; here a batch of
+        // edits can be made with the preview suppressed and rebuilt once at the
+        // end. The rest are arguments the mac's surface simply does not offer.
+        //
+        // Held to an exact set for the same reason as the type departures: a
+        // NEW one is a routing difference nobody chose, and a resolved one that
+        // stays listed makes this list a record of what once differed. The
+        // plan_ twins take no `preview` — they change nothing, so there is
+        // nothing to rebuild — which this list said they did until the check
+        // itself said otherwise.
+        var agreedExtras = new[]
+        {
+            "publish_class_on.preview",
+            "publish_pages.preview", "publish_pages.includeLinked",
+            "unpublish_pages.preview", "unpublish_pages.includeLinked",
+            "plan_publish_pages.includeLinked",
+            "plan_unpublish_pages.includeLinked",
+            "add_next_class.unit", "add_next_class.days",
+            "plan_add_next_class.unit", "plan_add_next_class.days",
+            "read_remembered_timetable.scope", "read_remembered_timetable.revise",
+            "re_date_classes.timetable", "re_date_classes.block", "re_date_classes.pages",
+            "re_date_classes.meetings", "re_date_classes.firstDay", "re_date_classes.startYear",
+            "plan_re_date_classes.timetable", "plan_re_date_classes.block",
+            "plan_re_date_classes.pages", "plan_re_date_classes.meetings",
+            "plan_re_date_classes.firstDay", "plan_re_date_classes.startYear",
+
+            // The rollover's website question. `website` itself IS in the
+            // contract and so is not listed here; these three are ours alone,
+            // for a reason that is a platform fact rather than a preference.
+            //
+            // Plantoir's own assistant window reaches these tools THROUGH this
+            // MCP server over JSON-RPC (Plantoir/Services/McpClient.cs), and
+            // an argument the tool does not DECLARE is DROPPED by the SDK's
+            // binder rather than refused — measured against
+            // ModelContextProtocol 2.2.0 by sending a made-up key: the call
+            // completed, IsError false, the key gone. So an undeclared
+            // `rollover` would make the rollover phrasing run as an ordinary
+            // re-date with nothing anywhere reporting a fault, which is why
+            // TheCardsArgumentsReachTheToolThatReadsThem asserts arrival and
+            // not merely presence on the schema. On the mac the card and the
+            // tool runner share a process, so no binder stands between them
+            // and `rollover` is deliberately absent from its published schema
+            // — the same aim, reached differently because the two apps are
+            // built differently.
+            //
+            // `plan_re_date_classes` needs both for the same reason once
+            // removed: plan mode is ON by default, so the card's arguments
+            // reach the TWIN first, and a twin that cannot see them proposes an
+            // ordinary re-date and the answer is lost.
+            //
+            // Costs no routing accuracy: re_date_classes and its twin are not
+            // in AssistAgent.ForTheLocalModel, so no local model reads either
+            // schema.
+            "re_date_classes.rollover",
+            "plan_re_date_classes.website", "plan_re_date_classes.rollover",
+
+            // "Duplicate Unit 3, Day 2 as my next class" — a fixed phrasing
+            // the prompt shelf OFFERS, and the binder reason above exactly:
+            // without the declaration the key is dropped and the sentence runs
+            // as a plain "add the next class", making a BLANK page where a
+            // teacher asked for a copy of a lesson. Issue #149; it was carried
+            // in KnownToBeDropped below until 2026-09-18 and the entry is gone
+            // because the pair now arrives.
+            //
+            // The mac needs no schema argument for the same phrasing — the
+            // card and the tool runner share a process there — so this is a
+            // platform difference rather than a product one, and the mac's own
+            // `duplicate` is deliberately absent from its published schema.
+            //
+            // Costs no routing accuracy either, though add_next_class IS one
+            // of the thirteen tools the local model sees:
+            // AssistAgent.CardOnlyArguments strips the argument from the
+            // narrowed schema, and NarrowToolsMirrorTests pins that the
+            // measurement script strips it too.
+            "add_next_class.duplicate", "plan_add_next_class.duplicate",
+        }.Where(e => tools.Contains(e[..e.IndexOf('.')])).ToList();
+
+        var unagreedExtras = onlyHere.Except(agreedExtras).OrderBy(e => e, StringComparer.Ordinal).ToList();
+        Assert.True(unagreedExtras.Count == 0,
+            "This server takes tool arguments the contract does not describe, and nobody has " +
+            "agreed them: " + string.Join("; ", unagreedExtras) + ". An argument the mac's model " +
+            "is not shown is a routing difference as surely as an extra tool is. Either add it to " +
+            "the contract, or record it here with its reason.");
+
+        var goneExtras = agreedExtras.Except(onlyHere).OrderBy(e => e, StringComparer.Ordinal).ToList();
+        Assert.True(goneExtras.Count == 0,
+            "These are recorded as arguments this server alone takes, and it no longer does — or " +
+            "the contract now describes them: " + string.Join("; ", goneExtras) + ". Delete them " +
+            "from the list.");
+
+        // READ from the contract now, rather than restated here. Asked for in
+        // issue #83, emitted by the mac on 2026-09-08, and consumed here for
+        // issue #122.
+        //
+        // toolSchemas.departures.listShapedStringParameters names every
+        // parameter that is a STRING carrying a list on that surface, with the
+        // separator it advertises. It deliberately says nothing about what this
+        // side does — the mac cannot check that — so the two are INTERSECTED,
+        // and there are FOUR outcomes rather than three:
+        //
+        //   1. an ARRAY here          -> a genuine type departure, expected
+        //   2. a string, different    -> a separator difference, asserted below
+        //      separator                 against its own list
+        //   3. a string, SAME         -> an agreement; assert NOTHING
+        //      separator
+        //   4. anything else          -> a real disagreement, and it fails
+        //
+        // Case 3 is the one the first version of #83 left out, and leaving it
+        // out turns this suite red for two apps AGREEING: `codes` is in it
+        // today. Cases 2 and 3 also produce no entry in `differing` at all —
+        // both sides say "string" — so neither may go in the list below, or
+        // `resolved` fails saying the departure has been resolved.
+        var departures = ContractLoader.LoadJson("assist-cases.json")
+            ["toolSchemas"]!["departures"]!["listShapedStringParameters"]!.AsArray();
+
+        var agreed = new List<string>();
+        var separatorDifferences = new List<string>();
+        foreach (var entry in departures)
+        {
+            string parameter = entry!["parameter"]!.ToString();
+            string tool = parameter[..parameter.IndexOf('.')];
+            // Scoped to the surface being checked: the plan_ twins are MCP-only,
+            // so on the local surface they are not departures, they are simply
+            // absent.
+            if (!tools.Contains(tool)) continue;
+            if (!typesHere.TryGetValue(parameter, out string? here)) continue;
+
+            if (here == "array")
+            {
+                agreed.Add($"{parameter} (contract string, here array)");
+                continue;
+            }
+
+            Assert.True(here == "string",
+                $"The contract calls \"{parameter}\" a string carrying a list, and this server " +
+                $"declares it \"{here}\", which is neither that nor an array. That is a real " +
+                "disagreement rather than one of the two departures anybody has agreed.");
+
+            Assert.True(SeparatorHere.TryGetValue(parameter, out string? mine),
+                $"\"{parameter}\" is a list-shaped string on both surfaces and this suite does not " +
+                "know which character this server advertises for it. Add it to SeparatorHere — it " +
+                "cannot be read off the schema, because the separator lives in the runner's " +
+                "Split(...) and in the [Description] prose.");
+
+            if (mine != entry["separator"]!.ToString())
+                separatorDifferences.Add($"{parameter} (there {entry["separator"]}, here {mine})");
+        }
+
+        AssertOnlyTheSeparatorDifferencesWeHaveAgreed(separatorDifferences, tools);
+
+        var unexpected = differing.Except(agreed).OrderBy(d => d, StringComparer.Ordinal).ToList();
+        Assert.True(unexpected.Count == 0,
+            "Tool arguments differ between the two apps in ways nobody has agreed: " +
+            string.Join("; ", unexpected) + ". A client that sends the documented shape gets a " +
+            "refusal the teacher reads as \"the assistant could not do that\", with nothing " +
+            "saying why. Either make them agree, or record the departure here with its reason.");
+
+        var resolved = agreed.Except(differing).OrderBy(d => d, StringComparer.Ordinal).ToList();
+        Assert.True(resolved.Count == 0,
+            "These are recorded as deliberate departures and the two apps now agree about them: " +
+            string.Join("; ", resolved) + ". Delete them from this list, so it keeps meaning " +
+            "\"everything that differs\" rather than \"everything that once did\".");
+    }
+
+    /// <summary>
+    /// Which character this server ADVERTISES for each list-shaped string
+    /// parameter, since the schema does not say.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Hand-kept, and it is the half of #122 that could not be
+    /// removed.</b> The mac emits its separators because
+    /// <c>separatedList(separator:)</c> knows them; here the separator lives in
+    /// <c>AssistToolRunner</c>'s <c>Split(...)</c> and in the parameter's
+    /// <c>[Description]</c> prose, neither of which is reachable from a JSON
+    /// schema. So consuming the contract removed the SHARED copy — the list of
+    /// which parameters are list-shaped, and what the other side advertises —
+    /// and not this one.</para>
+    ///
+    /// <para><b>What is advertised, not what is accepted.</b>
+    /// <c>AssistToolRunner</c> is deliberately forgiving and splits on several
+    /// characters — so a comma-separated date list from this side is parsed
+    /// correctly by the mac today. A difference here is a difference in what
+    /// each side tells the MODEL, which is worth knowing; it is not an
+    /// incompatibility and nothing should assert one from it.</para>
+    ///
+    /// <para><b>This list is now EXERCISED, and was not when it was written.</b>
+    /// All five entries below belong to MCP-only tools, and
+    /// <c>EveryToolTheContractsMcpSurfaceNamesIsServedTheSameWayHere</c> used
+    /// to stop at an earlier assertion and never reach them: it had been red
+    /// on <c>dev</c> since before this was written, behind THREE stacked
+    /// divergences, each hidden by the one before it — <c>back_up_course</c>
+    /// requiring <c>section</c> there and not here, the same tool's
+    /// <c>section</c> property, and <c>add_classes.firstDay</c> /
+    /// <c>plan_add_classes.firstDay</c> being undeclared in the contract.
+    /// Issue #70 closed all three on 2026-09-09, in the direction the contract
+    /// had it: the section is taken and attributed, and the day a unit carries
+    /// on from is worked out rather than asked for. The test is green, so this
+    /// list is load-bearing from here on — an entry that stops being a
+    /// departure now fails it.</para>
+    /// </remarks>
+    private static readonly Dictionary<string, string> SeparatorHere = new(StringComparer.Ordinal)
+    {
+        // "separated by commas", and Split(',') in the runner.
+        ["remember_timetable.dates"] = ",",
+        ["plan_remember_timetable.dates"] = ",",
+        ["plan_scheduled_deploy.classes"] = ",",
+        ["add_curriculum_mentions.codes"] = ",",
+        ["plan_curriculum_mentions.codes"] = ",",
+    };
+
+    /// <summary>
+    /// The parameters both surfaces carry as strings and describe with
+    /// DIFFERENT separators, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// <para>An exact set in both directions, like the type departures: a new
+    /// separator difference is a routing difference nobody chose, and a
+    /// resolved one left listed makes this a record of what once differed.</para>
+    ///
+    /// <para><b>Why the two that differ, differ.</b> The mac advertises
+    /// semicolons for anything that can carry a page or class TITLE, because
+    /// "Unit 2, Day 3" is the name nearly every class page in these courses
+    /// has and a comma-separated list would cut it in half. That reasoning
+    /// applies to <c>plan_scheduled_deploy.classes</c> here too and this side
+    /// says commas — worth revisiting, and NOT a fix to make silently, since
+    /// changing what a schema advertises is a routing change and the routing
+    /// suites are hand-run. <c>dates</c> are YYYY-MM-DD and can hold no comma,
+    /// so that one is cosmetic.</para>
+    /// </remarks>
+    private static void AssertOnlyTheSeparatorDifferencesWeHaveAgreed(
+        List<string> found, HashSet<string> onThisSurface)
+    {
+        // Scoped to the surface, exactly as the type departures are. All
+        // three of these are MCP-only tools, so on the LOCAL surface they
+        // produce no entries at all — and an unscoped list would then fail
+        // saying three differences had been resolved, which is the same
+        // mistake in the same shape as the third outcome #83 first left out.
+        var agreed = new[]
+        {
+            "remember_timetable.dates (there ;, here ,)",
+            "plan_remember_timetable.dates (there ;, here ,)",
+            "plan_scheduled_deploy.classes (there ;, here ,)",
+        }.Where(d => onThisSurface.Contains(d[..d.IndexOf('.')])).ToArray();
+
+        var unexpected = found.Except(agreed).OrderBy(d => d, StringComparer.Ordinal).ToList();
+        Assert.True(unexpected.Count == 0,
+            "The two surfaces now advertise different separators for arguments nobody has agreed " +
+            "to differ on: " + string.Join("; ", unexpected) + ". The model is told one thing here " +
+            "and another there. Either make them agree, or record it above with the reason.");
+
+        var resolved = agreed.Except(found).OrderBy(d => d, StringComparer.Ordinal).ToList();
+        Assert.True(resolved.Count == 0,
+            "These are recorded as separator differences and the two surfaces now advertise the " +
+            "same character: " + string.Join("; ", resolved) + ". Delete them, so this keeps " +
+            "meaning \"everything that differs\" rather than \"everything that once did\".");
+    }
+
+    // ---- What each client is shown ---------------------------------------
+
+    /// <summary>
+    /// The thirteen the on-device model sees are these thirteen — no more, and
+    /// in particular no fewer.
+    ///
+    /// <para>Already pinned by name against <c>tools.local</c>. Asserted again
+    /// from <c>toolSchemas</c> because the two lists are separate halves of the
+    /// contract and a tool added to one and not the other is a contract that
+    /// disagrees with itself.</para>
+    /// </summary>
+    [Fact]
+    public void TheLocalModelIsShownExactlyTheToolsTheSchemasName()
+    {
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+        var named = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var tool in doc["toolSchemas"]!["local"]!.AsArray())
+            named.Add(tool!["function"]!["name"]!.ToString());
+
+        Assert.Equal(named, AssistAgent.ForTheLocalModel);
+    }
+
+    /// <summary>
+    /// Every tool the contract's local surface names is one this app's server
+    /// actually serves, with the same required arguments and the same types.
+    ///
+    /// <para>The arguments are where a mismatch bites silently: a model that
+    /// sends <c>section</c> as a string to a server expecting an integer gets a
+    /// refusal the teacher reads as "the assistant could not do that", with
+    /// nothing anywhere saying why.</para>
+    /// </summary>
+    [Fact]
+    public void EveryLocalToolTakesTheArgumentsTheContractGivesIt()
+    {
+        var served = ServedTools();
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+        var tools = doc["toolSchemas"]!["local"]!.AsArray();
+        Assert.NotEmpty(tools);
+
+        var differing = new List<string>();
+        var onlyHere = new List<string>();
+        // What this server really declares each contract-known argument to be,
+        // keyed "tool.parameter". The departures check needs the TYPE, not just
+        // whether it differed: an entry the contract calls a list-shaped STRING
+        // is a type departure here only if this side declares an array.
+        var typesHere = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var tool in tools)
+        {
+            string name = tool!["function"]!["name"]!.ToString();
+            Assert.True(served.TryGetValue(name, out var method),
+                $"The contract shows the local model a tool called \"{name}\" and this app's " +
+                "server does not serve it. The local surface is narrowed FROM the server's own " +
+                "list, so a tool missing there is a tool the model is told about and cannot call.");
+
+            var (required, types) = Parameters(method!);
+            var (expectedRequired, expectedTypes) = Expected(tool);
+
+            // Named, because a bare Assert.Equal here reports two lists of
+            // argument names and not which of the tools they belong to — and
+            // the loop stops at the first failure, so the reader has no other
+            // clue either.
+            Assert.True(
+                expectedRequired.OrderBy(p => p, StringComparer.Ordinal)
+                    .SequenceEqual(required.OrderBy(p => p, StringComparer.Ordinal)),
+                $"\"{name}\" must require exactly the arguments the contract says it does. " +
+                $"Contract: [{string.Join(", ", expectedRequired.OrderBy(p => p, StringComparer.Ordinal))}]; " +
+                $"here: [{string.Join(", ", required.OrderBy(p => p, StringComparer.Ordinal))}].");
+
+            foreach (var (parameter, type) in expectedTypes)
+            {
+                Assert.True(types.TryGetValue(parameter, out string? actual),
+                    $"\"{name}\" is documented as taking \"{parameter}\" and does not.");
+                typesHere[$"{name}.{parameter}"] = actual!;
+                if (type != actual) differing.Add($"{name}.{parameter} (contract {type}, here {actual})");
+            }
+
+            // The other direction, which the first version of this test did not
+            // ask: an argument this server takes and the contract does not
+            // describe is one the model here is offered and the mac's is not.
+            // On a router, an extra argument is a routing difference exactly as
+            // an extra tool is.
+            foreach (string parameter in types.Keys)
+                if (!expectedTypes.ContainsKey(parameter)) onlyHere.Add($"{name}.{parameter}");
+        }
+
+        AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere, typesHere,
+            tools.Select(t => t!["function"]!["name"]!.ToString()));
+    }
+
+    /// <summary>
+    /// The contract's MCP surface is a SUBSET of what this app serves, not an
+    /// equality — and the difference is a known one, not drift.
+    ///
+    /// <para>The contract carries the mac's 32 — counted, not remembered; this
+    /// said 25 until 2026-09-09, which was the number before the rollover
+    /// tools landed — and <c>plantoir-mcp.exe</c> serves 37. So the same
+    /// question asked of Claude Code gets a different toolbox
+    /// depending on the machine, which is written up in documentation/10-local-ai-assistant.md and is
+    /// the mac's to decide. What must hold either way is that every tool the
+    /// contract DOES describe behaves the same here.</para>
+    ///
+    /// <para>A subset check cannot notice an addition, which is exactly how the
+    /// drift went unseen — so the count is asserted too, and a change in it
+    /// fails here saying which tools moved.</para>
+    /// </summary>
+    [Fact]
+    public void EveryToolTheContractsMcpSurfaceNamesIsServedTheSameWayHere()
+    {
+        var served = ServedTools();
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+        var tools = doc["toolSchemas"]!["mcp"]!.AsArray();
+        Assert.NotEmpty(tools);
+
+        var differing = new List<string>();
+        var onlyHere = new List<string>();
+        // What this server really declares each contract-known argument to be,
+        // keyed "tool.parameter". The departures check needs the TYPE, not just
+        // whether it differed: an entry the contract calls a list-shaped STRING
+        // is a type departure here only if this side declares an array.
+        var typesHere = new Dictionary<string, string>(StringComparer.Ordinal);
+        var missing = new List<string>();
+        foreach (var tool in tools)
+        {
+            string name = tool!["function"]!["name"]!.ToString();
+            if (!served.TryGetValue(name, out var method)) { missing.Add(name); continue; }
+
+            var (required, types) = Parameters(method);
+            var (expectedRequired, expectedTypes) = Expected(tool);
+
+            // Named, because a bare Assert.Equal here reports two lists of
+            // argument names and not which of the tools they belong to — and
+            // the loop stops at the first failure, so the reader has no other
+            // clue either.
+            Assert.True(
+                expectedRequired.OrderBy(p => p, StringComparer.Ordinal)
+                    .SequenceEqual(required.OrderBy(p => p, StringComparer.Ordinal)),
+                $"\"{name}\" must require exactly the arguments the contract says it does. " +
+                $"Contract: [{string.Join(", ", expectedRequired.OrderBy(p => p, StringComparer.Ordinal))}]; " +
+                $"here: [{string.Join(", ", required.OrderBy(p => p, StringComparer.Ordinal))}].");
+
+            foreach (var (parameter, type) in expectedTypes)
+            {
+                Assert.True(types.TryGetValue(parameter, out string? actual),
+                    $"\"{name}\" is documented as taking \"{parameter}\" and does not.");
+                typesHere[$"{name}.{parameter}"] = actual!;
+                if (type != actual) differing.Add($"{name}.{parameter} (contract {type}, here {actual})");
+            }
+
+            // The other direction, which the first version of this test did not
+            // ask: an argument this server takes and the contract does not
+            // describe is one the model here is offered and the mac's is not.
+            // On a router, an extra argument is a routing difference exactly as
+            // an extra tool is.
+            foreach (string parameter in types.Keys)
+                if (!expectedTypes.ContainsKey(parameter)) onlyHere.Add($"{name}.{parameter}");
+        }
+
+        Assert.True(missing.Count == 0,
+            "The contract describes MCP tools this app does not serve: " +
+            string.Join(", ", missing) + ". A client told about a tool that is not there gets a " +
+            "failure it cannot explain to the teacher.");
+
+        AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere, typesHere,
+            tools.Select(t => t!["function"]!["name"]!.ToString()));
+    }
+
+    /// <summary>
+    /// Every plan twin the confirmation gate runs can MARK its answer as a
+    /// plan.
+    /// </summary>
+    /// <remarks>
+    /// <para>A tool that returns a bare <c>string</c> cannot carry
+    /// <c>_meta</c>, so <see cref="AssistToolAnswer.IsPlanKey"/> never reaches
+    /// the window — and <c>AssistAgent.ShowPlan</c> reads an unmarked answer
+    /// as a REFUSAL: it prints the plan and never offers Go. The write it was
+    /// gating then cannot be run from the app at all.</para>
+    ///
+    /// <para><b>Invisible to every other kind of test</b>, which is why this
+    /// one is structural. Claude Code reads the WORDS and is perfectly happy
+    /// with a plain string; so is any test that asserts on the plan's text.
+    /// <c>plan_make_room_for_classes</c> shipped that way and only mattered
+    /// the day <c>make_room_for_classes</c> gained a fixed phrasing and an
+    /// entry in <c>PlanTwins</c> (issue #70). The return TYPE is the honest
+    /// check: it is the thing that makes the mark possible.</para>
+    ///
+    /// <para><b>It walks the CONTRACT's twins as well as this app's map, and
+    /// the difference is the whole point.</b> Checking only
+    /// <c>AssistAgent.PlanTwins</c> asks "is anything broken that we already
+    /// gate?", which is a question about today. The defect above was invisible
+    /// for exactly as long as nothing routed to it, so a test that waits for
+    /// the map to name a tool waits until the damage is possible.
+    /// <c>plan_add_classes</c> was the next one along: a contract twin, still
+    /// returning a bare string, one fixed phrasing away from the same
+    /// failure.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryPlanTwinTheGateRunsCanSayItIsAPlan()
+    {
+        var served = ServedTools();
+        var unmarkable = new List<string>();
+
+        var twins = new Dictionary<string, string>(AssistAgent.PlanTwins, StringComparer.OrdinalIgnoreCase);
+        foreach (var (write, twin) in ContractLoader.LoadJson("assist-cases.json")!["tools"]!["planTwins"]!.AsObject())
+            twins[write] = twin!.ToString();
+        Assert.NotEmpty(twins);
+
+        foreach (var (write, twin) in twins)
+        {
+            // A twin the contract names and this server does not serve is
+            // another test's business — this one is about SHAPE.
+            if (!served.TryGetValue(twin, out var method)) continue;
+
+            // An async tool is just as able to mark its answer, so the check
+            // is on what it eventually RETURNS, not on whether it awaits.
+            var returns = method.ReturnType;
+            if (returns.IsGenericType && returns.GetGenericTypeDefinition() == typeof(Task<>))
+                returns = returns.GetGenericArguments()[0];
+
+            if (returns != typeof(CallToolResult))
+                unmarkable.Add($"{twin} (the twin of {write}) returns {method.ReturnType.Name}");
+        }
+
+        Assert.True(unmarkable.Count == 0,
+            "These plan twins cannot mark their answer as a plan, so the window reads it as a " +
+            "refusal and never offers Go — the write behind each becomes unrunnable from the app " +
+            "the moment anything routes to it: " + string.Join("; ", unmarkable) + ".");
+
+        // And every twin the gate DOES run has to exist here, which is the
+        // other way this can be wrong.
+        foreach (var (write, twin) in AssistAgent.PlanTwins)
+            Assert.True(served.ContainsKey(twin),
+                $"{write} is gated behind \"{twin}\", and this server does not serve it.");
+    }
+
+    /// <summary>
+    /// Every argument a card phrasing sets is an argument the tool it routes to
+    /// actually DECLARES.
+    ///
+    /// <para><b>Presence on the schema is not the property that matters —
+    /// arrival is.</b> Plantoir's own assistant window sends
+    /// <c>AssistCardCommand.ToJsonObject</c> to this server over JSON-RPC, and
+    /// the SDK's binder DROPS a key the method does not declare rather than
+    /// refusing it: measured against ModelContextProtocol 2.2.0 by sending a
+    /// made-up argument, the call completed with <c>IsError = false</c> and the
+    /// key simply gone. So a phrasing whose argument the tool has forgotten to
+    /// take runs as though the teacher had said the plainer sentence, with
+    /// nothing anywhere reporting a fault. "Roll this section over to a new
+    /// year" would quietly become an ordinary re-date, and the section would go
+    /// on publishing over last year's website — the defect this whole feature
+    /// exists to fix.</para>
+    ///
+    /// <para>Across every phrasing rather than one case, because the failure is
+    /// silent and so is invisible to any test that does not go looking.</para>
+    /// </summary>
+    [Fact]
+    public void TheCardsArgumentsReachTheToolThatReadsThem()
+    {
+        var served = ServedTools();
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+        var missing = new List<string>();
+        var stillDropped = new HashSet<string>(StringComparer.Ordinal);
+
+        void Check(string typed)
+        {
+            var matched = AssistCardCommand.Matching(typed);
+            if (matched is null) return;   // the phrasing itself is another test's business
+            if (!served.TryGetValue(matched.ToolName, out var method)) return;
+
+            var takes = method.GetParameters()
+                .Select(p => p.Name!)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (string key in matched.ToJsonObject("ICS3U", 1).Select(pair => pair.Key))
+            {
+                if (takes.Contains(key)) continue;
+                string pair = $"{matched.ToolName}.{key}";
+                if (KnownToBeDropped.ContainsKey(pair)) { stillDropped.Add(pair); continue; }
+                missing.Add($"“{typed}” sets \"{key}\" and {matched.ToolName} does not take it");
+            }
+        }
+
+        foreach (var phrasing in doc["cardPhrasings"]!["matches"]!.AsArray())
+            Check(phrasing!["phrasing"]!.ToString());
+
+        // The PARSED families too, which this walked past until 2026-09-09.
+        // They are the half where an argument is most easily misnamed, because
+        // it is built in code from a number rather than written out beside the
+        // sentence — and `make_room_for_classes`, whose three are `unit`,
+        // `atDay` and `howMany`, is the most dangerous tool on the surface.
+        // A dropped `atDay` there would make room at the wrong day and rename
+        // a run of the teacher's pages to prove it.
+        foreach (var family in doc["cardPhrasings"]!["parsed"]!.AsArray())
+            Check(family!["example"]!.ToString());
+
+        Assert.True(missing.Count == 0,
+            "These card arguments are dropped on the way to the tool, silently: " +
+            string.Join("; ", missing) + ". The request then runs as though the teacher had said " +
+            "something simpler, and nothing reports a fault.");
+
+        // The other direction, so the list cannot rot: a pair recorded as
+        // broken and no longer broken has been FIXED, and leaving it here would
+        // turn this into a record of what once went wrong.
+        var mended = KnownToBeDropped.Keys.Except(stillDropped).OrderBy(p => p, StringComparer.Ordinal);
+        Assert.True(!mended.Any(),
+            "These are recorded as arguments the binder drops and they now arrive: " +
+            string.Join(", ", mended) + ". Delete them from KnownToBeDropped, and close the issue " +
+            "the entry names.");
+    }
+
+    /// <summary>
+    /// Card arguments the tool does not declare, each with the reason it is
+    /// listed rather than fixed.
+    /// </summary>
+    /// <remarks>
+    /// <para>Listed rather than tolerated: the test above fails on anything NOT
+    /// here, and fails again when something here is mended and not deleted, so
+    /// this is a short-lived record rather than a licence.</para>
+    /// </remarks>
+    private static readonly Dictionary<string, string> KnownToBeDropped = new(StringComparer.Ordinal)
+    {
+        // HARMLESS, and correct as it stands. The undo history is per
+        // conversation, so the tool needs neither — the card sends course and
+        // section to every tool it can reach, and these two are simply surplus.
+        ["undo_last_change.course"] = "the undo history is per conversation, so the argument is surplus",
+        ["undo_last_change.section"] = "the undo history is per conversation, so the argument is surplus",
+
+        // HARMLESS for the same reason, and MEASURED rather than assumed.
+        // Driving the real plantoir-mcp.exe over stdio (ModelContextProtocol
+        // 2.2.0) with both keys present, `list_courses` answered with the
+        // folder's three courses and `IsError` was false. `list_courses` is
+        // about the FOLDER, so a course and a section are nothing it could
+        // use; `back_up_course` copies a whole course, sections and all.
+        ["list_courses.course"] = "list_courses is about the folder, so both are surplus",
+        ["list_courses.section"] = "list_courses is about the folder, so both are surplus",
+
+        // Issue #149 was here — "duplicate Unit 3, Day 2 as my next class",
+        // offered by the prompt shelf and pinned by the contract, reaching an
+        // add_next_class with no `duplicate` parameter at all: the binder
+        // dropped it and the teacher got a BLANK next class where they had
+        // asked for a copy of a lesson. Fixed 2026-09-18: both halves of
+        // add_next_class declare it, and the pair is in `agreedExtras` above
+        // with the reason it is ours alone. Deleted rather than kept as
+        // history, because the check below fails on a pair that is listed and
+        // mended.
+
+        // Issue #116 was here — the eight publish_class_on phrasings sending
+        // `when` at a tool that takes `date`. Fixed 2026-09-09:
+        // `AssistCardCommand.ToJsonObject` settles the relative day and sends
+        // it as `date`, so nothing is dropped and nothing is missing. The
+        // entry is deleted rather than kept as history, because the check
+        // below fails on a pair that is listed and mended.
+    };
+
+    /// <summary>
+    /// How far this app's MCP surface has drifted ahead of the contract's,
+    /// asserted as a NUMBER so that drifting further fails.
+    ///
+    /// <para>The subset test above passes whatever this app adds — which is how
+    /// twelve extra tools accumulated without either suite noticing. Pinning
+    /// the count turns the next addition into a decision: either it belongs in
+    /// the contract, or the number and the reason change together.</para>
+    /// </summary>
+    [Fact]
+    public void TheExtraToolsThisServerOffersAreTheOnesWeKnowAbout()
+    {
+        var served = ServedTools().Keys.ToHashSet(StringComparer.Ordinal);
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+        var described = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var tool in doc["toolSchemas"]!["mcp"]!.AsArray())
+            described.Add(tool!["function"]!["name"]!.ToString());
+
+        // Named, not counted. A count stays at twelve when one tool is added
+        // and another adopted into the contract, and it cannot tell the reader
+        // WHICH — so the two things that should happen next would get the same
+        // message.
+        //
+        // Twelve as of 2026-09-06; FIVE since 2026-09-08, when the mac built
+        // seven of them (`add_classes`, `back_up_course`, `explain_publishing`,
+        // `list_courses`, `make_room_for_classes`, `plan_add_classes`,
+        // `plan_make_room_for_classes`) and the contract began describing them.
+        // Deleting an adopted name from this list is the whole of what the
+        // "adopted" assertion below asks for, and the list shrinking is the gap
+        // closing rather than anything being lost.
+        var knownExtras = new[]
+        {
+            "list_recent_changes", "plan_sync_page_dates", "read_timetable",
+            "roll_over_section", "sync_page_dates",
+        };
+
+        var extra = served.Except(described).OrderBy(n => n, StringComparer.Ordinal).ToList();
+
+        var unrecorded = extra.Except(knownExtras).OrderBy(n => n, StringComparer.Ordinal).ToList();
+        Assert.True(unrecorded.Count == 0,
+            "This server offers tools the contract does not describe and nobody has recorded: " +
+            string.Join(", ", unrecorded) + ". Add each to assist-cases.json → toolSchemas.mcp " +
+            "so both apps serve it, or list it here and open a `mac` issue saying why it is this " +
+            "platform's alone. A subset check cannot notice an addition, which is how twelve of " +
+            "these accumulated without either suite saying so.");
+
+        var adopted = knownExtras.Except(extra).OrderBy(n => n, StringComparer.Ordinal).ToList();
+        Assert.True(adopted.Count == 0,
+            "The contract now describes tools this list still records as this platform's alone: " +
+            string.Join(", ", adopted) + ". That is the gap closing — delete them from the " +
+            "list, which is the whole of what is owed here.");
+    }
+
+    /// <summary>
+    /// The <c>TEACHERS SAY:</c> clause of every shared tool matches the
+    /// contract's, character for character.
+    ///
+    /// <para><b>Why this exists.</b> The phrasings are measured artifacts —
+    /// <c>AssistToolSurface</c>'s own comment says they "are what took routing
+    /// from 69% to 91%" — and <c>AssistAgent.Briefly()</c> puts the clause
+    /// FIRST in what the local model reads, so a missing or edited one is a
+    /// routing change nobody chose. Until 2026-09-08 this side was missing the
+    /// clause ENTIRELY on seven tools and no test could see it: the rest of
+    /// this class deliberately asserts names and argument types and never
+    /// descriptions, because <c>NarrowToLocal</c> rewrites every description
+    /// through <c>Briefly()</c> and asserting the mac's full wording would be
+    /// red on all thirteen.</para>
+    ///
+    /// <para>The clause is the part that can be pinned, and pinning only the
+    /// clause is deliberate: the descriptions' BODIES differ between the two
+    /// servers on purpose — this one writes for Claude Code — so asserting
+    /// those would be asserting a difference both sides chose.</para>
+    ///
+    /// <para>Added because the branch that closed the gap wrote up "a hand
+    /// copy of a shipping list needs something that runs on every commit" as
+    /// its own lesson, and had applied it to a research script and not to the
+    /// twenty phrasings that were the point of the work.</para>
+    /// </summary>
+    [Fact]
+    public void TheTriggerPhrasingsAreTheContractsOwn()
+    {
+        var served = ServedTools();
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+
+        // check_section: this server offers a fourth phrasing, "what would
+        // students see in this section right now?", written here 2026-08-17
+        // and never adopted on the mac. It is the mac's to take up, and is a
+        // GitHub issue on the `mac` label rather than a difference to erase.
+        var agreedDepartures = new HashSet<string>(StringComparer.Ordinal) { "check_section" };
+
+        var missing = new List<string>();
+        var differing = new List<string>();
+        var resolved = new List<string>();
+        int compared = 0;
+
+        foreach (var tool in doc["toolSchemas"]!["mcp"]!.AsArray())
+        {
+            string name = tool!["function"]!["name"]!.ToString();
+            if (!served.TryGetValue(name, out var method)) continue;
+
+            string? wanted = TriggerClause(tool["function"]!["description"]?.ToString());
+            if (wanted is null) continue;
+
+            string? here = TriggerClause(
+                method.GetCustomAttribute<System.ComponentModel.DescriptionAttribute>()?.Description);
+
+            if (agreedDepartures.Contains(name))
+            {
+                if (here == wanted) resolved.Add(name);
+                continue;
+            }
+
+            compared++;
+            if (here is null) missing.Add(name);
+            else if (here != wanted)
+                differing.Add($"{name} — contract has [{wanted}] and this server has [{here}]");
+        }
+
+        Assert.True(compared > 0,
+            "No shared tool carried a TEACHERS SAY: clause, so this test compared nothing. "
+            + "Either the contract stopped writing them or the surface stopped overlapping.");
+
+        Assert.True(missing.Count == 0,
+            "These shared tools carry a TEACHERS SAY: clause in the contract and none here: "
+            + string.Join(", ", missing.Order(StringComparer.Ordinal))
+            + ". The phrasings are measured, not decorative — Briefly() puts them FIRST in what "
+            + "the local model reads, so a missing clause is a routing change nobody chose. "
+            + "Copy the contract's clause WHOLE; see research/ai-assist/teachers-say-results.txt "
+            + "for what the last set was worth.");
+
+        Assert.True(differing.Count == 0,
+            "These shared tools' TEACHERS SAY: clauses differ from the contract's: "
+            + string.Join("; ", differing.Order(StringComparer.Ordinal))
+            + ". Copy the contract's, or — if this side is deliberately ahead — add the tool to "
+            + "agreedDepartures above and open a `mac` issue so the mac adopts it.");
+
+        Assert.True(resolved.Count == 0,
+            "These tools are listed as agreed departures and no longer differ: "
+            + string.Join(", ", resolved.Order(StringComparer.Ordinal))
+            + ". That is the gap closing — remove them from agreedDepartures, which is the whole "
+            + "of what is owed here.");
+    }
+
+    /// <summary>
+    /// The leading <c>TEACHERS SAY: "…", "…".</c> of a description, or null.
+    /// MIRRORS the first half of <c>AssistAgent.Briefly()</c>, which splits on
+    /// the first occurrence of quote-full-stop-space.
+    /// </summary>
+    private static string? TriggerClause(string? description)
+    {
+        if (description is null) return null;
+        if (!description.StartsWith("TEACHERS SAY:", StringComparison.Ordinal)) return null;
+        int end = description.IndexOf("\". ", StringComparison.Ordinal);
+        return end > 0 ? description[..(end + 2)] : null;
+    }
+
+    // ---- Which assistant a teacher is offered ----------------------------
+
+    /// <summary>
+    /// A model is comfortable on a machine when it needs at most a share of
+    /// physical memory that the contract fixes — a third, today.
+    ///
+    /// <para>Driven from the contract rather than typed, because the number
+    /// is the line the automatic ladder has always been held to, and a test
+    /// that hard-codes it cannot notice the ladder and the comfort rule
+    /// drifting apart.</para>
+    /// </summary>
+    [Fact]
+    public void ComfortIsTheShareOfMemoryTheContractNames()
+    {
+        var doc = ContractLoader.LoadJson("shared-rules.json");
+        int denominator = doc["assistantModelChoice"]!["comfortFraction"]!["denominator"]!.GetValue<int>();
+        Assert.True(denominator > 0);
+
+        foreach (var tier in new[] { AssistModelTier.Small, AssistModelTier.Large })
+        {
+            long resident = tier.ResidentBytes();
+
+            // Exactly enough is comfortable; a byte less is not. Asserting both
+            // sides of the line is what makes this a test of the fraction
+            // rather than of one machine that happens to be large.
+            Assert.True(new AssistHardwareBudget(resident * denominator).IsComfortable(tier));
+            Assert.False(new AssistHardwareBudget(resident * denominator - 1).IsComfortable(tier));
+        }
+    }
+
+    /// <summary>
+    /// The automatic choice never cautions, BY CONSTRUCTION: a caution names a
+    /// tier the teacher picked, and the automatic choice names none.
+    ///
+    /// <para>Worth saying plainly, because the contract's own
+    /// <c>comfortFraction.why</c> gives a different reason — "the line the
+    /// automatic ladder has always been held to, which is why the automatic
+    /// choice can never produce a caution" — and that reason does not hold at
+    /// the bottom of the ladder here. On a 4 GB machine the ladder picks the
+    /// small assistant, which needs 1.75 GB, and a third of 4 GB is less than
+    /// that. The absence of a caution is right either way — a teacher who
+    /// chose nothing has nothing to be cautioned about — but the reason is the
+    /// construction, not the arithmetic. Recorded for the mac.</para>
+    /// </summary>
+    [Fact]
+    public void TheAutomaticChoiceNeverCautions()
+    {
+        foreach (long gigabytes in new long[] { 4, 8, 16, 32, 64, 128 })
+        {
+            var budget = new AssistHardwareBudget(gigabytes * 1024 * 1024 * 1024);
+            Assert.Null(AssistModelChoice.Caution(AssistModelChoice.Automatic, budget));
+        }
+
+        // A NAMED choice DOES caution on a tight machine, so the loop above is
+        // not passing because cautions never happen at all.
+        Assert.NotNull(AssistModelChoice.Caution(
+            AssistModelChoice.Larger, new AssistHardwareBudget(4L * 1024 * 1024 * 1024)));
+        Assert.Null(AssistModelChoice.Caution(
+            AssistModelChoice.Larger, new AssistHardwareBudget(64L * 1024 * 1024 * 1024)));
+    }
+
+    /// <summary>
+    /// What a teacher is told about a choice names BOTH costs: the download,
+    /// which is what runs out on a small laptop, and the memory it holds while
+    /// working, which is what makes the machine feel slow while a class is
+    /// being prepared and appears as a number nowhere else.
+    ///
+    /// <para>Neither is guessable from the other — on the mac the larger
+    /// download is 2.2x the smaller but 2.9x the memory, because most of the
+    /// difference is the conversation being held rather than the file being
+    /// read.</para>
+    /// </summary>
+    [Fact]
+    public void TheGuidanceNamesBothWhatIsDownloadedAndWhatIsHeld()
+    {
+        var doc = ContractLoader.LoadJson("shared-rules.json");
+        var guidance = doc["assistantModelChoice"]!["guidance"]!;
+
+        foreach (var tier in new[] { AssistModelTier.Small, AssistModelTier.Large })
+        {
+            string said = tier.SizeGuidance();
+
+            if (guidance["mustNameDownloadSize"]!.GetValue<bool>())
+                Assert.Contains(tier.DownloadDescription(), said, StringComparison.Ordinal);
+
+            if (guidance["mustNameMemoryWhileWorking"]!.GetValue<bool>())
+                Assert.Contains(tier.MemoryDescription(), said, StringComparison.Ordinal);
+        }
+    }
+
+    // ---- What must be true of the model choice itself ---------------------
+
+    /// <summary>
+    /// <c>modelTiers.requirements</c> — five rules about the local assistant
+    /// that hold on both platforms. Three can be executed; two are about how
+    /// the work is done rather than about what the code does, and say so here
+    /// rather than being quietly dropped.
+    ///
+    /// <para>A sixth requirement added on the mac fails this test by name,
+    /// which is the point: the numbers in that section are explicitly NOT
+    /// shared, but the shape is.</para>
+    /// </summary>
+    [Fact]
+    public void EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable()
+    {
+        var doc = ContractLoader.LoadJson("app-rules.json");
+        var unanswered = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rule in doc["modelTiers"]!["requirements"]!.AsArray())
+            unanswered.Add(rule!["rule"]!.ToString());
+        Assert.NotEmpty(unanswered);
+
+        void Answer(string rule)
+        {
+            Assert.True(unanswered.Remove(rule),
+                $"No requirement in the contract reads \"{rule}\" any more.");
+        }
+
+        // Two rungs, no more.
+        Assert.Equal(2, Enum.GetValues<AssistModelTier>().Length);
+        Answer("Two rungs, no more");
+
+        // The rung is CHOSEN from the hardware, never asked. A small machine
+        // and a large one must reach different answers with nothing asked of
+        // the teacher in between.
+        Assert.Equal(AssistModelTier.Small,
+            new AssistHardwareBudget(8L * 1024 * 1024 * 1024).Tier);
+        Assert.Equal(AssistModelTier.Large,
+            new AssistHardwareBudget(64L * 1024 * 1024 * 1024).Tier);
+        Answer("The rung is CHOSEN from the hardware, never asked");
+
+        // The teacher never learns the model's name.
+        var names = doc["modelTiers"]!["requirements"]!.AsArray()
+            .First(r => r!["rule"]!.ToString() == "The teacher never learns the model's name")!["names"]!;
+        Assert.Equal(names["small"]!.ToString(), AssistModelTier.Small.DisplayName());
+        Assert.Equal(names["large"]!.ToString(), AssistModelTier.Large.DisplayName());
+        Answer("The teacher never learns the model's name");
+
+        // The model runs on the HOST, with hardware acceleration — never inside
+        // the container that builds the site. Both halves ARE executable, and
+        // the first version of this test wrongly called them unexecutable: the
+        // server launched is the bundled llama-server.exe rather than wsl.exe or
+        // a container runtime, and LocalModelTests pins the GPU offload flag it
+        // is given. A change routing the server through WSL would otherwise
+        // have left this green.
+        string? server = LocalModel.FindServer();
+        if (server is not null)
+        {
+            // A bundled executable beside the app, not a shell into a VM.
+            Assert.EndsWith("llama-server.exe", server, StringComparison.OrdinalIgnoreCase);
+            foreach (string elsewhere in new[] { "wsl", "docker", "colima" })
+                Assert.DoesNotContain(elsewhere, server, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // And the arguments carry the GPU offload, which is the "with hardware
+        // acceleration" half. Asserted here rather than only in
+        // LocalModelTests because that is where this requirement is claimed.
+        Assert.Contains("--n-gpu-layers",
+            LocalModel.BuildArguments("model.gguf", 8080, threads: 4, useGpu: true));
+        Answer("The model runs on the HOST, with hardware acceleration");
+
+        // The one that genuinely cannot be executed, named rather than dropped.
+        // A polarity veto is a rule about how a MODEL is chosen: it governs the
+        // routing suite in research/ai-assist/, which is measured by hand and
+        // states its own conditions. A test that pretended otherwise would be
+        // the green-for-the-wrong-reason this whole item exists to remove.
+        Assert.True(unanswered.Remove("A model that inverts polarity is VETOED, whatever it scores"),
+            "The polarity veto is recorded here as the one requirement no test can execute, and " +
+            "the contract no longer states it in those words.");
+
+        Assert.True(unanswered.Count == 0,
+            "contracts/app-rules.json requires things of the local assistant that no test here " +
+            "answers: " + string.Join("; ", unanswered.OrderBy(r => r, StringComparer.Ordinal)) +
+            ". The numbers in that section are not shared; the shape is.");
+    }
+
+    // ---- Walking back through what was typed ------------------------------
+
+    /// <summary>
+    /// The two cases where Up and Down must do their ORDINARY job instead of
+    /// walking the prompt history. A key that silently does nothing reads as a
+    /// dropped keystroke.
+    ///
+    /// <para>The two cases live in two places, which is why they are checked
+    /// two ways. "Nowhere further to walk" is <see cref="AssistPromptHistory"/>
+    /// answering null, and null is the signal the key was not consumed.
+    /// "More than one line" is the composer's own guard, in the interface
+    /// project this suite cannot reference, so it is read from the source the
+    /// same way the wizard's answers are.</para>
+    /// </summary>
+    [Fact]
+    public void TheArrowsAreLetThroughInBothCasesTheContractNames()
+    {
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+        var cases = doc["promptHistory"]!["passThroughWhen"]!["cases"]!.AsArray();
+
+        var unanswered = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in cases) unanswered.Add(entry!["when"]!.ToString());
+        Assert.NotEmpty(unanswered);
+
+        // Nowhere further to walk, in both directions.
+        var history = new AssistPromptHistory();
+        history.Remember("publish tomorrow's class");
+        history.Remember("hide the quiz");
+
+        // Down with no walk under way: nothing to come back to.
+        Assert.Null(history.Later());
+
+        // Up to the oldest entry, and then one more.
+        Assert.Equal("hide the quiz", history.Earlier(""));
+        Assert.Equal("publish tomorrow's class", history.Earlier(""));
+        Assert.Null(history.Earlier(""));
+
+        // An empty history has nowhere to walk from the start, which is the
+        // same case on a teacher's first ever conversation.
+        Assert.Null(new AssistPromptHistory().Earlier(""));
+        Assert.True(unanswered.Remove("there is nowhere further to walk"));
+
+        // More than one line: the composer must not swallow the key, because
+        // the arrows have to move the caret between those lines.
+        //
+        // Anchored to EACH arrow's own block, with comments stripped first.
+        // Bare containment stayed green with the guard deleted from Down and
+        // left on Up, and green again with it moved into a comment — which is
+        // the shape of source-reading test that reports a rule nobody follows.
+        string composer = File.ReadAllText(Path.Combine(
+            RepoRoot, "windows-app", "Plantoir", "Views", "AssistWindow.xaml.cs"));
+        string code = Regex.Replace(composer, @"//[^\n]*", "");
+
+        foreach (string arrow in new[] { "Up", "Down" })
+        {
+            Assert.Matches(
+                new Regex(@"VirtualKey\." + arrow + @"\)\s*\{\s*if \(Input\.Text\.Contains\('\\n'\)\) return;",
+                          RegexOptions.Singleline),
+                code);
+        }
+        Assert.True(unanswered.Remove("the box holds more than one line"));
+
+        Assert.True(unanswered.Count == 0,
+            "contracts/assist-cases.json names cases where the arrow keys must be passed on " +
+            "that no test here answers: " + string.Join("; ", unanswered) + ".");
+    }
+
+    private static string RepoRoot
+    {
+        get
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (int i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "Dockerfile")))
+                    return dir.FullName;
+            }
+            throw new DirectoryNotFoundException("Could not find repository root containing Dockerfile.");
+        }
+    }
+}

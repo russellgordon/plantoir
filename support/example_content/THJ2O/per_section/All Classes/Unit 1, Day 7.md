@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] First measurements, dated.
+- [ ] Check your first measurements went into the log, dated.

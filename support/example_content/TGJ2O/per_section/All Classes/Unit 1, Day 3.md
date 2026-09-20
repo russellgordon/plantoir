@@ -14,8 +14,8 @@ tags:
 2. Warm-up: [[News or Not]], round two
 3. Desk time: fix a buried lede — the news is in there somewhere, dig it out
 4. Edit and compare, then name it: [[The Inverted Pyramid]]
-5. Launch your [[Newsroom Journal]] — write [[Your First Entry]] before
-   the bell
+5. Launch your [[Newsroom Journal]] — [[Your First Entry]], written
+   here, before the bell
 
 ## Things to do before our next class
 

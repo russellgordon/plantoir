@@ -32,8 +32,8 @@ Put plainly, week to week that means:
   favourable and unbearably slow. [[Enthalpy]] and
   [[Collision Theory and Catalysts]] are answering different questions.
 - **Accept that reactions stop early** — [[Dynamic Equilibrium]] is the
-  hinge of the course, and [[Le Châtelier's Principle]] is what you do
-  with it.
+  hinge of the course, and [[Le Chatelier's Principle|Le Châtelier's Principle]]
+  is what you do with it.
 - **Handle the mathematics honestly** — logarithms in pH, ICE tables in
   equilibrium, and cell potentials in electrochemistry are arithmetic
   with meaning attached, not formulas to pattern-match. See

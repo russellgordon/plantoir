@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Reading a Budget]] — the fiscal tables at the back, not the announcement at the front
-2. Deficit, debt, debt-to-GDP and debt service kept apart
-3. One federal budget opened and navigated in class
+1. [[The Indicators Report]] handed in
+2. [[Reading a Budget]] — the fiscal tables at the back, not the announcement at the front
+3. Deficit, debt, debt-to-GDP and debt service kept apart
+4. One federal budget opened and navigated in class
 
 ## Things to do before our next class
 

@@ -12,10 +12,12 @@ tags:
 
 1. Number talk: [[Which One Doesn't Belong]] — four rational
    expressions
-2. Random groups — simplify four, and state every restriction. The
+2. Random groups — four pairs of different-looking formulas: prove each
+   pair equal or break it, then simplify and state every restriction. The
    restrictions come from the ORIGINAL expression, not the simplified
    one
-3. Consolidate: back to [[Equivalent Algebraic Expressions]]
+3. Consolidate: [[Equivalent Algebraic Expressions]] — simplifying
+   rationals, and the restrictions that keep us honest
 4. Check your understanding: [[Equivalent Expressions Practice]]
 
 ## Things to do before our next class

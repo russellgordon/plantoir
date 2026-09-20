@@ -29,7 +29,7 @@ how you got there is what this course is actually teaching.
 > reflection written with it asks you to point at evidence: where the
 > exploration stage changed the original idea, where feedback altered a
 > work, where you would do it differently now. You cannot point at what
-> you threw away in November. [[The Portfolio and Reflection]] has the
+> you threw away early on. [[The Portfolio and Reflection]] has the
 > full requirements.
 
 ## Naming things so you can find them

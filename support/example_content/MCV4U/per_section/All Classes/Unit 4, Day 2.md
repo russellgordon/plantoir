@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Number talk: [[Visual Patterns]] — arrows head to tail
-2. Random groups — the September walk in coordinates, then in
+2. Random groups — the first walk in coordinates, then in
    components, then as a magnitude and a bearing
 3. Consolidate: [[What Vectors Are]] — three representations of one
    quantity, and when each is the convenient one

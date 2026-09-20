@@ -33,8 +33,9 @@ public static class CourseCodeValidator
             bool isAsciiLetter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
             bool isDigit = (c >= '0' && c <= '9');
             bool isSpace = (c == ' ');
-            if (!isAsciiLetter && !isDigit && !isSpace)
-                return ("A course code can only use letters, numbers and spaces.", "Letters, numbers, spaces");
+            bool isDash = (c == '-');
+            if (!isAsciiLetter && !isDigit && !isSpace && !isDash)
+                return ("A course code can only use letters, numbers, spaces and dashes.", "Letters, numbers, dashes");
         }
 
         if (trimmed.Length > MostCharacters)

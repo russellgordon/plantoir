@@ -26,21 +26,30 @@ S-shaped curve is the classic result: slow, then fast, then levelling.
 
 ## What sets carrying capacity
 
-Food, water, space, nesting sites, disease, predation. Density-DEPENDENT
-factors intensify as the population grows; density-INDEPENDENT factors —
-a hard frost, a fire — do not care how many there are.
+Food, water, space, nesting sites, disease, and predation. Density-DEPENDENT
+factors intensify per-capita mortality or depress fecundity (birth rate) as
+population density rises; density-INDEPENDENT factors — a hard frost, a
+drought, a flood — eliminate individuals regardless of density.
+
+In [[Modelling Population Growth]], you simulate how variations in intrinsic
+fecundity, lag times, and resource limitations create damped oscillations or
+chaotic boom-and-bust cycles around $K$.
 
 ## r-selected and K-selected
 
-Many small offspring, little care, early maturity (mosquitoes, dandelions)
-versus few offspring, heavy investment, late maturity (elephants, humans).
-Neither is better; each fits a different environment, and the labels are
-ends of a continuum rather than boxes.
+Many small offspring, high fecundity, little parental care, early maturity
+(dandelions, fruit flies) versus few offspring, heavy energetic investment,
+late maturity (whales, humans). Neither strategy is superior; each represents
+an evolutionary trade-off across varying ecological disturbance regimes.
 
 %%curriculum-start%%
 ## Curriculum connection
 
+![[F2.1]]
+
+![[F2.3]]
+
 ![[F3.1]]
 
-![[F2.1]]
+![[F3.3]]
 %%curriculum-end%%

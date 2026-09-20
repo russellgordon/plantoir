@@ -14,7 +14,8 @@ tags:
 2. Random groups — at the boards: theoretical against experimental
    probability, argued from the dice simulation
 3. Consolidate: why more trials settle it, and what 'settle' means
-4. [[A Data Story]], day 6 — working period: collect your data
+4. [[A Data Story]], day 4 of 9 — working period: finish collecting,
+   and tabulate what you have
 
 ## Things to do before our next class
 

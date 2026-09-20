@@ -51,8 +51,8 @@ a sentence about wanting to have grown.
 > the ±0.005 repeatability we measured on the colorimeter, so it is a
 > real effect and not the dilution itself: the system shifted toward the
 > side with more dissolved particles, as
-> [[Le Châtelier's Principle]] predicts. What the principle does not
-> tell us is *how far* it shifted — for that we would need the
+> [[Le Chatelier's Principle|Le Châtelier's Principle]] predicts. What the
+> principle does not tell us is *how far* it shifted — for that we would need the
 > equilibrium constant, and the direction is all this observation can
 > support."
 >

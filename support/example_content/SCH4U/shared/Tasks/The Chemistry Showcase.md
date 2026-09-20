@@ -24,11 +24,16 @@ Today that stops. The room is arranged so that everybody presents and
 everybody questions, and the two halves are marked together, because
 explaining and defending are the same skill seen from two sides.
 
-**Nothing new is built for this.** No new experiment, no new
+**Almost nothing new is built for this.** No new experiment, no new
 calculation, no poster produced the night before, no slides. You are
 presenting what you already have, which means the preparation is
-entirely about **selection and explanation** rather than production. If
-you find yourself making something, you have misread the task.
+almost entirely about **selection and explanation** rather than
+production.
+
+The one exception is the **panel page** — the career and the scientist,
+one page, written in class on the first preparation day, with sources.
+That page is handed in, and it is the only thing this task asks you to
+make.
 
 ## Who it is for
 
@@ -40,6 +45,18 @@ went wrong at your bench unless you tell them.
 Pitch it at somebody who is competent and uninformed about your
 specifics. That is a harder audience than either a beginner or an
 expert, and it is the one most real explaining is done for.
+
+## How the period runs
+
+The room splits into groups of about five, one to a bench. Everybody in
+a group presents in turn, to that group, and the group questions them.
+That is what makes the arithmetic work: everybody presents once, at
+length, to people who have to listen rather than wait.
+
+I move between the groups. I will hear all of some of you and some of
+all of you, which is why the two preparation periods matter as much as
+the day itself — most of what I can fairly judge about how you explain
+under pressure, I have to gather before the room gets loud.
 
 ## What you present
 
@@ -65,7 +82,8 @@ than a cycle that closed to within 2% by chance. The lab where you found
 out that your model had a boundary is the most interesting thing you
 did all semester.
 
-**3. A career panel.** One role connected to the chemistry in your work.
+**3. A career panel — written, on the panel page.** One role connected
+to the chemistry in your work.
 The curriculum's own examples are food and drug analyst, chemical safety
 officer, nurse practitioner, consumer protection specialist, metallurgy
 technologist, environmental and waste management technician, and
@@ -74,21 +92,25 @@ quality analyst, a materials scientist, a pharmacy technician, a
 corrosion engineer, a laboratory technologist, a science teacher.
 
 What does the work actually involve day to day, and what education and
-training does it take to get there? Two minutes.
+training does it take to get there? Half a page, with a source. Bring it
+to the bench so you can answer questions on it, but do not read it out.
 
-**4. A scientist panel.** One person who contributed to a field this
-course touched. The curriculum document offers **Robert G. Ackman**,
+**4. A scientist panel — written, on the same page.** One person who
+contributed to a field this course touched. The curriculum document
+offers **Robert G. Ackman**,
 **Alice Wilson**, **Carol Ann Budd**, **Norman L. Bowen**, and
 **Brian Evans Conway** as starting points, and you are free to choose
 someone else. Find out what they actually did, from a source that says
 where its information came from. A name is not a summary, and a one-line
-label copied from a search result is worth nothing here. Two minutes.
+label copied from a search result is worth nothing here. Half a page,
+with a source.
 
 ## The questioning
 
 Every presenter answers **at least two questions**, and every student
-asks **at least two questions** of other people. Both sides are marked,
-and half the marks are on the asking side of the room.
+asks **at least two questions** of other people. Both sides are marked.
+A question that makes a presenter stop and think is evidence about you,
+not only about them, and there is a row for it in the table below.
 
 > [!important] "I don't know" is a good answer when it is finished
 > Nobody expects you to have an answer to everything about your own
@@ -167,9 +189,9 @@ a result actually shows**:
   all semester, and it is the one I will be listening for.
 - **A career or scientist panel copied from the first search result**,
   with no source and no sign you understood it.
-- **Vanishing during the questioning half.** Half the marks are on that
-  side of the room, and a room where nobody asks anything is a room
-  where nobody has to defend anything.
+- **Vanishing during the questioning half.** It is marked, and a room
+  where nobody asks anything is a room where nobody has to defend
+  anything.
 
 Afterwards, and before the course ends, write [[Final Reflection]] in
 your [[Chemistry Journal]]. It is the entry I read first. If you want to
@@ -186,3 +208,47 @@ there.
 
 ![[A2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Showcase day itself is not the day to gather any of this. You are moving
+between benches, you will not hear most of what is said, and a student
+defending their work to you is having a different conversation from the
+one they have with a classmate. Both slots below are in the two
+preparation periods.
+
+OBSERVE — Unit 5, Day 11, while another group interrogates their numbers
+  Watch for: the three seconds after a question that has no easy answer.
+  This is the same behaviour the criteria table marks — that is exactly
+  why it is worth watching a day early, while there is still a period in
+  which to teach the difference, and while you can actually hear it.
+  Going well: the curve or the data table gets picked up and pointed at;
+  "I do not know" arrives with what would settle it attached; the
+  weakest answer is written down to be fixed.
+  Stuck: the same sentence said again more loudly; the question handed
+  to a partner; a number invented on the spot to fill the silence.
+  Record: your seating plan, one mark for reached for evidence and two
+  for went quiet. Anybody carrying two gets five minutes with you before
+  Day 12.
+
+TALK — Unit 5, Day 10, while the two panels are being written
+  Ask: "Who checks that person's work, and what happens when they get
+  something wrong?"
+  Then: "What did your scientist's field believe before them, and what
+  could people do afterwards that they could not do before?"
+  A strong first answer has an accountability in it — a second analyst,
+  a regulator, a signed batch record, a customer who notices — which is
+  a career described rather than a career looked up, and is the half of
+  A2.1 a job advertisement cannot supply. A strong second answer is a
+  before and an after with something in between, which is A2.2; a list
+  of posts held and prizes won is what comes back when the first
+  paragraph of a search result was the whole of the reading. Ask both
+  before the panels are finished, not after, so the answer can still
+  change what gets written.
+  Record: nothing. Send anybody who cannot answer back to a source for
+  the rest of the period; that is what the period is for.
+
+The product evidence is the panel page handed in on Day 10, and the
+presentation and questioning on Day 12.
+%%

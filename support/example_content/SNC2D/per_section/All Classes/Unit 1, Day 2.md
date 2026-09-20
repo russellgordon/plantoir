@@ -14,7 +14,7 @@ tags:
 2. For each group: what would that shape be good at doing?
 3. Compare with a group that sorted differently — argue it out
 4. Name it: [[Cells and Specialisation]], against your own categories
-5. Skill: [[Drawing Scientific Diagrams]] — the conventions we use all year
+5. Skill: [[Drawing Scientific Diagrams]] — the conventions we use all semester
 6. Discuss: [[Mistakes Are Data]] — the sorts that broke were the useful ones
 
 ## Things to do before our next class

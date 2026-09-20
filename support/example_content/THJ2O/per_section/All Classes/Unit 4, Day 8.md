@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Period 4 of 8: preparation
+1. Period 4 of 8: preparation: [[The Site Project]]
 2. Materials staged, tools checked, site prepared
-3. Safety brief for this specific job
+3. Safety brief for this specific job: [[Hazards on a Green Industry Site]]
 
 ## Things to do before our next class
 

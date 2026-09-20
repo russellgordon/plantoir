@@ -64,4 +64,8 @@ question into [[What Should a Country Remember|What Should a Country Remember?]]
 ![[E3.4]]
 
 ![[E3.2]]
+
+![[E1.4]]
+
+![[E2.3]]
 %%curriculum-end%%

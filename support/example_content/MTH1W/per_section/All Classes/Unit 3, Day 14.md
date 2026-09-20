@@ -11,11 +11,13 @@ tags:
 ## Agenda
 
 1. Number talk: [[Number Strings]] — a short one; presenters need the floor
-2. [[A Data Story]] talks — listen for claims the data actually supports
-3. Circle up: which stories changed your mind?
-4. Journal collection — [[Journal Checklist]] first, as always
+2. [[A Data Story]], day 9 of 9 — the talks: listen for claims the data
+   actually supports
+3. Stories in — the page as well as the talk
+4. Circle up: which stories changed your mind?
+5. Journal collection — [[Journal Checklist]] first, as always
 
 ## Things to do before our next class
 
-- [ ] Rest your correlation instincts — Unit 4 gets physical.
-- [ ] Bring a box, tube, or container you think is well designed.
+- [ ] Rest your correlation instincts — Unit 3 is not finished with you
+      yet.

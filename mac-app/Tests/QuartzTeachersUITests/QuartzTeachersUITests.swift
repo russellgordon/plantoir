@@ -5,7 +5,235 @@ import XCTest
 /// UITEST_WORKSPACE environment variable.
 final class QuartzTeachersUITests: XCTestCase {
 
+    // The stub preview server these tests start (see
+    // `writeStubPreviewScript(in:buildingInto:)`) is a child of the APP,
+    // not of this runner, so nothing reaps it on the way out.
+    // `tearDown` does — `reapStubPreviewServer()`.
+    //
+    // Be precise about what that covers, because the obvious reading is
+    // wrong: it catches a server that outlived the TEST BODY (the test
+    // failed before it could stop the preview, or stop mode did not
+    // fire). It does NOT catch an INTERRUPTED run — Cmd-period, or
+    // `xcodebuild` killed — because `tearDown` never executes, and the
+    // recorded pid is stranded in a `cq4t-fixture-<UUID>` folder that
+    // `FixtureWorkspace.materialize()` will never hand out again, so no
+    // later run can even find it. What makes an interrupted run harmless
+    // is the port, not the reaper: the orphan holds a kernel-assigned
+    // port nobody is waiting for, instead of the 8081 a real preview
+    // needs.
+    //
+    // Do NOT reach for `Process` here, however obvious it looks. An
+    // earlier attempt put `pkill -f "http.server 8081"` in
+    // `setUp`/`tearDown`; it looked right and did nothing, because the
+    // UI-test runner is sandboxed and cannot spawn a child process at
+    // all. Verified 2026-08-23 by having the helper write a marker file
+    // after `process.waitUntilExit()` — the marker was never written,
+    // and the `try?` had been swallowing the failure silently. Whatever
+    // reaps that server has to do it WITHOUT spawning anything, which is
+    // why the reaper is a raw `kill()` on a pid the stub records.
+    //
+    // The stub also no longer asks for port 8081, or any fixed port. It
+    // binds port 0, lets the kernel choose a free one, and announces the
+    // result on the line `ScriptRunner.previewAddress` already scrapes,
+    // so the app follows it wherever it lands. A fixed port made this
+    // suite fail whenever ANYTHING else on the machine held 8081 — an
+    // orphan from an interrupted run one morning, an unrelated `ssh -L`
+    // tunnel another — and that failure reads like a broken toolchain
+    // rather than like a busy port.
+
+    // MARK: - Stored properties
+
+    /// Where a running stub preview server recorded its process id, so
+    /// `tearDown` can reap a server the app would otherwise leave
+    /// behind. Nil when the current test started no stub server.
+    var stubPreviewPIDFileURL: URL?
+
     // MARK: - Functions
+
+    /// Reaps a stub preview server before the next test runs.
+    override func tearDown() {
+        reapStubPreviewServer()
+        super.tearDown()
+    }
+
+    /// Kills the stub preview server started by the current test, if it
+    /// is still running.
+    ///
+    /// The server is a child of the APP rather than of this runner, so
+    /// nothing else reaps one that outlived the test body. This uses a
+    /// bare `kill()` because the runner is sandboxed and cannot spawn a
+    /// helper process. It does NOT rescue an interrupted run, which
+    /// never reaches `tearDown` at all — see the note at the top of this
+    /// class for why that case is handled by the port instead.
+    func reapStubPreviewServer() {
+        guard let pidFileURL = stubPreviewPIDFileURL else {
+            return
+        }
+        stubPreviewPIDFileURL = nil
+
+        guard let recordedText = try? String(contentsOf: pidFileURL, encoding: .utf8) else {
+            return
+        }
+        try? FileManager.default.removeItem(at: pidFileURL)
+
+        let trimmedText: String = recordedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let processID = Int32(trimmedText), processID > 1 else {
+            return
+        }
+
+        // A process id is reused once its original owner is reaped, so
+        // "something answers to this number" is NOT enough to justify a
+        // SIGKILL — that is how a test murders an unrelated program of
+        // the teacher's. Check the name first: only a Python process can
+        // be the stub server this class started.
+        guard let runningName = nameOfRunningProcess(processID) else {
+            return
+        }
+        // Lowercased deliberately, and it matters. Homebrew's `python3`
+        // runs through a `Python.app` framework stub, so the kernel
+        // reports `Python` with a capital P, while the `/usr/bin/python3`
+        // that ships with the developer tools reports `python3`. A
+        // case-sensitive test passes on one machine and silently reaps
+        // nothing on the other — the same shape of quiet no-op this
+        // class was already caught by once.
+        guard runningName.lowercased().hasPrefix("python") else {
+            return
+        }
+        _ = kill(processID, SIGKILL)
+    }
+
+    /// The short name of a running process, or nil when no process holds
+    /// that id.
+    ///
+    /// Asks the kernel directly (`sysctl`) rather than running `ps`,
+    /// because this runner cannot spawn a process at all.
+    func nameOfRunningProcess(_ processID: Int32) -> String? {
+        var selector: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processID]
+        var processInfo: kinfo_proc = kinfo_proc()
+        var infoSize: Int = MemoryLayout<kinfo_proc>.stride
+
+        let outcome: Int32 = sysctl(&selector, 4, &processInfo, &infoSize, nil, 0)
+        if outcome != 0 || infoSize == 0 {
+            return nil
+        }
+
+        // Copied to a local first: reading the tuple's size inside a
+        // pointer closure over the same property is an overlapping
+        // access, and the compiler rejects it.
+        var commandName = processInfo.kp_proc.p_comm
+        let commandNameSize: Int = MemoryLayout.size(ofValue: commandName)
+        return withUnsafePointer(to: &commandName) { commandPointer in
+            return commandPointer.withMemoryRebound(
+                to: CChar.self,
+                capacity: commandNameSize
+            ) { characterPointer in
+                return String(cString: characterPointer)
+            }
+        }
+    }
+
+    /// Writes a fake `preview.sh` into a fixture workspace: it reports
+    /// the same milestones a real preview does, builds a one-page site
+    /// where a real build would put it, and serves that folder over HTTP
+    /// for the app to embed.
+    ///
+    /// Two details are load-bearing, and the test cannot pass without
+    /// either of them.
+    ///
+    /// It BUILDS INTO the folder the app watches. `waitForPreviewServer`
+    /// will not show a preview until this section's built `index.html`
+    /// has CHANGED — that is how a teacher is stopped from being shown
+    /// the previous build — and it waits two minutes before giving up on
+    /// that. A stub that serves a site from somewhere else never trips
+    /// the check, so the preview arrives two minutes late and the test
+    /// times out first.
+    ///
+    /// And it takes whatever port the kernel hands it, announcing that
+    /// port on the line the app scrapes, so this suite cannot collide
+    /// with a second run, a teacher's own preview, or any unrelated
+    /// program that happens to hold a port. It records its process id
+    /// before `exec`, which preserves that id, so what is written is the
+    /// server's own and `tearDown` can reap it.
+    func writeStubPreviewScript(in fixtureURL: URL, buildingInto publicURL: URL) throws {
+        let pidFileURL: URL = fixtureURL.appendingPathComponent("stub-preview.pid")
+        try? FileManager.default.removeItem(at: pidFileURL)
+
+        let stubScript: String = """
+        #!/bin/bash
+        # Stop mode. The app runs `preview.sh <course> <section> --stop`
+        # whenever a preview ends, and WAITS for it before starting the
+        # next one, so a stub that ignores the flag and starts a server
+        # instead never exits and wedges the restart.
+        for argument in "$@"; do
+            if [ "$argument" = "--stop" ]; then
+                if [ -f "\(pidFileURL.path)" ]; then
+                    # Name-checked, for the same reason the Swift reaper
+                    # checks: a recorded pid may have died and been
+                    # recycled, and signalling it blind is how a test
+                    # kills an unrelated program. Substring rather than
+                    # prefix because `ps` reports a full path here.
+                    stub_pid="$(cat "\(pidFileURL.path)")"
+                    stub_name="$(ps -p "$stub_pid" -o comm= 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+                    case "$stub_name" in
+                        *python*) kill "$stub_pid" 2>/dev/null ;;
+                    esac
+                    rm -f "\(pidFileURL.path)"
+                fi
+                exit 0
+            fi
+        done
+
+        # Recorded FIRST, before anything slow. `$$` is this shell, and
+        # `exec` below keeps that id, so the value is right this early —
+        # and writing it here closes a window that would otherwise leak
+        # the very orphan this file exists to prevent: a test can finish
+        # and tear down within a second of starting a preview, and a pid
+        # written after the sleeps would not exist yet to be reaped.
+        echo $$ > "\(pidFileURL.path)"
+
+        echo "Starting container if needed"
+        sleep 1
+        echo "Copying shared folders"
+        sleep 1
+        mkdir -p "\(publicURL.path)"
+        printf '%s' '<html><body><h1>Stub site</h1></body></html>' > "\(publicURL.path)/index.html"
+        cd "\(publicURL.path)" && exec python3 -u -c '
+        import http.server
+        import socketserver
+        import sys
+
+        class ReusableServer(socketserver.TCPServer):
+            allow_reuse_address = True
+
+        # Bind BEFORE announcing: the port is real by the time the app
+        # reads about it, so there is no window in which something else
+        # could take it.
+        server = ReusableServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler)
+        port = server.server_address[1]
+        print("Preview will be available at: http://localhost:%d/" % port)
+        print("Launching Quartz preview on http://localhost:%d" % port)
+        sys.stdout.flush()
+        server.serve_forever()
+        '
+        """
+
+        let stubURL: URL = fixtureURL.appendingPathComponent("preview.sh")
+        try stubScript.write(to: stubURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stubURL.path)
+        stubPreviewPIDFileURL = pidFileURL
+    }
+
+    /// Where a build for `sectionNumber` of the fixture's EXC2O course
+    /// puts the pages it serves — the folder the app watches to decide a
+    /// preview is ready.
+    func builtSiteURL(in fixtureURL: URL, sectionNumber: Int) -> URL {
+        return fixtureURL
+            .appendingPathComponent("courses")
+            .appendingPathComponent("EXC2O")
+            .appendingPathComponent(".merged_output")
+            .appendingPathComponent("section\(sectionNumber)")
+            .appendingPathComponent("public")
+    }
 
     /// Launches the app pointed at a fixture workspace: the one supplied
     /// via UITEST_WORKSPACE, or a fresh disposable one built from the test
@@ -23,8 +251,12 @@ final class QuartzTeachersUITests: XCTestCase {
         return application
     }
 
-    func saveScreenshot(named name: String, of application: XCUIApplication) {
-        let screenshot: XCUIScreenshot = application.screenshot()
+    /// Takes an `XCUIScreenshotProviding` rather than the application so
+    /// a caller can attach ONE WINDOW. `XCUIApplication.screenshot()` on
+    /// macOS captures the entire display, which put another app's window
+    /// over the thing under test more than once (2026-08-23).
+    func saveScreenshot(named name: String, of provider: XCUIScreenshotProviding) {
+        let screenshot: XCUIScreenshot = provider.screenshot()
         let attachment: XCTAttachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
         attachment.lifetime = .keepAlways
@@ -67,6 +299,21 @@ final class QuartzTeachersUITests: XCTestCase {
         saveScreenshot(named: "03-after-save", of: application)
     }
 
+    /// The wizard's affirmative button, as `contracts/shared-rules.json` spells
+    /// it. Read rather than retyped: a copy of a contract sentence in a test is
+    /// the copy that keeps passing after the product's words change.
+    private func createCourseButtonLabel() throws -> String {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let wizard: [String: Any] = try XCTUnwrap(all["wizard"] as? [String: Any])
+        return try XCTUnwrap(wizard["createCourseButton"] as? String)
+    }
+
     func testWizardSuggestsCourseNameFromCode() throws {
         let application: XCUIApplication = try launchApp()
 
@@ -87,6 +334,20 @@ final class QuartzTeachersUITests: XCTestCase {
         let waitResult: XCTWaiter.Result = XCTWaiter().wait(for: [expectation], timeout: 5)
         XCTAssertEqual(waitResult, .completed, "The course name should auto-fill from the code; value was: \(String(describing: nameField.value))")
 
+        // The RENDERED affirmative button says what the contract says.
+        //
+        // The gated test in QuartzTeachersTests compares WizardWording to the
+        // contract, which pins the CONSTANT: it stays green if this view stops
+        // using it and goes back to a literal. Only a run of the real app can
+        // see the button, so the assertion belongs here even though this target
+        // is outside the documented gate.
+        let createButton: XCUIElement = application.buttons[try createCourseButtonLabel()]
+        XCTAssertTrue(
+            createButton.waitForExistence(timeout: 5),
+            "The wizard's affirmative button is not labelled the way "
+            + "contracts/shared-rules.json → wizard.createCourseButton spells it."
+        )
+
         // The formal-name suggestion button should switch the name.
         let formalNameButton: XCUIElement = application.buttons["suggestedFormalNameButton"]
         XCTAssertTrue(formalNameButton.waitForExistence(timeout: 5))
@@ -97,6 +358,437 @@ final class QuartzTeachersUITests: XCTestCase {
 
         let closeButton: XCUIElement = application.buttons["wizardCloseButton"]
         closeButton.click()
+    }
+
+    /// The course-code field's popup: typing narrows a floating list of
+    /// rich rows (code, example-content badge, formal name), and picking
+    /// one sets both the code and — via the existing auto-fill — the
+    /// course name in one action.
+    func testCourseCodePopupShowsRichSuggestionsAndSelectionFillsBothFields() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+        codeField.click()
+        codeField.typeText("SCH")
+
+        let suggestionsList: XCUIElement = application.scrollViews["courseCodeSuggestionsList"]
+        XCTAssertTrue(suggestionsList.waitForExistence(timeout: 5), "The popup should appear while typing")
+
+        let sch3uRow: XCUIElement = application.buttons["courseCodeSuggestion-SCH3U"]
+        XCTAssertTrue(sch3uRow.waitForExistence(timeout: 5), "SCH3U should be a suggestion for \"SCH\"")
+
+        saveScreenshot(named: "06-course-code-popup", of: application)
+
+        sch3uRow.click()
+
+        // Selecting a row sets the code…
+        let codeSettled: NSPredicate = NSPredicate(format: "value == %@", "SCH3U")
+        let codeExpectation: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: codeSettled, object: codeField)
+        XCTAssertEqual(XCTWaiter().wait(for: [codeExpectation], timeout: 5), .completed, "Selecting the row should set the code field to SCH3U")
+
+        // …and the popup should close (the field now holds an exact code).
+        XCTAssertFalse(suggestionsList.exists, "The popup should close once a code is chosen")
+
+        // …and auto-fills the course name.
+        let nameField: XCUIElement = application.textFields["wizardCourseNameField"]
+        let nameSettled: NSPredicate = NSPredicate(format: "value == %@", "Chem")
+        let nameExpectation: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: nameSettled, object: nameField)
+        XCTAssertEqual(XCTWaiter().wait(for: [nameExpectation], timeout: 5), .completed, "Selecting a suggestion should auto-fill the course name; value was: \(String(describing: nameField.value))")
+
+        let closeButton2: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton2.click()
+    }
+
+    /// The trailing chevron — the visual cue that this field is really a
+    /// combo box, per the HIG — opens the popup and browses the whole
+    /// catalog without the teacher needing to type anything first.
+    func testCourseCodeRevealButtonOpensThePopup() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+
+        let revealButton: XCUIElement = application.buttons["courseCodeRevealButton"]
+        XCTAssertTrue(revealButton.waitForExistence(timeout: 5))
+        revealButton.click()
+
+        let suggestionsList: XCUIElement = application.scrollViews["courseCodeSuggestionsList"]
+        XCTAssertTrue(suggestionsList.waitForExistence(timeout: 5), "Clicking the chevron should open the popup without typing anything")
+
+        // Browsing (an empty query) lists the whole province catalog
+        // alphabetically — ADA1O leads the Ontario list.
+        let firstRow: XCUIElement = application.buttons["courseCodeSuggestion-ADA1O"]
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 5), "The full catalog should be browsable from the chevron")
+
+        // The reveal button must actually sit INSIDE the field's visual
+        // bounds — Russell caught the first attempt rendering it
+        // detached, with no fill to show it was even a button. Checked
+        // by geometry rather than a screenshot: this machine's screen
+        // capture has been unreliable mid-session (grabbing an unrelated
+        // window), so frame containment is the trustworthy check here.
+        // Against the background SHAPE's own frame, not `codeField`'s —
+        // an `NSTextField`'s reported AX frame reflects the underlying
+        // control's own intrinsic content bounds (~18pt tall) regardless
+        // of a later `.frame(height:)` giving it more room to sit inside
+        // (confirmed identical across two different modifier orderings,
+        // 2026-08-23), so it under-reports this field's real 30pt visual
+        // height. The `RoundedRectangle` used as the field's
+        // `.background` doesn't have that limitation — its own
+        // accessibility frame matches its actual laid-out size.
+        let fieldBackground: XCUIElement = application.descendants(matching: .any).matching(identifier: "wizardCourseCodeFieldBackground").firstMatch
+        XCTAssertTrue(fieldBackground.waitForExistence(timeout: 5))
+        let fieldFrame: CGRect = fieldBackground.frame
+        let buttonFrame: CGRect = revealButton.frame
+        XCTAssertTrue(fieldFrame.contains(buttonFrame), "The reveal button should be fully contained within the field's own visual bounds — field: \(fieldFrame), button: \(buttonFrame)")
+        XCTAssertGreaterThan(buttonFrame.midX, fieldFrame.midX, "The reveal button should sit on the trailing half of the field")
+        XCTAssertLessThan(buttonFrame.height, fieldFrame.height, "The reveal button should leave a visible margin top and bottom, not fill the whole field")
+        // An upper bound too, not just containment — a regression that
+        // grew the field far beyond the wizard sheet itself would still
+        // "contain" the button and still put it on the "trailing half",
+        // so containment alone can't catch that. The field legitimately
+        // spans the Form row's full width here (measured ~620pt), the
+        // same as every sibling field (Course Name, etc.) in this same
+        // `Form` — an EARLIER version of this bound (400pt, assuming a
+        // compact code-sized box) was wrong about that and failed on
+        // correct, unchanged behaviour; this one only catches the field
+        // growing past what the 680pt wizard sheet itself could hold.
+        XCTAssertLessThan(fieldFrame.width, 700, "The field shouldn't grow past what the wizard sheet itself could hold — frame: \(fieldFrame)")
+        XCTAssertLessThan(fieldFrame.height, 40, "The field itself should stay a single compact row — frame: \(fieldFrame)")
+
+        let closeButton3: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton3.click()
+    }
+
+
+    /// The copy of a `Form` row's label that belongs to the row holding
+    /// `field` — the one whose vertical centre is closest to the
+    /// field's. Needed because the window behind the wizard sheet can
+    /// carry a label with the identical text; see the note in
+    /// `testCourseCodeFieldMatchesCourseNameFieldsLeadingEdgeAndLabel`.
+    func wizardLabel(named text: String, near field: XCUIElement, in application: XCUIApplication) -> XCUIElement {
+        let candidates: [XCUIElement] = application.staticTexts.matching(identifier: text).allElementsBoundByIndex
+        var closest: XCUIElement = application.staticTexts[text]
+        var smallestDistance: CGFloat = .greatestFiniteMagnitude
+        for candidate in candidates {
+            let distance: CGFloat = abs(candidate.frame.midY - field.frame.midY)
+            if distance < smallestDistance {
+                smallestDistance = distance
+                closest = candidate
+            }
+        }
+        return closest
+    }
+
+    /// Course code's field should look and sit like every other field
+    /// in the Basics section: a "Course code" label OUTSIDE the field,
+    /// in the same leading column as "Course name", with its own field
+    /// starting at the same leading edge as Course name's — and typed
+    /// text reading from that leading edge rather than pushed against
+    /// the trailing one (Russell, 2026-08-23, comparing a screenshot of
+    /// the two rows).
+    func testCourseCodeFieldMatchesCourseNameFieldsLeadingEdgeAndLabel() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+
+        // "Course code" is a real label OUTSIDE the field, in the same
+        // leading column as "Course name" — not placeholder text inside
+        // it, which is what a `Form` row gives a view of ours that
+        // isn't a bare `TextField` (Russell, 2026-08-23, comparing the
+        // two rows). `NewCourseWizardView` writes it as an explicit
+        // `LabeledContent`; if this stops finding a match, that wrapper
+        // was removed or renamed.
+        // Both labels are found by their VISIBLE TEXT, then narrowed
+        // to the wizard's own copies. Two things forced that shape.
+        // First, the course settings pane BEHIND this sheet has a
+        // "Course name" label of its own, so an unscoped query matched
+        // two elements and the frame comparison below died with
+        // "Multiple matching elements found" — but only when an earlier
+        // test in the same run had left a course selected, which is why
+        // it passed in isolation (2026-08-23). Second, the two obvious
+        // fixes both failed: `application.sheets` finds nothing (this
+        // sheet isn't reported as one), and giving the labels their own
+        // `.accessibilityIdentifier` in `NewCourseWizardView` made the
+        // whole `LabeledContent` row merge into a single element, so
+        // `wizardCourseCodeField` stopped existing as a `TextField` at
+        // all and every later click failed. So: pick the copy that
+        // belongs to this sheet by its geometry instead.
+        let label: XCUIElement = wizardLabel(named: "Course code", near: codeField, in: application)
+        XCTAssertTrue(label.exists, "\"Course code\" should be a label beside the field, the same way \"Course name\" is")
+        let nameLabel: XCUIElement = wizardLabel(named: "Course name", near: application.textFields["wizardCourseNameField"], in: application)
+        XCTAssertTrue(nameLabel.exists)
+        XCTAssertEqual(label.frame.minX, nameLabel.frame.minX, accuracy: 2.0, "The two labels should share a leading edge — code: \(label.frame.minX), name: \(nameLabel.frame.minX)")
+
+        let codeFieldBackground: XCUIElement = application.descendants(matching: .any).matching(identifier: "wizardCourseCodeFieldBackground").firstMatch
+        XCTAssertTrue(codeFieldBackground.waitForExistence(timeout: 5))
+        let nameField: XCUIElement = application.textFields["wizardCourseNameField"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+
+        // The label sits to the LEFT of both fields now, so a field
+        // that still started where the label does would mean the
+        // two-column row never formed.
+        XCTAssertGreaterThan(nameField.frame.minX, nameLabel.frame.maxX, "Course name's field should sit in the row's trailing column, past its label")
+
+        // Not `codeFieldBackground.frame` — that identifier is bound to
+        // a `Shape` used only as decoration, and SwiftUI's
+        // accessibility tree hoists a decorative element's identifier
+        // onto the nearest "real" ancestor container it merges into,
+        // which turns out to be the whole Form ROW (both columns
+        // together): confirmed directly, it reported x=1951, width=620
+        // — the same leading edge as the row's own label and far wider
+        // than the field itself (2026-08-23). The `TextField` elements
+        // themselves are the reliable comparison.
+        let codeLeadingX: CGFloat = codeField.frame.minX
+        let nameLeadingX: CGFloat = nameField.frame.minX
+        // 8pt, not a tight match: an `NSTextField`'s AX frame is its
+        // TEXT area, and `.roundedBorder` keeps its own inset inside
+        // that frame while this field's `.plain` style draws none — so
+        // the course-code field spends `textLeadingInset` (4pt,
+        // AppKit's own `titleRect` answer) to put its text where Course
+        // name's already is, and that shows up here as a difference in
+        // reported origin even when the two BOXES line up exactly
+        // (measured 2234.0 vs 2229.0, 2026-08-23, with the boxes
+        // visually flush in a screenshot).
+        XCTAssertEqual(codeLeadingX, nameLeadingX, accuracy: 8.0, "Course code's field should start at the same leading edge as Course name's — code: \(codeLeadingX), name: \(nameLeadingX)")
+
+        // Typed text reads LEADING in all three fields. `Form`'s own
+        // label extraction would have made each field's contents the
+        // row's trailing-aligned VALUE — Russell saw Timetable section
+        // numbers' "1" against the field's right edge (2026-08-23) —
+        // and `.multilineTextAlignment(.leading)` alone did not
+        // override that; the explicit `LabeledContent` wrappers are
+        // what fixed it. Compared by where each field's own text
+        // element STARTS relative to its field: near the leading edge,
+        // nowhere near the trailing one.
+        codeField.click()
+        codeField.typeText("SCH3U")
+        nameField.click()
+        nameField.typeText("Chemistry")
+
+        for (fieldName, field) in [("course code", codeField), ("course name", nameField)] {
+            let text: XCUIElement = field.staticTexts.firstMatch
+            if text.exists {
+                let offsetFromLeading: CGFloat = text.frame.minX - field.frame.minX
+                XCTAssertLessThan(offsetFromLeading, 20.0, "The \(fieldName) field's text should start at its leading edge, not float to the right of it — offset: \(offsetFromLeading)")
+            }
+        }
+
+        saveScreenshot(named: "06-course-code-vs-name-alignment", of: application.windows.firstMatch)
+
+        let closeButton5: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton5.click()
+    }
+
+    /// A British Columbia course code — dashes and all — is accepted, and is
+    /// NOT mistaken for a club (Russell, 2026-08-23). Both halves matter:
+    /// the character rule refused the dash, and the club heuristic ("the
+    /// fourth character is the grade digit") called every one of BC's 117
+    /// courses a club, which put the club-only short-label field on screen
+    /// for a real course.
+    func testBritishColumbiaCourseCodeIsAcceptedAndIsNotAClub() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10))
+        codeField.click()
+        codeField.typeText("MTEL-12")
+
+        // No complaint about the dash.
+        let warning: XCUIElement = application.staticTexts["courseCodeWarning"]
+        XCTAssertFalse(
+            warning.waitForExistence(timeout: 2),
+            "A BC course code's dash should be accepted — warning said: \(warning.exists ? "\(warning.label)" : "")"
+        )
+
+        // And the club-only short-label field stays away, because the
+        // catalog knows MTEL-12 is a course.
+        let shortLabel: XCUIElement = application.textFields["wizardCustomShortNameField"]
+        XCTAssertFalse(shortLabel.exists, "MTEL-12 is a real BC course, not a club — the short-label field should not appear")
+
+        let closeButton: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton.click()
+    }
+
+    /// A teacher-invented club code still gets the short-label field — the
+    /// catalog check above must not have switched it off for everyone.
+    func testAClubCodeStillOffersTheShortLabelField() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10))
+        codeField.click()
+        codeField.typeText("ROBOTICS")
+
+        let shortLabel: XCUIElement = application.textFields["wizardCustomShortNameField"]
+        XCTAssertTrue(shortLabel.waitForExistence(timeout: 5), "A club code should still offer a short label")
+
+        // And it wears the same chrome as its neighbours: a label in the
+        // leading column, and a field starting where Course Name's does.
+        let nameField: XCUIElement = application.textFields["wizardCourseNameField"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            shortLabel.frame.minX, nameField.frame.minX, accuracy: 4.0,
+            "The short-label field should start where Course Name's does — short: \(shortLabel.frame.minX), name: \(nameField.frame.minX)"
+        )
+        let shortLabelText: XCUIElement = wizardLabel(named: "Short label", near: shortLabel, in: application)
+        XCTAssertTrue(shortLabelText.exists, "\"Short label\" should be a label beside the field, not placeholder text inside it")
+
+        // Move focus out of the code field before the screenshot: the
+        // suggestion popup floats over the rows below it, so a shot taken
+        // with it open shows the popup rather than the thing under test.
+        // Waiting on the popup's own disappearance rather than sleeping —
+        // it fades over 0.12s, and a shot timed by a guess catches it
+        // half-faded (which is exactly what the first attempt did).
+        // Escape rather than clicking elsewhere: the popup COVERS the rows
+        // below, so clicking Course Name fails outright with "Not
+        // hittable" (it did). Escape closes the popup without moving
+        // focus, which is what it is for.
+        codeField.typeKey(.escape, modifierFlags: [])
+        let suggestions: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "courseCodeSuggestionsList").firstMatch
+        XCTAssertTrue(suggestions.waitForNonExistence(timeout: 5))
+        saveScreenshot(named: "08-club-short-label-field", of: application.windows.firstMatch)
+
+        let closeButton: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton.click()
+    }
+
+    /// The chevron TOGGLES, the way a real `NSComboBox`'s arrow does:
+    /// a second press puts the popup away rather than doing nothing
+    /// (Russell, 2026-08-23).
+    func testCourseCodeRevealButtonAlsoClosesThePopup() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let revealButton: XCUIElement = application.buttons["courseCodeRevealButton"]
+        XCTAssertTrue(revealButton.waitForExistence(timeout: 10))
+
+        revealButton.click()
+        let suggestions: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "courseCodeSuggestionsList").firstMatch
+        XCTAssertTrue(suggestions.waitForExistence(timeout: 5), "The first press should open the popup")
+
+        revealButton.click()
+        // `waitForNonExistence` rather than a bare `exists`: the popup
+        // fades out over 0.12s, so an immediate read can still see it.
+        XCTAssertTrue(suggestions.waitForNonExistence(timeout: 5), "A second press should close it again")
+
+        revealButton.click()
+        XCTAssertTrue(suggestions.waitForExistence(timeout: 5), "A third press should reopen it")
+
+        let closeButton: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton.click()
+    }
+
+    /// Down-arrow walks the popup and Return takes the highlighted row,
+    /// the way a real `NSComboBox` does (Russell, 2026-08-23).
+    func testArrowKeysAndReturnChooseACourseCode() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10))
+        codeField.click()
+        codeField.typeText("SCH")
+
+        let sch3uRow: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "courseCodeSuggestion-SCH3U").firstMatch
+        XCTAssertTrue(sch3uRow.waitForExistence(timeout: 5), "SCH3U should be among the suggestions for \"SCH\"")
+
+        // What the FIRST row is depends on the catalog's ordering, so
+        // read it out of the row's own identifier rather than hard-coding
+        // a code — the behaviour under test is "down highlights the
+        // first row, Return takes it", not which course happens to sort
+        // first for "SCH".
+        let rows: [XCUIElement] = application.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "courseCodeSuggestion-"))
+            .allElementsBoundByIndex
+        XCTAssertFalse(rows.isEmpty, "There should be suggestions to walk")
+        let firstRowCode: String = String(rows[0].identifier.dropFirst("courseCodeSuggestion-".count))
+        XCTAssertFalse(firstRowCode.isEmpty)
+
+        codeField.typeKey(.downArrow, modifierFlags: [])
+        saveScreenshot(named: "07-course-code-keyboard-highlight", of: application.windows.firstMatch)
+        codeField.typeKey(.return, modifierFlags: [])
+        XCTAssertEqual(
+            "\(codeField.value ?? "")".uppercased(),
+            firstRowCode.uppercased(),
+            "One down-arrow should highlight the first suggestion and Return should take it"
+        )
+
+        // And the popup closes on commit, the same as clicking a row.
+        let suggestions: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "courseCodeSuggestionsList").firstMatch
+        XCTAssertTrue(suggestions.waitForNonExistence(timeout: 5), "Committing with Return should close the popup")
+
+        let closeButton: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton.click()
+    }
+
+    /// The reveal button's actual reason for existing: reopening the
+    /// popup when the field is ALREADY focused but Escape just closed
+    /// the list — a plain focus change wouldn't trigger that popup again
+    /// on its own, since nothing about focus is changing.
+    func testCourseCodeRevealButtonReopensAfterEscape() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+        codeField.click()
+
+        let suggestionsList: XCUIElement = application.scrollViews["courseCodeSuggestionsList"]
+        XCTAssertTrue(suggestionsList.waitForExistence(timeout: 5), "Clicking into the field should open the popup")
+
+        codeField.typeKey(.escape, modifierFlags: [])
+        let closedExpectation: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: suggestionsList
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [closedExpectation], timeout: 5), .completed, "Escape should close the popup")
+
+        // The field still has focus — Escape doesn't blur it — so a
+        // plain focus change wouldn't reopen anything on its own; this
+        // is what `onRevealRequested` exists for.
+        let revealButton: XCUIElement = application.buttons["courseCodeRevealButton"]
+        XCTAssertTrue(revealButton.waitForExistence(timeout: 5))
+        revealButton.click()
+
+        XCTAssertTrue(suggestionsList.waitForExistence(timeout: 5), "The reveal button should reopen the popup even though the field never lost focus")
+
+        let closeButton4: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton4.click()
     }
 
     func testSidebarContextMenuOffersFolderActions() throws {
@@ -128,26 +820,8 @@ final class QuartzTeachersUITests: XCTestCase {
     func testRestartingAPreviewReturnsToTheProgressView() throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
 
-        let siteURL: URL = fixtureURL.appendingPathComponent("stub-site")
-        try FileManager.default.createDirectory(at: siteURL, withIntermediateDirectories: true)
-        try "<html><body><h1>Stub site</h1></body></html>".write(
-            to: siteURL.appendingPathComponent("index.html"),
-            atomically: true,
-            encoding: .utf8
-        )
-
-        let stubScript: String = """
-        #!/bin/bash
-        echo "Starting container if needed"
-        sleep 1
-        echo "Copying shared folders"
-        sleep 1
-        echo "Launching Quartz preview on http://localhost:8081"
-        cd "\(siteURL.path)" && exec python3 -m http.server 8081 --bind 127.0.0.1
-        """
-        let stubURL: URL = fixtureURL.appendingPathComponent("preview.sh")
-        try stubScript.write(to: stubURL, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stubURL.path)
+        let publicURL: URL = builtSiteURL(in: fixtureURL, sectionNumber: 1)
+        try writeStubPreviewScript(in: fixtureURL, buildingInto: publicURL)
 
         let application: XCUIApplication = XCUIApplication()
         application.launchEnvironment["UITEST_WORKSPACE"] = fixtureURL.path
@@ -252,5 +926,79 @@ final class QuartzTeachersUITests: XCTestCase {
 
         let restoredValue: String = "\(readingTimeToggle.value ?? "")"
         XCTAssertEqual(initialValue, restoredValue, "Cancel should revert the toggle")
+    }
+
+    /// The skeleton toggle, driven for real: typing a code with no
+    /// ready-made pages fills the structure editor with that subject's
+    /// folders, turning the toggle off puts the generic defaults back, and
+    /// turning it on again brings the subject's folders back.
+    ///
+    /// The unit suite can only call the functions this uses, and the bug
+    /// behind issue #77 was a control with no handler at all — which every
+    /// unit test passed. So this one presses the toggle.
+    ///
+    /// Read through the Marks checklist rather than the folder lists: it
+    /// offers every folder the course currently has and sits OUTSIDE the
+    /// "Folders and files" disclosure, so the state of the editor can be
+    /// read without opening anything. `Investigations` belongs to the
+    /// science skeleton and to no factory list; `Examples` is the other way
+    /// round.
+    func testDecliningTheSkeletonPutsTheDefaultFoldersBack() throws {
+        let application: XCUIApplication = try launchApp()
+
+        // `.firstMatch`: the sidebar's own button and the menu item that
+        // does the same thing both answer to this identifier, and either
+        // opens the wizard.
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"].firstMatch
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+        codeField.click()
+        codeField.typeText("SNC4M")
+
+        let subjectFolder: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "toggle-Investigations").firstMatch
+        let factoryFolder: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "toggle-Examples").firstMatch
+        XCTAssertTrue(
+            subjectFolder.waitForExistence(timeout: 10),
+            "Typing a code with a skeleton should put that subject's folders in the editor"
+        )
+        XCTAssertFalse(factoryFolder.exists, "…and take the factory-only ones out")
+
+        let skeletonToggle: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "skeletonToggle").firstMatch
+        XCTAssertTrue(skeletonToggle.waitForExistence(timeout: 5))
+        skeletonToggle.click()
+
+        XCTAssertTrue(
+            factoryFolder.waitForExistence(timeout: 5),
+            "Turning the skeleton off should put the generic defaults back — the editor has to "
+            + "show what will actually be created (contracts/shared-rules.json → "
+            + "wizard.skeletonToggle)."
+        )
+        XCTAssertFalse(subjectFolder.exists, "…and take the skeleton's folders out")
+
+        let emptyCourseNote: XCUIElement = application.staticTexts["noExampleContentNote"]
+        XCTAssertTrue(
+            emptyCourseNote.waitForExistence(timeout: 5),
+            "A teacher who declines the skeleton is told the course will start with empty "
+            + "folders — the same sentence a code with no skeleton at all gets."
+        )
+
+        skeletonToggle.click()
+
+        XCTAssertTrue(
+            subjectFolder.waitForExistence(timeout: 5),
+            "Turning it back on should adopt the subject's folders again"
+        )
+        XCTAssertFalse(factoryFolder.exists)
+        XCTAssertFalse(emptyCourseNote.exists, "…and take the empty-course note away again")
+
+        saveScreenshot(named: "07-skeleton-toggle-restores-defaults", of: application)
+
+        application.buttons["wizardCloseButton"].click()
     }
 }

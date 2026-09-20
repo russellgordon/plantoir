@@ -6,7 +6,7 @@ created: __CREATED__
 What you should be able to do by the end of THJ2O, in plain words first
 and in the Ministry's words underneath.
 
-## By June you should be able to
+## By the end of the course you should be able to
 
 - **Identify** the plants on our sites, and say what each needs.
 - **Explain how a plant works** well enough to diagnose why one is

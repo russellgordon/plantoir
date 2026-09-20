@@ -30,14 +30,14 @@ the "what broke" prompt to capture.
 ## Feelings are welcome — anchored to a moment and an error
 
 The journal is not a lab report; frustrated, proud, embarrassed, and
-delighted all belong in it. The rule is that a feeling arrives
-*attached to the moment that caused it and the code involved*. "I
-felt stupid" floats free and teaches you nothing in June. "I felt
-stupid when the same `SyntaxError` came back four runs in a row — so
-I finally read the whole message, and the bug was on the line above"
-is a feeling with an address and an exit. The feeling is real data
-about you; the error is the handle you can actually turn — the same
-pairing [[Debugging Is the Job]] argues staying curious depends on.
+delighted all belong in it. The rule is that a feeling arrives *attached to
+the moment that caused it and the code involved*. "I felt stupid" floats
+free and teaches you nothing at the end of the course. "I felt stupid when
+the same `SyntaxError` came back four runs in a row — so I finally read the
+whole message, and the bug was on the line above" is a feeling with an
+address and an exit. The feeling is real data about you; the error is the
+handle you can actually turn — the same pairing [[Debugging Is the Job]]
+argues staying curious depends on.
 
 %%curriculum-start%%
 ## Curriculum connection

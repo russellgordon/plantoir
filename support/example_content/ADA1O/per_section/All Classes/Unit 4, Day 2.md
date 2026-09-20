@@ -19,5 +19,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] [[Production Roles Interview]] presentations next class — be ready.
+- [ ] [[Production Roles Interview]] presentations on Day 4 — be ready.
 - [ ] Journal: which piece did your group choose, and what convinced you?

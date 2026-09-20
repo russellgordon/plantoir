@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Preparedness Audit]] handed in
-2. Summary pages swapped between groups and tested — could you act on this in ten minutes?
-3. Gaps named as gaps: what no group could find, and what that absence itself tells us
+1. First half of the period: [[The Preparedness Audit]] revision — what Day 19's conference found, fixed here
+2. [[The Preparedness Audit]] handed in
+3. Summary pages swapped between groups and tested — could you act on this in ten minutes? No group's reading of another's page carries a mark
+4. Gaps named as gaps: what no group could find, and what that absence itself tells us
 
 ## Things to do before our next class
 

@@ -17,3 +17,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Journal: the idea from Unit 1 you would explain differently now.
+- [ ] First journal collection is next class — measure your entries
+      against [[Journal Checklist]].

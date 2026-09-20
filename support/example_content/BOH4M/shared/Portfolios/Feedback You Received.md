@@ -41,6 +41,10 @@ example and ignored the feedback that came as a judgement. That finding
 is the whole reason appraisal instruments look the way they do — see
 [[Appraisal Methods]].
 
+The analysis is written in class, and it is marked against the four rows
+on [[The Management Portfolio]] — the same four rows as every other
+entry.
+
 %%curriculum-start%%
 ## Curriculum connection
 

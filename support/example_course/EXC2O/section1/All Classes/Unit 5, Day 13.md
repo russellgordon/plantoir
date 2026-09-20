@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Reflection drafted.
+- [ ] Bring your portfolio again. The reflection is finished in class
+      tomorrow, and handed in with it.

@@ -113,6 +113,17 @@ class WorkspaceModel {
         }
     }
 
+    /// True when this model is one a window shows — as against one the
+    /// assistant or the MCP server made for its own reading.
+    static func isShownInAWindow(_ model: WorkspaceModel) -> Bool {
+        for existing in windowModels {
+            if existing === model {
+                return true
+            }
+        }
+        return false
+    }
+
     /// True while some open window is working in this folder.
     static func folderIsInUse(_ path: String) -> Bool {
         for model in windowModels {
@@ -255,6 +266,35 @@ class WorkspaceModel {
     /// fault, just an unfinished choice.
     var workspaceIsUnrecognized: Bool = false
 
+    /// The cloud service keeping this working folder in sync, when one is
+    /// — see `CloudSyncedFolder` for what that costs and why it is allowed.
+    /// Nil for an ordinary folder.
+    var syncedFolder: CloudSyncedFolder?
+
+    /// True while the picker waits for the teacher to decide about a synced
+    /// folder they have just CHOSEN: use it anyway, or pick a different one.
+    /// The moment they can still change their mind for free, so it is a
+    /// choice here and only a notice later.
+    var needsCloudSyncDecision: Bool = false
+
+    /// True while the window shows the quiet, dismissable notice about a
+    /// synced folder it RESTORED rather than one the teacher just chose — a
+    /// folder that was moved into iCloud after it was set up, or set up
+    /// before Plantoir could tell. Never a dialog: a folder that opens on
+    /// every launch must not nag on every launch.
+    var isShowingCloudSyncNotice: Bool = false
+
+    /// The preferences key holding the folders whose sync note the teacher
+    /// has already seen and gone past. Per folder, not per app: a second
+    /// synced folder deserves its own note.
+    static let acknowledgedSyncedFoldersKey: String = "acknowledgedSyncedFolders"
+
+    /// How a folder is recognised as synced. Replaceable so a test can make
+    /// a temporary folder read as synced without putting one in iCloud.
+    static var syncDetector: (URL) -> CloudSyncedFolder? = { folderURL in
+        return CloudSyncDetector.syncedFolder(at: folderURL)
+    }
+
     /// Set by the test harness (UITEST_WORKSPACE) to bypass persistence.
     private let isUnderUITest: Bool
 
@@ -385,17 +425,193 @@ class WorkspaceModel {
     /// Adopts a new working folder, validates it, and remembers it.
     func chooseWorkspace(at url: URL) {
         let previousPath: String? = workspaceURL?.path
-        workspaceURL = url
         ActivityTrail.note(.workingFolderOpened, "opened the working folder " + url.path)
         if canRememberChoice {
             // Remembered app-wide so a NEW window opens where the last one
             // left off; each window then keeps its own choice in its scene.
             defaults.set(url.path, forKey: WorkspaceModel.storedPathKey)
         }
-        reloadCourses()
+        pointAtFolder(url)
+        // Choosing the folder this window already shows is not a new
+        // choice — a teacher who does that with the notice showing would
+        // otherwise find their courses hidden behind the picker.
+        noticeCloudSync(folderWasChosen: previousPath != url.path)
         if let previousPath, previousPath != url.path {
             WorkspaceModel.releaseFolderIfUnused(previousPath)
         }
+    }
+
+    /// Points this window at a working folder and reads what is in it.
+    ///
+    /// The one way a folder is adopted, so that neither route can gain the
+    /// letting-go below while the other quietly keeps the old folder's
+    /// selection. What each CALLER owns stays with the caller — the trail
+    /// line, the remembered path, releasing the folder being left — because
+    /// those differ between a folder a teacher chose and one a window
+    /// restored, and moving them here would give a restored window a trail
+    /// line saying the teacher had opened something.
+    private func pointAtFolder(_ url: URL) {
+        // Plain `.path`, which is the same comparison `chooseWorkspace`
+        // already makes to decide whether the cloud-sync note is a question
+        // or a notice and whether the folder being left may rest. Two
+        // spellings of one folder would read as DIFFERENT and merely
+        // over-clear — a selection that could have stayed is dropped, and
+        // the teacher is looking at the sidebar either way. The reverse,
+        // two different folders reading as the same, cannot happen.
+        let isADifferentFolder: Bool = workspaceURL?.path != url.path
+        if isADifferentFolder {
+            forgetWhatBelongedToTheOldFolder()
+        }
+        workspaceURL = url
+        reloadCourses()
+    }
+
+    /// What this window lets go of when it points at a different folder.
+    ///
+    /// ONE rule, so that nothing has to be argued item by item: **anything
+    /// that names a course, an archive or a backup in the folder being
+    /// left.** Those are the things that would otherwise either describe
+    /// the old folder — the detail pane reading "Course Not Found" for a
+    /// course that was never in the folder now shown, which is the defect
+    /// this fixes — or ACT on it, a confirmation still holding the file URL
+    /// of an archive in a folder this window has left.
+    ///
+    /// A course in the new folder wearing the SAME code is cleared along
+    /// with the rest. It is a different course; landing on it would be a
+    /// guess dressed up as a memory. Nothing is selected in its place
+    /// either: the empty state already says what to do, and choosing for
+    /// the teacher would be the same guess made twice.
+    ///
+    /// Two things deliberately stay, and they are the rule's edge rather
+    /// than exceptions to it:
+    ///
+    /// - `filterText` is a way of LOOKING, not a thing named. A teacher who
+    ///   typed "3U" to narrow one folder is usually after the same courses
+    ///   in the next, and the field is in front of them either way.
+    /// - `expandedCourseCodes`, `isShowingArchived` and `isShowingBackups`
+    ///   are the sidebar's SHAPE. A code left in the set that this folder
+    ///   does not have draws nothing at all, and no action hangs off a
+    ///   disclosure triangle for it to aim at the wrong folder — so
+    ///   clearing them would buy nothing, while leaving them means a
+    ///   teacher who keeps two folders of the same courses finds the
+    ///   sidebar arranged as they left it.
+    ///
+    /// Deliberately NOT done inside `reloadCourses()`, which is the other
+    /// place that could have held it: a selection checked against the
+    /// courses just loaded would also erase the legitimately right "Course
+    /// Not Found" for a course deleted from disk in the folder still in
+    /// use, would make what a teacher sees depend on when some unrelated
+    /// reload next happened to run, and would still land on the wrong
+    /// course when the new folder has one with the same code.
+    private func forgetWhatBelongedToTheOldFolder() {
+        selection = nil
+        renamingCourseCode = nil
+        // Confirmations waiting on an answer about a particular archive,
+        // backup or course. Each holds something from the old folder, so
+        // answering one after the window has moved would act there.
+        restoreRequest = nil
+        archiveDeleteRequest = nil
+        backupRestoreRequest = nil
+        backupDeleteRequest = nil
+        obsidianRenameRequest = nil
+        // Alerts about what just happened in the folder being left. A
+        // sentence naming a course this window no longer shows is worse
+        // than no sentence, because it will be read as being about the
+        // folder now on screen.
+        renameProblem = nil
+        renameNotice = nil
+        restoreProblem = nil
+        backupProblem = nil
+    }
+
+    // MARK: - A folder a cloud service keeps in sync
+
+    /// Works out whether the folder just adopted is synced, and what — if
+    /// anything — to show about it.
+    ///
+    /// A folder the teacher has already been told about shows nothing; the
+    /// note is per folder and shown once. Otherwise a folder they CHOSE gets
+    /// the picker's choice, and a folder the window RESTORED gets the notice.
+    private func noticeCloudSync(folderWasChosen: Bool) {
+        needsCloudSyncDecision = false
+        isShowingCloudSyncNotice = false
+        guard let workspaceURL else {
+            syncedFolder = nil
+            return
+        }
+        syncedFolder = WorkspaceModel.syncDetector(workspaceURL)
+        guard let syncedFolder else {
+            return
+        }
+        // A folder the picker will not take anyway — neither a working
+        // folder nor empty — gets no question about syncing: the teacher is
+        // about to choose again, and a note about a folder they cannot use
+        // is noise beside the guidance that says what to choose.
+        if workspaceIsUnrecognized {
+            return
+        }
+        // Keyed by the RESOLVED path the detector answers with, so a folder
+        // reached through a symlink (`~/Dropbox` → `~/Library/CloudStorage/
+        // Dropbox`) is one folder, told about once.
+        if hasAcknowledgedCloudSync(forPath: syncedFolder.folderPath) {
+            return
+        }
+        // Only a model that belongs to a window records the line: the
+        // assistant and the MCP server adopt folders on models nothing
+        // shows, and "noticed" from those would say Plantoir told the
+        // teacher something it never did.
+        if WorkspaceModel.isShownInAWindow(self) {
+            ActivityTrail.note(
+                .syncedFolderNoticed,
+                "noticed the working folder is kept in sync with \(syncedFolder.serviceName) — " + LogRedactor.redacting(syncedFolder.folderPath)
+            )
+        }
+        if folderWasChosen {
+            needsCloudSyncDecision = true
+        } else {
+            isShowingCloudSyncNotice = true
+        }
+    }
+
+    /// Whether the teacher has already gone past the note for this folder.
+    func hasAcknowledgedCloudSync(forPath path: String) -> Bool {
+        let acknowledgedPaths: [String] = defaults.stringArray(forKey: WorkspaceModel.acknowledgedSyncedFoldersKey) ?? []
+        return acknowledgedPaths.contains(path)
+    }
+
+    /// The teacher has read the note and chosen to go on — from the picker's
+    /// "Use This Folder Anyway", from setting up an empty synced folder, or
+    /// from dismissing the window's notice. Remembered for this folder so it
+    /// is not said again.
+    func acknowledgeCloudSync() {
+        guard let workspaceURL, let syncedFolder else {
+            needsCloudSyncDecision = false
+            isShowingCloudSyncNotice = false
+            return
+        }
+        let wasAChoice: Bool = needsCloudSyncDecision
+        needsCloudSyncDecision = false
+        isShowingCloudSyncNotice = false
+        if canRememberChoice {
+            var acknowledgedPaths: [String] = defaults.stringArray(forKey: WorkspaceModel.acknowledgedSyncedFoldersKey) ?? []
+            if !acknowledgedPaths.contains(syncedFolder.folderPath) {
+                acknowledgedPaths.append(syncedFolder.folderPath)
+                defaults.set(acknowledgedPaths, forKey: WorkspaceModel.acknowledgedSyncedFoldersKey)
+            }
+        }
+        // The same folder open in a second window: its notice goes too,
+        // or "Got It" here leaves it there until relaunch, against the
+        // once-per-folder rule.
+        for other in WorkspaceModel.windowModels {
+            if other !== self && other.workspaceURL?.path == workspaceURL.path {
+                other.needsCloudSyncDecision = false
+                other.isShowingCloudSyncNotice = false
+            }
+        }
+        let howTheyWentOn: String = wasAChoice
+            ? "chose to use the working folder anyway"
+            : "read the note about the working folder"
+        ActivityTrail.note(.syncedFolderAccepted, howTheyWentOn + ", kept in sync with \(syncedFolder.serviceName)")
     }
 
     /// Adopts the folder a window remembered from its last session.
@@ -412,8 +628,16 @@ class WorkspaceModel {
         if workspaceURL?.path == path {
             return
         }
-        workspaceURL = URL(fileURLWithPath: path)
-        reloadCourses()
+        // The same funnel the picker goes through, so the letting-go cannot
+        // belong to one route and not the other. Here it is DEFENSIVE: every
+        // caller in the product reaches this with no folder yet — a window
+        // being restored, a window opened mid-session, the assistant and the
+        // MCP server each on a model of their own — and the guard above
+        // turns away the one path that would arrive with the same folder
+        // already set. It stays because "no caller does that today" is a
+        // fact about today.
+        pointAtFolder(URL(fileURLWithPath: path))
+        noticeCloudSync(folderWasChosen: false)
     }
 
     /// Keeps this folder's launcher scripts current.
@@ -524,7 +748,7 @@ class WorkspaceModel {
         }
         // Whole folders, mirrored (extraneous files removed — they would
         // change the hash and force rebuilds for nothing).
-        for folderName in ["patches", "scripts", "support"] {
+        for folderName in ["patches", "scripts", "support", "contracts"] {
             if let sourceURL = Bundle.main.url(forResource: folderName, withExtension: nil) {
                 changed += WorkspaceModel.syncDirectory(from: sourceURL, to: toolchainURL.appendingPathComponent(folderName))
             }
@@ -786,8 +1010,91 @@ class WorkspaceModel {
             return firstCourse.code < secondCourse.code
         }
         courses = loadedCourses
+        placeBuiltSitesOutsideTheFolder(for: loadedCourses, everythingIn: entryURLs)
         archivedItems = WorkspaceModel.findArchivedItems(in: coursesDirectoryURL)
         backupItems = WorkspaceModel.findBackupItems(in: coursesDirectoryURL)
+    }
+
+    /// Points every course's `.merged_output` at this folder's builds folder,
+    /// outside the working folder, and clears builds left behind by courses
+    /// that are no longer here.
+    ///
+    /// Run whenever the courses are read rather than once, because a folder
+    /// can gain a course at any time — and because the answer for a course
+    /// that is already linked is one `readlink`, so asking often costs
+    /// nothing. Done SYNCHRONOUSLY, before anything can act on the courses
+    /// just loaded: the work is a rename within one volume, and a build
+    /// started against a `.merged_output` that is about to move would be
+    /// writing into a folder nothing will read again.
+    ///
+    /// The launchers carry the same rule in shell — `preview.sh`, `deploy.sh`
+    /// and `setup.sh` each ensure the link before they build — because a
+    /// teacher at the command line and a deploy scheduled with launchd have no
+    /// app to do it for them. See `contracts/shared-rules.json` →
+    /// `buildOutputLocation`, which is where the rule itself is written down.
+    private func placeBuiltSitesOutsideTheFolder(for loadedCourses: [Course], everythingIn entryURLs: [URL]) {
+        guard let workspaceURL else {
+            return
+        }
+        // Test fixtures build their own folders and must not reach into the
+        // real Application Support; the rule itself is tested directly.
+        if isUnderUITest || WorkspaceModel.isRunningTests {
+            return
+        }
+        // Every folder in `courses/`, not only the courses that LOADED. A
+        // course whose `course_config.json` will not parse is skipped above,
+        // and treating it as gone would throw away the built website of the
+        // one course whose teacher is already having a bad morning.
+        var codesPresent: [String] = []
+        for entryURL in entryURLs {
+            codesPresent.append(entryURL.lastPathComponent)
+        }
+        for course in loadedCourses {
+            // Never out from under a running build. Moving a course's output
+            // while a preview is writing into it would break that build on a
+            // path the teacher can see working, and the courses are reloaded
+            // at plenty of moments a preview is live. A course previewing now
+            // is simply left until the next reload; the launchers ensure the
+            // link before every build in any case.
+            if previewIsRunning(forCourse: course.code) {
+                continue
+            }
+            do {
+                let outcome: BuildOutputLocation.Outcome = try BuildOutputLocation.ensureLink(
+                    courseDirectory: course.directoryURL,
+                    workingFolderURL: workspaceURL
+                )
+                if outcome == .migrated {
+                    ActivityTrail.note(
+                        .builtSiteMovedOutOfTheFolder,
+                        BuildOutputLocation.trailLine(courseCode: course.code)
+                    )
+                }
+            } catch {
+                // Not fatal: the launchers try again before every build, and
+                // a build with no link still writes a real folder in the old
+                // place rather than failing.
+                AppLog.interface.error("could not place \(course.code, privacy: .public)'s built site outside the working folder: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        BuildOutputLocation.discardBuildsForMissingCourses(
+            workingFolderURL: workspaceURL,
+            courseCodesPresent: codesPresent
+        )
+    }
+
+    /// Whether any window is previewing a section of this course in this
+    /// folder. Across windows, because the leases are shared.
+    private func previewIsRunning(forCourse code: String) -> Bool {
+        guard let workspaceURL else {
+            return false
+        }
+        for lease in PreviewLeases.active {
+            if lease.folderPath == workspaceURL.path && lease.courseCode == code {
+                return true
+            }
+        }
+        return false
     }
 
     /// The archived item matching a sidebar selection, if that is what is
@@ -1057,6 +1364,21 @@ class WorkspaceModel {
                 }
             }
             try CourseRestorer.restoreBackup(item, coursesDirectoryURL: coursesDirectoryURL)
+            // The built site goes with the pages it was built from, for the
+            // reason `CourseRestorer.restoreSection` gives: the restored
+            // files carry the timestamps they had when they were backed up,
+            // which can be OLDER than the site built since — so the
+            // freshness check would read "up to date" and a deploy would
+            // publish the pages the teacher has just undone. Missed here
+            // until 2026-09-10, when renaming a course's word for a unit made
+            // this backup its last resort: a site built under "Module" over a
+            // vault restored to "Unit" is exactly that case.
+            BuildOutputLocation.discardBuild(
+                forWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
+                courseCode: item.courseCode
+            )
+            // (The records of renames under way are cleared by the restorer
+            // itself, so a test can see it.)
         } catch {
             backupProblem = error.localizedDescription
             reloadCourses()
@@ -1334,6 +1656,18 @@ class WorkspaceModel {
         if let problem {
             workspaceProblem = problem
             return
+        }
+        // Setting up an empty synced folder IS the decision to use it: the
+        // picker showed the note beside the button, and pressing it is the
+        // teacher's answer. Recorded before the reload so the note is not
+        // shown a second time.
+        // …and only if the folder set up is still the one showing. The copy
+        // runs off the main thread, and File › Open Working Folder stays
+        // enabled meanwhile: a synced folder chosen during the copy has a
+        // decision of its own pending, and finishing the FIRST folder's
+        // set-up must not answer it.
+        if needsCloudSyncDecision && self.workspaceURL == workspaceURL {
+            acknowledgeCloudSync()
         }
         reloadCourses()
 

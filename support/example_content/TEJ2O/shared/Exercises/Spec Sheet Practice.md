@@ -32,6 +32,12 @@ you for real. Three machines, no brand names, one table:
    "because 500 GB is bigger than 256 GB". What has been mixed up?
 6. **Explain the terms.** What does GHz measure on the CPU row —
    and does more cores always mean a faster machine?
+7. **OS versus application requirements.** A workstation runs an OS
+   requiring 2 GB RAM and a 20 GB drive partition. A 3D CAD application
+   suite requires 16 GB RAM, a dedicated OpenGL GPU, and 50 GB storage.
+   Which machine from the table can successfully install and run both,
+   and what happens if you attempt to install the application on
+   Machine B?
 
 ## Answers
 
@@ -68,10 +74,22 @@ you for real. Three machines, no brand names, one table:
 > software splits its work among them; a stubborn single-file task
 > cares about tempo, not headcount. Read both numbers together.
 
+> [!success]- Answer 7
+> Machine C. It exceeds the combined requirements (32 GB RAM vs
+> 18 GB total, 1 TB SSD vs 70 GB total, dedicated 8 GB graphics card).
+> On Machine B (8 GB RAM, integrated graphics), the installer may warn
+> of insufficient memory and lack of a dedicated GPU, resulting in
+> severe viewport lag, crashing under complex models, or refusal to
+> launch.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A1.2]]
 
 ![[B1.2]]
+
+![[B4.1]]
+
+![[B4.2]]
 %%curriculum-end%%

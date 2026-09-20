@@ -40,7 +40,7 @@ graph LR
 > [!important] The pairing is the point
 > The outputs of one are the inputs of the other. That is what keeps the
 > composition of the atmosphere roughly steady — and it is the clearest example
-> of ==dynamic equilibrium== you will meet all year.
+> of ==dynamic equilibrium== you will meet all semester.
 
 %%curriculum-start%%
 ## Curriculum connection

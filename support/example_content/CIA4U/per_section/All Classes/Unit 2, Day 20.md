@@ -10,9 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Defences, second half
-2. What the class found: where interventions worked and where they backfired
-3. [[Efficiency and Equity]] used to name what we actually disagreed about
+1. Defences, second half, on the same terms
+2. What the class found — where interventions worked, where they backfired, and, with [[Efficiency and Equity]], what we were actually disagreeing about
 
 ## Things to do before our next class
 

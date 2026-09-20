@@ -1,7 +1,9 @@
 using System;
+using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 using Windows.System;
 using Windows.UI;
@@ -18,6 +20,7 @@ public sealed partial class TaskProgressView : UserControl
 {
     private readonly System.Collections.Generic.List<ScriptRunner> _registered = new();
     private ScriptRunner? _runner;
+    private MultiDestinationDeployRunner? _multiRunner;
     private string _title = "";
     private bool _detailsOpen;
     private bool _questionDialogShowing;
@@ -30,7 +33,7 @@ public sealed partial class TaskProgressView : UserControl
         // Re-renders once a second while a task runs, so the "still working…"
         // timer keeps moving even when the script itself is momentarily quiet.
         _tick = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _tick.Tick += (_, _) => { if (_runner is { IsRunning: true }) Render(); };
+        _tick.Tick += (_, _) => { if (_runner is { } r && (r.IsRunning || r.IsBetweenPhases)) Render(); };
         Unloaded += (_, _) => _tick.Stop();
     }
 
@@ -54,12 +57,22 @@ public sealed partial class TaskProgressView : UserControl
 
     public Action? OnCancel { get; set; }
 
-    /// <summary>Choose which registered runner the panel displays.</summary>
-    public void Show(ScriptRunner runner, string title, Action? onCancel = null)
+    /// <summary>
+    /// Choose which registered runner the panel displays.
+    /// <paramref name="multiRunner"/>, when set and carrying more than one
+    /// leg, adds the destination checklist, the combined console (every leg
+    /// that has produced output, not just whichever is current — see
+    /// documentation/13-windows-port-archive.md), and every succeeded leg's own link
+    /// once the whole run is finished (entry 306). Left null — the default —
+    /// for every caller with a single runner: the wizard's preview, and a
+    /// single-destination deploy behave byte-for-byte as before.
+    /// </summary>
+    public void Show(ScriptRunner runner, string title, Action? onCancel = null, MultiDestinationDeployRunner? multiRunner = null)
     {
         Register(runner);
         if (!ReferenceEquals(_runner, runner)) _renderedTranscriptVersion = -1;
         _runner = runner;
+        _multiRunner = multiRunner is { Legs.Count: > 1 } ? multiRunner : null;
         _title = title;
         OnCancel = onCancel;
         Render();
@@ -67,6 +80,49 @@ public sealed partial class TaskProgressView : UserControl
 
     /// <summary>Single-runner callers (the wizard) register-and-show in one call.</summary>
     public void Bind(ScriptRunner runner, string title, Action? onCancel = null) => Show(runner, title, onCancel);
+
+    /// <summary>
+    /// A dedicated placeholder for the span between a deploy being clicked
+    /// and <c>MultiDestinationDeployRunner.RunAsync</c> actually taking
+    /// over — there is no runner to bind to yet that is not either blank
+    /// (a brand-new <see cref="ScriptRunner"/> renders neither the running
+    /// branch nor the outcome branch of <see cref="Render"/>) or stale (the
+    /// PREVIOUS deploy's finished leg, still sitting in
+    /// <c>MultiDestinationDeployRunner.ActiveRunner</c> until <c>RunAsync</c>
+    /// replaces <c>Legs</c> with fresh ones) — neither is what is actually
+    /// happening right now. Mirrors the mac's
+    /// `preparingToDeployPlaceholder` (documentation/13-windows-port-archive.md, row 318a).
+    /// Sets the currently-shown runner to null (not unregistered — a
+    /// runner, once <see cref="Register"/>ed, stays registered for its own
+    /// question dialog for the life of this view) so a stray notification
+    /// from a leftover leg runner cannot re-render over the placeholder:
+    /// <see cref="RunnerChanged"/> only calls <see cref="Render"/> when the
+    /// notifying runner is reference-equal to the one currently shown.
+    /// </summary>
+    public void ShowPreparing(string title)
+    {
+        _runner = null;
+        _multiRunner = null;
+        OnCancel = null;
+        EnsureTicking(false);
+
+        TitleText.Text = title;
+        DestinationChecklist.Visibility = Visibility.Collapsed;
+        OutcomeIcon.Visibility = Visibility.Collapsed;
+        PhaseText.Text = "Preparing to deploy…";
+        PhaseText.Foreground = Secondary();
+        Bar.IsIndeterminate = true;
+        Bar.Visibility = Visibility.Visible;
+        MilestoneText.Visibility = Visibility.Collapsed;
+        OutcomeDetail.Visibility = Visibility.Collapsed;
+        LiveLink.Visibility = Visibility.Collapsed;
+        FolderResult.Visibility = Visibility.Collapsed;
+        DestinationLinks.Visibility = Visibility.Collapsed;
+        RunningActionsRow.Visibility = Visibility.Collapsed;
+        AwaitingNotice.Visibility = Visibility.Collapsed;
+        LaunchProblemText.Visibility = Visibility.Collapsed;
+        ConsoleInputRow.Visibility = Visibility.Collapsed;
+    }
 
     private void RunnerChanged(ScriptRunner runner, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -82,9 +138,16 @@ public sealed partial class TaskProgressView : UserControl
     {
         if (_runner is null) return;
         TitleText.Text = _title;
+        RenderDestinationChecklist();
 
         bool hasMilestones = _runner.Milestones.Count > 0;
-        if (_runner.IsRunning)
+        // IsBetweenPhases: this runner has already finished the build half
+        // of a build-then-deploy leg (IsRunning is false) but the deploy
+        // half is about to start on it — rendering the outcome branch here
+        // would flash "Done"/a failure for the gap the caller's polling
+        // wait takes to notice the deploy is still queued up on it. See
+        // ScriptRunner.IsBetweenPhases (row 318b).
+        if (_runner.IsRunning || _runner.IsBetweenPhases)
         {
             OutcomeIcon.Visibility = Visibility.Collapsed;
             PhaseText.Text = hasMilestones ? _runner.StepDescription : "Working…";
@@ -115,24 +178,56 @@ public sealed partial class TaskProgressView : UserControl
             Bar.IsIndeterminate = false;
             Bar.Value = _runner.WasCancelled || _runner.WasStoppedByUser ? Bar.Value : 100;
             MilestoneText.Visibility = Visibility.Collapsed;
-            // An ending the teacher asked for is not a fault.
-            if (_runner.WasCancelled) Outcome("Cancelled", Glyphs.Cancel, Caution(), $"{_title} was cancelled.");
-            else if (_runner.WasStoppedByUser) Outcome("Stopped", Glyphs.Stop, Secondary(), null);
-            else if (exitCode == 0) Outcome("Done", Glyphs.CheckMark, Success(), null);
-            else Outcome("Something went wrong", Glyphs.Cancel, Critical(), _runner.FailureExplanation);
 
-            if (exitCode == 0 && !_runner.WasCancelled && _runner.PublishedFolder is { } folder)
+            if (_multiRunner is { } multi)
             {
-                // Folder publishing ends at a folder, not a live link.
-                FolderResult.Visibility = Visibility.Visible;
-                _publishedFolder = folder;
+                // The badge reflects the WHOLE run's outcome, not just
+                // whichever leg happened to run last — a course whose FIRST
+                // destination failed and second succeeded must never read
+                // as "Done" just because the last leg to run was fine.
+                var outcome = multi.CurrentOutcome;
+                if (_runner.WasCancelled) Outcome("Cancelled", Glyphs.Cancel, Caution(), $"{_title} was cancelled.");
+                else if (_runner.WasStoppedByUser) Outcome("Stopped", Glyphs.Stop, Secondary(), null);
+                else if (outcome.AllSucceeded) Outcome("Done", Glyphs.CheckMark, Success(), null);
+                else if (outcome.AnySucceeded)
+                {
+                    var failedNames = outcome.FailedDestinations.Select(DeployCommand.DestinationDescription).ToList();
+                    Outcome("Some destinations failed", Glyphs.Cancel, Critical(),
+                        $"Deployed to some destinations, but not {MultiDestinationDeployRunner.JoinedWithAnd(failedNames)}.");
+                }
+                else Outcome("Something went wrong", Glyphs.Cancel, Critical(), _runner.FailureExplanation);
+
+                LiveLink.Visibility = Visibility.Collapsed;
+                FolderResult.Visibility = Visibility.Collapsed;
+                RenderDestinationLinks(outcome);
             }
-            else if (exitCode == 0 && !_runner.WasCancelled && _runner.PublishedSiteUrl is { } url)
+            else
             {
-                LiveLink.Visibility = Visibility.Visible;
-                LiveLinkButton.Content = url.AbsoluteUri;
-                LiveLinkButton.NavigateUri = url;
+                // An ending the teacher asked for is not a fault.
+                if (_runner.WasCancelled) Outcome("Cancelled", Glyphs.Cancel, Caution(), $"{_title} was cancelled.");
+                else if (_runner.WasStoppedByUser) Outcome("Stopped", Glyphs.Stop, Secondary(), null);
+                else if (exitCode == 0) Outcome("Done", Glyphs.CheckMark, Success(), null);
+                else Outcome("Something went wrong", Glyphs.Cancel, Critical(), _runner.FailureExplanation);
+
+                DestinationLinks.Visibility = Visibility.Collapsed;
+
+                if (exitCode == 0 && !_runner.WasCancelled && _runner.PublishedFolder is { } folder)
+                {
+                    // Folder publishing ends at a folder, not a live link.
+                    FolderResult.Visibility = Visibility.Visible;
+                    _publishedFolder = folder;
+                }
+                else if (exitCode == 0 && !_runner.WasCancelled && _runner.PublishedSiteUrl is { } url)
+                {
+                    LiveLink.Visibility = Visibility.Visible;
+                    LiveLinkButton.Content = url.AbsoluteUri;
+                    LiveLinkButton.NavigateUri = url;
+                }
             }
+        }
+        else
+        {
+            DestinationLinks.Visibility = Visibility.Collapsed;
         }
 
         if (!_runner.IsRunning) EnsureTicking(false);
@@ -143,18 +238,112 @@ public sealed partial class TaskProgressView : UserControl
         LaunchProblemText.Visibility = _runner.LaunchProblem is null ? Visibility.Collapsed : Visibility.Visible;
         ConsoleInputRow.Visibility = _runner.IsRunning ? Visibility.Visible : Visibility.Collapsed;
 
-        if (_detailsOpen && _runner.Transcript.Version != _renderedTranscriptVersion)
+        long combinedVersion = _multiRunner is { } forVersion
+            ? forVersion.Legs.Sum(leg => leg.Runner.Transcript.Version)
+            : _runner.Transcript.Version;
+        if (_detailsOpen && combinedVersion != _renderedTranscriptVersion)
         {
-            _renderedTranscriptVersion = _runner.Transcript.Version;
+            _renderedTranscriptVersion = combinedVersion;
             // Terminal behaviour: keep the newest line in view as older lines
             // scroll up out of the frame — but only while the reader is already
             // at the bottom. Judge that against the extent BEFORE the text
             // grows, so scrolling up to read back is never yanked away.
             bool follow = ConsoleScroll.ScrollableHeight - ConsoleScroll.VerticalOffset <= BottomThreshold;
-            string text = _runner.Transcript.DisplayText;
+            string text = CombinedTranscriptText();
             ConsoleText.Text = text.Length == 0 ? "Starting…" : text;
             if (follow) ScrollConsoleToEnd();
         }
+    }
+
+    /// <summary>
+    /// The console text to show: a single runner's own transcript, or —
+    /// for a multi-destination deploy — every leg that has produced any
+    /// output so far, each under its own heading, joined in deploy order.
+    /// Without this, the moment a second destination started, the FIRST
+    /// destination's own console output was simply gone — not scrolled
+    /// past, gone (documentation/13-windows-port-archive.md). A leg the run never
+    /// reached (stopped by a cancel, or an earlier failed shared build) is
+    /// filtered out rather than shown as an empty, confusing section.
+    /// </summary>
+    private string CombinedTranscriptText()
+    {
+        if (_multiRunner is not { } multi) return _runner!.Transcript.DisplayText;
+        var sections = multi.Legs
+            .Where(leg => leg.Runner.Transcript.Lines.Count > 0 || leg.Runner.Transcript.CurrentLine.Length > 0)
+            .Select(leg => $"── {DeployCommand.DestinationDescription(leg.Destination)} ──\n{leg.Runner.Transcript.DisplayText}");
+        return string.Join("\n\n", sections);
+    }
+
+    /// <summary>
+    /// One row per configured destination, with a symbol showing whether it
+    /// is still to come, currently running, done, or failed — shown only
+    /// for a multi-destination deploy, so a teacher can see the whole
+    /// sequence rather than a bar that looks stuck between legs.
+    /// </summary>
+    private void RenderDestinationChecklist()
+    {
+        if (_multiRunner is not { } multi)
+        {
+            DestinationChecklist.Visibility = Visibility.Collapsed;
+            return;
+        }
+        DestinationChecklist.Children.Clear();
+        for (int index = 0; index < multi.Legs.Count; index++)
+        {
+            var leg = multi.Legs[index];
+            string symbol = leg.IsFinished
+                ? (leg.Succeeded ? "✓" : "✗")   // ✓ / ✗
+                : index == multi.CurrentLegIndex && multi.IsRunning ? "•" : "○";   // • / ○
+            DestinationChecklist.Children.Add(new TextBlock
+            {
+                Text = $"{symbol} {DeployCommand.DestinationDescription(leg.Destination)}",
+                FontSize = 13,
+                Opacity = leg.IsFinished || (index == multi.CurrentLegIndex) ? 1.0 : 0.6,
+            });
+        }
+        DestinationChecklist.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Every SUCCEEDED destination's own link (or "Show in File Explorer"
+    /// button, for a folder), once the whole run is finished — occupying
+    /// the same slot a single destination's own link would. A destination
+    /// the run never reached, or that failed, is simply not listed here;
+    /// its absence is already explained by the checklist above and the
+    /// outcome line.
+    /// </summary>
+    private void RenderDestinationLinks(MultiDestinationDeployRunner.Outcome outcome)
+    {
+        DestinationLinks.Children.Clear();
+        if (_multiRunner is not { IsRunning: false } multi || !outcome.AnySucceeded)
+        {
+            DestinationLinks.Visibility = Visibility.Collapsed;
+            return;
+        }
+        foreach (var leg in multi.Legs.Where(l => l.Succeeded))
+        {
+            var block = new StackPanel { Spacing = 2 };
+            block.Children.Add(new TextBlock
+            {
+                Text = DeployCommand.DestinationDescription(leg.Destination),
+                FontSize = 12,
+                Opacity = 0.7,
+            });
+            if (leg.Runner.PublishedFolder is { } folder)
+            {
+                var button = new Button { Content = "Show in File Explorer" };
+                button.Click += (_, _) => FolderActions.ShowInFileExplorer(folder);
+                block.Children.Add(button);
+            }
+            else if (leg.Runner.PublishedSiteUrl is { } url)
+            {
+                var link = new HyperlinkButton { Content = url.AbsoluteUri, NavigateUri = url, Padding = new Thickness(0) };
+                block.Children.Add(link);
+            }
+            else continue;
+            DestinationLinks.Children.Add(block);
+        }
+        DestinationLinks.Visibility = DestinationLinks.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private const double BottomThreshold = 24;

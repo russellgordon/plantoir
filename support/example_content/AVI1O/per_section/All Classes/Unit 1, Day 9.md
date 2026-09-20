@@ -12,7 +12,8 @@ tags:
 
 1. [[Making Marks]] — the tool decides the mark
 2. [[Surface and Texture]]: cross-hatching, stippling, scumbling
-3. Studio time: the texture study
+3. Studio time: the texture trials into the sketchbook, then the study
+   itself
 
 ## Things to do before our next class
 

@@ -43,9 +43,12 @@ handling it.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.4]]
+
+![[A1.6]]
+
 ![[F2.4]]
 
 ![[F3.1]]
-
-![[A1.6]]
 %%curriculum-end%%
+

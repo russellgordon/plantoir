@@ -2,7 +2,8 @@
 title: Thesis and Argument
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - concepts
 ---
 A thesis is a claim about how a text works that somebody informed could
 dispute. Everything else in an essay exists to earn it.

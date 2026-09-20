@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval; then the crash, and what a crash actually is
+1. Retrieval; then the crash, and what a crash actually is. Your first answers
+   are not marked — they tell me where this unit has to begin
 2. [[The Crash and the Thirties]]
 3. [[Statistics and the Census]] — reading the numbers of a decade
 

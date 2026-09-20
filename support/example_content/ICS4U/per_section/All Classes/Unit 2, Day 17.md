@@ -15,6 +15,8 @@ tags:
    tests from the original still passing
 3. Watch the arithmetic: [[How Numbers Actually Fit]] on why a faster
    sum can be a wrong one
+4. Last ten minutes: bring me both of your measurement tables. I mark
+   one thing to change, and tomorrow's period opens with it.
 
 ## Things to do before our next class
 

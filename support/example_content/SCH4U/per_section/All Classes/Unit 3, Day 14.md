@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[The Rate Investigation]], day 3 — bench time: run the trials, in
-   triplicate, recording as you go
+1. [[The Rate Investigation]], day 3 — bench time: the design as
+   approved, with whatever the conference sent back changed first, then
+   the trials in triplicate, recording as you go
 2. Skill: [[Measuring Well]] — timing consistently is harder than it
    sounds
 

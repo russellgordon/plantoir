@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Number talk: [[Visual Patterns]] — how is this pattern growing, and
-   how do you SEE it growing?
+   how do you SEE it growing? Unmarked: it tells me what this class
+   already expects a growing pattern to do, before quadratics are named
 2. Random groups — [[The Handshake Problem]] at the boards
 3. Consolidate: a pattern that refuses to grow in a straight line
 4. Check your understanding — predict step 10, then step 100

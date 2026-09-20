@@ -7,8 +7,8 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Pairs · two bench periods plus finishing time · soldered board,
-> schematic, and a measurement sheet · demonstrated on the last day of
+> Pairs · a design period and two bench periods · soldered board,
+> schematic, and a measurement sheet · demonstrated near the end of
 > Unit 1
 
 ## What you are making
@@ -44,10 +44,23 @@ the tools; [[Solder a Board]] is the construction standard.
 ## How it is assessed
 
 The criteria below are the whole of it, and they are visible at your
-bench rather than inferred from a finished object. Bench periods are
-class time, and using them well is part of the assessment — see
-[[How Marks Work]]. Your [[Tech Journal]] carries the process: what you
+bench rather than inferred from a finished object. That is the point of
+building this in class: I am watching the work happen, and what I see is
+evidence — see [[How Marks Work]]. Nobody is marked on how busy they
+looked. Your [[Tech Journal]] carries the rest of the process: what you
 predicted, what you measured, and what you changed as a result.
+
+You build in pairs and you are marked on your own. The board is shared;
+your mark rests on your own calculation sheet, your own journal entries
+for this task's periods, and what you can account for at the conference
+— which is why the journal asks you to name what *you* wired, measured,
+or misread rather than hiding it inside "we". There is no such thing as
+a bench mark here.
+
+On the build day you will stop, read your own board against the table
+below, and name the row that is weakest — [[Judging Your Own Work]]
+shows how, and the demonstration period afterwards is where you fix it.
+It changes nothing about your mark. It changes the board.
 
 ## Success criteria
 
@@ -90,3 +103,46 @@ shape of a strong entry; the content has to be yours.
 
 ![[D1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 16, while the boards are being soldered
+  Take this in the middle of the period, not at the end: the last
+  fifteen minutes of Day 16 are the self-check, and by then the irons
+  are cold.
+  Watch for: the iron between joints, once a bench realises it is
+  behind. Back in the stand every time, or parked on the mat?
+  Extraction still running, or switched off because it is loud?
+  Glasses on before the clippers come out? A finished board tells you
+  nothing about any of this — a dangerously soldered board and a safely
+  soldered one look identical, and the criteria row "safe habits
+  without reminders" can only ever be marked from what you saw.
+  Going well: the iron goes back without the student noticing they did
+  it, and somebody says "glasses" to their partner before you do. The
+  warm-up that morning was the soldering round of Spot the Hazard, so
+  today is a fair test of whether naming a hazard changes a hand.
+  Stuck: the iron rests on the bench "for a second", or the extraction
+  arm is pushed aside to see better.
+  Record: a class list on your day plan, one tick per bench day. A
+  column of ticks here and again in Unit 3, on the driver-stage days of
+  The Embedded Device — the other task carrying D1.1 — is that
+  expectation evidenced properly, and it costs you nothing you were not
+  already doing.
+
+TALK — Unit 1, Day 15, the conference already on that agenda
+  Ask: "If I handed you a 9 V supply instead of the 5 V one, which of
+  your values would have to change, and to what?"
+  Then: "You rounded to a standard value — which way did you round, and
+  what did that cost you?"
+  A strong answer treats the resistor as the result of a relationship
+  rather than a number copied off a worked example, and knows which
+  direction is the safe one to round. That is A3.3 heard out loud, and
+  a correct calculation sheet cannot tell you whether the student
+  derived it or borrowed it from the bench opposite.
+  Record: two columns beside the bench list — derived, or copied.
+
+The product evidence is the soldered board, the schematic, the
+calculation sheet and the measurement sheet, demonstrated and handed in
+on Day 17.
+%%

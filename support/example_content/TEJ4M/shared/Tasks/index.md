@@ -13,8 +13,8 @@ as [[How Marks Work]] explains.
 
 Every task publishes its criteria in advance, written as things an
 observer could see at your bench, and each table traces back to our
-[[Learning Goals]]. Three of those criteria appear in all five, because
-in Grade 12 they are what "finished" means:
+[[Learning Goals]]. Three of those criteria turn up on almost every
+table below, because in Grade 12 they are what "finished" means:
 
 - **A claim with a number, stated before you build.** Not "it works" —
   at what current, within what tolerance, over how many trials, in what
@@ -26,8 +26,14 @@ in Grade 12 they are what "finished" means:
   matches the board, code somebody else could maintain, and a log of
   what went wrong and what you decided about it.
 
-## The six jobs
+Where a task is done at a shared bench, the page says which piece of
+the evidence is yours and marked as yours. Nobody in this course
+receives a mark for work somebody else did.
 
+## The seven jobs
+
+- [[The Bench Record]] — the write-up every lab produces, at the bench,
+  in the period, against one criteria table that never changes.
 - [[The Specification]] — write the document a manufacturer would need,
   with testable requirements and acceptance tests somebody else can run.
 - [[The Interface]] — bring up a real peripheral from its datasheet, and

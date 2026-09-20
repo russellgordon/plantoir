@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Calculating what a job needs: area, volume, and waste
-2. Working out soil for a bed and lumber for a frame
-3. Practice calculations
+1. Calculating what a job needs: area, volume, and waste: [[Measuring and Marking]]
+2. Working out soil for a bed and lumber for a frame: [[Reading a Working Drawing]]
+3. Practice calculations, checked against a neighbour's — no marks
 
 ## Things to do before our next class
 

@@ -12,7 +12,10 @@ tags:
 
 1. Warm-up: [[Read the Waveform]] — overshoot and settling
 2. Bench: tune your loop, logging every change and its effect
-3. The tuning log IS the evidence — a setting with no log is a guess
+3. The tuning log IS the evidence — a setting with no log is a guess.
+   Last ten minutes: two logs on the board, and the room says which
+   change can be defended
+4. Bench record for [[Close the Loop]] in at tools-away
 
 ## Things to do before our next class
 

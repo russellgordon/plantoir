@@ -59,6 +59,35 @@ passed in a hurry can still be struck down, and why the public service
 keeps paying pensions through an election. Stability is the product; the
 division of powers is the mechanism.
 
+## How governments pay for it: revenue and budgets
+
+Every responsibility comes with a price tag. How different orders of
+government raise revenue shapes what they can deliver and how they plan:
+
+- **Federal revenue** comes primarily from personal and corporate income taxes,
+  the Goods and Services Tax (GST), customs duties, and payroll premiums. Ottawa
+  uses this broad tax base to fund federal responsibilities and to redistribute
+  revenue through major transfers (such as the Canada Health Transfer, Canada
+  Social Transfer, and Equalization).
+- **Provincial revenue** relies on provincial income and sales taxes (HST),
+  resource royalties (mining, forestry, energy), gaming and liquor profits, and
+  federal transfers. Provinces carry the largest operational costs in the
+  country — particularly healthcare and education.
+- **Municipal revenue** is much more restricted, relying heavily on property
+  taxes, user fees (recreation, water, transit fares), and development charges.
+  Because Ontario municipalities are legally prohibited from running operating
+  deficits, they rely on provincial and federal capital grants for major
+  infrastructure.
+- **Indigenous government revenue** draws from own-source economic enterprises,
+  local taxation agreements, resource revenue-sharing agreements, treaty
+  entitlements, and federal fiscal transfer agreements.
+
+Governments design their annual budgets to reconcile **short-term operational
+needs** (paying teachers, nurses, and police; maintaining roads; running transit)
+with **long-term capital investments** (building light-rail transit lines, water
+treatment plants, affordable housing, and climate flood mitigation) while
+managing public debt over decades.
+
 Work a real decision through it in [[Who Decided This|Who Decided This?]], and argue about
 where a decision belongs in [[Who Should Decide Locally|Who Should Decide Locally?]].
 
@@ -68,4 +97,6 @@ where a decision belongs in [[Who Should Decide Locally|Who Should Decide Locall
 ![[B2.2]]
 
 ![[B2.4]]
+
+![[B2.5]]
 %%curriculum-end%%

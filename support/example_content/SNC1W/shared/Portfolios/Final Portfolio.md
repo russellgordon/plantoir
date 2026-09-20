@@ -6,6 +6,15 @@ enableToc: true
 tags:
   - portfolio
 ---
+> [!abstract] At a glance
+> Individual · built across the whole semester, entry by entry, and assembled
+> in class on Unit 5, Days 13 and 14 · handed in at the end of Day 14 ·
+> **part of the final 30%**, with [[Culminating Reflection]] and the
+> [[Final Examination]]
+>
+> **Success criteria:** the four rows on [[Portfolio Checklist]], which you
+> read in the first week of the course and have had ever since.
+
 Bring everything together into one place a reader can move through.
 
 ## Structure

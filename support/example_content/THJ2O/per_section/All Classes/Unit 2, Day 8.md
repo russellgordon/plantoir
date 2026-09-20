@@ -12,7 +12,7 @@ tags:
 
 1. [[The Safety Ticket]] assessments continue
 2. Repeats for anything not yet to standard
-3. Shop practice
+3. Shop practice: tool operation drills and safety routine rehearsals
 
 ## Things to do before our next class
 

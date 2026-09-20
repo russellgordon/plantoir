@@ -12,7 +12,8 @@ tags:
 
 1. Case: [[Feeding a City]] — where a city's food comes from
 2. Distance, seasonality, and cost
-3. Notebook: what would change if the farm we visited stopped?
+3. Your farm entries back, with comments — you will need them for the
+   notebook question: what would change if the farm we visited stopped?
 
 ## Things to do before our next class
 

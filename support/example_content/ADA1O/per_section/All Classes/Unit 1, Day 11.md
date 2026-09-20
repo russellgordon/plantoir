@@ -11,9 +11,12 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Mirrors]], slow
-2. [[Tableau Story Sequence]], day 4 — working period: build all three images to
+2. [[Tableau Story Sequence]], day 4 — working period: build all five images to
    the same standard, checking levels and focus in each
 3. Half-class look at image two only — the one groups always neglect
+4. Last fifteen minutes: I judge one group's image out loud against the
+   task's criteria, row by row, so the routine is not new to you when it
+   is yours — [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

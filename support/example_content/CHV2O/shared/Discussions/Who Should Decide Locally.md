@@ -70,4 +70,6 @@ Bring your position into [[The Issue Brief]] if it holds up.
 ![[B2.2]]
 
 ![[C1.3]]
+
+![[A2.2]]
 %%curriculum-end%%

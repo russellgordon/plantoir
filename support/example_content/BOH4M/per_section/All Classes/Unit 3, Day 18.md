@@ -12,7 +12,7 @@ tags:
 
 1. The obligations that are not optional: safety, accessibility, pay equity, human rights
 2. [[The Restructure]] finished — whose accountability is the accessibility delay?
-3. Launch: [[The Change Plan]]
+3. Launch: [[The Change Plan]], criteria read together before you touch the timeline
 
 ## Things to do before our next class
 

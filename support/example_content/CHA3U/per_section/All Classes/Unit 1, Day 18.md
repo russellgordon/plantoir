@@ -12,7 +12,7 @@ tags:
 
 1. [[Citing Historical Sources]] — footnotes that let someone check you
 2. Practice on your own drafts, not on examples
-3. Work period
+3. Work period: the weakest row you named last class, and whatever your conference turned up
 
 ## Things to do before our next class
 

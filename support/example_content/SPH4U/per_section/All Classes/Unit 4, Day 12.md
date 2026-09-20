@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. [[Optics Investigation Report]], day 5 — working period: analysis and
-   conclusions, justified against the wave model
+   conclusions justified against the wave model, then the closing
+   paragraph — the device in the world that runs on the effect you
+   measured, and which of your own numbers explains why it works
 2. Peer read: does the conclusion follow from the data, or from what you
    expected?
 

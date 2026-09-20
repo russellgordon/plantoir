@@ -12,7 +12,9 @@ tags:
 
 1. Hand in the [[Newton's Second Law]] report
 2. [[Force of Gravity and Weight]] — mass, weight, and the lift
-3. Launch: [[Forces in a Real Situation]]
+3. Launch: [[Forces in a Real Situation]] — with its criteria read
+   together, so you know what the two pages have to do before you choose
+   your situation
 4. Discussion: [[Speed Limiters and Highway Safety]]
 
 ## Things to do before our next class

@@ -69,3 +69,39 @@ Take the argument about what to call these events to
 
 ![[A1.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 10, during the peer reading on that agenda
+  Watch for: the ten seconds after a partner points at the line where
+  description stops and explanation starts. Some argue the line back,
+  some write it down, some agree pleasantly and change nothing. The
+  comparison handed in the next day reads the same whichever it was: a
+  paragraph that was defended and a paragraph that was never reopened
+  look identical on the page.
+  Going well: a pencil is in the margin before the partner has finished
+  the sentence.
+  Stuck: "yeah, I know" — and the page stays clean.
+  Record: one mark per name on the seating plan — argued, wrote, or
+  neither. A lap of the room does the class.
+
+TALK — Unit 2, Day 10, at the conferences already on that agenda
+  Ask: "Name one thing your two events have in common that you had to
+  go and check rather than assume." A strong answer produces something
+  they verified — the depth of water, the hour of day, the season, the
+  building stock — and can say what they would have concluded wrongly
+  had it not held. A comparison stands entirely on what is genuinely
+  alike, and E1.2 asks for exactly that: two disasters set against each
+  other from a geographic perspective rather than side by side.
+  Then: "Your reader thinks the whole difference here is money. Talk
+  them out of it — or agree with them." A strong answer defends a
+  position under pressure and does not simply restate the essay. A
+  student who can only agree has not separated the physical differences
+  from the human ones, and you will know that a week before you read it.
+  Record: initials, the checked commonality, and a tick if the money
+  challenge got a real answer. On the same seating plan.
+
+The product evidence is the comparison itself, handed in on Unit 2,
+Day 11. That one arrives on its own.
+%%

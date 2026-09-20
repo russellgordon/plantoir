@@ -179,7 +179,7 @@ molecular formulas.
 >
 > **(b)** $M(\ce{CH}) = 12.01 + 1.01 = 13.02 \text{ g/mol}$
 >
-> $\begin{aligned} \frac{26.04}{13.02} &= 2.000 \rightarrow \ce{C2H2} \\ \frac{78.12}{13.02} &= 6.000 \rightarrow \ce{C6H6} \end{aligned}$
+> $\begin{aligned} \frac{26.04}{13.02} &= 2.000 \implies \ce{C2H2} \\ \frac{78.12}{13.02} &= 6.000 \implies \ce{C6H6} \end{aligned}$
 >
 > **(c)** The **molar mass**, and nothing else is needed. That is the
 > whole content of the relationship between empirical and molecular

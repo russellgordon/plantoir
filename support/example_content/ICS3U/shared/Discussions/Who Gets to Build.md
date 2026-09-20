@@ -13,7 +13,7 @@ moments, and some of them happen in classrooms like this one.
 ## Before we talk
 
 Read [[Pathways After This Course]], and come with one honest answer to
-this: when you pictured "a programmer" in September, who did you
+this: when you pictured "a programmer" at the start of the course, who did you
 picture? Nobody is asked to share that answer.
 
 ## What we are discussing
@@ -26,7 +26,7 @@ picture? Nobody is asked to share that answer.
 3. Does "anyone can learn to code" help or hurt? It is true. Is it the
    whole truth?
 4. What would you change about how this course runs, if the goal were
-   that everybody who is curious in September is still here in January?
+   that everybody who is curious at the start of the course is still here at the end of the course?
 
 ## Groups that exist for exactly this
 

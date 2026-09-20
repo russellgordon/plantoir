@@ -12,8 +12,9 @@ tags:
 
 1. [[The Production Run]] review handed in
 2. What recent innovation does to this work, and to the people doing it
-3. Bench care
+3. Bench care, and time to act on the feedback on your identification
+   section
 
 ## Things to do before our next class
 
-- [ ] Finish the pest report draft.
+- [ ] Report in next period: check your sections 4 and 5 are signed.

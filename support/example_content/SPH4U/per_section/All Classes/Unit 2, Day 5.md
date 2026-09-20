@@ -10,11 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: three situations — energy bar charts before any equation
+1. Warm-up: three situations — energy bar charts before any equation: [[Work and Energy]]
 2. In groups: where the energy starts, where it ends, what is not
    conserved
 3. Consolidate: the work–energy theorem is $F_{net} = ma$ in another
-   currency
+   currency: [[Elastic and Inelastic Collisions]]
 
 ## Things to do before our next class
 

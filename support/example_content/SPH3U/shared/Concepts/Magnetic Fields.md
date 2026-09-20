@@ -38,6 +38,10 @@ it returns in Grade 12 for gravity and electricity too.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[F1.1]]
+
+![[F2.4]]
+
 ![[F2.5]]
 
 ![[F3.1]]

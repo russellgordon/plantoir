@@ -13,7 +13,8 @@ tags:
 1. Warm-up: [[The Standard Warm-Up]]
 2. Constraints handed out: solving a movement problem
 3. [[Solving a Movement Problem]] — generating options first
-4. Working period
+4. Working period — your own movements written in your journal, dated,
+   before they go into the phrase
 5. Cool-down
 
 ## Things to do before our next class

@@ -40,9 +40,7 @@ before the lid comes off, every time. Stains and gloves as instructed.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D2.3]]
-
-![[D2.4]]
+![[A1.4]]
 
 ![[A1.6]]
 %%curriculum-end%%

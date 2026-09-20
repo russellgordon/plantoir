@@ -7,7 +7,8 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo, or pairs with two clients' agreement · launched at the end of Unit 3 and
+> Solo, or pairs with two clients' agreement and marked individually ·
+> launched at the end of Unit 3 and
 > running through all of Unit 4 across fifteen named working days · a working app, a tested
 > handover, and a real person who keeps using it · the culminating
 > project of this course
@@ -139,6 +140,13 @@ That takes more than a file:
 
 ## How this is assessed
 
+**If you work as a pair, your mark is still your own.** You each own a
+named half of the app — say so on the board on day 3 — and you each
+write your own status updates, your own journal entries, and your own
+handover section. What I ask you in conference, I ask you separately.
+Two people can come out of one project with different marks, and that
+is what makes a pair a fair way to work rather than a way to hide.
+
 Per [[How Marks Work]], the working periods, the milestones, and the
 trail in your [[Code Journal]] all count — this project is assessed
 across five weeks, not on the last day. Expect a journal entry at every
@@ -197,3 +205,35 @@ there?
 
 ![[B4.6]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 3, the client check-in
+  This is the most revealing two minutes of the whole course. The
+  client uses the skeleton while the student is present.
+  Watch for: whether the student writes down what the client DOES, or
+  explains what the client SHOULD be doing. Nothing in the finished
+  handover distinguishes the two, and the second student will build the
+  wrong thing for another three weeks.
+  Going well: silence, and a pen.
+  Stuck: "no, you have to click the other one first".
+  Record: names in two columns; this one is worth doing properly.
+
+TALK — Unit 4, Day 14, at the conferences already on that agenda
+  The agenda already tells them the conference is about what is
+  finished, so do not open with that — they will have rehearsed it.
+  Ask: "What did you cut, and who would notice?"
+  Then: "Which milestone on your board turned out to be in the wrong
+  place, and when did you find out?"
+  A strong answer names a decision and its cost. That is B4.1 — the
+  phases of the process, seen from inside one — and a student whose
+  project is behind can answer it superbly, which is exactly why it is
+  worth asking. Note that B4.6 is met IN WRITING, by the status updates
+  from Day 5 onwards; this conversation corroborates them, it does not
+  replace them.
+  Record: three columns — cut, why, who noticed.
+
+The product evidence is the handover on Day 17 and the demonstration on
+Day 18.
+%%

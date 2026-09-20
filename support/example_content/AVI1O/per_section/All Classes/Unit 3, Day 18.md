@@ -12,7 +12,7 @@ tags:
 
 1. Whose image is it: [[Copyright, Ownership, and Credit]]
 2. Reference, homage, and copying — where the lines are
-3. Studio time
+3. Studio time: sketchbook case study on appropriation, reference, and copyright
 
 ## Things to do before our next class
 

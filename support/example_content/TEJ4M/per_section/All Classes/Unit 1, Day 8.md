@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[Name That Part]] — tolerance markings
 2. Practise: tolerance stack-up on paper, then measured against the
-   drawer's actual spread
+   drawer's actual spread. Last ten minutes: three answers on the
+   board, and we find where they disagree — feedback, not a mark
 3. Consolidate: [[Component Selection and Tolerances]]
 
 ## Things to do before our next class

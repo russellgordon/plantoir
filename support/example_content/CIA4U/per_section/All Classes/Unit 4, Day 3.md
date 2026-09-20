@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Tariffs, quotas, subsidies and non-tariff barriers, each drawn
+1. Tariffs, quotas, subsidies and non-tariff barriers, each drawn — drawings compared, and the commonest error named
 2. [[Elasticity]] returned to for the question that matters: who actually bears a tariff
 3. CUSMA and the WTO — what a trade agreement binds a country to
 

@@ -56,8 +56,8 @@ narrative sounds like someone borrowed a suit.
 
 > [!tip] The habit worth building
 > Keep a page at the back of your notebook for words you meet in your own
-> reading. Ten a week, with the sentence you found them in, is about 350
-> by June — and they will be words you actually encountered, which is why
+> reading. Ten a week, with the sentence you found them in, is about 180
+> by the end of the course — and they will be words you actually encountered, which is why
 > they will stay.
 
 %%curriculum-start%%

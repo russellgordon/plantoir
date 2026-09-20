@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Studio time: the information piece
+1. [[Judging Your Own Work]] against the criteria on
+   [[The Information Piece]] — on your own this time
 2. Mid-point critique in small groups
-3. Revision
+3. Revision, on what you found and what they said
 
 ## Things to do before our next class
 

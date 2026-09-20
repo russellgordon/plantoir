@@ -26,13 +26,21 @@ settles an argument about the nature of light.
   phone screen goes black through polarized sunglasses at some angles.
 - **Photography.** A polarizing filter darkens a sky and kills reflections
   in glass.
-- **Stress analysis.** Some plastics rotate polarized light in proportion
-  to internal stress, making the stress visible as colour.
+- **Stress analysis and photoelasticity.** Stressed transparent polymers
+  develop temporary double refraction (birefringence). Placed between two
+  polarizing filters, the orthogonal polarization components travel at
+  different phase speeds, creating constructive and destructive wave
+  interference that separates white light into vivid coloured stress contours.
 
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E1.2]]
+
+![[E2.1]]
+
 ![[E3.2]]
 
-![[E1.2]]
+![[E3.3]]
 %%curriculum-end%%
+

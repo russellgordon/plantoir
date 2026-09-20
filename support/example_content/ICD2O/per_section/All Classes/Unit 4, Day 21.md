@@ -7,6 +7,7 @@ enableToc: false
 excludeBacklinks: true
 tags:
   - unit-4
+  - review
 ---
 %% This page is an example of one HELD BACK: `publish: false` in the
 frontmatter means it is never published to the site. Plan tomorrow today,
@@ -23,4 +24,4 @@ comment when you reuse the page; comments never appear on the site either. %%
 
 ## Things to do before our next class
 
-- [ ] Journal: the tool you described, and who would use it.
+- [ ] Go and build something over the break, for nobody but yourself.

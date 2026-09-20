@@ -168,11 +168,13 @@ Draw and label both kinds of cell until it is automatic, in
 %%curriculum-start%%
 ## Curriculum connection
 
+![[F2.1]]
+
+![[F2.5]]
+
 ![[F3.2]]
 
 ![[F3.3]]
 
 ![[F3.4]]
-
-![[F2.5]]
 %%curriculum-end%%

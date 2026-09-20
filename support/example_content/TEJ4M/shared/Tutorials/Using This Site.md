@@ -42,7 +42,7 @@ The map of folders — Concepts, Labs, Exercises, Code, and the rest — is
 on [[How This Site Is Organised]]. The full tour of what a page can
 *do*, including several features this page skips, is on
 [[What This Site Can Do]]. Ten minutes with those two in the first week
-repays itself several times over by April, particularly if you end up
+repays itself several times over a year from now, particularly if you end up
 writing your capstone documentation in the same format.
 
 > [!tip] The site is not a substitute for the bench

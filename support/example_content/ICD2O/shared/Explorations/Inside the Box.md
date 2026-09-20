@@ -47,6 +47,20 @@ gone? Rank the parts from "will not start" to "would barely notice"
 — then find one component whose whole job has since migrated into
 the single chip inside a phone.
 
+## Assessing components for user requirements
+
+Once your group has mapped the physical parts, assess how component
+variations change the machine's capabilities for different users:
+
+- How would adding more RAM (from 8 GB to 32 GB) change what a student
+  can run simultaneously without slowdown?
+- Why does a digital video editor or 3D animator require a dedicated
+  graphics card (GPU) and fast NVMe storage, while an office clerk needs
+  only integrated graphics and cloud storage?
+
+Connecting hardware specifications directly to user needs is the bridge to
+[[The Device Recommendation]].
+
 > [!note] The answer is not on this page
 > No labelled diagram appears here — on purpose. The class assembles
 > its own map first, and checks it against the world second.
@@ -55,4 +69,6 @@ the single chip inside a phone.
 ## Curriculum connection
 
 ![[B1.1]]
+
+![[B2.3]]
 %%curriculum-end%%

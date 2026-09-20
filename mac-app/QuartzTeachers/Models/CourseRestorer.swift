@@ -36,6 +36,32 @@ enum CourseRestorer {
 
     // MARK: - Functions
 
+    /// Throws away the built website of a section whose PAGES have just been
+    /// replaced.
+    ///
+    /// A restored section carries the timestamps it had when it was backed up,
+    /// and those can be OLDER than the site that was built from it — so the
+    /// freshness check reads "already up to date" and publishing ships the
+    /// pages the teacher has just undone. The built site is derived and one
+    /// build brings it back; the wrong site on a student's screen does not
+    /// come back at all.
+    ///
+    /// **The staleness is older than the move.** It was true when
+    /// `.merged_output` still sat inside the course folder, because a section
+    /// restore replaces `section<N>` and never touched the built tree beside
+    /// it. Moving the output out did not cause it and does not excuse it.
+    private static func discardBuiltSite(
+        forSection sectionNumber: Int,
+        courseCode: String,
+        coursesDirectoryURL: URL
+    ) {
+        BuildOutputLocation.discardSectionBuild(
+            forWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
+            courseCode: courseCode,
+            sectionNumber: sectionNumber
+        )
+    }
+
     /// Restores one archived item, then removes the archive — the content is
     /// live again, and a list of archived things should not include it.
     static func restore(_ item: ArchivedItem, coursesDirectoryURL: URL, courses: [Course]) throws {
@@ -59,6 +85,11 @@ enum CourseRestorer {
 
             try extract(item.fileURL, named: "section\(sectionNumber)", into: courseURL)
             try putSectionBack(sectionNumber, into: course)
+            discardBuiltSite(
+                forSection: sectionNumber,
+                courseCode: item.courseCode,
+                coursesDirectoryURL: coursesDirectoryURL
+            )
         } else {
             if fileManager.fileExists(atPath: courseURL.path) {
                 throw Problem.courseAlreadyPresent(item.courseCode)
@@ -81,6 +112,14 @@ enum CourseRestorer {
     static func restoreBackup(_ item: BackupItem, coursesDirectoryURL: URL) throws {
         let fileManager: FileManager = FileManager.default
         let destination: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
+
+        // The records of renames under way go with the pages they described:
+        // a record left standing would open the next Course Settings with
+        // "did not finish — press Rename to finish" about a rename the
+        // restore has just undone. Cleared first, so a restore that then
+        // fails cannot leave a record about pages that are no longer there.
+        UnitWordRenamer.clearRenameRecord(courseDirectory: destination)
+        SpecialFolderRenamer.clearRenameRecord(courseDirectory: destination)
 
         if !fileManager.fileExists(atPath: destination.path) {
             try extract(item.fileURL, named: item.courseCode, into: coursesDirectoryURL)
@@ -170,6 +209,11 @@ enum CourseRestorer {
             with: backedUpSectionURL
         )
         restorePerSectionKeys(sectionNumber, inCourseAt: courseURL, from: payload)
+        discardBuiltSite(
+            forSection: sectionNumber,
+            courseCode: item.courseCode,
+            coursesDirectoryURL: coursesDirectoryURL
+        )
     }
 
     /// Empties a folder and refills it from another, leaving the folder itself
@@ -240,10 +284,13 @@ enum CourseRestorer {
     /// exactly as the backup had them, and every other byte left alone.
     ///
     /// The backup's LINES are carried across verbatim rather than its values
-    /// read and rewritten. That is what keeps a course written in the older
-    /// `draftSection<N>` spelling in that spelling — the same care
-    /// `AssistPageVisibility.setting` takes, arrived at more simply, because
-    /// here the right line already exists and only has to be copied.
+    /// read and rewritten, because a restore's whole job is to put back what
+    /// was there. A page the backup holds in the older `draftSection<N>`
+    /// spelling comes back in that spelling — a restore is not an edit of a
+    /// page's visibility, so it is not where migration happens
+    /// (`AssistPageVisibility.setting` is, the next time something changes
+    /// what the page says). Rewriting the key here would mean a restore
+    /// putting back something the backup never contained.
     ///
     /// Which lines count is asked of `SectionAdder.perSectionKeyNumber`, so
     /// this can never disagree with the code that writes them about what

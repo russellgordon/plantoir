@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Concentration in Canada: groceries, telecommunications, airlines, banks
+1. Concentration in Canada: groceries, telecommunications, airlines, banks: [[Market Structures]]
 2. What a regulator looks at, and what the Competition Bureau can actually do
-3. Firm study research period
+3. Firm study research period: [[The Firm Study]]
 
 ## Things to do before our next class
 

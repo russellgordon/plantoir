@@ -13,7 +13,8 @@ tags:
 1. Warm-up: [[Name That Part]] — no notes, timed
 2. Bench check, on your own: address a machine, diagnose a fault, and
    explain a share permission
-3. Mark your own; note what to practise
+3. Mark your own; note what to practise — nothing here reaches your
+   mark, which is exactly what makes it worth being honest on
 
 ## Things to do before our next class
 

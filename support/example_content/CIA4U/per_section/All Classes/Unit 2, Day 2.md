@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Fixed, variable, average and marginal cost, computed from one table
+1. Fixed, variable, average and marginal cost, computed from one table — answers compared before we go on
 2. The output rule: produce while marginal revenue exceeds marginal cost
 3. [[Marginal Thinking]] returned to, now inside a firm
 

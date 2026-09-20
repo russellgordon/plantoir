@@ -10,10 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Chromatography of Plant Pigments]] in class
-2. Rf values, and what an absorption spectrum explains about leaf colour
-3. Skill: [[Uncertainty and Error]] — measuring a solvent front honestly
+1. Rf values, and what an absorption spectrum explains about leaf colour
+2. Skill: [[Uncertainty and Error]] — measuring a solvent front honestly
+3. Then write up [[Chromatography of Plant Pigments]] at the bench —
+   write-up two of five on [[Investigation Reports]], handed in at the
+   end of the period
 
 ## Things to do before our next class
 
-- [ ] Report finished with Rf values calculated.
+- [ ] Journal: which pigment's position surprised you, and what polarity
+      says about it.

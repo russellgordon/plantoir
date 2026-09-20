@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Management Review]] — the engagement, the client, the standard
+1. Launch: [[The Management Review]] — the engagement, the client, the criteria, and the recommendation each of you owns and is marked on
 2. Day 1 of 8: meeting your client and agreeing the question
 3. Scoping: what a management question is, and what it is not
 

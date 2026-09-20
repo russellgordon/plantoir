@@ -45,10 +45,32 @@ opening it. [[Reading a Spec Sheet]] shows how to read those lines
 without flinching, and in [[Build a Workstation]] you match them so
 the parts you choose actually work together.
 
+## Semiconductor advances: fabrication and multi-core architecture
+
+Computer processing advances through continuous electronic innovation:
+
+- **Semiconductor miniaturization:** Shrinking transistor gate widths
+  from micrometres down to single-digit nanometres allows billions of
+  transistors to fit on a single silicon die.
+- **Clock rates and thermal limits:** Clock speeds climbed from
+  megahertz to gigahertz before hitting thermal barriers ("power walls")
+  near 4 GHz, driving the shift toward multi-core processors.
+- **Cache hierarchy:** Layered SRAM caches (L1, L2, and shared L3) sit
+  directly on the CPU die, delivering instructions in nanoseconds so the
+  cores rarely stall waiting for main system RAM.
+- **Memory bus architecture:** Dual-channel and multi-channel DDR buses
+  widen the data pathways between the memory controller and RAM sticks,
+  increasing throughput for bandwidth-intensive tasks.
+
+Understanding these advances enables technicians to interpret spec sheets
+and predict real-world computing performance accurately.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A1.2]]
 
 ![[A1.3]]
+
+![[A1.4]]
 %%curriculum-end%%

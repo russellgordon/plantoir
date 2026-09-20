@@ -66,5 +66,15 @@ using [[Statistics and the Census]].
 
 ![[E1.1]]
 
+![[E1.2]]
+
 ![[E1.3]]
+
+![[E1.4]]
+
+![[E3.3]]
+
+![[E3.4]]
+
+![[E3.5]]
 %%curriculum-end%%

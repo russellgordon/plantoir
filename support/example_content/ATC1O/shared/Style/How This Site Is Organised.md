@@ -16,7 +16,7 @@ and the expectations behind all of it.
 | **Warm-Ups** | The warm-ups we use, and what each is for | When you are leading one |
 | **Choreography** | How dances get made | Whenever you are making something |
 | **Discussions** | Seminar questions and how to prepare | The night before a seminar |
-| **Portfolios** | Your journal, video, and portfolio entries | All year |
+| **Portfolios** | Your journal, video, and portfolio entries | All semester |
 | **Tasks** | Assessed work, with the criteria | Whenever something is due |
 | **Tutorials** | Using the site, filming, writing about dance | The first time you need one |
 | **Setup** | How the studio runs | Week one |

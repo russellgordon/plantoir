@@ -7,8 +7,8 @@ tags:
 ---
 By mid-course, your [[Newsroom Journal]] stops being only a diary
 and becomes something rarer: **evidence**. The reporter who wrote
-your September entries no longer quite exists — and because that
-reporter wrote honestly, you can prove it: September self and
+your earliest entries no longer quite exists — and because that
+reporter wrote honestly, you can prove it: starting self and
 now-self side by side, letting the difference speak.
 
 ## Growth is a claim plus evidence — a corrections log read backwards
@@ -21,7 +21,7 @@ forwards it is a list of mistakes; read backwards, a record of a
 newsroom getting better, every step dated. Your journal works the
 same way: every claim reproduced by two dated entries of your own.
 
-> In September I wrote: "Moving is apparently most of photography."
+> At the start of the course I wrote: "Moving is apparently most of photography."
 > Last week I planned positions before the whistle — net first
 > half, bench for reactions — and my desk ran three of my frames.
 > What I noticed by accident is now something I do on purpose.
@@ -35,7 +35,7 @@ is the [[How Marks Work]] question: what can you point to?
 
 Treat your earlier entries the way a story treats sources:
 
-- **Date it** — "In my September 24 entry…" — the distance matters.
+- **Date it** — "In my entry from the third week…" — the distance matters.
 - **Quote a phrase, not a page.** "I keep thinking about that",
   from [[Your First Entry]], carries more truth than any summary
   you could write of it now.
@@ -52,4 +52,6 @@ Treat your earlier entries the way a story treats sources:
 ## Curriculum connection
 
 ![[B1.2]]
+
+![[D2.5]]
 %%curriculum-end%%

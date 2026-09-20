@@ -48,4 +48,8 @@ and this discussion is about its missing rows.
 ## Curriculum connection
 
 ![[A2.3]]
+
+![[A3.1]]
+
+![[B4.3]]
 %%curriculum-end%%

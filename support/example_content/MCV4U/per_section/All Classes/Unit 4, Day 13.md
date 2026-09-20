@@ -18,11 +18,10 @@ tags:
    [[Intersections of Lines and Planes]] — the algebra behind each
    arrangement on your desks
 4. Practise: [[Lines and Planes Practice]] — the rest
-5. Symposium stations assigned: [[The Math Symposium]] is one class
-   away — plan what your station will show
+5. Symposium stations assigned: [[The Math Symposium]] is eight classes
+   away — start planning what your station will show
 
 ## Things to do before our next class
 
-- [ ] Read the prompt in [[Final Reflection]] tonight — symposium day
-      moves fast, and you will want it already turning over.
-- [ ] Rehearse your five-minute tour once, out loud.
+- [ ] With your partner, decide which artefact from each unit your
+      station will show. Eight classes is less time than it sounds.

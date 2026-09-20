@@ -149,6 +149,34 @@ def check(family: str) -> list:
 
     # The sidebar rule: the curriculum folder is never visible, every other
     # shared folder carries a chevron, and All Classes stays a plain link.
+    # Which folders count for marks — the ring on a cell in the Curriculum
+    # Coverage map, and Ontario's ask that every overall expectation be
+    # evaluated at least once. Declared rather than inferred at install time,
+    # because inference is a substring ("task") while the build matches a
+    # pooled name EXACTLY: a family whose folder is "Thinking Tasks" would
+    # silently stop counting under a pool of ["Tasks"].
+    graded = manifest.get("graded_folders")
+    if graded is None:
+        problems.append(
+            "manifest: no graded_folders. Say which folders hold work that "
+            "counts for marks, even if the answer is []"
+        )
+    else:
+        known = set(manifest.get("shared_folders", [])) \
+            | set(manifest.get("per_section_folders", []))
+        for name in graded:
+            if name not in known:
+                problems.append(
+                    f"manifest: graded folder {name!r} is not one of this "
+                    "course's folders, so nothing will ever count for marks in it"
+                )
+        if not graded:
+            problems.append(
+                "manifest: graded_folders is empty, so no expectation can ever "
+                "be shown as evaluated. Deliberate? Say so in a comment field; "
+                "otherwise name the folder your assessed work lives in"
+            )
+
     hidden = manifest.get("hidden", [])
     expandable = manifest.get("expandable", [])
     if curriculum not in hidden:

@@ -14,7 +14,9 @@ tags:
 2. Concept: [[Electronics Fundamentals]] — voltage, current, resistance,
    and what a resistor is actually for
 3. Practise: [[Electronics Calculations Practice]], first half
+4. Walkthrough: [[Safety in the Lab]] soldering rules before tomorrow's bench
 
 ## Things to do before our next class
 
-- [ ] Finish the first half.
+- [ ] Finish the first half of [[Electronics Calculations Practice]].
+- [ ] Skim [[Soldering a Circuit]] and review the safety checklist.

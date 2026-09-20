@@ -71,9 +71,10 @@ Part A is next because you cannot write what you cannot read.
 ## How this is assessed
 
 Against the same expectations as everything else. Per [[How Marks Work]],
-this examination is part of the final 30% of the course mark, alongside
-[[The Community App]] — deliberately, so that neither one afternoon nor
-one project decides your grade alone.
+the final thirty per cent of your mark is this examination and
+[[Launch Day]] together — twenty and ten — so that neither one afternoon
+nor one project decides your grade alone. The other seventy comes from
+the semester's work, [[The Community App]] included.
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -93,4 +94,47 @@ one project decides your grade alone.
 ![[C3.3]]
 
 ![[C3.4]]
+
+![[A3.2]]
+
+![[C1.2]]
+
+![[C2.2]]
+
+![[D1.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Be honest about this one: an examination is product evidence and
+nothing else. You cannot observe or converse in an examination room,
+and you should not try. What follows is where the observation and
+conversation evidence for THESE expectations is actually available —
+the review sequence, while there is still time for it to change
+somebody's preparation.
+
+OBSERVE — Unit 4, Day 20, review part one, tracing cold
+  Watch for: who builds a trace table and who reads down the program
+  and guesses. Both produce an answer; only one of them will still
+  work when the program is longer than the page.
+  Going well: pencil, columns, one row per line executed.
+  Stuck: an answer arrived at in under ten seconds, right or wrong.
+  Record: three columns — traced, part-traced, guessed. Keep the list:
+  Day 23's clinic runs on the questions students bring, but the ones
+  who guessed are the ones to make sure you reach before the end of it.
+
+TALK — Unit 4, Day 23, at the individual conferences already on that
+agenda
+  Put a five-line program with one fault in it on the desk between you
+  and ask them to find and fix it out loud. Then: "How did you know to
+  look there?"
+  Asking which kind of fault they find slowest reports on the ability;
+  watching them do it IS the ability, which is what A4.1 asks for —
+  identify and correct — and for a quiet student this conference may be
+  the strongest evidence of it you will ever have. It is also the last
+  conversation of the course, which is worth remembering.
+  Record: one line each, and the fault you gave them.
+
+The product evidence is the examination itself.
+%%

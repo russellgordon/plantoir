@@ -20,3 +20,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Ten angle problems, each with its reason.
+- [ ] Bring one price you think is unfair, with a reason — next class
+      turns to money.

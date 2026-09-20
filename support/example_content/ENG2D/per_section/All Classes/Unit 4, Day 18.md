@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Sight passage under time, marked together
-2. Then: the same passage, answered better, in half the time
+1. Sight passage under time, marked together: [[Sight Passage Practice]]
+2. Then: the same passage, answered better, in half the time: [[Close Reading]]
 
 ## Things to do before our next class
 

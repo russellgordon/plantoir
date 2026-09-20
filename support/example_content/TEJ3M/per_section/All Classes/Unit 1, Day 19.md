@@ -11,8 +11,10 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Predict the Circuit]] — unit-one finale
-2. Consolidation: circuits on one page, built by the room
-3. Look ahead: the same electricity, now carrying decisions
+2. Acting on last class's check: we take the two questions the room
+   asked for most and work them properly, at the boards
+3. Consolidation: circuits on one page, built by the room
+4. Look ahead: the same electricity, now carrying decisions
 
 ## Things to do before our next class
 

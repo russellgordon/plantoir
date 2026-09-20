@@ -10,15 +10,17 @@ tags:
 ---
 ## Agenda
 
-1. [[The Math Symposium]] — four units, one hour, invited guests
-2. Every station fields the same two questions: where is the
+1. First fifteen minutes, before the doors open: each of you gives me
+   your tour, two minutes, at your own station. That is the telling I
+   mark — the pair shares the station, never the mark
+2. Then the doors: [[The Math Symposium]] — four units, one hour,
+   invited guests
+3. Every station fields the same two questions: where is the
    mathematics doing the work, and where does the model stop?
-3. [[The Flight Path]] lands today — final flight plans on display at
+4. [[The Flight Path]] lands today — final flight plans on display at
    your station
-4. Begin [[Final Reflection]] while the symposium is fresh
-5. Journal collection — [[Journal Checklist]] and [[Showing Growth]]
-   are your last look before handing it in
 
 ## Things to do before our next class
 
-- [ ] Finish [[Final Reflection]] and hand in your [[Math Journal]].
+- [ ] Reread your [[Math Journal]] front to back tonight, the way
+      [[Final Reflection]] asks — and bring every volume with you.

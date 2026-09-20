@@ -7,7 +7,7 @@ tags:
 ---
 Everything for this course lives on this site, and it rewards being
 used in a particular way. Five minutes here saves you an hour of
-wandering in November.
+wandering later in the course.
 
 ## Start where the site starts
 

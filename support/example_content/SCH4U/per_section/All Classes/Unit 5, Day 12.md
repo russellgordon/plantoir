@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[The Chemistry Showcase]] — present the investigation you stand behind
-2. Questions from the floor; state your uncertainty before you are asked
-3. Name the boundary of the model you used — where it stopped being true
-4. [[Final Reflection]] written in the last twenty minutes
+1. [[The Chemistry Showcase]] — benches of five, everybody presents in
+   turn to their own group, panel pages handed in on the way in
+2. Questions from your group; state your uncertainty before you are
+   asked, and name the boundary of the model you used
+3. [[Final Reflection]] written in the last twenty minutes
 
 ## Things to do before you leave
 

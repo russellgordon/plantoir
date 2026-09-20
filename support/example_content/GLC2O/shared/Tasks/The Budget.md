@@ -6,8 +6,8 @@ tags:
   - tasks
   - unit-3
 ---
-**Unit 3. Individual. Due in week eleven.** A spreadsheet, plus two
-pages of writing.
+**Unit 3. Individual. Handed in twenty-five minutes into Day 5, at the
+end of the revision block.** A spreadsheet, plus two pages of writing.
 
 A twelve-month budget for your first year after secondary school,
 sourced, and a written argument about how it would be funded.
@@ -68,3 +68,42 @@ it is a different budget, and the same rules apply to every line of it.
 
 ![[C2.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 4, the first half of the period. Take this walk
+before the conferences on the written argument, which are the second half
+of the same period and are the conversation below
+  Watch for: what happens the first time the running total goes
+  negative. The finished sheet shows whether a shortfall is there; it
+  cannot show you whether one was there and got edited away. A cost
+  quietly reduced with no new source beside it leaves no trace at all.
+  Going well: they go back to a source and re-check the figure, or add a
+  line to the income side and mark it "hoped-for" rather than "likely".
+  Stuck: a number gets smaller and its source column stays empty; or the
+  months are filled in as twelve copies of each other, which is the
+  version with no timing in it.
+  Record: one word beside each name for what the shortfall did to them —
+  sourced, borrowed, cut, or vanished. The last one is who to sit with
+  during the conference.
+
+TALK — Unit 3, Day 4, at the conferences on the written argument that
+are already on that agenda
+  Ask: "Take the form of borrowing you are NOT using. What would have to
+  be true about your year for it to become the better one?"
+  Then: "Which single figure in here are you least sure of, and how far
+  out would it have to be to matter?"
+  The first is C2.2 heard rather than tabulated: comparing forms of
+  borrowing including their risks is exactly what a two-page written
+  comparison flattens into a list. A strong answer to the second names a
+  figure and a threshold — that is C2.3's key considerations tested
+  against their own numbers, and it is a different question from "what
+  could you not find out", which the criteria already ask for in
+  writing.
+  Record: the figure they flagged and the threshold they put on it. You
+  will go looking for both when you open the sheet.
+
+The product evidence is the spreadsheet and the two pages, handed in
+twenty-five minutes into Day 5.
+%%

@@ -58,5 +58,5 @@ One page per idea, written once and linked from every class that uses it.
 - [[The Motor Principle]]
 - [[Electromagnetic Induction]]
 
-If an idea is explained in two places, one of them is wrong by June. That
-is why it lives here and the lessons link to it.
+If an idea is explained in two places, one of them is wrong by the end of
+the course. That is why it lives here and the lessons link to it.

@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[The Independent Study]] — day 9
-2. Four students present their argument in three minutes each
+1. Hand in [[The Independent Study]] — day 10 of 10, with your three-hundred
+   word note
+2. Defences begin: two minutes each — claim, the evidence you would not
+   give up, the hardest objection. Assessed; see [[The Independent Study]]
 
 ## Things to do before our next class
 

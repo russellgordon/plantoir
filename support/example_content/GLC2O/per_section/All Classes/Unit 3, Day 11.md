@@ -17,4 +17,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Write the final portfolio entry.
+- [ ] Nothing to write — the entry was written here. Bring the plan and the portfolio next class.

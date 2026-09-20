@@ -74,5 +74,45 @@ sit, see [[Government Records]].
 
 ![[B2.3]]
 
+![[B2.4]]
+
 ![[B3.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 11, the work period
+  The drafting itself is set for that evening, so what is on the screen in
+  the period is the comparison table and the sources behind it. That is
+  the right moment for this.
+  Watch for: what a student does with a source that undercuts the regional
+  difference they had already decided to argue. There are three moves —
+  change the claim, narrow it to what the evidence will carry, or leave the
+  source out and write as though it were not on the screen. The third is
+  the common one and it is undetectable in the finished essay, because an
+  essay never shows you what was omitted. Read over a shoulder and ask what
+  the open tab is; that is the whole technique.
+  Going well: says out loud that the claim has to change, and narrows it
+  before drafting rather than after.
+  Stuck: the awkward source is open, uncited, and the draft is proceeding
+  around it; or the whole claim is abandoned rather than narrowed.
+  Record: initials in two columns on the day plan — narrowed, or wrote
+  round it.
+
+TALK — Unit 1, Day 10, the conferences on the sources found so far
+  Ask: "Name one way your two colonies were alike that you did not expect."
+  Then: "Which of the two is harder to find evidence for, and what have you
+  done about the imbalance?"
+  A strong answer produces a real shared feature — the same export market,
+  the same dependence on unfree labour at a different scale, the same
+  quarrel with London — and sees that a similarity is what makes the
+  difference worth arguing about. On the second, it treats the thin colony
+  as a problem to be named in the essay rather than padded out. B1.2 asks
+  for a comparison of aspects of life of different colonial groups; the
+  essay will show you a comparison either way, and only this tells you
+  whether it was tested or assembled to fit.
+  Record: one line per student, as you move between desks.
+
+The product evidence is the comparison handed in on Day 12.
+%%

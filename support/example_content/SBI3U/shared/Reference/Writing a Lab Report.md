@@ -25,15 +25,17 @@ only. When a full one is asked for, this is its shape.
 **Observations** contain no interpretation. A table, a graph, a note that
 the string slipped on trial 3. Nothing about what it means.
 
-**Analysis** is where the physics happens: calculations shown once in
-full, graphs read for slope or area, comparison with the accepted value,
-and a real account of uncertainty — see [[Uncertainty and Error]].
+**Analysis** is where the biology happens: calculations shown once in
+full, graphs read for the trend and where it flattens, the result set
+against what the biology predicted, and a real account of how much the
+living material varied — see [[Uncertainty and Error]].
 
 ## Past tense, no "I"
 
-"The cart was released from the 40 cm mark" rather than "I let the cart
-go". This convention is not about formality; it is about the result
-belonging to the procedure rather than to you.
+"The leaf discs were placed in the syringe and the plunger drawn back"
+rather than "I sucked the air out of the discs". This convention is not
+about formality; it is about the result belonging to the procedure rather
+than to you.
 
 The sentence-level habits — precise terms, structure before function — are
 on [[Writing About Biology]].

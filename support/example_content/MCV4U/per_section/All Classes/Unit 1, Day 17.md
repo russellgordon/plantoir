@@ -12,7 +12,8 @@ tags:
 
 1. Checkpoint, on your own: limits, rates of change, and one derivative
    from first principles
-2. Mark your own; write your revision list
+2. Mark your own; write your revision list — the top item of it opens
+   next class
 3. Method: [[Checking Your Own Work]]
 
 ## Things to do before our next class

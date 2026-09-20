@@ -36,7 +36,7 @@ the relationship changes too, because now you are dealing with the ground.
 This is the most useful thing about the vocabulary. When a phrase is dull,
 "make it better" is not an instruction anyone can follow. "Keep the movement
 exactly as it is and change only the timing" is. You will hear that kind of
-instruction all year, and it works because the elements can be isolated.
+instruction all semester, and it works because the elements can be isolated.
 
 ## Where you will use them
 

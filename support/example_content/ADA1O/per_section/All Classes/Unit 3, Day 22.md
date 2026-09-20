@@ -13,7 +13,10 @@ tags:
 1. Warm-up: whole-ensemble [[Soundscape]]
 2. Unit 3 consolidation: one scene, five minutes' preparation, using a
    convention from every unit so far
-3. Look ahead: Unit 4 is a production, and everybody has a job in it
+3. Last fifteen minutes: Unit 3's [[Milestone Journal Entries|milestone entry]],
+   written in class with [[Journal Checklist]] beside you — the same five
+   criteria again
+4. Look ahead: Unit 4 is a production, and everybody has a job in it
 
 ## Things to do before our next class
 

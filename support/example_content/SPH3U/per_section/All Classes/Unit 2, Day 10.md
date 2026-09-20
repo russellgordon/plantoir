@@ -13,7 +13,10 @@ tags:
 1. Warm-up: the same crate, on the flat and on a ramp — two diagrams
 2. Practise: inclines and pulleys, at the boards, in random groups
 3. Consolidate: tilting the axes is a choice, and you say when you make it
+4. Last ten minutes: your [[Newton's Second Law]] report in front of me,
+   weakest row named, before it is handed in next class
 
 ## Things to do before our next class
 
 - [ ] Journal: the step in the tilted-axis method you keep forgetting.
+- [ ] [[Newton's Second Law]] report finished; it is handed in next class.

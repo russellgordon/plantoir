@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Estimate the atoms in one paperclip — any method, defended out loud
+1. Estimate the atoms in one paperclip — any method, defended out loud.
+   Nothing today is marked; the spread of estimates is how I find out
+   where this class is starting from
 2. Post the estimates; they will span several orders of magnitude
 3. What every method needed and none had — a bridge from mass to count
 4. Weigh a stack of paper to get the mass of one sheet — same trick, smaller

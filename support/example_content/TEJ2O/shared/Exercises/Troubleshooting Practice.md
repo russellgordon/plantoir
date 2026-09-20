@@ -23,6 +23,16 @@ check. The order is always the same: look, smell, listen, read.
 6. After a move to a new desk, the keyboard no longer responds.
 7. **Explain what is wrong with this approach.** A classmate's first
    move on *any* fault is to reinstall the operating system.
+8. **OS versus application fault.** A user reports that when they launch
+   a photo-editing application, it immediately crashes with an error,
+   but all other applications (browser, text editor) work smoothly. Is
+   this an operating system kernel fault, a hardware fault, or an
+   application software issue? How would you verify?
+9. **Utility software selection.** Which utility software tool from
+   [[Maintenance Utilities]] would you use for each scenario:
+   (a) an accidental file deletion from a local folder;
+   (b) a mechanical drive that takes minutes to open large folders;
+   (c) verifying how much free space remains on a USB backup drive?
 
 ## Answers
 
@@ -61,10 +71,27 @@ check. The order is always the same: look, smell, listen, read.
 > may be a loose cable — and a failing drive fails just as hard
 > with a fresh system on it. Diagnose first; smallest fix first.
 
+> [!success]- Answer 8
+> It is an application-level fault. Because the operating system and
+> other applications run normally, the OS kernel, memory, and hardware
+> are sound. Verify by checking the application's configuration files,
+> testing in another user account, checking event logs, or updating and
+> reinstalling only that specific application.
+
+> [!success]- Answer 9
+> (a) File recovery / undelete utility or restoring from an active backup;
+> (b) Disk defragmenter to reorganise non-contiguous file sectors;
+> (c) Disk management / storage properties utility to inspect storage
+> capacity and volume usage.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[B1.1]]
+
+![[B4.1]]
+
+![[B4.4]]
 
 ![[D1.1]]
 %%curriculum-end%%

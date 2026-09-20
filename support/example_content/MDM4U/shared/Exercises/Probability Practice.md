@@ -157,3 +157,21 @@ outcomes are.
 > $\binom{23}{2} = 253$. Your intuition tracks the people; the
 > mathematics tracks the pairs. That mismatch is the entire trick of
 > [[The Birthday Problem]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.1]]
+
+![[A1.2]]
+
+![[A1.3]]
+
+![[A1.4]]
+
+![[A1.5]]
+
+![[A1.6]]
+
+![[A2.5]]
+%%curriculum-end%%

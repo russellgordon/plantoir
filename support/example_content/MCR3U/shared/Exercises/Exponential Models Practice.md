@@ -90,3 +90,21 @@ the last step.
 > $y = 2(2)^{-x} + 3$ sneaks in as a decreasing option. Two
 > properties pin down two letters, and the base was never mentioned —
 > so it stays free. Compare candidates in [[Using Desmos]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B2.1]]
+
+![[B2.2]]
+
+![[B2.3]]
+
+![[B2.5]]
+
+![[B3.1]]
+
+![[B3.2]]
+
+![[B3.3]]
+%%curriculum-end%%

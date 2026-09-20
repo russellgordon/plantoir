@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Keep the annotated posting. You apply for it next week.
+- [ ] Keep the annotated posting. You write an application to it two classes from now.

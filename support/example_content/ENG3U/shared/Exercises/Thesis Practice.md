@@ -2,6 +2,8 @@
 title: Thesis Practice
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 Turn each observation into a claim with a mechanism, per
 [[Thesis and Argument]].

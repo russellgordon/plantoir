@@ -16,8 +16,10 @@ tags:
    nouns, follow one path, then change one small thing on purpose
 3. Launch: [[The Maintenance Sprint]] — extend and fix a program your
    team did not write, without breaking what already worked
-4. Sprint work period; every fix gets a commit message a stranger could
-   act on a year from now
+4. Sprint work period: run it, follow one path, then write the
+   characterisation tests that capture what it already does — all of
+   that before a single line is changed. Every commit gets a message a
+   stranger could act on a year from now.
 
 ## Things to do before our next class
 

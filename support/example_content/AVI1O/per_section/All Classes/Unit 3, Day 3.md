@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Elements and principles found in real works
-2. What each one is doing to the viewer
-3. Studio time
+1. Elements and principles found in real works: [[The Elements of Design]] and [[The Principles of Design]]
+2. What each one is doing to the viewer: [[Describing What You See]]
+3. Studio time: analyzing elements and principles in chosen reference artworks
 
 ## Things to do before our next class
 

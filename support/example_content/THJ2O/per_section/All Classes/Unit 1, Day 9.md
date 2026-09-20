@@ -12,8 +12,9 @@ tags:
 
 1. Biological factors: [[The Plant's Own Limits]]
 2. Why the same conditions give different results
-3. Trial measurements
+3. Trial measurements, then one round of "name something your data
+   cannot tell you yet" — no marks
 
 ## Things to do before our next class
 
-- [ ] Update the trial log.
+- [ ] Check the trial log has this period's readings.

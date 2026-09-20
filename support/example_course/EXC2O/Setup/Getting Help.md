@@ -1,8 +1,8 @@
 ---
 title: Getting Help
-createdSection1: 2026-08-14T12:24:26.000-0400
+createdSection1: 2026-09-08T07:00:00.000-0400
 publishForSection1: true
-createdSection2: 2026-08-14T12:24:26.000-0400
+createdSection2: 2026-09-09T07:00:00.000-0400
 publishForSection2: true
 enableToc: true
 tags:

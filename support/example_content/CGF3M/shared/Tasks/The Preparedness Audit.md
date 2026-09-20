@@ -50,6 +50,17 @@ for the hazard itself.
 | Thinking | Effectiveness assessed against stated criteria, not asserted |
 | Application | Real documents used; gaps named as gaps |
 | Communication | The summary page is genuinely usable by someone in a hurry |
+| Your own sections | The two components you signed for stand up to the four rows above on their own, and the comparison answer is in your words |
+
+## Three people, three marks
+
+You work as a group of three and you are marked one at a time. Split the
+six components so that each of you signs for two of them, and put the
+names on the contents page. The comparison in component 6 is written
+separately by each of you — same community, same hazard, your own choice
+of the measure you would import and your own reason for it. The criteria
+you write down before researching are the group's; what you did with them
+is yours. Nothing on this task carries a common mark.
 
 > [!tip] Assess against criteria you write down first
 > Decide before you research what "effective" means here — lead time
@@ -66,6 +77,42 @@ for the hazard itself.
 ![[E2.2]]
 
 ![[E2.3]]
-
-![[A2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 18, the research period, with each group's
+  criteria taped to the front of its folder
+  Watch for: whether a group turns the folder round and reads its own
+  criteria when it opens a document, or reads everything first and fits
+  the criteria to what it found. The finished audit reads identically
+  either way — criteria at the top, findings underneath — and the
+  reverse-engineered version reads BETTER, because every criterion
+  happens to be one the evidence can answer.
+  Going well: an argument about whether something they have just found
+  counts, settled by looking at the taped sheet.
+  Stuck: the folder is face down and the criteria have not been touched
+  since Day 16.
+  Record: three columns on the group list — used, ignored, rewritten.
+  Once at the midpoint of the period and once at the end.
+
+TALK — Unit 2, Day 19, at the audit conferences already on that agenda
+  Ask: "The coordinator who wrote this plan is reading your criteria.
+  Where do they push back, and what do they say?" A strong answer gives
+  the coordinator a real reason — cost, jurisdiction, the population the
+  measure was designed for — rather than dismissing them. That is E2.2
+  heard: a protective measure assessed against what it was built to do,
+  instead of against what the group wishes it did.
+  Then: "Something in this plan was written after a real event. Which
+  part, and what happened?" A strong answer finds the paragraph that
+  reads differently from the rest and can name the flood, the ice storm
+  or the evacuation behind it. That is E2.3: how a community's
+  preparation was actually arrived at, which the document itself never
+  says.
+  Record: one line per group — where the coordinator pushed back, and
+  the event they identified. Write it while they talk.
+
+The product evidence is the audit and the summary page, handed in on
+Unit 2, Day 21. Those arrive on their own.
+%%

@@ -12,7 +12,9 @@ tags:
 
 1. Read: "The Painted Door"
 2. Concept: [[Setting as Argument]] — weather as pressure
-3. The ending: argued two ways, with passages
+3. The same argument in twenty lines: "The Cariboo Horses" (Al Purdy),
+   read aloud — see [[Poems for Grade 10]]
+4. The ending: argued two ways, with passages
 
 ## Things to do before our next class
 

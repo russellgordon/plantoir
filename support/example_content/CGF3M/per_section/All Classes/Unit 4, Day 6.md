@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Two profiles on one sheet: what changed, what did not, and what the measurement error allows you to say
-2. [[Weathering, Erosion, and Deposition]] returned to for a rate rather than for a process
-3. [[Mapping a Hazard]] — the three layers drawn for this stretch of shore
+1. First ten minutes: yesterday's field pages finished here, where the marked record is written
+2. Two profiles on one sheet: what changed, what did not, and what the measurement error allows you to say — feedback only, nothing recorded
+3. [[Weathering, Erosion, and Deposition]] returned to for a rate rather than for a process
+4. [[Mapping a Hazard]] — the three layers drawn for this stretch of shore
 
 ## Things to do before our next class
 

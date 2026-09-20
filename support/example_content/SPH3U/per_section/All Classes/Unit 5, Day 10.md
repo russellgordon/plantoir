@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[Motor and Generator Report]], day 3 — working period: the improvement,
-   tested and documented
-2. Rehearse the presentation on another group
+1. [[Motor and Generator Report]], day 3 — working period: the prediction
+   written down before anything is measured, then the improvement tested
+   and documented, then the weakest row you named last class
+2. Second half: Part 4, the grid argument — your sources on the table and
+   the two transformer ratios worked out here, where I can help
 
 ## Things to do before our next class
 

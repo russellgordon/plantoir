@@ -50,9 +50,15 @@ rather than paraphrasing the sentence.
 
 ![[C1.5]]
 
-![[C3.7]]
+![[C2.2]]
+
+![[C3.1]]
 
 ![[C3.2]]
 
+![[C3.4]]
+
 ![[C3.6]]
+
+![[C3.7]]
 %%curriculum-end%%

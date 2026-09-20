@@ -25,7 +25,7 @@ the honest map.
   start earning while training.
 - **Clubs and contests** — robotics, game jams, hackathons, and the
   Canadian Computing Competition. Two evenings a month, and a portfolio
-  by June.
+  by the end of the course.
 
 ## After school
 

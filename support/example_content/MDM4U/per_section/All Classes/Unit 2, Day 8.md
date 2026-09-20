@@ -14,6 +14,8 @@ tags:
 2. Random groups — binomial, hypergeometric, or neither? Eight
    situations, decided from whether the draws are replaced
 3. Consolidate: the decision question, written on the board
+4. Exit ticket, not marked: one scenario — binomial, hypergeometric,
+   or neither — with the one sentence that decides it
 
 ## Things to do before our next class
 

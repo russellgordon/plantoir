@@ -14,8 +14,35 @@
     "doesNotMoveWhen": [
       "the page is already visible to students - it has a place on the site somebody may have linked to or looked at, and republishing a class must not shuffle work that was already out",
       "the page named for publishing is not a class page - there is no class day to inherit",
-      "the page is a class page - a class's date is its position in the schedule and nothing may move it"
+      "the page is a class page - a class's date is its position in the schedule and nothing may move it",
+      "the page is reached only THROUGH another class page - the walk stops at a class, so material a different class brings takes that class's date and not this one's (issue #173, 2026-09-19)"
     ],
+    "reachStopsAtAClassPage": {
+      "value": true,
+      "why": "The same rule as shared-rules.json -> followingLinks.stopsAtAClassPage, said here because this is where the date half is specified. A class page never INHERITS a date on either platform and never did; what was decided in #173 is that the walk does not continue PAST it either. It applies wherever a class's date is followed outwards: at publish time, and when a whole section is re-dated from a new timetable - where material behind another class is now claimed by the class that actually brings it rather than by whichever earlier class could see it through that one.",
+      "cases": [
+        {
+          "name": "a worksheet behind another class keeps its own date",
+          "classes": [
+            {"title": "Unit 2, Day 3", "date": "2026-10-06", "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "date": "2026-10-07", "links": ["Worksheet"]}
+          ],
+          "pages": [{"title": "Worksheet", "visible": false, "date": "2026-08-01"}],
+          "publish": ["Unit 2, Day 3"],
+          "expectNoMove": ["Worksheet", "Unit 2, Day 4"]
+        },
+        {
+          "name": "named together, the class that brings it dates it",
+          "classes": [
+            {"title": "Unit 2, Day 3", "date": "2026-10-06", "links": ["Unit 2, Day 4"]},
+            {"title": "Unit 2, Day 4", "date": "2026-10-07", "links": ["Worksheet"]}
+          ],
+          "pages": [{"title": "Worksheet", "visible": false, "date": "2026-08-01"}],
+          "publish": ["Unit 2, Day 3", "Unit 2, Day 4"],
+          "expectMoves": {"Worksheet": "2026-10-07"}
+        }
+      ]
+    },
     "sharedPagesMoveToo": {
       "value": true,
       "why": "A page several classes link to still moves, as long as students have never seen it. An earlier rule left shared pages alone - 'a concept page linked from three different lessons belongs to none of them' - which is sound for a page already on the site and beside the point for one nobody can reach. A page students cannot see has no place to be left in; it has only the day its FILE was made, which is a fact about the teacher's evening rather than about the course."
@@ -137,6 +164,68 @@
     ],
     "note": "Making room for a class in the middle of a unit. The RENAME ORDER is the part to get right and the part that looks like an implementation detail: it is the difference between a course that survives and one that loses a lesson."
   },
+  "duplication": {
+    "cases": [
+      {
+        "name": "the copy is the source's own next day, not a page after the last class",
+        "duplicate": "Unit 1, Day 1",
+        "existingClasses": [
+          { "title": "Unit 1, Day 1", "date": "2026-09-08" },
+          { "title": "Unit 1, Day 2", "date": "2026-09-10" },
+          { "title": "Unit 2, Day 1", "date": "2026-09-12" }
+        ],
+        "timetable": ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16"],
+        "expectNewTitle": "Unit 1, Day 2",
+        "expectDate": "2026-09-10",
+        "expectRenamesInOrder": ["Unit 1, Day 2 → Unit 1, Day 3"],
+        "expectOtherClassesMoving": 2,
+        "expectUndoOffered": false,
+        "why": "\"Duplicate Unit 1, Day 1 as my next class\" means tomorrow's lesson is a copy of that one. Landing the copy after the last class of the course would put it weeks away from the lesson it repeats, and leave the day the teacher meant holding the old page."
+      },
+      {
+        "name": "a later unit re-dated is enough to withhold the undo, even with nothing renamed",
+        "duplicate": "Unit 1, Day 2",
+        "existingClasses": [
+          { "title": "Unit 1, Day 1", "date": "2026-09-08" },
+          { "title": "Unit 1, Day 2", "date": "2026-09-10" },
+          { "title": "Unit 2, Day 1", "date": "2026-09-12" },
+          { "title": "Unit 2, Day 2", "date": "2026-09-14" }
+        ],
+        "timetable": ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16", "2026-09-18"],
+        "expectNewTitle": "Unit 1, Day 3",
+        "expectDate": "2026-09-12",
+        "expectRenamesInOrder": [],
+        "expectOtherClassesMoving": 2,
+        "expectUndoOffered": false,
+        "why": "The case a renames-only test cannot see. Renames happen only WITHIN the unit being changed, so duplicating the last day of a unit renames nothing while re-dating every class of every later unit. An undo keyed on renames alone is offered here and takes back only the new page, leaving the rest of the year moved — a partial undo, which is worse than none. The way back is the backup, and the reply says so."
+      },
+      {
+        "name": "duplicating the last class of the course moves nothing, so it can be taken back",
+        "duplicate": "Unit 2, Day 2",
+        "existingClasses": [
+          { "title": "Unit 1, Day 1", "date": "2026-09-08" },
+          { "title": "Unit 2, Day 1", "date": "2026-09-10" },
+          { "title": "Unit 2, Day 2", "date": "2026-09-12" }
+        ],
+        "timetable": ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14"],
+        "expectNewTitle": "Unit 2, Day 3",
+        "expectDate": "2026-09-14",
+        "expectRenamesInOrder": [],
+        "expectOtherClassesMoving": 0,
+        "expectUndoOffered": true,
+        "why": "Nothing else moves, so taking the copy back is whole rather than partial — and this is the common case, since a teacher duplicating a lesson is usually working at the end of what they have written."
+      }
+    ],
+    "forcedUnpublished": {
+      "value": true,
+      "why": "The copy starts hidden however the source was. A page made by duplicating a published lesson is a draft of next week's, and putting it in front of students the moment it is made is the one thing duplicating must not do. The per-section publish key has to be checked as well as the plain one: a copied page carrying publishForSection<N>: true beats the publish: false written over it, and the copy would be visible."
+    },
+    "undoRule": {
+      "rule": "record undo ONLY when nothing else moved - no renames AND no date moves",
+      "why": "A partial undo that deleted the copy and left every later class renamed and re-dated is worse than no undo at all. When classes shuffled, the way back is the backup taken before any of it, and the reply names it."
+    },
+    "note": "Duplicating a lesson as the next class. BOTH suites run all three cases plus forcedUnpublished and undoRule, through the real tool rather than through a re-implementation of the rule, and they ask for the undo the way a teacher does — Windows in ClassPlanningContractTests.Duplication_MatchesContract, the mac in ClassPlanningContractTests.testDuplicatingMatchesTheContract. Proposed FROM Windows 2026-09-18 (#149). The second case — \"a later unit re-dated is enough to withhold the undo, even with nothing renamed\" — was RED on the mac when its runner was first written, because AssistToolRunner keyed the duplicate's undo on renames.isEmpty alone; mac issue #163 widened it to ClassInsertionPlan.movesAnythingElse, which is the property make-room had used all along. That red run is the handover working rather than damage, and it is recorded here because a case nobody remembers catching anything gets \"simplified\" out. expectOtherClassesMoving is the number a teacher reads on the plan card before pressing Go: the UNION of renamed and re-dated pages, counted once each (case 1 renames one page and re-dates two, and the answer is 2, not 3). Windows' loop indexes by name and simply does not read it yet — see mac-proposed issue for #163."
+  },
   "nextClass": {
     "cases": [
       {
@@ -224,9 +313,30 @@
         "expectUnit": null,
         "title": "Unit 2 Day 4",
         "why": "The comma is part of the form. Accepting near-misses means guessing at what a teacher meant by a name, and the cost of guessing wrong is a renamed lesson."
+      },
+      {
+        "expectDay": 3,
+        "expectUnit": 2,
+        "term": "Module",
+        "title": "Module 2, Day 3",
+        "why": "A course that says Module. Its pages are named this way as the course is made \u2014 see file-formats.json, `unit_word`."
+      },
+      {
+        "expectDay": null,
+        "expectUnit": null,
+        "term": "Module",
+        "title": "Unit 2, Day 3",
+        "why": "The load-bearing case, and the one that fails silently if it is got wrong. In a Module course a page called \"Unit 2, Day 3\" is NOT a class page. Reading it as one would put two numbering schemes in one section, and reading it as one only sometimes is worse still."
+      },
+      {
+        "expectDay": 1,
+        "expectUnit": 1,
+        "term": "Thread",
+        "title": "thread 1, day 1",
+        "why": "Case-insensitive, exactly as the default word already is."
       }
     ],
-    "note": "Which class-page titles carry numbers. A page named some other way — 'Field Trip', 'Exam Review' — is NOT guessed at: it is passed over everywhere classes are renumbered, and keeps its own date. The plan says how many were skipped so nobody is surprised."
+    "note": "Which class-page titles carry numbers. A page named some other way — 'Field Trip', 'Exam Review' — is NOT guessed at: it is passed over everywhere classes are renumbered, and keeps its own date. The plan says how many were skipped so nobody is surprised. A case with no `term` uses the default word, \u201cUnit\u201d \u2014 which is what a course says when `unit_word` is absent from its configuration, and what every course made before 2026-09-01 says."
   },
   "refusals": {
     "cases": [
@@ -250,5 +360,526 @@
       }
     ],
     "note": "Named by case, not by message: which refusal it is must match on both platforms, while the sentence a teacher reads is the product's wording."
+  },
+  "classFolder": {
+    "note": "Which folder holds a section's class pages, and whether a given page is one of them. ONE rule, because there were several and they disagreed — a teacher whose folder was not called 'All Classes' got a different answer from the mac app, the Windows app and the build, and the build's answer silently changed the Curriculum Coverage map from 'pages the course teaches' to 'every published page'. A wrong map that reports success is the failure this rule exists to close.",
+    "naming": {
+      "rule": "WHERE A NEW CLASS PAGE IS WRITTEN. Read from the course's own configured per_section_folders, never guessed from what is on disk: the first entry whose name contains 'class' (case-insensitive), else the first entry, else the literal 'All Classes'. Substring matching is safe HERE because the list is a short curated one the teacher chose; it is NOT safe against arbitrary paths, which is what isClassPage below is careful about.",
+      "cases": [
+        {
+          "name": "the ordinary case",
+          "perSectionFolders": [
+            "All Classes"
+          ],
+          "expect": "All Classes"
+        },
+        {
+          "name": "a teacher's own name for it",
+          "perSectionFolders": [
+            "Handouts",
+            "Class Pages"
+          ],
+          "expect": "Class Pages",
+          "why": "Contains 'class', so it wins over the earlier entry. This is the case that was broken: the build matched only the exact strings 'all classes' and 'classes', so this course's lessons were invisible to it while both apps found them."
+        },
+        {
+          "name": "case-insensitive",
+          "perSectionFolders": [
+            "all classes"
+          ],
+          "expect": "all classes"
+        },
+        {
+          "name": "nothing mentions classes",
+          "perSectionFolders": [
+            "Handouts",
+            "Worksheets"
+          ],
+          "expect": "Handouts",
+          "why": "The first entry, so a course still has somewhere to put a class page rather than failing."
+        },
+        {
+          "name": "no per-section folders at all",
+          "perSectionFolders": [],
+          "expect": "All Classes",
+          "why": "The last-resort literal. A section with nothing configured still gets a predictable answer instead of an empty path."
+        },
+        {
+          "name": "a recorded folder with no 'class' in its name",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "All Days",
+            "Tasks"
+          ],
+          "expect": "All Days",
+          "why": "The case the key exists for. A teacher whose units are Threads and whose classes are Days calls the folder 'All Days'; the guess returns it here only by accident of it being first, and returns 'Tasks' the moment the list is ordered the other way."
+        },
+        {
+          "name": "a recorded folder that is not first",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "Tasks",
+            "All Days"
+          ],
+          "expect": "All Days",
+          "why": "Proves the key beats position. Without it this course's class pages would be written into Tasks."
+        },
+        {
+          "name": "the record beats the guess",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "Class Resources",
+            "All Days"
+          ],
+          "expect": "All Days",
+          "why": "A folder mentioning 'class' is present and is NOT the class folder. The teacher said which one; the guess does not get a vote."
+        },
+        {
+          "name": "a record naming a folder that is no longer there",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "Class Pages",
+            "Tasks"
+          ],
+          "expect": "Class Pages",
+          "why": "A stale key must not win. Falling back to the guess keeps a course working after somebody removes the recorded folder in Obsidian; honouring the stale name would point the next-class button at a folder that is not there."
+        },
+        {
+          "name": "the record's spelling loses to the list's",
+          "classFolder": "all days",
+          "perSectionFolders": [
+            "All Days"
+          ],
+          "expect": "All Days",
+          "why": "Matched case-insensitively, but the LIST's spelling is returned: everything downstream builds file paths out of this answer, and on a case-sensitive volume the key's spelling would not be there."
+        }
+      ]
+    },
+    "isClassPage": {
+      "rule": "A page is a class page when it is NOT an index.md and one of its FOLDER segments — never its file name — equals ANY of the membership names above, case-insensitively. Segments are taken RELATIVE to the content root (or the section folder); the path above it is the teacher's own filing and means nothing here. Either path separator is understood.",
+      "whyFolderSegmentsOnly": "Defence in depth, not a bug that was observed. Under segment EQUALITY a file name can never collide with a folder name (a page is 'x.md' and a folder is 'x'), so excluding the file name changes no answer today. It is kept so that a future change to prefix or substring matching cannot silently start counting a page because of what it is CALLED — 'How This Class Works.md' ships in about twenty payloads, and ADA1O ships a curriculum expectation page called 'B3. Connections Beyond the Classroom.md'. An earlier draft of this contract claimed those pages HAD been miscounted; that was wrong — the previous build rule was equality too — and the claim is corrected here rather than left to be believed.",
+      "whyRelativeToTheContentRoot": "Every implementation had this wrong somewhere. build_site.py walked `page.parts` of an ABSOLUTE path (content_root.rglob yields absolute paths), Windows tested the whole directory STRING, and the mac's AssistSectionGraph returns the FULL ABSOLUTE PATH whenever workspaceURL is nil — which SectionIndexPointer.repointIndex passes. So a teacher whose working folder was 'C:\\\\Users\\\\x\\\\Classroom' or '~/Documents/All Classes' made every page in every course a class page. Where a teacher keeps their files is not a fact about their lessons.",
+      "cases": [
+        {
+          "name": "the ordinary case",
+          "path": "All Classes/Unit 1, Day 1.md",
+          "expect": true,
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "nested inside the class folder",
+          "path": "All Classes/Unit 1/Day 3.md",
+          "expect": true,
+          "why": "Any folder segment, at any depth — a teacher who files lessons by unit has not stopped teaching them.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "case-insensitive",
+          "path": "all classes/Unit 1, Day 1.md",
+          "expect": true,
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a folder index is never a class page",
+          "path": "All Classes/index.md",
+          "expect": false,
+          "why": "A folder index carries the same date as the first class, and treating it as a lesson would let a reshuffle move the way in to the folder.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "the file name is ignored",
+          "path": "Setup/How This Class Works.md",
+          "expect": false,
+          "why": "Ships in about twenty payloads. The old build rule counted it.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a curriculum page that mentions a classroom",
+          "path": "Curriculum/B3. Connections Beyond the Classroom.md",
+          "expect": false,
+          "why": "Ships in ADA1O. An expectation page is not a lesson.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a folder that merely contains the word",
+          "path": "Classical Studies/Ovid.md",
+          "expect": false,
+          "why": "The segment must EQUAL the class folder's name. A classics course's reference folder is not where its lessons live.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a teacher's own class folder",
+          "path": "Class Pages/Unit 2, Day 4.md",
+          "expect": true,
+          "classFolders": [
+            "Class Pages"
+          ]
+        },
+        {
+          "name": "the old hardcoded name, when it is not this course's",
+          "path": "All Classes/Unit 2, Day 4.md",
+          "expect": false,
+          "why": "The rule follows the COURSE's configured folder, not a name that used to be hardcoded.",
+          "classFolders": [
+            "Class Pages"
+          ]
+        },
+        {
+          "name": "a Windows path separator",
+          "classFolders": [
+            "All Classes"
+          ],
+          "path": "All Classes\\Unit 1, Day 1.md",
+          "expect": true,
+          "why": "The same relative path arrives with either separator depending on the platform that produced it, and one implementation understanding only '/' is a divergence hiding inside a shared rule."
+        },
+        {
+          "name": "the second of two class folders",
+          "classFolders": [
+            "Class Resources",
+            "All Classes"
+          ],
+          "path": "All Classes/Unit 1, Day 1.md",
+          "expect": true,
+          "why": "Membership is every configured folder that mentions classes, not only the one a new page would be written to."
+        },
+        {
+          "name": "a page in the OTHER class folder",
+          "classFolders": [
+            "Class Resources",
+            "All Classes"
+          ],
+          "path": "Class Resources/Seating Plan.md",
+          "expect": true
+        }
+      ]
+    },
+    "membership": {
+      "rule": "WHICH FOLDERS COUNT AS HOLDING CLASS PAGES — every configured per_section_folder whose name contains 'class' (case-insensitive); if none does, just the single name `naming` chose.",
+      "why": "Naming and membership are the same question only when a course has ONE such folder. A course configured [\"Class Resources\", \"All Classes\"] would otherwise resolve to 'Class Resources' for both, match zero pages, and drop the coverage map back to 'every published page' — reintroducing the exact silent failure this rule was written to close. Writing goes to one folder; counting looks at all of them.",
+      "cases": [
+        {
+          "name": "the ordinary case",
+          "perSectionFolders": [
+            "All Classes"
+          ],
+          "expect": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a class folder beside one that mentions no classes",
+          "perSectionFolders": [
+            "All Classes",
+            "Handouts"
+          ],
+          "expect": [
+            "All Classes"
+          ],
+          "why": "Only the folder that mentions classes counts. Handouts are course material, not days of teaching, and counting them puts them in the dated class lists, in 'publish every class from the 15th', and in the list of classes a scheduled deploy says students cannot see yet. Windows walked every per_section_folder in two places and did exactly that until 2026-09-19 (issue #115); the mac and build_site.py never did."
+        },
+        {
+          "name": "two folders that both mention classes",
+          "perSectionFolders": [
+            "Class Resources",
+            "All Classes"
+          ],
+          "expect": [
+            "Class Resources",
+            "All Classes"
+          ],
+          "why": "Both count. Only the first is where a NEW page is written."
+        },
+        {
+          "name": "nothing mentions classes",
+          "perSectionFolders": [
+            "Handouts",
+            "Worksheets"
+          ],
+          "expect": [
+            "Handouts"
+          ],
+          "why": "Falls back to whatever `naming` chose, so a course still has one answer."
+        },
+        {
+          "name": "no per-section folders at all",
+          "perSectionFolders": [],
+          "expect": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a recorded folder counts, and so does a class-mentioning one",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "All Days",
+            "Class Resources"
+          ],
+          "expect": [
+            "All Days",
+            "Class Resources"
+          ],
+          "why": "The recorded folder first, then the guess's answers. Dropping the class-mentioning folder would SHRINK what the course is seen to teach, which is the direction that produces the wrong map; adding the recorded one can only widen it. A course that had 'Class Resources' counting yesterday must not lose it by recording a class folder today."
+        },
+        {
+          "name": "a recorded folder that also mentions classes is counted once",
+          "classFolder": "Class Pages",
+          "perSectionFolders": [
+            "Class Pages",
+            "Tasks"
+          ],
+          "expect": [
+            "Class Pages"
+          ]
+        }
+      ]
+    }
+  },
+  "renamingTheUnitWord": {
+    "note": "Renaming a course's word for a unit after the course is in use (issue #100, 2026-09-10). Pure rules over page titles: which pages are renamed, what refuses the whole rename, and how links follow. The sentences are in shared-rules.json → specialNames.renameUnitWord. Reference implementation: UnitWordRenamer (mac). Each case builds a course with the given sections and pages, plans a rename from `from` to `to`, and compares. `expectRefused` true means the plan lists NO renames and at least one problem; `expectRenames` is every page that would move, as {section, from, to}; anything not listed is left alone.",
+    "why": "Chosen at course creation and, until this, nowhere else — because renaming an existing course's word means rewriting every class page's name, its frontmatter title and every wikilink pointing at it, and a half-finished pass leaves a broken site. What made it safe was not scale (a ready-made course holds 84–87 class pages, 42 for CHV2O and GLC2O) but an undo: the operation is its own inverse (rename it back), a backup of the whole course is saved first, and a rename that stops part way is recognised and finished by running it again. REJECTED: a display-only rename (titles say Thread while files stay Unit — Obsidian is the teacher's editor and they would see the old word every time); rewriting prose ('by the end of Unit 3' is the teacher's own writing after creation); skipping a page that already sits where a renamed page would go (two numbering schemes in one section); skipping a page that cannot be read (the configuration would then name a word half the pages do not use).",
+    "howAPageIsRenamed": {
+      "rule": "The title inside the frontmatter is set to the new name IN PLACE, then the file is MOVED. Never copied and deleted.",
+      "why": "A move is atomic on one volume, so there is never a moment with two copies or none — an interruption leaves a page under its old name whose title says the new one, which is harmless because every reader goes by the file name, and a second run finishes it. Copy-then-delete (the insertion planner's shape) interrupted between the two leaves both files, and the plan's own collision rule would then refuse the very re-run meant to finish it. A page with no title line is moved without one: Quartz falls back to the file name. Whether a destination that 'exists' is the SOURCE — a change of capitalisation on a case-insensitive volume — is asked of the filesystem's file identity, never of the spelling, so a case-sensitive volume still sees a genuine clash."
+    },
+    "order": [
+      "read every planned page (an unreadable one refuses everything)",
+      "back up the whole course",
+      "write the record that a rename is under way",
+      "retitle and move every page",
+      "rewrite links across every page of the course, shared folders included",
+      "write unit_word to course_config.json",
+      "clear the record"
+    ],
+    "orderWhy": "Disk first, configuration last: if a move fails nothing has been written and the course is as it was. Links after moves so a link can never point at a name that is not there yet. The backup before the record, so a record can never exist without a way back.",
+    "cases": [
+      {
+        "name": "every numbered page in every section moves; anything else stays",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Unit 1, Day 1"
+          },
+          {
+            "section": 1,
+            "title": "Unit 1, Day 2"
+          },
+          {
+            "section": 1,
+            "title": "Field Trip"
+          },
+          {
+            "section": 2,
+            "title": "Unit 2, Day 1"
+          },
+          {
+            "section": 2,
+            "title": "index"
+          }
+        ],
+        "expectRenames": [
+          {
+            "section": 1,
+            "from": "Unit 1, Day 1",
+            "to": "Module 1, Day 1"
+          },
+          {
+            "section": 1,
+            "from": "Unit 1, Day 2",
+            "to": "Module 1, Day 2"
+          },
+          {
+            "section": 2,
+            "from": "Unit 2, Day 1",
+            "to": "Module 2, Day 1"
+          }
+        ],
+        "expectSections": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "a page named with a different word is not a class page and is left alone",
+        "from": "Module",
+        "to": "Thread",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Module 1, Day 1"
+          },
+          {
+            "section": 1,
+            "title": "Unit 1, Day 1"
+          }
+        ],
+        "expectRenames": [
+          {
+            "section": 1,
+            "from": "Module 1, Day 1",
+            "to": "Thread 1, Day 1"
+          }
+        ],
+        "expectSections": [
+          1
+        ],
+        "why": "Only the course's CURRENT word names a class page. 'Unit 1, Day 1' in a Module course is somebody's own page, whatever it looks like."
+      },
+      {
+        "name": "the match is case-insensitive, as the parser already is",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "unit 3, day 4"
+          }
+        ],
+        "expectRenames": [
+          {
+            "section": 1,
+            "from": "unit 3, day 4",
+            "to": "Module 3, Day 4"
+          }
+        ],
+        "expectSections": [
+          1
+        ]
+      },
+      {
+        "name": "a page already sitting where a renamed page would go refuses the whole rename",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Unit 1, Day 1"
+          },
+          {
+            "section": 1,
+            "title": "Unit 1, Day 2"
+          },
+          {
+            "section": 1,
+            "title": "Module 1, Day 2"
+          }
+        ],
+        "expectRefused": true,
+        "why": "Not one page skipped — the whole rename refused. Two numbering schemes in one section is worse than no rename."
+      },
+      {
+        "name": "a course with no class pages yet is allowed: only the settings would change",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Field Trip"
+          }
+        ],
+        "expectRenames": [],
+        "expectSections": [],
+        "why": "A brand-new course, or one whose class pages are all named some other way. The word still decides what the next class is called, so changing it is meaningful."
+      },
+      {
+        "name": "finishing an interrupted rename: pages already moved are not matched, and links to their old names are still followed",
+        "from": "Unit",
+        "to": "Module",
+        "pages": [
+          {
+            "section": 1,
+            "title": "Module 1, Day 1"
+          },
+          {
+            "section": 1,
+            "title": "Unit 1, Day 2"
+          }
+        ],
+        "expectRenames": [
+          {
+            "section": 1,
+            "from": "Unit 1, Day 2",
+            "to": "Module 1, Day 2"
+          }
+        ],
+        "expectSections": [
+          1
+        ],
+        "expectLinkMap": {
+          "Unit 1, Day 1": "Module 1, Day 1",
+          "Unit 1, Day 2": "Module 1, Day 2"
+        },
+        "why": "A rename that stopped after the first page. Running it again must finish: the moved page is under the new word and is not planned again, but a link written as [[Unit 1, Day 1]] still needs to follow it, so the link map covers both."
+      },
+      {
+        "name": "finishing an interrupted change of capitalisation: a page already spelled the new way is not moved onto itself",
+        "from": "Unit",
+        "to": "unit",
+        "pages": [
+          {"section": 1, "title": "unit 1, Day 1"},
+          {"section": 1, "title": "Unit 1, Day 2"}
+        ],
+        "expectRenames": [
+          {"section": 1, "from": "Unit 1, Day 2", "to": "unit 1, Day 2"}
+        ],
+        "expectSections": [1],
+        "expectLinkMap": {
+          "unit 1, Day 1": "unit 1, Day 1",
+          "Unit 1, Day 2": "unit 1, Day 2"
+        },
+        "why": "The parser is case-insensitive, so on a re-run the page already moved matches the OLD word too. Its new title equals its title: it is left where it is rather than moved onto itself — which the mac's filesystem tolerates and others may not — and stays in the link map so [[Unit 1, Day 1]] is still repointed. Found by the implementation review, 2026-09-10."
+      }
+    ],
+    "linkCases": {
+      "note": "How links follow renamed pages. Each case rewrites `text` with the link map a rename from `from` to `to` builds over `pageTitles`, and expects `expect`. The rewriter is the one the insertion planner already uses (WikiLinkRewriter on the mac): it changes only the page name between the brackets and stops at #, | and ].",
+      "cases": [
+        {
+          "name": "a plain link, an alias, a heading and a transclusion all follow; the alias is the teacher's own words",
+          "from": "Unit",
+          "to": "Module",
+          "pageTitles": [
+            "Unit 2, Day 3"
+          ],
+          "text": "See [[Unit 2, Day 3]] and [[Unit 2, Day 3|the lesson on loops]], [[Unit 2, Day 3#Agenda]], ![[Unit 2, Day 3]].",
+          "expect": "See [[Module 2, Day 3]] and [[Module 2, Day 3|the lesson on loops]], [[Module 2, Day 3#Agenda]], ![[Module 2, Day 3]]."
+        },
+        {
+          "name": "prose that mentions a unit by number is not touched",
+          "from": "Unit",
+          "to": "Module",
+          "pageTitles": [
+            "Unit 3, Day 1"
+          ],
+          "text": "By the end of Unit 3 you will link to [[Unit 3, Day 1]] and read Unit 3 of the textbook.",
+          "expect": "By the end of Unit 3 you will link to [[Module 3, Day 1]] and read Unit 3 of the textbook."
+        },
+        {
+          "name": "a link to a page that is not a class page is not touched even when it starts with the word",
+          "from": "Unit",
+          "to": "Module",
+          "pageTitles": [
+            "Unit 2, Day 1"
+          ],
+          "text": "[[Unit 2 Test]] and [[Unit 2, Day 1]]",
+          "expect": "[[Unit 2 Test]] and [[Module 2, Day 1]]"
+        }
+      ]
+    }
   }
 }

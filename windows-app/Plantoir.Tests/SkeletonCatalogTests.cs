@@ -85,4 +85,50 @@ public class SkeletonCatalogTests
         Assert.Contains("mathematics", names);
         Assert.Contains("general", names);
     }
+
+    /// <summary>
+    /// A family's marks pool travels with it, so the wizard can seed
+    /// <c>graded_folders</c> the way the mac does. Fifty manifests declare
+    /// one; the rule for the rest is the build's own: every folder whose name
+    /// contains "task".
+    /// </summary>
+    [Fact]
+    public void AdoptedGradedFoldersComeFromTheManifestOrFallBackToTaskFolders()
+    {
+        var declared = SkeletonCatalog.GetFamilyByName(SkeletonsRoot, "science");
+        Assert.NotNull(declared);
+        Assert.NotEmpty(declared!.GradedFolders);
+        Assert.Equal(declared.GradedFolders, SkeletonCatalog.AdoptedGradedFolders(declared));
+
+        var undeclared = new SkeletonCatalog.Family(
+            "made-up", "Made Up",
+            SharedFolders: new[] { "Notes", "Tasks", "Thinking Tasks" },
+            SharedFiles: Array.Empty<string>(),
+            PerSectionFolders: new[] { "All Classes" },
+            PerSectionFiles: Array.Empty<string>(),
+            Hidden: Array.Empty<string>(),
+            Expandable: Array.Empty<string>(),
+            GradedFolders: Array.Empty<string>());
+        Assert.Equal(new[] { "Tasks", "Thinking Tasks" }, SkeletonCatalog.AdoptedGradedFolders(undeclared));
+    }
+
+    /// <summary>
+    /// The wizard adopts a skeleton only over a structure it is allowed to
+    /// replace — the factory defaults, the LCS defaults, or another
+    /// skeleton's — and never over a list the teacher has edited. The same
+    /// guard, asked the other way, is what lets the toggle put the defaults
+    /// back without discarding an edit.
+    /// </summary>
+    [Fact]
+    public void AStructureTheTeacherEditedIsNeverReplacedInEitherDirection()
+    {
+        var defaults = new[] { "Notes", "Tasks" };
+        var lcs = new[] { "Notes", "Tasks", "College Board Curriculum" };
+        var theirs = new[] { "My Folder" };
+
+        Assert.NotNull(SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, "SNC4M", defaults, defaults, lcs));
+        Assert.Null(SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, "SNC4M", theirs, defaults, lcs));
+        Assert.True(SkeletonCatalog.IsOffered(SkeletonsRoot, lcs, defaults, lcs));
+        Assert.False(SkeletonCatalog.IsOffered(SkeletonsRoot, theirs, defaults, lcs));
+    }
 }

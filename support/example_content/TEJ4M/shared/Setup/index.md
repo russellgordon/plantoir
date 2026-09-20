@@ -23,8 +23,8 @@ things other people will switch on.
   credited.
 - [[What to Wear and Bring]] — closed toes, tied hair, eye protection,
   a calculator, and a paper journal.
-- [[How Marks Work]] — process, evidence, and communication, with the
-  capstone carrying the largest share of the year.
+- [[How Marks Work]] — the seventy and the thirty, the four kinds of
+  thinking, and what is deliberately kept out of your mark.
 - [[Getting Help]] — measure before you guess, and report every
   incident.
 

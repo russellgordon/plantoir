@@ -105,6 +105,14 @@ work of [[Name That Error]] run in reverse, and it is the fastest way
 to build the habit that [[Reading a Traceback in Someone Else's Code]]
 turns into a method.
 
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.3]]
+
+![[A4.1]]
+%%curriculum-end%%
+
 [^bloch]: The same off-by-one has a famous relative. For decades, a
     standard binary search in several major languages computed the
     midpoint as `(low + high) / 2`, which overflows when the two

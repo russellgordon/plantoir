@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Discussion: [[Whose Genome Is It|Whose Genome Is It?]] — again, now that you have
+1. Your Day 1 diagnostic, handed back — what you said a gene was, three
+   weeks ago. Rewrite it in one sentence, underneath
+2. Discussion: [[Whose Genome Is It|Whose Genome Is It?]] — again, now that you have
    written somebody's risk down
-2. Consolidate the strand: from a molecule to a family's decision
-3. Look ahead: next unit, the systems that keep an animal alive
+3. Consolidate the strand: from a molecule to a family's decision
+4. Look ahead: next unit, the systems that keep an animal alive
 
 ## Things to do before our next class
 

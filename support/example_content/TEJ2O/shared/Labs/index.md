@@ -12,7 +12,7 @@ Every lab page opens with its own safety notes, and we read them
 together before tools move — that is the agreement in
 [[Safety in the Lab]], and it holds in every one of these.
 
-The nine labs, in course order:
+The ten labs, in course order:
 
 | Lab | What it builds |
 | --- | --- |
@@ -23,5 +23,6 @@ The nine labs, in course order:
 | [[Build a Small Network]] | Machines that answer each other and share a file |
 | [[Share Files Across the Network]] | A share, permissions you set, and the errors when they are wrong |
 | [[Breadboard a Circuit]] | Your first circuit, and the reason resistors exist |
+| [[Soldering a Circuit]] | Permanent, reliable joints connecting discrete components |
 | [[Gates in Hardware]] | AND and OR as things you can touch and test |
 | [[Control Something with Code]] | A program that changes the physical world |

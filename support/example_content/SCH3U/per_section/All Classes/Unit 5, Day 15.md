@@ -12,9 +12,9 @@ tags:
 ## Agenda
 
 1. Review, part one: naming, formulas, balancing, and classifying —
-   forty questions, marked in the room
+   forty questions, marked in the room: [[Naming Rules at a Glance]] and [[Final Examination]]
 2. Then the mole map, redrawn from memory and checked against your
-   September journal
+   earliest journal
 3. Clinic: your questions, worked on the board
 
 ## Things to do before our next class

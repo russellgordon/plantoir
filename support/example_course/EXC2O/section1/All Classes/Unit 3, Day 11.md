@@ -10,11 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Bench: [[Testing Conductivity]] — write it up in class
+1. Bench: [[Testing Conductivity]] — run it and write it up in the one
+   period. The shortest of the seven [[Lab Reports]]
 2. What conductivity tells you about bonding, and what it does not
-3. [[Science in the News]], day 4 — submission two, on a claim made about
-   a material or a product
 
 ## Things to do before our next class
 
-- [ ] Report finished; second submission handed in.
+- [ ] Read [[Product Life Cycle Analysis]] again. The working periods start
+      next class.

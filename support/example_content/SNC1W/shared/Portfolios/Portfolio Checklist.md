@@ -23,4 +23,4 @@ Before the final submission:
 | Selection | The pieces chosen show a range, not just the best marks |
 | Reflection | Specific, honest, about thinking rather than feelings |
 | Growth | Change is shown with evidence, not asserted |
-| Care | Organised well enough that a stranger could follow it |
+| Made for a reader | Headings, dates and links that work, so a stranger can find their way through it without you beside them |

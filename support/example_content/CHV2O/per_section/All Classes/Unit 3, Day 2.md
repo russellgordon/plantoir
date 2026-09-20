@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Seminar: [[Is Voting Enough|Is Voting Enough?]]
-2. [[Writing to Someone in Power]] — how most civic actions are actually made
-3. Groups formed for the culminating task
+2. [[Writing to Someone in Power]] — how most civic actions are actually made; groups formed for the culminating task
+3. Notebook milestone, written here in the last ten minutes: after that seminar, what do you now think a vote is for?
 
 ## Things to do before our next class
 

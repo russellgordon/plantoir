@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[Tech Headlines]] — a recycling programme, examined
 2. Audit: what this school does with its old equipment, found out rather
-   than assumed
+   than assumed — nothing is handed in; what you find changes what the
+   room believes
 3. Discussion: [[Where Does Old Tech Go]] — with the audit on the table
 
 ## Things to do before our next class

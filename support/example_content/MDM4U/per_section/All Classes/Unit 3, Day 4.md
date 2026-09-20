@@ -14,7 +14,8 @@ tags:
 2. Random groups — audit each other's investigation plans for the four
    kinds of bias. Every plan has at least one
 3. Consolidate: which biases you can design out, and which you can only
-   declare
+   declare. Formative, nothing collected: the bias each group could not
+   design out goes on the board and stays there for the rest of the unit
 
 ## Things to do before our next class
 

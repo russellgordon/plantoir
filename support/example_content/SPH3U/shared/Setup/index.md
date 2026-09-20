@@ -5,8 +5,8 @@ created: __CREATED__
 tags:
   - setup
 ---
-How the course runs — the pages you read in September and come back to in
-November when something has gone wrong.
+How the course runs — the pages you read at the start of the course and come
+back to in later, when something has gone wrong.
 
 - [[How Physics Class Works]]
 - [[Safety in the Lab]]

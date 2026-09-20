@@ -17,3 +17,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Read [[Climate and Its Controls]] and explain one anomaly in the climograph you built on Day 11.
+- [ ] Draft [[The Process Study]] far enough to be worth reading. Tomorrow's checkpoint needs something on paper.

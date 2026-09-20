@@ -13,7 +13,9 @@ tags:
 
 1. Review, part one, against [[Final Examination]]: vectors, projectiles,
    circular motion, then energy, momentum, and collisions
-2. By request: [[Vectors and Projectiles Practice]],
+2. Start where yesterday's self-check said you were weakest — the second
+   half of this period is for exactly that
+3. By request: [[Vectors and Projectiles Practice]],
    [[Circular Motion Practice]], [[Momentum and Collisions Practice]]
 
 ## Things to do before our next class

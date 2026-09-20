@@ -42,6 +42,26 @@ Every launcher derives the image from the folder's build recipe: the tag is
   this to preview sections side by side in separate windows. Each preview
   only ever stops a server on its own port.
 
+  A build for publishing (`--build-only`) also stops a preview, but matches
+  the section's build DIRECTORY rather than a port — it is never given one,
+  and guessing the default took down other sections' previews. See
+  [the build pipeline](05-build-pipeline.md#a-build-for-publishing-stops-that-sections-preview).
+- `--stop` (preview only) — end this section's leftover processes and exit.
+  Ending the host-side launcher does not stop the build or server it started
+  inside the container: idle for a server, real CPU for a mid-flight build.
+  This reclaims them, and **must never start anything** — no engine
+  bootstrap, no image build, no container creation, because if nothing is
+  running there is nothing to stop. The app runs it behind Stop Preview,
+  navigating away, closing a window, and cancelling a publish.
+
+  It ships the rule INTO the container over stdin rather than running a copy
+  baked into the image, and that is deliberate: stop mode runs against
+  whatever container is already there, which right after an upgrade was built
+  from the previous image and has no such file. Naming a baked path fails
+  with a message nobody sees — both callers discard this launcher's output
+  and neither checks its exit code — while the build it was asked to stop
+  carries on.
+
 ### One container per working folder
 
 Each working folder gets its own container, named
@@ -224,7 +244,11 @@ Recreating the container is cheap because all state lives in the bind mount.
 - Takes `COURSE SECTION` as positional arguments, plus pass-through flags
   understood by `build_site.py`: `--include-social-media-previews`,
   `--force-npm-install`, `--full-rebuild`, `--build-only` — plus its own
-  `--port N` (container port 8081–8084) and `--image REF`.
+  `--port N` (container port 8081–8084, which IS passed on to `build_site.py`),
+  `--image REF`, `--non-interactive` (nobody is watching this build; refuse
+  rather than ask — see `deploy.sh` below, where the flag is explained in
+  full), and `--stop`. The last three are handled entirely by the launcher and
+  never reach `build_site.py`.
 - Checks host-side that the course is set up (`course_config.json` exists)
   and that the section folder is there. The `section_numbers` check itself
   runs in the container once it is up (`docker exec … python3 -`), so a typo
@@ -261,6 +285,92 @@ Recreating the container is cheap because all state lives in the bind mount.
     temp file (`umask 077`) and reading it inside the `docker exec` shell
     into the `NETLIFY_AUTH_TOKEN` environment variable — it never appears in
     a process argument list on the host.
+- **`--non-interactive`** says nobody is at the computer, which is what a
+  scheduled publish is. Every question the launcher can ask — the course-code
+  correction, the Cloudflare Account ID, and both token prompts — becomes a
+  refusal that names the question and exits **3**, a code meaning "a question
+  went unanswered" and nothing else, so a caller can tell it from an ordinary
+  failure. The flag is FORWARDED to `deploy.py`, which does the same for the
+  questions it owns — including the one that matters most, what the website
+  should be called. `deploy.sh` looks for the flag TWICE: once in a pre-scan
+  before the course-code guard, which runs before the option loop, and once in
+  the loop itself. `deploy.ps1` needs no pre-scan, parsing its flags first.
+  A saved credential that fails its check is KEPT rather than cleared under
+  this flag: the check is a network call, so an offline machine and a revoked
+  token look identical from here, and discarding a working credential only a
+  person can replace is the more expensive mistake. Only the app's SCHEDULED
+  deploy passes it — pressing Deploy runs this same launcher through a
+  pseudo-terminal so a question can come back as a dialog.
+
+  **It is a PREVIEW flag too, as of 2026-09-09 (issue #124).** A scheduled
+  publish BUILDS before it publishes, and the build runs `preview.sh` /
+  `preview.ps1` — which ask questions of their own, at half six, of nobody.
+  Both now take the flag and refuse with the same exit 3. `preview.sh` needs a
+  pre-scan for the same reason `deploy.sh` does, its course-code guard running
+  before the option loop; `preview.ps1` parses first and needs none.
+  `preview.ps1` also asks one thing `preview.sh` does not — *"Continue
+  anyway?"*, when a section is not listed in `course_config.json` — which is
+  recorded in `app-rules.json` with `appliesOn: ["windows"]` so it reads as a
+  deliberate difference rather than drift.
+
+  **And both deploy launchers FORWARD it to that rebuild**, the one they run
+  themselves when they find a preview-built site. `deploy.sh`'s pass-through
+  of exit 3 was dead code until 2026-09-09, and **the line has now been got
+  wrong twice**, which is why the launcher carries both shapes in a comment
+  rather than just the right one:
+
+  - `if ! CMD; then _rc=$?` — with `!` in front of a pipeline the status is
+    the logical NOT, so `$?` is 0 and the `-eq 3` test could never fire.
+  - `CMD` then `_rc=$?` on the next line, which was the FIX for the first and
+    is worse: `deploy.sh` runs under `set -euo pipefail`, so the script aborts
+    at `CMD` and the guard never runs at all — printing nothing, where the
+    broken version at least printed "Could not rebuild this site for
+    publishing." It propagated 3 by accident, which reads as working.
+
+  `_rc=0; CMD || _rc=$?` is the shape that survives both: an `||` list is
+  exempt from `set -e` and leaves `$?` readable. Measured on bash 5.3.15 and
+  pinned by two tests in `scripts/test_deploy_non_interactive.py`, one of
+  which RUNS all three behaviours rather than asserting a shape — because the
+  test written for the first mistake passed against the second.
+
+  What it refuses is
+  listed in `contracts/app-rules.json` → `launcherFlags.nonInteractive`, and
+  the flag itself is registered in `launcherFlags.deployExtras`.
+
+  All four refusals are DRIVEN, not just described:
+  `scripts/test_deploy_sh_questions.py` runs the real `deploy.sh` to each
+  question — with `--image` so no build recipe is resolved and no container is
+  needed, and a Keychain user that does not exist so the lookups come back
+  empty — and checks the refusal is SAID as well as the exit code being 3. It
+  also pins the other half, that a teacher at a keyboard is asked exactly what
+  they were asked before and their answer is taken. It exists because this
+  flag was written on a machine with no bash and the launcher had never been
+  started; doing so found two bugs in `prompt_for_cf_account` that reading it
+  had not (issue #129, written up in
+  [publishing](07-deployment.md#asking-once-and-the-subshell-that-ate-the-question-2026-09-09)).
+
+  **`preview.sh` takes it too**, and needs to: a scheduled publish BUILDS
+  before it publishes, the mac's launchd agent runs `preview.sh --build-only`
+  directly, and `deploy.sh` forwards the flag to its own rebuild. `preview.sh`
+  has no `set -e`, so without the flag its own course-code guard reads at end
+  of input, takes the `[Y/n]` DEFAULT, and rebuilds a DIFFERENT course — which
+  is then published successfully against the wrong one. A refusal is the
+  better failure. Registered in `launcherFlags.preview`.
+
+  **And it is driven too**, by `scripts/test_preview_sh_questions.py` — added
+  2026-09-09, because a launcher that has only ever been READ under a new flag
+  is the state `deploy.sh` was in when running it found two bugs. It borrows
+  the twin's harness rather than copying it, and it pins four things reading
+  cannot: that the refusal exits 3 and says which question it could not ask;
+  that the command the launchd wrapper actually writes — flag LAST, after
+  `--build-only` — refuses the same way; that "Nothing was built" is TRUE,
+  by looking at the folder afterwards; and that the flag's parser arm does not
+  eat the argument following it, which it would if a `shift` were ever added
+  there (the loop shifts once at the bottom already). The measurement the
+  contract's reasoning rests on — that without the flag, at end of input, the
+  default is taken and the build retargets — is run rather than remembered,
+  because the Windows side found the equivalent claim about PowerShell was
+  false the day they measured it.
 - Finally runs `deploy.py` inside the container
   (see [Deployment](07-deployment.md)).
 
@@ -273,6 +383,146 @@ bare LF), and `verify.sh` checks the CRLF survives. Teachers normally
 receive launchers via the app's `.toolchain/` mirror rather than
 `export-scripts`, but the exported copies remain a supported escape hatch
 and differ from the repo versions in line endings only.
+
+## One rule for stopping a section's preview
+
+New on 2026-09-05, and the closing of a `TODO.md` item. Read
+`contracts/shared-rules.json` → `stopPreview` first; this explains why it is
+shaped the way it is, and what was rejected.
+
+**What was wrong.** One question — *which processes belong to this section's
+preview?* — was answered in three places: `preview.sh --stop` (a `/proc` sweep
+by working directory, run inside the container), `preview.ps1 --stop`
+(`Win32_Process` by command line, plus a descendant walk, run natively), and
+`build_site.py` (command line plus `--serve`, inside the container, written
+because both of the others are HOST scripts and it is not). The reason for the
+third is sound and has not gone away; the problem was never that it existed,
+it was that nothing held the three to the same answer.
+
+**The finding that changed the design, and the reason a straight refactor
+would have been wrong.** They were not three copies of one rule. They were
+three PARTIAL rules, and each saw something the others could not:
+
+- A **working directory** catches a child launched by a RELATIVE path, which
+  carries no directory to match on. `npm install` runs exactly that way, and
+  so do the esbuild workers under it.
+- A **command line** catches the Python driver. `build_site.py` never calls
+  `os.chdir` — it passes `cwd=` to its CHILDREN — so the driver sits in the
+  container's `/teaching` for the whole build. Through every in-process phase
+  (copying the scaffold, copying content, social cards, the rsync mirror) it
+  is the only process there is to find, and the mac's sweep found nothing and
+  printed "Stopped 0 process(es)".
+- Only **`preview.ps1`** walked descendants — Windows', and it was right.
+
+So picking any one of the three as "the" implementation would have shipped
+that one's blind spot to both platforms. The rule is a **disjunction of three
+evidences, plus a walk down the process tree**, and it stops strictly more
+than any of the three did alone.
+
+**Why the cases are process SNAPSHOTS rather than single processes.** The
+first design had each case describe one process — name, command line, working
+directory — with an expected verdict. That cannot be run on both platforms,
+for two independent reasons. `Win32_Process` exposes no working directory at
+all, so every cwd case would be unanswerable there. And the descendant
+walk is not a property of any single process: it is a rule over parent links
+across the whole list. A case is therefore a small process TABLE with `pid`,
+`ppid`, `name`, `commandLine` and `cwd`, and the expected answer is the list
+of pids to stop. A platform that cannot see one kind of evidence must still
+reach the same verdict — through the walk — and that is exactly the property
+worth testing rather than assuming.
+
+**Two modes, because there are genuinely two questions.** `everything` is the
+launcher's `--stop`: reclaim the server, the build, the driver, and everything
+under them. `servingOnly` is `build_site.py --build-only`: remove ONLY the
+preview server that would otherwise overwrite the publish build a second later
+through its own host mirror. A build must never be stopped in that mode,
+because the build being protected is itself a build of this section — and the
+process asking is the driver the rule would otherwise recognise.
+
+**The version-independence trap, which is the one to carry if anyone ever adopts
+`--match-stdin`.** `preview.sh` pipes the recipe's copy of the rule into the
+container over stdin rather than running the copy baked into the image. Stop
+mode must never build anything, so it runs against whatever container is
+ALREADY there — right after an upgrade, one built from the previous image,
+with no such file. Naming a baked path would make `docker exec` fail with a
+message nobody sees (both callers send the launcher's output to the null
+device and neither checks its exit code) while the build it was asked to stop
+carried on burning CPU. This is exactly once per teacher per upgrade, and only
+when something was running, which is the only time the mode matters at all.
+`verify.sh` section 6d proves it by deleting the file from a running container
+and stopping a preview anyway.
+
+**Rejected: making `preview.ps1` call the shared Python.** It would leave one
+implementation and two ports, which is better, and the `--match-stdin` entry
+point exists so it can be. It was not done from the mac because `--stop` must never
+start anything and whether Python is reliably resolvable on that path at that
+moment is a question only a Windows machine can answer. Measure it there; say
+what you find.
+
+**Rejected: extracting `preview.ps1`'s matcher into a new `.ps1` file beside
+the launchers.** A test could then dot-source it without running the script.
+But a new file there has to be added to `ToolchainMirror.Launchers` and
+`RecipeRootFiles`, the Dockerfile's `COPY … /opt/export/` and its `unix2dos`
+line, `project.yml`, and the mac's own refresh lists — five hand-maintained
+lists, which is the precise failure `contracts/toolchain.json` →
+`recipeFolders` exists to record. The functions are defined inside
+`preview.ps1`'s stop block instead. Making them dot-sourceable is a
+real cost to weigh, not a free tidy-up.
+
+**A case a platform may skip, and why that is not a loophole.** One case —
+"a process is caught by its working directory alone" — can be decided ONLY
+with a working directory, which `Win32_Process` does not expose. Rather than
+delete it (it pins the evidence that catches `npm install`) or let it fail on
+Windows, cases carry `needsEvidence`, and a runner without that evidence skips
+it naming what was missing. The loophole this could obviously become is closed
+by a test rather than by discipline: the mac's suite BLINDS every case — takes
+the working directories away — and asserts that a marked case's verdict
+changes and an unmarked case's does not. It caught a case wearing the marker
+that did not need it on the first run, which is exactly the drift the marker
+would otherwise invite.
+
+**Three holes the second review found, all in the rule itself, all the same
+family as the bug being fixed.** A blank or root build directory was evidence
+for EVERY process, because an empty string is a prefix of everything — a
+caller that lost track of which section it was asking about would have swept
+the whole container rather than failed. A target that is a SUFFIX of a longer
+absolute path matched as well, so `/x/tmp/quartz-builds/ADA1O/section1` was
+evidence for `/tmp/quartz-builds/ADA1O/section1`. Both are the section1 /
+section10 mistake pointed in different directions: one about where a path
+ends, one about where it begins, one about whether it is a path at all. The
+lesson worth keeping is that fixing a boundary bug in one direction is not
+finishing it — check every edge of the match, and check that the thing being
+matched is a real value.
+
+**One harness lesson, learned twice in one afternoon.** A process that scans
+other processes for a marker string finds ITSELF — the marker is on its own
+command line. In `verify.sh` 6d this first inflated a count so that every
+check in the section failed while the code under test was correct, and then,
+in the cleanup, made the script SIGKILL itself part-way through: it printed
+nothing, exited quietly, and left behind the very processes it was written to
+collect. The second one was found only by checking the container afterwards
+rather than trusting a green run. Exclude the harness's own process id, and treat
+"scanning for a string I am myself carrying" as a shape worth recognising —
+the same trap that `stop_preview.py` already guards against for the real rule.
+
+**What was measured, not decided.** The two `preview.ps1` prefix bugs were
+found by reading, and both are real: `$lower.Contains($sectionNeedle)` with a
+needle ending `\section1` matches `\section10`, and
+`$lower.Contains('--section=1')` matches `--section=10`. Each was reproduced
+as a contract case, and each case was checked by putting the fault back into
+the shared Python and watching that case — and only that case — fail. The same
+was done for the descendant walk. A green suite proves nothing about a case
+that cannot fail.
+
+## `--image` is the mac's flag alone
+
+Found 2026-09-06 while wiring the contract's case lists into the Windows suite.
+`contracts/app-rules.json` → `launcherFlags.deployExtras` named `--diagnose` and `--image <tag>` as flags
+the launchers must both accept. `deploy.sh` parses `--image`; `deploy.ps1`
+does not, and cannot — Windows has had no image to name since it dropped
+Docker on 2026-08-19. Recorded as `macOnly` rather than closed by adding a
+dead flag to `deploy.ps1` so a test would go green, which is the shape of fix
+`WINDOWS-BOOTSTRAP.md` §0 exists to forbid.
 
 ---
 

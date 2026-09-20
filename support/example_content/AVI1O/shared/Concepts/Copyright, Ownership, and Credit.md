@@ -38,13 +38,13 @@ composition, whatever medium you finished it in.
 
 ## What this means in this studio
 
-Ask before you use somebody's image in your own work, and be prepared to hear
-no. Keep a record in your portfolio of where every source came from — you
-will not remember by June. Photograph people only with their agreement,
-especially if the photograph is going on a wall or a website. And when you
-show work in [[The Exhibition]], the label carries your name because the work
-is yours; if it depends on somebody else's image, that belongs on the label
-too.
+Ask before you use somebody's image in your own work, and be prepared to
+hear no. Keep a record in your portfolio of where every source came from —
+you will not remember by the end of the course. Photograph people only with
+their agreement, especially if the photograph is going on a wall or a
+website. And when you show work in [[The Exhibition]], the label carries
+your name because the work is yours; if it depends on somebody else's image,
+that belongs on the label too.
 
 The habit works in your favour as well. Sign and date what you make. Keep
 your files. When you photograph work for [[The Portfolio]], you are building

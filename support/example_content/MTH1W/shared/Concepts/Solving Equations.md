@@ -41,12 +41,47 @@ solution is an unfinished one.
 - [ ] If they differ, celebrate: you found the error before anyone
       else did, which is the whole point of [[Mistakes Are Data]]
 
+## The word "algebra" is a method, not a subject
+
+Around 820 CE in Baghdad, al-Khwārizmī wrote a book whose title contains
+the words *al-jabr* and *al-muqābala*. *Al-jabr* — "restoring" — is the
+move where you get rid of a subtracted term by adding it to both sides.
+*Al-muqābala* — "balancing" — is where you cancel like terms that appear
+on both sides. Those two operations are the whole of what you did to
+$3x + 5 = 20$ above, and *al-jabr* is the word that became "algebra".
+
+Two things about that book are worth knowing. It was written for
+practical use — inheritance shares, land measurement, trade — rather
+than as pure theory, so its problems are about people dividing an estate
+rather than about $x$. And it contains no symbols at all. Every equation
+is written out in sentences: "a square and ten roots equal
+thirty-nine dirhams" is what we would write as $x^2 + 10x = 39$.
+
+That is the part that repays a minute's thought, because it says
+something about what the notation is *for*. Al-Khwārizmī could solve the
+problem; symbolic notation arrived centuries later, in stages, from
+several places. What the symbols bought was not the ability to solve —
+it was the ability to see the *shape* of a method at a glance, and so to
+notice that two problems that sound completely different are the same
+problem. Try writing $3x + 5 = 20$ as a sentence with no symbols, solve
+it that way, and you will feel exactly what the notation is saving you.
+
+His name travelled too: Latinised, *al-Khwārizmī* became *algorismus*,
+and then **algorithm** — the word you will use in [[Getting Started with Python]]
+for a procedure that gets a result if you follow the steps. The step-by-step
+undoing on this page is an algorithm, and it has carried his name for
+twelve hundred years. This is the kind of thread [[The Math Fair]] asks
+you to follow: where an idea started, who needed it, and what it is
+called now.
+
 The habit generalises far beyond equations — it is the core move in
 [[Checking Your Own Work]]. [[Equation Practice]] builds fluency, and
 [[Getting Unstuck]] has strategies for equations that fight back.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[C1.1]]
 
 ![[C1.5]]
 %%curriculum-end%%

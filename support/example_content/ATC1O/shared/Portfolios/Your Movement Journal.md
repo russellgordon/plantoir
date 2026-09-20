@@ -17,6 +17,12 @@ day later. The cool-down is when to notice what to write about, which is why
 [[Cool-Down and Recovery]] tells you to pay attention as your pulse
 settles.[^format]
 
+The entries that carry a mark are the ones written **in the studio, at a
+milestone** — after a showing, after a seminar, after the day we watch the
+recording — where the class page asks for one. Everything else in here is
+practice: it is yours, it is where the marked entries come from, and it is not
+something I mark. See [[How Marks Work]].
+
 ## What an entry contains
 
 Four short things. Not an essay — a working record.
@@ -46,13 +52,13 @@ same in both directions: replace the verdict with the moment.
 - Instead of *I don't have the flexibility for this* — *my hip stops before
   the extension does; I can work on where the weight sits.*
 
-Nobody marks you for how you feel about your dancing; what is assessed is
-whether you can see it. The entries where you were honest about something not
-working are the ones you will quote in June, because they are the only ones
-that prove anything changed.
+Nobody marks you for how you feel about your dancing. What the milestone
+entries are read for is whether you can see it. The entries where you were
+honest about something not working are the ones you will quote at the end of
+the course, because they are the only ones that prove anything changed.
 
 [^format]: Paper or digital, both are fine — but pick one and stay with it for
-    the year. Half a journal in a notebook and half in an app is a portfolio
+    the semester. Half a journal in a notebook and half in an app is a portfolio
     that cannot be handed in.
 
 %%curriculum-start%%

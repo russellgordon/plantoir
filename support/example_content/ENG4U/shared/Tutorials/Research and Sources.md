@@ -60,9 +60,11 @@ course, an unchecked citation is treated the same as a made-up one.
 
 ![[C1.3]]
 
-![[D1.4]]
-
 ![[B1.6]]
 
+![[D1.4]]
+
 ![[D1.5]]
+
+![[D1.6]]
 %%curriculum-end%%

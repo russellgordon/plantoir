@@ -137,3 +137,17 @@ which tool applies.
 > $\binom{n}{2}$ counts handshakes. Same arithmetic, two stories,
 > which is exactly what [[Pascal's Triangle]] claims about every
 > diagonal it has.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.1]]
+
+![[A2.2]]
+
+![[A2.3]]
+
+![[A2.4]]
+
+![[A2.5]]
+%%curriculum-end%%

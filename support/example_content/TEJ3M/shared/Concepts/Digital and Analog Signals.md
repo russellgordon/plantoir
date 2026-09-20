@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 On the analog day of [[Blink, Read, React]] you turned a potentiometer
 and watched a number on screen sweep smoothly from nearly zero to

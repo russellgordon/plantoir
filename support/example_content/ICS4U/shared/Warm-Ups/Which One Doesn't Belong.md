@@ -77,3 +77,11 @@ team about which container to use.
 > just as hard. This is rehearsal: in [[The Code Review]] you will
 > have to state the case for a design you would not have chosen, and
 > do it well enough that its author agrees you understood it.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C1.1]]
+
+![[C1.4]]
+%%curriculum-end%%

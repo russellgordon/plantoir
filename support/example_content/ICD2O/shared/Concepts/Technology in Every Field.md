@@ -59,10 +59,36 @@ attendance three times. Each is a small program waiting to be written,
 and each is a better first project than anything invented from nothing,
 because you already know when it is right.
 
+## Career pathways and continuous learning
+
+The skills you build in this course connect to dozens of careers — not
+only traditional software development, systems administration, and web
+engineering, but also emerging roles across the economy:
+
+- **Cybersecurity analyst and data specialist** — protecting digital
+  infrastructure, auditing access logs, and uncovering actionable trends
+  in healthcare, finance, or municipal governance.
+- **User experience (UX) and accessibility designer** — ensuring digital
+  tools and interfaces work seamlessly for people with diverse abilities.
+- **Automated equipment technician and skilled trades specialist** —
+  programming CNC machines, configuring agricultural robotics, and
+  troubleshooting smart-building telemetry.
+- **Interdisciplinary developer** — creating custom tools inside
+  journalism, game development, environmental monitoring, or biotech.
+
+Continuing your learning does not require waiting for a university degree:
+explore secondary computer science and technology courses, open-source
+developer communities, college diploma and apprenticeship programs,
+official documentation, and community hackathons. The most important
+habit is self-directed curiosity — learning to read documentation and test
+small prototypes on your own.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A3.1]]
 
 ![[A3.2]]
+
+![[A3.3]]
 %%curriculum-end%%

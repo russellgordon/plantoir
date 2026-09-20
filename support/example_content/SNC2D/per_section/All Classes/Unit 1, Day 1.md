@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Bench rules, quickly and for real: [[Lab Safety and WHMIS]]
-2. Investigation: [[Looking at Tissue]] — draw three slides, unlabelled
+2. Diagnostic: [[Looking at Tissue]] — draw three slides, unlabelled.
+   Nothing is marked; it tells me what this class already notices, and the
+   drawings come back next class to sort
 3. [[Using a Microscope]] — focus and lighting troubleshooting as you go
 4. Compare drawings: what turned up in every group's slide?
 5. The year ahead: [[How Science Class Works]] and [[Learning Goals]]

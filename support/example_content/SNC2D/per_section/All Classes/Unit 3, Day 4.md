@@ -18,4 +18,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Journal: the card that moved, and the evidence that moved it.
-- [ ] Bring one climate graph from anywhere. We read them next class.
+- [ ] Bring one climate graph from anywhere. Keep hold of it; the class
+      where we judge them is two on from here.

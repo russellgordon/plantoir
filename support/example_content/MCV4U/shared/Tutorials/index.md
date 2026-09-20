@@ -20,6 +20,6 @@ student in this course, usually more than once.
 
 > [!tip] When to come back
 > Stuck on an optimization at the boards? [[Getting Unstuck]]. The
-> derivative rules test next week? [[How to Study for Math]]. Just
-> fit a model to position data? [[Checking Your Own Work]]. These
-> pages are built to be reread.
+> derivative rules still shaky before a checkpoint?
+> [[How to Study for Math]]. Just fit a model to position data?
+> [[Checking Your Own Work]]. These pages are built to be reread.

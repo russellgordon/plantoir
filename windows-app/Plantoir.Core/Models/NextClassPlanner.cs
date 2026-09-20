@@ -6,13 +6,19 @@ namespace Plantoir.Core.Models;
 /// <summary>
 /// The page for the next class: the one that comes after the last one a
 /// section has, on the next day it meets.
+///
+/// <para>Every method takes the course's own word for a unit, defaulting to
+/// "Unit" so a caller that has none keeps the answer it always had. Passing it
+/// matters: in a course that says Module, parsing for "Unit" finds no numbered
+/// classes at all, and this would then propose "Unit 1, Day 1" for a course
+/// that already has thirty Module pages.</para>
 /// </summary>
 public static class NextClassPlanner
 {
-    public static UnitDay NextUnitAndDay(IEnumerable<string> pageTitles)
+    public static UnitDay NextUnitAndDay(IEnumerable<string> pageTitles, string? term = null)
     {
         var unitDays = pageTitles
-            .Select(UnitDay.Parse)
+            .Select(t => UnitDay.Parse(t, term))
             .Where(u => u.HasValue)
             .Select(u => u!.Value)
             .ToList();
@@ -25,10 +31,10 @@ public static class NextClassPlanner
         return new UnitDay(highestUnit, highestDay + 1);
     }
 
-    public static UnitDay FirstDayOfANewUnit(IEnumerable<string> pageTitles)
+    public static UnitDay FirstDayOfANewUnit(IEnumerable<string> pageTitles, string? term = null)
     {
         var unitDays = pageTitles
-            .Select(UnitDay.Parse)
+            .Select(t => UnitDay.Parse(t, term))
             .Where(u => u.HasValue)
             .Select(u => u!.Value)
             .ToList();
@@ -40,10 +46,10 @@ public static class NextClassPlanner
         return new UnitDay(highestUnit + 1, 1);
     }
 
-    public static List<string> NumberedClasses(IEnumerable<string> pageTitles)
+    public static List<string> NumberedClasses(IEnumerable<string> pageTitles, string? term = null)
     {
         return pageTitles
-            .Select(t => (Title: t, UnitDay: UnitDay.Parse(t)))
+            .Select(t => (Title: t, UnitDay: UnitDay.Parse(t, term)))
             .Where(x => x.UnitDay.HasValue)
             .OrderBy(x => x.UnitDay!.Value.Unit)
             .ThenBy(x => x.UnitDay!.Value.Day)

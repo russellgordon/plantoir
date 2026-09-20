@@ -12,7 +12,7 @@ tags:
 
 1. Description without judgement: [[Describing What You See]]
 2. A work described by the class, in turns, with no opinions
-3. Studio time
+3. Studio time: visual description notes and preliminary sketches in [[The Sketchbook Habit|The Sketchbook]]
 
 ## Things to do before our next class
 

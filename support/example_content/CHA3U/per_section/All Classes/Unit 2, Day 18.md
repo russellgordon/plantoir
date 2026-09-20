@@ -12,7 +12,7 @@ tags:
 
 1. Writing clinic: [[Using Evidence]] — weighing two sources that flatly disagree
 2. [[Citing Historical Sources]] practised on your own draft
-3. Work period
+3. Work period: the conference notes from last class turned into changes
 
 ## Things to do before our next class
 

@@ -10,12 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. [[Circular Motion Design Challenge]], day 4 — the discrepancy,
-   quantified and explained
-2. Demonstrations to the room; one question each from the floor
-3. Careers: [[Where This Physics Leads]] — who does this, and how they
-   got there
+1. [[Circular Motion Design Challenge]], day 4 — working period: the
+   discrepancy quantified and explained, then the same machine at full
+   size — which real device works the way yours does, and who carries
+   the cost of it
+2. Last twenty minutes: demonstrations to the room, one question each
+   from the floor
 
 ## Things to do before our next class
 
-- [ ] Design challenge due next class.
+- [ ] Design challenge in next class. There are ten minutes at the start
+      of it for a last pass over your own page.

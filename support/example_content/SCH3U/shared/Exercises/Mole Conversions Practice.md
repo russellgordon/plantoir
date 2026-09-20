@@ -223,4 +223,6 @@ figures you are entitled to: [[Significant Figures and Units]].
 ![[D2.1]]
 
 ![[D2.3]]
+
+![[D3.1]]
 %%curriculum-end%%

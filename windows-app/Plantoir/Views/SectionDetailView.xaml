@@ -14,6 +14,7 @@
         </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -94,9 +95,27 @@
             </Button>
         </Grid>
 
+        <!-- How last night's scheduled publish turned out. An InfoBar rather
+             than a dialog on purpose: a dialog can only be acknowledged, and
+             this has to be DISMISSABLE — the record now stands until the
+             teacher clears it or a run that gets through replaces it
+             (contracts/shared-rules.json, scheduledPublishStopped.clearedBy).
+             A dialog also cannot be shown at all when another one is already
+             up, which is how the first version of this could lose the only
+             record of an overnight failure. Never covers the toolbar; the
+             preview keeps the row below. -->
+        <InfoBar x:Name="ScheduledPublishNotice" Grid.Row="1" Margin="12,8,12,0"
+                 IsOpen="False" IsClosable="True" Closed="ScheduledPublishNotice_Closed"
+                 AutomationProperties.AutomationId="scheduledPublishNotice">
+            <InfoBar.ActionButton>
+                <Button Content="Dismiss" Click="ScheduledPublishNoticeDismiss_Click"
+                        AutomationProperties.AutomationId="scheduledPublishNoticeDismiss" />
+            </InfoBar.ActionButton>
+        </InfoBar>
+
         <!-- Base layer stays MOUNTED under the full-bleed web view — the
              console never inherits a departing web view's geometry. -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid x:Name="BaseLayer">
                 <StackPanel x:Name="NoPreviewState" HorizontalAlignment="Center" VerticalAlignment="Center"
                             Spacing="8" MaxWidth="460">

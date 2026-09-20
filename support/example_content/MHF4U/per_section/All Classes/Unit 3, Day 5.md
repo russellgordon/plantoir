@@ -15,6 +15,7 @@ tags:
    parameters, with the period now $\frac{2\pi}{|k|}$
 3. At the boards: sketch in the order that works — axis, amplitude,
    period, start, five points
+4. Practise: [[Sinusoid Practice]], the parent graphs
 
 ## Things to do before our next class
 

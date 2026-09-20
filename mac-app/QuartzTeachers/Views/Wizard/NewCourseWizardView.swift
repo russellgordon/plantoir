@@ -15,6 +15,62 @@ struct NewCourseWizardView: View {
     @State var courseCode: String = ""
     @State var courseName: String = ""
 
+    /// What this course calls a unit — "Unit 2, Day 3", or "Module 2, Day 3".
+    /// Asked here because the ready-made pages are poured in this word, so
+    /// nothing needs renaming afterwards. A course already in use changes it
+    /// from Course Settings → Rename… (`UnitWordRenamer`), which renames the
+    /// class pages and follows the links.
+    @State var unitWord: String = ClassPageTerm.standard
+
+    /// The province the course-code picker is currently browsing —
+    /// narrows its suggestion list, never gates typing a code straight
+    /// through. Defaults to Ontario, the more common case, so nothing is
+    /// disabled before a teacher has touched the form.
+    @State var province: String = "ON"
+
+    /// The course-code field's own focus state, published up by
+    /// `CourseCodePickerView`. The field's on-screen position is read
+    /// separately, via an anchor preference resolved at the top of
+    /// `body` — see `CourseCodeFieldAnchorKey`. The popup stays open for
+    /// as long as this is true — including once the typed text is
+    /// already an exact code. An earlier version closed the popup the
+    /// instant the text matched exactly, which Russell found
+    /// disorienting in practice: finish typing "ICS3U" and the whole
+    /// list vanishes, right when a teacher would expect to SEE the row
+    /// they just typed confirming it's the right one (2026-08-22). It
+    /// closes only when the field loses focus — a selection sets this to
+    /// false itself (see `selectCourseCodeSuggestion`), and clicking
+    /// elsewhere does the same the ordinary way SwiftUI focus works.
+    @State var courseCodeFieldIsFocused: Bool = false
+
+    /// True once Escape has closed the popup without moving focus out of
+    /// the field — reset the moment the code changes (typing should
+    /// reopen it) or the field regains focus. Kept separate from
+    /// `courseCodeFieldIsFocused` because Escape should NOT blur the
+    /// field, only hide the list — a teacher can keep typing right after,
+    /// same as dismissing a native combo box's popup. Also what makes
+    /// Escape here NOT fall through to dismissing the whole wizard sheet
+    /// — see the `.onKeyPress(.escape)` on `CourseCodePickerView`'s field
+    /// (Russell, 2026-08-22).
+    @State var courseCodeSuggestionsManuallyDismissed: Bool = false
+
+    /// Which suggestion the arrow keys are sitting on, or `nil` when the
+    /// teacher has not walked the list — the state behind Russell's
+    /// 2026-08-23 ask that up/down/Return work here the way they do in a
+    /// real `NSComboBox`. Held as a CODE rather than an index because
+    /// the list re-filters on every keystroke: an index would silently
+    /// come to mean a different course, while a code that is no longer
+    /// in the list resolves to no highlight at all, which is the honest
+    /// answer.
+    @State var highlightedCourseCode: String?
+
+    /// Focus for the two plain fields, so `WizardFieldChrome` can draw
+    /// their accent ring — a `ViewModifier` can't own focus for the view
+    /// it decorates, so it has to be told.
+    @FocusState var courseNameFieldHasFocus: Bool
+    @FocusState var sectionNumbersFieldHasFocus: Bool
+    @FocusState var customShortNameFieldHasFocus: Bool
+
     /// The last name this view filled in automatically. Auto-fill only
     /// ever replaces its own suggestion, never a name the teacher typed.
     @State var lastAutoFilledName: String = ""
@@ -55,6 +111,10 @@ struct NewCourseWizardView: View {
     @State var deployTarget: String = "netlify"
     @State var deployFolderPath: String = ""
 
+    /// Extra destinations this course ALSO publishes to, beyond
+    /// `deployTarget` — see `CourseConfiguration.additionalDeployTargets`.
+    @State var additionalDeployTargets: [CourseConfiguration.AdditionalDeployTarget] = []
+
     @State var expandOnFolderClick: Bool = false
     @State var showReadingTime: Bool = false
     @State var footerHTML: String = ""
@@ -63,6 +123,13 @@ struct NewCourseWizardView: View {
     @State var sharedFiles: [String] = WizardDefaults.sharedFiles
     @State var perSectionFolders: [String] = WizardDefaults.perSectionFolders
     @State var perSectionFiles: [String] = WizardDefaults.perSectionFiles
+    @State var gradedFolders: [String] = ["Tasks"]
+
+    /// What the last adoption put into the five lists above, so that turning
+    /// the skeleton toggle off can put the defaults back for exactly the
+    /// lists the teacher has NOT edited since. Nil until a skeleton is
+    /// adopted, and nil again the moment one is given up.
+    @State var adoptedStructure: WizardStructure.Lists?
 
     @State var validationProblem: String?
     @State var hasStarted: Bool = false
@@ -73,14 +140,48 @@ struct NewCourseWizardView: View {
 
     // MARK: - Initializer
 
-    init(creator: NewCourseCreator = NewCourseCreator(), startedForTesting: Bool = false) {
+    init(
+        creator: NewCourseCreator = NewCourseCreator(),
+        startedForTesting: Bool = false,
+        courseCode: String = "",
+        prepopulatesExampleContent: Bool = true,
+        startsFromSkeleton: Bool = true,
+        includesCurriculumPages: Bool = true,
+        includesCurriculumCoverage: Bool = true,
+        sharedFolders: [String] = WizardDefaults.sharedFolders,
+        sharedFiles: [String] = WizardDefaults.sharedFiles,
+        perSectionFolders: [String] = WizardDefaults.perSectionFolders,
+        perSectionFiles: [String] = WizardDefaults.perSectionFiles,
+        gradedFolders: [String] = ["Tasks"]
+    ) {
         _creator = State(initialValue: creator)
         if startedForTesting {
             _hasStarted = State(initialValue: true)
         }
+        _courseCode = State(initialValue: courseCode)
+        _prepopulatesExampleContent = State(initialValue: prepopulatesExampleContent)
+        _startsFromSkeleton = State(initialValue: startsFromSkeleton)
+        _includesCurriculumPages = State(initialValue: includesCurriculumPages)
+        _includesCurriculumCoverage = State(initialValue: includesCurriculumCoverage)
+        _sharedFolders = State(initialValue: sharedFolders)
+        _sharedFiles = State(initialValue: sharedFiles)
+        _perSectionFolders = State(initialValue: perSectionFolders)
+        _perSectionFiles = State(initialValue: perSectionFiles)
+        _gradedFolders = State(initialValue: gradedFolders)
     }
 
     // MARK: - Computed properties
+
+    /// The five lists as the structure editor is showing them now.
+    var currentStructure: WizardStructure.Lists {
+        return WizardStructure.Lists(
+            sharedFolders: sharedFolders,
+            sharedFiles: sharedFiles,
+            perSectionFolders: perSectionFolders,
+            perSectionFiles: perSectionFiles,
+            gradedFolders: gradedFolders
+        )
+    }
 
     /// The teacher's Cloudflare Account ID, which belongs to the person
     /// rather than to this new course — so it is read from and written
@@ -181,18 +282,241 @@ struct NewCourseWizardView: View {
         return result
     }
 
-    var isClubCode: Bool {
-        let code: String = courseCode.trimmingCharacters(in: .whitespaces)
-        if code.count < 4 {
-            return false
+    /// Whether a specific course — or club — has been identified. Nothing
+    /// else in the form means anything before this: the name, the
+    /// timetable, the appearance, even the folder structure all take
+    /// their defaults from the code, so every other field and section
+    /// stays disabled until it is true. True the moment the code field
+    /// holds anything at all, typed by hand or chosen from its
+    /// suggestions — a club code with no catalog entry counts too.
+    var hasChosenCourse: Bool {
+        return !courseCode.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// How many rows the popup offers at once when searching — an empty
+    /// query instead browses the WHOLE province catalog (`Int.max`,
+    /// effectively uncapped), since the popup scrolls a long list fine.
+    static let courseCodeSearchResultLimit: Int = 40
+
+    var courseCodeSuggestions: [CourseCatalogEntry] {
+        let trimmed: String = courseCode.trimmingCharacters(in: .whitespaces)
+        let limit: Int = trimmed.isEmpty ? Int.max : NewCourseWizardView.courseCodeSearchResultLimit
+        return CourseCatalog.matching(courseCode, inProvince: province, limit: limit)
+    }
+
+    var courseCodeSuggestionIDs: [String] {
+        var result: [String] = []
+        for suggestion in courseCodeSuggestions {
+            result.append(suggestion.id)
         }
-        let characters: [Character] = Array(code)
-        return !characters[3].isNumber
+        return result
+    }
+
+    /// Whether the suggestion popup is on screen right now. One place
+    /// rather than three: the overlay draws on it, its animation keys
+    /// off it, and the chevron button TOGGLES on it — and a toggle that
+    /// disagreed with what is drawn would need pressing twice.
+    var courseCodeSuggestionsAreShown: Bool {
+        !hasStarted && courseCodeFieldIsFocused && !courseCodeSuggestionsManuallyDismissed
+    }
+
+    /// The highlighted entry, resolved against the CURRENT list — `nil`
+    /// if the highlight's code has been filtered away by further typing.
+    var highlightedCourseCodeEntry: CourseCatalogEntry? {
+        guard let highlightedCourseCode else {
+            return nil
+        }
+        for entry in courseCodeSuggestions where entry.code == highlightedCourseCode {
+            return entry
+        }
+        return nil
+    }
+
+    /// Whether this code names a club rather than a course — which is what
+    /// puts the "Short label" field on screen and what decides whether
+    /// `custom_short_name` is written into `course_config.json`. The rule
+    /// itself lives in `ClubCodeRule`, and is a contract case, because
+    /// Windows asks the same question and had the same bug.
+    var isClubCode: Bool {
+        return ClubCodeRule.isClub(courseCode)
+    }
+
+    var gradedFolderChoices: [String] {
+        var choices: [String] = []
+        for folder in sharedFolders {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
+        for folder in perSectionFolders {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
+        return choices
+    }
+
+    var gradedFoldersBinding: Binding<[String]> {
+        return Binding(
+            get: {
+                return gradedFolders
+            },
+            set: { newValue in
+                gradedFolders = newValue
+            }
+        )
+    }
+
+    var effectiveCurriculumPagesEnabled: Bool {
+        return ExampleContentCatalog.hasContent(forCode: courseCode)
+            && prepopulatesExampleContent
+            && ExampleContentCatalog.includesCurriculum(forCode: courseCode)
+            && includesCurriculumPages
+    }
+
+    var effectiveCurriculumCoverageEnabled: Bool {
+        return CourseConfiguration.curriculumCoverageEnabled(
+            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: courseCode),
+            prepopulatesExampleContent: prepopulatesExampleContent,
+            payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: courseCode),
+            includesCurriculumPages: includesCurriculumPages,
+            includesCurriculumCoverage: includesCurriculumCoverage
+        )
+    }
+
+    var wizardResolvedCurriculumFolder: String? {
+        let declared: String? = ExampleContentCatalog.curriculumFolder(forCode: courseCode)
+            ?? SkeletonCatalog.family(forCode: courseCode)?.curriculumFolder
+        return CurriculumFolderRule.resolvedCurriculumFolder(configured: declared, in: sharedFolders)
+    }
+
+    /// What a teacher is told when this course will start with nothing in
+    /// it — either because no ready-made pages exist for the code and no
+    /// skeleton does either, or because they have turned the skeleton down.
+    /// Both are the same situation, so both say the same sentence
+    /// (`WizardWording.noExampleContentNote`, pinned by the contract).
+    var noExampleContentNote: some View {
+        Text(WizardWording.noExampleContentNote)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("noExampleContentNote")
+    }
+
+    /// Offered above the form: someone who has never built a course learns
+    /// far more from opening a finished one than from an empty form.
+    var exampleCourseInvitation: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("New to this?")
+                    .font(.headline)
+                Text("Add a complete example course — a real Grade 9 science course you can explore, change, and remove whenever you like.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+            Button("Add Example Course") {
+                startExampleInstall()
+            }
+            .accessibilityIdentifier("addExampleCourseButton")
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .padding(.horizontal)
+        .padding(.bottom, 10)
     }
 
     // MARK: - Body
 
     var body: some View {
+        wizardContent
+            .frame(width: 680, height: 620)
+            // Resolves the anchor `CourseCodePickerView` published for the
+            // code field into an actual rect via THIS outer
+            // `GeometryReader`'s proxy, then draws the popup as a sibling
+            // layer over the whole sheet — floating over the form rather
+            // than living inside it. See the note on
+            // `CourseCodeFieldAnchorKey` for why an anchor, not a
+            // `GeometryReader`-computed `CGRect` preference straight from
+            // the field: the field sits inside a `Form`'s `Section`,
+            // which the anchor approach reads through reliably and the
+            // plain preference approach (tried first, same day) did not.
+            .onChange(of: courseCodeFieldIsFocused) { _, isFocused in
+                if isFocused {
+                    // Regaining focus always reopens the popup, even if
+                    // Escape most recently closed it.
+                    courseCodeSuggestionsManuallyDismissed = false
+                }
+            }
+            .onChange(of: courseCode) {
+                // Typing invalidates an Escape-driven dismissal — a
+                // teacher who closed the popup and kept typing should
+                // see it reopen against what they're typing now.
+                courseCodeSuggestionsManuallyDismissed = false
+                // …and starts the walk over. Keeping a highlight across
+                // a re-filter would leave it pointing at a row that has
+                // moved or gone, so Return would take something the
+                // teacher never looked at.
+                highlightedCourseCode = nil
+            }
+            // The structure editor must show what will actually be
+            // created, in both directions — so the toggle adopts and
+            // gives up, rather than only adopting.
+            //
+            // Attached HERE, to the whole sheet, rather than to the
+            // Toggle itself: the Toggle lives inside an `else if let
+            // skeleton` branch of the Starting Content section, and that
+            // branch LEAVES the hierarchy the moment the typed code stops
+            // having a skeleton — a handler that is not there cannot fire.
+            // (Re-evaluating a body does not cost a handler: the LCS
+            // switch's own `.onChange` sits inside a branch and works.
+            // Disappearing is the case this avoids.)
+            .onChange(of: startsFromSkeleton) { _, startsFromASkeletonNow in
+                if startsFromASkeletonNow {
+                    adoptSkeletonStructure()
+                } else {
+                    restoreGenericStructure()
+                }
+            }
+            .overlayPreferenceValue(CourseCodeFieldAnchorKey.self) { anchor in
+                GeometryReader { proxy in
+                    if courseCodeSuggestionsAreShown, let anchor {
+                        CourseCodeSuggestionsOverlay(
+                            fieldFrame: proxy[anchor],
+                            province: province,
+                            entries: courseCodeSuggestions,
+                            onSelect: selectCourseCodeSuggestion,
+                            highlightedID: highlightedCourseCodeEntry?.id
+                        )
+                        // A quick fade + a short drop from the field,
+                        // rather than snapping into place — the same
+                        // motion a native popup's own appear animation
+                        // uses, just gentler than its default speed.
+                        .transition(
+                            .opacity.combined(with: .offset(y: -6))
+                        )
+                    }
+                }
+                // Two things drive this animation: the popup appearing or
+                // disappearing, and its ROWS changing as typing narrows
+                // the list — both should move gently rather than snap,
+                // so both are folded into one comparable value rather
+                // than the boolean alone.
+                .animation(
+                    .easeOut(duration: 0.12),
+                    value: CourseCodeSuggestionsAnimationKey(
+                        isShown: courseCodeSuggestionsAreShown,
+                        rowIDs: courseCodeSuggestionIDs
+                    )
+                )
+            }
+            .interactiveDismissDisabled(creator.isCreating)
+    }
+
+    var wizardContent: some View {
         VStack(spacing: 0) {
             HStack {
                 Text("New Course or Club")
@@ -241,7 +565,7 @@ struct NewCourseWizardView: View {
                 }
 
                 if !hasStarted {
-                    Button("Create Course") {
+                    Button(WizardWording.createCourseButton) {
                         startCreation()
                     }
                     .buttonStyle(.borderedProminent)
@@ -266,21 +590,67 @@ struct NewCourseWizardView: View {
             }
             .padding(12)
         }
-        .frame(width: 680, height: 620)
-        .interactiveDismissDisabled(creator.isCreating)
     }
 
     var wizardForm: some View {
         Form {
             Section {
+                // Its own `Form` row, a sibling of the course-code row
+                // below rather than bundled into the same one — a bare
+                // `Picker` used as a row's whole content already gets
+                // `Form`'s native side-by-side "label left, control
+                // right" treatment (this looks unchanged from before),
+                // and splitting it out is what lets `Form` give the
+                // course-code row BELOW its own native styling too,
+                // including the `Divider` between the two rows that
+                // every other pair of rows in this dialog already has
+                // (Russell, 2026-08-23: "There should also be a divider
+                // between Province and Course Code, following the
+                // example set by the rest of this dialog").
+                Picker("Province", selection: $province) {
+                    Text("Ontario").tag("ON")
+                    Text("British Columbia").tag("BC")
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("wizardProvincePicker")
+
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("Course code", text: $courseCode)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityIdentifier("wizardCourseCodeField")
+                    // An EXPLICIT `LabeledContent`, not `Form`'s own
+                    // automatic labelling. `Form` only extracts a row
+                    // label from a bare `TextField(title:, text:)` used
+                    // as the row's content; `CourseCodePickerView` is a
+                    // view of ours, so `Form` had nothing to extract and
+                    // "Course code" stayed INSIDE the field as
+                    // placeholder text, unlike every other row here
+                    // (Russell, 2026-08-23, comparing it to Course
+                    // name). Writing the label ourselves puts it in the
+                    // same leading column as Course name's, and hands
+                    // the field the trailing column at the same width.
+                    LabeledContent("Course code") {
+                        CourseCodePickerView(
+                            courseCode: $courseCode,
+                            isFocused: $courseCodeFieldIsFocused,
+                            onEscape: {
+                                courseCodeSuggestionsManuallyDismissed = true
+                                highlightedCourseCode = nil
+                            },
+                            // A TOGGLE, not an open: pressing a real
+                            // combo box's arrow a second time puts the
+                            // popup away again (Russell, 2026-08-23).
+                            onRevealRequested: {
+                                courseCodeSuggestionsManuallyDismissed = courseCodeSuggestionsAreShown
+                                if courseCodeSuggestionsManuallyDismissed {
+                                    highlightedCourseCode = nil
+                                }
+                            },
+                            onMoveHighlight: moveCourseCodeHighlight,
+                            onCommitHighlight: commitCourseCodeHighlight
+                        )
                         .onChange(of: courseCode) {
                             autoFillCourseName()
                             adoptSkeletonStructure()
                         }
+                    }
                     if let problem = courseCodeProblem {
                         // The same orange every other inline warning
                         // wears — a duplicate code is the usual reason a
@@ -291,62 +661,120 @@ struct NewCourseWizardView: View {
                             .foregroundStyle(.orange)
                             .accessibilityIdentifier("courseCodeWarning")
                     } else {
-                        ExampleCaption("e.g. ICS3U — or a club name like CODING")
+                        ExampleCaption("Type a code, or type what the course is called — e.g. “chem” finds SCH3U. Or type a club name like CODING.")
                     }
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    TextField("Course name", text: $courseName)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityIdentifier("wizardCourseNameField")
-                    ExampleCaption("e.g. Introduction to Computer Science")
-                }
-
-                // For known Ontario course codes, offer the same short and
-                // formal names the command-line wizard suggests — the short
-                // one first, because it is the one already filled in.
-                if let knownNames = CourseNameCatalog.names(forCode: courseCode) {
+                .padding(.bottom, 8)
+                // Nothing below here means anything until a course (or
+                // club) has actually been identified — see
+                // `hasChosenCourse`.
+                Group {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Suggested names for \(courseCode.trimmingCharacters(in: .whitespaces).uppercased()):")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        HStack {
-                            Button(knownNames.short) {
-                                courseName = knownNames.short
-                                lastAutoFilledName = knownNames.short
-                            }
-                            .accessibilityIdentifier("suggestedShortNameButton")
-                            Button(knownNames.formal) {
-                                courseName = knownNames.formal
-                                lastAutoFilledName = knownNames.formal
-                            }
-                            .accessibilityIdentifier("suggestedFormalNameButton")
+                        // The label is written out here rather than
+                        // passed as the `TextField`'s own title, and
+                        // that is what makes the typed text read
+                        // LEADING. A title `Form` extracts for itself
+                        // turns the row into a label/VALUE pair, and a
+                        // value is trailing-aligned — Russell saw
+                        // Timetable section numbers' "1" sitting
+                        // against the field's right edge (2026-08-23),
+                        // and `.multilineTextAlignment(.leading)` alone
+                        // did NOT override it. Given an explicit
+                        // `LabeledContent` the field is ordinary
+                        // content again, and its text starts at the
+                        // leading edge like any other text field's.
+                        LabeledContent("Course name") {
+                            // `WizardFieldChrome`, not
+                            // `.roundedBorder`: every AppKit control
+                            // this stands in for is 24pt tall and
+                            // SwiftUI's own bezel is 26, which left
+                            // this row 2pt out from the course-code
+                            // field beside it (Russell, 2026-08-23).
+                            // `.frame(height:)` does not fix that — see
+                            // the note on `WizardFieldChrome`.
+                            TextField("", text: $courseName)
+                                .focused($courseNameFieldHasFocus)
+                                .accessibilityIdentifier("wizardCourseNameField")
+                                .modifier(WizardFieldChrome(
+                                    isFocused: courseNameFieldHasFocus,
+                                    trailingInset: CourseCodePickerView.textLeadingInset
+                                ))
                         }
-                        .font(.callout)
+                        ExampleCaption("e.g. Chemistry")
+                    }
+
+                    // For known Ontario course codes, offer the same short and
+                    // formal names the command-line wizard suggests — the short
+                    // one first, because it is the one already filled in.
+                    if let knownNames = CourseNameCatalog.names(forCode: courseCode) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Suggested names for \(courseCode.trimmingCharacters(in: .whitespaces).uppercased()):")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Button(knownNames.short) {
+                                    courseName = knownNames.short
+                                    lastAutoFilledName = knownNames.short
+                                }
+                                .accessibilityIdentifier("suggestedShortNameButton")
+                                Button(knownNames.formal) {
+                                    courseName = knownNames.formal
+                                    lastAutoFilledName = knownNames.formal
+                                }
+                                .accessibilityIdentifier("suggestedFormalNameButton")
+                            }
+                            .font(.callout)
+                        }
+                    }
+                    if isClubCode {
+                    // The same shape as Course Name and Timetable Section
+                    // Numbers: an explicit `LabeledContent` so the label
+                    // sits in the leading column and the typed text reads
+                    // leading, plus `WizardFieldChrome` so the box is the
+                    // same 24pt. It had neither — its label was still
+                    // placeholder text inside the field and its value was
+                    // pushed to the trailing edge, which is exactly the
+                    // pre-`LabeledContent` look every other row was moved
+                    // off (Russell, 2026-08-23, spotting the odd one out).
+                    VStack(alignment: .leading, spacing: 4) {
+                        LabeledContent("Short label") {
+                            TextField("", text: $customShortName)
+                                .focused($customShortNameFieldHasFocus)
+                                .accessibilityIdentifier("wizardCustomShortNameField")
+                                .modifier(WizardFieldChrome(
+                                    isFocused: customShortNameFieldHasFocus,
+                                    trailingInset: CourseCodePickerView.textLeadingInset
+                                ))
+                        }
+                        ExampleCaption("Shown beside the emoji — 12 characters at most")
+                    }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        // See the note beside Course Name's own
+                        // `LabeledContent` for why the label is written
+                        // out rather than passed as the field's title.
+                        LabeledContent("Timetable section numbers") {
+                            // See Course Name's own note.
+                            TextField("", text: $sectionNumbersText)
+                                .focused($sectionNumbersFieldHasFocus)
+                                .accessibilityIdentifier("wizardSectionNumbersField")
+                                .modifier(WizardFieldChrome(
+                                    isFocused: sectionNumbersFieldHasFocus,
+                                    trailingInset: CourseCodePickerView.textLeadingInset
+                                ))
+                        }
+                        if let problem = sectionNumbersProblem {
+                            // The same orange every other warning wears.
+                            Text(problem)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .accessibilityIdentifier("sectionNumbersWarning")
+                        } else {
+                            ExampleCaption("e.g. 1,3 — comma-separated")
+                        }
                     }
                 }
-                if isClubCode {
-                    TextField("Short label beside emoji (≤ 12 characters)", text: $customShortName)
-                        .textFieldStyle(.roundedBorder)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    TextField("Timetable section numbers", text: $sectionNumbersText)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityIdentifier("wizardSectionNumbersField")
-                    if let problem = sectionNumbersProblem {
-                        // The same orange every other warning wears.
-                        Text(problem)
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                            .accessibilityIdentifier("sectionNumbersWarning")
-                    } else {
-                        ExampleCaption("e.g. 1,3 — comma-separated")
-                    }
-                }
-                Picker("Language / region", selection: $locale) {
-                    ForEach(LocaleCatalog.codes, id: \.self) { code in
-                        Text(LocaleCatalog.displayName(forCode: code)).tag(code)
-                    }
-                }
+                .disabled(!hasChosenCourse)
             } header: {
                 FormSectionHeader("Basics")
             }
@@ -360,7 +788,7 @@ struct NewCourseWizardView: View {
                     }
                     if ExampleContentCatalog.includesCurriculum(forCode: courseCode) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Toggle("Include Ontario curriculum pages", isOn: $includesCurriculumPages)
+                            Toggle("Include \(ExampleContentCatalog.jurisdictionName(forCode: courseCode)) curriculum pages", isOn: $includesCurriculumPages)
                                 .disabled(!prepopulatesExampleContent)
                                 .accessibilityIdentifier("curriculumToggle")
                             ExampleCaption("Every expectation as its own page, so lessons and tasks can link to exactly what they address")
@@ -391,16 +819,24 @@ struct NewCourseWizardView: View {
                         Toggle("Start from a \(skeleton.label.lowercased()) skeleton", isOn: $startsFromSkeleton)
                             .accessibilityIdentifier("skeletonToggle")
                         ExampleCaption("There is no ready-made course for this code, but there is a starting point shaped for the subject: folders that suit it, four units of class pages to rename, a page explaining what the site can do, and placeholders saying what belongs where.")
+                        // With the toggle off the teacher is in exactly
+                        // the situation the no-content note below
+                        // describes, so it says so — the same sentence,
+                        // not a third one. Sharing its accessibility
+                        // identifier is safe because the two are branches
+                        // of the same `if`, so they are never on screen
+                        // at once.
+                        if !startsFromSkeleton {
+                            noExampleContentNote
+                        }
                     }
                 } else {
-                    Text("Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("noExampleContentNote")
+                    noExampleContentNote
                 }
             } header: {
                 FormSectionHeader("Starting Content")
             }
+            .disabled(!hasChosenCourse)
 
             Section {
                 EmojiChoiceField(label: "Header emoji", emoji: $emoji)
@@ -443,6 +879,7 @@ struct NewCourseWizardView: View {
             } header: {
                 FormSectionHeader("Appearance", caption: "Applied to every section — fine-tune later in Settings")
             }
+            .disabled(!hasChosenCourse)
 
             Section {
                 Picker("Sidebar folders expand when clicking", selection: $expandOnFolderClick) {
@@ -453,16 +890,44 @@ struct NewCourseWizardView: View {
             } header: {
                 FormSectionHeader("Behaviour")
             }
+            .disabled(!hasChosenCourse)
+
+            // Asked of EVERY course, including a pre-populated one: the
+            // ready-made pages are poured in this word rather than renamed
+            // afterwards, which is why it cannot be moved into Settings later.
+            Section {
+                LabeledContent("What do you call a unit?") {
+                    TextField("Unit", text: $unitWord, prompt: Text(ClassPageTerm.standard))
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("unitWordField")
+                }
+                if let problem = ClassPageTerm.problem(with: unitWord) {
+                    Text(problem)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("unitWordProblem")
+                } else {
+                    ExampleCaption("Class pages will be named “\(ClassPageTerm.cleaned(unitWord)) 1, Day 1”. Some teachers say Module or Thread.")
+                }
+            } header: {
+                FormSectionHeader(
+                    "Units",
+                    caption: "Chosen once, when the course is made — the pages are named this way as they are written"
+                )
+            }
+            .disabled(!hasChosenCourse)
 
             Section {
                 PublishingChoiceView(
                     deployTarget: $deployTarget,
                     deployFolderPath: $deployFolderPath,
-                    cloudflareAccountID: cloudflareAccountIDBinding
+                    cloudflareAccountID: cloudflareAccountIDBinding,
+                    additionalDeployTargets: $additionalDeployTargets
                 )
             } header: {
                 FormSectionHeader("Deploying", caption: "Netlify is the usual choice — change any time in Settings")
             }
+            .disabled(!hasChosenCourse)
 
             Section {
                 if structureComesFromExampleContent {
@@ -491,12 +956,44 @@ struct NewCourseWizardView: View {
 
                     // The lists are long, so they stay collapsed until needed.
                     DisclosureGroup("Folders and files") {
-                        StringListEditorView(title: "Shared folders", items: $sharedFolders)
-                        StringListEditorView(title: "Shared files", hidesMarkdownExtension: true, items: $sharedFiles)
-                        StringListEditorView(title: "Per-section folders", items: $perSectionFolders)
-                        StringListEditorView(title: "Per-section files", hidesMarkdownExtension: true, items: $perSectionFiles)
+                        StringListEditorView(
+                            title: "Shared folders",
+                            items: $sharedFolders,
+                            onRemove: { _ in reconcileGradedFolders() },
+                            protection: wizardSharedFolderProtection
+                        )
+                        StringListEditorView(
+                            title: "Shared files",
+                            hidesMarkdownExtension: true,
+                            items: $sharedFiles
+                        )
+                        StringListEditorView(
+                            title: "Per-section folders",
+                            items: $perSectionFolders,
+                            onRemove: { _ in reconcileGradedFolders() },
+                            protection: wizardPerSectionFolderProtection
+                        )
+                        StringListEditorView(
+                            title: "Per-section files",
+                            hidesMarkdownExtension: true,
+                            items: $perSectionFiles,
+                            protection: wizardPerSectionFileProtection
+                        )
                     }
                     .accessibilityIdentifier("structureDisclosure")
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        MembershipToggleListView(
+                            title: GradedFolderWording.listTitle,
+                            allItems: gradedFolderChoices,
+                            members: gradedFoldersBinding,
+                            protection: wizardGradedFolderProtection
+                        )
+                        Text(GradedFolderWording.caption)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 4)
                 }
             } header: {
                 if structureComesFromExampleContent {
@@ -505,17 +1002,98 @@ struct NewCourseWizardView: View {
                     FormSectionHeader("Structure", caption: "Defaults are fine for most courses")
                 }
             }
+            .disabled(!hasChosenCourse)
 
             Section {
                 FooterEditorView(footerHTML: $footerHTML)
             } header: {
                 FormSectionHeader("Footer")
             }
+            .disabled(!hasChosenCourse)
+
+            // Settings a teacher rarely needs to touch, tucked behind a
+            // disclosure triangle at the very end rather than competing
+            // with the ones almost everyone sets.
+            Section {
+                DisclosureGroup("Advanced") {
+                    Picker("Language / region", selection: $locale) {
+                        ForEach(LocaleCatalog.codes, id: \.self) { code in
+                            Text(LocaleCatalog.displayName(forCode: code)).tag(code)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                .accessibilityIdentifier("advancedDisclosure")
+            }
+            .disabled(!hasChosenCourse)
         }
         .formStyle(.grouped)
     }
 
     // MARK: - Functions
+
+    /// A row picked from `CourseCodeSuggestionsOverlay` — sets the code
+    /// exactly like finishing typing one by hand, then drops focus so
+    /// the popup closes.
+    func selectCourseCodeSuggestion(_ entry: CourseCatalogEntry) {
+        courseCode = entry.code
+        courseCodeFieldIsFocused = false
+        highlightedCourseCode = nil
+    }
+
+    /// Up or down pressed in the field: walks the popup's rows the way a
+    /// real `NSComboBox` does. Returns whether the key was used, so the
+    /// arrows keep moving the insertion point whenever there is no list
+    /// to walk.
+    ///
+    /// Pressing down with the popup CLOSED opens it and takes the first
+    /// row, which is what a combo box does and what makes the keyboard a
+    /// complete path — otherwise a teacher who dismissed the list with
+    /// Escape would have to reach for the mouse to get it back.
+    func moveCourseCodeHighlight(by step: Int) -> Bool {
+        let entries: [CourseCatalogEntry] = courseCodeSuggestions
+        if entries.isEmpty {
+            return false
+        }
+        if !courseCodeSuggestionsAreShown {
+            if step < 0 {
+                return false
+            }
+            courseCodeSuggestionsManuallyDismissed = false
+            highlightedCourseCode = entries[0].code
+            return true
+        }
+
+        var currentIndex: Int = -1
+        for index in entries.indices where entries[index].code == highlightedCourseCode {
+            currentIndex = index
+        }
+        // Deliberately CLAMPED rather than wrapping. A wrap turns one
+        // key too many into a jump from the bottom of a 40-row list back
+        // to the top, which reads as the list having jumped somewhere
+        // else entirely; a native popup stops at the ends.
+        var nextIndex: Int = currentIndex + step
+        if nextIndex < 0 {
+            nextIndex = 0
+        }
+        if nextIndex > entries.count - 1 {
+            nextIndex = entries.count - 1
+        }
+        highlightedCourseCode = entries[nextIndex].code
+        return true
+    }
+
+    /// Return pressed in the field: takes the highlighted row if the
+    /// teacher has walked to one. Returns false otherwise, so Return
+    /// still reaches the sheet's default button for someone who typed a
+    /// code and never touched the arrows.
+    func commitCourseCodeHighlight() -> Bool {
+        guard courseCodeSuggestionsAreShown, let entry = highlightedCourseCodeEntry else {
+            return false
+        }
+        selectCourseCodeSuggestion(entry)
+        return true
+    }
 
     /// When a course code with no example content is entered, offer the
     /// folders its SUBJECT wants rather than the school-neutral factory
@@ -523,16 +1101,131 @@ struct NewCourseWizardView: View {
     /// chemistry course with Investigations and Safety in the Lab. The
     /// lists stay editable; a list the teacher has already changed is left
     /// alone (see `SkeletonCatalog.structureToAdopt`).
+    ///
+    /// Does nothing while the toggle is OFF, which is not a detail: this
+    /// runs on every change to the course code, so without the guard a
+    /// teacher who declined the skeleton and then corrected a typo in the
+    /// code would silently be given the skeleton's folders back.
     func adoptSkeletonStructure() {
+        guard startsFromSkeleton else {
+            return
+        }
         guard let skeleton = SkeletonCatalog.structureToAdopt(
             forCode: courseCode, currentSharedFolders: sharedFolders
         ) else {
             return
         }
-        sharedFolders = skeleton.sharedFolders
-        sharedFiles = skeleton.sharedFiles
-        perSectionFolders = skeleton.perSectionFolders
-        perSectionFiles = skeleton.perSectionFiles
+        let adopted: WizardStructure.Lists = WizardStructure.adopting(skeleton)
+        putIntoEditor(adopted)
+        // Recorded so that turning the toggle off can tell a list the teacher
+        // has edited since from one they never touched.
+        adoptedStructure = adopted
+    }
+
+    /// The toggle went off: the skeleton's folders leave the editor and the
+    /// generic defaults come back, list by list against what the adoption put
+    /// there. The rule — and what it deliberately costs — is in
+    /// `WizardStructure.restoringDefaults(in:adopted:usesLCSTerminology:)`.
+    func restoreGenericStructure() {
+        let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
+            in: currentStructure,
+            adopted: adoptedStructure,
+            usesLCSTerminology: usesLCSTerminology
+        )
+        putIntoEditor(restored)
+        adoptedStructure = nil
+    }
+
+    /// Puts a set of lists into the structure editor.
+    func putIntoEditor(_ lists: WizardStructure.Lists) {
+        sharedFolders = lists.sharedFolders
+        sharedFiles = lists.sharedFiles
+        perSectionFolders = lists.perSectionFolders
+        perSectionFiles = lists.perSectionFiles
+        gradedFolders = lists.gradedFolders
+    }
+
+    /// The marks pool narrowed to the folders this course will actually have.
+    /// The rule itself is `GradedFolderRule.reconciled(_:toFolders:)`, which
+    /// says how it differs from Windows' and why; this stays as the name the
+    /// call sites and their tests already use.
+    static func reconciledGradedFolders(from gradedFolders: [String], validChoices: [String]) -> [String] {
+        return GradedFolderRule.reconciled(gradedFolders, toFolders: validChoices)
+    }
+
+    func reconcileGradedFolders() {
+        gradedFolders = NewCourseWizardView.reconciledGradedFolders(
+            from: gradedFolders, validChoices: gradedFolderChoices
+        )
+    }
+
+    func wizardSharedFolderProtection(for folder: String) -> ItemProtection {
+        if let resolvedCurriculum = wizardResolvedCurriculumFolder, folder == resolvedCurriculum {
+            if effectiveCurriculumCoverageEnabled {
+                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageMap)
+            } else if effectiveCurriculumPagesEnabled {
+                let jurisdiction: String = ExampleContentCatalog.jurisdictionName(forCode: courseCode)
+                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCurriculumPages(jurisdiction: jurisdiction))
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                    message: SpecialNames.removeCurriculumFolderMessage
+                )
+            }
+        }
+        if gradedFolders.contains(folder) {
+            if effectiveCurriculumCoverageEnabled && gradedFolders.count <= 1 {
+                return .blocked(reason: SpecialNames.lastGradedFolderBlockedWizard)
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeGradedFolderTitle(for: folder),
+                    message: SpecialNames.removeGradedFolderMessage
+                )
+            }
+        }
+        return .ordinary
+    }
+
+    func wizardPerSectionFolderProtection(for folder: String) -> ItemProtection {
+        if perSectionFolders.count <= 1 {
+            return .blocked(reason: SpecialNames.lastPerSectionFolderBlocked)
+        }
+        if gradedFolders.contains(folder) && effectiveCurriculumCoverageEnabled && gradedFolders.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlockedWizard)
+        }
+        // "All Classes" is never removable (Russell, 2026-08-24); see
+        // CourseSettingsView.perSectionFolderProtection.
+        // The wizard has no recorded class folder to consult: the course does
+        // not exist yet, and the name it will record is the one this rule is
+        // about to pick. The literal is the right test here.
+        if ClassFolder.isTheAllClassesFolder(folder) {
+            return .blocked(reason: SpecialNames.classFolderBlocked)
+        }
+        if gradedFolders.contains(folder) {
+            return .consequential(
+                title: SpecialNames.removeGradedFolderTitle(for: folder),
+                message: SpecialNames.removeGradedFolderMessage
+            )
+        }
+        return .ordinary
+    }
+
+    func wizardPerSectionFileProtection(for file: String) -> ItemProtection {
+        let normalized: String = file.lowercased()
+        if normalized == "index.md" || normalized == "index" {
+            return .blocked(reason: SpecialNames.sectionIndexFileBlocked)
+        }
+        return .ordinary
+    }
+
+    func wizardGradedFolderProtection(for folder: String) -> ItemProtection {
+        guard effectiveCurriculumCoverageEnabled else {
+            return .ordinary
+        }
+        if gradedFolders.contains(folder) && gradedFolders.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlockedWizard)
+        }
+        return .ordinary
     }
 
     /// When a known course code is entered, pre-fill the name with the
@@ -550,35 +1243,6 @@ struct NewCourseWizardView: View {
             lastAutoFilledName = suggestedName
         }
     }
-
-    /// Offered above the form: someone who has never built a course learns
-    /// far more from opening a finished one than from an empty form.
-    var exampleCourseInvitation: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("New to this?")
-                    .font(.headline)
-                Text("Add a complete example course — a real Grade 9 science course you can explore, change, and remove whenever you like.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 12)
-            Button("Add Example Course") {
-                startExampleInstall()
-            }
-            .accessibilityIdentifier("addExampleCourseButton")
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .padding(.horizontal)
-        .padding(.bottom, 10)
-    }
-
-    // MARK: - Functions
 
     /// Adds the example course. Nothing else on this form is needed for it.
     func startExampleInstall() {
@@ -609,6 +1273,13 @@ struct NewCourseWizardView: View {
             validationProblem = problem
             return
         }
+        // The same check the caption under the field shows. Refused here as
+        // well because the pages would otherwise be written with names nothing
+        // can read back — built, and then recognised by nothing.
+        if let problem = ClassPageTerm.problem(with: unitWord) {
+            validationProblem = problem
+            return
+        }
         guard let workspaceURL = workspace.workspaceURL else {
             validationProblem = "No working folder is selected."
             return
@@ -623,6 +1294,25 @@ struct NewCourseWizardView: View {
             if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
                 validationProblem = problem
                 return
+            }
+        }
+        // Every ADDITIONAL destination gets the same check its primary
+        // counterpart would — a redundancy target with no valid folder or
+        // credential would just fail silently the first time a deploy
+        // actually reaches it, which is exactly the surprise redundancy
+        // is supposed to prevent.
+        for target in additionalDeployTargets {
+            if target.type == "local_folder" {
+                if let problem = CourseConfiguration.deployFolderProblem(forPath: target.path) {
+                    validationProblem = problem
+                    return
+                }
+            }
+            if target.type == "cloudflare_pages" {
+                if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
+                    validationProblem = problem
+                    return
+                }
             }
         }
 
@@ -665,16 +1355,24 @@ struct NewCourseWizardView: View {
         var chosenSharedFiles: [String] = sharedFiles
         var chosenPerSectionFolders: [String] = perSectionFolders
         var chosenPerSectionFiles: [String] = perSectionFiles
+        var chosenGradedFolders: [String] = gradedFolders
         var skeleton: SkeletonCatalog.Family? = nil
         if startsFromSkeleton && SkeletonCatalog.hasSkeleton(forCode: code) {
             skeleton = SkeletonCatalog.family(forCode: code)
             if let adopted = SkeletonCatalog.structureToAdopt(
                 forCode: code, currentSharedFolders: sharedFolders
             ) {
-                chosenSharedFolders = adopted.sharedFolders
-                chosenSharedFiles = adopted.sharedFiles
-                chosenPerSectionFolders = adopted.perSectionFolders
-                chosenPerSectionFiles = adopted.perSectionFiles
+                let lateAdoption: WizardStructure.Lists = WizardStructure.adopting(adopted)
+                chosenSharedFolders = lateAdoption.sharedFolders
+                chosenSharedFiles = lateAdoption.sharedFiles
+                chosenPerSectionFolders = lateAdoption.perSectionFolders
+                chosenPerSectionFiles = lateAdoption.perSectionFiles
+                // The marks pool comes with them. Leaving it behind wrote the
+                // wizard's default ["Tasks"] beside the mathematics
+                // skeleton's folders, whose assessed work is in Thinking
+                // Tasks — the same silent loss row 359 exists about. Windows
+                // sets all five here too (NewCourseDialog.BuildConfiguration).
+                chosenGradedFolders = lateAdoption.gradedFolders
             }
         }
 
@@ -698,7 +1396,7 @@ struct NewCourseWizardView: View {
                     || chosenSharedFiles.contains(item)
                     || chosenPerSectionFolders.contains(item)
                     || chosenPerSectionFiles.contains(item)
-                    || item == "Media"
+                    || item.lowercased() == "media"
                 if isKnown {
                     hiddenItems.append(item)
                 }
@@ -710,7 +1408,7 @@ struct NewCourseWizardView: View {
             }
         }
 
-        return [
+        var config: [String: Any] = [
             "course_code": code,
             "course_name": name,
             "custom_short_name": isClubCode ? customShortName.trimmingCharacters(in: .whitespaces) : "",
@@ -728,6 +1426,17 @@ struct NewCourseWizardView: View {
             "footer_html": footerHTML,
             "show_reading_time": showReadingTime,
             "show_grade_in_title": ["sections": gradeMap],
+            // What this course calls a unit. Written even when it is the
+            // default, so the file says out loud what the pages will be
+            // called; an ABSENT key still means "Unit" for every course made
+            // before the choice existed.
+            "unit_word": ClassPageTerm.cleaned(unitWord),
+            // Which per-section folder holds class pages, RECORDED rather than
+            // left to be guessed from the word "class". Written at creation so
+            // a teacher whose vocabulary is "Thread 2, Day 3" can call it
+            // "All Days" without the next-class button and the curriculum map
+            // quietly looking somewhere else.
+            "class_folder": ClassFolder.name(inPerSectionFolders: chosenPerSectionFolders),
             // The real wizard reads these as its defaults, exactly like
             // every other answer here. False when no content exists for
             // the code, so a stale true can never mean anything.
@@ -770,5 +1479,47 @@ struct NewCourseWizardView: View {
             "show_section_marker": ["sections": markerMap],
             "color_schemes": schemeMap,
         ]
+
+        // Omitted entirely rather than written as `[]` when nobody has
+        // opted in — a course that never touches this feature writes the
+        // exact same file the wizard has always written. See
+        // `CourseConfiguration.additionalDeployTargets`, whose setter
+        // does the identical thing on every later save.
+        // Pruned against the primary one more time here, defensively —
+        // the picker's own onChange keeps this consistent live on screen,
+        // but the file written to disk must be correct even if some future
+        // change to this view ever let the two disagree.
+        let prunedAdditionalTargets: [CourseConfiguration.AdditionalDeployTarget] =
+            CourseConfiguration.pruningAdditionalTargets(additionalDeployTargets, ofType: deployTarget)
+        if !prunedAdditionalTargets.isEmpty {
+            var encoded: [[String: Any]] = []
+            for target in prunedAdditionalTargets {
+                var entry: [String: Any] = ["type": target.type]
+                if !target.path.isEmpty {
+                    entry["path"] = target.path
+                }
+                encoded.append(entry)
+            }
+            config["additional_deploy_targets"] = encoded
+        }
+        let structureFromExample: Bool = prepopulatesExampleContent
+            && ExampleContentCatalog.hasContent(forCode: code)
+        if !structureFromExample {
+            // Narrowed once more as the file is written, the way Windows does
+            // it (NewCourseDialog.BuildConfiguration). The editor narrows the
+            // pool wherever it changes the folder lists — a removal, a
+            // skeleton given up — but the terminology switch does not, so a
+            // teacher who ticked College Board Curriculum and then turned LCS
+            // off would otherwise have that folder written into a course that
+            // has no such folder. `setup_course.py` reconciles the key again
+            // when it reads it, so this is the second net rather than the
+            // only one; what it buys is that both apps write the same file.
+            config["graded_folders"] = GradedFolderRule.reconciled(
+                chosenGradedFolders,
+                toFolders: chosenSharedFolders + chosenPerSectionFolders
+            )
+        }
+
+        return config
     }
 }

@@ -16,10 +16,12 @@ tags:
 3. Name it: [[Galvanic and Electrolytic Cells]] — driven, and driving
 4. [[Corrosion and Electrolysis]] — the same chemistry, unwanted
 5. Discuss: [[Batteries and Corrosion]] — what we mine, and what we bury
-6. [[What This Site Can Do]] — features worth knowing before the showcase
+6. [[What This Site Can Do]] — the features worth knowing when you write
+   chemistry up, from equations to folded answers
 
 ## Things to do before our next class
 
-- [ ] Skim [[What This Site Can Do]] before you plan your showcase page.
+- [ ] Skim [[What This Site Can Do]]; try the chemistry notation on one
+      equation of your own.
 - [ ] Journal: something metal near you that is being deliberately
       protected, and the method being used on it.

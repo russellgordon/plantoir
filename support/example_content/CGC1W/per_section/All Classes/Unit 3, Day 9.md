@@ -10,7 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Working period
+1. Working period: your draft against the criteria with
+   [[Judging Your Own Work]], then the weakest row it named and what
+   yesterday's conference asked for — you fix them in the rest of the
+   period
 2. Peer review: does the graph answer the question asked?
 3. [[Judging a Source]] applied to a statistics agency
 

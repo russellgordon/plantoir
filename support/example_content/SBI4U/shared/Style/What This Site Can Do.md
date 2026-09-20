@@ -135,8 +135,8 @@ summary table can then be navigation rather than a dead end.
 
 > [!note] For teachers: escape the pipe inside a table cell
 > A wikilink with different display words uses a pipe, and so does the
-> table. Write `[[Velocity\|how fast, which way]]` with a backslash, or the
-> row splits into an extra column.
+> table. Write `[[Osmosis in Plant Tissue\|the potato lab]]` with a
+> backslash, or the row splits into an extra column.
 
 ---
 
@@ -185,7 +185,7 @@ feature you will use most.
 
 ## Footnotes
 
-Physics writing needs asides, and they belong at the bottom.[^1]
+Writing about biology needs asides, and they belong at the bottom.[^1]
 
 [^1]: Like this one. Footnotes collect at the end of the page no matter
     where you write them, so you can put the note beside the sentence it

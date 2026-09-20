@@ -11,8 +11,11 @@ tags:
 ## Agenda
 
 1. [[The Yield Investigation]], day 4 — working period: percentage yield, and
-   the honest account of where the missing mass went
+   the honest account of where the missing mass went. Start with whatever
+   your conference on day 2 sent you back to
 2. Compare across the room: the spread is the finding
+3. [[Judging Your Own Work]] against the criteria table before you write
+   the conclusion; fix the weakest row today rather than tonight
 
 ## Things to do before our next class
 

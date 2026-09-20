@@ -26,6 +26,15 @@ is for equations that will not budge, not a substitute for noticing.
    Check one of her roots, find the slip, and finish it correctly.
 6. **Challenge.** For what value of $k$ does $x^2 + 6x + k = 0$
    have exactly one root? Explain using the discriminant.
+7. **Explore the development.** The general quadratic equation
+   $ax^2 + bx + c = 0$ is solved by completing the square in four
+   steps: (1) divide by $a$ and isolate constants,
+   $x^2 + \frac{b}{a}x = -\frac{c}{a}$; (2) add
+   $(\frac{b}{2a})^2 = \frac{b^2}{4a^2}$ to both sides; (3) factor the
+   left side as $(x + \frac{b}{2a})^2 = \frac{b^2 - 4ac}{4a^2}$;
+   (4) take square roots and solve for
+   $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$.
+   Match each step to the numerical equation $2x^2 + 8x - 10 = 0$.
 
 ## Answers
 
@@ -61,10 +70,21 @@ is for equations that will not budge, not a substitute for noticing.
 > Sensible, because $x^2 + 6x + 9 = (x + 3)^2$ — a perfect square,
 > touching the axis once at $x = -3$.
 
+> [!success]- Answer 7
+> Step 1: Divide by 2 and isolate: $x^2 + 4x = 5$.
+> Step 2: Add $(\frac{4}{2})^2 = 4$ to both sides: $x^2 + 4x + 4 = 5 + 4 = 9$.
+> Step 3: Factor left side: $(x + 2)^2 = 9$.
+> Step 4: Square roots: $x + 2 = \pm 3 \implies x = -2 \pm 3$, giving
+> $x = 1$ or $x = -5$.
+> The general formula is simply completing the square on parameters — the
+> development [[Zeros and the Quadratic Formula]] demonstrates.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A3.4]]
+
+![[A3.7]]
 
 ![[A3.8]]
 %%curriculum-end%%

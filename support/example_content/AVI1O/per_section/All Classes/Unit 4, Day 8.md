@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Studio time
+1. [[Judging Your Own Work]] against the criteria on
+   [[The Body of Work]], before anyone else sees the set
 2. Critique: the set so far, seen together for the first time
 3. Revision decisions
 

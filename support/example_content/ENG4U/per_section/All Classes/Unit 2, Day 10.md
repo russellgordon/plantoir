@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. 3.3–3.4: the prayer scene and the closet scene
-2. The reason Hamlet gives, and the register it is given in
+1. 3.3–3.4: the prayer scene and the closet scene: [[Hamlet]]
+2. The reason Hamlet gives, and the register it is given in: [[Structure and Delay]]
 
 ## Things to do before our next class
 

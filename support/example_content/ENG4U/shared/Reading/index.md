@@ -19,7 +19,7 @@ enableToc: true
 
 ## Poetry
 
-- [[Poetry Unit]] — ten poems across the year, each doing something the
+- [[Poetry Unit]] — ten poems across the semester, each doing something the
   prose cannot.
 
 ## Adaptations and media

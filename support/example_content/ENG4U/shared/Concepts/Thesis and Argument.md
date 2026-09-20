@@ -43,4 +43,6 @@ accidental reads as accidental. See [[The Extended Essay]].
 ![[C1.2]]
 
 ![[C1.4]]
+
+![[C3.4]]
 %%curriculum-end%%

@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. [[Sound in a Space]], day 4 — working period: your recommendation, costed
-   and justified by your own data
+   and justified by your own data, and the weakest row you named last
+   class fixed
 2. Peer read: is each claim traceable to a measurement?
 
 ## Things to do before our next class

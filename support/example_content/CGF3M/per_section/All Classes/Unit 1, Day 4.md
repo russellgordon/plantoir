@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Four spheres, six edges: [[The Four Spheres]] built on the board from a single photograph of our shoreline
-2. Every edge named as a process — rain on rock, root in crack, wave on till
-3. [[The Geographic Inquiry Process]] — the five components, and the four concepts we will name all year
+1. Diagnostic: four minutes in writing on one photograph of our shoreline — every process you can already name, and where it is happening. Unmarked; it tells me where this class is starting from
+2. Four spheres, six edges: [[The Four Spheres]] built on the board from that same photograph
+3. Every edge named as a process — rain on rock, root in crack, wave on till
+4. [[The Geographic Inquiry Process]] — the five components, and the four concepts we will name all semester
 
 ## Things to do before our next class
 

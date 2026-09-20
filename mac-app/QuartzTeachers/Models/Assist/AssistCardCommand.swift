@@ -17,6 +17,21 @@ import Foundation
 /// of the model is reliability bought back.
 nonisolated struct AssistCardCommand: Sendable, Equatable {
 
+    // MARK: - The rollover answers
+
+    /// The sentence that means "roll over, and start a new website".
+    ///
+    /// Named rather than typed, because the assistant's own reply offers it
+    /// back to the teacher word for word — a phrasing a teacher is TOLD to say
+    /// and a phrasing the matcher accepts must be the same string, or the
+    /// feature invites a sentence it then does not understand.
+    static let rollOverOntoANewWebsite: String =
+        "roll this section over onto a new website"
+
+    /// The sentence that means "roll over, and keep last year's website".
+    static let rollOverKeepingTheSameWebsite: String =
+        "roll this section over, keeping the same website"
+
     // MARK: - Stored properties
 
     /// The tool this phrasing always means.
@@ -44,13 +59,299 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 return command
             }
         }
-        if let unit = AssistCardCommand.wholeUnit(tidied) {
+        if let unit = AssistCardCommand.wholeUnitOrClassPage(tidied) {
             return unit
         }
         if let more = AssistCardCommand.moreDays(tidied) {
             return more
         }
+        if let room = AssistCardCommand.makeRoom(tidied) {
+            return room
+        }
+        if let scheduled = AssistCardCommand.deployAtATime(tidied) {
+            return scheduled
+        }
         return AssistCardCommand.duplicateClass(tidied, original: message)
+    }
+
+    /// "Deploy at 6:30 AM", and the same with a day word.
+    ///
+    /// **Measured, and it is the reason this family exists.** The shelf offers
+    /// this sentence word for word, and the smaller assistant sent it to
+    /// `deploy_section` ten trials out of ten — a deploy to students on the
+    /// spot, in answer to a teacher who asked for half six tomorrow
+    /// (`research/ai-assist/metal-routing-results.txt`, issue #168). The
+    /// approval card it landed on named no time at all, so nothing in front of
+    /// the teacher contradicted them.
+    ///
+    /// A time in a fixed frame is a NUMBER, not a judgement — the same
+    /// argument `makeRoom` already won for "make room for two classes at Unit
+    /// 3, Day 4". So it is read here and never reaches the model, which costs
+    /// the router nothing because it never sees it.
+    ///
+    /// **Clock-free on purpose.** This hands back `"06:30"`, or
+    /// `"tomorrow 06:30"` when a day word was said, and never a date. Which
+    /// DAY a bare time means is settled once, where the call is made, against
+    /// the runner's own clock — `AssistToolRunner.momentText(forTimeOfDay:…)`
+    /// — so this stays a pure function of the sentence, which is what lets the
+    /// contract describe it as input and output.
+    ///
+    /// Course and section words are refused deliberately. "Deploy section 2 at
+    /// 6:30 am" falls through, because this window is about ONE section and
+    /// `AssistAgent` binds that section whatever the sentence said: a card that
+    /// appeared to honour another section would answer a different question
+    /// with total confidence.
+    private static func deployAtATime(_ tidied: String) -> AssistCardCommand? {
+        // A question mark is dropped HERE rather than by the shared tidier at
+        // the top of this file. Widening that would break the fixed shapes
+        // whose literal carries one — "what courses do i have?" and "when are
+        // my next classes?" are matched by EQUALITY, so a shared strip would
+        // stop them matching at all.
+        var frame: String = tidied
+        while frame.hasSuffix("?") {
+            frame = String(frame.dropLast())
+        }
+
+        var words: [String] = []
+        for piece in frame.split(separator: " ") {
+            words.append(String(piece))
+        }
+        // "Please" is courtesy rather than content, at either end. "Can you
+        // deploy at 7 pm" is deliberately NOT accepted: it asks about ability
+        // as much as it instructs, and everything this frame cannot read
+        // without guessing goes to the model.
+        if words.first == "please" {
+            words.removeFirst()
+        }
+        if words.last == "please" {
+            words.removeLast()
+        }
+        guard words.first == "deploy" else {
+            return nil
+        }
+        words.removeFirst()
+        // "deploy it at…" and "deploy this section at…" — both name the one
+        // section this window is about, which is the only section a card can
+        // reach. ("deploy this section now" is already a fixed shape above.)
+        if words.first == "it" {
+            words.removeFirst()
+        } else if words.count >= 2, words[0] == "this", words[1] == "section" {
+            words.removeFirst(2)
+        }
+
+        var dayWord: String? = nil
+        if let opening = words.first, opening == "today" || opening == "tomorrow" {
+            dayWord = opening
+            words.removeFirst()
+        }
+        guard words.first == "at" else {
+            return nil
+        }
+        words.removeFirst()
+        if let closing = words.last, closing == "today" || closing == "tomorrow" {
+            // A day word on BOTH sides is a sentence disagreeing with itself,
+            // and choosing a half is exactly what this table exists to avoid.
+            if dayWord != nil {
+                return nil
+            }
+            dayWord = closing
+            words.removeLast()
+        }
+        guard let time = AssistCardCommand.timeOfDay(words) else {
+            return nil
+        }
+        guard let dayWord else {
+            return AssistCardCommand(toolName: "schedule_deploy", arguments: ["when": time])
+        }
+        return AssistCardCommand(
+            toolName: "schedule_deploy", arguments: ["when": "\(dayWord) \(time)"]
+        )
+    }
+
+    /// "6:30 am", "6:30am", "7 pm", "18:30", "noon", "midnight" — as `HH:mm`,
+    /// or nil when the spelling leaves any doubt about which minute was meant.
+    ///
+    /// **The rule that carries the most weight, stated once so it can be
+    /// argued with: a time with no am or pm must be written with two digits
+    /// for the hour.** That is what 24-hour time looks like, and it is the
+    /// form `schedule_deploy`'s own schema asks for. `06:30` and `18:30` are
+    /// unambiguous; `6:30` is morning or evening and nobody can tell which, so
+    /// it goes to the model — which has the dateline and is measured reading
+    /// arguments out reliably. A deploy set twelve hours wrong is a site that
+    /// updates after the class it was meant for.
+    private static func timeOfDay(_ words: [String]) -> String? {
+        guard words.count == 1 || words.count == 2 else {
+            return nil
+        }
+        if words.count == 1 {
+            // The two times a teacher writes with no digits in them. Both are
+            // exact readings — 12:00 and 00:00 — and both are handled the same
+            // way as "12 pm" and "12 am", which a teacher may equally type.
+            // Neither is a silent guess about the DAY: the approval card names
+            // the whole moment, weekday and date included, before anything is
+            // set.
+            if words[0] == "noon" {
+                return "12:00"
+            }
+            if words[0] == "midnight" {
+                return "00:00"
+            }
+        }
+
+        var clock: String = words[0]
+        var meridiem: String? = nil
+        if words.count == 2 {
+            guard let named = AssistCardCommand.meridiem(named: words[1]) else {
+                return nil
+            }
+            meridiem = named
+        } else {
+            // Written up against the digits: "6:30am". The longest spellings
+            // are tried first so "6:30a.m" does not lose only its last two
+            // characters.
+            for ending in ["a.m.", "p.m.", "a.m", "p.m", "am", "pm"]
+            where meridiem == nil && clock.hasSuffix(ending) {
+                meridiem = AssistCardCommand.meridiem(named: ending)
+                clock = String(clock.dropLast(ending.count))
+            }
+        }
+
+        var hourText: String = clock
+        var minuteText: String = "00"
+        if let colon = clock.firstIndex(of: ":") {
+            hourText = String(clock[clock.startIndex..<colon])
+            minuteText = String(clock[clock.index(after: colon)...])
+        } else if meridiem == nil {
+            // "deploy at 7" — a bare number is not a time anybody has spelled
+            // out, and reading it as an hour would schedule a deploy off a
+            // number that might have been a section or a unit.
+            return nil
+        }
+        // One or two digits of hour, always. Without the upper bound "007:30
+        // am" and "0007 pm" are read as 07:30 and 19:00, because `Int` does
+        // not care how a number was padded — harmless in itself, since nobody
+        // types that, but it is a boundary the other platform would implement
+        // as one-or-two from reading the accepted rows, and a difference no
+        // suite could see. So it is stated here and pinned by a refused row.
+        guard AssistCardCommand.isPlainDigits(hourText),
+              AssistCardCommand.isPlainDigits(minuteText),
+              hourText.count <= 2,
+              minuteText.count == 2,
+              let hour = Int(hourText),
+              let minute = Int(minuteText), minute <= 59 else {
+            return nil
+        }
+
+        guard let meridiem else {
+            guard hourText.count == 2, hour <= 23 else {
+                return nil
+            }
+            return AssistCardCommand.twoDigits(hour) + ":" + minuteText
+        }
+        guard hour >= 1, hour <= 12 else {
+            return nil
+        }
+        var onTheTwentyFourHourClock: Int = hour
+        if meridiem == "pm", hour != 12 {
+            onTheTwentyFourHourClock = hour + 12
+        }
+        if meridiem == "am", hour == 12 {
+            onTheTwentyFourHourClock = 0
+        }
+        return AssistCardCommand.twoDigits(onTheTwentyFourHourClock) + ":" + minuteText
+    }
+
+    /// "am" or "pm", from "am", "a.m", "a.m." and their afternoon twins — nil
+    /// for anything else. The message has already been case-folded.
+    private static func meridiem(named raw: String) -> String? {
+        let folded: String = raw.replacingOccurrences(of: ".", with: "")
+        if folded == "am" || folded == "pm" {
+            return folded
+        }
+        return nil
+    }
+
+    /// Whether every character is an ASCII digit.
+    ///
+    /// ASCII deliberately. `Character.isNumber` is true of Arabic-Indic digits
+    /// and of several other scripts, so a laxer check would accept a "clock
+    /// reading" that `Int` then cannot read, and the refusal would come from
+    /// somewhere further down that was not thinking about spelling at all.
+    private static func isPlainDigits(_ text: String) -> Bool {
+        if text.isEmpty {
+            return false
+        }
+        for character in text {
+            if !character.isASCII || !character.isNumber {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// 6 → "06", 18 → "18".
+    private static func twoDigits(_ number: Int) -> String {
+        if number < 10 {
+            return "0\(number)"
+        }
+        return "\(number)"
+    }
+
+    /// "Make room for a class at Unit 3, Day 4", and the same with a count.
+    ///
+    /// **Parity with the MCP tool, which is the rule for these** — a teacher
+    /// should be able to ask for whatever a Claude Code session can. Course
+    /// and section come from the window, so the three things left to say are
+    /// the unit, the day, and how many. Everything in the sentence is a number
+    /// in a fixed frame; none of it is a judgement, so none of it needs a
+    /// model.
+    ///
+    /// Deliberately strict, like the rest of this table. The shape is fixed
+    /// and the parts are read out of it — it does not try to understand a
+    /// sentence that merely resembles this one, because answering the wrong
+    /// question with total confidence is worse than routing it.
+    private static func makeRoom(_ tidied: String) -> AssistCardCommand? {
+        let spelled: [String: Int] = [
+            "a": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+            "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+        ]
+        let opening: String = "make room for "
+        guard tidied.hasPrefix(opening) else {
+            return nil
+        }
+        // The comma in "Unit 3, Day 4" is punctuation in the frame rather than
+        // part of any value, so it is dropped before the words are counted.
+        let body: String = String(tidied.dropFirst(opening.count))
+            .replacingOccurrences(of: ",", with: " ")
+        var words: [String] = []
+        for piece in body.split(separator: " ") {
+            words.append(String(piece))
+        }
+
+        // <count> class|classes at unit <unit> day <day>
+        guard words.count == 7,
+              words[2] == "at", words[3] == "unit", words[5] == "day" else {
+            return nil
+        }
+        guard words[1] == "class" || words[1] == "classes" else {
+            return nil
+        }
+        guard let howMany = spelled[words[0]] ?? Int(words[0]), howMany > 0,
+              let unit = Int(words[4]), unit > 0,
+              let day = Int(words[6]), day > 0 else {
+            return nil
+        }
+        // A plural count with a singular noun, or the reverse, is a sentence
+        // somebody typed carelessly rather than one of these shapes — and
+        // guessing which half they meant is exactly what this table exists to
+        // avoid.
+        guard (howMany == 1) == (words[1] == "class") else {
+            return nil
+        }
+        return AssistCardCommand(
+            toolName: "make_room_for_classes",
+            arguments: ["unit": "\(unit)", "atDay": "\(day)", "howMany": "\(howMany)"]
+        )
     }
 
     /// "Duplicate Unit 3, Day 2 as my next class."
@@ -121,39 +422,189 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         )
     }
 
-    /// "Publish Unit 5" and "Unpublish Unit 4", for any unit number.
+    /// "Publish Unit 5", "Unpublish Unit 4", and — since #215 — "Hide Unit 4,
+    /// Day 21".
     ///
     /// Parsed rather than listed, because unlike the seven weekdays there is
     /// no fixed set of units to write down. It is still a FIXED SHAPE in every
-    /// way that matters: the whole sentence is the request, the unit number is
-    /// the only thing in it, and reading an integer off the end is not a
-    /// judgement anybody needs a language model for.
+    /// way that matters: the whole sentence is the request, the numbers in it
+    /// are the only things in it, and reading an integer out of a frame is not
+    /// a judgement anybody needs a language model for.
     ///
-    /// Deliberately strict. "Publish Unit 4, Day 3" has a comma and is one
-    /// page, so it is not matched here and goes to the model, which is exactly
-    /// right — that request has a page title in it to read out.
-    private static func wholeUnit(_ tidied: String) -> AssistCardCommand? {
-        for (prefix, tool) in [("unpublish unit ", "unpublish_pages"),
-                               ("publish unit ", "publish_pages")]
-        where tidied.hasPrefix(prefix) {
-            let rest: String = String(tidied.dropFirst(prefix.count))
-                .trimmingCharacters(in: .whitespaces)
-            guard !rest.isEmpty, !rest.contains(","), Int(rest) != nil else {
-                return nil
-            }
-            return AssistCardCommand(toolName: tool, arguments: ["pages": "Unit \(rest)"])
+    /// **"Hide" is here because the model could not do it, and that was
+    /// measured** (issue #215, 2026-09-19, Qwen2.5-1.5B Q4_K_M with the app's
+    /// own flags, request body and system prompt, temperature 0). "Unpublish
+    /// unit 4, day 21" reached `unpublish_pages` every time; "hide unit 4, day
+    /// 21" reached NO tool at all in five phrasings out of five — the model
+    /// handed the teacher their own sentence back as text, date line and all.
+    /// It errs in the safe direction, and it reads as broken. The repository's
+    /// own rule says to steer with code rather than with a tool description
+    /// (one clarifying sentence added to `publish_pages`' description once took
+    /// the promise-card score from 110/110 to 90/110), so the word is answered
+    /// here and the router never sees it.
+    ///
+    /// **THE WHOLE VERB IS GATED, not only the day arm, and the asymmetry is
+    /// deliberate.** `hide` and `unpublish` take a whole unit or one class
+    /// page, and tolerate a "please" at either end, a trailing question mark,
+    /// a stray comma and odd spacing. `publish` is read by
+    /// `wholeUnitToPublish` below, which is the shipped code unchanged: the
+    /// literal prefix `"publish unit "` and a bare number, so "publish unit 4,
+    /// day 3" still goes to the model and so do "publish unit 4?", "please
+    /// publish unit 4" and "publish  unit 5".
+    ///
+    /// The split was made deliberately rather than inherited. The first
+    /// version of this frame read the verb AFTER stripping the courtesy words
+    /// and the question mark, which widened publish as a side effect: an
+    /// adversarial differential fuzz of 13,464 sentences across the two
+    /// matchers found 0 matches lost and **141 new `publish_pages` matches**,
+    /// none of them asked for. "publish unit 4?" is the case that decided it —
+    /// a teacher typing a question mark is plausibly ASKING, and that sentence
+    /// would have published a whole unit with no model in the loop, which is
+    /// the exact ambiguity used two paragraphs down to reject "show unit 4".
+    /// Unpublishing errs safe — a page nobody can see — while publishing puts
+    /// a page in front of students, and "Publish Unit 2, Day 3" is 10/10 on
+    /// the smaller assistant today, so there is nothing to buy by widening the
+    /// dangerous direction on the same day. Five of those 141 are pinned as
+    /// `refused` rows in `hideIsUnpublish`, so the gate is data rather than a
+    /// comment somebody deletes. `show` and `unhide` are out for a nearer
+    /// reason: "show unit 4" is at least as likely to mean "display it to me",
+    /// and getting that wrong publishes.
+    ///
+    /// **Any extra word must fall through, and that is a safety rule rather
+    /// than tidiness.** `AssistAgent.encode` writes this window's course and
+    /// section into every card call, and the guard that refuses a request
+    /// naming another course lives in `think()`, which a matched card never
+    /// reaches. So "hide unit 4, day 21 in ICS3U", typed in an ICS4U window,
+    /// would act on ICS4U and report success — the exact failure #202 exists
+    /// to remove. The frame therefore reads a fixed number of words and
+    /// refuses anything else.
+    ///
+    /// **Term-blind on purpose, for now.** Only the literal word "unit" is
+    /// matched, because this is a pure function of the sentence and a course's
+    /// own word for a unit is not in it. A Module course loses nothing: "hide
+    /// module 4, day 21" falls through to the model exactly as it does today,
+    /// and "hide unit 4" still works there because `AssistPublishPlanner`
+    /// accepts "unit" alongside the course's own word.
+    private static func wholeUnitOrClassPage(_ tidied: String) -> AssistCardCommand? {
+        // The two arms are separate functions because they have to be read by
+        // DIFFERENT rules — see "THE WHOLE VERB IS GATED" above. Hide and
+        // unpublish first; a publish sentence falls through to the shipped
+        // reading below, untouched.
+        if let hidden = AssistCardCommand.hideOrUnpublish(tidied) {
+            return hidden
         }
-        return nil
+        return AssistCardCommand.wholeUnitToPublish(tidied)
+    }
+
+    /// "Publish Unit 5", read exactly as it has been read since the family
+    /// shipped.
+    ///
+    /// **Kept as its own function so the publish surface cannot move by
+    /// accident.** A literal prefix, a bare number, no comma — so "publish
+    /// unit 4, day 3" goes to the model (it names one page, which has a title
+    /// in it to read out), and so does every sentence the hide frame beside it
+    /// now tolerates: a courtesy word, a question mark, a doubled space, a
+    /// stray comma. Verified by differential fuzz rather than by reading:
+    /// 36,864 generated sentences through this matcher and `dev`'s, **0
+    /// matches gained and 0 lost on `publish_pages`**.
+    ///
+    /// The `.` and `!` a teacher types at the end are still accepted, because
+    /// the shared tidier at the top of this file strips them before anything
+    /// here runs, and that is shipped behaviour rather than a new tolerance.
+    private static func wholeUnitToPublish(_ tidied: String) -> AssistCardCommand? {
+        let opening: String = "publish unit "
+        guard tidied.hasPrefix(opening) else {
+            return nil
+        }
+        let rest: String = String(tidied.dropFirst(opening.count))
+            .trimmingCharacters(in: .whitespaces)
+        guard !rest.isEmpty, !rest.contains(","), Int(rest) != nil else {
+            return nil
+        }
+        return AssistCardCommand(
+            toolName: "publish_pages", arguments: ["pages": "Unit \(rest)"]
+        )
+    }
+
+    /// "Hide Unit 4, Day 21" and "Unpublish Unit 4" — the widened arm, and the
+    /// only one the new tolerance applies to.
+    private static func hideOrUnpublish(_ tidied: String) -> AssistCardCommand? {
+        // A question mark comes off HERE rather than in the shared tidier, for
+        // the reason `deployAtATime` gives above: the fixed shapes are matched
+        // by equality and two of them carry one.
+        var frame: String = tidied
+        while frame.hasSuffix("?") {
+            frame = String(frame.dropLast())
+        }
+
+        // The comma in "Unit 4, Day 21" is punctuation in the frame rather
+        // than part of any value — the same reading `makeRoom` already uses —
+        // so it is dropped before the words are counted. That makes "unit 4 ,
+        // day 21" and "unit 4 day 21" the same sentence, and leaves "day21"
+        // refused, because that is not a word this frame has.
+        var words: [String] = []
+        for piece in frame.replacingOccurrences(of: ",", with: " ").split(separator: " ") {
+            words.append(String(piece))
+        }
+        // "Please" is courtesy rather than content, at either end — the same
+        // tolerance `deployAtATime` already has.
+        if words.first == "please" {
+            words.removeFirst()
+        }
+        if words.last == "please" {
+            words.removeLast()
+        }
+
+        guard words.count >= 3, words[1] == "unit" else {
+            return nil
+        }
+        // "publish" is deliberately absent, and its absence is the gate: a
+        // publish sentence falls out of here unmatched and is read by
+        // `wholeUnitToPublish`, which is the shipped code.
+        guard words[0] == "hide" || words[0] == "unpublish" else {
+            return nil
+        }
+        let toolName: String = "unpublish_pages"
+
+        // Read exactly as it was before this family grew a second arm:
+        // `Int(...) != nil` is the acceptance test, and the teacher's own
+        // digits are what travels into the title. Tightening this to plain
+        // digits would change a shipped behaviour for no reported fault, so
+        // "unit 04" still becomes "Unit 04".
+        let unit: String = words[2]
+        guard Int(unit) != nil else {
+            return nil
+        }
+        if words.count == 3 {
+            return AssistCardCommand(toolName: toolName, arguments: ["pages": "Unit \(unit)"])
+        }
+        guard words.count == 5, words[3] == "day" else {
+            return nil
+        }
+        let day: String = words[4]
+        guard Int(day) != nil else {
+            return nil
+        }
+        return AssistCardCommand(
+            toolName: toolName, arguments: ["pages": "Unit \(unit), Day \(day)"]
+        )
     }
 
     /// A phrasing the matcher PARSES rather than compares, described so the
     /// other app can implement the same thing.
     ///
     /// The literal shapes can be listed; these cannot, because the number in
-    /// them is unbounded — any unit, any count of days, any page title. A
-    /// contract that carried only the literals would say the assistant
-    /// understands eleven sentences when it understands those plus three
-    /// families, and Windows would build eleven.
+    /// them is unbounded — any unit, any count of days, any page title, any
+    /// time of day. A contract that carried only the literals would say the
+    /// assistant understands eleven sentences when it understands those plus
+    /// six families, and Windows would build eleven.
+    ///
+    /// One example and one near-miss is not enough to describe a family whose
+    /// variable part is a TIME, because the spellings a teacher uses are the
+    /// whole question. The deploy-at-a-time family therefore has its own
+    /// authored table of accepted and refused spellings in
+    /// `contracts/assist-cases.json` → `deployAtATime`; this entry is its
+    /// summary, not its specification.
     struct ParsedShape: Sendable, Equatable {
 
         // MARK: - Stored properties
@@ -181,21 +632,49 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     static var everyParsedShape: [ParsedShape] {
         return [
             ParsedShape(
+                shape: "make room for <count> class|classes at unit <unit>, day <day>",
+                tool: "make_room_for_classes",
+                fills: [
+                    "unit": "<unit>", "atDay": "<day>",
+                    "howMany": "<count>, as a number — words up to twelve are understood",
+                ],
+                example: "make room for two classes at Unit 3, Day 4",
+                notThis: "make room for two class at Unit 3, Day 4",
+                becauseNotThis: "The count and the noun disagree, so it is a sentence somebody typed "
+                              + "carelessly rather than one of these shapes — and this tool renames "
+                              + "pages the teacher's links point at. Guessing which half they meant is "
+                              + "exactly what a fixed shape exists to avoid."
+            ),
+            ParsedShape(
                 shape: "publish unit <number>",
                 tool: "publish_pages",
                 fills: ["pages": "Unit <number>"],
                 example: "publish unit 5",
                 notThis: "publish unit 4, day 3",
-                becauseNotThis: "A comma means one PAGE was named, which has a title in it for the "
-                              + "model to read out. Only a bare unit number is a whole unit."
+                becauseNotThis: "Publishing is the direction that reaches students, so this verb is "
+                              + "read by a frame of its own that has not moved: the literal opening "
+                              + "'publish unit ' and a bare number. A comma means one PAGE was named, "
+                              + "and that request goes to the model — and so does every spelling the "
+                              + "hide and unpublish family beside it tolerates, so 'publish unit 4?', "
+                              + "'please publish unit 4' and 'publish  unit 5' are refused too, each "
+                              + "pinned in hideIsUnpublish.refused. The asymmetry is the decision: "
+                              + "unpublishing errs safe, a question mark on a publish request is "
+                              + "plausibly a teacher ASKING, and this phrasing is answered correctly "
+                              + "by the model anyway, so there is nothing to buy by widening it."
             ),
             ParsedShape(
-                shape: "unpublish unit <number>",
+                shape: "[please] hide|unpublish unit <number>[, day <number>] [please]",
                 tool: "unpublish_pages",
-                fills: ["pages": "Unit <number>"],
-                example: "unpublish unit 4",
-                notThis: "unpublish unit 4, day 3",
-                becauseNotThis: "As above: a comma names a page, not a unit."
+                fills: ["pages": "Unit <number>, or Unit <number>, Day <number> when a day was named — "
+                              + "always in these capitals, since the frame only fires on the literal "
+                              + "word 'unit'. Every accepted and refused spelling is in hideIsUnpublish."],
+                example: "hide unit 4, day 21",
+                notThis: "hide unit 4, day 21 in ICS3U",
+                becauseNotThis: "A matched card binds THIS window's course and section into the call "
+                              + "unconditionally, and the guard that refuses a request naming another "
+                              + "course only runs on the model's answers. So a frame that swallowed a "
+                              + "sentence naming another course would act on this one and report "
+                              + "success. Any extra word falls through."
             ),
             ParsedShape(
                 shape: "add <count> more days to unit <number>",
@@ -215,6 +694,21 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 notThis: "duplicate Unit 3, Day 2",
                 becauseNotThis: "The closing half is what makes the sentence unambiguous. Without "
                               + "it, 'duplicate' could mean several things and belongs with the model."
+            ),
+            ParsedShape(
+                shape: "[please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow]",
+                tool: "schedule_deploy",
+                fills: [
+                    "when": "<time> as HH:mm, with the day word in front of it when one was said — "
+                          + "settled into a whole moment where the call is made, not here. Every "
+                          + "accepted and refused spelling is in deployAtATime.",
+                ],
+                example: "deploy at 6:30 am",
+                notThis: "deploy at 6:30",
+                becauseNotThis: "A one-digit hour with no am or pm is morning or evening and nobody "
+                              + "can tell which. A deploy set twelve hours wrong is a site that "
+                              + "updates after the class it was meant for, so the doubt goes to the "
+                              + "model rather than being resolved by a coin toss."
             ),
         ]
     }
@@ -249,6 +743,31 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// simply goes to the model — but it goes to the model on a shape that was
     /// put here precisely because the model gets it wrong.
     private static let fixedShapes: [(String, AssistCardCommand)] = [
+        // The app reaches `list_courses` too, even though the tool is MCP-only.
+        // MCP-only means the local MODEL is not shown it — which is what keeps
+        // routing accuracy intact — and says nothing about whether a teacher
+        // can ask for it. A fixed phrasing is matched in code and never reaches
+        // the model, so this costs the router nothing and still answers a
+        // teacher who is looking at one section and wants to know what else is
+        // in the folder.
+        // The publish/deploy distinction, on demand. The local model is told
+        // it in its system prompt and a teacher never was — the shelf explains
+        // what the assistant can DO, not what its words mean.
+        ("what does publishing mean?",
+         AssistCardCommand(toolName: "explain_publishing", arguments: [:])),
+        ("what is the difference between publishing and deploying?",
+         AssistCardCommand(toolName: "explain_publishing", arguments: [:])),
+
+        // A copy before a big edit. No arguments: the window is scoped to one
+        // course, so the only course it could mean is that one.
+        ("back up this course",
+         AssistCardCommand(toolName: "back_up_course", arguments: [:])),
+
+        ("what courses do i have?",
+         AssistCardCommand(toolName: "list_courses", arguments: [:])),
+        ("list my courses",
+         AssistCardCommand(toolName: "list_courses", arguments: [:])),
+
         ("what would students see in this section right now?",
          AssistCardCommand(toolName: "check_section", arguments: [:])),
 
@@ -392,7 +911,30 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
          AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
         ("re-date this section",
          AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
+        // A ROLLOVER, and the only one of these four that is. The other three
+        // are ordinary re-dating — a snow day, a timetable that shifted — and
+        // must never be asked about websites: answering "a new website" to a
+        // mid-semester re-date abandons the address students are reading right
+        // now. So the rollover carries the fact that it is one.
+        //
+        // `rollover` is deliberately absent from the tool's schema, the same
+        // way `unit`, `scope` and `revise` are above: the model never needs to
+        // know it exists, so this adds a whole answer without touching the
+        // surface routing was measured against, and without changing the
+        // argument set Windows pins as an exact departure list.
         ("roll this section over to a new year",
-         AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
+         AssistCardCommand(toolName: "re_date_classes", arguments: ["rollover": "yes"])),
+
+        // The two answers to the website question, as whole sentences rather
+        // than "a new website" — which is an exact match a teacher could type
+        // meaning something else entirely. Each also works as a FIRST thing to
+        // say, for a teacher who already knows which they want, because
+        // re-dating a section that is already on its dates changes nothing.
+        (AssistCardCommand.rollOverOntoANewWebsite,
+         AssistCardCommand(toolName: "re_date_classes",
+                           arguments: ["rollover": "yes", "website": "new"])),
+        (AssistCardCommand.rollOverKeepingTheSameWebsite,
+         AssistCardCommand(toolName: "re_date_classes",
+                           arguments: ["rollover": "yes", "website": "same"])),
     ]
 }

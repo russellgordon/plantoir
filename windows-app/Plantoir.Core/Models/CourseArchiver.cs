@@ -22,7 +22,11 @@ public static class CourseArchiver
     ///
     /// A course full of images makes a large zip, and the assistant saves one
     /// per conversation whether or not anybody asked for it, so without a
-    /// limit a term of chats fills a disk with copies of copies.
+    /// limit a term of chats fills a disk with copies of copies. (Until
+    /// 2026-09-07 this comment described the mac and not this code, which
+    /// saved one per CHANGE — so after six changes the copy from before the
+    /// conversation had already been pruned. See
+    /// <c>AssistWorkspace.BackUpOnceForThisConversation</c>.)
     ///
     /// A teacher's OWN backups are never counted here and never pruned. They
     /// made those on purpose; deciding on their behalf that a backup from
@@ -58,8 +62,22 @@ public static class CourseArchiver
     /// ONLY the assistant's own backups are pruned. A teacher's backup is a
     /// decision — deleting that on a schedule they never agreed to is the app
     /// overruling them about their own work.
+    ///
+    /// And only backups whose stamp COULD BE TRUE. See
+    /// <see cref="ArchiveStamp"/>: a zip carried in from a Mac that wrote its
+    /// own calendar into the name parses cleanly as a year like 2569, sorts
+    /// as the newest thing in the folder, and would take a real backup's
+    /// place among the five that are kept.
     /// </summary>
-    public static void PruneBackups(string courseCode, string coursesDirectory)
+    /// <param name="now">
+    /// The clock the plausibility check measures against. Nothing in the app
+    /// passes it; tests do, because the CEILING is the half of the rule
+    /// nothing on disk can exercise on its own — a stamp is past it or not
+    /// depending only on when the suite happens to run. See
+    /// <c>PruneBackups_AStampPastTheCeiling_CountsOnceTheClockCatchesUp</c>,
+    /// which asks about one file twice with the clock in two places.
+    /// </param>
+    public static void PruneBackups(string courseCode, string coursesDirectory, DateTime? now = null)
     {
         string backupsDir = BackupsDirectory(coursesDirectory, courseCode);
         if (!Directory.Exists(backupsDir)) return;
@@ -68,10 +86,16 @@ public static class CourseArchiver
         var assistantBackups = new List<BackupItem>();
         foreach (var file in entries)
         {
-            if (BackupItem.From(file, courseCode) is { } item && item.Maker is BackupMaker.Assistant)
-            {
-                assistantBackups.Add(item);
-            }
+            if (BackupItem.From(file, courseCode) is not { } item) continue;
+            if (item.Maker is not BackupMaker.Assistant) continue;
+            // A stamp that cannot be true is not allowed to decide what gets
+            // DELETED. The zip stays where it is and stays LISTED, so the
+            // teacher can restore it or delete it themselves; it is simply
+            // left out of the count and out of the sort, because its date is
+            // the one thing about it known to be wrong and this list is
+            // sorted by date before its tail is thrown away.
+            if (!ArchiveStamp.CouldHaveBeenStamped(item.BackedUpAt, now)) continue;
+            assistantBackups.Add(item);
         }
 
         if (assistantBackups.Count <= MostBackupsKept) return;
@@ -112,7 +136,38 @@ public static class CourseArchiver
     {
         string archivePath = ArchiveCourseWithoutRemoving(course, coursesDirectory);
         CourseRestorer.DeleteTree(course.DirectoryPath);
+        // A build outlives the content it was made from. Archive this course
+        // and restore it next term and the notes that come back can be OLDER
+        // than the site standing outside the working folder, so a freshness
+        // check comparing dates says "already up to date" and the next publish
+        // puts last term's pages online. The mac reaches the same rule a
+        // different way - a build with no symlink pointing at it is cleared
+        // rather than reused - and Windows has no link, so the clearing is
+        // explicit at each moment a course's content is replaced.
+        DiscardBuilds(coursesDirectory, course.Code);
         return archivePath;
+    }
+
+    /// <summary>
+    /// Throw away a course's built site and build workspace, given the courses
+    /// directory this course lives in.
+    ///
+    /// <para>The working folder is the courses directory's parent — the same
+    /// relationship <c>Workspace.CoursesDirectory</c> creates going the other
+    /// way. Best-effort inside <see cref="BuildOutputLocation"/>: a build
+    /// still locked by a running preview must not turn "archive this course"
+    /// into an error.</para>
+    /// </summary>
+    internal static void DiscardBuilds(string coursesDirectory, string courseCode, int? sectionNumber = null)
+    {
+        string? workingFolder = Path.GetDirectoryName(coursesDirectory.TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        if (string.IsNullOrEmpty(workingFolder)) return;
+        string buildsRoot = BuildOutputLocation.BuildsRootFor(workingFolder!);
+        if (sectionNumber is int number)
+            BuildOutputLocation.DiscardBuildsFor(buildsRoot, courseCode, number);
+        else
+            BuildOutputLocation.DiscardBuildsFor(buildsRoot, courseCode);
     }
 
     /// <summary>
@@ -125,6 +180,14 @@ public static class CourseArchiver
         string archivePath = Archive(sectionDir, $"{course.Code}-section{sectionNumber}",
                                      coursesDirectory, course.Code);
         if (Directory.Exists(sectionDir)) CourseRestorer.DeleteTree(sectionDir);
+        DiscardBuilds(coursesDirectory, course.Code, sectionNumber);
+        // A scheduled deploy for a section that no longer exists cannot do
+        // anything useful, and left alone it wakes up nightly to fail. Taking
+        // the section's number out of the configuration is what makes the
+        // launcher ask "Continue anyway?" about it, so this is also the other
+        // half of the reason the wrapper runs non-interactively.
+        Plantoir.Core.Assist.TaskScheduling.Cancel(
+            Plantoir.Core.Assist.TaskScheduling.NameFor(course.Code, sectionNumber));
         var remaining = course.Configuration.SectionNumbers.Where(n => n != sectionNumber).ToList();
         course.Configuration.SetSectionNumbers(remaining);
         course.Configuration.Write(course.ConfigFilePath);

@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Build day 3: assembly and squaring
-2. Conferences on fit
+2. Conferences on fit, and your own check against the build criteria:
+   [[Judging Your Own Work]]
 3. Clean-down
 
 ## Things to do before our next class

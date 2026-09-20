@@ -17,6 +17,18 @@ is genuinely Russell's — a product decision, a trade-off with no obviously
 right answer, or something hard to undo. He works interactively here and has
 said plainly that he does not want to be asked for permission step by step.
 
+**On the rhythm of the work — `CLAUDE.md` rule 11, and it governs both jobs
+below** (in B it applies from the moment you start implementing, at B.3). Implement with the strongest model available (Opus in Claude Code).
+Have each logical chunk reviewed by something that is not the thing that wrote
+it (Opus in Claude Code) — the PLAN first, then the implementation, then the
+fixes, because a review of the finished thing arrives too late to change its
+shape. Write it up for Windows AS YOU GO rather than from memory at the end.
+**Finish with a documentation pass before you say it is ready**, which is
+step 7 below — and then, last of all, ONE sweep of the whole finished piece on
+Fable (standing order 2026-09-10: Opus for every chunk review, Fable only for
+that final pre-merge sweep). Nothing else should still be changing when it
+runs.
+
 ---
 
 ## A. Adding a feature or changing a behaviour
@@ -29,11 +41,18 @@ places, and which one is a judgement about portability rather than effort:
 - **[`contracts/`](contracts/README.md)** if it is a sentence a teacher reads,
   a rule with inputs and expected outputs, or a sequence that must happen in
   order. Add the case, run it here, commit the diff — the Windows suite then
-  runs the identical case.
-- **[`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)** if it cannot be expressed as
-  data: anything visual, anything with platform mechanics (Colima, port leases,
-  WebKit), anything measured rather than asserted. Write the INTENT and the
-  reasoning, not just that it exists.
+  runs the identical case. **It still owes an issue**, which is not a second
+  home for the behaviour but the notification that it moved: step 3 below says
+  why, and rule 4 already spells out the same thing for a case travelling the
+  other way.
+- **A [GitHub issue](https://github.com/russellgordon/plantoir/issues)
+  labelled `windows`** if it cannot be expressed as data: anything visual,
+  anything with platform mechanics (Colima, port leases, WebKit), anything
+  measured rather than asserted. Write the INTENT and the reasoning, not just
+  that it exists — and put the reasoning that an implementer will need to READ
+  in the [`documentation/`](documentation/README.md) page that owns its subject,
+  which the issue points at.
+  The issue is the index; the section is the manual.
 
 **Never neither.** The failure this prevents is the quiet one: a behaviour that
 exists in one app, is described nowhere the other app's tests can reach, and is
@@ -60,7 +79,38 @@ Plantoir --write-contracts contracts     # or the built binary in DerivedData
 It preserves the hand-written halves (`scenarios`, `nearMisses`,
 `promptHistory`, every case list) and rewrites only the readouts. It is
 idempotent, so a run that changes nothing produces no diff. **Commit the diff —
-that diff is how the Windows side finds out.**
+that diff is how the change travels.**
+
+**It is not how they find out**, and the difference has cost real time. Nobody
+reads a folder of JSON for changes; what the Windows side meets is its own
+suite going red, days later, part-way through something else. So the issue step
+6 asks for is not a courtesy on top of the diff — it is the whole of the
+notification, and the diff is only the payload. **Say in it which key moved and
+which of their tests will go red**, the way
+[#70](https://github.com/russellgordon/plantoir/issues/70) did: *"Three more
+card phrasings will make your suite red"*, with the three quoted. That is what
+turns a failure into a task.
+
+**Name every key the regeneration moved, and remember that the FIX you made
+after the feature moved one too.** This is the half #70 missed, and the shape
+of it is worth knowing because it is not carelessness:
+
+| When | What |
+|---|---|
+| 18:54 | `0f34c54d` builds `back_up_course`, requiring `[course]` — the same shape Windows had had since August. Nothing diverges. |
+| 19:14 | `b0913344` fixes a real defect in it: the copy was filed as the TEACHER's, so `pruneBackups` would have kept every one for ever. The fix takes a `section`. The schema moves. |
+| 19:52 | #70 is opened. It names the tool, its plan twin and its briefing persistence — everything except the argument. |
+
+The issue describes the FEATURE, because that is what you set out to build; the
+review fix twenty minutes later is the part memory drops. And it is the worse
+part to drop — Windows had the identical defect and found it only because the
+contract went red and somebody chased it. Windows'
+`AssistSurfaceContractTests` reported the change exactly — *"must require
+exactly the arguments the contract says it does"* — and its reader had a
+perfectly clear failure and nowhere to look it up, which is half of why
+[#146](https://github.com/russellgordon/plantoir/issues/146) was filed saying
+nobody had been told. **`git diff contracts/` before you write the issue**, and
+let the diff tell you what to list rather than your memory of the afternoon.
 
 ### 4. Run the tests, and read what they say
 
@@ -81,7 +131,7 @@ Two things worth knowing:
   scheme sets `parallelizable = "NO"`; `PreviewLeaseTests` and
   `CourseActivityTests` reset process-wide statics around individual methods.
 
-Toolchain changes (`scripts/`, `support/`, `patches/`, the launchers, the
+Toolchain changes (`scripts/`, `support/`, `patches/`, `contracts/`, the launchers, the
 Dockerfile) are gated by `./verify.sh` instead — from a non-interactive shell,
 `script -q /dev/null ./verify.sh`.
 
@@ -109,46 +159,100 @@ bundle from the Dock. Test, then build, then stop.
 - `GUI-IMPROVEMENTS.md` gets a row, with a **"Notes for Windows port"** cell
   that says something usable. Say what you measured, not only what you decided.
   Record the options REJECTED, or they get proposed again.
-- Anything architectural also gets a section in `WINDOWS-HANDOFF.md`, and any
+- Anything architectural also gets a section in the `documentation/` page that
+  owns its subject, and any
   guidance the change made WRONG is corrected there in the same breath. Stale
   advice is worse than none, because it gets followed.
+- **Anything WINDOWS must now do gets a GitHub issue labelled `windows`, in
+  the same session.** Standing instruction, `CLAUDE.md` rule 3. The issue is
+  not a duplicate of the section: a Windows session is told to read its open
+  issues FIRST, so the issue is how they find out there is work at all, while
+  the `documentation/` page it points at is the manual for doing it. Give it a
+  milestone if it is
+  pinned to a release, and `decision` as well if it needs Russell to choose.
+  A change written up beautifully in a section nothing points at is, from their
+  side, a change nobody wrote up.
+
+  ```bash
+  GH_TOKEN=$(gh auth token --user russellgordon) gh issue create \
+    --repo russellgordon/plantoir --label windows --milestone v1.2.0 \
+    --title "..." --body-file issue-body.md
+  ```
+
+  **Per-command auth, never `gh auth switch`** — this machine has more than one
+  `gh` account and switching globally affects every other session on it.
 - **An affordance that lives only in a context menu is invisible to everyone
   else.** A right-click menu, a double-click, a hover, a keyboard shortcut —
-  each needs a handoff line even though nothing on screen changed. That is how
-  the path bar's menu went unnoticed for months.
+  each needs a write-up even though nothing on screen changed. That is how the
+  path bar's menu went unnoticed for months.
 - Commit code changes as they are made, not in one lump at the end.
+
+### 7. Then update the documentation — the LAST thing before "it is ready"
+
+`CLAUDE.md` rule 11. Step 6 covers the records that exist because a rule
+demands them; this covers the ones that exist because somebody remembered, and
+they are the ones that rot.
+
+- **Grep for what you changed**, rather than trusting your memory of where it
+  is described. A behaviour is nearly always written down in more places than
+  the one you edited.
+- **`documentation/` is the folder that gets forgotten**, because nothing in
+  the daily rhythm points at it. The deep dives 01–13 describe how the
+  toolchain, the launchers, the build pipeline and the assistant actually
+  work, and a change to any of those has almost certainly made a sentence
+  there wrong. On the session rule 11 came from, four places in
+  `documentation/` described the rule that had just been replaced and THREE
+  needed correcting — one flatly wrong, one merely incomplete, and one that
+  had never documented a launcher flag the app has called since August.
+- **A doc that links to the canonical description rather than restating the
+  mechanism does not need touching** — which is the argument for writing them
+  that way. `07-deployment.md` needed nothing for exactly this reason, while
+  the three files that restated the mechanism themselves all did.
+- **Do NOT update `GUI-IMPROVEMENTS.md` rows or completed `TODO.md`
+  entries.** Both are append-only records of what was true on their day.
+
+Then say it is ready, say what it contains, and stop. Merging into `dev` is
+Russell's call every time (`CLAUDE.md` rule 6).
 
 ---
 
 ## B. Bringing the mac up to speed with Windows work
 
-### 1. Read [`MAC-HANDOFF.md`](MAC-HANDOFF.md) top-down
+### 1. Read the open `mac` issues
 
-It is ordered by status, so you can stop when you like:
+```bash
+GH_TOKEN=$(gh auth token --user russellgordon) \
+  gh issue list --repo russellgordon/plantoir --label mac --limit 100
+```
 
-1. **Contract cases waiting on the mac** — read this FIRST. If the suite is
-   red, the explanation is probably here.
-2. **Open — what the mac still owes.**
-3. **For awareness** — things to know, not to do.
-4. **Done — the ledger**, kept in full because the reasoning is the point.
+Pass `--limit`: `gh` shows 30 by default and silently hides the rest, which is
+the failure this whole arrangement was made to stop.
+
+That is what the mac still owes, and it is the whole of it. Things the mac
+must merely KNOW are not issues — an issue nobody can close is one everybody
+learns to scroll past — so those live in the [`documentation/`](documentation/README.md)
+page that owns their subject, and
+[`13-windows-port-archive.md`](documentation/13-windows-port-archive.md) holds
+the reasoning behind Windows-port work that already shipped.
 
 ### 2. A red suite may be a REQUEST
 
 The Windows side can propose a case in the authored half of a contract. When
 they do, the mac suite fails until this side implements it — that is the
-mechanism working, not a break. The failing case names itself, and
-`MAC-HANDOFF.md` should carry a line saying it is waiting.
+mechanism working, not a break. The failing case names itself, and there
+should be an open `mac` issue saying it is waiting.
 
-### 3. Implement, then mark it DONE in place
+### 3. Implement, then CLOSE the issue
 
-Entries are never deleted: a `✅ DONE` line names what landed here and where.
-Add what the mac found that Windows had not — the ledger's most useful entries
-are the ones where implementing their fix turned up a second instance of the
-same bug on this side.
+Close it with a comment naming what landed here and where — never by editing
+its title. Say what the mac found that Windows had not: the most useful
+closing comments are the ones where implementing their fix turned up a second
+instance of the same bug on this side.
 
 ### 4. Answer back
 
 If the mac's implementation makes their guidance wrong, correct
-`WINDOWS-HANDOFF.md` in the same change. If it settles a question they asked,
+the `documentation/` page that owns it, in the same change. If it settles a
+question they asked,
 say so where they will look. A handoff that only travels one way is a report,
 not a conversation.

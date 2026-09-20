@@ -14,7 +14,7 @@ measured by: *what do you leave with that you did not arrive with?*
 ## Before you write
 
 Reread your journal front to back in one sitting — expect the
-September entries to feel written by someone else. As you read, flag:
+your earliest entries to feel written by someone else. As you read, flag:
 
 - one entry that embarrasses you a little — that is usually where the
   growth is buried
@@ -27,7 +27,7 @@ Three sections, roughly a page, built the way [[Showing Growth]]
 taught — date it, quote your own words, then show the now:
 
 1. **How my mathematics changed.** The biggest difference between what
-   September-you and now-you can *do*, proven with two cited entries —
+   the you who started this course and now-you can *do*, proven with two cited entries —
    a method gained, a kind of problem that stopped being frightening,
    a check that became automatic.
 2. **How my relationship with mathematics changed.** The other axis,

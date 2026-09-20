@@ -31,6 +31,8 @@ short of oxygen, and why hyperventilating before a swim is dangerous.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E3.1]]
+
 ![[E3.3]]
 
 ![[E2.3]]

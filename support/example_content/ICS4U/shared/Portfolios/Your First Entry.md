@@ -55,5 +55,5 @@ a real moment and stays with it, which already beats a page of
 > other students never do, and nothing you admit here is quoted or
 > used as an example without your explicit okay. That promise holds
 > even when the honest thing to write is about your team. The candour
-> you risk in week one becomes your best evidence of growth by June —
+> you risk in week one becomes your best evidence of growth by the end of the course —
 > but you decide who ever hears about it.

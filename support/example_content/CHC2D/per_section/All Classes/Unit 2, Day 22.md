@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval clinic: Units 1 and 2 mixed
-2. The three lenses across two periods
+1. Retrieval clinic: Units 1 and 2 mixed — [[The Document Examination]]
+2. The three lenses across two periods: [[Historical Perspective]]
 3. Looking ahead: the country that got built
 
 ## Things to do before our next class

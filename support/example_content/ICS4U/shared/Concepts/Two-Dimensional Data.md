@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 A list holds a line of things. A great deal of real data is not a line:
 a seating chart, a spreadsheet, a chessboard, an image, a distance table

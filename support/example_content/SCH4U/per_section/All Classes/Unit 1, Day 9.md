@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: write three configurations, cold
+1. Warm-up: write three configurations, cold: [[Atomic Structure and Orbitals]]
 2. The exceptions, and why chromium and copper do what they do
 3. Practise: configurations across a period and down a group, until the
-   pattern is boring
+   pattern is boring: [[The Blocks of the Periodic Table]]
 
 ## Things to do before our next class
 

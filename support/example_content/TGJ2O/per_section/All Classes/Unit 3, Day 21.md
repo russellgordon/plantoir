@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Standup
+1. Standup: [[Record a Standup]]
 2. Retrieval warm-up — no notes: three claims, sourced or not, decided
-   and defended
+   and defended: [[Misinformation and Verification]] and [[Verification Practice]]
 3. Desk check, on your own: a paragraph rewritten so every claim carries
    its source
 

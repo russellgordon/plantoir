@@ -12,7 +12,9 @@ tags:
 
 1. Poem: "This Is a Photograph of Me" — see [[Poetry Unit]]
 2. What a text withholds, and how a reader is made to do the work
-3. Practise: [[Evidence and Analysis Practice]], first two
+3. Practise: [[Evidence and Analysis Practice]], first two — nothing
+   here is marked; it shows you how long the analysis runs beside how
+   short the quotation is
 
 ## Things to do before our next class
 

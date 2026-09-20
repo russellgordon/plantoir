@@ -98,4 +98,6 @@ $$\frac{\dfrac{1}{x} + \dfrac{1}{y}}{\dfrac{1}{xy}}$$
 ![[A3.3]]
 
 ![[A3.1]]
+
+![[A3.4]]
 %%curriculum-end%%

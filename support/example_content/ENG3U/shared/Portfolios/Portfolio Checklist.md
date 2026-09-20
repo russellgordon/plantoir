@@ -2,25 +2,37 @@
 title: Portfolio Checklist
 publish: true
 created: __CREATED__
+tags:
+  - portfolios
 ---
 Copy this into your notebook — the boxes here are printed, not clickable.
+
+> [!note] What is checked, and what was marked
+> The portfolio itself carries no mark. I check that it is there and that
+> it is yours. The pieces in the second list were each marked when they
+> were handed in; they are collected here so you can see the whole run of
+> them at once, which is what [[Showing Growth]] needs.
 
 ## Across the course
 
 - [ ] [[Your First Entry]], untouched
 - [ ] At least twenty-five journal entries, dated
 - [ ] Annotated copies of the short stories and of two acts of the play
-- [ ] Passage notes for your seminar novel, with page numbers
+- [ ] Passage notes for your seminar act, with act, scene, and line
 - [ ] Your vocabulary page
+- [ ] Your [[Judging Your Own Work]] entries, one for each of the four
+      essays
 
 ## The assessed pieces, with drafts
 
-- [ ] [[The Close Reading Essay]] — story, craft note, and draft
-- [ ] [[The Macbeth Seminar]] — script with blocking, and the director's
-      note
+- [ ] [[The Close Reading Essay]] — annotations, draft, and final
+- [ ] [[The Macbeth Seminar]] — your question, your passages, and your
+      write-up
 - [ ] [[The Critical Essay]] — outline, draft with feedback, final
-- [ ] [[The Macbeth Seminar]] — your question, your passages, your follow-up
-- [ ] [[The Comparative Response]] — the analysis and the text you made
+- [ ] [[The Comparative Response]] — passage notes from both texts, and
+      the final
+- [ ] [[The Media Argument]] — your half of the analysis and your own note
+- [ ] [[The Independent Study]] — the four checkpoints and the essay
 
 ## For the examination
 
@@ -31,7 +43,8 @@ Copy this into your notebook — the boxes here are printed, not clickable.
 
 > [!warning] The one people forget
 > The drafts. A final copy with nothing behind it cannot show growth, and
-> growth is what the last part of this course is judging.
+> [[Showing Growth]] is what the whole portfolio is built to make
+> possible.
 
 %%curriculum-start%%
 ## Curriculum connection

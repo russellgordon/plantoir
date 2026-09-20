@@ -16,9 +16,13 @@ tags:
    was wrong — and how do you know?
 3. Consolidation boards: Unit 3 on one board per group, radians
    everywhere
-4. Journal: read [[Showing Growth]], then find the entry where the
-   radian finally clicked — and say so in the margin
+4. Ten minutes, in class: your milestone journal entry for this task —
+   where the stopwatch and the model parted company, and which of the
+   two you believe
 
 ## Things to do before our next class
 
-- [ ] Journal in next class — Unit 3 volume complete.
+- [ ] Unit 3 volume of your journal complete; it is collected on the
+      first day of the next unit. While you are in there, find the
+      entry where the radian finally clicked and say so in the margin —
+      [[Showing Growth]] explains why that will matter later.

@@ -7,9 +7,12 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo · three working periods early in the course · guides
-> field-tested in class during the third period · three documented
-> algorithms plus one original design, in a small illustrated guide
+> Solo, with one paired workday · four working periods early in the
+> course · entries tested on
+> a real reader in the last of them, the original designed and first
+> run in class on day 5, and run again by a classmate on presentation
+> day · three documented algorithms plus one original design, in a
+> small illustrated guide
 
 ## What you are making
 
@@ -42,8 +45,9 @@ per entry, because a picture of a failure mode is worth a paragraph.
    [[Human Robot]], reading it as literally as possible. Every place
    they stall or improvise is a revision waiting to happen — revise.
 5. Assemble and illustrate the guide, and note what the field test
-   changed. The working periods are class time, and using them well is
-   part of the task — [[How Marks Work]] explains how.
+   changed. Most of that happens in the working periods, where I can
+   see the drafts as well as the finished thing — [[How Marks Work]]
+   explains why what I watch counts.
 
 ## Success criteria
 
@@ -52,6 +56,7 @@ per entry, because a picture of a failure mode is worth a paragraph.
 | Real specimens | All three algorithms come from your actual life |
 | Full write-ups | Each entry has habitat, inputs, steps, failure mode |
 | Honest failure modes | The failures are observed, not invented to fill a box |
+| The moves are visible | Your original was broken into pieces before it was written as steps |
 | A literal-proof design | Your original survived the most literal reading |
 | Visible revision | The guide shows what the field test broke and fixed |
 | Working illustration | Each picture explains what the words alone did not |
@@ -78,3 +83,44 @@ find there is the gap this whole course lives in.
 
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 10, the working period where every entry is
+tested on somebody who has never done that task
+  Watch for: what the author does with their hands and their mouth
+  while the tester works. The guide's revision note tells you WHAT the
+  test changed; only this period tells you whether the test was allowed
+  to happen. An entry rewritten after a coached, narrated run has been
+  fixed for a problem nobody actually hit.
+  Going well: the author is writing, not talking. The tester holds the
+  paper. A step gets crossed out mid-run.
+  Stuck: the author reads their own steps aloud while the tester
+  follows along, so nothing can fail; or the tester is a friend who
+  already knows the task and fills in the gaps out of politeness.
+  Record: initials on your day plan in three columns — silent, coached,
+  not tested. Revisit the middle column before Day 14: Day 13's clinic
+  is the slot, because on Day 14 you are chairing the presentations.
+
+TALK — Unit 1, Day 5, at the conference the agenda already schedules
+  Ask: "Which of these three did you have to go and watch somebody do
+  before you could write it down — and what did you get wrong from
+  memory?"
+  Then: "When a stranger runs this one, which step will they do
+  differently from you — and will the result still come out right?"
+  Both are C1.2, describing an everyday algorithm, heard rather than
+  read. The first tells you whether the description came from the world
+  or from a memory of it — the page reads the same either way, and the
+  student who says "I thought I knew our recipe and I had the order
+  wrong" has done the work. The second is the harder one: naming a
+  specific step, a specific variation, and then whether the outcome
+  survives it, on a step they have not rehearsed.
+  (A1.2, also on this page, is evidenced by the designed original and
+  the illustrated guide — plan, design, share — not by either of these
+  questions.)
+  Record: one line per student in the margin of your list, right then.
+
+The product evidence is the guide itself, plus the original design run
+by a classmate on Day 14. Both arrive on their own.
+%%

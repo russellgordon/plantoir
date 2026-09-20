@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Research period: the recent past
-2. Recent history's three problems: abundance, participants, hindsight
-3. Conferences
+1. Research period: [[The Recent Past]]
+2. Recent history's three problems: abundance, participants, hindsight — [[Reading a Primary Source]]
+3. Conferences on research scope and source reliability for [[The Recent Past]]
 
 ## Things to do before our next class
 

@@ -16,7 +16,10 @@ tags:
 3. Consolidate: and against or, and why the word matters more than the
    arithmetic
 4. Practice, in class: probability problems from the room's own data
+5. Look ahead: next unit measures things, and money is one of them
 
 ## Things to do before our next class
 
 - [ ] Practice finished.
+- [ ] Bring a box, tube, or container you think is well designed — next
+      class gets physical.

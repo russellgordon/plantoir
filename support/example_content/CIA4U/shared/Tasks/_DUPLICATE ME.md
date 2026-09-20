@@ -35,13 +35,47 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
-%%curriculum-start%%
-## Curriculum connection
-
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
+
+(This note sits OUTSIDE the curriculum markers on purpose. Anything between them is
+removed for a teacher who chose not to have curriculum pages, and a note kept inside
+would disappear with them.)
 %%
+
+%%curriculum-start%%
+## Curriculum connection
 
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Two of the three kinds of evidence — what you watch, and what you hear —
+leave no trace unless you decide in advance where to collect them. Fill
+this in when you write the task, not when you mark it. Keep it to real
+days from your own schedule, and delete this file's version before you
+use the page. Plain text only in here: no links, and no transclusions.
+
+OBSERVE — Unit __, Day __, and say which part of that period
+
+  Watch for: something that is visible while they work and invisible in
+  the finished piece. If you cannot name one, the observation is
+  decoration and the task may be worth reopening.
+  Going well:
+  Stuck:
+  Record: how you will note it for a whole class in seconds.
+
+TALK — Unit __, Day __, preferably a conference or check-in the schedule
+already gives you
+
+  Ask:
+  Then:
+  A strong answer sounds like: and name the curriculum code it evidences,
+  after checking the expectation's own wording says what you are claiming.
+  Record:
+
+The product evidence is:
+%%

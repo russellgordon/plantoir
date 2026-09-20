@@ -2,6 +2,8 @@
 title: What This Site Can Do
 publish: true
 created: __CREATED__
+tags:
+  - style
 enableToc: true
 ---
 This page has two audiences. Students: it shows why the notes look the
@@ -93,8 +95,9 @@ Add a `-` after the kind to start it collapsed — useful for answers,
 hints, and anything a reader should attempt before seeing.
 
 > [!success]- A worked answer (click to expand)
-> The witches never tell Macbeth to do anything. Every instruction in the
-> play comes from somebody he is married to or from himself, which is
+> The witches never tell Macbeth to kill anyone. They give him plenty of
+> orders — "seek to know no more" — but every instruction to do the thing
+> itself comes from somebody he is married to or from himself, which is
 > what makes the prophecy a test rather than a cause.
 
 ---

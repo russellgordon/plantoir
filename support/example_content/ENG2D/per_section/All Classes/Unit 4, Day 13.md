@@ -14,6 +14,8 @@ tags:
 2. Practise: [[Paragraph Practice]] to the end
 3. Concept: [[Style and Diction]] revisited — reading your own prose for
    rhythm
+4. "Blues Spiritual for Mammy Prater" (Dionne Brand), read aloud: what
+   plain words carry — see [[Poems for Grade 10]]
 
 ## Things to do before our next class
 

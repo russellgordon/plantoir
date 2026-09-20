@@ -164,9 +164,11 @@ rays dashed because the light does not really go there.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.12]]
+
+![[E2.1]]
+
 ![[E2.2]]
 
 ![[E2.3]]
-
-![[A1.12]]
 %%curriculum-end%%

@@ -60,7 +60,9 @@ of a program — and Python applies them in a strict order, not yours.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C2.5]]
+![[C1.3]]
 
 ![[C1.4]]
+
+![[C2.5]]
 %%curriculum-end%%

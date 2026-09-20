@@ -14,7 +14,9 @@ tags:
    stops
 2. Build: [[Setting Up Python]], then your first program, in pairs —
    driver and navigator, swap on the timer
-3. Compare: every pair's first program on the big screen
+3. Compare: every pair's first program on the big screen — this is how
+   I find out who has met a terminal and an error message before, and
+   it decides what the next few classes look like
 4. Notes to your future self — what "run" actually means
 5. Log it in your [[Dev Journal]]
 

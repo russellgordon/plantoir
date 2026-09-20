@@ -10,8 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 3 — replication, and why one strand is built backwards
-2. [[DNA Replication in Detail]]: the enzyme cast
+1. Start of Unit 3 — the DNA claims you brought, sorted into true,
+   half-true and false. Unmarked: it tells me where this unit has to
+   start
+2. [[DNA Replication in Detail]]: the enzyme cast, and why one strand is
+   built backwards
 3. Proofreading, and why the error rate is not zero
 4. Practise: [[Molecular Genetics Practice]], question 2
 

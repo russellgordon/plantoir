@@ -11,12 +11,16 @@ tags:
 ## Agenda
 
 1. Number talk: [[True or False]] — one last round of claims
-2. Workday: [[Design Under Constraints]] — final builds and costings
-3. Prepare your table for [[The Math Fair]] — visitors are coming
-4. Portfolio picks: [[Showing Growth]] — choose work that shows your climb
-5. Self-check: [[Checking Your Own Work]] before anything goes on display
+2. [[Design Under Constraints]], day 3 of 5 — studio period: every
+   candidate costed, then one of them taken and a single dimension
+   changed, to see what moves with it and what moves faster
+3. Judge your own design against the criteria, using
+   [[Judging Your Own Work]], and name the weakest row — the next two
+   studio periods are for acting on it
+4. [[The Math Fair]], day 3 of 5 — portfolio picks: [[Showing Growth]]
+   is how you choose the work your growth statement will rest on
 
 ## Things to do before our next class
 
-- [ ] Have your fair table ready: design, costing, and the story of both.
-- [ ] Invite someone — the fair is open to visitors next class.
+- [ ] The weakest row named, and what you will change about it.
+- [ ] Bring the journal entries your growth statement will quote.

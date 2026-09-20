@@ -97,6 +97,8 @@ the judgement calls, in [[One- and Two-Variable Data Practice]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.2]]
+
 ![[D1.1]]
 
 ![[D1.2]]

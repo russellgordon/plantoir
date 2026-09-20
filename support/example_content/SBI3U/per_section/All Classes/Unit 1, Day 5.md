@@ -10,10 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Microscopy of Microorganisms]] in class
-2. Skill: [[Biological Drawing]] — the conventions, and why a drawing is
+1. Launch: [[Investigation Reports]] — the six success criteria that will
+   be used on all five write-ups this semester, read before you write
+   the first one
+2. Bench: write up [[Microscopy of Microorganisms]] in class, the first
+   of the five
+3. Skill: [[Biological Drawing]] — the conventions, and why a drawing is
    a record rather than a picture
-3. Every drawing gets a magnification, a title, and label lines that do
+4. Every drawing gets a magnification, a title, and label lines that do
    not cross
 
 ## Things to do before our next class

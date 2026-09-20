@@ -10,8 +10,8 @@ tags:
   - assessment
 ---
 > [!abstract] At a glance
-> Individual · **four class periods** of work time, then handed in
-> at the end of the biology unit · **Format:** 4–6 pages or equivalent
+> Individual · **three class periods** of work time — Unit 2, Days 14, 15
+> and 16 — then handed in on Day 17 · **Format:** 4–6 pages or equivalent
 
 ## The task
 
@@ -31,7 +31,11 @@ for responding to it.
    Inuit community's experience, using sources from that community wherever
    possible.
 4. **Existing responses.** What is already being tried? What is working?
-5. **Your plan.** Three actions, each with: who does it, what it costs, what it
+5. **Practices that already work.** Find a sustainable practice — one used by a
+   community rather than sold to it, and at least one of them from a First
+   Nations, Métis, or Inuit community. Say what it protects and why it works:
+   the ecological reason, not "it is traditional".
+6. **Your plan.** Three actions, each with: who does it, what it costs, what it
    would achieve, and how you would measure whether it worked.
 
 > [!tip] The most common weakness
@@ -45,7 +49,12 @@ for responding to it.
 | Understanding the science | Names the impact | Describes it | Explains the mechanism accurately | Explains it and its interactions with other systems |
 | Use of evidence | Few sources, unexamined | Sources listed | Sources evaluated for reliability | Sources compared where they disagree |
 | Communities | Mentioned generally | Described | Specific, sourced, respectful | Draws on community voices directly |
+| Practices that work | Named | Described | Explained — what it protects, and how | Set against a technical fix, honestly compared |
 | Plan | Vague actions | Actions with some detail | Costed, measurable actions | Actions with trade-offs assessed honestly |
+
+The five rows above are the whole story of the mark. Run them over your own
+draft at the start of the last working period — [[Judging Your Own Work]] is
+how — and spend the rest of that period on the row you called weakest.
 
 ## Hand in
 
@@ -66,3 +75,46 @@ for responding to it.
 ![[B2.1]]
 
 ![[B2.2]]
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+This one is written alone and handed in as paper, so without a deliberate plan
+the whole mark rests on the product. The arc already gives you a conference on
+Day 14 and a working period on Day 15; use those two.
+
+OBSERVE — Unit 2, Day 15, the working period on sustainable practices
+  Watch for: what a student does when the practice in front of them is a
+  practice rather than a device — a burn on a schedule, a harvest left early,
+  a stand of trees not cut. Plenty of Grade 9s scroll straight past it looking
+  for a solar panel, because it does not look like technology to them.
+  The criteria row about practices means the plan will show you who explained
+  one. What no plan can show you is the practice that was scrolled past on the
+  way to a photograph of a turbine — a plan built entirely out of technology
+  reads perfectly well, and looks like a choice rather than a miss.
+  Going well: a practice written down together with the ecological reason it
+  works — the equilibrium it protects, not just that it is traditional.
+  Stuck: fifteen minutes of image search, and a source list of manufacturers.
+  Record: three columns down your day plan — practice with a reason, practice
+  named without one, no practice at all. That is B1.3 as evidence you watched
+  rather than B1.3 as a citation, and the citation is the easy half.
+
+TALK — Unit 2, Day 14, the conference already on that agenda
+  The agenda's own question — which community, and whose sources — is spent by
+  the time you sit down, and so is everything in the numbered list on this
+  page. Two minutes, once the community is chosen.
+  Ask: "If your plan worked perfectly, what does that place look like in ten
+  years — and what has it lost anyway?"
+  Then: "If this impact stopped tomorrow, what would still be a problem there?"
+  The first is B1.1 with the weight on the word "some": the expectation asks
+  for solutions to some of the impacts, and a student who thinks their three
+  actions fix all of it has not read their own research. Listen for something
+  named as gone for good. The second separates the students who have read about
+  a community from the students who have only read about a hazard — that is
+  B1.2 heard, impacts on communities in Canada assessed rather than asserted,
+  and a well-sourced paragraph can be assembled without either.
+  Record: one line per student in the margin, right then. A tick for the first
+  question, a tick for the second; the ones with neither are your Day 15 list.
+
+The product evidence is the plan itself, handed in on Unit 2, Day 17.
+%%

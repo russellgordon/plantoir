@@ -22,6 +22,7 @@ tags:
 
 - [ ] Skim [[Writing About Technology]] — your handover document is a
       service note, and that page holds the standard it is read by.
-- [ ] Draft the handover document for [[The Network Job]].
+- [ ] Write down the three questions your binder will have to answer
+      without you in the room. The binder itself gets written in class.
 - [ ] Journal: one thing you would lock down on our network, and the
       cost of doing it.

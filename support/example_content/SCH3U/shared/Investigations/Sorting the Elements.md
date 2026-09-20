@@ -184,9 +184,13 @@ difference matters at the end of this page.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
 ![[B2.2]]
 
 ![[B2.3]]
 
-![[A1.1]]
+![[B3.1]]
+
+![[B3.3]]
 %%curriculum-end%%

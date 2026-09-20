@@ -14,6 +14,7 @@ tags:
 2. Concept: [[Computers in Every Job]] — twelve jobs, and what stops when
    the machine does
 3. In pairs: one job nobody in the room wants, and the computing in it
+   — two minutes each to the room, nothing collected
 
 ## Things to do before our next class
 

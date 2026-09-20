@@ -45,11 +45,13 @@ international version is argued in [[What Do We Owe Other Countries|What Do We O
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C2.3]]
+
+![[C3.2]]
+
 ![[D1.3]]
 
 ![[D1.5]]
-
-![[C2.3]]
 
 ![[E3.1]]
 %%curriculum-end%%

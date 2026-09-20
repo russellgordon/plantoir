@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Studio time: the response piece
-2. Critique in small groups
-3. Revision
+1. Studio time: the response piece — [[The Creative Process]]
+2. Critique in small groups: [[The Class Critique]]
+3. Revision: refining the artistic response piece based on small-group critique
 
 ## Things to do before our next class
 

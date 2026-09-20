@@ -2,6 +2,7 @@
 title: Rights, and What Limits Them
 publish: true
 created: __CREATED__
+enableToc: true
 tags:
   - concepts
   - unit-2
@@ -70,6 +71,43 @@ ombudsman offices, and police oversight bodies, most of which are cheaper
 and faster to reach than a courtroom and are where a real complaint
 usually starts.
 
+## Rights in a global context, and international violations
+
+Canada's rights protections exist within an international legal framework:
+
+- **International conventions** — such as the *Universal Declaration of Human
+  Rights* (UDHR, 1948), the *International Covenant on Civil and Political
+  Rights* (ICCPR), the *UN Convention on the Rights of the Child* (UNCRC), and
+  the *UN Declaration on the Rights of Indigenous Peoples* (UNDRIP) — set
+  global standards for dignity, liberty, and self-determination.
+- **Domestic implementation**: Ratifying a treaty creates binding commitments
+  under international law, but international agreements generally do not become
+  directly enforceable in Canadian courts until Parliament passes domestic
+  enabling legislation.
+
+Around the world, human rights face ongoing and severe violations: authoritarian
+crackdowns on independent journalists and peaceful protesters, persecution of
+religious and ethnic minorities, state surveillance, arbitrary detention, and
+suppression of democratic elections.
+
+When international violations occur, the global community responds through a
+range of tools with varied effectiveness:
+
+- **Targeted sanctions** (such as Canada's *Justice for Victims of Corrupt
+  Foreign Officials Act / Magnitsky Law*), freezing assets and barring travel for
+  foreign officials responsible for gross human rights abuses.
+- **International judicial accountability**, such as investigations and
+  indictments by the International Criminal Court (ICC) for war crimes and
+  crimes against humanity.
+- **Diplomatic censure and multilateral monitors**, including formal UN Human
+  Rights Council resolutions and fact-finding missions.
+- **Civil society action**, including documentation and global campaigns by
+  organisations like Amnesty International and Human Rights Watch, and emergency
+  refugee resettlement for persecuted populations.
+
+Assessing responses requires examining what actually changed for victims on the
+ground rather than evaluating official statements alone.
+
 Read what a decision actually looks like in [[Court Decisions]], then
 take a live conflict into [[Whose Rights Win|Whose Rights Win?]].
 
@@ -79,4 +117,8 @@ take a live conflict into [[Whose Rights Win|Whose Rights Win?]].
 ![[B3.1]]
 
 ![[B3.4]]
+
+![[B3.5]]
+
+![[B3.6]]
 %%curriculum-end%%

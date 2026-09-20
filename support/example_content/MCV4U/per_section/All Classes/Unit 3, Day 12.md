@@ -12,7 +12,8 @@ tags:
 
 1. [[The Packaging Brief]], day 2 — working period: the real container, its
    real constraint, and your model
-2. Conference: what does your model ignore, and does it matter?
+2. Conference with me while you build. Write down what I say; next class
+   opens with it
 
 ## Things to do before our next class
 

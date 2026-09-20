@@ -5,18 +5,21 @@ created: __CREATED__
 tags:
   - portfolio
 ---
-Your [[Code Journal]] is collected at the end of each unit. Before
-you hand it in, run this check. It is the same lens I read with, so
-anything you catch here is something we never need to have a
-conversation about.
+Your [[Code Journal]] is collected at the end of each unit, and the
+milestone entry you write in class that day is the one read against
+the criteria. Run this check while you write it. It is the same lens
+I read with, so anything you catch here is something we never need to
+have a conversation about.
 
 ## The check
 
 **Coverage**
 
-- [ ] There is an entry for every class in the unit
-- [ ] Entries were written close to the day, not reconstructed the
-      night before collection — reconstructed entries always show
+- [ ] The milestone entry reaches across the whole unit, not only the
+      last week of it
+- [ ] The moments it cites were written down on the day they
+      happened, not reconstructed this morning — reconstructed
+      entries always show
 - [ ] All four prompts appear across the unit: what I built, what I
       decided, what broke, what I would try next
 - [ ] At least one entry includes a real artifact — a pasted

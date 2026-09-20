@@ -12,7 +12,7 @@ tags:
 
 1. Headline round: two stories, ninety seconds each
 2. What managers actually work in: [[The Tools of the Trade]]
-3. Setting up your evidence file so you can find a source in March
+3. Setting up your evidence file so you can find a source months later
 4. Sourcing what you find: [[Citing Business Sources]]
 
 ## Things to do before our next class

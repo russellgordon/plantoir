@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. [[Where Canadian Economic Data Lives]] — the three bodies that publish it
-2. Retrieve one series by its number and write the citation properly
+2. Retrieve one series by its number and write the citation properly — every citation checked in the room before you leave
 3. [[The Economic Inquiry Process]] — the five components, in the Ministry's order
 
 ## Things to do before our next class

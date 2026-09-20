@@ -13,6 +13,7 @@ tags:
 1. Warm-up: [[Spot the Hazard]] — the bench you left last class
 2. Bench time: [[Build a Workstation]] — cable management and first POST
 3. When it does not post: the diagnostic order, written on the board
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

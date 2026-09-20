@@ -1,4 +1,5 @@
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Assist;
 
@@ -35,6 +36,101 @@ public sealed class AssistWorkspace
     private readonly ILauncherRunner _launcher;
     private readonly string? _lockedCourse;
     private readonly UndoHistory? _undo;
+
+    /// <summary>
+    /// Set only by tests. A test that read the real, machine-global
+    /// %LOCALAPPDATA%\Plantoir\settings.json would behave differently
+    /// depending on whatever Cloudflare Account ID happens to be configured
+    /// on the machine running the suite — exactly the kind of surprise this
+    /// override exists to make deterministic instead.
+    /// </summary>
+    internal static Func<string>? CloudflareAccountIdOverrideForTests;
+
+    private static string CurrentCloudflareAccountId() =>
+        CloudflareAccountIdOverrideForTests?.Invoke() ?? AppSettings.Load().CloudflareAccountId;
+
+
+    // ---- One backup per conversation ---------------------------------------
+
+    /// <summary>
+    /// The copy saved for each course this conversation has changed, keyed by
+    /// course code — the mac's <c>conversationBackups</c>. This object lives
+    /// for the life of the serving process, which is the life of the
+    /// teacher's conversation, so "once" means once per chat.
+    /// </summary>
+    private readonly Dictionary<string, string> _conversationBackups = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The sections this conversation has already been told what publishing
+    /// means, as <c>CODE/N</c>. Lives beside <see cref="_conversationBackups"/>
+    /// and for the same span, which is the same span the mac's
+    /// <c>sectionsToldWhatPublishingMeans</c> lives for.
+    /// </summary>
+    private readonly HashSet<string> _sectionsToldWhatPublishingMeans = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Note that this section has now had the briefing, and say whether it
+    /// had already had it BEFORE this call.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Per conversation, not per folder — changed 2026-09-09.</b>
+    /// This used to be a marker file under <c>courses/.internal/assist/</c>,
+    /// so a section briefed once was never briefed again on that machine.
+    /// That was defensible while a MODEL was the only caller: it is the model
+    /// the repetition would bore, and a model cannot repeat itself after its
+    /// session has ended anyway.</para>
+    ///
+    /// <para>A fixed phrasing changed the question. "What does publishing
+    /// mean?" is now matched in code and reaches this tool directly, so the
+    /// caller is a TEACHER asking a question — and a file on disk meant the
+    /// answer arrived once per working folder, ever, with every later asking
+    /// brushed off. Answering a question with "I explained that before" is
+    /// refusing to answer it. A conversation cannot repeat itself after it has
+    /// ended, and a teacher back a month later may genuinely have forgotten,
+    /// so the smaller promise is the right one.</para>
+    /// </remarks>
+    public bool NoteExplainedThisConversation(string courseCode, int sectionNumber) =>
+        !_sectionsToldWhatPublishingMeans.Add($"{courseCode}/{sectionNumber}");
+
+    /// <summary>
+    /// The copy saved before this conversation's FIRST change, or null while
+    /// it has only read. What "Restore Section N…" puts back. The most recent
+    /// one when a session unlocked to a course has changed several.
+    /// </summary>
+    public string? ConversationBackupPath { get; private set; }
+
+    /// <summary>
+    /// Saves a copy of the course before the first change of a conversation,
+    /// and reuses it for every later change in the same conversation.
+    ///
+    /// <para>Until 2026-09-07 every changing tool saved its own copy, and
+    /// <see cref="CourseArchiver.MostBackupsKept"/> is five — so after six
+    /// changes the copy from before the conversation started had already
+    /// been pruned, and a "put it all back" button could not have kept its
+    /// promise. One copy per conversation is what the mac has always done,
+    /// and it is what the Backups list a teacher reads describes ("before an
+    /// assistant chat about Section N"). Per-change undo is
+    /// <see cref="UndoHistory"/>'s promise and is unchanged.</para>
+    /// </summary>
+    private string BackUpOnceForThisConversation(Course course, int sectionNumber)
+    {
+        // The recorded copy is reused even if it has since gone — deleted from
+        // the Backups list, or pruned by five later conversations. Taking a
+        // fresh copy of the already-changed course and calling it "from before
+        // this conversation started" would make the restore dialog's promise
+        // false; the mac checks only its dictionary too, and a vanished copy
+        // then fails honestly with "could not be read".
+        if (_conversationBackups.TryGetValue(course.Code, out var existing))
+        {
+            ConversationBackupPath = existing;
+            return existing;
+        }
+        string made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
+                                                  new BackupMaker.Assistant(sectionNumber));
+        _conversationBackups[course.Code] = made;
+        ConversationBackupPath = made;
+        return made;
+    }
 
     /// <param name="lockedCourse">
     /// When given, the session can see and touch this course and nothing else.
@@ -132,9 +228,18 @@ public sealed class AssistWorkspace
     /// order.
     ///
     /// "Class page" is read from the course's own configuration rather than
-    /// guessed: it is a page inside one of the course's
-    /// <c>per_section_folders</c> (typically "All Classes"), and never an
-    /// <c>index.md</c>.
+    /// guessed: it is a page inside one of the folders the SHARED membership
+    /// rule counts (<c>contracts/class-planning.json</c> →
+    /// <c>classFolder.membership</c>), and never an <c>index.md</c>.
+    ///
+    /// <para>Membership, not the whole <c>per_section_folders</c> list. This
+    /// walked every per-section folder until 2026-09-19, so a course
+    /// configured <c>["All Classes","Handouts"]</c> counted its handouts as
+    /// days of teaching here while the mac and <c>build_site.py</c> did not —
+    /// a difference nobody chose. The rule can also count FEWER folders than
+    /// the list: a course whose folders are <c>["Lessons","Labs"]</c> mentions
+    /// classes nowhere, so membership falls back to the single name the naming
+    /// half chose and the Labs pages stop being classes.</para>
     ///
     /// Both exclusions matter, and the second is the dangerous one. A section's
     /// <c>index.md</c>, its folder indexes and its Key Links page all carry the
@@ -143,7 +248,8 @@ public sealed class AssistWorkspace
     /// </summary>
     public List<string> ClassPages(Course course, int sectionNumber)
     {
-        var folders = course.Configuration.PerSectionFolders;
+        var folders = ClassFolderRule.Names(course.Configuration.ClassFolder,
+                                            course.Configuration.PerSectionFolders);
         var pages = new List<(DateOnly? Date, string Path)>();
 
         foreach (string folder in folders)
@@ -441,12 +547,18 @@ public sealed class AssistWorkspace
             string wanted = title.Trim();
             if (wanted.Length == 0) continue;
 
-            // Expand unit if title is like "Unit 4"
-            if (wanted.StartsWith("Unit ", StringComparison.OrdinalIgnoreCase) &&
-                int.TryParse(wanted[5..].Trim(), out int unitNum) && !wanted.Contains(','))
+            // Expand a whole unit if the title is like "Unit 4" - in the
+            // course's OWN word, so "publish Module 4" is understood at all.
+            // Reading only the literal "Unit" does not refuse: it matches
+            // nothing, the request quietly names no pages, and the teacher is
+            // told their unit is empty. The mac shipped exactly that for a few
+            // hours; it is the input half of this feature and the half that
+            // fails silently.
+            string unitWord = course.Configuration.UnitWord;
+            if (PublishPlan.UnitNamed(wanted, unitWord) is { } unitNum)
             {
                 var unitPages = pagesList.Where(p => p.IsClassPage &&
-                    p.Title.StartsWith($"Unit {unitNum},", StringComparison.OrdinalIgnoreCase)).ToList();
+                    p.Title.StartsWith($"{unitWord} {unitNum},", StringComparison.OrdinalIgnoreCase)).ToList();
                 var ordered = isDraft ? unitPages.OrderByDescending(p => p.Title) : unitPages.OrderBy(p => p.Title);
                 foreach (var up in ordered)
                 {
@@ -571,6 +683,12 @@ public sealed class AssistWorkspace
 
             foreach (var candidate in sweepCandidates)
             {
+                // REPORTING, deliberately left collapsed: this feeds the
+                // "N linked pages stay visible" sentence, and a page whose
+                // flag cannot be read is counted among them. Erring towards
+                // mentioning a page costs a teacher a second look; the sites
+                // that decide to SKIP A WRITE are the ones that require
+                // VisibilityIsCertain. The mac collapses here too.
                 if (!candidate.IsVisibleToStudents) continue;
                 string? reason = ReasonToKeep(candidate, mustStay, referrers, goingDown, course);
                 if (reason != null && keptSeen.Add(candidate.Title))
@@ -625,9 +743,14 @@ public sealed class AssistWorkspace
         var changes = new List<PlannedChange>();
         var alreadyRight = new List<PlannedPage>();
 
+        // "Already right" has to be a CONFIDENT reading on both lists. A page
+        // whose flag this app will not read REPORTS as visible, and dropping it
+        // into the already-right list would tell the teacher it was published
+        // while the build went on holding it back — the residue this reader
+        // exists to close (issue #140).
         foreach (var page in named)
         {
-            if (page.IsVisibleToStudents == isPublish)
+            if (page.IsVisibleToStudents == isPublish && page.VisibilityIsCertain)
             {
                 alreadyRight.Add(page);
             }
@@ -639,7 +762,7 @@ public sealed class AssistWorkspace
 
         foreach (var page in linked)
         {
-            if (page.IsVisibleToStudents == isPublish)
+            if (page.IsVisibleToStudents == isPublish && page.VisibilityIsCertain)
             {
                 if (!named.Any(n => string.Equals(n.Title, page.Title, StringComparison.OrdinalIgnoreCase)))
                     alreadyRight.Add(page);
@@ -841,13 +964,18 @@ public sealed class AssistWorkspace
 
             if (earliest is not { } owner) continue;
 
-            // If already visible to students, leave it alone
+            // Already out where students can see it — leave it alone.
+            //
+            // CERTAINLY out, that is. A page whose flag this app will not read
+            // is REPORTED visible, and it is about to be published by the
+            // change list; skipping it here would publish it with whatever
+            // date it happened to have rather than the day of the class that
+            // brought it. So only a confident "visible" skips.
             bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, target);
-            string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
             try
             {
-                bool isDraft = PageFrontmatter.StoredDraft(File.ReadAllText(target), key) ?? false;
-                if (!isDraft) continue; // visible to students
+                var visibility = PageFrontmatter.Visibility(File.ReadAllText(target), section);
+                if (visibility is PageVisibility.Visible or PageVisibility.SaysNothing) continue;
             }
             catch { }
 
@@ -944,13 +1072,12 @@ public sealed class AssistWorkspace
         {
             string full = Path.GetFullPath(path);
             if (planned.TryGetValue(full, out bool willBeDraft)) return willBeDraft;
-            bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
             try
             {
                 // "Hidden" is the question here, and the file answers the
-                // opposite one, so it has to be read in draft terms.
-                string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-                return PageFrontmatter.StoredDraft(File.ReadAllText(full), key) ?? false;
+                // opposite one, so it has to be read in draft terms. REPORTING,
+                // so a flag this app will not read collapses to visible.
+                return PageFrontmatter.StoredDraft(File.ReadAllText(full), section) ?? false;
             }
             catch { return false; }
         });
@@ -963,13 +1090,12 @@ public sealed class AssistWorkspace
         var graph = LinkGraph.Build(course.DirectoryPath, section);
         return (graph, path =>
         {
-            bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, path);
             try
             {
                 // "Hidden" is the question here, and the file answers the
-                // opposite one, so it has to be read in draft terms.
-                string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
-                return PageFrontmatter.StoredDraft(File.ReadAllText(path), key) ?? false;
+                // opposite one, so it has to be read in draft terms. REPORTING,
+                // so a flag this app will not read collapses to visible.
+                return PageFrontmatter.StoredDraft(File.ReadAllText(path), section) ?? false;
             }
             catch { return false; }
         }
@@ -983,20 +1109,32 @@ public sealed class AssistWorkspace
         string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
         string text = File.ReadAllText(pagePath);
         bool isFolderIndex = Path.GetFileName(pagePath).Equals("index.md", StringComparison.OrdinalIgnoreCase);
-        bool isClassPage = !isFolderIndex && (pagePath.Contains("All Classes", StringComparison.OrdinalIgnoreCase) ||
-                           Path.GetDirectoryName(pagePath)?.Contains("class", StringComparison.OrdinalIgnoreCase) == true);
+        // The shared rule (contracts/class-planning.json -> classFolder), against
+        // the path relative to the SECTION. This used to test the whole absolute
+        // directory string, so a teacher whose working folder was
+        // C:\Users\x\Classroom\ made every page in every course a class page;
+        // Relative(pagePath) closed that, and PathWithinSection closes the rest
+        // of it — see the helper, and the mac's pathWithinSection it mirrors.
+        bool isClassPage = ClassFolderRule.IsClassPage(
+            PathWithinSection(course, section, pagePath),
+            ClassFolderRule.Names(course.Configuration.ClassFolder, course.Configuration.PerSectionFolders));
+        // Read the way the BUILT SITE reads it, which is all four keys in build
+        // order — never branching on where the page lives, since a page's
+        // folder decides which key is WRITTEN and nothing about what it says.
+        var visibility = PageFrontmatter.Visibility(text, section);
         return new PlannedPage(
             Title: Path.GetFileNameWithoutExtension(pagePath),
             RelativePath: Relative(pagePath),
             FrontmatterKey: key,
-            CurrentValue: PageFrontmatter.StoredDraft(text, key),
+            CurrentValue: PageFrontmatter.StoredDraft(text, section),
             Draft: draft,
             ViaLink: viaLink,
             Date: PageFrontmatter.CreatedOn(text, section, sectionLocal),
             DisplayTitle: PagePaths.DisplayTitle(pagePath, text),
             IsFolderIndex: isFolderIndex,
             IsClassPage: isClassPage,
-            IsSectionLocal: sectionLocal);
+            IsSectionLocal: sectionLocal,
+            VisibilityIsCertain: visibility != PageVisibility.CannotTell);
     }
 
 
@@ -1057,41 +1195,95 @@ public sealed class AssistWorkspace
         int section = Section(course, sectionNumber);
         RefuseIfPlantoirIsBuilding(course);
 
-        // A Pages-scoped Cloudflare token cannot list its own account, so the
-        // account id lives in Plantoir's settings and only the app can pass it.
-        if (course.Configuration.DeploysToCloudflare)
+        var destinations = course.Configuration.AllDeployDestinations;
+
+        // A Pages-scoped Cloudflare token cannot list its own account, so
+        // the account id lives in Plantoir's settings and only the app —
+        // never this headless process — can pass it. Checked against EVERY
+        // configured destination, primary or additional: a redundancy
+        // target the assistant cannot reach is refused up front rather than
+        // silently skipped partway through a multi-destination deploy.
+        foreach (var destination in destinations)
+        {
+            if (destination.Type != "cloudflare_pages") continue;
+            bool isPrimary = destination.Type == course.Configuration.DeployTarget;
             throw new AssistRefusal(
-                $"{course.Code} deploys to Cloudflare Pages, which needs the account ID Plantoir stores. " +
-                "Deploy this section from Plantoir instead.");
+                $"{course.Code} {(isPrimary ? "deploys" : "also deploys")} to Cloudflare Pages, which needs " +
+                "the account ID Plantoir stores. Deploy this section from Plantoir instead.");
+        }
 
         // With no site marker, deploy.py asks what to call the website — a
         // prompt on stdin, which is closed here, so the launcher would die
-        // with an unhandled EOFError minutes into a build.
-        if (!course.Configuration.DeploysToLocalFolder &&
-            !File.Exists(Path.Combine(course.DirectoryPath, ".netlify_sites", $"section{section}.json")))
-            throw new AssistRefusal(
-                $"{course.Code} Section {section} has never been deployed, so deploying it asks what to call " +
-                "the website — and that can only be answered in Plantoir. Deploy it once from there, and I can " +
-                "do it after that.");
+        // with an unhandled EOFError minutes into a build. Checked for
+        // every destination up front, same reasoning as ScheduledDeploy.Problem.
+        foreach (var destination in destinations)
+        {
+            if (destination.Type == "local_folder") continue;
+            if (Models.DeployCommand.HasDeployedBefore(section, course, destination.Type)) continue;
+            bool isPrimary = destination.Type == course.Configuration.DeployTarget;
+            string destinationName = Models.DeployCommand.DestinationDescription(destination);
+            throw new AssistRefusal(isPrimary
+                ? $"{course.Code} Section {section} has never been deployed, so deploying it asks what to call " +
+                  "the website — and that can only be answered in Plantoir. Deploy it once from there, and I can " +
+                  "do it after that."
+                : $"{course.Code} Section {section} has never been deployed to {destinationName}, so deploying " +
+                  "it there asks what to call that site — and that can only be answered in Plantoir. Deploy it " +
+                  "there once from Plantoir, and I can do it after that.");
+        }
 
         progress?.Report($"Building Section {section} of {course.Code}…");
         using var claim = ClaimTheBuild(course);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
-            return new AssistResult(false, $"The build failed, so nothing was deployed. {build.Message}", null);
+            return new AssistResult(false,
+                // What the build said about the folders belongs HERE most of
+                // all: a build that failed because the front page is missing
+                // is the case where the finding is the cause.
+                Models.SiteHealthFinding.Appending(
+                    $"The build failed, so nothing was deployed. {build.Message}", build.Findings),
+                null);
 
-        var arguments = course.Configuration.DeploysToLocalFolder
-            ? new[] { course.Code, section.ToString(), "--to-folder", course.Configuration.DeployFolderPath }
-            : new[] { course.Code, section.ToString() };
+        // Every destination's own deploy — one FAILING does not stop the
+        // others, the whole point of a course having more than one.
+        //
+        // This is a SEPARATE loop from MultiDestinationDeployRunner.RunAsync,
+        // not a reuse of it, and that is a deliberate, not accidental,
+        // divergence from the mac's own AssistSiteWork.deploy(), which calls
+        // "the same sequencer the Deploy button uses." RunAsync is built on
+        // ScriptRunner — ConPTY, live progress notifications, a WinUI
+        // SynchronizationContext — which is GUI-only infrastructure this
+        // process (plantoir-mcp.exe, a separate headless process with no
+        // window) cannot use. ILauncherRunner is the existing, narrower
+        // abstraction this whole class already runs every operation through
+        // for exactly that reason. The one-build-then-N-deploys shape and the
+        // "a failure never stops the others" rule ARE kept in step by hand
+        // here — found and reasoned through in a parity audit, not missed —
+        // rather than by sharing code, because forcing the two abstractions
+        // together would be a larger, riskier change than this feature
+        // warranted, with no way to verify it against the real MCP process
+        // in this environment. If this drifts from RunAsync's own rules
+        // again, that is the trade being made.
+        var outcomeLegs = new List<(Models.CourseConfiguration.DeployDestination Destination, bool Succeeded)>();
+        foreach (var destination in destinations)
+        {
+            var arguments = Models.DeployCommand.Arguments(course.Code, section, destination);
+            progress?.Report($"Deploying to {Models.DeployCommand.DestinationDescription(destination)}…");
+            var deployed = await _launcher.Run("deploy", arguments, _folder, progress, cancellation);
+            outcomeLegs.Add((destination, deployed.Succeeded));
+        }
 
-        progress?.Report($"Deploying to {DestinationOf(course)}…");
-        var deployed = await _launcher.Run("deploy", arguments, _folder, progress, cancellation);
-        return deployed.Succeeded
-            ? new AssistResult(true,
-                $"Deployed {course.Code} Section {section} to {DestinationOf(course)}. Students can see it now.",
-                null)
-            : new AssistResult(false, $"Deploying failed. {deployed.Message}", null);
+        bool anySucceeded = outcomeLegs.Any(leg => leg.Succeeded);
+        var failedDestinations = outcomeLegs.Where(leg => !leg.Succeeded).Select(leg => leg.Destination).ToList();
+        var outcome = new MultiDestinationDeployRunner.Outcome(anySucceeded, failedDestinations);
+        var result = MultiDestinationDeployRunner.Result(course.Code, section.ToString(), destinations.Count, outcome);
+        // Findings come from the BUILD, not from a destination's upload: every
+        // destination publishes the same built site, and the checks run inside
+        // the build. Said after the outcome, never instead of it.
+        return result with
+        {
+            Message = Models.SiteHealthFinding.Appending(result.Message, build.Findings),
+        };
     }
 
     public async Task<AssistResult> RebuildPreview(string courseCode, int sectionNumber,
@@ -1108,9 +1300,12 @@ public sealed class AssistWorkspace
                                         _folder, progress, cancellation);
         return build.Succeeded
             ? new AssistResult(true,
-                $"Rebuilt the preview of {course.Code} Section {section}. No content was changed. " +
-                "Look it over in Plantoir, and deploy it there when you're happy.", null)
-            : new AssistResult(false, $"Nothing was changed, and the preview couldn’t be built. {build.Message}", null);
+                Models.SiteHealthFinding.Appending(
+                    $"Rebuilt the preview of {course.Code} Section {section}. No content was changed. " +
+                    "Look it over in Plantoir, and deploy it there when you're happy.", build.Findings), null)
+            : new AssistResult(false,
+                Models.SiteHealthFinding.Appending(
+                    $"Nothing was changed, and the preview couldn’t be built. {build.Message}", build.Findings), null);
     }
 
     /// <summary>
@@ -1137,7 +1332,7 @@ public sealed class AssistWorkspace
     /// be encouraged to use an LLM for bulk edits, and an LLM can make a mess
     /// that is hard to undo" — so undo is a real button here, not advice.
     /// </summary>
-    public async Task<AssistResult> Apply(PublishPlan plan, IProgress<string>? progress = null,
+    public async Task<AssistResult> Apply(PublishPlan plan, bool preview = true, IProgress<string>? progress = null,
                                           CancellationToken cancellation = default)
     {
         var course = Course(plan.CourseCode);
@@ -1152,7 +1347,7 @@ public sealed class AssistWorkspace
         if (plan.Publishes) RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             // No backup, no edits. This is the one step that has no fallback.
@@ -1165,9 +1360,10 @@ public sealed class AssistWorkspace
         // you asked me to undo that…" — so a gerund here puts a broken
         // sentence in front of the teacher at the one moment they are
         // checking that the right thing was put back.
-        _undo?.Begin($"{(plan.Hiding ? "unpublished" : "published")} " +
-                     $"{Humanize(plan.Named.Select(p => "“" + p.Title + "”"))} " +
-                     $"in {course.Code} Section {section}");
+        using var recording = UndoHistory.Record(_undo,
+            $"{(plan.Hiding ? "unpublished" : "published")} " +
+            $"{Humanize(plan.Named.Select(p => "“" + p.Title + "”"))} " +
+            $"in {course.Code} Section {section}");
 
         var changed = new List<string>();
         foreach (var page in plan.Changing)
@@ -1178,7 +1374,7 @@ public sealed class AssistWorkspace
             progress?.Report($"Editing “{page.Title}”…");
             string full = PagePaths.ResolveInside(_folder, page.RelativePath);
             string text = File.ReadAllText(full);
-            var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft);
+            var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
             if (!edit.Changed) continue;
             Save(full, updated);
             changed.Add(page.Title);
@@ -1203,7 +1399,7 @@ public sealed class AssistWorkspace
         // And the front page catches up with what is now published.
         if (plan.Index is { WillChange: true } index) ApplyIndexChange(index, tail);
 
-        _undo?.End();
+        recording.Done();
 
         if (!plan.Publishes)
             return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding), backup);
@@ -1220,12 +1416,27 @@ public sealed class AssistWorkspace
         // the site-name prompt, the Cloudflare account, the first publish, the
         // multi-minute upload — so the safety valve and the simplification are
         // the same decision.
+        //
+        // `preview` is false when the caller (the assistant chat window) is
+        // about to put its OWN visible rebuild on screen — see
+        // AssistAgent.RunTool's `arguments["preview"] = false` for
+        // publish_pages/unpublish_pages. Building here too would race that
+        // rebuild for the same output folder, and a failure from this hidden
+        // build would hand the model a message to restate in the chat, which
+        // is exactly the "every line of the build spews into the reply" bug.
+        // So when told not to build, this returns the plain summary and
+        // leaves the one visible build to the app.
+        if (!preview)
+            return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding), backup);
+
+        RefuseIfPlantoirIsBuilding(course);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
+        using var claim = ClaimTheBuild(course);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
             return new AssistResult(false,
-                $"{WhatSurvived(changed)}, but the preview couldn’t be built. {build.Message}", backup);
+                $"{WhatSurvived(changed)}, but the preview couldn’t be built. {AssistWording.WhereTheOutputIs}", backup);
 
         return new AssistResult(true, Summary(changed, previewed: true, course.Code, section, plan.Hiding), backup);
     }
@@ -1243,7 +1454,7 @@ public sealed class AssistWorkspace
         foreach (var p in allMarkdown)
         {
             var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
-            if (planned.IsClassPage && UnitDay.Parse(planned.Title) is { } ud && ud.Unit == unit)
+            if (planned.IsClassPage && UnitDay.Parse(planned.Title, course.Configuration.UnitWord) is { } ud && ud.Unit == unit)
             {
                 unitPages.Add(planned);
             }
@@ -1257,16 +1468,20 @@ public sealed class AssistWorkspace
                 PlanText: null,
                 Summary: null,
                 AlreadyDoneSentence: null,
-                ErrorMessage: $"I can’t find any class pages in Unit {unit} of {course.Code} Section {section}.");
+                ErrorMessage: $"I can’t find any class pages in {course.Configuration.UnitWord} {unit} of {course.Code} Section {section}.");
         }
 
         // Only the ones that would actually move, ordered highest day first (matching Swift)
-        unitPages = unitPages.OrderByDescending(p => UnitDay.Parse(p.Title)?.Day ?? 0).ToList();
+        unitPages = unitPages.OrderByDescending(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList();
 
         var moving = new List<string>();
         foreach (var p in unitPages)
         {
-            if (p.IsVisibleToStudents != publishing)
+            // And a page whose flag this app will not read counts as moving,
+            // for the reason above: it reports visible and the build may be
+            // hiding it, so "the unit has already been published" would be a
+            // sentence nobody can stand behind.
+            if (p.IsVisibleToStudents != publishing || !p.VisibilityIsCertain)
             {
                 moving.Add(p.DisplayTitle);
             }
@@ -1275,8 +1490,8 @@ public sealed class AssistWorkspace
         if (moving.Count == 0)
         {
             string already = publishing
-                ? $"Unit {unit} has already been published."
-                : $"Unit {unit} is already hidden.";
+                ? $"{course.Configuration.UnitWord} {unit} has already been published."
+                : $"{course.Configuration.UnitWord} {unit} is already hidden.";
             return new WholeUnitPlanResult(
                 HasPages: true,
                 MovingCount: 0,
@@ -1292,7 +1507,7 @@ public sealed class AssistWorkspace
         string startingPhrase = publishing ? "starting at" : "starting from";
 
         var lines = new List<string>();
-        lines.Add($"{course.Code} Section {section}: {(publishing ? "publishing" : "unpublishing")} Unit {unit}.");
+        lines.Add($"{course.Code} Section {section}: {(publishing ? "publishing" : "unpublishing")} {course.Configuration.UnitWord} {unit}.");
         lines.Add("");
         lines.Add($"{moving.Count} {word} would become {becoming}, {startingPhrase} “{startPage}”.");
         if (publishing)
@@ -1304,7 +1519,7 @@ public sealed class AssistWorkspace
             lines.Add("Pages only they use come down too; anything still needed stays.");
         }
 
-        string summary = $"Worked out what {(publishing ? "publishing" : "unpublishing")} Unit {unit} would do.";
+        string summary = $"Worked out what {(publishing ? "publishing" : "unpublishing")} {course.Configuration.UnitWord} {unit} would do.";
         string planText = string.Join("\n", lines);
         return new WholeUnitPlanResult(
             HasPages: true,
@@ -1331,31 +1546,32 @@ public sealed class AssistWorkspace
         foreach (var p in allMarkdown)
         {
             var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
-            if (planned.IsClassPage && UnitDay.Parse(planned.Title) is { Unit: var u } && u == unit)
+            if (planned.IsClassPage && UnitDay.Parse(planned.Title, course.Configuration.UnitWord) is { Unit: var u } && u == unit)
             {
                 unitPages.Add(planned);
             }
         }
 
         if (unitPages.Count == 0)
-            return new AssistResult(false, $"I can’t find any class pages in Unit {unit} of {course.Code} Section {section}.", null);
+            return new AssistResult(false, $"I can’t find any class pages in {course.Configuration.UnitWord} {unit} of {course.Code} Section {section}.", null);
 
         // Highest day first to take a unit down; Day 1 first to put it up.
         unitPages = publishing
-            ? unitPages.OrderBy(p => UnitDay.Parse(p.Title)?.Day ?? 0).ToList()
-            : unitPages.OrderByDescending(p => UnitDay.Parse(p.Title)?.Day ?? 0).ToList();
+            ? unitPages.OrderBy(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList()
+            : unitPages.OrderByDescending(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList();
 
         if (publishing) RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(section)); }
+        try { backup = BackUpOnceForThisConversation(course, section); }
         catch (Exception error)
         {
             throw new AssistRefusal($"{course.Code} couldn’t be backed up, so nothing was changed: {error.Message}");
         }
 
         string verb = publishing ? "published" : "unpublished";
-        _undo?.Begin($"{verb} Unit {unit} in {course.Code} Section {section}");
+        using var recording = UndoHistory.Record(_undo,
+            $"{verb} {course.Configuration.UnitWord} {unit} in {course.Code} Section {section}");
 
         bool changedAnything = false;
         var changed = new List<string>();
@@ -1372,7 +1588,7 @@ public sealed class AssistWorkspace
                 progress?.Report($"Editing “{change.Title}”…");
                 string full = PagePaths.ResolveInside(_folder, change.RelativePath);
                 string text = File.ReadAllText(full);
-                var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft);
+                var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft, section);
                 if (!edit.Changed) continue;
                 Save(full, updated);
                 if (!changed.Contains(change.Title)) changed.Add(change.Title);
@@ -1403,27 +1619,29 @@ public sealed class AssistWorkspace
             }
         }
 
-        _undo?.End();
+        recording.Done();
 
         if (!changedAnything)
         {
             string already = publishing
-                ? $"Unit {unit} has already been published."
-                : $"Unit {unit} is already hidden.";
+                ? $"{course.Configuration.UnitWord} {unit} has already been published."
+                : $"{course.Configuration.UnitWord} {unit} is already hidden.";
             return new AssistResult(true, already, backup);
         }
 
-        string summary = $"Unit {unit} was {verb}.";
+        string summary = $"{course.Configuration.UnitWord} {unit} was {verb}.";
 
         if (!preview)
             return new AssistResult(true, summary, backup);
 
+        RefuseIfPlantoirIsBuilding(course);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
+        using var claim = ClaimTheBuild(course);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         return build.Succeeded
             ? new AssistResult(true, summary, backup)
-            : new AssistResult(false, build.Message, backup);
+            : new AssistResult(false, $"{summary} But the preview couldn’t be built. {AssistWording.WhereTheOutputIs}", backup);
     }
 
     /// <summary>
@@ -1730,7 +1948,7 @@ public sealed class AssistWorkspace
         catch { return new List<string>(); }
 
         var classPages = ClassPages(course, section);
-        var problems = DateAudit.Run(classPages, graph, Resolve, Relative);
+        var problems = DateAudit.Run(classPages, graph, Resolve, Relative, course.Configuration.UnitWord);
 
         var newDates = dates.Select(d => d.New).ToList();
         if (newDates.Count > 0)
@@ -1775,33 +1993,181 @@ public sealed class AssistWorkspace
     ///
     /// The marker is renamed rather than deleted: it holds the site id and
     /// admin URL, and a teacher who decides they wanted the old site after all
-    /// has no other way back to it.
+    /// has no other way back to it. <c>deploy.py</c> and <c>build_site.py</c>
+    /// build exact marker paths and never glob the folder, so a
+    /// <c>.previous-*.json</c> sitting beside them is inert.
     /// </summary>
-    public string? ReleaseSite(Course course, int sectionNumber)
+    /// <remarks>
+    /// <para><b>EVERY destination type, not just the course's primary — this
+    /// used to <c>return</c> inside the first folder that held a marker.</b>
+    /// Markers are keyed purely by destination TYPE and a course can carry
+    /// additional targets, so a section pinned to both Netlify and Cloudflare
+    /// had only its Netlify marker released and went on publishing over last
+    /// year's Cloudflare site. Pinned by
+    /// <c>contracts/file-formats.json</c> -&gt;
+    /// <c>firstDeployMarkers.releasedWhenASectionRollsOver</c>.</para>
+    ///
+    /// <para><b>"Still pinned" is kept apart from "there was nothing to
+    /// release"</b>, because both used to produce the same empty answer — so a
+    /// marker that existed and could not be moved was reported as "this
+    /// section had not been published anywhere yet", the opposite of the truth
+    /// about the one fact this whole feature turns on.</para>
+    /// </remarks>
+    public SiteRelease ReleaseSite(Course course, int sectionNumber)
     {
+        var kept = new List<string>();
+        var stillPinned = new List<string>();
+        string stamp = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
+
+        // ONE undo entry for the whole release, not one per destination. A
+        // rollover is a single act to the teacher, and a partial undo would
+        // put a section back on last year's Netlify site while leaving it cut
+        // loose from Cloudflare — a state nobody chose and nothing describes.
+        using var recording = UndoHistory.Record(_undo,
+            $"cut section {sectionNumber} loose from its website");
+
         foreach (string folder in new[] { ".netlify_sites", ".cloudflare_sites" })
         {
             string marker = Path.Combine(course.DirectoryPath, folder, $"section{sectionNumber}.json");
-            if (!File.Exists(marker)) continue;
-            string kept = Path.Combine(course.DirectoryPath, folder,
-                $"section{sectionNumber}.previous-{DateTime.Now:yyyy-MM-dd_HHmmss}.json");
+            string keptPath = Path.Combine(course.DirectoryPath, folder,
+                ReleasedMarkerName(sectionNumber, stamp));
+            Release(marker, keptPath, kept, stillPinned);
+        }
+
+        // The LEGACY marker, which `deploy.py` still reads and migrates back
+        // into the stable path (`load_netlify_marker`). Leaving it would make
+        // a rollover report "never published" and then publish over last
+        // year's site on the next deploy — in exactly the folders old enough
+        // to have taught somebody something. Netlify only: there has never
+        // been a Cloudflare equivalent.
+        //
+        // **It lives in the BUILT OUTPUT, and on THIS platform that is not
+        // `.merged_output`.** `deploy.py` computes it from `section_dir`,
+        // which is `toolchain_paths.merged_output_root(...)/section<N>` — and
+        // `merged_output_root` returns `PLANTOIR_BUILD_ROOT/<COURSE>` when
+        // that is set, with no `.merged_output` level at all, which is the
+        // Windows layout the launchers always set up. Releasing the mac's
+        // literal `<CODE>/.merged_output/section<N>/…` here would repeat the
+        // mac's own first-cut mistake in the other direction: a path that has
+        // never held a marker on this platform, so the release would do
+        // nothing and the section would keep publishing over last year's site.
+        //
+        // Both are attempted, guarded by existence. The build-root one is the
+        // path `deploy.py` reads HERE; the `.merged_output` one is what a
+        // folder carried here from a mac would have, and releasing a file that
+        // is not there costs nothing.
+        foreach (string sectionOutput in LegacyMarkerHomes(course, sectionNumber))
+        {
+            string marker = Path.Combine(sectionOutput, ".netlify_site.json");
+            string keptPath = Path.Combine(sectionOutput, $".netlify_site.previous-{stamp}.json");
+            Release(marker, keptPath, kept, stillPinned);
+        }
+
+        recording.Done();
+        return new SiteRelease(kept, stillPinned);
+    }
+
+    /// <summary>
+    /// Move one marker aside, recording it for undo, and file it under kept or
+    /// still-pinned.
+    /// </summary>
+    private void Release(string marker, string keptPath, List<string> kept, List<string> stillPinned)
+    {
+        if (!File.Exists(marker)) return;   // nothing pinning this destination
+        string contents;
+        try { contents = File.ReadAllText(marker); }
+        catch { stillPinned.Add(NameForTeacher(marker)); return; }
+
+        try
+        {
             // Recorded as a move so an undo puts the section back on last
             // year's site rather than leaving it orphaned.
-            try
-            {
-                string? contents = File.ReadAllText(marker);
-                _undo?.Begin($"cut section {sectionNumber} loose from its website");
-                _undo?.Touch(marker, contents);
-                _undo?.Touch(kept, null);
-                File.Move(marker, kept);
-                _undo?.Wrote(marker, null);
-                _undo?.Wrote(kept, contents);
-                _undo?.End();
-                return Relative(kept);
-            }
-            catch { return null; }
+            _undo?.Touch(marker, contents);
+            _undo?.Touch(keptPath, null);
+            File.Move(marker, keptPath);
+            _undo?.Wrote(marker, null);
+            _undo?.Wrote(keptPath, contents);
+            kept.Add(NameForTeacher(keptPath));
         }
-        return null;
+        catch
+        {
+            // A marker that could not be moved is one this section is STILL
+            // pinned to, and the reply has to say so rather than reporting the
+            // same empty result as "never published".
+            stillPinned.Add(NameForTeacher(marker));
+        }
+    }
+
+    /// <summary>
+    /// The folders a legacy <c>.netlify_site.json</c> could be sitting in, in
+    /// the order they are tried.
+    /// </summary>
+    /// <remarks>
+    /// One known divergence, inherited rather than introduced:
+    /// <c>BuildOutputLocation.BuildsRootFor</c> falls back to
+    /// <c>AppDataRoot</c>, which <c>--state-dir</c> redirects, while the
+    /// launchers compute the same root from the real <c>%LOCALAPPDATA%</c>. So
+    /// a run started with <c>--state-dir</c> looks for the legacy marker
+    /// somewhere the launcher would never have put one and finds nothing —
+    /// the same hazard <c>run-ui-tests.ps1</c> already warns about, and
+    /// harmless here because it can only cause a release to be skipped, never
+    /// a wrong file to be moved.
+    /// </remarks>
+    private IEnumerable<string> LegacyMarkerHomes(Course course, int sectionNumber)
+    {
+        string fromBuildRoot;
+        try
+        {
+            fromBuildRoot = BuildOutputLocation.ForSection(
+                BuildOutputLocation.BuildsRootFor(_folder), course.Code, sectionNumber);
+        }
+        catch { fromBuildRoot = ""; }
+        if (fromBuildRoot.Length > 0) yield return fromBuildRoot;
+
+        yield return Path.Combine(course.DirectoryPath, ".merged_output", $"section{sectionNumber}");
+    }
+
+    /// <summary>
+    /// The name a released marker is kept under.
+    ///
+    /// <para><b>Frozen, and shared with the mac</b> (<c>DeployCommand.releasedMarkerName</c>),
+    /// so a teacher who wants back onto last year's website is told the same
+    /// filename whichever app they are sitting at. Pinned in
+    /// <c>contracts/file-formats.json</c> -&gt; <c>firstDeployMarkers</c>.</para>
+    /// </summary>
+    public static string ReleasedMarkerName(int sectionNumber, string stamp) =>
+        $"section{sectionNumber}.previous-{stamp}.json";
+
+    /// <summary>
+    /// A marker named the way a teacher would find it — the folder it sits in
+    /// and the file, without the rest of the path.
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="Relative"/>, which is relative to the WORKING FOLDER: on
+    /// this platform the built output lives outside it, so a legacy marker
+    /// would be named with a run of <c>..\..\</c> nobody could use. The mac
+    /// says it this way too, and the sentence carrying it is shared.
+    /// </remarks>
+    private static string NameForTeacher(string path) =>
+        (Path.GetFileName(Path.GetDirectoryName(path)) ?? "") + "/" + Path.GetFileName(path);
+
+    /// <summary>What cutting a section loose actually managed.</summary>
+    /// <param name="KeptFiles">Where last year's details were put, for each destination released.</param>
+    /// <param name="StillPinned">
+    /// Destinations this section is STILL pinned to, because releasing them
+    /// failed — kept apart from "there was nothing to release", which is the
+    /// distinction that matters.
+    /// </param>
+    public sealed record SiteRelease(IReadOnlyList<string> KeptFiles, IReadOnlyList<string> StillPinned)
+    {
+        /// <summary>Whether this section was pinned to any website at all.</summary>
+        public bool ReleasedAnything => KeptFiles.Count > 0;
+
+        /// <summary>
+        /// Whether anything was left pinned — either because a release failed
+        /// or because only some of several destinations came loose.
+        /// </summary>
+        public bool SomethingIsStillPinned => StillPinned.Count > 0;
     }
 
     /// <summary>Carry out a re-date the teacher has agreed to, after backing the course up.</summary>
@@ -1812,7 +2178,7 @@ public sealed class AssistWorkspace
         if (plan.ChangesNothing) return new AssistResult(true, "Every class already carries that date.", null);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal(
@@ -1826,7 +2192,8 @@ public sealed class AssistWorkspace
             TimetableMemory.Write(_folder, course.Code, section, plan.AllMeetings,
                 $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
 
-        _undo?.Begin($"re-dated {course.Code} Section {section} onto block {plan.Block}");
+        using var recording = UndoHistory.Record(_undo,
+            $"re-dated {course.Code} Section {section} onto block {plan.Block}");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         var classPaths = new HashSet<string>(
             plan.Dates.Select(d => d.RelativePath), StringComparer.OrdinalIgnoreCase);
@@ -1843,7 +2210,7 @@ public sealed class AssistWorkspace
                 bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
                 string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
                 var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
-                    updated, pubKey, draft: true);
+                    updated, pubKey, draft: true, section);
                 updated = draftUpdated;
                 if (draftEdit.Changed) changed = true;
             }
@@ -1871,7 +2238,7 @@ public sealed class AssistWorkspace
             catch { }
         }
 
-        _undo?.End();
+        recording.Done();
 
         // Counted apart, because "moved 91 classes" when 26 classes and 65
         // materials moved is a sentence a teacher would rightly query.
@@ -1981,15 +2348,16 @@ public sealed class AssistWorkspace
         if (plan.ChangesNothing) return new AssistResult(true, "Every page already matches its class.", null);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal(
                 $"{course.Code} couldn’t be backed up, so no dates were changed: {error.Message}");
         }
 
-        _undo?.Begin($"brought {Humanize(plan.Anchors)}’ pages into date in " +
-                     $"{course.Code} Section {section}");
+        using var recording = UndoHistory.Record(_undo,
+            $"brought {Humanize(plan.Anchors)}’ pages into date in " +
+            $"{course.Code} Section {section}");
 
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         int moved = 0;
@@ -2002,7 +2370,7 @@ public sealed class AssistWorkspace
             Save(full, updated);
             moved++;
         }
-        _undo?.End();
+        recording.Done();
 
         return new AssistResult(true,
             $"Brought {moved} page{(moved == 1 ? "" : "s")} into date with the class that uses " +
@@ -2011,10 +2379,26 @@ public sealed class AssistWorkspace
     }
 
     /// <summary>A whole-course backup, on its own.</summary>
-    public string BackUp(string courseCode)
+    /// <remarks>
+    /// <para><b>Attributed to the ASSISTANT, which is what the section is
+    /// for.</b> Left to default, <see cref="CourseArchiver.BackUpCourse"/>
+    /// records <see cref="BackupMaker.DefaultTeacher"/> — so the Backups list
+    /// says "made by you" about a copy the teacher never made, and, worse,
+    /// <see cref="CourseArchiver.PruneBackups"/> deliberately skips anything
+    /// that is not the assistant's. A session following this tool's own advice
+    /// to back up "before any bulk editing" would write a whole-course zip
+    /// every time and none of them would ever be cleared;
+    /// <see cref="CourseArchiver.MostBackupsKept"/> exists precisely to stop
+    /// that. The mac takes the section for the same reason, and
+    /// <c>contracts/assist-cases.json</c> has required it of both since the
+    /// tool arrived.</para>
+    /// </remarks>
+    public string BackUp(string courseCode, int sectionNumber)
     {
         var course = Course(courseCode);
-        return Relative(CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)));
+        int number = Section(course, sectionNumber);
+        return Relative(CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
+                                                    new BackupMaker.Assistant(number)));
     }
 
     // ---- Helpers ---------------------------------------------------------
@@ -2040,8 +2424,17 @@ public sealed class AssistWorkspace
         int section = Section(course, sectionNumber);
 
         // Shared with the sidebar's own "Schedule Deploy…", so a refusal
-        // cannot be walked around by using the other door.
-        if (ScheduledDeploy.Problem(course, section, when, DateTime.Now) is { } problem)
+        // cannot be walked around by using the other door. The Cloudflare
+        // Account ID is a per-teacher, machine-global setting — not tied to
+        // this workspace — so it's read the same way the GUI's
+        // SidebarPane does, via AppSettings.Load(), rather than assumed
+        // unreachable from a headless process. Found missing here entirely
+        // (defaulted to "") while auditing this feature for mac parity:
+        // scheduling a Cloudflare-destination deploy through the assistant
+        // always refused with "Paste your Cloudflare Account ID" even when
+        // one was correctly configured, because this check never saw it.
+        string cloudflareAccountId = CurrentCloudflareAccountId();
+        if (ScheduledDeploy.Problem(course, section, when, DateTime.Now, cloudflareAccountId) is { } problem)
             throw new AssistRefusal(problem);
 
         var unpublished = new List<string>();
@@ -2190,13 +2583,23 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal($"{course.Code} couldn’t be backed up, so the page was not changed: {error.Message}");
         }
 
-        _undo?.Begin($"added {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
+        // BEGIN and END are a pair, and the END is the half that was missing
+        // until 2026-09-18. `UndoHistory.Begin` ignores a nested call, so an
+        // entry left open does two things, both silent: this tool records no
+        // undo at all ("undo that" answers "I have not changed any pages"),
+        // and the NEXT operation's files are swallowed into this open entry
+        // and committed under THIS description. A teacher who added
+        // expectations, then published a class, then said "undo that" was
+        // told they had added expectations and had the publish taken back
+        // with them.
+        using var recording = UndoHistory.Record(_undo,
+            $"added {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
 
         string path = PagePaths.ResolveInside(_folder, plan.RelativePath);
         string text = File.ReadAllText(path);
@@ -2223,6 +2626,8 @@ public sealed class AssistWorkspace
         }
 
         Save(path, text);
+        recording.Done();
+
         return new AssistResult(true,
             $"Added {plan.Adding.Count} curriculum expectation{(plan.Adding.Count == 1 ? "" : "s")} to " +
             $"“{plan.PageTitle}” — {string.Join(", ", plan.Adding.Select(e => e.Code))}. " +
@@ -2253,13 +2658,16 @@ public sealed class AssistWorkspace
         foreach (string path in ClassPages(course, section))
         {
             string title = Path.GetFileNameWithoutExtension(path);
-            var match = System.Text.RegularExpressions.Regex.Match(
-                title, @"^Unit\s+(\d+),\s*Day\s+(\d+)$",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!match.Success) { unnumbered++; continue; }
+            // The course's OWN word. Reading a literal "Unit" here made the
+            // whole make-room feature unreachable for a Module course: every
+            // page counted as unnumbered, the plan found no classes, and it
+            // refused with "has no pages named ...". The title-building below
+            // was converted first and could therefore never run.
+            var parsed = UnitDay.Parse(title, course.Configuration.UnitWord);
+            if (parsed is null) { unnumbered++; continue; }
 
             found.Add(new ClassRef(
-                int.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value),
+                parsed.Value.Unit, parsed.Value.Day,
                 path, DateOf(course, section, path), title));
         }
 
@@ -2333,7 +2741,7 @@ public sealed class AssistWorkspace
         var added = new List<NewClass>();
         for (int i = 0; i < count; i++)
         {
-            string title = $"Unit {unit}, Day {atDay + i}";
+            string title = $"{course.Configuration.UnitWord} {unit}, Day {atDay + i}";
             added.Add(new NewClass(title, Relative(Path.Combine(folder, title + ".md")),
                                    runway[i], atDay + i));
         }
@@ -2343,7 +2751,7 @@ public sealed class AssistWorkspace
         var renames = new List<Rename>();
         foreach (var moving in shifted.Where(c => c.Unit == unit).OrderByDescending(c => c.Day))
         {
-            string to = $"Unit {unit}, Day {moving.Day + count}";
+            string to = $"{course.Configuration.UnitWord} {unit}, Day {moving.Day + count}";
             renames.Add(new Rename(moving.Title, to, moving.Path, Path.Combine(folder, to + ".md")));
         }
 
@@ -2356,7 +2764,7 @@ public sealed class AssistWorkspace
             var to = runway[count + i];
             if (moving.Date == to) continue;
 
-            string name = moving.Unit == unit ? $"Unit {unit}, Day {moving.Day + count}" : moving.Title;
+            string name = moving.Unit == unit ? $"{course.Configuration.UnitWord} {unit}, Day {moving.Day + count}" : moving.Title;
             moves.Add(new DateMove(name, Relative(moving.Path), moving.Date ?? to, to));
         }
 
@@ -2407,15 +2815,28 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal(
                 $"{course.Code} couldn’t be backed up, so nothing was moved: {error.Message}");
         }
 
-        _undo?.Begin($"made room for {plan.Added.Count} classes at Unit {plan.Unit}, Day {plan.AtDay} " +
-                     $"in {course.Code} Section {section}");
+        // NO undo entry of its own, deliberately — and this is the mac's rule
+        // rather than a Windows shortcut (`AssistToolRunner.makeRoomForClasses`
+        // records nothing either). Making room renames later days, re-dates
+        // every class from the insertion point onwards and rewrites the links
+        // that pointed at the old names; an undo that put some of that back
+        // and not the rest would leave a course in a state nobody chose. The
+        // way back is the backup taken above, which the reply names.
+        //
+        // It used to call Begin here and never End, which is worse than
+        // either: no entry was recorded AND the next operation's files were
+        // swallowed into the open one under this description.
+        //
+        // The Touch/Wrote calls below stay. They do nothing while no entry is
+        // open, and they are what lets a CALLER that opened its own entry —
+        // ApplyDuplicateClass — record the whole of what happened.
 
         // Highest day first, so a rename never lands on a name still in use.
         progress?.Report("Renaming the classes that come after…");
@@ -2465,13 +2886,172 @@ public sealed class AssistWorkspace
             Save(path, ClassSkeleton(added, plan.Unit, plan.Added.Count, tail));
         }
 
-        return new AssistResult(true,
-            $"Made room for {plan.Added.Count} class{(plan.Added.Count == 1 ? "" : "es")} at Unit " +
+        string said =
+            $"Made room for {plan.Added.Count} class{(plan.Added.Count == 1 ? "" : "es")} at {UnitWordFor(plan.CourseCode)} " +
             $"{plan.Unit}, Day {plan.AtDay}. Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
             $"later class days, and updated {plan.LinksToRewrite} link" +
             $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
-            "Look the section over in Plantoir before you deploy it.",
-            backup);
+            "Look the section over in Plantoir before you deploy it.";
+
+        // Said because it is now TRUE and was not said before: this records no
+        // undo entry, so "undo that" afterwards reaches back past it to
+        // whatever the conversation did before — or answers that nothing has
+        // been changed. The mac says the same sentence, on the same condition
+        // (`makeRoomForClasses` → `movesAnythingElse`).
+        if (plan.Renames.Count > 0 || plan.Moves.Count > 0)
+            said += "\n\n" + ClassChangeWording.OtherClassesMoved(backup);
+
+        return new AssistResult(true, said, backup);
+    }
+
+    // ---- Duplicating a lesson as the next class ----------------------------
+
+    /// <summary>
+    /// Work out what "duplicate Unit 3, Day 2 as my next class" would do,
+    /// changing nothing.
+    ///
+    /// <para>The copy becomes the SOURCE'S next day — Unit 3, Day 3 — not a
+    /// page after the last class of the course. Everything from there on
+    /// shuffles, which <see cref="PlanInsertClasses"/> works out; this adds
+    /// only which page is being copied and what it becomes.</para>
+    /// </summary>
+    /// <exception cref="AssistRefusal">
+    /// No such page, a page that is not numbered, a section with no remembered
+    /// timetable, a timetable with no day left, or a page that cannot be read.
+    /// </exception>
+    public DuplicateClassPlan PlanDuplicateClass(string courseCode, int sectionNumber, string pageTitle)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+
+        // ONE refusal for "no such page", reused rather than reworded. A
+        // second sentence for a fact a teacher already meets elsewhere is how
+        // two wordings for one thing start.
+        string path = Page(course, section, pageTitle);
+        string sourceTitle = Path.GetFileNameWithoutExtension(path);
+
+        var numbers = UnitDay.Parse(sourceTitle, course.Configuration.UnitWord)
+            ?? throw new AssistRefusal(
+                ClassChangeWording.NotANumberedClassPage(sourceTitle, course.Configuration.UnitWord));
+
+        // The source's own next day. Throws the timetable refusal unchanged,
+        // which is the sentence that asks for the class dates.
+        var insertion = PlanInsertClasses(course.Code, section, numbers.Unit, numbers.Day + 1, 1);
+        if (insertion.Added.Count == 0)
+        {
+            string why = string.Join(" ", insertion.Problems);
+            throw new AssistRefusal(why.Length > 0 ? why : ClassChangeWording.NoClassDateLeft);
+        }
+
+        string sourceText;
+        try { sourceText = File.ReadAllText(path); }
+        catch { throw new AssistRefusal(ClassChangeWording.CouldNotBeRead(sourceTitle)); }
+
+        var added = insertion.Added[0];
+        return new DuplicateClassPlan
+        {
+            CourseCode = course.Code,
+            SectionNumber = section,
+            SourceTitle = sourceTitle,
+            SourceText = sourceText,
+            NewTitle = added.Title,
+            NewDate = added.Date,
+            Insertion = insertion,
+        };
+    }
+
+    /// <summary>
+    /// Make the copy: room first, then the source's words under a new title, a
+    /// date of its own, and hidden.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Hidden however the source was.</b> A page made by duplicating
+    /// a published lesson is a draft of next week's, and putting it in front
+    /// of students the moment it is made is the one thing it must not do. The
+    /// body is copied verbatim — including the frontmatter keys belonging to
+    /// OTHER sections, which is what the mac does and what a teacher copying a
+    /// shared page would expect.</para>
+    ///
+    /// <para><b>Undoable only when nothing else moved.</b> The entry is opened
+    /// HERE, before <see cref="ApplyInsertClasses"/> — which records nothing of
+    /// its own — so this either records the whole change or records none of
+    /// it. A partial undo that deleted the copy and left every later class
+    /// renamed and re-dated would be worse than no undo at all, so when
+    /// classes shuffled the entry is abandoned and the reply names the backup
+    /// instead.</para>
+    /// </remarks>
+    public AssistResult ApplyDuplicateClass(DuplicateClassPlan plan, IProgress<string>? progress = null)
+    {
+        var course = Course(plan.CourseCode);
+        int section = Section(course, plan.SectionNumber);
+        string newPath = Path.Combine(ClassFolder(course, section), plan.NewTitle + ".md");
+
+        // Read BEFORE anything moves, so the guard below can tell "the page
+        // that was in the way is still there" from "the new skeleton".
+        string? occupying = null;
+        try { if (File.Exists(newPath)) occupying = File.ReadAllText(newPath); } catch { }
+
+        // OUTERMOST, and that is the whole of why this reads the way it does.
+        // Begin ignores a nested call, so whoever opens the entry first owns
+        // the description — and everything ApplyInsertClasses writes lands in
+        // this one. Leaving without reaching Done abandons it, so every
+        // refusal below is safe by construction rather than by remembering.
+        using var recording = UndoHistory.Record(_undo,
+            $"duplicated “{plan.SourceTitle}” as “{plan.NewTitle}”");
+
+        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress);
+
+        // The one case that could destroy a lesson. ApplyInsertClasses
+        // SKIPS a rename whose destination already exists rather than
+        // writing over it — right in itself, but it leaves the page the
+        // copy was meant to become holding somebody's real class. Writing
+        // the copy there anyway would lose it.
+        if (occupying is not null && File.Exists(newPath) && File.ReadAllText(newPath) == occupying)
+            throw new AssistRefusal(
+                ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath));
+
+        progress?.Report($"Copying “{plan.SourceTitle}”…");
+        bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, newPath);
+        string copied = PageFrontmatter.SetTitle(plan.SourceText, plan.NewTitle);
+        copied = PageFrontmatter.SetCreated(
+            copied, PageFrontmatter.CreatedKeyFor(section, sectionLocal), plan.NewDate,
+            SiblingTimeAndOffset(course, section, ClassPages(course, section))).Text;
+        copied = PageFrontmatter.SetDraft(
+            copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true, section).Text;
+
+        // A shared source carrying publishForSection<N>: true beats the
+        // plain publish: false just written (PageFrontmatter.IsDraft reads
+        // the per-section key FIRST), so the copy would be VISIBLE to this
+        // section's students the moment it existed. Checked rather than
+        // assumed, because the frontmatter the copy inherits is whatever
+        // the teacher's page happened to carry.
+        if (!PageFrontmatter.IsDraft(copied, section))
+            copied = PageFrontmatter.SetDraft(
+                copied, PageFrontmatter.PublishKeyFor(section, isSectionLocal: false), draft: true, section).Text;
+
+        Save(newPath, copied);
+
+        // Recorded ONLY when nothing else moved. Left unsettled otherwise, so
+        // the scope abandons it: a partial undo that deleted the copy and left
+        // every later class renamed and re-dated is worse than no undo at all,
+        // and the reply names the backup instead.
+        if (!plan.MovesOtherClasses) recording.Done();
+
+        string said = ClassChangeWording.CopiedTo(plan.SourceTitle, plan.NewTitle, plan.NewDate);
+        if (plan.MovesOtherClasses)
+        {
+            // What moved, and — already the last paragraph of that message, on
+            // exactly this condition — that the backup is the way back rather
+            // than "undo that". Saying ClassChangeWording.OtherClassesMoved
+            // here as well would print it twice.
+            said += "\n\n" + inserted.Message;
+        }
+        else
+        {
+            said += "\n\n" + AssistWording.ACreatedPageCanBeTakenBack;
+        }
+
+        return new AssistResult(true, said, inserted.BackupPath);
     }
 
     /// <summary>
@@ -2534,6 +3114,44 @@ public sealed class AssistWorkspace
     /// next seven days this class actually meets rather than the next seven
     /// days in the calendar. A teacher should never have to work that out.
     /// </summary>
+    /// <summary>
+    /// The day number a unit's next class takes: one past the highest day that
+    /// already EXISTS in it, or 1 for a unit with no pages yet.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Worked out rather than asked for, since 2026-09-09.</b>
+    /// <c>add_classes</c> and <c>plan_add_classes</c> used to take a
+    /// <c>firstDay</c> argument described as "1 unless the earlier days
+    /// already exist" — a question the caller could only answer by going and
+    /// looking at the section, and one it could get wrong. Left at its
+    /// default, "add five more days to Unit 4" on a unit that already has
+    /// Days 1–3 planned Days 1–5, reported three of them as already there,
+    /// and created TWO pages for a teacher who asked for five.</para>
+    ///
+    /// <para>Counted from the pages on disk, published or NOT: a class a
+    /// teacher has written and not yet shown anybody is still a day of the
+    /// course, and numbering over it would collide with a real file. The mac
+    /// has never taken the argument, and
+    /// <c>contracts/assist-cases.json</c> describes neither tool as having
+    /// one — an argument nobody can get wrong beats one with a sensible
+    /// default. See issue #70.</para>
+    /// </remarks>
+    public int DayToCarryOnFrom(string courseCode, int sectionNumber, int unit)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+
+        int highestDay = 0;
+        foreach (string page in ClassPages(course, section))
+        {
+            string title = Path.GetFileNameWithoutExtension(page) ?? "";
+            if (UnitDay.Parse(title, course.Configuration.UnitWord) is { } found
+                && found.Unit == unit && found.Day > highestDay)
+                highestDay = found.Day;
+        }
+        return highestDay + 1;
+    }
+
     public NewClassesPlan PlanAddClasses(string courseCode, int sectionNumber, int unit,
                                          int firstDay, int count)
     {
@@ -2573,7 +3191,7 @@ public sealed class AssistWorkspace
         for (int i = 0; i < count; i++)
         {
             int day = firstDay + i;
-            string title = $"Unit {unit}, Day {day}";
+            string title = $"{UnitWordFor(courseCode)} {unit}, Day {day}";
             string path = Path.Combine(folder, title + ".md");
 
             // Never written over. A page with this name may be a lesson the
@@ -2623,20 +3241,13 @@ public sealed class AssistWorkspace
         var existingTitles = existing.Select(p => Path.GetFileNameWithoutExtension(p) ?? "").ToList();
 
         if (days is { } howMany && howMany > 0 && int.TryParse(unitAsked, out int specificUnit))
-        {
-            int highestDay = 0;
-            foreach (var t in existingTitles)
-            {
-                if (UnitDay.Parse(t) is { } ud && ud.Unit == specificUnit && ud.Day > highestDay)
-                    highestDay = ud.Day;
-            }
-            return PlanAddClasses(courseCode, sectionNumber, specificUnit, highestDay + 1, howMany);
-        }
+            return PlanAddClasses(courseCode, sectionNumber, specificUnit,
+                                  DayToCarryOnFrom(courseCode, sectionNumber, specificUnit), howMany);
 
         bool startingANewUnit = string.Equals(unitAsked, "next", StringComparison.OrdinalIgnoreCase);
         UnitDay next = startingANewUnit
-            ? NextClassPlanner.FirstDayOfANewUnit(existingTitles)
-            : NextClassPlanner.NextUnitAndDay(existingTitles);
+            ? NextClassPlanner.FirstDayOfANewUnit(existingTitles, course.Configuration.UnitWord)
+            : NextClassPlanner.NextUnitAndDay(existingTitles, course.Configuration.UnitWord);
 
         return PlanAddClasses(courseCode, sectionNumber, next.Unit, next.Day, 1);
     }
@@ -2652,15 +3263,23 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal(
                 $"{course.Code} couldn’t be backed up, so no pages were created: {error.Message}");
         }
 
-        _undo?.Begin($"added {plan.Classes.Count} class pages to Unit {plan.Unit} of " +
-                     $"{course.Code} Section {section}");
+        // Undoable, and the END is what makes that true. `Save` records each
+        // created page with no "before" at all, so undo deletes it — which is
+        // exactly what AssistWording.ACreatedPageCanBeTakenBack promises the
+        // teacher, and what this tool did not do until 2026-09-18 because the
+        // entry was opened and never closed. Nothing here renames or re-dates
+        // anything else, so there is no partial-undo question to ask: the mac
+        // records this one too (AssistToolRunner, the placeholder-class path).
+        using var recording = UndoHistory.Record(_undo,
+            $"added {plan.Classes.Count} class pages to {UnitWordFor(plan.CourseCode)} {plan.Unit} of " +
+            $"{course.Code} Section {section}");
 
         // Match the time of day and UTC offset the section's existing classes
         // use, so a new page sorts beside them rather than at midnight.
@@ -2674,6 +3293,7 @@ public sealed class AssistWorkspace
             if (File.Exists(path)) continue;       // checked again: the plan may be minutes old
             Save(path, ClassSkeleton(created, plan.Unit, plan.Classes.Count, tail));
         }
+        recording.Done();
 
         return new AssistResult(true,
             $"Created {plan.Classes.Count} class page{(plan.Classes.Count == 1 ? "" : "s")} in Unit " +
@@ -2684,15 +3304,71 @@ public sealed class AssistWorkspace
     }
 
     /// <summary>Where a section's class pages live.</summary>
+    /// <summary>
+    /// What this course calls a unit. By CODE, because several planning paths
+    /// carry the code rather than the course.
+    /// </summary>
+    public string UnitWordForCourse(string courseCode) => UnitWordFor(courseCode);
+
+    private string UnitWordFor(string courseCode)
+    {
+        try { return Course(courseCode).Configuration.UnitWord; }
+        catch (AssistRefusal) { return ClassPageTerm.DefaultWord; }
+    }
+
+    /// <summary>
+    /// A page's path relative to its SECTION folder, which is the form the
+    /// class-page rule needs.
+    ///
+    /// <para>Nothing above the section can reach the rule this way, so what a
+    /// teacher called their working folder cannot change what counts as a
+    /// lesson — and neither can what they called their COURSE folder, nor the
+    /// <c>courses</c> folder itself. <see cref="Relative"/> is relative to the
+    /// working folder, so its segments still include <c>courses</c>, the course
+    /// code and <c>sectionN</c>; that was enough for the
+    /// <c>C:\Users\x\Classroom</c> bug and not enough for the rest.</para>
+    ///
+    /// <para>A page OUTSIDE the section folder — every course-level SHARED
+    /// page, which <c>PagePaths.MarkdownPages</c> deliberately includes —
+    /// falls back to its own file NAME, so it is never a class page. Returning
+    /// the last two components instead, which is what the mac tried first,
+    /// puts the immediate parent's name back in front of the rule: that is the
+    /// discredited "does the parent mention classes" sniff, and a false
+    /// POSITIVE waiting to happen, because a course-level shared folder called
+    /// "All Classes" would then make every shared page under it a lesson of
+    /// every section. A shared page is not a class page; say so plainly rather
+    /// than guess from a fragment of path.</para>
+    ///
+    /// <para>Mirrors <c>AssistSectionGraph.pathWithinSection</c> on the mac —
+    /// its CODE, which returns <c>url.lastPathComponent</c>; that method's own
+    /// header comment still says "last two components" and is stale.</para>
+    /// </summary>
+    private static string PathWithinSection(Course course, int sectionNumber, string fullPath)
+    {
+        string root;
+        string full;
+        try
+        {
+            root = Path.GetFullPath(course.SectionDirectory(sectionNumber));
+            full = Path.GetFullPath(fullPath);
+        }
+        catch { return Path.GetFileName(fullPath); }
+
+        if (!root.EndsWith(Path.DirectorySeparatorChar)) root += Path.DirectorySeparatorChar;
+        // Case-insensitively, because Windows paths are: a page reached as
+        // SECTION1\... must not read as a page outside section1.
+        if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            return full[root.Length..];
+        return Path.GetFileName(full);
+    }
+
     private static string ClassFolder(Course course, int sectionNumber)
     {
-        var folders = course.Configuration.PerSectionFolders;
-        // "All Classes" by convention, but a course names its own folders and
-        // the first per-section folder is where classes go.
-        string name = folders.FirstOrDefault(f => f.Contains("Class", StringComparison.OrdinalIgnoreCase))
-                      ?? folders.FirstOrDefault()
-                      ?? "All Classes";
-        return Path.Combine(course.SectionDirectory(sectionNumber), name);
+        // The naming half of the shared rule
+        // (contracts/class-planning.json -> classFolder.naming).
+        return Path.Combine(course.SectionDirectory(sectionNumber),
+                            ClassFolderRule.Name(course.Configuration.ClassFolder,
+                                                 course.Configuration.PerSectionFolders));
     }
 
     /// <summary>
@@ -2787,7 +3463,18 @@ public interface ILauncherRunner
 }
 
 /// <summary>The result of one launcher run.</summary>
-public readonly record struct LaunchOutcome(bool Succeeded, string Message);
+///
+/// <remarks>
+/// <para><see cref="Findings"/> is what the build said about the course's
+/// FOLDERS — the same <c>PLANTOIR_HEALTH:</c> lines the app's own
+/// <c>ScriptRunner</c> collects. It is optional so that the two-argument shape
+/// every other caller uses keeps working; a runner that does not look for them
+/// simply reports none.</para>
+/// </remarks>
+public readonly record struct LaunchOutcome(
+    bool Succeeded,
+    string Message,
+    IReadOnlyList<Models.SiteHealthFinding>? Findings = null);
 
 /// <summary>The result of planning a whole unit publish/unpublish.</summary>
 public sealed record WholeUnitPlanResult(

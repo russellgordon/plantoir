@@ -7,7 +7,7 @@ tags:
   - concepts
 ---
 A concept page is where an idea gets said cleanly, once, in a form you can
-reread in March and still follow.
+reread later in the course and still follow.
 
 That is deliberately the *second* time you meet it. In this course the idea
 almost always arrives first as something you did — a slide under a microscope,
@@ -24,7 +24,7 @@ did to flip it. That is the Grade 10 move, and this is where it lives.
 Class pages link here. These pages do not go stale, so start here when you are
 studying, when you missed a class, or when a lab makes no sense afterwards.
 
-## The sixteen pages, by unit
+## The eighteen pages, by unit
 
 **Unit 1 — Tissues, Organs, and Systems**
 
@@ -47,11 +47,13 @@ studying, when you missed a class, or when a lab makes no sense afterwards.
 - [[The Greenhouse Effect]]
 - [[Natural and Human Influences on Climate]]
 - [[Feedback Loops in Climate]]
+- [[Mitigation and Adaptation]]
 
 **Unit 4 — Light and Geometric Optics**
 
 - [[Reflection]]
 - [[Refraction]]
+- [[Light in the Room]]
 - [[Lenses and Images]]
 
 > [!tip] Use the backlinks

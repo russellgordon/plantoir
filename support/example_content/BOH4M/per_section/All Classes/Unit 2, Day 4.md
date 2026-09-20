@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish [[Your Management Profile]] for Friday.
+- [ ] Bring your instrument result and your two matching occasions — the analysis gets written in class.

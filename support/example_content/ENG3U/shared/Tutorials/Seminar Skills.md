@@ -2,6 +2,8 @@
 title: Seminar Skills
 publish: true
 created: __CREATED__
+tags:
+  - tutorials
 enableToc: true
 ---
 A seminar is a discussion where the participants have all read the thing
@@ -15,16 +17,17 @@ actually get tested.
 - **Write two questions that cannot be answered yes or no.** The best
   seminar questions begin "Why does…", "What is the effect of…", or
   "Which matters more…".
-- **Choose two passages** you will bring, with page numbers. Nobody
-  waits while you find it.
+- **Choose two passages** you will bring to any seminar — three, with
+  act, scene, and line, if you are the one leading it. Nobody waits while
+  you find it.
 
 ## During
 
 | Move | Sounds like |
 | --- | --- |
-| Open with evidence | "On page 84 he says… which suggests…" |
+| Open with evidence | "At 1.7.1 he says \"If it were done…\" — which suggests…" |
 | Build | "That connects to what Amir said about…" |
-| Complicate | "That works for chapter two, but what about the ending?" |
+| Complicate | "That works for Act 1, but what about the banquet?" |
 | Invite | "Sara, you had a different reading of that scene." |
 | Steelman | "The strongest version of that argument is…, and even then…" |
 | Concede | "You are right, and it changes my claim to…" |
@@ -65,9 +68,17 @@ uses.
 
 ![[A2.3]]
 
+![[A2.4]]
+
 ![[A2.5]]
 
 ![[A2.6]]
 
 ![[A2.7]]
+
+![[A1.1]]
+
+![[A1.7]]
+
+![[A2.1]]
 %%curriculum-end%%

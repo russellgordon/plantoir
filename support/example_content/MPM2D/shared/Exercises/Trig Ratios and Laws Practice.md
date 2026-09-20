@@ -28,6 +28,13 @@ calculation; the other half is choosing the tool. Round to one decimal.
 6. **Challenge.** A triangular park has sides $5$ m, $7$ m, and
    $8$ m. Find its largest angle, and explain how you knew where to
    hunt before calculating anything.
+7. **Explore the development.** In acute $\triangle ABC$, drop an
+   altitude $h$ from vertex $C$ to side $c$ (meeting $c$ at $D$). Let
+   $AD = x$, so $DB = c - x$. (a) In right $\triangle ACD$, express $x$
+   and $h^2$ in terms of side $b$ and angle $A$. (b) Apply the
+   Pythagorean theorem in right $\triangle BCD$: $a^2 = h^2 + (c - x)^2$.
+   (c) Substitute your expressions from (a) into (b), expand, and
+   simplify to produce the cosine law $a^2 = b^2 + c^2 - 2bc\cos A$.
 
 ## Answers
 
@@ -61,10 +68,29 @@ calculation; the other half is choosing the tool. Round to one decimal.
 > side: $\cos\theta = \frac{5^2 + 7^2 - 8^2}{2(5)(7)} = \frac{1}{7}$,
 > so $\theta \approx 81.8°$ — under $90°$: the triangle is truly acute.
 
+> [!success]- Answer 7
+> (a) In $\triangle ACD$, $\cos A = \frac{x}{b} \implies x = b\cos A$,
+> and $h^2 = b^2 - x^2$.
+> (b) In $\triangle BCD$,
+> $a^2 = h^2 + (c - x)^2 = h^2 + c^2 - 2cx + x^2$.
+> (c) Substitute $h^2 + x^2 = b^2$ and $x = b\cos A$:
+> $a^2 = (h^2 + x^2) + c^2 - 2cx = b^2 + c^2 - 2c(b\cos A) = b^2 + c^2 - 2bc\cos A$.
+> The cosine law is the Pythagorean theorem with the $-2bc\cos A$
+> correction accounting for non-right angles — the development
+> [[The Cosine Law]] establishes.
+
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C2.1]]
+
 ![[C2.2]]
 
+![[C3.1]]
+
+![[C3.2]]
+
 ![[C3.3]]
+
+![[C3.4]]
 %%curriculum-end%%

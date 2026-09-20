@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval; then 1945: soldiers home, and a boom
+1. Retrieval; then 1945, soldiers home, and a boom. Before anything else, and
+   not marked: what do you think the country owed the people coming home? Your
+   answers tell me where to start
 2. [[Building the Postwar State]], first half, and what daily life
    became: [[Postwar Life and Technology]]
 3. Veterans' benefits, and who received them

@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Sketchbook check, second of three
-2. Studio time: free choice medium
-3. Conferences
+1. Sketchbook check, second of three: [[The Sketchbook Habit]]
+2. Studio time: free choice medium — [[How a Studio Period Works]]
+3. Conferences on sketchbook habits and media explorations for [[The Sketchbook Habit]]
 
 ## Things to do before our next class
 

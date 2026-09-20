@@ -2,9 +2,10 @@
 title: Poetry Unit
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - reading
 ---
-Eight poems, spread across the year rather than blocked, each read beside
+Eight poems, spread across the course rather than blocked, each read beside
 something else.
 
 | Poem | Poet | Read beside |
@@ -15,7 +16,7 @@ something else.
 | "Letter to Sir John A. Macdonald" | Marilyn Dumont (Métis) | *The Inconvenient Indian* |
 | "I Lost My Talk" | Rita Joe (Mi'kmaw) | The residential-school material in *Monkey Beach* |
 | "Tomorrow, and tomorrow" (5.5) | Shakespeare | Read as a poem, out of the play |
-| "Bones" | Gregory Scofield (Métis) | Inheritance, and what a body carries |
+| "Invocation for the Bones in My Back" | Gregory Scofield (Métis) | Inheritance, and what a body carries |
 | One of your own choosing | You | The last week: bring one and defend it |
 
 ## How we read a poem here

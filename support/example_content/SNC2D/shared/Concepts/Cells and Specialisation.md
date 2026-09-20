@@ -102,9 +102,17 @@ Next, the levels above the single cell: [[Tissues, Organs, and Systems]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B2.1]]
+
+![[B2.2]]
+
+![[B2.3]]
+
+![[B2.4]]
+
+![[B2.5]]
+
 ![[B3.1]]
 
 ![[B3.2]]
-
-![[B2.5]]
 %%curriculum-end%%

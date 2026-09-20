@@ -15,7 +15,7 @@ things, try a table, or park an idea for next semester. %%
 - Try the climograph before the region study rather than after; the data
   work makes the regions easier to argue about.
 - A second visit to the shoreline in Unit 4 landed well. Keep it, and
-  make the September/January comparison explicit in the notebook.
+  make the start-of-course/end-of-course comparison explicit in the notebook.
 
 ## Paste area
 

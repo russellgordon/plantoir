@@ -26,6 +26,13 @@ final class CourseNameCatalogTests: XCTestCase {
     }
 
     @MainActor
+    func testBritishColumbiaCodeReturnsBothNames() {
+        let names: CourseNames? = CourseNameCatalog.names(forCode: "MCMPR11")
+        XCTAssertEqual(names?.formal, "Computer Programming 11")
+        XCTAssertEqual(names?.short, "Computer Programming")
+    }
+
+    @MainActor
     func testUnknownAndClubCodesReturnNil() {
         XCTAssertNil(CourseNameCatalog.names(forCode: "CODING"))
         XCTAssertNil(CourseNameCatalog.names(forCode: ""))

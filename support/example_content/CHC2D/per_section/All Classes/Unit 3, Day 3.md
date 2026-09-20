@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Eligibility rules as historical evidence
-2. Research period
+2. Research period: gathering postwar census data and immigration records for [[The Postwar Argument]]
 3. [[Statistics and the Census]] applied
 
 ## Things to do before our next class

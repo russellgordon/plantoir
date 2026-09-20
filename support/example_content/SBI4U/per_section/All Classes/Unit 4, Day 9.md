@@ -10,11 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Heart Rate and Recovery]] in class
-2. Recovery curves compared across the class, and what they do and do
+1. Recovery curves compared across the class, and what they do and do
    not say about fitness
-3. Consent and privacy with classmates' data — anonymised, always
+2. Consent and privacy with classmates' data — anonymised, always
+3. Then write up [[Heart Rate and Recovery]] at the bench — write-up four
+   of five on [[Investigation Reports]], handed in at the end of the
+   period
 
 ## Things to do before our next class
 
-- [ ] Report finished; curves compared honestly.
+- [ ] Journal: which of your explanations for the differences you could
+      actually test.

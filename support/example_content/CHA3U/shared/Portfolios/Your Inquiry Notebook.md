@@ -54,11 +54,22 @@ means you have been reading sources that already agreed with you, which
 
 ## What is marked
 
-The notebook is assessed as a set, once, near the end of term, on
-consistency, precision of sourcing, and evidence that your thinking actually
-moved. It feeds [[Skills You Are Building]] and, in the end,
+The notebook is read and marked as a set, once, in the closing portfolio
+class, together with the two reflections — the whole thing is
+[[The Historian's Portfolio]], and the criteria live on that page from the
+first week. It is gone through with you in the period rather than taken
+away, because you need it for the three review classes and for
+[[The Document Examination]].
+
+One rule worth knowing now: **the entries that carry the mark are the ones
+written in class, at a milestone.** Six periods this term have one on the
+agenda, and your class page says so on the day. What you add at home between
+those days is yours, is worth doing, and is what makes the milestone entry
+possible — but practice between classes is practice, and it is not marked.
+
+The notebook feeds [[Skills You Are Building]] and, in the end,
 [[The Long Argument]] — where the question you settle on will very likely be
-one you first wrote down in October.
+one you first wrote down in the opening weeks.
 
 %%curriculum-start%%
 ## Curriculum connection

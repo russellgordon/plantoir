@@ -41,14 +41,18 @@ recorded.
 4. The temperature curve falls after its peak while the substrate curve
    levels off. Explain the difference — one is denaturation, the other is
    saturation, and saying which is which is the point.
-4. Predict the effect of boiling the enzyme first, then test it.
+5. Predict the effect of boiling the enzyme first, then test it.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A1.4]]
+
+![[A1.8]]
 
 ![[B2.3]]
 
 ![[B2.4]]
 
-![[A1.8]]
+![[B3.4]]
 %%curriculum-end%%

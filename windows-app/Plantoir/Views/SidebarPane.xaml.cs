@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
@@ -14,28 +15,76 @@ using Plantoir.ViewModels;
 
 namespace Plantoir.Views;
 
-/// <summary>One row of the sidebar tree: a course, a section, the Archived group, or an archive.</summary>
-public sealed class SidebarRow
+/// <summary>
+/// One row of the sidebar tree: a course, a section, the Archived group, or
+/// an archive.
+///
+/// Rows are RECONCILED, not recreated — <see cref="SidebarPane.Refresh"/>
+/// reuses the same row object across passes so WinUI's `TreeView` never
+/// tears down and rebuilds a container, which is what silently collapsed
+/// "Courses & Clubs" after the create-course dialog closed (row 172's own
+/// comment). That means a value changed on an EXISTING row's object after
+/// its container was already created and bound — <see cref="ScheduledDeploy"/>
+/// and <see cref="Menu"/>, both of which change without the row itself being
+/// re-created — must raise <see cref="INotifyPropertyChanged"/>, and the XAML
+/// binding it, `Mode=OneWay`. `x:Bind` defaults to `OneTime`: without both of
+/// these, scheduling a deploy on an already-open window would still be true
+/// in this object the instant it happened, and invisible in the window until
+/// the app restarted and rebuilt the row fresh — found 2026-08-23, reported
+/// directly ("There is no clock next to the section name once a deploy is
+/// scheduled... There is no way to modify or cancel").
+/// </summary>
+public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private void Raise(string propertyName) =>
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
+
     public required string Title { get; init; }
     public required string Glyph { get; init; }
     public string? Tooltip { get; init; }
     public bool IsExpanded { get; set; }   // mutable: user toggles are recorded (row 99)
     public string AutomationId { get; init; } = "";
     public ObservableCollection<SidebarRow> Children { get; init; } = new();
-    public MenuFlyout? Menu { get; set; }
     public SidebarSelection? Selection { get; init; }
     public ArchivedItem? Archived { get; init; }
 
+    private MenuFlyout? _menu;
+    /// <summary>
+    /// Rebuilt every `Refresh()` pass (its closures must always hold the
+    /// freshly loaded course/section, never a stale one) — so this has to be
+    /// a real property that raises change notification, not `init`-only,
+    /// or `ContextFlyout`'s `Mode=OneWay` binding has nothing to react to.
+    /// </summary>
+    public MenuFlyout? Menu
+    {
+        get => _menu;
+        set { if (!ReferenceEquals(_menu, value)) { _menu = value; Raise(nameof(Menu)); } }
+    }
+
+    private DateTime? _scheduledDeploy;
     /// <summary>
     /// When a deploy is waiting to fire for this section, null otherwise.
     ///
     /// A scheduled deploy is the one thing Plantoir does while nobody is
     /// looking, and until now nothing said so — a teacher who set one on
     /// Friday had no way to be reminded on Monday except by remembering. The
-    /// row it belongs to is the row that says it.
+    /// row it belongs to is the row that says it. Raises change notification
+    /// for the two DERIVED properties the badge actually binds to, not just
+    /// this one, since `x:Bind` subscribes to the property path it names.
     /// </summary>
-    public DateTime? ScheduledDeploy { get; set; }
+    public DateTime? ScheduledDeploy
+    {
+        get => _scheduledDeploy;
+        set
+        {
+            if (_scheduledDeploy == value) return;
+            _scheduledDeploy = value;
+            Raise(nameof(ScheduledDeploy));
+            Raise(nameof(BadgeVisibility));
+            Raise(nameof(BadgeTooltip));
+        }
+    }
 
     public string BadgeGlyph => Glyphs.Clock;
     public Visibility BadgeVisibility =>
@@ -43,6 +92,48 @@ public sealed class SidebarRow
     public string BadgeTooltip => ScheduledDeploy is { } when
         ? $"Deploying automatically at {when:h:mm tt} on {when:dddd d MMMM}. " +
           "Right-click to cancel. This computer must be on and awake."
+        : "";
+
+    private DateTime? _publishStopped;
+    /// <summary>
+    /// When this section's scheduled publish did not get through, null
+    /// otherwise.
+    /// </summary>
+    /// <remarks>
+    /// <para>A teacher who does not know WHICH section failed cannot open the
+    /// right one, and not knowing is the whole problem — the run happened at
+    /// half six with the app closed. The sentence itself lives inside the
+    /// section; this is only what points at it.</para>
+    ///
+    /// <para><b>Failures only.</b> A scheduled publish that WORKED also leaves
+    /// a record and a notice inside the section, and deliberately no badge
+    /// here: one beside every section that published fine overnight is a badge
+    /// nobody reads by Wednesday
+    /// (contracts/shared-rules.json, scheduledPublishStopped.attention).</para>
+    ///
+    /// <para>Raises change notification for the two DERIVED properties the
+    /// badge binds to as well as this one, since <c>x:Bind</c> subscribes to
+    /// the property path it names.</para>
+    /// </remarks>
+    public DateTime? PublishStopped
+    {
+        get => _publishStopped;
+        set
+        {
+            if (_publishStopped == value) return;
+            _publishStopped = value;
+            Raise(nameof(PublishStopped));
+            Raise(nameof(WarningVisibility));
+            Raise(nameof(WarningTooltip));
+        }
+    }
+
+    public string WarningGlyph => Glyphs.Warning;
+    public Visibility WarningVisibility =>
+        PublishStopped is null ? Visibility.Collapsed : Visibility.Visible;
+    public string WarningTooltip => PublishStopped is { } when
+        ? $"The publish set to happen on its own did not go out on {when:dddd d MMMM}. " +
+          "Open this section to see why."
         : "";
 }
 
@@ -276,12 +367,27 @@ public sealed partial class SidebarPane : UserControl
                     Glyph = DocumentGlyph,
                     Selection = new SidebarSelection.SectionItem(course.Code, number),
                     AutomationId = $"sidebar-{course.Code}-section{number}",
-                    // Windows is asked, not a note of our own: the teacher can
-                    // delete the task themselves, and a badge promising a
-                    // deploy that will not happen is worse than no badge.
-                    ScheduledDeploy = TaskScheduling.NextRun(course.Code, number),
                 };
             row.Menu = SectionMenu(course, number);
+            // Re-read on EVERY pass, not only when the row is first created —
+            // rows are reconciled, not recreated, so an existing row's clock
+            // badge would otherwise stay stuck at whatever was true the
+            // moment this section was first shown, forever. Windows is asked
+            // rather than anything of ours being written down: the teacher
+            // can delete the task themselves, and a badge promising a deploy
+            // that will not happen is worse than no badge.
+            row.ScheduledDeploy = TaskScheduling.NextRun(course.Code, number);
+            // Re-read on every pass for the same reason as the clock above, and
+            // read rather than remembered: the record is on disk, an overnight
+            // run writes it with nothing of ours alive, and the teacher can
+            // clear it from inside the section — so anything cached here would
+            // be wrong within a click. FAILURES only; a run that worked leaves a
+            // notice inside the section and no badge.
+            var outcome = ScheduledPublishOutcome.Read(course.Code, number);
+            row.PublishStopped =
+                outcome is { } result && ScheduledPublishOutcome.NeedsAttention(result.Outcome)
+                    ? result.When
+                    : null;
             desired.Add(row);
         }
         ApplyDesiredOrder(courseRow.Children, desired);
@@ -499,11 +605,18 @@ public sealed partial class SidebarPane : UserControl
         // most teachers setting a 6:30 deploy know exactly what they want and
         // should not have to describe it in a sentence first.
         var scheduled = TaskScheduling.NextRun(course.Code, number);
-        menu.Items.Add(scheduled is { } when
-            ? MenuItem($"Cancel Deploy at {when:h:mm tt}…", Glyphs.Clock,
-                       () => ConfirmCancelScheduledDeploy(course, number, when))
-            : MenuItem("Schedule Deploy…", Glyphs.Clock,
-                       () => AskWhenToDeploy(course, number)));
+        if (scheduled is { } when)
+        {
+            menu.Items.Add(MenuItem($"Change Deploy Time ({when:h:mm tt})…", Glyphs.Clock,
+                                     () => AskWhenToDeploy(course, number, existing: when)));
+            menu.Items.Add(MenuItem("Cancel Scheduled Deploy…", Glyphs.Remove,
+                                     () => ConfirmCancelScheduledDeploy(course, number, when)));
+        }
+        else
+        {
+            menu.Items.Add(MenuItem("Schedule Deploy…", Glyphs.Clock,
+                                     () => AskWhenToDeploy(course, number, existing: null)));
+        }
 
         menu.Items.Add(new MenuFlyoutSeparator());
 
@@ -525,27 +638,39 @@ public sealed partial class SidebarPane : UserControl
     }
 
     /// <summary>
-    /// Ask when to deploy, and set it.
+    /// Ask when to deploy, and set it — both for a brand-new schedule and
+    /// for changing an existing one, since <see cref="TaskScheduling.Schedule"/>
+    /// already replaces by name (there is at most one per section by
+    /// construction, see <see cref="TaskScheduling.NameFor"/>), so "modify"
+    /// needs no backend of its own: it is this same dialog, pre-filled with
+    /// the time already set, calling the same Schedule.
     ///
-    /// Defaults to half past six tomorrow morning, because that is the case
-    /// this exists for — the site live before the students are, without the
-    /// teacher being at their desk. Everything the computer must be doing at
-    /// that moment is stated in the dialog rather than discovered at 6:31.
+    /// Defaults to half past six tomorrow morning for a brand-new schedule
+    /// (<paramref name="existing"/> is null) — the site live before the
+    /// students are, without the teacher being at their desk. When
+    /// <paramref name="existing"/> is given, the pickers open on that time
+    /// instead, so changing a 6:30 deploy to 7:00 does not mean re-entering
+    /// tomorrow's date from scratch. Everything the computer must be doing
+    /// at that moment is stated in the dialog rather than discovered at
+    /// 6:31, either way.
     /// </summary>
-    private async void AskWhenToDeploy(Course course, int number)
+    private async void AskWhenToDeploy(Course course, int number, DateTime? existing)
     {
-        var tomorrow = DateTime.Today.AddDays(1).AddHours(6).AddMinutes(30);
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
+        var initial = existing ?? DateTime.Today.AddDays(1).AddHours(6).AddMinutes(30);
+        bool isChange = existing is not null;
 
         var day = new CalendarDatePicker
         {
-            Date = tomorrow,
+            Date = initial,
             MinDate = DateTimeOffset.Now.Date,
             PlaceholderText = "Pick a day",
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
         var time = new TimePicker
         {
-            Time = tomorrow.TimeOfDay,
+            Time = initial.TimeOfDay,
             ClockIdentifier = "12HourClock",
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
@@ -556,6 +681,25 @@ public sealed partial class SidebarPane : UserControl
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                 "SystemFillColorCautionBrush"],
         };
+        // Advice, not a refusal: the classes a deploy would put the site up
+        // without. The assistant's tool has said this since it existed
+        // (ScheduledDeploy.Describe), and so has the mac's sheet; this door
+        // said nothing, so a teacher scheduled 6:30 AM without being told
+        // tomorrow's page was unpublished — the one thing the description
+        // exists to tell them. Date-independent, so it is read once; the
+        // button stays enabled, because "publish first" is advice the teacher
+        // may have a reason to ignore. Shown only while there is no refusal,
+        // as on the mac, where the problem is shown alone.
+        string? advice = ScheduledDeploy.UnpublishedClassesSentence(
+            ScheduledDeploy.UnpublishedClassesIn(course, number));
+        var unpublished = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "SystemFillColorCautionBrush"],
+        };
+        AutomationProperties.SetAutomationId(unpublished, "unpublishedClassesNote");
 
         var body = new StackPanel { Spacing = 12 };
         body.Children.Add(new TextBlock
@@ -567,13 +711,14 @@ public sealed partial class SidebarPane : UserControl
         });
         body.Children.Add(day);
         body.Children.Add(time);
+        body.Children.Add(unpublished);
         body.Children.Add(warning);
 
         var dialog = new ContentDialog
         {
-            Title = "Schedule a deploy",
+            Title = isChange ? "Change the scheduled deploy" : "Schedule a deploy",
             Content = body,
-            PrimaryButtonText = "Schedule",
+            PrimaryButtonText = isChange ? "Save" : "Schedule",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
         };
@@ -589,6 +734,10 @@ public sealed partial class SidebarPane : UserControl
             warning.Text = problem ?? "";
             warning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             dialog.IsPrimaryButtonEnabled = problem is null;
+
+            bool showAdvice = problem is null && advice is not null;
+            unpublished.Text = showAdvice ? advice! : "";
+            unpublished.Visibility = showAdvice ? Visibility.Visible : Visibility.Collapsed;
         }
 
         DateTime? Chosen() => day.Date is { } picked
@@ -600,12 +749,14 @@ public sealed partial class SidebarPane : UserControl
         Recheck();
 
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         if (Chosen() is not { } when) return;
 
         if (Workspace.WorkspacePath is not { } folder) return;
-        var deployArgs = DeployCommand.Arguments(course.Code, number, course.Configuration, Workspace.Settings.CloudflareAccountId);
         if (TaskScheduling.Schedule(TaskScheduling.NameFor(course.Code, number),
-                                    folder, course.Code, number, when, deployArgs) is { } failure)
+                                    folder, course.Code, number, when, course.DirectoryPath,
+                                    course.Configuration.AllDeployDestinations,
+                                    Workspace.Settings.CloudflareAccountId) is { } failure)
         {
             await ShowError("That couldn't be scheduled", failure);
             return;
@@ -623,6 +774,8 @@ public sealed partial class SidebarPane : UserControl
     /// </summary>
     private async void ConfirmCancelScheduledDeploy(Course course, int number, DateTime when)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         var dialog = new ContentDialog
         {
             Title = "Cancel this scheduled deploy?",
@@ -634,6 +787,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Close,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         if (TaskScheduling.Cancel(TaskScheduling.NameFor(course.Code, number)) is { } problem)
         {
@@ -752,6 +906,8 @@ public sealed partial class SidebarPane : UserControl
 
     private async void Remove_Click(object sender, RoutedEventArgs e)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         // An archived item is already put away — nothing for this button to do.
         var course = Workspace.SelectedCourse;
         if (course is null || Workspace.WorkspacePath is null) return;
@@ -785,6 +941,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Close,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         try
         {
@@ -831,12 +988,15 @@ public sealed partial class SidebarPane : UserControl
                       "Anything you add from now on won't be in this backup.",
             CloseButtonText = "OK",
         };
+        // folder-check: not needed — nothing follows this dialog but a discard.
         await ShowDialogSafelyAsync(dialog);
         _ = when;
     }
 
     public async void ConfirmRestoreBackup(BackupItem item)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         // Restoring rewrites the course's folders — never mid-copy (row 104's rule).
         if (Workspace.WorkspacePath is { } folder
             && CourseActivity.BusyReason(folder, item.CourseCode) is not null)
@@ -859,6 +1019,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Primary,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         try
         {
@@ -887,8 +1048,10 @@ public sealed partial class SidebarPane : UserControl
         && !Workspace.ArchivedItems.Any(a => a.CourseCode == courseCode && a.SectionNumber is null && a.FilePath != zipPath)
         && !Workspace.BackupItems.Any(b => b.CourseCode == courseCode && b.FilePath != zipPath);
 
-    private async void ConfirmDeleteBackup(BackupItem item)
+    public async void ConfirmDeleteBackup(BackupItem item)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         string consequence = IsOnlyRemainingCopy(item.CourseCode, item.FilePath)
             ? $"This backup is the only remaining copy of {item.CourseCode} — the course is no longer " +
               $"in Courses & Clubs. Deleting it removes {item.CourseCode} for good."
@@ -903,6 +1066,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Close,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         try
         {
             CourseRestorer.DeleteBackup(item);
@@ -919,6 +1083,8 @@ public sealed partial class SidebarPane : UserControl
 
     public async void ConfirmDeleteArchive(ArchivedItem item)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         // Sections inside a still-present course are never the only copy;
         // the survey matters for whole-course archives.
         bool onlyCopy = item.SectionNumber is null && IsOnlyRemainingCopy(item.CourseCode, item.FilePath);
@@ -935,6 +1101,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Close,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         try
         {
             CourseRestorer.DeleteArchive(item);
@@ -951,6 +1118,8 @@ public sealed partial class SidebarPane : UserControl
 
     public async void ConfirmRestore(ArchivedItem item)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         string message = item.SectionNumber is int n
             ? $"Section {n} will be put back into {item.CourseCode}, and will no longer be listed as archived."
             : $"{item.CourseCode} will be put back into Courses & Clubs, and will no longer be listed as archived.";
@@ -963,6 +1132,7 @@ public sealed partial class SidebarPane : UserControl
             DefaultButton = ContentDialogButton.Primary,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         try
         {
@@ -980,6 +1150,41 @@ public sealed partial class SidebarPane : UserControl
         }
     }
 
+    // ---- A confirmation belongs to the folder it was asked in -------------
+
+    /// <summary>
+    /// True when the window has been pointed at a DIFFERENT working folder
+    /// since this confirmation went up — in which case the answer is void and
+    /// the caller must do nothing at all.
+    ///
+    /// <para>This is the Windows shape of the contract's
+    /// <c>workingFolderSelection.alsoCleared</c>
+    /// (<c>contracts/shared-rules.json</c>): the mac holds its pending
+    /// confirmations as FIELDS and drops them when the folder changes, while
+    /// here each one is a continuation on an <c>await</c>, so there is nothing
+    /// to drop and the check has to happen where the continuation resumes.
+    /// Silently void, exactly like the mac's cleared confirmation — no
+    /// sentence, because a teacher who has just moved to another folder is
+    /// not waiting to be told about the one they left.</para>
+    ///
+    /// <para>What it prevents is not theoretical. Every one of these
+    /// confirmations names a course, an archive or a backup by a path taken
+    /// BEFORE the dialog, and finishes by asking the window where it is NOW.
+    /// Answer a backup restore after the folder has moved and
+    /// <c>Workspace.CoursesDirectory()</c> is the new folder's while
+    /// <c>item.FilePath</c> is still the old folder's zip: the new folder's
+    /// course of that code is archived and overwritten with a backup from a
+    /// folder nobody is looking at, and it reports success. A delete removes
+    /// the old folder's file while the window shows the new one.</para>
+    ///
+    /// <para>Ctrl+O is what makes it reachable — a window-wide accelerator
+    /// with no <c>ScopeOwner</c>, so it is not obviously shut while a modal
+    /// dialog is up (issue #191). The guard is here rather than on the
+    /// accelerator because it is true whatever opens the picker.</para>
+    /// </summary>
+    private bool TheFolderMovedUnderThisConfirmation(string? askedIn) =>
+        !WorkingFolder.IsTheSame(askedIn, Workspace.WorkspacePath);
+
     private XamlRoot? EffectiveXamlRoot => XamlRoot ?? _window.Content?.XamlRoot;
 
     private async Task<ContentDialogResult?> ShowDialogSafelyAsync(ContentDialog dialog)
@@ -989,7 +1194,7 @@ public sealed partial class SidebarPane : UserControl
             dialog.XamlRoot = root;
             try
             {
-                return await dialog.ShowAsync();
+                return await dialog.ShowAsync();   // folder-check: not needed — this IS the helper every confirmation is shown through; its callers hold the check.
             }
             catch (Exception ex)
             {
@@ -1012,6 +1217,7 @@ public sealed partial class SidebarPane : UserControl
             Content = message,
             CloseButtonText = "OK",
         };
+        // folder-check: not needed — an error report acts on nothing.
         await ShowDialogSafelyAsync(dialog);
     }
 
@@ -1025,6 +1231,8 @@ public sealed partial class SidebarPane : UserControl
 
     public async Task OpenNewCourseWizard(string? autoCreateCode = null, string? autoSections = null)
     {
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         if (EffectiveXamlRoot is null) return;
         var wizard = new NewCourseDialog(_window) { XamlRoot = EffectiveXamlRoot };
         if (autoCreateCode is not null) wizard.AutoCreate(autoCreateCode, autoSections);
@@ -1037,6 +1245,7 @@ public sealed partial class SidebarPane : UserControl
             App.LogDiagnostic($"OpenNewCourseWizard exception: {ex.Message}");
             return;
         }
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         Workspace.Reload();
         _window.ApplyState();
         if (wizard.CreatedCourseCode is { } code)
@@ -1060,6 +1269,8 @@ public sealed partial class SidebarPane : UserControl
                 "preview or deploy of this course is still using them. Try again when it finishes.");
             return;
         }
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = Workspace.WorkspacePath;
         if (EffectiveXamlRoot is null) return;
         var dialog = new AddSectionDialog(course) { XamlRoot = EffectiveXamlRoot };
         try
@@ -1071,6 +1282,7 @@ public sealed partial class SidebarPane : UserControl
             App.LogDiagnostic($"OpenAddSectionDialog exception: {ex.Message}");
             return;
         }
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         if (dialog.AddedNumber is { } number)
         {
             Workspace.Reload();
@@ -1082,6 +1294,8 @@ public sealed partial class SidebarPane : UserControl
     public async Task OpenRenameCourseDialog(Course course)
     {
         if (Workspace.WorkspacePath is not { } folder) return;
+        // Which folder this confirmation belongs to, taken BEFORE it goes up.
+        string? askedIn = folder;
 
         string? busy = CourseActivity.BusyReason(folder, course.Code);
         if (busy is not null)
@@ -1114,7 +1328,7 @@ public sealed partial class SidebarPane : UserControl
             {
                 new TextBlock
                 {
-                    Text = $"Choose a new course code for {course.Code}. Letters, numbers, and single spaces up to 12 characters are allowed.",
+                    Text = $"Choose a new course code for {course.Code}. Letters, numbers, spaces and dashes up to 12 characters are allowed.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 codeBox,
@@ -1144,6 +1358,7 @@ public sealed partial class SidebarPane : UserControl
         Validate();
 
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
         string requestedCode = codeBox.Text.Trim();
         string newNormalized = CourseCodeValidator.Normalize(requestedCode);
@@ -1160,8 +1375,32 @@ public sealed partial class SidebarPane : UserControl
                 DefaultButton = ContentDialogButton.Primary,
             };
             if (await ShowDialogSafelyAsync(obsidianDialog) != ContentDialogResult.Primary) return;
+            if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
             await FolderActions.QuitObsidianAndWait();
+            // Asked AGAIN after the wait, and this is the WIDEST window in the
+            // whole rename: quitting Obsidian polls for up to five seconds
+            // with NO dialog on screen at all, so the File menu and Ctrl+O are
+            // both fully live. Everything below reads the LIVE workspace — the
+            // taken-codes list, the reload, and the selection it sets — so a
+            // folder chosen during those five seconds would have this rename
+            // select a course code in a folder that never had one, which is
+            // the "Course Not Found" #162 exists to remove. A check before a
+            // wait says nothing about what is true after it.
+            //
+            // What this leaves the teacher with, decided rather than
+            // overlooked: Obsidian has been QUIT and is not reopened, and
+            // nothing says so. Nothing on disk is half-done — the rename has
+            // not run at all — so the cost is an editor they have to open
+            // again. Reopening it here was rejected: the vault to reopen is
+            // the one in the folder they have just left, so Plantoir would
+            // pull them back to a folder they deliberately moved away from,
+            // and the folder they ARE in may have no vault of that name at
+            // all. Saying it was rejected too — the contract's rule is that a
+            // confirmation about a folder the window has left is silently void
+            // (workingFolderSelection.alsoCleared), and a sentence about the
+            // old folder is exactly what it forbids.
+            if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         }
 
         try

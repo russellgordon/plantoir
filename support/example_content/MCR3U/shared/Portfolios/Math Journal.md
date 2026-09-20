@@ -40,8 +40,12 @@ testable, and yours.
 
 ## Success criteria and collection
 
-The journal comes in each unit, read against these criteria —
-[[Journal Checklist]] turns them into a self-check before handing in.
+The journal comes in at the end of each unit and is read against these
+criteria — read and written back to, never scored.
+[[Journal Checklist]] turns them into a self-check before you hand it
+in, and [[How Marks Work]] explains the one part of the journal that
+does carry a mark: the four entries written in class on task hand-in
+days.
 
 | Quality | What it looks like |
 | --- | --- |

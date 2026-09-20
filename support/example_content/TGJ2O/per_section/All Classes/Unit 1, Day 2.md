@@ -14,9 +14,10 @@ tags:
 2. Warm-up: [[News or Not]]
 3. Read together: [[Safety in the Newsroom]] — the slow injuries this
    work causes, and the habits that prevent them
-4. Set up your [[Newsroom Journal]]: [[Your First Entry]], with
-   [[What a Strong Entry Looks Like]] read together
+4. Set up your [[Newsroom Journal]], and read
+   [[What a Strong Entry Looks Like]] together — the bar, before anybody
+   writes to it
 
 ## Things to do before our next class
 
-- [ ] First journal entry written.
+- [ ] Journal set up and named, ready for tomorrow's first entry.

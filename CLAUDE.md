@@ -30,8 +30,8 @@ Neither app contains toolchain logic of its own: they write the same
    assistant's own plumbing: no model names, parameter counts, tokens, context
    windows or GPU talk. It says "the small assistant" and "the larger
    assistant", and a test enforces it.
-2. **A new behaviour goes into the SHARED test suite, or its intent goes into
-   the other side's handoff. Never neither.** Every feature and every changed
+2. **A new behaviour goes into the SHARED test suite, or its intent goes to
+   the other side as an ISSUE. Never neither.** Every feature and every changed
    behaviour lands in one of two places, and which one is a judgement about
    portability, not about effort:
    - **It belongs in [`contracts/`](contracts/README.md)** if it is a sentence
@@ -40,13 +40,21 @@ Neither app contains toolchain logic of its own: they write the same
      the other side then runs the identical case. Adding to `AssistWording` or
      to a contract's authored half is part of writing the feature, not a
      follow-up.
-   - **It belongs in the other side's handoff** — `WINDOWS-HANDOFF.md` for
-     work done on the mac, `MAC-HANDOFF.md` for work done on Windows — if it
-     cannot be expressed as data: anything visual, anything with platform
-     mechanics (WSL2, ConPTY, Colima, port leases), anything measured rather
-     than asserted. Then write the INTENT and the desired behaviour, not just
-     that it exists. `WINDOWS-HANDOFF.md` keeps the list of what the contract
-     cannot carry; if your change is on that list, the handoff is where it goes.
+   - **It belongs in a [GitHub
+     issue](https://github.com/russellgordon/plantoir/issues)** labelled for
+     the OTHER platform — `windows` for work done on the mac, `mac` for work
+     done on Windows — if it cannot be expressed as data: anything visual,
+     anything with platform mechanics (WSL2, ConPTY, Colima, port leases),
+     anything measured rather than asserted. Then write the INTENT and the
+     desired behaviour, not just that it exists. `contracts/README.md`'s
+     coverage table says what the contract deliberately cannot carry; if your
+     change is on that list, an issue is where it goes.
+
+     **An issue is an OBLIGATION**, so this fork is for things the other side
+     must DO. Something they only need to KNOW — a shared decision, a frozen
+     name, a trap — is not a third case slipping between the two: it goes in
+     the `documentation/` page that owns its subject (rules 3 and 4), and an
+     issue nobody can close is the thing that arrangement avoids.
 
    The failure this prevents is the quiet one: a behaviour that exists in one
    app, is described nowhere the other app's tests can reach, and is discovered
@@ -62,11 +70,32 @@ Neither app contains toolchain logic of its own: they write the same
      says something usable** — what to do differently, what is inherited
      unchanged, or the trap that would pass review. "Shared Python, nothing to
      mirror" is fine when true; an empty cell never is.
-   - **anything architectural also has a section in
-     [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)**. A log row records a decision;
-     the handoff explains it well enough to implement.
+   - **anything architectural also has a section in the
+     [`documentation/`](documentation/README.md) page that owns its subject** —
+     the build pipeline in 05, publishing in 07, the assistant in 10, and so on.
+     A log row records a decision; the deep dive explains it well enough to
+     implement. Say what you measured and what you REJECTED: a behaviour can be
+     read off the code, the reason for it cannot.
+   - **a GitHub issue is opened, labelled `windows`, in the same session** —
+     one short paragraph naming what the change is, what Windows inherits free,
+     what they owe, and a pointer to the section that explains it. Give it a
+     milestone if it is pinned to a release, and `decision` as well if it needs
+     Russell to choose. Close it when it is done rather than editing the title;
+     the issue keeps its own history that way.
    - **guidance the change made WRONG is corrected there too.** Stale advice is
      worse than none, because it gets followed.
+
+   **The issue is not a duplicate of the section, and this is the part that
+   gets skipped.** A Windows session is told to read the open `windows` issues
+   first ([`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md)), so the issue is the
+   INDEX — how they learn there is work at all — and the `documentation/` page
+   it points at is the manual for doing it. Prose buried three hundred lines down that nothing
+   points at is work they will not find, and a change written up beautifully
+   and never opened as an issue is indistinguishable, from their side, from a
+   change nobody wrote up. (This replaced a numbered list inside
+   `WINDOWS-HANDOFF.md` on 2026-09-08; the list rotted because it mixed durable
+   reasoning with perishable state, and every session had to re-read a thousand
+   lines of struck-through items to find the five that were live.)
 
    Say what you measured, not just what you decided — numbers travel, taste does
    not. Write down the **reasoning**, not only the behaviour: a behaviour can be
@@ -81,13 +110,25 @@ Neither app contains toolchain logic of its own: they write the same
    back to the app's own button was their design, and the mac ran its own
    invisible script runner for weeks afterwards because nobody wrote it down
    here. A change made on Windows is not finished until:
-   - **[`MAC-HANDOFF.md`](MAC-HANDOFF.md) has an entry**, written to the
-     template at the top of that file: what was done, what it fixed, and — the
-     part that travels — WHY, including what was rejected. Entries are marked
-     `✅ DONE` in place rather than deleted, so the ledger keeps its own
-     history, and a proposed contract case is named in that file's
-     "Contract cases waiting on the mac" section so a red mac suite reads as a
-     request rather than as damage.
+   - **a GitHub issue is opened, labelled `mac`**, carrying: what was done,
+     what it fixed, and — the part that travels — WHY, including what was
+     rejected; numbers with the hardware they came from for anything measured;
+     the file and test names to look at, which outlast commit hashes; and
+     whether the mac must MATCH it or merely know. **A proposed contract case
+     is an issue too**, so a red mac suite reads as a request rather than as
+     damage; say in it which case was added and what the mac has to implement
+     to make it pass.
+   - **anything the MAC must merely KNOW, rather than do, goes in the
+     `documentation/` page that owns its subject** — not an issue, because an
+     issue nobody can close is one everybody learns to scroll past. Anything it
+     must DO is an issue, opened in the same session. A change that creates an
+     obligation for the other platform and opens no issue has, from their side,
+     not been handed over at all.
+   - **The record of what LANDED is the closing comment on the issue.** Said
+     explicitly because the rule this replaced ended "entries are marked
+     `✅ DONE` in place rather than deleted" in a ledger that no longer exists,
+     and dropping that sentence without saying what took its place would leave
+     nobody knowing where a finished piece gets written down.
    - **`GUI-IMPROVEMENTS.md` gets a row for anything a teacher can see**, so
      the log stays the record of the product rather than of one platform.
    - **anything measured is written with its NUMBERS and the hardware they
@@ -101,8 +142,8 @@ Neither app contains toolchain logic of its own: they write the same
    `promptHistory`, and every case list in the other files) are preserved by
    the generator and can be proposed from either side. A case added on Windows
    will make the MAC suite fail until the mac implements it, and that is the
-   feature working, not a break: say so in `MAC-HANDOFF.md` so the failure is
-   read as a request rather than as damage.
+   feature working, not a break: open a `mac` issue saying so, so the failure
+   is read as a request rather than as damage.
 5. **A feature a teacher can see leaves a line on the trail — new or
    CHANGED.** Plantoir keeps a breadcrumb trail (`~/Library/Logs/Plantoir/
    activity.txt`; `%LOCALAPPDATA%\Plantoir\Logs` on Windows) so that a problem
@@ -143,34 +184,113 @@ Neither app contains toolchain logic of its own: they write the same
      the Netlify site is not connected to GitHub. `python3 website/build.py
      --deploy` is the only way it updates, run from `main` so the live site
      matches what shipped.)
-   - **`dev` is where work integrates.** Start sessions from `dev`, branch
-     off it, merge back to it. A piece merges only with its tests green and
-     its write-ups done (rules 2–5).
+   - **`dev` is where work integrates — and NOTHING reaches it without
+     Russell saying so.** Start sessions from `dev` and branch off it. The
+     merge back is HIS call, every time: see "Autonomy moves with the
+     model" below, which was narrowed on 2026-08-22 for exactly this.
+     A piece is ready to merge only with its tests green, its write-ups
+     done (rules 2–5) and its documentation pass made (rule 11) — say it is
+     ready and stop there.
+
+     **The push rule now applies to the ISSUE BRANCH: work is not finished
+     until `git push -u origin issue/<slug>` — push in the same session, as
+     you go.** The reason is unchanged and was learned the hard way on
+     2026-08-21, when a Windows session merged a hero-image fix into its
+     local `dev`, reported it done, and a mac clone made from `origin/dev`
+     minutes later had none of it, because the commits had never left the
+     Windows machine. Work that stays on one machine is invisible to every
+     other machine and every other session, and that is just as true of an
+     unpushed issue branch as it was of an unpushed `dev`. If `git push` is
+     rejected because the remote moved, `git fetch` and read what changed
+     before merging or force-pushing anything — never push over work you
+     have not looked at.
    - **One issue branch per coherent piece**, branched off `dev`: named
      `issue/<number>-<slug>` when a GitHub issue exists, `issue/<slug>` when
      not. "A coherent piece" keeps its old meaning — one thing a teacher
      could notice, with its tests and its write-up; not one file, and not a
-     whole afternoon. Merge with `--no-ff` so the piece stays one readable
-     unit in history, and delete the branch after it merges.
-   - **Autonomy moves with the model.** Committing as you go on the issue
-     branch and merging a finished piece into `dev` are the standing order —
-     no per-session permission, exactly as commit-to-main used to be. Merging
-     `dev` into `main` is PUBLISHING: do it during a requested release cut,
-     or when Russell asks, never on your own initiative. Outside an iterative
-     run — a one-off question, an experiment, something half-finished — the
-     older rule still holds: ask first.
+     whole afternoon. When Russell approves the merge, merge with `--no-ff`
+     so the piece stays one readable unit in history.
+   - **Then DELETE the branch — local and remote — in the same session, as
+     the last step of the merge.** Standing order from Russell, 2026-09-09,
+     replacing the trailing clause "and delete the branch after it merges"
+     that used to end the point above. Same instruction; it is its own step
+     now because a clause at the end of a sentence about merge strategy was
+     read as advice and skipped, and by the day this was written the remote
+     carried **26 branches of which 25 were fully merged** — 0 commits
+     ahead, nothing unique in any of them.
+
+     ```bash
+     git branch -d issue/<number>-<slug>                      # local
+     git push origin --delete issue/<number>-<slug>           # remote
+     ```
+
+     Use `-d`, never `-D`: the lowercase form refuses a branch that is not
+     fully merged, which is the check, not an inconvenience to work around.
+     A branch it refuses is telling you something — go and look before you
+     force it.
+
+     **The cost is not tidiness.** A list where 25 of 26 entries are dead is
+     a list nobody reads, so the one LIVE branch — somebody else's work in
+     flight, on a repository where two agents and a session can be running
+     at once — is invisible in it. That happened here the same day: this
+     session read the eight most recently committed branches, called them
+     live without checking, and warned Russell about a duplicate that did
+     not exist. Every branch that survives its merge makes the next reader's
+     answer worse.
+
+     **Deleting the branch is not what finishes the WORK** — the issue's
+     closing comment is (rules 3 and 4), and the branch goes after it, so a
+     merged piece leaves exactly two traces: the `--no-ff` merge commit and
+     the closed issue.
+   - **Autonomy moves with the model, and it stops at the issue branch.**
+     Committing as you go on the issue branch, and pushing that branch to
+     `origin`, are the standing order — no per-session permission.
+     **Merging into `dev` is NOT**, and asking is not a formality to be
+     inferred past: wait for Russell to say so in this session, about this
+     piece. Narrowed 2026-08-22, superseding the order that had merging and
+     pushing `dev` in the standing set — which is why a session can find
+     merge commits on `dev` dated before this rule and should not read them
+     as precedent.
+
+     The reason is what `dev` is FOR. It is the branch every other machine
+     and every other session starts from, so a merge is not "saving work",
+     it is handing work to everybody — including a Windows session that
+     will build on it before anyone has looked at it. Work pushed to an
+     issue branch is just as safe from being lost and costs nobody anything
+     if it turns out to be wrong. So: finish the piece, push the branch,
+     say it is ready and what it contains, and let him decide.
+
+     Merging `dev` into `main` is PUBLISHING and was already his: do it
+     during a requested release cut, or when he asks, never on your own
+     initiative.
 
    End every commit message with the `Co-Authored-By` trailer naming the
    agent that did the work. Claude sessions use the trailer their harness
-   supplies. **An Antigravity or Gemini session must use
-   `Co-Authored-By: Antigravity <noreply@google.com>` — never
-   `antigravity@google.com`.** GitHub resolves co-author emails to whatever
-   account has the address registered, and `antigravity@google.com` belongs
-   to a stranger's personal account (`shimonenator`), so every commit
-   carrying it credits that person as a contributor to this repository —
-   found 2026-08-19, after seven commits had already done exactly that.
-   `noreply@google.com` was checked the same day and maps to no account at
-   all, which is the property that makes it safe. The failure
+   supplies.
+
+   **`.githooks/pre-commit` is committed rather than left in `.git/hooks`** so
+   it reaches the Windows machine too — but hooks are not installed by
+   cloning, so **each clone must opt in once**:
+
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+
+   Do that on any machine that has not, and check `git config --get
+   core.hooksPath` before assuming you are covered. The hook does two things,
+   neither of which blocks: it says when a commit touches the publishing path,
+   and — since 2026-09-08 — it says when a staged file carries carriage
+   returns, this repository being LF. `.gitattributes` handles ordinary CRLF
+   drift on its own; the hook exists for the shape it cannot, an editor
+   writing CR CR LF, which git normalises only halfway and which once produced
+   7,672 insertions for 264 lines of work.
+
+   **A note on this repository's contributor list**, so nobody investigates it
+   twice: seven commits from August 2026 carry a co-author trailer whose
+   address resolves to an unrelated person's GitHub account, which credits
+   them here. They are left as they are — removing them would mean rewriting
+   `main` and `dev` and breaking every existing clone, which costs more than
+   it buys. The failure
    the commit-per-piece order prevents is unchanged: one session's worth of
    unrelated work in one working tree — forty files, a dozen decisions
    tangled together, no way to undo one piece without unpicking the rest —
@@ -185,9 +305,13 @@ Neither app contains toolchain logic of its own: they write the same
    The Swift in `mac-app/` avoids `map`/`filter`/`reduce`, uses `@Observable`
    (never `ObservableObject`) and `// MARK: -` sections, and prefers clarity
    over concision. Those rules live in Russell's MACHINE-WIDE instructions
-   (`~/.claude/CLAUDE.md`, mirrored to `~/.gemini/GEMINI.md`), not in this
-   repository, because they govern his Swift everywhere rather than this
-   project in particular.
+   (`~/.claude/CLAUDE.md`), not in this repository, because they govern his
+   Swift everywhere rather than this project in particular. There is ONE
+   copy, and that is the point: the `~/.gemini/GEMINI.md` mirror this line
+   used to name was removed on 2026-09-09 along with the agent that read it,
+   and it had already drifted — 203 lines against 263, missing the rule
+   against `DispatchQueue` entirely. A mirror nobody re-syncs is a second
+   answer to the same question.
 
    **A Windows session is therefore not missing a rule set** — decided
    2026-08-17, when it turned out that machine has no global instructions
@@ -274,6 +398,96 @@ Neither app contains toolchain logic of its own: they write the same
     that cost real time", below); rebuilding the app is the first link of it,
     not a substitute for it.
 
+11. **How a piece of work is done here: implement, review each chunk, write up
+    for Windows as you go, and finish with the documentation.** Standing order
+    from Russell, 2026-09-05, after a session where every one of these paid for
+    itself and the last one had to be asked for.
+
+    - **Implement with the strongest model available.** In Claude Code that
+      means Opus; on another harness, the most capable model you have. This is
+      not a preference about style: the work in this repository is mostly
+      judgement — which of three implementations is
+      right, what a teacher would recognise, what a rule's REASON was — and
+      that is exactly where a weaker model produces something that passes its
+      tests and is wrong.
+    - **Have each logical chunk checked by a genuinely independent reviewer
+      before moving on. In Claude Code, use OPUS for those reviews** — a fresh
+      context at the very least, because a reviewer that is the same mind
+      with the same assumptions agrees with itself. **At least three reviews
+      per coherent piece** (rule 6's sense of "piece"), and more if it has
+      separable parts: the PLAN, then the implementation, then the fixes. A
+      review of the finished thing arrives too late to change its shape, and
+      the shape is usually what is wrong. Brief the reviewer adversarially —
+      tell it to find where the work is wrong, incomplete, or has created a
+      new problem, and tell it that "nothing to act on" is an acceptable
+      answer, or it will invent findings to justify its existence.
+
+      **Then ONE final sweep on FABLE, and only that one, right before "this
+      is ready".** Standing order from Russell, 2026-09-10: **Opus for all
+      subagent reviews; Fable only for the VERY FINAL pre-merge sweep.** The
+      sweep is a fourth review, of the whole finished piece as it will be
+      merged — after the fixes from the earlier reviews, after the
+      documentation pass (below) and after the rebuild rule 10 asks for — so
+      that the most capable model reads exactly what Russell will be asked to
+      merge and nothing that will still change. It is a sweep, not a fourth
+      round: brief it to look across the whole diff for what the chunk
+      reviews could not see (a fix in one place that made a sentence
+      elsewhere wrong, a contract case and a doc that disagree, a rule
+      followed in three files and not the fourth). Findings it raises are
+      fixed and re-run through the ordinary tests; they do not earn another
+      Fable pass unless Russell asks for one.
+
+      **Pass the model EXPLICITLY when spawning an agent** rather than relying
+      on the default — the default subagent model is configured outside this
+      repository, so a session that omits it cannot tell what it got. Say
+      which model did which review in the write-up, the way row 480 of
+      `GUI-IMPROVEMENTS.md` does.
+
+      *(Superseded, kept because a session may meet its consequences. On
+      2026-09-09 the order was FABLE for every subagent review, restoring the
+      original "a DIFFERENT model where one is available" rule after a
+      one-day order on 2026-09-08 to run subagent work on OPUS — that day a
+      review agent had died mid-run with "You're out of usage credits … to
+      keep using Fable 5.1", and the order said Fable would come back the
+      moment it could run. It did, for a day: the piece for issue #100 on
+      2026-09-10 ran all three of its reviews on Fable, and the rule above
+      replaced that arrangement the same day. Reviews recorded as Fable
+      before 2026-09-10 are not a breach of the rule above; they predate it.)*
+
+      **Verify what a review claims rather than acting on it.** A reviewer is
+      wrong often enough to matter, and a finding accepted without checking is
+      just a second opinion with extra steps. Equally, when it is right about
+      something you decided, say so plainly and change the decision — on the
+      session this rule came from, a recorded decision about the activity
+      trail was reversed on review and the reversal was correct.
+    - **Write it up for the other platform AS YOU GO, not at the end.** This
+      is rule 3 (and rule 4 pointing the other way); it is named here because
+      it belongs to the rhythm of the work rather than to its ending. A
+      write-up made at the end is made from memory, and the reasons — which is
+      the part that travels — are what memory loses first.
+    - **ALWAYS end with a documentation update, BEFORE asking to merge** —
+      after the rebuild rule 10 asks for, since a documentation pass needs no
+      further build. The last act before "this is ready" is to go looking for
+      every place that describes what you changed, and fix the ones the change
+      made wrong. Start with `documentation/`, which is the one most easily forgotten
+      because nothing in the daily rhythm points at it: an issue and a
+      `GUI-IMPROVEMENTS.md` row get written because rules 3 to 5 demand them,
+      and the deep dive gets written because somebody remembers. On the session
+      this rule came from, four places in `documentation/` described the rule
+      that had just been replaced, three of them wrongly, and one of them did
+      not document a launcher flag the app has been calling for weeks.
+
+      **Grep for the thing you changed rather than trusting your memory of
+      where it is described.** A behaviour is usually written down in more
+      places than the one you edited, and the copies that are now wrong are
+      worse than no copy at all, because they will be believed. Two things
+      are deliberately NOT updated: `GUI-IMPROVEMENTS.md` rows and completed
+      `TODO.md` entries are append-only records of what was true on their
+      day.
+
+    Then say it is ready, say what it contains, and stop — rule 6 still
+    decides what happens next, and the merge is his.
+
 ## Setting up on a new machine
 
 The command-line toolchain needs nothing built — the launchers download any
@@ -310,8 +524,12 @@ and re-asks every time. On a machine without that team's certificate, point
 `DEVELOPMENT_TEAM` at your own or set `CODE_SIGN_IDENTITY: "-"` and live with
 the prompts.
 
-**Windows app.** Nothing is generated, the solution is committed, and the only
-prerequisite is the **.NET 9 SDK**. It targets `net9.0-windows10.0.19041.0` /
+**Windows app.** Nothing is generated, the solution is committed, and the
+prerequisites are the **.NET 9 SDK** and a **`python` on PATH** — the latter
+since 2026-09-07, when `dotnet test` began running the shared
+`scripts/test_*.py` files; the suite FAILS rather than skips without an
+interpreter, deliberately, because a suite that is green having run nothing is
+the failure mode that change was made to close. It targets `net9.0-windows10.0.19041.0` /
 `win-x64` and ships self-contained, Windows App SDK included, so a teacher
 installs no runtime.
 
@@ -345,6 +563,16 @@ preview or a deploy running in the app's own console is work he is watching;
 wait for it, or ask. Relaunching afterwards is HIS, the same way it is on the
 mac (rule 10): a rebuild that reopens the app steals focus from whatever he has
 moved on to.
+
+**Standing order, added 2026-08-22: when a round of changes looks done, rebuild
+for `x64` so his "PT - Dev" Desktop shortcut runs it.** The Windows mirror of
+mac rule 10 below — "when you think the work is done, rebuild the app before
+you say so." His shortcut points at
+`Plantoir\bin\x64\Debug\net9.0-windows10.0.19041.0\win-x64\Plantoir.exe`,
+which a plain `dotnet build` does not write to (see `WINDOWS-BOOTSTRAP.md` §6
+for why and the exact command). Build with `-p:Platform=x64` before reporting
+back, and say the build is ready at "PT - Dev" — still without launching it
+yourself; that part stays his.
 
 ### Clean up after yourself, because a force-kill skips the app's own tidying
 
@@ -396,7 +624,7 @@ old `ca.russellgordon.QuartzTeachers` domain.
 ## How the toolchain ships
 
 There is no Docker Hub. The full build recipe (Dockerfile, `patches/`,
-`scripts/`, `support/`, launchers) is bundled inside the app and mirrored into
+`scripts/`, `support/`, `contracts/`, launchers) is bundled inside the app and mirrored into
 each working folder's `.toolchain/`. The launchers:
 
 - tag the image `teaching-quartz:src-<hash>`, where the hash covers every file
@@ -411,7 +639,18 @@ each working folder's `.toolchain/`. The launchers:
 - probe a free host port block per container (8081/8091/8101…), mapping to
   fixed container ports 8081–8084 for sites plus 9081–9084 for Quartz's
   live-reload websockets (`--wsPort` = port + 1000 — without it, concurrent
-  previews collide on the websocket even with distinct site ports).
+  previews collide on the websocket even with distinct site ports);
+- give the container **TWO** bind mounts, not one: `courses/` at
+  `/teaching/courses`, and `~/Library/Application Support/Plantoir/builds/
+  <folder id>` at **its own absolute path**. The second is where built
+  websites live — `courses/<CODE>/.merged_output` is a symlink to it, so the
+  link has to resolve to the same string on both sides. A container missing
+  that mount is recreated, because a mount cannot be added to one that
+  already exists. Every launcher creates the same mount set; if one of them
+  stopped, two launchers would recreate the container away from each other
+  on alternate runs. The rule, and what was rejected, is in
+  [`contracts/shared-rules.json`](contracts/shared-rules.json) →
+  `buildOutputLocation`.
 
 The image carries **wrangler**, Cloudflare's own deploy CLI, used by
 `scripts/deploy.py` for the Cloudflare Pages destination (their upload protocol
@@ -429,7 +668,8 @@ lives inside the Colima VM's disk (`~/.colima`).
 
 ### Editing the toolchain: two traps that cost real time
 
-A change to `scripts/`, `support/`, `patches/` or a launcher does **not** reach
+A change to `scripts/`, `support/`, `patches/`, `contracts/` or a launcher does
+**not** reach
 a working folder until it has travelled through the app bundle. The app mirrors
 its bundled copy into `.toolchain/` whenever it touches a folder, and the
 launchers hash that folder to name the image. The chain is: edit → **rebuild the
@@ -484,8 +724,11 @@ and every folder built before the fix stays broken until someone passes
 ## The local assistant
 
 Plantoir has an on-device assistant: the teacher types "publish tomorrow's
-class" and the pages are published. It is on `main` in both apps and in no
-released version, because no release has been tagged yet.
+class" and the pages are published. It is on `main` in both apps and it has
+SHIPPED: it is in v1.1.0 (2026-08-20), so a change to it is a change to
+something teachers already use — not to a feature still waiting for its first
+release. (This paragraph said "in no released version, because no release has
+been tagged yet" until 2026-09-19, a month after that stopped being true.)
 
 One sentence explains the architecture — **the model never does anything.** It
 reads a sentence and answers with the name of a function and its arguments;
@@ -526,10 +769,12 @@ Four things that cost a day each if you do not know them:
   probe, took the promise-card score from 110/110 to 90/110 and broke three
   probes that had been perfect. A small model reads a sentence naming another
   tool as a recommendation, not a boundary. The rule went into Swift instead.
-- **Adding a tool is a routing change.** The local model is shown 13 of the 20
-  tools that exist (`AssistToolRunner.localTools`); an MCP client is shown 23
-  (`.mcpTools`, the 20 plus three that ask for judgement about meaning). More
-  choices is the classic way a router degrades.
+- **Adding a tool is a routing change.** On the mac the local model is shown
+  13 of the 22 tools that exist (`AssistToolRunner.localTools`); an MCP client
+  is shown 32 (`.mcpTools`, the 22 plus ten: three that ask for judgement about
+  meaning). More choices is the classic way a router degrades. **Windows'
+  `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
+  same product — see [issue #66](https://github.com/russellgordon/plantoir/issues/66).
 
 On the mac the MCP server IS the app: `Plantoir --mcp-stdio <working-folder>`
 serves the same tools to Claude Code, so there is no second binary to sign or
@@ -538,7 +783,7 @@ forget. Windows ships `plantoir-mcp.exe` instead.
 ## Example content and skeletons
 
 `support/example_content/<CODE>/` holds ready-made course content, one folder
-per Ontario course code (ADA1O is the template to copy; **37 codes** have
+per Ontario course code (ADA1O is the template to copy; **38 codes** have
 payloads today — count the folders rather than trusting a number). Each payload
 is `manifest.json` plus `shared/` and `per_section/` trees, and the manifest is
 the course's ENTIRE structure when a teacher pre-populates: the wizard asks no
@@ -562,19 +807,39 @@ mistake there is a mistake in nineteen hundred courses.
 
 | Change | Gate |
 |---|---|
-| Toolchain (launchers, `scripts/`, Dockerfile, patches) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
+| Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
 | macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
-| Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` |
+| Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` — which since 2026-09-07 also runs every shared `scripts/test_*.py` through `PythonToolchainTests`, so a change to the shared Python is gated on Windows too. Needs a `python` on PATH and FAILS rather than skips without one. **Judge it by the TOTALS line, never the exit code** — `dotnet test` exits 1 for a failing test, for a test host that DIED underneath the run, and for a project that did not compile, and only the output tells the three apart. `.\run-tests.ps1` (repo root) runs the same command and says which happened; a convenience, not a gate. What each looks like, measured, is in `documentation/12-windows-app.md` → "Reading a test run". **A green totals line may carry NAMED GAPS** — contract keys this app does not implement yet, held open by name rather than left red; `windows-app/Plantoir.Tests/NamedGapLedger.cs` lists them with the issue and milestone that own each, and `contracts/README.md` → "Named gaps" says when one is allowed (and `RELEASING.md` step 2 says to read the ledger before cutting). |
+| Windows app, **through the real interface** | `.\run-ui-tests.ps1`, **run from the repository root** (every other command in this table starts `cd windows-app`; this one does not), — launches the x64 Debug `Plantoir.exe` with `--state-dir` and drives it with UI Automation, for what a unit test cannot see: that a control can be REACHED, that clicking it opens something, that the RENDERED text is what the model said in the order the contract fixes, that a scrolling list is not cut off at the bottom, that a panel follows the course a teacher selected rather than going stale, and that a sentence the contract pins is actually RENDERED where a teacher can see it rather than merely held in a constant. **Opt-in and part of no gate**: every test carries `[UiFact]` and skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and runs none. It is in the solution, so a SOLUTION build compiles it — the per-project commands this table names do not, which is the honest limit of the compile-rot protection. Needs a desktop session and the foreground, takes minutes, and CLOSES a running Plantoir (saying so, and not reopening it). Nothing of the teacher's is touched: `--state-dir` moves the whole state folder for the run — but that redirects only what the APP resolves, and one test now presses the wizard's Create button and so runs `setup.ps1`, which computes the builds root from the real environment itself. That one is safe because `setup_course.py` never resolves `merged_output_root`; **a test that drove Preview or a scheduled deploy would NOT be**, and `documentation/12-windows-app.md` is where to read why before writing one. |
 | Assistant routing | **Nothing.** Measured by hand — see below. |
+| Publishing (any destination, `deploy.sh`/`deploy.py`, the preview→publish path) | `./verify-deploy.sh` — publishes to a folder, Netlify and Cloudflare, and every primary+secondary pairing, then FETCHES EACH SITE BACK and reads it. Deliberately NOT part of `verify.sh`: it needs three credentials, the network, and it creates real sites. Run it when the publishing path changes. |
 
 `verify.sh` **does not run on Windows** (bash, and it expects `docker` on PATH;
-in the normal Windows setup Docker Engine lives inside WSL2). Toolchain changes
-made on Windows have no automated gate: verify them by driving a real publish
-through the app, and re-run `verify.sh` from the mac after the next sync.
+in the normal Windows setup Docker Engine lives inside WSL2). What Windows does
+and does not get from that, corrected 2026-09-07 — this used to say toolchain
+changes made there have "no automated gate" at all, which is no longer true:
+
+- **The shared Python IS gated there now.** `PythonToolchainTests` runs every
+  `scripts/test_*.py` — DISCOVERED rather than listed, so no count is kept in
+  step by hand (fifteen when this was written on 2026-09-07, eighteen later
+  the same week) — the same files `verify.sh` runs, inside `dotnet test`, in about
+  eight seconds. They need no Docker, no network and no
+  credentials, and until 2026-09-07 Windows ran none of them, so a shared file
+  could be broken from that machine with every gate on it staying green.
+- **The IMAGE is still ungated there**, and that part stands: nothing on
+  Windows builds the Docker image or checks the baked files. Verify those by
+  driving a real publish through the app, and re-run `verify.sh` from the mac
+  after the next sync.
+- **Publishing for real is `verify-deploy.ps1`**, the Windows counterpart of
+  `verify-deploy.sh` in the row above and opt-in for the same reasons. No suite
+  runs either of them; `.githooks/pre-commit` says so when a commit touches the
+  publishing path, and `RELEASING.md` requires a run — with nothing skipped —
+  for any release that changes it.
 
 **The mac suite runs its test classes one at a time, and that is load-bearing.**
-The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`
-and `CourseActivityTests` both reset process-wide statics
+The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`,
+`CourseActivityTests` and `CourseActivityPublishOnlyTests` all reset
+process-wide statics
 (`PreviewLeases.reset()`, `CourseActivity.reset()`) around individual methods,
 so turning parallel testing on would let one class wipe the state another is
 mid-assertion on — an intermittent failure that looks exactly like a
@@ -601,7 +866,7 @@ through the app bundle — rebuild the app to test it end to end.
 
 The same rule used to be written in four places at once, and three of them
 would drift — a sentence in the Swift that says it, in the test that pins it,
-in the log row that specified it, and in the handoff telling Windows to copy
+in the log row that specified it, and in the issue telling Windows to copy
 it. So each kind of truth now has **one** home, and everywhere else points at
 it rather than restating it:
 
@@ -613,9 +878,9 @@ it rather than restating it:
 | How is a teacher's list of class dates read? | [`contracts/schedule-rules.json`](contracts/schedule-rules.json). |
 | Which page titles carry numbers, what is the next class called, what happens when room is made for one? | [`contracts/class-planning.json`](contracts/class-planning.json). |
 | What are the backup and archive files called, and what section number is offered next? | [`contracts/course-management.json`](contracts/course-management.json). |
-| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, and **which local assistant a teacher may choose (and when one may be removed)**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
+| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, and **where a section's built website is kept — and what happens to a folder that already has one in the old place**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
-| WHY is it that way, and what was rejected? | [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) for anything an implementer needs; a code comment for anything a reader of that file needs. |
+| WHY is it that way, and what was rejected? | The [`documentation/`](documentation/README.md) page that owns the subject, for anything an implementer needs; a code comment for anything a reader of the code needs. |
 | WHAT changed, WHEN, and what it cost | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — a dated log. **Append-only history, not a specification**: a row records what was true that day, and is not edited when the behaviour changes again. Never quote a row as the current wording. |
 | How does the whole feature work? | [`documentation/10-local-ai-assistant.md`](documentation/10-local-ai-assistant.md). |
 | What did we MEASURE? | [`research/`](research/README.md) — routing accuracy, model tiers, preview staleness. Never asserted in a test; each file states its own conditions. |
@@ -627,18 +892,35 @@ assistant's sentences into a document or a test, don't — name it instead.**
 contract. A quoted copy is the one that keeps passing after the product's
 words change.
 
-## The two handoff documents, and where a Windows session begins
+## Where the work is tracked, and where a session begins
 
-There are exactly **two**, and they point in opposite directions:
+**Work still to do is in [GitHub
+issues](https://github.com/russellgordon/plantoir/issues), and nowhere else.**
+Since 2026-09-08: a `mac` / `windows` / `toolchain` / `assistant` label says
+which side it lands on, `decision` says it needs Russell to choose, and a
+milestone pins it to a release. Start a session by reading the open issues for
+your platform. Nothing is tracked in a Markdown list any more, and adding one
+back is the thing this replaced.
 
-- [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) — mac → Windows. Everything this
-  side learned, written for somebody who cannot read the Swift.
-- [`MAC-HANDOFF.md`](MAC-HANDOFF.md) — Windows → mac. Work that originated
-  over there and needs attention here; entries are marked `✅ DONE` in place
-  rather than deleted.
+**The two handoff documents are gone**, and this is deliberate rather than
+lost. `WINDOWS-HANDOFF.md` and `MAC-HANDOFF.md` were deleted on 2026-09-08 and
+their reference material moved into
+[`documentation/`](documentation/README.md), each section landing in the page
+that owns its subject: the assistant's design in 10, folder problems and the
+build in 05, publishing races in 07, stopping a preview in 03, the config
+writers in 08, the WinUI and ConPTY mechanics in 12, and so on. Write-ups for
+work already shipped on the Windows port are archived in
+[`13-windows-port-archive.md`](documentation/13-windows-port-archive.md).
 
-(The old `AI-ASSIST-HANDOFF.md` is gone: it was a record of how the assistant
-was built, and it now lives in
+The reason they went: each had become three things at once — a to-do list, a
+changelog, and a manual — and only the third was worth keeping. The to-do list
+is now GitHub issues, the changelog is `GUI-IMPROVEMENTS.md`, and the manual is
+`documentation/`, where somebody looking up how a thing works will actually
+find it. **Do not recreate them.** A change written for the other platform goes
+in the documentation page that owns its subject, and the issue points at it.
+
+(The old `AI-ASSIST-HANDOFF.md` went the same way earlier: it was a record of
+how the assistant was built, and it now lives in
 [`research/ai-assist/HISTORY.md`](research/ai-assist/HISTORY.md).)
 
 **Starting work on the macOS app? Open
@@ -654,38 +936,40 @@ the plan before implementing anything**, then work autonomously once it is
 agreed. What follows is the same reading order, in short:
 
 1. **This file**, for the rules that override default behaviour.
-2. **[`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)** — architecture, the config
-   contract, and the reasoning behind the decisions. Long, and the section
-   headings are enough to navigate.
-3. **[`contracts/README.md`](contracts/README.md)**, then the JSON files — its coverage table says what is shared and what deliberately is not.
+2. **The open `windows` issues** — everything outstanding on that side.
+3. **[`documentation/`](documentation/README.md)** — architecture, the config
+   contract, and the reasoning behind the decisions, numbered 01–13. Read the
+   page an issue points at rather than all of them.
+4. **[`contracts/README.md`](contracts/README.md)**, then the JSON files — its coverage table says what is shared and what deliberately is not.
    These are the acceptance list: wire them into `Plantoir.Tests` and the
    assistant's behaviour is tested rather than eyeballed. **Do not retype the
    sentences or the scenarios into your test files** — deserialise them.
-4. **[`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md)**, newest rows first, for
+5. **[`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md)**, newest rows first, for
    what changed recently and why. Read it as history; where a row and the
    contract disagree, the contract is what is true now.
-5. **[`windows-app/PROGRESS.md`](windows-app/PROGRESS.md)** for where that app
+6. **[`windows-app/PROGRESS.md`](windows-app/PROGRESS.md)** for where that app
    actually stands.
 
-Two known-failing cases are waiting in `contracts/assist-cases.json` — "deploy
-with a preview running" and "deploy while that section is already busy" — and
-they are a fair first task: implementing them fixes a real bug on that side.
+(The two contract cases once flagged here as known-failing — "deploy with a
+preview running" and "deploy while that section is already busy" — are now
+implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
+263, 282, 283, 317 and 318. Confirmed by adversarial review 2026-08-24.)
 
 ## Where everything else lives
 
 | Read this | When |
 |---|---|
-| [`documentation/`](documentation/README.md) | How the toolchain works, numbered 01–10: overview, image, launchers, course setup, build pipeline, Quartz customizations, deployment, config reference, mac app, local AI assistant. |
+| [`documentation/`](documentation/README.md) | How the toolchain works AND why, numbered 01–13: overview, image, launchers, course setup, build pipeline, Quartz customizations, deployment, config reference, mac app, local AI assistant, release strategy, Windows app, and the Windows-port archive. Since 2026-09-08 this is also where the reasoning behind a decision lives — what was chosen, what was rejected, what was measured. |
 | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change, with a required "Notes for Windows port" column. Append here for any GUI change — and read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
-| [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) | Architecture, the config contract, platform notes, and the WSL2 background — the reference a Windows session reads second, and where architectural decisions are written. |
-| [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Generated from the macOS app; never hand-edited. Its coverage table says what is deliberately NOT shared, and why. |
-| [`MAC-HANDOFF.md`](MAC-HANDOFF.md) | The mirror: work that originated on Windows or in shared `scripts/` and needs the mac's attention. Ordered by STATUS — contract cases waiting, then what is still owed, then awareness, then the finished ledger — so it can be read top-down and abandoned at any point. |
+| [GitHub issues](https://github.com/russellgordon/plantoir/issues) | **Everything still to do**, on either platform. Labelled `mac`, `windows`, `toolchain`, `assistant`, `decision`; milestones pin an issue to a release. |
+| [`documentation/13-windows-port-archive.md`](documentation/13-windows-port-archive.md) | Write-ups for Windows-port work verified shipped as of 2026-08-22, kept for the reasoning. **History, not a specification** — where it and a contract disagree, the contract is true. Closed to new entries. |
+| [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Three of the ten files are generated from the macOS app by `Plantoir --write-contracts` and must never be hand-edited; the other seven — `shared-rules.json` among them — are AUTHORED, and can be proposed or corrected from either platform. `contracts/README.md` says which is which, and this line used to say "never hand-edited" of all ten, which sent a Windows session on 2026-09-08 to ask the mac for an edit it could make itself. Its coverage table says what is deliberately NOT shared, and why. |
 | [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, and the frozen asset names both platforms depend on. |
 | [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, and `--deploy` publishes it to Netlify — the site is not Git-connected, so nothing deploys on push. `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
-| [`TODO.md`](TODO.md) | Deferred work, with the research already done so picking one up is cheap. |
-| [`AGENTS.md`](AGENTS.md) · `.agents/rules/` | How this file reaches an agent that reads `AGENTS.md` rather than `CLAUDE.md` — Google Antigravity, among others. `.agents/rules/*.md` is a GENERATED copy of THIS file, split into parts because Antigravity silently truncates a rule file that is too long. **After changing CLAUDE.md, run `python3 .agents/sync-rules.py`** or the copy goes stale. |
+| [`TODO.md`](TODO.md) | **Closed to new entries** since 2026-09-08 — deferred work is a GitHub issue now. What is left is append-only history like a `GUI-IMPROVEMENTS.md` row: an entry records what was true on its day and what the entry itself got wrong, and is not rewritten when the behaviour changes again. |
+| [`AGENTS.md`](AGENTS.md) | How this file reaches an agent that looks for `AGENTS.md` rather than `CLAUDE.md`. It is a POINTER, four sentences long, and deliberately carries no rules of its own — a second copy of the rules is a second copy to keep in step, and the one that used to live beside it went stale exactly that way. |
 | [`research/`](research/README.md) | Measurement records the code cites as evidence — the assistant's model choices, the preview-staleness findings. Not an automated gate; each file states its own conditions. |
 | [`mac-app/README.md`](mac-app/README.md) · [`windows-app/PROGRESS.md`](windows-app/PROGRESS.md) | Per-app build, test and layout notes. |
 | [`README.md`](README.md) | The repository's front page: sends teachers to plantoir.app and orients developers who want to fork. [`PRESENTATION.md`](PRESENTATION.md) is the 2025 workshop document it replaced, preserved as a historical artifact — leave it as it stands. |

@@ -20,9 +20,7 @@ graph TD
     D["D. Topics in Computer Science"] --> B
 ```
 
-## Overall and specific expectations
-
-### Strand A. Programming Concepts and Skills
+## Strand A. Programming Concepts and Skills
 *By the end of this course, students will:*
 
 ![[A1. Data Types and Expressions]]
@@ -48,7 +46,7 @@ graph TD
 ![[A4.3]]
 ![[A4.4]]
 
-### Strand B. Software Development
+## Strand B. Software Development
 *By the end of this course, students will:*
 
 ![[B1. Project Management]]
@@ -64,7 +62,7 @@ graph TD
 ![[B2.2]]
 ![[B2.3]]
 
-### Strand C. Designing Modular Programs
+## Strand C. Designing Modular Programs
 *By the end of this course, students will:*
 
 ![[C1. Modular Design]]
@@ -78,7 +76,7 @@ graph TD
 ![[C2.3]]
 ![[C2.4]]
 
-### Strand D. Topics in Computer Science
+## Strand D. Topics in Computer Science
 *By the end of this course, students will:*
 
 ![[D1. Environmental Stewardship and Sustainability]]

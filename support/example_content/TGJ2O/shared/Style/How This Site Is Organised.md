@@ -18,7 +18,7 @@ where something lives.
 | Exercises | Practice sets, answers folded below | You want to test whether it stuck |
 | Tasks | The beats and projects, with criteria | Before, during, and after any task |
 | Discussions | The conversations we return to | Preparing to talk, or thinking after |
-| Portfolios | Your Newsroom Journal and its guides | Reflection time, and unit ends |
+| Portfolios | Your Newsroom Journal, and judging your own work | Before you file, at reflection time, and unit ends |
 | Tutorials | How-to skills for the newsroom | The moment a how-do-I question hits |
 | Setup | Standards, routines, marks, help | Your first week, then whenever |
 | Style | Pages about the site itself | You wonder why pages look this way |

@@ -2,6 +2,8 @@
 title: Getting Unstuck
 publish: true
 created: __CREATED__
+tags:
+  - tutorials
 enableToc: true
 ---
 Being stuck is not a sign that you are bad at this. It is a normal stage

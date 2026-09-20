@@ -109,6 +109,8 @@ count through the equation, which is where this is all going.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D2.1]]
+
 ![[D3.1]]
 
 ![[D3.2]]

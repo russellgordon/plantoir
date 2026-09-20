@@ -63,4 +63,6 @@ flattening them, and take a suffrage pamphlet apart in
 ![[B2.4]]
 
 ![[B3.3]]
+
+![[C1.2]]
 %%curriculum-end%%

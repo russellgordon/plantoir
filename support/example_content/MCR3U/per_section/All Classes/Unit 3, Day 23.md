@@ -14,6 +14,7 @@ tags:
 2. Clinic: the trigonometry the room found hardest — brought by you,
    worked at the boards
 3. Then alone: two problems of that kind, marked together
+4. Journal collection — hand it in on your way out
 
 ## Things to do before our next class
 

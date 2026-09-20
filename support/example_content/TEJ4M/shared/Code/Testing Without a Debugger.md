@@ -166,10 +166,10 @@ roughly in half.
    afternoon.
 
 Then record it, because an undocumented fix is a fix you get to discover
-again in March. In your [[Tech Journal]]: the symptom, exactly; what you
-expected; what you measured; what you changed; what happened next. That
-record is also the log the curriculum asks you to keep of work done on a
-system, and it is the raw material for the failure analysis in
+again later in the course. In your [[Tech Journal]] : the symptom, exactly;
+what you expected; what you measured; what you changed; what happened next.
+That record is also the log the curriculum asks you to keep of work done on
+a system, and it is the raw material for the failure analysis in
 [[The Engineering Design Project]] and the defence in
 [[The Engineering Review]]. "It works now" is not an entry. "The I²C
 reads failed above 100 kHz with 30 cm leads; shortened to 10 cm and added

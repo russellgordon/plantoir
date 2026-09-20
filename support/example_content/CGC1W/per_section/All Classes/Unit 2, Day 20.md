@@ -11,7 +11,10 @@ tags:
 ## Agenda
 
 1. Disposal, recycling, and what actually happens to it
-2. Working period
+2. Working period: your map against the criteria with
+   [[Judging Your Own Work]], then the weakest row it named and what
+   yesterday's conference asked for — you fix them in the rest of the
+   period
 3. Peer review of journey maps
 
 ## Things to do before our next class

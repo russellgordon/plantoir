@@ -205,9 +205,15 @@ account.[^1]
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D2.7]]
+![[A1.8]]
+
+![[A1.9]]
 
 ![[D2.6]]
 
-![[A1.8]]
+![[D2.7]]
+
+![[E2.5]]
+
+![[E3.4]]
 %%curriculum-end%%

@@ -58,3 +58,17 @@ taught — date it, quote your own words, then show the now.
 > Honesty and specificity are what made your journal worth keeping;
 > trust them one last time. A reflection that admits what you still
 > cannot do is more convincing about what you can.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D3.3]]
+
+![[D3.4]]
+
+![[D3.6]]
+%%curriculum-end%%

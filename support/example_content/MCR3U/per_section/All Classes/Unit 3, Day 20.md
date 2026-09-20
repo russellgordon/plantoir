@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: an exact ratio, a sine-law triangle, an
-   identity proof, and a sinusoidal model from data
-2. Compare methods at the boards
+   identity proof, and a sinusoidal model from data: [[Special Angles]], [[The Sine Law]], and [[Sinusoidal Functions]]
+2. Compare methods at the boards; practice: [[Trig Ratios and Laws Practice]] and [[Sinusoidal Functions Practice]]
 
 ## Things to do before our next class
 

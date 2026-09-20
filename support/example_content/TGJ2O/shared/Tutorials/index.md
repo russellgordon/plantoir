@@ -14,6 +14,7 @@ every later page can simply link here instead of re-explaining it.
 | Tutorial | The skill |
 | --- | --- |
 | [[Using This Site]] | Finding your way around this site quickly |
+| [[Scavenger Hunt]] | Ten-minute interactive walkthrough of site tools |
 | [[Planning a Production]] | Objectives, criteria, constraints, and a sketch |
 | [[Filing a Story]] | Getting work from "done" to published |
 | [[Releases and Consent]] | Asking permission the right way |

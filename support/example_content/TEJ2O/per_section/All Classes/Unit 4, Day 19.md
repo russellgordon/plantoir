@@ -11,9 +11,13 @@ tags:
 ---
 ## Agenda
 
-1. Review, part one: identify, specify, build, install — then address,
+1. Why these three days: the showcase is behind you and nothing here is
+   collected. This is the course gathered into a shape you can carry out
+   of here — into next year's course, a summer job, or your own bench at
+   home
+2. Review, part one: identify, specify, build, install — then address,
    cable, share, and diagnose
-2. By request: [[Component Identification Practice]],
+3. By request: [[Component Identification Practice]],
    [[Spec Sheet Practice]], [[Network Addressing Practice]],
    [[Troubleshooting Practice]]
 

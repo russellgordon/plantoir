@@ -29,14 +29,14 @@ exactly what [[Math Journal]] asks the "what is foggy" prompt to do.
 ## Feelings are welcome — anchored to a moment and a method
 
 The journal is not a lab report; frustrated, proud, embarrassed, and
-delighted all belong in it. The rule is that a feeling arrives
-*attached to the moment that caused it and the method involved*.
-"I felt dumb" floats free and teaches you nothing in June. "I felt
-dumb when the whole group saw the difference of squares and I was
-still expanding brackets — so I asked Theo what he looks for first" is
-a feeling with an address and an exit. The feeling is real data about
-you; the method is the handle you can actually turn — the same pairing
-[[Mistakes Are Data]] argues for at the boards.
+delighted all belong in it. The rule is that a feeling arrives *attached to
+the moment that caused it and the method involved*. "I felt dumb" floats
+free and teaches you nothing at the end of the course. "I felt dumb when the
+whole group saw the difference of squares and I was still expanding brackets
+— so I asked Theo what he looks for first" is a feeling with an address and
+an exit. The feeling is real data about you; the method is the handle you
+can actually turn — the same pairing [[Mistakes Are Data]] argues for at the
+boards.
 
 %%curriculum-start%%
 ## Curriculum connection

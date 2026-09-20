@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Consolidate the range data — was 45° really best?
+1. Consolidate the range data — was 45° really best, and where does air
+   resistance break the answer?
 2. [[Relative Motion]] and the river crossing
 3. Forces on a plane, resolved: [[Forces in Two Dimensions]]
 4. Practise: the rest of [[Vectors and Projectiles Practice]]

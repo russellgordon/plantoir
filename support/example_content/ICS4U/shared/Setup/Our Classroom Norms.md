@@ -64,3 +64,11 @@ professional teams have the most trouble with.
 - [ ] Read this page with a parent or guardian.
 - [ ] Bring one norm you would add. We finish the list together in
       the first week, and it stays linked from every task.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D2.2]]
+
+![[D2.3]]
+%%curriculum-end%%
