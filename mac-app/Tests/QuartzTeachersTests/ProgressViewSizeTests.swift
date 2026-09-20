@@ -399,4 +399,134 @@ final class ProgressViewSizeTests: XCTestCase {
             "Squeezed, the 'No Preview Running' placeholder claimed \(claimed) points"
         )
     }
+
+    // MARK: - The notice must not end up under the site
+
+    /// The section's detail column, built the way `SectionDetailView` builds
+    /// it, with the site stood in for by something that records the room it
+    /// was given.
+    ///
+    /// A real `WKWebView` cannot be hosted in this suite, and it does not need
+    /// to be: what is under test is the LAYOUT — whether the notice takes its
+    /// space out of the site's or is drawn underneath it. `SiteStandIn` answers
+    /// `sizeThatFits` exactly as `WebPreviewView` does (take what is offered,
+    /// never dictate a size), so the height it is offered is the height the
+    /// real site would get.
+    @MainActor
+    func heightOfferedToTheSite(withNotice: Bool, width: CGFloat, height: CGFloat) -> CGFloat {
+        let room: OfferedHeight = OfferedHeight()
+        let outcome: ScheduledPublishOutcome.Stopped = ScheduledPublishOutcome.Stopped(
+            kind: .succeeded,
+            destination: "Netlify, Cloudflare Pages",
+            when: Date(timeIntervalSince1970: 1_758_297_000)
+        )
+        let column = VStack(spacing: 0) {
+            if withNotice {
+                ScheduledPublishNoticeView(
+                    outcome: outcome, course: "ICS4U", sectionNumber: 1, dismiss: {}
+                )
+            }
+            ZStack {
+                NoPreviewPlaceholderView(deploysToLocalFolder: false)
+                SiteStandIn(room: room)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        let hostingView: NSHostingView = NSHostingView(rootView: AnyView(column))
+        hostingView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        hostingView.layoutSubtreeIfNeeded()
+        return room.height
+    }
+
+    /// The notice takes its room OUT of the site's, rather than being drawn
+    /// underneath it.
+    ///
+    /// Issue #219, found in Russell's smoke of #216: with a preview showing —
+    /// the commonest state — the band arrived under the full-bleed web view and
+    /// all a teacher saw was a green tint through the toolbar. A teacher
+    /// looking at their preview is exactly who needs telling.
+    ///
+    /// Measuring the room the site is offered is what says this rather than
+    /// eyeballing a screenshot: if the site is still offered the whole window
+    /// while a notice is showing, the notice is on top of it or under it, and
+    /// either way the two are fighting over the same points.
+    @MainActor
+    func testTheNoticeTakesItsRoomOutOfTheSiteRatherThanSittingUnderIt() {
+        let withoutNotice: CGFloat = heightOfferedToTheSite(
+            withNotice: false, width: 800, height: 720
+        )
+        let withNotice: CGFloat = heightOfferedToTheSite(
+            withNotice: true, width: 800, height: 720
+        )
+        XCTAssertEqual(
+            withoutNotice,
+            720,
+            "With no notice the site must have the whole window, as it always has — it was offered \(withoutNotice)"
+        )
+        XCTAssertLessThan(
+            withNotice,
+            withoutNotice,
+            "The site was offered \(withNotice) points with a notice showing and \(withoutNotice) without, so the notice is not taking any room of its own — it is behind the site, which is issue #219"
+        )
+        // And the notice's share is the notice's height, not some rigid slab:
+        // it wraps at this width to a single line plus its date.
+        XCTAssertGreaterThan(
+            withNotice,
+            720 - ProgressViewSizeTests.squeezedHeightBound,
+            "The notice took \(720 - withNotice) points of the window, which is more than any honest state of it claims"
+        )
+    }
+
+    /// Dismissing gives the room straight back.
+    @MainActor
+    func testDismissingTheNoticeGivesTheSiteItsRoomBack() {
+        let withNotice: CGFloat = heightOfferedToTheSite(
+            withNotice: true, width: 800, height: 720
+        )
+        let afterDismissing: CGFloat = heightOfferedToTheSite(
+            withNotice: false, width: 800, height: 720
+        )
+        XCTAssertEqual(afterDismissing, 720)
+        XCTAssertLessThan(withNotice, afterDismissing)
+    }
+}
+
+/// Somewhere to put the height the stand-in was offered.
+@MainActor
+final class OfferedHeight {
+
+    // MARK: - Stored properties
+
+    var height: CGFloat = 0
+}
+
+/// Stands in for the site while a test measures the column around it.
+///
+/// It answers `sizeThatFits` the way `WebPreviewView` does — take the space
+/// offered, never dictate a size — and writes down what it was offered.
+struct SiteStandIn: NSViewRepresentable {
+
+    // MARK: - Stored properties
+
+    let room: OfferedHeight
+
+    // MARK: - Functions
+
+    func makeNSView(context: Context) -> NSView {
+        return NSView()
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSView, context: Context) -> CGSize? {
+        let offered: CGSize = CGSize(
+            width: proposal.width ?? 600,
+            height: proposal.height ?? 400
+        )
+        MainActor.assumeIsolated {
+            room.height = offered.height
+        }
+        return offered
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+    }
 }
