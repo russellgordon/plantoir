@@ -33,7 +33,11 @@ set -euo pipefail
 #      build of the Example Course runs through the real launcher.
 #   6. Confirms the built site exists, that it carries and links Plantoir's
 #      own icon rather than Quartz's, and that the running container uses the
-#      dev-test image, then prints a PASS/FAIL summary.
+#      dev-test image, then prints a PASS/FAIL summary. Section 6e builds the
+#      same fixture again from a folder called ".plantoir-verify-26:27" —
+#      the name macOS writes when a teacher types "26/27" in Finder — in a
+#      container of its own, removed before AND after, since a container left
+#      behind would let the next run pass without creating one.
 #
 # Usage:
 #   ./verify.sh [--no-cache] [--skip-build]
@@ -52,6 +56,20 @@ cd "$(dirname "$0")"
 DEV_TEST_IMAGE="quartz-teacher:dev-test"
 # The launchers name their container after the working folder.
 CONTAINER_NAME="teaching-quartz-$(pwd -P | shasum -a 256 | cut -c1-8)"
+# The launchers' own way of naming a folder they hand to a container, loaded
+# out of the block the three of them share rather than spelled a second way
+# here. `-v src:dst` splits on ':', so a working folder called
+# "Comm Tech 26:27" cannot be named with it at all (GitHub issue #221) — and
+# a known-bad pattern left in the file that demonstrates the fix is how the
+# pattern comes back. Section 6e below drives the real thing from a real
+# colon-named folder; this is for the checks that mount a file into a
+# throwaway container.
+# shellcheck disable=SC1090
+source /dev/stdin <<<"$(awk '/^# >>> CONTAINER MOUNT BLOCK >>>/{inside=1} inside{print} /^# <<< CONTAINER MOUNT BLOCK <<</{inside=0}' setup.sh)"
+if ! declare -f bind_mount_argument >/dev/null; then
+  echo "❌ setup.sh has no CONTAINER MOUNT BLOCK — verify.sh names its mounts with the launchers' own helper."
+  exit 1
+fi
 NO_CACHE=""
 SKIP_BUILD="false"
 
@@ -139,6 +157,13 @@ if bash scripts/test_build_output_link.sh >/tmp/verify_build_output_link_test.lo
 else
   fail "the launchers keep built websites outside the working folder, for every state an existing folder can be in (scripts/test_build_output_link.sh)"
   cat /tmp/verify_build_output_link_test.log
+fi
+
+if bash scripts/test_container_mount.sh >/tmp/verify_container_mount_test.log 2>&1; then
+  pass "the launchers name a teacher's folder in a form that survives a colon in it, and all three use it (scripts/test_container_mount.sh)"
+else
+  fail "the launchers name a teacher's folder in a form that survives a colon in it, and all three use it (scripts/test_container_mount.sh)"
+  cat /tmp/verify_container_mount_test.log
 fi
 
 if (cd scripts && python3 test_deploy_course_dir_resolution.py) >/tmp/verify_deploy_course_dir_test.log 2>&1; then
@@ -327,7 +352,7 @@ fi
 echo ""
 echo "🔎 Checking build_site.py's graded-folder rule against the shared contract…"
 if docker run --rm \
-  -v "$(pwd)/scripts/test_graded_folders.py:/opt/scripts/test_graded_folders.py:ro" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_graded_folders.py" /opt/scripts/test_graded_folders.py),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/test_graded_folders.py >/tmp/verify_graded_test.log 2>&1; then
   pass "build_site.py: graded-folder rule matches contracts/shared-rules.json (scripts/test_graded_folders.py)"
 else
@@ -344,7 +369,7 @@ fi
 echo ""
 echo "🔎 Checking build_site.py's class-folder rule against the shared contract…"
 if docker run --rm \
-  -v "$(pwd)/scripts/test_class_folder.py:/opt/scripts/test_class_folder.py:ro" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_class_folder.py" /opt/scripts/test_class_folder.py),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/test_class_folder.py >/tmp/verify_class_folder_test.log 2>&1; then
   pass "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
 else
@@ -365,7 +390,7 @@ fi
 echo ""
 echo "🔎 Checking the visibility contract against what the real build does…"
 if docker run --rm \
-  -v "$(pwd)/scripts/check_visibility_against_the_site.py:/opt/scripts/check_visibility_against_the_site.py:ro" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_visibility_against_the_site.py" /opt/scripts/check_visibility_against_the_site.py),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/check_visibility_against_the_site.py \
   >/tmp/verify_visibility_site.log 2>&1; then
   pass "every pageVisibility reading case agrees with the built site (scripts/check_visibility_against_the_site.py)"
@@ -383,7 +408,7 @@ fi
 echo ""
 echo "🔎 Checking build_site.py's custom-domain resolution against the real image…"
 if docker run --rm \
-  -v "$(pwd)/scripts/test_build_site_domain_resolution.py:/opt/scripts/test_build_site_domain_resolution.py:ro" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_build_site_domain_resolution.py" /opt/scripts/test_build_site_domain_resolution.py),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/test_build_site_domain_resolution.py >/dev/null 2>&1; then
   pass "build_site.py: custom-domain resolution follows the primary destination (scripts/test_build_site_domain_resolution.py)"
 else
@@ -424,7 +449,7 @@ fi
 EXPORT_TMP="$(mktemp -d "$(pwd)/.verify-export.XXXXXX")"
 echo ""
 echo "📤 Testing 'export-scripts' → $EXPORT_TMP"
-if docker run --rm -v "$EXPORT_TMP:/out" "$DEV_TEST_IMAGE" export-scripts >/dev/null; then
+if docker run --rm --mount "$(bind_mount_argument "$EXPORT_TMP" /out)" "$DEV_TEST_IMAGE" export-scripts >/dev/null; then
   EXPORT_OK="true"
   for f in setup.sh preview.sh deploy.sh; do
     if ! cmp -s "$f" "$EXPORT_TMP/$f"; then
@@ -594,7 +619,7 @@ echo "🔬 Comparing files baked into the image against the working tree…"
 BAKED_OK="true"
 check_baked() {
   local repo_path="$1" image_path="$2"
-  if ! docker run --rm -v "$(pwd):/repo:ro" "$DEV_TEST_IMAGE" cmp -s "/repo/$repo_path" "$image_path"; then
+  if ! docker run --rm --mount "$(bind_mount_argument "$(pwd)" /repo),readonly" "$DEV_TEST_IMAGE" cmp -s "/repo/$repo_path" "$image_path"; then
     BAKED_OK="false"
     fail "Image file $image_path differs from repo $repo_path"
   fi
@@ -947,6 +972,59 @@ if docker exec "$CONTAINER_NAME" test -f /opt/scripts/stop_preview.py 2>/dev/nul
 else
   fail "the container is still missing /opt/scripts/stop_preview.py — the next build in it will fail on an import, which reads as a broken toolchain rather than as this section's litter"
 fi
+
+# -------------------- 6e. A working folder whose name has a colon ----------
+# A teacher typed "Comm Tech 26/27" into Finder; macOS stored it as
+# "Comm Tech 26:27"; `docker run -v "$path":/teaching/courses` read
+# "/teaching/courses" as the MODE and refused — after 147 seconds of
+# first-run setup (GitHub issue #221). Everything else in this file runs from
+# THIS repository, whose path has no colon in it, so nothing here would ever
+# have noticed.
+#
+# Its own folder, its own container, its own builds folder, all removed
+# afterwards. And removed BEFORE as well, which is the part that matters: the
+# launcher keeps a container it is happy with, so a second run would print
+# "already running with correct mount", never call `docker run`, and pass
+# having tested nothing — including when the fix has been taken back out.
+VERIFY_COLON_DIR="$HOME/.plantoir-verify-26:27"
+echo ""
+echo "🚦 Building from a working folder called '$(basename "$VERIFY_COLON_DIR")'…"
+rm -rf "$VERIFY_COLON_DIR"
+mkdir -p "$VERIFY_COLON_DIR/courses"
+cp setup.sh preview.sh deploy.sh "$VERIFY_COLON_DIR/"
+cp -R courses/EXC2O "$VERIFY_COLON_DIR/courses/EXC2O"
+# The fixture's .merged_output is a LINK to THIS folder's builds root. Copied
+# as a link, it would aim the colon folder's build at this one's built site.
+rm -rf "$VERIFY_COLON_DIR/courses/EXC2O/.merged_output"
+VERIFY_COLON_ID="$(cd "$VERIFY_COLON_DIR" && pwd -P | shasum -a 256 | cut -c1-8)"
+VERIFY_COLON_CONTAINER="teaching-quartz-${VERIFY_COLON_ID}"
+VERIFY_COLON_BUILDS="${HOME%/}/Library/Application Support/Plantoir/builds/${VERIFY_COLON_ID}"
+docker rm -f "$VERIFY_COLON_CONTAINER" >/dev/null 2>&1 || true
+rm -rf "$VERIFY_COLON_BUILDS"
+if (cd "$VERIFY_COLON_DIR" && ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only) \
+     >/tmp/verify_colon_folder.log 2>&1; then
+  pass "a working folder whose name contains a colon builds a website"
+else
+  fail "a working folder whose name contains a colon could not build"
+  tail -20 /tmp/verify_colon_folder.log
+fi
+if [[ -f "$VERIFY_COLON_BUILDS/EXC2O/section1/public/index.html" ]]; then
+  pass "and the site is where every reader of it looks"
+else
+  fail "no site at $VERIFY_COLON_BUILDS/EXC2O/section1/public/index.html"
+fi
+# WHICH folder the container was actually given. A container that mounted
+# something else would still build something, and the something would be
+# wrong.
+COLON_MOUNT_SRC="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' \
+  "$VERIFY_COLON_CONTAINER" 2>/dev/null || echo "")"
+if [[ "$COLON_MOUNT_SRC" == "$VERIFY_COLON_DIR/courses" ]]; then
+  pass "and the workspace was given the colon-named folder itself, byte for byte"
+else
+  fail "the workspace was given [${COLON_MOUNT_SRC:-nothing}], not $VERIFY_COLON_DIR/courses"
+fi
+docker rm -f "$VERIFY_COLON_CONTAINER" >/dev/null 2>&1 || true
+rm -rf "$VERIFY_COLON_DIR" "$VERIFY_COLON_BUILDS"
 
 RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"
 if [[ "$RUNNING_IMAGE" == "$DEV_TEST_IMAGE" ]]; then

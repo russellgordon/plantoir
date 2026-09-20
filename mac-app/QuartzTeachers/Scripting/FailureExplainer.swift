@@ -32,6 +32,35 @@ struct FailureExplainer {
         if let reason = missingBuildExplanation(in: output) {
             return reason
         }
+        if let reason = workspaceCouldNotBeMadeExplanation(in: output) {
+            return reason
+        }
+        return nil
+    }
+
+    /// The workspace a section is built in could not be made, because a folder
+    /// it is given was not there.
+    ///
+    /// Asked LAST, so it can never shadow one of the specific troubles above.
+    ///
+    /// Matched on `bind source path does not exist` and nothing wider. The
+    /// tempting substring was `Error response from daemon`, which would put
+    /// "check that it has not been moved or renamed" in front of a teacher
+    /// whose disk was full or whose engine had restarted mid-run — a
+    /// confident wrong guess, which this file exists not to make.
+    ///
+    /// Until 2026-09-19 the commonest cause was a colon in the working
+    /// folder's name (a teacher typing "Comm Tech 26/27" in Finder gets
+    /// "Comm Tech 26:27" on disk), which the launchers now handle — GitHub
+    /// issue #221. What is left is a folder that moved, was renamed or is on
+    /// a disk that went away, and a builds folder that could not be made.
+    /// The launchers print the same sentence themselves, for a teacher at the
+    /// command line and for a publish launchd ran overnight.
+    static func workspaceCouldNotBeMadeExplanation(in output: String) -> String? {
+        if output.contains("bind source path does not exist") {
+            return "Plantoir could not get this folder ready for building. "
+                 + "Check that it has not been moved or renamed, then try again."
+        }
         return nil
     }
 
