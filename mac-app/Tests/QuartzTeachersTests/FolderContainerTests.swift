@@ -211,6 +211,47 @@ final class QuitScriptTests: XCTestCase {
         XCTAssertTrue(script.contains("no window was working in that folder any more"))
     }
 
+    // MARK: - The script is valid sh, whatever the folder is called
+
+    /// A working folder's name is the teacher's, and the quit script carries
+    /// it into shell source twice over — as an argument and inside a
+    /// sentence. `sh -n` parses without running anything, so this asks the
+    /// real shell whether the text it would be handed is a script at all.
+    ///
+    /// The names are the ones that have actually cost time here: a colon
+    /// (issue #221), a space, an apostrophe, and the shell's own
+    /// metacharacters.
+    @MainActor
+    func testTheScriptIsValidShellWhateverTheFolderIsCalled() throws {
+        let awkwardNames: [String] = [
+            "Comm Tech 26:27",
+            "O'Brien's Class",
+            "C++ 26(27)",
+            "Rock & Roll; rm -rf /",
+            "back\\slash \"quoted\" $PATH `date`"
+        ]
+        for name in awkwardNames {
+            let script: String = FolderContainers.quitScript(
+                folderPaths: ["/Users/o'brien/Desktop/" + name],
+                inHomeFolder: URL(fileURLWithPath: "/Users/o'brien")
+            )
+            let shell: Process = Process()
+            shell.executableURL = URL(fileURLWithPath: "/bin/sh")
+            shell.arguments = ["-n", "-c", script]
+            let complaint: Pipe = Pipe()
+            shell.standardError = complaint
+            try shell.run()
+            shell.waitUntilExit()
+            let said: String = String(
+                data: complaint.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8
+            ) ?? ""
+            XCTAssertEqual(
+                shell.terminationStatus, 0,
+                "A folder called \"\(name)\" produces a script the shell cannot read: \(said)"
+            )
+        }
+    }
+
     // MARK: - Every ending has a line on the trail
 
     /// Each outcome the script can reach is one of the contract's events, and
