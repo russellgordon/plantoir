@@ -191,8 +191,15 @@ enum FolderContainers {
         lines.append(releaseFunction(secondsToWaitForWork: secondsToWaitForWork))
 
         var body: [String] = []
+        body.append("  oursLeftRunning=''")
         body.append("  if ! command -v docker >/dev/null 2>&1; then")
-        body.append("    " + noteCall(.couldNotFindThePrograms, occasion: occasion))
+        // Only worth saying when there was something to do. A teacher who has
+        // never set anything up has no folder open, and a line on every quit
+        // of their first week saying nothing could be stopped would bury the
+        // one quit where something was.
+        if !folderPaths.isEmpty {
+            body.append("    " + noteCall(.couldNotFindThePrograms, occasion: occasion))
+        }
         body.append("    return 0")
         body.append("  fi")
 
@@ -211,6 +218,7 @@ enum FolderContainers {
                 + HelperPrograms.shellQuoted(sentence(
                     for: .couldNotStopAFoldersBuilder, occasion: occasion, folderName: folderName
                 ))
+                + " || oursLeftRunning=1"
                 + "  # " + event(for: .stoppedAFoldersBuilder).rawValue
                 + " / " + event(for: .leftAFoldersBuilderRunning).rawValue
                 + " / " + event(for: .couldNotStopAFoldersBuilder).rawValue
@@ -445,7 +453,11 @@ enum FolderContainers {
         lines.append("    waited=$((waited + 1))")
         lines.append("  done")
         lines.append("  note \"$4\"")
-        lines.append("  return 0")
+        // A non-zero return is how the caller learns one of OURS was left
+        // running — which the shared-machine question below has to know,
+        // because a builder we left up is itself in `docker ps -q` and would
+        // otherwise be reported as "other software on this Mac".
+        lines.append("  return 1")
         lines.append("}")
         return lines.joined(separator: "\n")
     }
@@ -467,17 +479,29 @@ enum FolderContainers {
         lines.append("    asked=$?")
         lines.append("    if [ \"$asked\" -ne 0 ]; then")
         lines.append("      " + noteCall(.couldNotAskWhatElseIsRunning, occasion: occasion))
-        lines.append("    elif [ -n \"$sharing\" ]; then")
+        // OUR OWN first, then anybody's launcher, then everything else. A
+        // builder this script has just decided to leave running is in
+        // `docker ps -q` too, so asking "is anything in there?" first would
+        // report a teacher's own unfinished publish as "other software on
+        // this Mac" — on a Mac that has no other software in it at all, which
+        // is every teacher's.
+        lines.append("    elif [ -n \"$oursLeftRunning\" ]; then")
         lines.append("      " + noteCall(
             .leftTheSharedSetupRunning,
             occasion: occasion,
-            reasonSomethingElseIsUsingIt: "other software on this Mac is still using it"
+            reasonSomethingElseIsUsingIt: "this folder’s own website builder is still working"
         ))
         lines.append("    elif anyLauncherRunning; then")
         lines.append("      " + noteCall(
             .leftTheSharedSetupRunning,
             occasion: occasion,
             reasonSomethingElseIsUsingIt: "a publish or preview is still going"
+        ))
+        lines.append("    elif [ -n \"$sharing\" ]; then")
+        lines.append("      " + noteCall(
+            .leftTheSharedSetupRunning,
+            occasion: occasion,
+            reasonSomethingElseIsUsingIt: "other software on this Mac is still using it"
         ))
         lines.append("    else")
         lines.append("      if colima stop >/dev/null 2>&1; then")

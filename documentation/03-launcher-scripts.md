@@ -77,8 +77,12 @@ and a terminal teacher should open. The old shared `teaching-quartz`
 container is retired automatically the first time a per-folder container is
 created. The macOS app stops a folder's container (a fast `docker stop`,
 not a removal) when the last window using that folder closes, and on quit —
-the container holds no content, and restarts in about a second on the next
-preview.
+but only once nothing is using it: no launcher for that folder running on the
+host, and no process inside the container beyond its idle `tail`. The
+container holds no content and restarts in about a second on the next preview.
+The conditions, and what happens when they are not met, are in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "Quitting: what it frees, what
+it refuses to free, and why".
 - `--context NAME` (setup only) — select a Docker context.
 - `--image REF` — use a specific already-built image instead of resolving
   one from the recipe (how `verify.sh` points the launchers at its

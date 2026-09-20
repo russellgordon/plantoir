@@ -149,6 +149,38 @@ final class QuitScriptRunsTests: XCTestCase {
         )
     }
 
+    /// The teacher's OWN builder, left running a moment earlier, must not be
+    /// reported as "other software on this Mac".
+    ///
+    /// It is in `docker ps -q`'s answer like anything else, so the obvious
+    /// order of questions produces a sentence that is false on every Mac that
+    /// has nothing else in there — which is every teacher's.
+    @MainActor
+    func testOurOwnBuilderIsNotReportedAsSomebodyElsesSoftware() throws {
+        let scratch: Scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.root) }
+        try writeDockerStandIn(
+            in: scratch, running: true, processesInside: 3, psExitCode: 0,
+            psPrints: "6c9d1e2f3a4b"
+        )
+        try writeColimaStandIn(in: scratch)
+        try makeSocket(at: colimaSocketPath(in: scratch))
+
+        let trail: String = try run(
+            in: scratch, includingTheSharedSetup: true, secondsToWaitForWork: 2
+        )
+
+        XCTAssertFalse(callsMade(in: scratch).contains("colima stop"))
+        XCTAssertTrue(
+            trail.contains("this folder’s own website builder is still working"),
+            "The trail says: \(trail)"
+        )
+        XCTAssertFalse(
+            trail.contains("other software on this Mac"),
+            "A teacher's own unfinished publish was reported as somebody else's software: \(trail)"
+        )
+    }
+
     /// No socket belonging to the shared machine, nothing touched — which is
     /// also what a Mac using Docker Desktop, or a differently named machine,
     /// looks like from here.

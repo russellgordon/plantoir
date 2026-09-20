@@ -140,14 +140,21 @@ enum QuitConfirmation {
     /// The sentence under it.
     ///
     /// "Could", not "would", and the difference is measured rather than
-    /// cautious. A publish is a separate program on a pseudo-terminal, and it
-    /// is NOT killed when the app goes — it is reparented and carries on
-    /// (measured 2026-09-19, a job still running well after its parent had
-    /// exited). What a teacher loses is the watching: the console is gone, a
-    /// question the publish asks is asked of nobody, and the folder's website
-    /// builder is then left running for as long as it lasts. Saying it would
-    /// be stopped would be a sentence describing something that does not
-    /// happen, which is worse than no sentence because it will be believed.
+    /// cautious — in both directions, which is why this comment is long.
+    ///
+    /// Plantoir does not END the publish: it is a separate program, and
+    /// `ScriptRunner.stopEveryLivePreview` deliberately passes it over. But it
+    /// is a program writing to a pseudo-terminal the APP owned, and
+    /// `deploy.sh` runs under `set -euo pipefail` (line 3), so when the app
+    /// goes its next line of output fails and the publish stops there.
+    /// Measured 2026-09-19, twice independently: two children of identical
+    /// shape orphaned on a dead pty — the plain one ran to the end, the
+    /// `set -euo pipefail` one died at its next `echo`, three ticks in.
+    ///
+    /// So "could leave it unfinished" is the honest sentence, and neither
+    /// "would be stopped" nor "carries on" is. What a teacher loses either way
+    /// is the watching: the console is gone and a question the publish asks is
+    /// asked of nobody.
     static func explanation() -> String {
         return "Quitting now could leave it unfinished, with the class website "
             + "part way updated."
