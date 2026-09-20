@@ -253,6 +253,37 @@ The ledger lives on Windows because that is the side that currently owes
 something; there is no mac equivalent and none is needed until the mac is the
 side behind. The same shape would work there.
 
+**One exception has been taken to the passage above, on 2026-09-19, and it is
+recorded here rather than argued in two places.** The quit-path work
+([#220](https://github.com/russellgordon/plantoir/issues/220)) added
+`quittingWhileWorkIsUnderWay` and the trail event `quit asked about work under
+way` with `appliesOn: ["mac"]` — the softening the "four ways out" list rejects
+by name. It was taken under a direct instruction, and the reasoning is worth
+having rather than repeating the argument every time somebody finds it:
+
+- **The honest alternative was not available to the mac.** Taking the event
+  bare reddens `ContractTests.SharedRules_ActivityTrailEvents_Exist` with a
+  failure only WINDOWS can mend, because a `NamedGapLedger` entry is theirs to
+  write and nobody was on that side that week. A red suite nobody can turn
+  green is the thing the ledger exists to avoid, reached by the other road.
+- **The cost the list names is real and is not waived.** `appliesOn` has no
+  mend-check: the day Windows asks this question, the contract will still say
+  it is none of their business and both suites will stay green. What points at
+  it instead is prose — the `appliesOnWhy` on both keys, which says to delete
+  them, this paragraph, and the `windows` issue that carries the work. That is
+  weaker than a test and everybody involved knew it.
+- **The scope is narrower than it looks.** The OTHER three events that landed
+  the same day (`website builder stopped`, `… left running`, `… could not be
+  stopped`) are `appliesOn: ["mac"]` for the ordinary, permanent reason and are
+  not part of this exception: a native Windows toolchain has no container and
+  no virtual machine, so `FolderContainers.StopContainer` and
+  `.ReleaseEverythingAtQuit` both return immediately there, and there is no
+  moment to record. That is the same case as `built site moved out of the
+  working folder`.
+
+If this shape is taken a second time, stop and build the mend-check instead —
+one precedent is an exception, two is a practice.
+
 ## Proposing a case from the Windows side
 
 So a behaviour invented on Windows can be written here as a case, and **the
@@ -356,7 +387,7 @@ recounted 2026-09-07.
 | What a teacher is told when a publish set to happen on its own did not get through | `shared-rules.json` → `scheduledPublishStopped` | ScheduledPublishOutcome (16), SharedRulesContract (2) |
 | Validation messages | `app-rules.json` → `configurationRules` | CourseConfiguration (10), CustomDomain (4) |
 | Progress milestones and marker origins | `app-rules.json` → `milestones`, `markerOrigins` | TaskMilestone (12) |
-| Failure explanations | `app-rules.json` → `failureExplanations` | FailureExplainer (8) |
+| Failure explanations | `app-rules.json` → `failureExplanations` | FailureExplainer (10) |
 | Special folder names: what is blocked, what is confirmed, what a rename says, which keys it carries, and how the new name is SPELLED inside a link | `shared-rules.json` → `specialNames` | SharedRulesContractTests (24), SpecialFolderRenamer (22), FolderPathRewriterTests (2) |
 | What a teacher reads under the four Content Structure lists | `shared-rules.json` → `specialNames.contentStructureTip` | `SharedRulesContract` (3 functions, plus one further assertion inside `testSpecialNamesSentencesMatchContract`). Proposed from Windows 2026-09-07 and adopted here 2026-09-09 ([#72](https://github.com/russellgordon/plantoir/issues/72)); Windows' wording won, widened to “folders and files”. **Not counted in the `SharedRulesContractTests (24)` row above**, which is left as it stands. Whether a teacher can SEE it is checked on Windows (`CourseSettingsCaptionUiTests`) and NOT here: an XCUITest was tried and reached this caption in one run of four, so the mac's on-screen half is the source scan's deletion guard — `documentation/09-mac-app.md` says what went wrong and which part is worth fixing. Two of the four go beyond the string: the entry must carry no `reason` key — pinned on the side that authors this file, because the cost lands on Windows, whose `NoBlockedSentenceInTheContractIsUnusedHere` sweeps every top-level `reason` — and `CourseSettingsView` must actually DRAW the constant, measured by mutation, because the other three stay green when the line that renders it is deleted. |
 | Which of a course's OWN folders the build treats specially, and what the sheet says about each | `shared-rules.json` → `specialFoldersHelp` | SpecialFoldersHelpContract (5) on Windows, SpecialFoldersHelpTests (5) on the mac — both sides adopted 2026-09-06 |
@@ -380,6 +411,7 @@ recounted 2026-09-07.
 | What the breadcrumb trail must record | `shared-rules.json` → `activityTrail` | ActivityTrail via ProblemReport, SharedRulesContract (2) |
 | A working folder a cloud service keeps in sync: how it is recognised, what is said, when | `shared-rules.json` → `cloudSyncedFolders` | CloudSyncedFolder (18), CloudSyncNoticeLayout (5) |
 | Where a section's BUILT WEBSITE is kept, and what happens to a folder that already has one | `shared-rules.json` → `buildOutputLocation` | BuildOutputLocation (22), SharedRulesContract (2), and `scripts/test_build_output_link.sh` in `verify.sh` (22 checks) |
+| When quitting asks the teacher first, and when it must NEVER ask | `shared-rules.json` → `quittingWhileWorkIsUnderWay` | QuitConfirmation (6) on the mac. **`appliesOn: ["mac"]` for now, and deliberately not for ever** — an acknowledged exception, recorded under "Named gaps" above rather than argued here: added 2026-09-19 with [#220](https://github.com/russellgordon/plantoir/issues/220), when nobody was working on Windows, and `appliesOn` has no mend-check. Its five cases are platform-neutral apart from the signal that says the system is logging out; **no Windows reader today**. The matching trail event `quit asked about work under way` carries the same `appliesOn` and is part of the same exception — adopt the rule and that line together, then delete BOTH `appliesOn` keys. The other three events that landed the same day are mac-only for the ordinary permanent reason (a native Windows toolchain has nothing to stop) and are not part of this |
 | When the report asks about the assistant, and what it is called | `shared-rules.json` → `problemReportDialog` | SharedRulesContract (2), ProblemReport (2) |
 | Which assistant a teacher may choose, the caution, and when one may be removed | `shared-rules.json` → `assistantModelChoice` | SharedRulesContract (5), AssistantSettings (22) |
 | What a page is called when the assistant names it | `shared-rules.json` → `pageNaming` | SharedRulesContract (2), AssistPageNaming (7), AssistToolRunner (2) |
@@ -480,8 +512,8 @@ The 2026-09-06 audit was a count; this is the same question asked of the file
 as it stands, and it is the milestone's "definition of done" for
 [#138](https://github.com/russellgordon/plantoir/issues/138): **every case list
 in every `contracts/*.json` is either run by a Windows gate, or owned by an
-open issue, or exempt for a reason written down here.** **122 case lists; 102
-have a reader here.** The other twenty are below. (It was 100 of 111 when this
+open issue, or exempt for a reason written down here.** **123 case lists; 102
+have a reader here.** The other twenty-one are below. (It was 100 of 111 when this
 paragraph was first written; `workingFolderSelection.cases` and `.rejected`
 have a Windows reader since [#162](https://github.com/russellgordon/plantoir/issues/162)
 landed, and the count was RE-TAKEN with the walker below rather than adjusted
@@ -540,6 +572,7 @@ subtraction.
 | `assist-cases.json` → `deployAtATime.accepted`, `.refused`, `.resolving` | 23 + 25 + 11 | **Owed**, [#193](https://github.com/russellgordon/plantoir/issues/193), the `windows` issue opened from [#168](https://github.com/russellgordon/plantoir/issues/168) — the whole family is theirs to implement, and these rows ARE the specification: one example in `cardPhrasings.parsed` cannot describe a grammar of times. `CardPhrasings_AllParsedExamplesFromContract_Pass` will go red on the sixth family the moment the contract lands, so the work is visible there; what these three add is every spelling and the day rule. |
 | `assist-cases.json` → `hideIsUnpublish.accepted`, `.refused` | 13 + 20 | **Owed**, the `windows` issue opened from [#215](https://github.com/russellgordon/plantoir/issues/215). AUTHORED, arrived 2026-09-19. The family it describes DOES have a Windows reader through `cardPhrasings.parsed` — their `CardPhrasings_AllParsedExamplesFromContract_Pass` walks the example and the near-miss, and goes red on pull until they implement the frame — but one example cannot describe a grammar whose spellings are the whole question, which is the same argument `deployAtATime` won. Two rows in it carry decisions rather than spellings and are the ones to read first: `publish unit 4, day 3` is REFUSED (the day arm is gated on the verb, because publishing is the direction that reaches students), and `hide unit 4, day 21 in ICS3U` is refused because a matched card binds the session's own course unconditionally on both platforms |
 | `assist-cases.json` → `echoedRequest.cases` | 9 | **Owed**, the same `windows` issue. AUTHORED, arrived 2026-09-19. A pure predicate — (what was sent, what the teacher typed, what came back, whether there was a tool call) → is this an echo — so it is runnable the moment they have a reader for it, and it needs no conversation to set up. NOT expressible as a scenario on either platform, for the reason `windowBinding` records: the scenario runner has no engine seam, so a model's reply cannot be scripted |
+| `shared-rules.json` → `quittingWhileWorkIsUnderWay.cases` | 5 | **Run on the mac, no Windows reader**, and the newest of the twenty-one. Arrived 2026-09-19 with [#220](https://github.com/russellgordon/plantoir/issues/220); `QuitConfirmationTests.testTheRuleIsTheOneTheContractWritesDown` deserialises all five, and `testTheSafeAnswerIsTheDefaultOne` reads `buttons.default`. Windows has no such question, and the block carries `appliesOn: ["mac"]` as an acknowledged exception — see "One exception has been taken to the passage above" under Named gaps. The five cases are platform-neutral apart from the two `quitReason` spellings; the discriminating one is "a preview is open and nothing is publishing", which pins that a preview merely being OPEN is not work under way. Owed with the behaviour, in the `windows` issue that carries #220's handover |
 | `shared-rules.json` → `followingLinks.stopsAtAClassPage.cases` | 3 | **Owed**, the `windows` issue opened from [#173](https://github.com/russellgordon/plantoir/issues/173) ([#203](https://github.com/russellgordon/plantoir/issues/203), v1.3.0). **Green by BEHAVIOUR, unrun by their SUITE**, which is the quiet kind of gap: `AssistWorkspace.cs:730` already guards both the add and the enqueue on `!targetPage.IsClassPage`, so all three cases would pass today — but `SharedRules_FollowingLinks_MatchesContract` asserts named booleans and walks no `cases` array, so nothing there runs them and nothing there goes red. What they owe is the loop, and the SENTENCE (`wording.linkedClassWasLeftAlone` / `…ClassesWereLeftAlone`), which is the one behaviour they do not have. The rule deliberately did NOT go into `neverTakenDownByFollowingLinks`, which `ContractTests.cs:295` asserts is exactly three. |
 | `assist-cases.json` → `windowBinding.cases` | 8 | **Owed**, the `windows` issue opened from [#202](https://github.com/russellgordon/plantoir/issues/202) ([#208](https://github.com/russellgordon/plantoir/issues/208), v1.2.0 — part of #180), the mac half of [#180](https://github.com/russellgordon/plantoir/issues/180). **Unrun there, and it cannot be red**: nothing on that side enumerates the top-level keys of `assist-cases.json` — every access is by name — and their scenario grammar (`AssistScenarioTests.cs`, whose `given` keys are `previewRunning`, `sectionWindowOpen`, `sectionBusy`, `pending`, `saying`) cannot script a model's TOOL CALL at all, which is what every case here starts from. What they owe is a seam that can, plus the two wording keys the refusals name. Their own behaviour is already close: `AssistWorkspace.Course` refuses any course but the session's, which is where the mac's rule came from. |
 | `class-planning.json` → `datingPagesAClassBrings.reachStopsAtAClassPage.cases` | 2 | **Owed**, the same `windows` issue as the row above. Green by behaviour for the same reason — their date walk stops on `classPaths` at `AssistWorkspace.cs:927`, before the enqueue at `:928`, and the backwards earliest-class walk does not pass through a class either — and unrun for the same reason. |

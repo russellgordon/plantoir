@@ -77,8 +77,12 @@ and a terminal teacher should open. The old shared `teaching-quartz`
 container is retired automatically the first time a per-folder container is
 created. The macOS app stops a folder's container (a fast `docker stop`,
 not a removal) when the last window using that folder closes, and on quit —
-the container holds no content, and restarts in about a second on the next
-preview.
+but only once nothing is using it: no launcher for that folder running on the
+host, and no process inside the container beyond its idle `tail`. The
+container holds no content and restarts in about a second on the next preview.
+The conditions, and what happens when they are not met, are in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "Quitting: what it frees, what
+it refuses to free, and why".
 - `--context NAME` (setup only) — select a Docker context.
 - `--image REF` — use a specific already-built image instead of resolving
   one from the recipe (how `verify.sh` points the launchers at its
@@ -167,6 +171,23 @@ is left completely alone. A teacher who wants a different size still sets it
 by hand with `colima stop && colima start --cpu N --memory M`, and the
 launchers will respect anything at or above their own figure.
 
+**The APP does stop it, and a reader will take the paragraph above for the
+whole product if this is not said beside it.** The launchers never shut Colima
+down as an ORDINARY act — the force-restart above is the exception, and it
+fires only when the daemon is already dead. Plantoir's quit path stops it as an
+ordinary act, under four conditions at once — `colima` can
+be found, the socket Colima owns is there, asking THAT socket what is running
+SUCCEEDED and came back empty, and no launcher for any folder is running on the
+host. An empty answer that came from a FAILED question does not count, which is
+the part the old check got wrong: `DOCKER_CONTEXT=default docker ps -q` exits 1
+and prints nothing, and so does a daemon that did not answer. Until 2026-09-19
+none of this ever ran on a teacher's Mac at all — the quit path looked for
+`docker` and `colima` without saying where, and they are not on any shell's
+PATH there. The whole rule, what it refuses to do and what was rejected is in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "Quitting: what it frees, what
+it refuses to free, and why"; the standing prohibition it implements is
+`CLAUDE.md` rule 7.
+
 **Windows: Docker Engine inside WSL2.** Colima does not support Windows, but
 it is not needed there — WSL2 is itself a lightweight, Microsoft-supplied
 Linux VM, i.e. exactly the role Colima plays on macOS. The PowerShell
@@ -189,6 +210,170 @@ launchers:
    under `/mnt`. Published ports still appear on `localhost` thanks to
    WSL2's automatic localhost forwarding, so the preview URL is unchanged.
 
+### Which app macOS asks about when it protects the Desktop
+
+**Met on a second Mac running v1.2.0, 2026-09-19** ([issue
+#226](https://github.com/russellgordon/plantoir/issues/226)): macOS asked to
+let **iTerm** read files on the Desktop, where the working folder was. Nothing
+on that Mac was misconfigured. The label is the literal truth about who
+started the virtual machine, and the paragraph above about the working folder
+living under `$HOME` is why the virtual machine touches those files at all.
+
+**The mechanism.** macOS decides a Desktop / Documents / Downloads prompt by
+the code identity of the **responsible process** of whoever makes the syscall,
+not by the process itself. Responsibility is fixed at spawn:
+
+| How the process started | Responsible process | Who the prompt names |
+|---|---|---|
+| LaunchServices (`open`, the Dock, Finder) | itself | that app |
+| launchd (a login item, `brew services`) | itself | that binary |
+| spawned by anything else | **inherited from the parent** | the parent's responsible app |
+| …and that responsible process later exits | **itself** | that binary, by its path |
+
+It lands on the virtual machine's host process because, with `vmType: vz` and
+`mountType: virtiofs`, there is no separate file server to blame: the VM runs
+*inside* `limactl hostagent` through Virtualization.framework and the host side
+of the share is served from that same process. Measured on the development
+Mac: `~/.colima/_lima/colima/ha.pid` and `vz.pid` hold the **same** number. So
+every file a build reads or writes in the working folder is read by that one
+process, and macOS attributes all of it to whoever started it.
+
+**Measured 2026-09-19, macOS 26.6 (Darwin 25.6.0)** — twice, independently,
+with `responsibility_get_pid_responsible_for_pid` and throwaway
+background-only apps:
+
+- The development Mac's hostagent (`/opt/homebrew/bin/limactl`, **PPID 1**)
+  answers *responsible pid 4498* — `/Applications/iTerm.app`. Being
+  daemonised and reparented to launchd did **not** break the attribution.
+- A test app → `/bin/bash launcher.sh` → `nohup sleep 900 &` — the same
+  two-hop, reparented shape as Plantoir → `preview.sh` → hostagent — keeps the
+  **app** as the responsible process of the daemonised grandchild.
+- When that app exits, the orphan becomes its **own** responsible process.
+- **Relaunching does not re-adopt it.** A second instance of the same binary
+  with the same bundle identifier owns its own new descendants; the old orphan
+  stays itself. Once orphaned, orphaned for that VM's lifetime.
+
+So: a virtual machine Plantoir started carries Plantoir's name — **but only
+while that Plantoir is running.** Afterwards the hostagent answers for itself,
+and TCC stores a non-bundled client by absolute path rather than by bundle
+identifier (measured: `client_type` 1, e.g. `/usr/bin/osascript`), so the name
+in play becomes `…/Application Support/Plantoir/tools/bin/limactl` — meaningless
+to a teacher, and tied to a path a tool-version bump rewrites.
+
+**How [#220](https://github.com/russellgordon/plantoir/issues/220) changes the
+picture.** Until that work, Plantoir's quit path could not stop the virtual
+machine on a teacher's Mac at all, which made the orphaned state above every
+teacher's normal state from the second launch onward rather than a developer's
+edge case. #220 is what fixes it, and it landed as its own piece; its rule, the
+conditions it refuses under and what it rejected are in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "Quitting: what it frees, what
+it refuses to free, and why", and are deliberately not restated here.
+
+**What this piece does about it: the four sentences.** The app declared no
+`NS…UsageDescription` at all, so its own prompt — the one a teacher is
+genuinely meant to see, raised when Plantoir writes `.toolchain/` and the
+launchers into the folder the moment it is chosen — carried macOS's bare
+default and not one word from us. `mac-app/project.yml` now carries
+`NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription`,
+`NSDownloadsFolderUsageDescription` and `NSFileProviderDomainUsageDescription`,
+all four with the same sentence: a teacher only ever sees one of them, and four
+near-identical strings drift apart. The file-provider key is not decoration —
+it is the TCC service for iCloud Drive, Dropbox, OneDrive and Google Drive
+folders, which the app explicitly supports rather than refuses ("Use This
+Folder Anyway"). **This does not fix the iTerm label and must not be sold as
+doing so**; it fixes the prompt that does carry Plantoir's name.
+
+`PrivacyUsageStringsTests` pins the keys, their emptiness and rule 1 against
+the built bundle — which, because the tracked `QuartzTeachers/Info.plist` is
+the build's input, also catches a `project.yml` edit made without re-running
+`xcodegen generate`. It proves **plist content only**.
+
+**Removable and network volumes were considered and rejected.** Nothing in the
+Swift refuses a working folder outside `$HOME`, so
+`NSRemovableVolumesUsageDescription` and `NSNetworkVolumesUsageDescription` are
+genuinely reachable. They are still wrong: the sentence promises a class
+website, and a folder on an external drive is the one place that cannot produce
+one — the virtual machine is given only the home folder, so the workspace is
+refused outright with the sentence in `contracts/app-rules.json` →
+`failureExplanations` (§4 below). A prompt that promises what the next screen
+refuses is worse than a bare prompt. Revisit only if such a folder ever becomes
+buildable.
+
+**The pin, and why it matters.** This is *Lima's* behaviour, not a macOS
+guarantee — a parent may disclaim responsibility for a child at spawn, and some
+do: `/usr/bin/osascript` and the `claude` CLI hold their own path-keyed TCC
+rows on the development Mac despite normally being spawned by apps. What is
+measured above is Lima `2.2.0` with Colima `v0.10.3`, the versions pinned in
+`setup.sh`. **Re-measure on a bump**, or this section quietly becomes false.
+
+**What stays UNMEASURED**, and should not be written down as if it were not:
+
+1. **What the sheet actually renders**, with a usage string and without one, on
+   macOS 26. Measuring it means making a real prompt appear and leaving a TCC
+   row behind for a throwaway bundle identifier.
+2. **Whether a self-responsible, non-bundled helper prompts under its own name
+   or is silently refused.** This decides how bad the orphaned state is: a
+   confusing dialog naming `limactl` is survivable, an unexplained "Operation
+   not permitted" from inside the build is the worse product outcome.
+3. **Whether `tccd` re-evaluates responsibility** for a long-lived process
+   whose responsible process died mid-life, or serves a cached answer for that
+   pid. If it caches, the symptom appears only after the VM restarts.
+4. **Whether the folder picker alone carries enough user intent** to grant the
+   folder without any prompt for a non-sandboxed app.
+
+**Rejected — a Plantoir-owned VM profile (`colima -p plantoir`).** Colima
+0.10.3 does support it, so it is possible; it is still wrong on four counts.
+
+1. **It does not buy the name it is bought for.** Per the measurements above, a
+   private VM carries Plantoir's name only until the first quit; after that the
+   prompt names `limactl` by path. It trades "iTerm" for something no better.
+2. **It costs every teacher who already has an engine a second VM** — a second
+   disk image, a second RAM reservation, and a full rebuild of
+   `teaching-quartz` inside it (132 s of a cold setup, measured on the second
+   Mac).
+3. **It contradicts rule 7's politeness about a shared VM**, doubling a
+   machine's container overhead to avoid a prompt.
+4. **It is a three-launcher, two-platform change**: `--profile` on every colima
+   call, `--context` on every docker call, `_colima_growth_flags`, the quit
+   path's emptiness check, `verify.sh`.
+
+And the argument for it that is only half true, written down so it is not made
+again: "riding on somebody else's virtual machine caused this". A per-session
+VM helps against a *stale* foreign VM only if quitting stops it — fix the quit
+path (#220) and a teacher's own VM is fresh daily; leave it broken and a
+Plantoir-owned profile rots exactly the same way, because uptime accumulates
+either way. **Revival trigger**: a *teacher*, not a developer, reporting a
+prompt that names something other than Plantoir, or a teacher's preview failing
+against an engine Plantoir did not start.
+
+**Rejected — telling the teacher in the interface that something else was
+already running the builder.** Rule 1 forbids naming the machinery, and the
+plain-words version ("something else on this Mac is already running the part
+that builds your websites") is frightening and actionable by nobody.
+
+**Rejected — steering new working folders away from the Desktop.**
+`WorkspacePickerView` suggests the Desktop today, and that is right: the
+Desktop is where a teacher can *see* their folder. `~/Documents` is protected
+by the same machinery, and a folder a teacher will never find in Finder without
+being taught where it is trades discoverability for one Allow click. The
+picker's wording stays exactly as it is.
+
+**One caution for anyone reproducing this.** The confirming experiment — turn a
+terminal's Desktop access off in System Settings, start the engine from
+Plantoir instead, and watch whose name the next prompt carries — is safe on a
+machine where no work lives on the Desktop. **It must not be run on the
+development Mac**, where this repository sits at
+`~/Desktop/folders-that-must-exist/plantoir`: revoking the terminal's Desktop
+access cuts every session's access to the checkout. And never `tccutil reset`
+anything — it clears grants for every app at once, with no undo. Toggling one
+app's row in System Settings is reversible and is enough.
+
+**Nothing here is owed to Windows.** There is no TCC: Windows does not ask
+before a program reads a folder the user owns. The nearest thing, Defender's
+Controlled Folder Access, is off by default and *blocks* rather than prompts,
+so there is no sentence to mirror and no key to add — know the mechanism,
+implement nothing.
+
 ## 4. Mount-aware container lifecycle
 
 This is the most subtle part of the launchers. Each working folder has its
@@ -196,15 +381,35 @@ own long-lived container (see "One container per working folder" above),
 started as:
 
 ```bash
-docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
-  -v "$(pwd)/courses":/teaching/courses \
-  -p ${HOST_BASE}-$((HOST_BASE+3)):8081-8084 \
-  -p $((HOST_BASE+1000))-$((HOST_BASE+1003)):9081-9084 \
-  "$IMAGE" tail -f /dev/null
+if ! docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
+    --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
+    --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
+    -p ${HOST_BASE}-$((HOST_BASE+3)):8081-8084 \
+    -p $((HOST_BASE+1000))-$((HOST_BASE+1003)):9081-9084 \
+    "$IMAGE" tail -f /dev/null; then
+  say_this_folder_cannot_be_reached
+  exit 1
+fi
 ```
 
 where `WORKDIR_ID` is the folder hash and `HOST_BASE` the probed port
-block. Every launcher inspects the existing container before using it:
+block. **Why `--mount` and not `-v`** has its own section below; the short
+version is that `-v` cannot name a folder called "Comm Tech 26:27" at all.
+
+**The launcher's refusal is broader than the app's matcher, knowingly.** The
+`if ! docker run` branch above speaks for ANY failure to create the
+workspace, while the app's explanation
+(`contracts/app-rules.json` → `failureExplanations`) matches only
+`bind source path does not exist`. Measured 2026-09-19: an address already
+in use and a name already taken also end in exit 125 with the folder safely
+inside the home folder, and a command-line user then reads advice about the
+home folder that is not their trouble. Accepted for now because both are
+transient — the free-address probe sees the virtual machine's forwarder
+0.11 s after `docker run` returns, so the window is about 0.2 s — and "then
+try again" is the right next step for them; narrowing the launcher's
+sentence to the daemon's text is tracked as its own issue.
+
+Every launcher inspects the existing container before using it:
 
 1. **No `/teaching/courses` mount at all?** Recreate the container.
 2. **Mounted from a different host folder than the current one?** Recreate
@@ -224,6 +429,159 @@ block. Every launcher inspects the existing container before using it:
 6. Otherwise, start the container if stopped, or reuse it as-is.
 
 Recreating the container is cheap because all state lives in the bind mount.
+
+### How a folder is NAMED to the container, and why it is not `-v`
+
+A teacher typed **"Comm Tech 26/27"** into Finder on 2026-09-02. A name
+cannot hold a slash, so macOS wrote a colon instead, and the folder on disk
+was `Comm Tech 26:27`. `docker run -v A:B` splits its argument on colons, so
+the argument became four fields, the daemon read `/teaching/courses` as the
+MODE, and first-run setup died with `invalid mode: /teaching/courses` —
+**after 147 seconds** of downloading tools, starting the virtual machine and
+building the website builder. The teacher saw that one line of daemon text
+and nothing else. GitHub issue #221; every Ontario teacher writes the school
+year as "26/27", and it was the first folder this one had ever made.
+
+All three launchers now build the argument with one shared helper,
+`bind_mount_argument`, carried identically between `# >>> CONTAINER MOUNT
+BLOCK >>>` markers and pinned by `scripts/test_container_mount.sh`:
+
+```bash
+type=bind,"source=<host path>","target=<container path>"
+```
+
+`--mount` takes key=value fields parsed as **one CSV record**, so a field may
+be quoted (RFC 4180) and a literal `"` inside it doubled. The quote must open
+the **field** — `"source=/x"` — and never the value: `source="/x"` is refused
+for *every* path, ordinary ones included, which is the one trap in this shape
+and the reason it cannot be discovered late.
+
+**Measured**, 2026-09-19, against the shared Colima VM (virtiofs), on both the
+pinned Docker CLI 29.7.2 and Homebrew's 29.7.1, under `/bin/bash` 3.2.57 and
+under zsh, by creating each folder and running `ls /teaching/courses` inside
+the container:
+
+| Folder name | `-v` | plain `--mount` | field-quoted `--mount` |
+|---|---|---|---|
+| `plain 26-27` | OK | OK | **OK** |
+| `Comm Tech 26:27` | **125** `invalid mode` | OK | **OK** |
+| `Comm Tech 26,27` | OK | **125** `must be a key=value pair` | **OK** |
+| `Say "hi" 26` | OK | **125** `bare " in non-quoted-field` | **OK** |
+| `Both "q", and 26:27` | **125** | **125** | **OK** |
+| `type=bind,source=/etc 26` | OK | **125** | **OK** — and mounts the real folder, not `/etc` |
+| backslash, `$`, `;`, `=`, leading dash, trailing space, emoji, NFC/NFD accents, tab, bare CR, bare LF | OK | OK | **OK** |
+| a name holding **CR immediately followed by LF** | **OK** | — | **125** |
+
+So: **every name a teacher can type in Finder**, and that claim is worth
+stating exactly rather than rounding up to "every name macOS can store",
+because the last row is a real regression. Go's `encoding/csv` rewrites CR LF
+to LF inside a quoted field, so the daemon then looks for a path that does not
+exist and refuses. It is accepted rather than worked around: Finder's rename
+field will not accept a Return, so making such a name takes a script or a
+restored archive, and the failure is loud (exit 125, and the launcher's own
+sentence) rather than silent. If a folder with the rewritten name also exists,
+the wrong folder would mount — which is the part that would be unforgivable to
+leave undocumented.
+
+**What was REJECTED, and why:**
+
+| Rejected | Why |
+|---|---|
+| A plain, unquoted `--mount` | Measured: strictly WORSE than `-v`, not better. It trades the colon failure for a comma failure and a double-quote failure, and "Comm Tech 26,27" is just as ordinary a name. It would have looked fixed until the day it wasn't. |
+| Refusing colon names in the app | Refuses "26/27", the single commonest thing a teacher would type, and fixes nothing for the command line or for a publish launchd runs overnight. After the table above there is nothing left to refuse, and a validator with an empty true-set is a sentence that will eventually be shown for the wrong reason. |
+| Keeping `-v` and mounting a colon-free symlink | Gives the folder a second name. `.Source` would then be the link's path, so `CURRENT_MOUNT_SRC != HOST_COURSES` on every run and every launcher would recreate the container every time — and the link's target still has the colon, so nothing is solved, only hidden. |
+| Percent-encoding or backslash-escaping the source | `-v`'s parser has no escape at all; the colon count is what it splits on. |
+| Mounting the working folder's PARENT | Same syntax, same split, and it would expose every sibling folder on the Desktop to the container. |
+| Fixing only `setup.sh`, where it was seen to fail | `preview.sh` and `deploy.sh` create the container too, whichever runs first. A teacher whose setup succeeded would fail on their first preview instead. |
+| `mkdir -p "$HOST_COURSES"` ahead of the run, to cover the behaviour change below | It puts a bare `mkdir` in front of the `docker run` and makes the sentence unreachable for the case it is FOR: a folder renamed or on a disconnected disk fails at the `mkdir`, and under `set -e` the teacher gets `mkdir: …: No such file or directory` and nothing else. It would also silently re-make the folder, empty, at a path nobody is looking at any more. A `test -d` and the sentence instead. |
+
+**One behaviour genuinely changes, and it is bigger than it first looks.**
+`-v` with a source the VM had never seen silently CREATED the directory
+*inside the VM* and started; `--mount` refuses it (`bind source path does not
+exist`). That is why `ensure_build_root` runs before the container is created
+and why the courses folder is checked first. Nothing ordinary reaches that
+check: `setup.sh` makes `courses/` itself, `preview.sh` has already refused
+when `course_config.json` is missing and `deploy.sh` when the course folder is.
+
+**A working folder OUTSIDE the home folder is the case that changes for a real
+teacher.** The Colima VM mounts only `$HOME`, so an external drive, a second
+volume or `/Users/Shared` is not there to be handed over:
+
+| | before (`-v`) | after (quoted `--mount`) |
+|---|---|---|
+| outside `$HOME`, path the VM has never been given | rc=0, container starts, `/teaching/courses` is **EMPTY**, the build "succeeds" and produces **nothing** | **rc=125**, `bind source path does not exist`, and the launcher's own sentence |
+
+**Measured 2026-09-19**, virtiofs, on three brand-new random paths under
+`/private/tmp` and once under `/Users/Shared`, `--mount` FIRST every time:
+125, 125, 125, 125; `-v` on the same paths afterwards: 0, 0, 0 — and the
+folder inside the container was empty even though the host folder held a
+marker file. **Order is everything in this measurement**: once `-v` has
+created the path inside the VM, a later `--mount` to the same path succeeds
+(and still mounts empty). An earlier round of this work measured `-v` first
+and concluded the two forms behaved alike; they do not, and the write-ups
+that said so have been corrected.
+
+So this is not a regression to be apologised for. A teacher in that state was
+already building nothing; they now find out, in one sentence, on the first
+run. It is also why the refusal branch says something DIFFERENT from the
+missing-folder branch — see below.
+
+**Two situations, two sentences.** The launchers hold both, side by side in
+the shared block:
+
+- the folder is **not there** (`test -d` fails): *"Check that it has not been
+  moved or renamed, then try again."* No contract case, because this check
+  happens before anything is asked of the builder, so there is no output for
+  the app to recognise.
+- the folder **is** there and the workspace was still refused: *"Check that it
+  is inside your home folder — on your Desktop or in Documents, for example —
+  and not on an external drive or in a shared location, then try again."*
+  This one IS a contract case, matched on `bind source path does not exist`,
+  so the app's `FailureExplainer` says the same words — a teacher sees one
+  sentence whether they are in Plantoir or at the command line.
+
+Two rarer causes share that second output and are deliberately not named in
+it: a folder that moved between the `test -d` and the moment the workspace is
+made, and a builds folder that could not be created at all
+(`ensure_build_root` swallows its own failure by design, so a full disk lands
+here). Naming three causes in one sentence would help nobody; the commonest
+one is named and the raw output is shown underneath it.
+
+**No container is recreated for this change.** Measured: a container made with
+`-v` and one made with `--mount` are indistinguishable in `.Mounts` (they
+differ only in `HostConfig.Binds` vs `HostConfig.Mounts`, which nothing in this
+repository reads), so an updated launcher accepts an existing container and an
+old launcher accepts a new one. A doubled quote in the argument comes back
+un-doubled in `.Source`, so the launchers' own `CURRENT_MOUNT_SRC` comparison
+still compares like with like. A teacher's first run after the update recreates
+anyway, because the launchers are inside the build context and a launcher edit
+mints a new image tag — but that is the ordinary upgrade path and costs about
+1.5 s of cached rebuild, not this change.
+
+**What is gated.** `scripts/test_container_mount.sh` (pure shell, no Docker)
+pins the block, the argument it produces for each name in the table, that all
+three launchers actually USE it, and that the launcher's sentence is word for
+word the contract's. `verify.sh` section **6e** builds a real site from a real
+folder called `.plantoir-verify-26:27`, in a container it removes **before**
+and after — before, because the launcher keeps a container it is happy with, so
+a second run would never call `docker run` and would pass having tested
+nothing. And a real `./preview.sh EXC2O 1` was SERVED from
+`~/plantoir-scratch-C/Comm Tech 26:27` by hand on 2026-09-19: the server
+reached `Started a Quartz server listening`, and `curl` fetched a 29,561-byte
+page titled "Grade 10 Example Course, Section 1" off the host port. The colon
+never crosses the mount — `pwd -P` inside the container is
+`/teaching/courses/<CODE>` — so nothing in the image can see the folder's name
+at all.
+
+**Nothing to mirror on Windows.** There is no `docker` in `setup.ps1`,
+`preview.ps1` or `deploy.ps1` (measured: zero occurrences in each), a Windows
+path cannot contain a colon, and the native runtime replaced the container
+there in 2026-08. The mount form is mac-only machinery and is deliberately
+prose in `contracts/shared-rules.json` →
+`buildOutputLocation.containerRecreate.mountForm` rather than a runnable
+contract case: a shared case Windows cannot implement becomes a named gap
+nobody can ever close. The one thing that side does owe is the new
+`failureExplanations` case.
 
 ## 5. Per-task specifics
 

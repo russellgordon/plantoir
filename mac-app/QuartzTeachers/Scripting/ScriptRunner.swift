@@ -126,6 +126,75 @@ class ScriptRunner {
         return false
     }
 
+    // MARK: - Every run in flight, across every window
+
+    /// The runners with a script actually running, in any window.
+    ///
+    /// A runner is `@State` on the view that started it, so nothing outside
+    /// that view can reach one — which was fine until quitting needed to end
+    /// a preview the way the Stop button does. Registered here for the whole
+    /// life of a run and taken out again when it finishes, so nothing has to
+    /// be reset between tests either.
+    private(set) static var runsInFlight: [ScriptRunner] = []
+
+    /// Ends every live PREVIEW, host side, the way the Stop button does.
+    ///
+    /// Called at quit, and deliberately narrow. A preview server's launcher
+    /// keeps running for as long as the preview is up, and — measured — a
+    /// child on a pseudo-terminal is reparented rather than killed when the
+    /// app goes, so without this the launcher can outlive the app, the quit
+    /// script's host-side check sees it, and the quit frees neither the
+    /// container nor the machine under it. That is the common case, not a
+    /// corner of one.
+    ///
+    /// A publish is NOT ended here, and that is a decision rather than an
+    /// oversight: the teacher was asked and chose to quit anyway, and
+    /// Plantoir should not then be the thing that kills their publish. It
+    /// will very likely stop on its own regardless — `deploy.sh` runs under
+    /// `set -euo pipefail` and its pseudo-terminal goes with the app, so its
+    /// next line of output fails (measured) — which is why the question says
+    /// quitting "could leave it unfinished" rather than promising either
+    /// outcome. `--build-only` is excluded for the same reason, being a
+    /// publish's own build, and `--stop` because a stop is the thing being
+    /// asked for.
+    static func stopEveryLivePreview() {
+        for runner in runsInFlight {
+            if runner.isALivePreview {
+                runner.stopByUser()
+            }
+        }
+    }
+
+    /// Adds a runner to the list, once.
+    private static func rememberInFlight(_ runner: ScriptRunner) {
+        for existing in runsInFlight where existing === runner {
+            return
+        }
+        runsInFlight.append(runner)
+    }
+
+    /// Takes a runner out of the list when its script has finished.
+    private static func forgetInFlight(_ runner: ScriptRunner) {
+        var remaining: [ScriptRunner] = []
+        for existing in runsInFlight where existing !== runner {
+            remaining.append(existing)
+        }
+        runsInFlight = remaining
+    }
+
+    /// Whether this run is a preview server rather than a build or a publish.
+    var isALivePreview: Bool {
+        if runScriptName != "preview.sh" {
+            return false
+        }
+        for argument in runArguments {
+            if argument == "--stop" || argument == "--build-only" {
+                return false
+            }
+        }
+        return isRunning
+    }
+
     // MARK: - Functions
 
     /// Starts a script (e.g. "preview.sh") from the working folder.
@@ -187,11 +256,14 @@ class ScriptRunner {
         newProcess.arguments = fullArguments
         newProcess.currentDirectoryURL = workingDirectory
 
-        // GUI apps inherit a minimal PATH; the scripts need Homebrew's
-        // programs (docker, colima) the same way a Terminal session has them.
-        var environment: [String: String] = ProcessInfo.processInfo.environment
-        let existingPath: String = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
-        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + existingPath
+        // GUI apps inherit a minimal PATH; the launchers need to find docker
+        // and colima the way a Terminal session does. One definition, shared
+        // with the quit path and with a scheduled publish — see
+        // `HelperPrograms`, which also explains why the pinned copies
+        // Plantoir downloaded come FIRST.
+        var environment: [String: String] = HelperPrograms.environment(
+            basedOn: ProcessInfo.processInfo.environment
+        )
         environment["TERM"] = "xterm-256color"
         newProcess.environment = environment
 
@@ -235,6 +307,7 @@ class ScriptRunner {
         runScriptName = scriptName
         runArguments = arguments
         runWorkingFolderPath = workingDirectory.path
+        ScriptRunner.rememberInFlight(self)
         // Redacted even here. The arguments carry a Cloudflare Account ID
         // and a folder path with the teacher's account name in it, and
         // `.public` in a Logger means exactly that — written out in full,
@@ -1122,6 +1195,7 @@ class ScriptRunner {
         AppLog.output.info("Finished with exit code \(exitCode), transcript \(self.transcript.lines.count) lines")
         lastExitCode = exitCode
         isRunning = false
+        ScriptRunner.forgetInFlight(self)
         terminal?.masterHandle.readabilityHandler = nil
         process = nil
         terminal = nil
