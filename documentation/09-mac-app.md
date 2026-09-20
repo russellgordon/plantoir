@@ -585,9 +585,10 @@ $ DOCKER_HOST="unix://$HOME/.colima/default/docker.sock" docker ps -q | wc -l
 
 Both produce an empty string from the old expression's point of view. This is
 rule 7 — Colima is shared, and on the Mac this was written on it held 15
-containers, 13 of them another project's database stack. A teacher with Docker
-Desktop current while Colima holds containers gets the same empty, exit-0
-answer from the wrong engine.
+containers, 13 of them another project's database stack (twelve
+`canopylocal-supabase-*` and its realtime companion) and two Plantoir's own. A
+teacher with Docker Desktop current while Colima holds containers gets the same
+empty, exit-0 answer from the wrong engine.
 
 **Previews are stopped first, or the piece delivers nothing in the common
 case.** A live preview keeps the container busy; a busy container is left
