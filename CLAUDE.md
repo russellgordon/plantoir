@@ -305,7 +305,12 @@ Neither app contains toolchain logic of its own: they write the same
    (`DOCKER_HOST=unix://$HOME/.colima/default/docker.sock`), require exit 0 AND
    no output, and leave it alone otherwise.
 
-   The launchers never stop it. **The app's quit path does, and as of
+   The launchers never stop it on purpose — with ONE exception worth knowing
+   before you read a log and think the rule was broken: when the Docker daemon
+   has already failed to answer, they force-cycle it (`colima stop --force`
+   then `colima start`, `setup.sh:490`, `preview.sh:715`, `deploy.sh:1182`),
+   ungated, because at that point no Colima-based tool is working anyway.
+   **The app's quit path is the other one, and as of
    2026-09-19 it does so for the first time** — it used to shell out to
    `docker` and `colima` without saying where they are, and on a teacher's Mac
    they are on no shell's PATH, so the whole path had never run (issue #220).
@@ -854,8 +859,8 @@ changes made there have "no automated gate" at all, which is no longer true:
 
 **The mac suite runs its test classes one at a time, and that is load-bearing.**
 The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`,
-`CourseActivityTests` and `CourseActivityPublishOnlyTests` all reset
-process-wide statics
+`CourseActivityTests`, `CourseActivityPublishOnlyTests` and
+`QuitConfirmationTests` all reset process-wide statics
 (`PreviewLeases.reset()`, `CourseActivity.reset()`) around individual methods,
 so turning parallel testing on would let one class wipe the state another is
 mid-assertion on — an intermittent failure that looks exactly like a

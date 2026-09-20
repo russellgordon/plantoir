@@ -68,6 +68,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // ours that is still up keeps the shared virtual machine up too —
             // so a quit with a preview open would otherwise free nothing at
             // all, which is the ordinary case rather than a corner of one.
+            //
+            // BOTH halves, in the Stop button's own order: the processes
+            // inside the container first, then the launcher on this Mac.
+            // Ending only the first would leave a `preview.sh` that the app
+            // no longer owns — measured, a child on a pseudo-terminal is
+            // reparented rather than killed when its parent goes — and the
+            // quit script's host-side check would then see it and refuse to
+            // stop anything, for the full length of its wait.
             for lease in PreviewLeases.active {
                 PreviewStopper.stopSectionProcessesOnTheWayOut(
                     courseCode: lease.courseCode,
@@ -75,6 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     workspaceURL: URL(fileURLWithPath: lease.folderPath)
                 )
             }
+            ScriptRunner.stopEveryLivePreview()
 
             // Let every folder's container rest — and if that leaves the
             // shared VM with nothing running at all, let the VM rest too.

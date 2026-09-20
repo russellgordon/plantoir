@@ -169,7 +169,9 @@ launchers will respect anything at or above their own figure.
 
 **The APP does stop it, and a reader will take the paragraph above for the
 whole product if this is not said beside it.** The launchers never shut Colima
-down; Plantoir's quit path does, under four conditions at once — `colima` can
+down as an ORDINARY act — the force-restart above is the exception, and it
+fires only when the daemon is already dead. Plantoir's quit path stops it as an
+ordinary act, under four conditions at once — `colima` can
 be found, the socket Colima owns is there, asking THAT socket what is running
 SUCCEEDED and came back empty, and no launcher for any folder is running on the
 host. An empty answer that came from a FAILED question does not count, which is

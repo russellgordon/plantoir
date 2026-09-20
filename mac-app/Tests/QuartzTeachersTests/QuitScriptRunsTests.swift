@@ -81,6 +81,31 @@ final class QuitScriptRunsTests: XCTestCase {
         XCTAssertEqual(trail.trimmingCharacters(in: .whitespacesAndNewlines), "")
     }
 
+    /// A stop that was asked for and REFUSED is reported as a refusal, not as
+    /// a success. Issue #220 was a fault that reported nothing; a line saying
+    /// the memory came back on a day it did not is the same fault with better
+    /// manners.
+    @MainActor
+    func testAStopThatWasRefusedIsNotReportedAsASuccess() throws {
+        let scratch: Scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.root) }
+        try writeDockerStandIn(
+            in: scratch, running: true, processesInside: 1, psExitCode: 0, stopExitCode: 1
+        )
+
+        let trail: String = try run(in: scratch, includingTheSharedSetup: false)
+
+        XCTAssertTrue(
+            callsMade(in: scratch).contains(where: { $0.hasPrefix("stop -t 2 ") }),
+            "The stop was never even attempted"
+        )
+        XCTAssertFalse(
+            trail.contains("stopped the website builder for"),
+            "A refused stop was written down as a stop. The trail says: \(trail)"
+        )
+        XCTAssertTrue(trail.contains("it would not stop"), "The trail says: \(trail)")
+    }
+
     // MARK: - The shared machine (rule 7)
 
     /// The one that matters most. A question that FAILED is not an empty
@@ -305,7 +330,8 @@ final class QuitScriptRunsTests: XCTestCase {
         running: Bool,
         processesInside: Int,
         psExitCode: Int,
-        psPrints: String = ""
+        psPrints: String = "",
+        stopExitCode: Int = 0
     ) throws {
         var inside: String = "UID  PID  PPID  C  STIME  TTY  TIME  CMD"
         for index in 0..<processesInside {
@@ -319,7 +345,7 @@ final class QuitScriptRunsTests: XCTestCase {
         lines.append("  top) printf '%s\\n' \(HelperPrograms.shellQuoted(inside)) ;;")
         lines.append("  ps) printf '%s' \(HelperPrograms.shellQuoted(psPrints.isEmpty ? "" : psPrints + "\n"))"
             + "; exit \(psExitCode) ;;")
-        lines.append("  stop) ;;")
+        lines.append("  stop) exit \(stopExitCode) ;;")
         lines.append("esac")
         lines.append("exit 0")
         try write(lines.joined(separator: "\n") + "\n", toProgramNamed: "docker", in: scratch)

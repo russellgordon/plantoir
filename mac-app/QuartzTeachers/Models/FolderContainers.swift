@@ -23,13 +23,16 @@ enum FolderContainers {
     /// built HERE: a sentence in a shell script is a sentence nothing can
     /// pin, and `contracts/shared-rules.json` → `activityTrail.mustRecord`
     /// names the events this list has to cover.
-    enum Outcome {
+    enum Outcome: CaseIterable {
         case stoppedAFoldersBuilder
         case leftAFoldersBuilderRunning
+        case couldNotStopAFoldersBuilder
         case stoppedTheSharedSetup
         case leftTheSharedSetupRunning
+        case couldNotStopTheSharedSetup
         case couldNotFindThePrograms
         case couldNotAskWhatElseIsRunning
+        case ranOutOfTime
     }
 
     /// Why a container is being released, which is the half of the sentence a
@@ -51,13 +54,27 @@ enum FolderContainers {
     /// nothing.
     static let secondsToWaitForWorkToFinish: Int = 20
 
-    /// The point at which the whole script gives up on itself.
+    /// How long the script gives itself beyond the waiting it was asked to do.
     ///
-    /// Nothing here should take two minutes, and a `docker` talking to a
-    /// wedged daemon can block for ever — which is exactly how this Mac came
-    /// to have two quit shells that had been asleep for 27 days. A detached
-    /// script with no deadline is a process nobody will ever notice again.
-    static let secondsBeforeTheScriptGivesUpOnItself: Int = 120
+    /// A `docker` talking to a wedged daemon can block for ever, which is
+    /// exactly how this Mac came to have two quit shells that had been asleep
+    /// for 27 days: a detached script with no deadline is a process nobody
+    /// will ever notice again. The allowance covers the calls that are not
+    /// the per-folder wait — a `docker stop` grace of two seconds each, and a
+    /// `colima stop` that takes ten to twenty.
+    static let secondsAllowedBeyondTheWaiting: Int = 60
+
+    /// The whole script's deadline, which has to GROW with the number of
+    /// folders or it becomes the thing that stops the work.
+    ///
+    /// A fixed two minutes was the first shape and it was wrong: six folders
+    /// each waiting twenty seconds is already two minutes, so the sixth
+    /// folder would be killed in the middle of being dealt with and the
+    /// teacher would be told nothing about any of them.
+    static func secondsBeforeGivingUp(folderCount: Int, secondsToWaitForWork: Int) -> Int {
+        let waiting: Int = max(1, folderCount) * max(0, secondsToWaitForWork)
+        return waiting + secondsAllowedBeyondTheWaiting
+    }
 
     // MARK: - Functions
 
@@ -75,11 +92,12 @@ enum FolderContainers {
     static func event(for outcome: Outcome) -> ActivityTrail.Event {
         switch outcome {
         case .stoppedAFoldersBuilder, .stoppedTheSharedSetup:
-            return .websiteBuilderStoppedAtQuit
+            return .websiteBuilderStopped
         case .leftAFoldersBuilderRunning, .leftTheSharedSetupRunning:
-            return .websiteBuilderLeftRunningAtQuit
-        case .couldNotFindThePrograms, .couldNotAskWhatElseIsRunning:
-            return .websiteBuilderCouldNotBeStoppedAtQuit
+            return .websiteBuilderLeftRunning
+        case .couldNotStopAFoldersBuilder, .couldNotStopTheSharedSetup,
+             .couldNotFindThePrograms, .couldNotAskWhatElseIsRunning, .ranOutOfTime:
+            return .websiteBuilderCouldNotBeStopped
         }
     }
 
@@ -107,18 +125,27 @@ enum FolderContainers {
         case .leftAFoldersBuilderRunning:
             return "left the website builder for “\(folderName)” running because "
                 + "a publish or preview for that folder is still going"
+        case .couldNotStopAFoldersBuilder:
+            return "tried to stop the website builder for “\(folderName)” \(because), "
+                + "and it would not stop"
         case .stoppedTheSharedSetup:
             return "stopped this Mac’s website-building setup too, \(because), "
                 + "so the memory it was holding is back"
         case .leftTheSharedSetupRunning:
             return "left this Mac’s website-building setup running because "
                 + reasonSomethingElseIsUsingIt
+        case .couldNotStopTheSharedSetup:
+            return "tried to stop this Mac’s website-building setup, and it would not stop, "
+                + "so the memory it was holding is still spoken for"
         case .couldNotFindThePrograms:
             return "could not find the programs that run your website builder, "
                 + "so nothing was stopped \(when)"
         case .couldNotAskWhatElseIsRunning:
             return "could not check what else was using this Mac’s website-building setup, "
                 + "so it was left running"
+        case .ranOutOfTime:
+            return "stopped waiting for an answer about your website builder \(when), "
+                + "so anything still running was left alone"
         }
     }
 
@@ -180,9 +207,13 @@ enum FolderContainers {
                 )) + " "
                 + HelperPrograms.shellQuoted(sentence(
                     for: .leftAFoldersBuilderRunning, occasion: occasion, folderName: folderName
+                )) + " "
+                + HelperPrograms.shellQuoted(sentence(
+                    for: .couldNotStopAFoldersBuilder, occasion: occasion, folderName: folderName
                 ))
                 + "  # " + event(for: .stoppedAFoldersBuilder).rawValue
                 + " / " + event(for: .leftAFoldersBuilderRunning).rawValue
+                + " / " + event(for: .couldNotStopAFoldersBuilder).rawValue
             )
         }
 
@@ -197,7 +228,12 @@ enum FolderContainers {
             lines.append(line)
         }
         lines.append("}")
-        lines.append(watchdogLines())
+        lines.append(watchdogLines(
+            seconds: secondsBeforeGivingUp(
+                folderCount: folderPaths.count, secondsToWaitForWork: secondsToWaitForWork
+            ),
+            occasion: occasion
+        ))
         return lines.joined(separator: "\n")
     }
 
@@ -312,14 +348,23 @@ enum FolderContainers {
     private static func noteCall(
         _ outcome: Outcome,
         occasion: Occasion,
-        reasonSomethingElseIsUsingIt: String = ""
+        reasonSomethingElseIsUsingIt: String = "",
+        endingTheLine: Bool = true
     ) -> String {
         let text: String = sentence(
             for: outcome,
             occasion: occasion,
             reasonSomethingElseIsUsingIt: reasonSomethingElseIsUsingIt
         )
-        return "note " + HelperPrograms.shellQuoted(text) + "  # " + event(for: outcome).rawValue
+        let call: String = "note " + HelperPrograms.shellQuoted(text)
+        // A `#` comment runs to the end of the LINE, so it can only be added
+        // where this call is the last thing on one. The watchdog's note sits
+        // mid-line between a `sleep` and a `kill`, and a comment there would
+        // swallow the kill.
+        if !endingTheLine {
+            return call
+        }
+        return call + "  # " + event(for: outcome).rawValue
     }
 
     /// Is anything of ours running on the HOST for this folder — or for any
@@ -386,8 +431,14 @@ enum FolderContainers {
         lines.append("  waited=0")
         lines.append("  while [ \"$waited\" -lt \(secondsToWaitForWork) ]; do")
         lines.append("    if ! launcherRunning \"$1\" && ! containerBusy \"$2\"; then")
-        lines.append("      docker stop -t 2 \"$2\" >/dev/null 2>&1")
-        lines.append("      note \"$3\"")
+        // A stop that FAILED must not be written down as a stop. It is the
+        // same fault this whole piece exists to fix, one level down: a line
+        // saying the memory came back, on a day it did not.
+        lines.append("      if docker stop -t 2 \"$2\" >/dev/null 2>&1; then")
+        lines.append("        note \"$3\"")
+        lines.append("      else")
+        lines.append("        note \"$5\"")
+        lines.append("      fi")
         lines.append("      return 0")
         lines.append("    fi")
         lines.append("    sleep 1")
@@ -429,8 +480,11 @@ enum FolderContainers {
             reasonSomethingElseIsUsingIt: "a publish or preview is still going"
         ))
         lines.append("    else")
-        lines.append("      colima stop >/dev/null 2>&1")
-        lines.append("      " + noteCall(.stoppedTheSharedSetup, occasion: occasion))
+        lines.append("      if colima stop >/dev/null 2>&1; then")
+        lines.append("        " + noteCall(.stoppedTheSharedSetup, occasion: occasion))
+        lines.append("      else")
+        lines.append("        " + noteCall(.couldNotStopTheSharedSetup, occasion: occasion))
+        lines.append("      fi")
         lines.append("    fi")
         lines.append("  fi")
         lines.append("fi")
@@ -439,17 +493,27 @@ enum FolderContainers {
 
     /// Runs the body with a deadline it cannot outlive.
     ///
+    /// **The deadline writes its own line before it fires**, because the one
+    /// ending that reported nothing is the whole fault this piece exists to
+    /// fix, and a script killed at its deadline is exactly that ending. Its
+    /// honest limit, said rather than hidden: `kill -9` on the body does not
+    /// take a wedged `docker` grandchild with it — measured, a `docker` stuck
+    /// on a dead socket was still there afterwards. What the deadline buys is
+    /// that PLANTOIR's own shell goes away and says so; a hung `docker` is
+    /// the engine's problem and killing it would not unwedge anything.
+    ///
     /// `kill "$guard"` after `wait` is the part that must not be dropped: a
     /// guard left behind would fire its `kill -9` at whatever process had
     /// been given that number by then. Killing the guard does NOT take its
     /// own `sleep` with it — measured, the `sleep` lingers out its full term
     /// as an orphan doing nothing — so do not "fix" the kill when you see
     /// one.
-    private static func watchdogLines() -> String {
+    private static func watchdogLines(seconds: Int, occasion: Occasion) -> String {
         var lines: [String] = []
         lines.append("body & work=$!")
-        lines.append("( sleep \(secondsBeforeTheScriptGivesUpOnItself); kill -9 \"$work\" 2>/dev/null )"
-            + " >/dev/null 2>&1 & guard=$!")
+        lines.append("( sleep \(seconds); "
+            + noteCall(.ranOutOfTime, occasion: occasion, endingTheLine: false)
+            + "; kill -9 \"$work\" 2>/dev/null ) >/dev/null 2>&1 & guard=$!")
         lines.append("wait \"$work\"")
         lines.append("kill \"$guard\" 2>/dev/null")
         return lines.joined(separator: "\n")

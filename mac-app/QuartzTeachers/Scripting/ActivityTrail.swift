@@ -327,9 +327,9 @@ nonisolated enum ActivityTrail {
         /// server — a real change in what a teacher can lose, which had no
         /// line describing it.
         case sectionProcessesReclaimed = "section processes reclaimed"
-        /// Quitting Plantoir gave the memory back: a working folder's website
-        /// builder was stopped, or — when nothing else on the Mac was using
-        /// it — the shared setup underneath them all was stopped too.
+        /// The memory came back: a working folder's website builder was
+        /// stopped, or — when nothing else on the Mac was using it — the
+        /// shared setup underneath them all was stopped too.
         ///
         /// On the trail because until 2026-09-19 it never happened. The app
         /// asked for it at every quit and the request went to programs it had
@@ -339,8 +339,15 @@ nonisolated enum ActivityTrail {
         /// "quitting does not seem to free anything" from a feeling into a
         /// report. Carries the working folder's NAME — never its path, and
         /// never anything from inside it.
-        case websiteBuilderStoppedAtQuit = "website builder stopped at quit"
-        /// Quitting deliberately left something running, and why.
+        ///
+        /// **Two occasions file here, and the name says neither**, on
+        /// purpose: quitting, and the last window on a folder closing. They
+        /// are the same act on the same container under the same conditions,
+        /// and the sentence written says which one it was. An event called
+        /// "…at quit" would have been a lie on every window close, which is
+        /// the commoner of the two.
+        case websiteBuilderStopped = "website builder stopped"
+        /// Something was deliberately left running, and why.
         ///
         /// The companion to the line above, and the one support will read
         /// more often, because "quitting did not free anything" is the report
@@ -351,19 +358,25 @@ nonisolated enum ActivityTrail {
         /// rule 7 says is never stopped out from under anybody. Both are
         /// deliberate, and without the line they look identical to the fault
         /// they replaced.
-        case websiteBuilderLeftRunningAtQuit = "website builder left running at quit"
-        /// Plantoir could not stop a website builder at quit, and says so
-        /// rather than saying nothing.
+        case websiteBuilderLeftRunning = "website builder left running"
+        /// Plantoir could not stop a website builder, and says so rather than
+        /// saying nothing.
         ///
         /// Issue #220 was a fault that REPORTED NOTHING: the quit script could
         /// not find the programs it needed, exited 0, and left a teacher with
         /// no evidence at all. This is the line that makes the same failure
-        /// visible the next time — whether the programs cannot be found, or
-        /// the setup cannot be asked what is running in it. Separate from
-        /// `websiteBuilderLeftRunningAtQuit` because that one says a
+        /// visible the next time. Four ways file here: the programs cannot be
+        /// found; the shared setup cannot be asked what is running in it; the
+        /// stop was asked for and REFUSED; and the whole attempt ran out of
+        /// time. That last pair matter most, because each of them would
+        /// otherwise be written down as a success — `docker stop` failing and
+        /// `docker stop` working are indistinguishable to a script that does
+        /// not look.
+        ///
+        /// Separate from `websiteBuilderLeftRunning` because that one says a
         /// deliberate choice was made, and a choice nobody was able to make is
         /// a different fact.
-        case websiteBuilderCouldNotBeStoppedAtQuit = "website builder could not be stopped at quit"
+        case websiteBuilderCouldNotBeStopped = "website builder could not be stopped"
         /// ⌘Q landed while this app was publishing, the teacher was asked
         /// whether to quit anyway, and this is what they chose.
         ///
