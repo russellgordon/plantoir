@@ -67,26 +67,182 @@ final class FolderContainerTests: XCTestCase {
     }
 }
 
-/// What happens to the shared VM at quit.
+/// What happens to a folder's container, and to the shared VM, at quit.
 final class QuitScriptTests: XCTestCase {
 
-    // MARK: - Functions
+    // MARK: - Stored properties
+
+    static let pretendHome: URL = URL(fileURLWithPath: "/Users/pretend")
+    static let pretendFolder: String = "/Users/pretend/Desktop/Comm Tech 26:27"
+
+    // MARK: - What is handed to Process
+
+    /// `/bin/sh`, never a login shell, and never a terminal.
+    ///
+    /// The login shell was chosen so that "docker is on PATH wherever it was
+    /// installed", which was never true on a teacher's Mac; and `zsh -l`
+    /// handed a pty whose other end has gone blocks in its own terminal
+    /// setup, before it reads the script at all. Two such shells had been
+    /// asleep on this Mac for 27 days.
+    @MainActor
+    func testTheQuitShellIsNotALoginShell() {
+        let command: HelperPrograms.Command = FolderContainers.quitCommand(
+            folderPaths: [QuitScriptTests.pretendFolder],
+            inheriting: [:],
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
+        XCTAssertEqual(command.executablePath, "/bin/sh")
+        XCTAssertEqual(command.arguments.first, "-c")
+        XCTAssertFalse(
+            command.arguments.contains("-l"),
+            "A login shell reads the teacher's whole profile to decide a two-line script, and can hang before it reads the script at all"
+        )
+        XCTAssertEqual(command.arguments.count, 2)
+    }
+
+    /// The fault itself: the quit path is told where Plantoir's own programs
+    /// are, both in the environment and in the script's first line.
+    @MainActor
+    func testTheQuitPathIsToldWhereTheProgramsAre() {
+        let command: HelperPrograms.Command = FolderContainers.quitCommand(
+            folderPaths: [QuitScriptTests.pretendFolder],
+            inheriting: ["HOME": "/Users/pretend", "PATH": "/usr/bin:/bin"],
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
+        let expected: String = HelperPrograms.binDirectory(inHomeFolder: QuitScriptTests.pretendHome)
+        XCTAssertEqual(command.environment["PATH"]?.components(separatedBy: ":").first, expected)
+        XCTAssertEqual(
+            command.environment["HOME"], "/Users/pretend",
+            "docker keeps its context store in ~/.docker and colima its state in ~/.colima — a stripped environment reaches neither"
+        )
+        let script: String = command.arguments[1]
+        XCTAssertEqual(
+            script.components(separatedBy: "\n").first,
+            HelperPrograms.exportLine(inHomeFolder: QuitScriptTests.pretendHome)
+        )
+    }
+
+    // MARK: - What the script refuses to do
 
     @MainActor
     func testTheVMStopsOnlyWhenNothingElseRuns() {
-        let script: String = FolderContainers.quitScript(containerNames: ["teaching-quartz-abc12345"])
-        XCTAssertTrue(script.contains("docker stop -t 2 teaching-quartz-abc12345"))
+        let script: String = FolderContainers.quitScript(
+            folderPaths: [QuitScriptTests.pretendFolder],
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
+        XCTAssertTrue(script.contains("docker stop -t 2"))
         XCTAssertTrue(script.contains("docker ps -q"), "The emptiness check is the safety: Colima is shared")
         XCTAssertTrue(script.contains("colima stop"))
-        let stopIndex = script.range(of: "docker stop")!.lowerBound
+        let releaseIndex = script.range(of: "release ")!.lowerBound
         let checkIndex = script.range(of: "docker ps -q")!.lowerBound
-        XCTAssertLessThan(stopIndex, checkIndex, "Our containers stop BEFORE the emptiness check, or the check always fails")
+        XCTAssertLessThan(
+            releaseIndex, checkIndex,
+            "Our containers stop BEFORE the emptiness check, or the check always fails"
+        )
+    }
+
+    /// A `docker ps` that FAILED is not a Mac with nothing running on it.
+    ///
+    /// `DOCKER_CONTEXT=default docker ps -q` exits 1 and prints nothing; so
+    /// does a daemon that did not answer. The old expression read both as
+    /// permission to stop the shared VM, which on this Mac holds thirteen
+    /// containers belonging to another project.
+    @MainActor
+    func testAFailedQuestionIsNotAnEmptyAnswer() {
+        let script: String = FolderContainers.quitScript(
+            folderPaths: [],
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
+        XCTAssertTrue(script.contains("asked=$?"), "Nothing reads whether the question succeeded")
+        XCTAssertTrue(script.contains("[ \"$asked\" -ne 0 ]"))
+        XCTAssertTrue(
+            script.contains("DOCKER_HOST='unix:///Users/pretend/.colima/default/docker.sock'"),
+            "The question must be put to the socket Colima owns, not to whatever context happens to be current"
+        )
+        XCTAssertTrue(
+            script.contains("[ -S '/Users/pretend/.colima/default/docker.sock' ]"),
+            "No socket, no answer, nothing stopped"
+        )
+    }
+
+    /// Nothing of ours is stopped while a launcher for that folder is running
+    /// on the host — the window the container-side check cannot see, because
+    /// building an image or starting the machine adds no container at all.
+    @MainActor
+    func testWorkRunningOnTheHostIsLeftAlone() {
+        let script: String = FolderContainers.quitScript(
+            folderPaths: [QuitScriptTests.pretendFolder],
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
+        XCTAssertTrue(script.contains("ps -Ao args="))
+        XCTAssertTrue(
+            script.contains("grep -F \"$1/$launcher\""),
+            "A fixed-string match, because pgrep -f takes a REGULAR EXPRESSION and a folder called C++ 26(27) would fail OPEN"
+        )
+        XCTAssertTrue(script.contains("release '/Users/pretend/Desktop/Comm Tech 26:27'"))
+        XCTAssertTrue(
+            script.contains("grep -Fv -- ' --stop'"),
+            "The app's own preview stops run a launcher too; counting them would make every quit-with-a-preview free nothing"
+        )
+        XCTAssertTrue(script.contains("docker top"), "A build inside the container is work too")
     }
 
     @MainActor
     func testAMachineWithoutColimaIsLeftAlone() {
-        let script: String = FolderContainers.quitScript(containerNames: [])
+        let script: String = FolderContainers.quitScript(
+            folderPaths: [],
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
         XCTAssertTrue(script.contains("command -v colima"), "Docker Desktop users have no colima to stop")
-        XCTAssertFalse(script.contains("docker stop"), "No containers of ours, nothing of ours to stop")
+        XCTAssertFalse(script.contains("release '"), "No folders of ours, nothing of ours to stop")
+    }
+
+    /// One window closing says nothing about the rest of the Mac.
+    @MainActor
+    func testClosingTheLastWindowNeverTouchesTheSharedSetup() {
+        let script: String = FolderContainers.quitScript(
+            folderPaths: [QuitScriptTests.pretendFolder],
+            occasion: .theLastWindowOnTheFolderClosed,
+            includingTheSharedSetup: false,
+            inHomeFolder: QuitScriptTests.pretendHome
+        )
+        XCTAssertFalse(script.contains("colima stop"))
+        XCTAssertTrue(script.contains("release '/Users/pretend/Desktop/Comm Tech 26:27'"))
+        XCTAssertTrue(script.contains("no window was working in that folder any more"))
+    }
+
+    // MARK: - Every ending has a line on the trail
+
+    /// Each outcome the script can reach is one of the contract's events, and
+    /// says something a teacher would recognise rather than naming a program.
+    @MainActor
+    func testEveryEndingSaysSomethingATeacherWouldRecognise() {
+        let outcomes: [FolderContainers.Outcome] = [
+            .stoppedAFoldersBuilder,
+            .leftAFoldersBuilderRunning,
+            .stoppedTheSharedSetup,
+            .leftTheSharedSetupRunning,
+            .couldNotFindThePrograms,
+            .couldNotAskWhatElseIsRunning
+        ]
+        for outcome in outcomes {
+            let sentence: String = FolderContainers.sentence(
+                for: outcome,
+                occasion: .quitting,
+                folderName: "Comm Tech 26:27",
+                reasonSomethingElseIsUsingIt: "other software on this Mac is still using it"
+            )
+            XCTAssertFalse(sentence.isEmpty)
+            for word in ["container", "docker", "colima", "toolchain", "script", "virtual machine"] {
+                XCTAssertFalse(
+                    sentence.lowercased().contains(word),
+                    "\"\(word)\" is machinery, and a teacher reads this: \(sentence)"
+                )
+            }
+            XCTAssertFalse(
+                sentence.contains("/Users/"),
+                "A path would need redacting, and the script writes straight to the trail: \(sentence)"
+            )
+        }
     }
 }

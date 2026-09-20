@@ -327,6 +327,54 @@ nonisolated enum ActivityTrail {
         /// server — a real change in what a teacher can lose, which had no
         /// line describing it.
         case sectionProcessesReclaimed = "section processes reclaimed"
+        /// Quitting Plantoir gave the memory back: a working folder's website
+        /// builder was stopped, or — when nothing else on the Mac was using
+        /// it — the shared setup underneath them all was stopped too.
+        ///
+        /// On the trail because until 2026-09-19 it never happened. The app
+        /// asked for it at every quit and the request went to programs it had
+        /// not told itself where to find, with the answer sent to the null
+        /// device, so a teacher whose Mac stayed slow all day had nothing to
+        /// show anyone (issue #220). A line saying it happened is what turns
+        /// "quitting does not seem to free anything" from a feeling into a
+        /// report. Carries the working folder's NAME — never its path, and
+        /// never anything from inside it.
+        case websiteBuilderStoppedAtQuit = "website builder stopped at quit"
+        /// Quitting deliberately left something running, and why.
+        ///
+        /// The companion to the line above, and the one support will read
+        /// more often, because "quitting did not free anything" is the report
+        /// and this is the only thing that can answer it. Two different
+        /// reasons file here: a publish or preview for that folder was still
+        /// going, so stopping it would have broken work the teacher could not
+        /// see; or other software on the Mac shares the same setup, which
+        /// rule 7 says is never stopped out from under anybody. Both are
+        /// deliberate, and without the line they look identical to the fault
+        /// they replaced.
+        case websiteBuilderLeftRunningAtQuit = "website builder left running at quit"
+        /// Plantoir could not stop a website builder at quit, and says so
+        /// rather than saying nothing.
+        ///
+        /// Issue #220 was a fault that REPORTED NOTHING: the quit script could
+        /// not find the programs it needed, exited 0, and left a teacher with
+        /// no evidence at all. This is the line that makes the same failure
+        /// visible the next time — whether the programs cannot be found, or
+        /// the setup cannot be asked what is running in it. Separate from
+        /// `websiteBuilderLeftRunningAtQuit` because that one says a
+        /// deliberate choice was made, and a choice nobody was able to make is
+        /// a different fact.
+        case websiteBuilderCouldNotBeStoppedAtQuit = "website builder could not be stopped at quit"
+        /// ⌘Q landed while this app was publishing, the teacher was asked
+        /// whether to quit anyway, and this is what they chose.
+        ///
+        /// BOTH answers are recorded, and the "keep working" one matters most:
+        /// a teacher who says "I pressed Quit and it would not quit" is
+        /// describing that branch, and nothing else would explain it. The
+        /// other branch explains a publish that stopped part way through with
+        /// no error anywhere — the teacher was told and went ahead, which is a
+        /// completely different report from a publish that died on its own.
+        /// Carries what was under way, in the words the teacher was shown.
+        case quitAskedAboutWorkUnderWay = "quit asked about work under way"
     }
 
     // MARK: - Stored properties

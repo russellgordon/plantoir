@@ -334,7 +334,8 @@ enum ScheduledDeploy {
         when: Date,
         workspaceURL: URL,
         deployArguments: [String],
-        calendar: Calendar = Calendar.current
+        calendar: Calendar = Calendar.current,
+        homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> [String: Any] {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         let components: DateComponents = calendar.dateComponents([.month, .day, .hour, .minute], from: when)
@@ -346,10 +347,15 @@ enum ScheduledDeploy {
         schedule["Minute"] = components.minute ?? 0
 
         var environment: [String: String] = [:]
-        // A launchd agent starts with a bare PATH; the launcher needs to
-        // find docker and colima the way a Terminal session does. Same
-        // list ScriptRunner prepends when the app runs a script itself.
-        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        // A launchd agent starts with a bare PATH; the launcher needs to find
+        // docker and colima the way a Terminal session does. Same definition
+        // ScriptRunner uses when the app runs a launcher itself, and the same
+        // one the quit path uses — and it begins with the folder the
+        // launchers download the pinned copies into, which this list used to
+        // leave out entirely. A scheduled publish on a Mac without Homebrew
+        // was reaching the engine only because the launcher re-exports that
+        // folder itself.
+        environment["PATH"] = HelperPrograms.pathValue(inheriting: nil, inHomeFolder: homeFolder)
         environment[scheduledForKey] = ISO8601DateFormatter().string(from: when)
 
         var plist: [String: Any] = [:]
@@ -776,9 +782,14 @@ enum ScheduledDeploy {
     }
 
     /// One argument, safe to paste into a shell command.
+    ///
+    /// The rule itself moved to `HelperPrograms`, which had to quote a home
+    /// folder into a generated script for the same reason; this stays as the
+    /// name the rest of this file and its tests already use, because two
+    /// implementations of "how is a path put into a script" is one more than
+    /// anybody can keep in step.
     static func shellQuoted(_ value: String) -> String {
-        let escaped: String = value.replacingOccurrences(of: "'", with: "'\\''")
-        return "'\(escaped)'"
+        return HelperPrograms.shellQuoted(value)
     }
 
     // MARK: - Applying
@@ -913,6 +924,12 @@ enum ScheduledDeploy {
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [script]
+        // This is the script that runs deploy.sh at half six, so it needs to
+        // find the same programs the app does. It would inherit them from the
+        // agent's own PATH today — but only because the plist above sets one,
+        // and a second answer to "where are the helpers" is how the first one
+        // drifts.
+        process.environment = HelperPrograms.environment()
         do {
             try process.run()
             process.waitUntilExit()

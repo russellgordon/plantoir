@@ -258,6 +258,42 @@
         "carries": "the course code and the section number",
         "event": "section kept its website",
         "why": "The OTHER answer, and the one a problem report is more likely to be about: a teacher writing in weeks later to say last year's class site was replaced is describing this branch. A trail recording only the cut-loose could not answer the question it would actually be read for. Both answers are recorded because the question is asked every time and neither answer is a default."
+      },
+      {
+        "carries": "the working folder's NAME - never its path - or, for the setup shared by every folder, nothing but the fact that it stopped",
+        "event": "website builder stopped at quit",
+        "why": "Until 2026-09-19 this never happened. The app asked for it at every quit and asked programs it had never told itself where to find, with the answer sent to the null device: a fault that reported nothing, and a teacher whose Mac stayed slow all day had nothing to show anybody (issue #220). The line is what turns 'quitting does not seem to free anything' from a feeling into a report. Written by the detached script rather than by the app, because the app is gone before the answer is known - the same arrangement the launchers already use for their own trail lines.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "The BEHAVIOUR is shared - Windows stops the same per-folder builder at quit behind the same emptiness check - but the fault being fixed is the mac's PATH story alone, and nobody is working on Windows in this release. Scoped to the mac so their suite is not held red for work nobody is doing, and NOT because the difference is permanent: when Windows adopts it, drop the appliesOn rather than adding a windows twin."
+      },
+      {
+        "carries": "which folder was left alone and WHY - a publish or preview for that folder still going, or other software on this Mac sharing the same setup",
+        "event": "website builder left running at quit",
+        "why": "The companion line, and the one support will read more often, because 'quitting did not free anything' is the report and this is the only thing that can answer it. Two different deliberate refusals file here. One: a publish or preview for that folder is still running, on the host or inside the builder, so stopping it would break work the teacher cannot see - a scheduled publish, an assistant working over a connection, a second window. Two: other software on this Mac shares the same setup, which is never stopped out from under anybody. Without the line, a deliberate refusal is indistinguishable from the fault it replaced.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "Scoped with its companion above, for the same reason and with the same expectation that it stops being scoped."
+      },
+      {
+        "carries": "that nothing was stopped, and which of the two ways it failed - the programs could not be found, or the shared setup could not be asked what was running in it",
+        "event": "website builder could not be stopped at quit",
+        "why": "Issue #220 was a fault that REPORTED NOTHING: the quit path could not find the programs it needed, exited 0, and left no evidence anywhere. This is the line that makes the same failure visible the next time it happens rather than a year later. Deliberately SEPARATE from 'left running at quit': that one says a choice was made and names it, and a choice nobody was able to make is a different fact - filing them together would make the trail say a refusal was deliberate when nothing was refused at all.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "Scoped with the two above, for the same reason."
+      },
+      {
+        "carries": "what was under way, in the words the teacher was shown, and which of the two buttons they pressed",
+        "event": "quit asked about work under way",
+        "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "Windows has no counterpart of this question today and its rule (quittingWhileWorkIsUnderWay, below) is likewise scoped to the mac. Adopt the rule and the line together, or neither - a line saying a teacher was asked, in an app that asks nothing, would be worse than no line."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -3041,5 +3077,74 @@
         ]
       }
     ]
+  },
+  "quittingWhileWorkIsUnderWay": {
+    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing, and never asks when the Mac itself is logging out, restarting or shutting down.",
+    "why": "Quitting used to be free, because it could not reach anything: the path that stops a working folder's website builder looked for programs it had never told itself where to find, so on an ordinary teacher's Mac it did nothing at all and there was nothing to interrupt (issue #220, 2026-09-19). Making it work means a quit can now genuinely land on work in flight, and the one case where that hurts is the one the teacher cannot see happening.",
+    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does.",
+    "whatDoesNotCount": "A preview. A preview is known by the port it holds, and that is held for as long as the preview is OPEN - it cannot tell a section still building from one that finished twenty minutes ago and is being read. Asking on every open preview would mean asking almost every quit, which teaches a teacher to dismiss the question unread, and the question exists for the publish. Previews are not abandoned either: quitting stops this app's own previews deliberately, the way the Stop button does, before anything else is asked to rest.",
+    "whatIsNeverAskedAbout": "Work belonging to another process - a publish set to happen on its own, an assistant driving the app over a connection, or a teacher's own command line. None of them is visible from here, so none of them is asked about; they are protected instead by the quit path refusing to stop anything while a launcher for that folder is running on the machine.",
+    "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
+    "buttons": {
+      "default": "keepWorking",
+      "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
+      "keepWorking": "the app stays open and nothing is stopped or released",
+      "quitAnyway": "the app goes. The publish itself is NOT killed on the way out - it is a separate program that carries on - but nothing is watching it any more, so it is left unattended and the quit path will leave that folder's website builder running while it lasts."
+    },
+    "cases": [
+      {
+        "name": "nothing is happening",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": false,
+        "why": "The ordinary quit, and it must stay silent. A confirmation a teacher meets every time is one they stop reading."
+      },
+      {
+        "name": "one section is publishing",
+        "given": {
+          "publishesUnderWay": 1,
+          "previewsOpen": 0,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "why": "The case this exists for."
+      },
+      {
+        "name": "several sections are publishing",
+        "given": {
+          "publishesUnderWay": 3,
+          "previewsOpen": 0,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true
+      },
+      {
+        "name": "a preview is open and nothing is publishing",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 2,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": false,
+        "why": "The decision this case exists to pin. A preview that is merely open is not work under way, and an app that cannot tell a building preview from a finished one must not guess."
+      },
+      {
+        "name": "the Mac is logging out while a section is publishing",
+        "given": {
+          "publishesUnderWay": 1,
+          "previewsOpen": 0,
+          "quitReason": "theMacIsLoggingOutOrShuttingDown"
+        },
+        "expectAsk": false,
+        "why": "The rule that must never bend. A modal here holds up the log out, and a teacher whose Mac will not log out has a worse problem than a publish that did not finish."
+      }
+    ],
+    "appliesOn": [
+      "mac"
+    ],
+    "appliesOnWhy": "Written on the mac 2026-09-19 with the quit-path fix it belongs to; Windows has no such question today and nobody is working on that side this release. Scoped so their suite is not held red for work nobody is doing - not because the difference is meant to last. The SHAPE is portable: what counts as under way, what never counts, and when never to ask are all platform-neutral; only the signal that says 'the system is logging out' differs. Adopt this and the 'quit asked about work under way' trail line together, or neither."
   }
 }

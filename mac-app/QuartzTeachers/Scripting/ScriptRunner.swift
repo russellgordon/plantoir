@@ -187,11 +187,14 @@ class ScriptRunner {
         newProcess.arguments = fullArguments
         newProcess.currentDirectoryURL = workingDirectory
 
-        // GUI apps inherit a minimal PATH; the scripts need Homebrew's
-        // programs (docker, colima) the same way a Terminal session has them.
-        var environment: [String: String] = ProcessInfo.processInfo.environment
-        let existingPath: String = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
-        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + existingPath
+        // GUI apps inherit a minimal PATH; the launchers need to find docker
+        // and colima the way a Terminal session does. One definition, shared
+        // with the quit path and with a scheduled publish — see
+        // `HelperPrograms`, which also explains why the pinned copies
+        // Plantoir downloaded come FIRST.
+        var environment: [String: String] = HelperPrograms.environment(
+            basedOn: ProcessInfo.processInfo.environment
+        )
         environment["TERM"] = "xterm-256color"
         newProcess.environment = environment
 
