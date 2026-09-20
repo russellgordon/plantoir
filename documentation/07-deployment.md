@@ -790,14 +790,47 @@ be deterministic: `ScheduledPublishWatcherTests` has **no sleeps at all** — ev
 wait is an expectation re-checked when the counter moves, and its seven cases run
 in under half a second.
 
-**A preview showing changes nothing about this.** The notice lives in the base
-layer of the section's `ZStack`, underneath the full-bleed web view, so a band
-arriving mid-preview does not shove the site around; it is there when the
-preview closes. Checked by hand on 2026-09-19 with a real preview on screen: the
-site did not move and the window survived, which is the corner #211 lived in.
-The same hand check, at the window's minimum height with nothing touched, saw
-the band come up flush under the toolbar and another section's sidebar warning
-appear at the same moment — and both go again when the records are removed.
+**A preview showing is the state that matters most, and it took a second piece
+of work to get right.** The notice first shipped in the base layer of the
+section's `ZStack`, underneath the full-bleed web view, and that was recorded
+here as deliberate — a band that "waits until the preview closes". It is not
+acceptable, and Russell said so the same evening after his smoke test: with a
+preview up, all a teacher sees is a green tint bleeding through the toolbar, and
+a teacher looking at their preview is exactly who needs telling. That is
+[issue #219](https://github.com/russellgordon/plantoir/issues/219).
+
+The band now sits ABOVE the whole stack — one band, in one place, in every
+state — and the site takes the room that is left. Two things decided that shape
+over the alternatives:
+
+- **The band must not be written twice.** `.safeAreaInset(edge: .top)` on the
+  web view, or a second copy of the band inside a cover-layer `VStack`, both put
+  it inside the branch that exists only while a preview is up, so the no-preview
+  case needs its own copy — two places to keep in step for one sentence.
+- **The web view must not move between containers.** It is a live `WKWebView`
+  showing a page the teacher has scrolled and navigated; `WebPreviewController`
+  owns the instance and `loadIfNeeded` is idempotent, but shifting the view
+  between branches as notices come and go is how a page gets thrown away.
+  It stays in the one branch it has always been in.
+
+Measured by hand (2026-09-19, dark and light, a real preview showing): with the
+band arriving, the page the teacher was on is **100% identical across 5,525
+sampled points once shifted down by the band's 57 points** — the same page,
+simply moved, not reloaded — and when the record goes, the site's pixels match
+what they were before the band arrived, 8,250 of 8,250. What a test can pin is
+the same property without a browser: `ProgressViewSizeTests` measures the room
+the site is OFFERED, with a stand-in that answers `sizeThatFits` exactly as
+`WebPreviewView` does. 720 points with no notice; less with one. On the old
+arrangement it was 720 either way, which is the fault stated as a number.
+
+**The toolbar must not take the band's colour, either.** A `.background(_:)`
+ignores every safe-area edge by default, so the band's fill reached up into the
+strip the window's toolbar sits in — and a toolbar is a translucent material
+that samples what is behind it. `.background(bandColour.opacity(0.12),
+ignoresSafeAreaEdges: [])` stops the colour at the band's own edges. The band's
+LAYOUT was never the problem; the background was. Measured after the change,
+552 points sampled right across the toolbar: identical with a band and without,
+(30, 30, 30) in dark and (242, 242, 242) in light.
 
 **And it now sits where it belongs.** In the same smoke Russell found the band
 floating in the MIDDLE of an empty window. The cause was that the base layer hugged
