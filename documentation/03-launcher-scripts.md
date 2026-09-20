@@ -196,15 +196,21 @@ own long-lived container (see "One container per working folder" above),
 started as:
 
 ```bash
-docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
-  -v "$(pwd)/courses":/teaching/courses \
-  -p ${HOST_BASE}-$((HOST_BASE+3)):8081-8084 \
-  -p $((HOST_BASE+1000))-$((HOST_BASE+1003)):9081-9084 \
-  "$IMAGE" tail -f /dev/null
+if ! docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
+    --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
+    --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
+    -p ${HOST_BASE}-$((HOST_BASE+3)):8081-8084 \
+    -p $((HOST_BASE+1000))-$((HOST_BASE+1003)):9081-9084 \
+    "$IMAGE" tail -f /dev/null; then
+  say_this_folder_could_not_be_opened
+  exit 1
+fi
 ```
 
 where `WORKDIR_ID` is the folder hash and `HOST_BASE` the probed port
-block. Every launcher inspects the existing container before using it:
+block. **Why `--mount` and not `-v`** has its own section below; the short
+version is that `-v` cannot name a folder called "Comm Tech 26:27" at all.
+Every launcher inspects the existing container before using it:
 
 1. **No `/teaching/courses` mount at all?** Recreate the container.
 2. **Mounted from a different host folder than the current one?** Recreate
@@ -224,6 +230,121 @@ block. Every launcher inspects the existing container before using it:
 6. Otherwise, start the container if stopped, or reuse it as-is.
 
 Recreating the container is cheap because all state lives in the bind mount.
+
+### How a folder is NAMED to the container, and why it is not `-v`
+
+A teacher typed **"Comm Tech 26/27"** into Finder on 2026-09-02. A name
+cannot hold a slash, so macOS wrote a colon instead, and the folder on disk
+was `Comm Tech 26:27`. `docker run -v A:B` splits its argument on colons, so
+the argument became four fields, the daemon read `/teaching/courses` as the
+MODE, and first-run setup died with `invalid mode: /teaching/courses` —
+**after 147 seconds** of downloading tools, starting the virtual machine and
+building the website builder. The teacher saw that one line of daemon text
+and nothing else. GitHub issue #221; every Ontario teacher writes the school
+year as "26/27", and it was the first folder this one had ever made.
+
+All three launchers now build the argument with one shared helper,
+`bind_mount_argument`, carried identically between `# >>> CONTAINER MOUNT
+BLOCK >>>` markers and pinned by `scripts/test_container_mount.sh`:
+
+```bash
+type=bind,"source=<host path>","target=<container path>"
+```
+
+`--mount` takes key=value fields parsed as **one CSV record**, so a field may
+be quoted (RFC 4180) and a literal `"` inside it doubled. The quote must open
+the **field** — `"source=/x"` — and never the value: `source="/x"` is refused
+for *every* path, ordinary ones included, which is the one trap in this shape
+and the reason it cannot be discovered late.
+
+**Measured**, 2026-09-19, against the shared Colima VM (virtiofs), on both the
+pinned Docker CLI 29.7.2 and Homebrew's 29.7.1, under `/bin/bash` 3.2.57 and
+under zsh, by creating each folder and running `ls /teaching/courses` inside
+the container:
+
+| Folder name | `-v` | plain `--mount` | field-quoted `--mount` |
+|---|---|---|---|
+| `plain 26-27` | OK | OK | **OK** |
+| `Comm Tech 26:27` | **125** `invalid mode` | OK | **OK** |
+| `Comm Tech 26,27` | OK | **125** `must be a key=value pair` | **OK** |
+| `Say "hi" 26` | OK | **125** `bare " in non-quoted-field` | **OK** |
+| `Both "q", and 26:27` | **125** | **125** | **OK** |
+| `type=bind,source=/etc 26` | OK | **125** | **OK** — and mounts the real folder, not `/etc` |
+| backslash, `$`, `;`, `=`, leading dash, trailing space, emoji, NFC/NFD accents, tab, bare CR, bare LF | OK | OK | **OK** |
+| a name holding **CR immediately followed by LF** | **OK** | — | **125** |
+
+So: **every name a teacher can type in Finder**, and that claim is worth
+stating exactly rather than rounding up to "every name macOS can store",
+because the last row is a real regression. Go's `encoding/csv` rewrites CR LF
+to LF inside a quoted field, so the daemon then looks for a path that does not
+exist and refuses. It is accepted rather than worked around: Finder's rename
+field will not accept a Return, so making such a name takes a script or a
+restored archive, and the failure is loud (exit 125, and the launcher's own
+sentence) rather than silent. If a folder with the rewritten name also exists,
+the wrong folder would mount — which is the part that would be unforgivable to
+leave undocumented.
+
+**What was REJECTED, and why:**
+
+| Rejected | Why |
+|---|---|
+| A plain, unquoted `--mount` | Measured: strictly WORSE than `-v`, not better. It trades the colon failure for a comma failure and a double-quote failure, and "Comm Tech 26,27" is just as ordinary a name. It would have looked fixed until the day it wasn't. |
+| Refusing colon names in the app | Refuses "26/27", the single commonest thing a teacher would type, and fixes nothing for the command line or for a publish launchd runs overnight. After the table above there is nothing left to refuse, and a validator with an empty true-set is a sentence that will eventually be shown for the wrong reason. |
+| Keeping `-v` and mounting a colon-free symlink | Gives the folder a second name. `.Source` would then be the link's path, so `CURRENT_MOUNT_SRC != HOST_COURSES` on every run and every launcher would recreate the container every time — and the link's target still has the colon, so nothing is solved, only hidden. |
+| Percent-encoding or backslash-escaping the source | `-v`'s parser has no escape at all; the colon count is what it splits on. |
+| Mounting the working folder's PARENT | Same syntax, same split, and it would expose every sibling folder on the Desktop to the container. |
+| Fixing only `setup.sh`, where it was seen to fail | `preview.sh` and `deploy.sh` create the container too, whichever runs first. A teacher whose setup succeeded would fail on their first preview instead. |
+| `mkdir -p "$HOST_COURSES"` ahead of the run, to cover the behaviour change below | It puts a bare `mkdir` in front of the `docker run` and makes the sentence unreachable for the case it is FOR: a folder renamed or on a disconnected disk fails at the `mkdir`, and under `set -e` the teacher gets `mkdir: …: No such file or directory` and nothing else. It would also silently re-make the folder, empty, at a path nobody is looking at any more. A `test -d` and the sentence instead. |
+
+**One behaviour genuinely changes.** `-v` with a missing source silently
+CREATED the directory; `--mount` refuses it (`bind source path does not
+exist`). That is the better answer, and it is why `ensure_build_root` runs
+before the container is created and why the courses folder is checked first.
+Nothing ordinary reaches that check: `setup.sh` makes `courses/` itself,
+`preview.sh` has already refused when `course_config.json` is missing and
+`deploy.sh` when the course folder is. What can still produce the daemon's
+refusal is a folder that moved mid-run, and a builds folder that could not be
+made at all (`ensure_build_root` swallows its own failure by design). Both get
+the sentence in `contracts/app-rules.json` →
+`failureExplanations`, the case matched on `bind source path does not exist` —
+the same words the app's `FailureExplainer` says, so a teacher sees one
+sentence whether they are in Plantoir or at the command line.
+
+**No container is recreated for this change.** Measured: a container made with
+`-v` and one made with `--mount` are indistinguishable in `.Mounts` (they
+differ only in `HostConfig.Binds` vs `HostConfig.Mounts`, which nothing in this
+repository reads), so an updated launcher accepts an existing container and an
+old launcher accepts a new one. A doubled quote in the argument comes back
+un-doubled in `.Source`, so the launchers' own `CURRENT_MOUNT_SRC` comparison
+still compares like with like. A teacher's first run after the update recreates
+anyway, because the launchers are inside the build context and a launcher edit
+mints a new image tag — but that is the ordinary upgrade path and costs about
+1.5 s of cached rebuild, not this change.
+
+**What is gated.** `scripts/test_container_mount.sh` (pure shell, no Docker)
+pins the block, the argument it produces for each name in the table, that all
+three launchers actually USE it, and that the launcher's sentence is word for
+word the contract's. `verify.sh` section **6e** builds a real site from a real
+folder called `.plantoir-verify-26:27`, in a container it removes **before**
+and after — before, because the launcher keeps a container it is happy with, so
+a second run would never call `docker run` and would pass having tested
+nothing. And a real `./preview.sh EXC2O 1` was SERVED from
+`~/plantoir-scratch-C/Comm Tech 26:27` by hand on 2026-09-19: the server
+reached `Started a Quartz server listening`, and `curl` fetched a 29,561-byte
+page titled "Grade 10 Example Course, Section 1" off the host port. The colon
+never crosses the mount — `pwd -P` inside the container is
+`/teaching/courses/<CODE>` — so nothing in the image can see the folder's name
+at all.
+
+**Nothing to mirror on Windows.** There is no `docker` in `setup.ps1`,
+`preview.ps1` or `deploy.ps1` (measured: zero occurrences in each), a Windows
+path cannot contain a colon, and the native runtime replaced the container
+there in 2026-08. The mount form is mac-only machinery and is deliberately
+prose in `contracts/shared-rules.json` →
+`buildOutputLocation.containerRecreate.mountForm` rather than a runnable
+contract case: a shared case Windows cannot implement becomes a named gap
+nobody can ever close. The one thing that side does owe is the new
+`failureExplanations` case.
 
 ## 5. Per-task specifics
 
