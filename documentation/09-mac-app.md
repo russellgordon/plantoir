@@ -675,12 +675,15 @@ watching — the console is gone, a question the publish asks is asked of nobody
 ### Measured
 
 All on the 48 GB Apple-silicon Mac this was written on, 2026-09-19, with 15
-containers running throughout and Colima never stopped:
+containers of another project's running throughout and Colima never stopped.
+Every figure was RE-TAKEN against the final script, after the reviews changed
+it — a measurement of an earlier draft is a measurement of something that no
+longer exists:
 
 | What | Result |
 |---|---|
-| The real generated script, login-less `/bin/sh`, `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, an EMPTY tools folder, Homebrew's two directories stood down | exit 0 in **0.012 s**, trail line "could not find the programs that run your website builder, so nothing was stopped when Plantoir quit" — the fault now REPORTS |
-| The same script in this Mac's real environment, against a throwaway container of my own named as a working folder's would be | **2.199 s**, my container stopped, the other 15 untouched, Colima untouched |
+| The real generated script, login-less `/bin/sh`, `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, an EMPTY tools folder, Homebrew's two directories stood down | exit 0 in **0.013 s**, trail line "could not find the programs that run your website builder, so nothing was stopped when Plantoir quit" — the fault now REPORTS |
+| The same script in this Mac's real environment, against a throwaway container of my own named as a working folder's would be | **2.175 s**, my container stopped, the other 15 untouched, Colima untouched |
 | The real VM gate with a stand-in `colima` first on PATH | `colima stop` never reached; trail line "left this Mac's website-building setup running because other software on this Mac is still using it" |
 | A stand-in launcher with the exact command line `ScriptRunner` produces (`/bin/bash <folder>/preview.sh ADA1O 1`) | container left UP after a 3.2 s wait; trail line "…because a publish or preview for that folder is still going" |
 | The same, with ` --stop` on the end | container stopped in 2.2 s — the app's own preview stop does not count as work |
