@@ -297,8 +297,24 @@ Neither app contains toolchain logic of its own: they write the same
    and a `GUI-IMPROVEMENTS.md` row with no commit behind it.
 
 7. **Colima is shared with other projects** on this machine (Supabase local dev,
-   among others). Never `colima stop` unless `docker ps -q` comes back empty.
-   The app's quit path and the scripts already enforce this; keep it that way.
+   among others). Never `colima stop` unless `docker ps -q` comes back empty —
+   **and the question has to have SUCCEEDED**, which is the half this rule used
+   to leave out. `DOCKER_CONTEXT=default docker ps -q` exits 1 and prints
+   nothing; so does a daemon that did not answer; and the old check read both
+   as "the machine is empty". Ask the socket Colima owns
+   (`DOCKER_HOST=unix://$HOME/.colima/default/docker.sock`), require exit 0 AND
+   no output, and leave it alone otherwise.
+
+   The launchers never stop it. **The app's quit path does, and as of
+   2026-09-19 it does so for the first time** — it used to shell out to
+   `docker` and `colima` without saying where they are, and on a teacher's Mac
+   they are on no shell's PATH, so the whole path had never run (issue #220).
+   It now also refuses while any launcher is running on the host, which is the
+   window `docker ps` cannot see: building the image or starting the VM adds no
+   container at all. What it frees, what it refuses to free and what was
+   rejected is in `documentation/09-mac-app.md` → "Quitting: what it frees,
+   what it refuses to free, and why". Keep it that way.
+
    The Colima VM only mounts `$HOME`, so a working folder outside the home
    directory bind-mounts as an empty folder inside the container.
 8. **Swift follows the project style rules; the C# deliberately does not.**
@@ -878,7 +894,7 @@ it rather than restating it:
 | How is a teacher's list of class dates read? | [`contracts/schedule-rules.json`](contracts/schedule-rules.json). |
 | Which page titles carry numbers, what is the next class called, what happens when room is made for one? | [`contracts/class-planning.json`](contracts/class-planning.json). |
 | What are the backup and archive files called, and what section number is offered next? | [`contracts/course-management.json`](contracts/course-management.json). |
-| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, and **where a section's built website is kept — and what happens to a folder that already has one in the old place**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
+| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, **where a section's built website is kept — and what happens to a folder that already has one in the old place**, and **when quitting asks the teacher first (and when it must never ask)**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
 | WHY is it that way, and what was rejected? | The [`documentation/`](documentation/README.md) page that owns the subject, for anything an implementer needs; a code comment for anything a reader of the code needs. |
 | WHAT changed, WHEN, and what it cost | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — a dated log. **Append-only history, not a specification**: a row records what was true that day, and is not edited when the behaviour changes again. Never quote a row as the current wording. |

@@ -167,6 +167,21 @@ is left completely alone. A teacher who wants a different size still sets it
 by hand with `colima stop && colima start --cpu N --memory M`, and the
 launchers will respect anything at or above their own figure.
 
+**The APP does stop it, and a reader will take the paragraph above for the
+whole product if this is not said beside it.** The launchers never shut Colima
+down; Plantoir's quit path does, under four conditions at once — `colima` can
+be found, the socket Colima owns is there, asking THAT socket what is running
+SUCCEEDED and came back empty, and no launcher for any folder is running on the
+host. An empty answer that came from a FAILED question does not count, which is
+the part the old check got wrong: `DOCKER_CONTEXT=default docker ps -q` exits 1
+and prints nothing, and so does a daemon that did not answer. Until 2026-09-19
+none of this ever ran on a teacher's Mac at all — the quit path looked for
+`docker` and `colima` without saying where, and they are not on any shell's
+PATH there. The whole rule, what it refuses to do and what was rejected is in
+[`documentation/09-mac-app.md`](09-mac-app.md) → "Quitting: what it frees, what
+it refuses to free, and why"; the standing prohibition it implements is
+`CLAUDE.md` rule 7.
+
 **Windows: Docker Engine inside WSL2.** Colima does not support Windows, but
 it is not needed there — WSL2 is itself a lightweight, Microsoft-supplied
 Linux VM, i.e. exactly the role Colima plays on macOS. The PowerShell
