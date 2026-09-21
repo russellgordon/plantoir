@@ -28,6 +28,7 @@ Pure stdlib. Run with:
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -181,6 +182,113 @@ class TheMarker(unittest.TestCase):
         )
 
 
+@unittest.skipUnless(HAS_BASH, "needs a bash that can reach a scratch folder")
+class ThreeReadersAgree(unittest.TestCase):
+    """`referenceCourses.markerAgreement`, run against all three readers.
+
+    The shell reader is the REAL `deploy.sh`, started against a scratch folder
+    — not the guard copied out of it, because what is being pinned is that the
+    refusal fires before anything is published, and only running the launcher
+    can show that.
+
+    PowerShell cannot be run here (there is no `pwsh` on the mac), so its half
+    is checked two ways: the file must carry the contract's `dotNet` pattern
+    verbatim, and each row is evaluated against that pattern with Python's
+    `re`, case-insensitively. That is a SIMULATION and is labelled one — it
+    relies on two .NET semantics stated in the contract: backslash-s matches a
+    newline, and PowerShell's `-match` is case-insensitive by default. If
+    either is ever wrong, the row that catches it is "the value in capitals".
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def _folder(self, row) -> Path:
+        folder = _a_working_folder(self.tmp, "AGREE", {}, )
+        config = folder / "courses" / "AGREE" / "course_config.json"
+        if row.get("noConfigFile"):
+            config.unlink()
+            return folder
+        text = row.get("configText", "")
+        data = text.encode("utf-8")
+        if row.get("bom"):
+            data = b"\xef\xbb\xbf" + data
+        config.write_bytes(data)
+        if row.get("unreadable"):
+            config.chmod(0o000)
+        return folder
+
+    def test_every_row_gets_the_same_answer_from_all_three(self):
+        agreement = _rules()["markerAgreement"]
+        rows = agreement["cases"]
+        self.assertGreaterEqual(len(rows), 17, "The agreement table has lost rows.")
+        self.assertEqual(agreement["pattern"]["python"], reference_course.MARKER_PATTERN)
+
+        launcher_source = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        self.assertIn(agreement["pattern"]["posixEre"], launcher_source)
+        powershell_source = (REPOSITORY_ROOT / "deploy.ps1").read_text(encoding="utf-8")
+        self.assertIn(agreement["pattern"]["dotNet"], powershell_source)
+        dot_net = re.compile(agreement["pattern"]["dotNet"], re.IGNORECASE)
+
+        for row in rows:
+            name = row["name"]
+            expect = row["expect"]
+            self.assertIn(expect, ("refused", "allowed"), name)
+            folder = self._folder(row)
+            course = folder / "courses" / "AGREE"
+
+            if row.get("unreadable") and os.access(str(course / "course_config.json"), os.R_OK):
+                self.skipTest("this account can read a file with no permissions (root?)")
+
+            # 1. The shared Python, which is also what deploy.py asks.
+            python_says = (
+                reference_course.is_reference(course) or reference_course.cannot_tell(course)
+            )
+            self.assertEqual(
+                python_says, expect == "refused",
+                "%s: the shared Python disagrees with the contract" % name
+            )
+
+            # 2. The real launcher, publishing to a folder — the one door the
+            #    shared Python never reaches.
+            destination = Path(self.tmp) / ("out-" + name.replace(" ", "-"))
+            destination.mkdir()
+            result = _run_launcher(folder, [
+                "AGREE", "1", "--to-folder", str(destination), "--image", "no-such-image",
+            ])
+            said = (result.stdout + result.stderr).decode("utf-8", "replace")
+            refused = "is kept for reference, so it is never deployed" in said \
+                or "cannot tell whether" in said.lower()
+            self.assertEqual(
+                refused, expect == "refused",
+                "%s: deploy.sh disagrees with the contract. It said: %s" % (name, said)
+            )
+            if expect == "refused":
+                self.assertEqual(result.returncode, 1, "%s: %s" % (name, said))
+                self.assertEqual(
+                    list(destination.iterdir()), [],
+                    "%s: A REFERENCE COURSE WAS PUBLISHED" % name
+                )
+
+            # 3. PowerShell's pattern, simulated. Unreadable and missing files
+            #    are about reading rather than matching, so they are not
+            #    questions the pattern answers.
+            if not row.get("unreadable") and not row.get("noConfigFile"):
+                self.assertEqual(
+                    dot_net.search(row.get("configText", "")) is not None,
+                    expect == "refused",
+                    "%s: deploy.ps1's pattern disagrees" % name
+                )
+            # The mode goes back before the folder goes, or the row that
+            # makes a file unreadable leaves one behind.
+            try:
+                (course / "course_config.json").chmod(0o644)
+            except OSError:
+                pass
+            shutil.rmtree(folder / "courses" / "AGREE", ignore_errors=True)
+
+
 class TheSentence(unittest.TestCase):
 
     def test_the_sentence_is_the_contracts_sentence(self):
@@ -262,6 +370,22 @@ class TheLauncherRefusesBeforePublishing(unittest.TestCase):
         self.assertNotIn("kept for reference", said)
         self.assertEqual(result.returncode, 0, said)
         self.assertTrue((destination / "section1" / "index.html").exists(), said)
+
+    def test_a_marker_with_no_course_code_still_says_the_sentence(self):
+        # Not "still exits 1": it did that already, SILENTLY. `grep -Eo`
+        # exits 1 when there is no course_code, `pipefail` propagates it and
+        # `set -e` killed the script on that assignment before the echo. The
+        # whole design of "no fourth exit code, matched on OUTPUT" rests on
+        # the sentence being printed — with no output a scheduled deploy falls
+        # back to the generic "did not finish", which is the log-nobody-opens
+        # failure this was written to close.
+        folder = _a_working_folder(self.tmp, "NOCODE", {"kept_for_reference": True})
+        result = _run_launcher(folder, ["NOCODE", "1", "--image", "no-such-image"])
+        said = (result.stdout + result.stderr).decode("utf-8", "replace")
+        self.assertEqual(result.returncode, 1, said)
+        self.assertIn("is kept for reference, so it is never deployed", said)
+        # With no recorded code, the folder name is the only honest name.
+        self.assertIn("NOCODE", said)
 
     def test_a_settings_file_that_cannot_be_read_refuses(self):
         # FAIL CLOSED. "Cannot tell" is not "no".

@@ -309,8 +309,26 @@ final class AssistToolRunner {
         if AssistToolRunner.toolsAllowedOnAReferenceCourse.contains(tool.name) {
             return nil
         }
-        let code: String = AssistToolRunner.text("course", in: call.argumentValues)
+        var code: String = AssistToolRunner.text("course", in: call.argumentValues)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        if code.isEmpty {
+            // **A write tool that names no course is gated by the course it
+            // would actually TOUCH.** Exactly one exists — `undo_last_change`
+            // declares no parameters at all — and what it would touch is the
+            // change waiting in this conversation's history, which knows its
+            // own course. Reading the argument and giving up when it is empty
+            // was fail-OPEN on the argument, and the test that "proved"
+            // otherwise passed a `course` the schema does not have.
+            //
+            // Nothing else may join it quietly: a test asserts that
+            // `undo_last_change` is the ONLY non-read-only tool without a
+            // `course` parameter, so a future one fails the suite rather than
+            // slipping past this.
+            guard let pending = history.nextToUndo else {
+                return nil
+            }
+            code = pending.courseCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         if code.isEmpty {
             return nil
         }

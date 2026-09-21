@@ -892,6 +892,16 @@ enum ScheduledDeploy {
         cloudflareAccountID: String,
         runner: LaunchControlRunning = LaunchControl()
     ) -> String? {
+        // The BACKSTOP on the act, not on the advice. `problem()` is
+        // advisory — a caller may read it and go ahead anyway — and this is
+        // the function that actually writes a plist into the teacher's
+        // LaunchAgents folder. Both callers check `problem()` first today, so
+        // there is no hole; the guard is here because one guard in one caller
+        // is one edit away from being gone, which is the same argument the
+        // headless deploy path's backstop was written under.
+        if course.isKeptForReference {
+            return AssistWording.deployRefusedForAReferenceCourse(course: course.displayCode)
+        }
         let scriptURL: URL = workspaceURL.appendingPathComponent(DeployCommand.scriptName)
         if !FileManager.default.fileExists(atPath: scriptURL.path) {
             return "This working folder is missing a piece it needs (\(DeployCommand.scriptName)), so there is nothing to schedule."

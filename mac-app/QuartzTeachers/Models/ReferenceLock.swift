@@ -91,14 +91,29 @@ enum ReferenceLock {
     ///   keeping it.
     /// * `.merged_output` — the built website. It is a symlink out of the
     ///   folder, and it is rebuilt rather than kept.
+    /// * `course_config.json.tmp` — the half of that same atomic write that
+    ///   exists only between `open()` and `os.replace()`. A build interrupted
+    ///   between the two leaves it on disk; locking it would mean every later
+    ///   preflight failed both its write AND its cleanup, so that course's
+    ///   settings could never be reconciled again.
     /// * `.DS_Store` — Finder's own bookkeeping. Nothing a teacher wrote.
     static let neverLocked: Set<String> = [
         "course_config.json",
         "course_config.backup.json",
+        "course_config.json.tmp",
         ".obsidian",
         ".merged_output",
         ".DS_Store",
     ]
+
+    /// Suffixes never locked, whatever the rest of the name is.
+    ///
+    /// Anything half-written. `SectionPublishState` already ignores the same
+    /// suffix when it fingerprints a section, for the same reason: a `.tmp`
+    /// is not a teacher's page, it is the middle of somebody's atomic write —
+    /// and locking the middle of one is how a writer ends up unable to finish
+    /// OR to clean up.
+    static let neverLockedSuffixes: [String] = [".tmp"]
 
     // MARK: - Functions
 
@@ -213,7 +228,7 @@ enum ReferenceLock {
 
         var found: [URL] = []
         for case let child as URL in walker {
-            if ReferenceLock.neverLocked.contains(child.lastPathComponent) {
+            if ReferenceLock.isNeverLocked(child.lastPathComponent) {
                 // A skipped FOLDER takes everything inside it: `.obsidian`
                 // holds plugins and themes, and the point is that Obsidian
                 // may write in there freely.
@@ -234,6 +249,17 @@ enum ReferenceLock {
             found.append(child)
         }
         return found
+    }
+
+    /// Whether this name is one the lock never touches.
+    static func isNeverLocked(_ name: String) -> Bool {
+        if ReferenceLock.neverLocked.contains(name) {
+            return true
+        }
+        for suffix in ReferenceLock.neverLockedSuffixes where name.hasSuffix(suffix) {
+            return true
+        }
+        return false
     }
 
     private static func set(immutable: Bool, at url: URL) {

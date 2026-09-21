@@ -455,15 +455,36 @@ if [[ -f "$_course_config" ]]; then
     echo "   its settings file could not be read. Nothing was published."
     exit 1
   fi
-  # `"kept_for_reference": true` and nothing else. A false, a missing key or
-  # anything that is not the literal true reads as an ordinary course.
+  # ONE LINE, because `grep` works a line at a time and `[[:space:]]` cannot
+  # span a newline. Without the `tr` a config whose key and colon sit on
+  # different lines walked straight past this check — while the shared Python
+  # called it a reference course — and the folder publish, which never enters
+  # the container, went through at exit 0 saying "Published: 1 file(s)
+  # updated." Found by review, 2026-09-20. PowerShell's own `-match` uses .NET
+  # regex, where `\s` already matches a newline, so flattening here is also
+  # what makes the two launchers agree.
+  _flat_config="$(printf '%s' "$_config_text" | tr '\n' ' ')"
+  # `"kept_for_reference": true`, in any case, unquoted. A false, a missing
+  # key, the STRING "true" and the number 1 all read as an ordinary course —
+  # they read as false in the app too, and a launcher that disagreed with the
+  # app about the same file would protect nothing. The table of inputs all
+  # three implementations must agree on is
+  # contracts/shared-rules.json -> referenceCourses.markerAgreement.
   _reference_code="$COURSE_CODE"
-  if printf '%s' "$_config_text" | grep -Eq '"kept_for_reference"[[:space:]]*:[[:space:]]*true'; then
+  if printf '%s' "$_flat_config" | grep -Eq '"kept_for_reference"[[:space:]]*:[[:space:]]*[Tt][Rr][Uu][Ee]'; then
     # The code a TEACHER reads, which for a reference course is deliberately
     # not the folder name. Falls back to the folder when there is none.
-    _recorded_code="$(printf '%s' "$_config_text" \
+    #
+    # `|| true` is load-bearing under `set -euo pipefail`: `grep -Eo` exits 1
+    # when a config carries the marker and no course_code, `pipefail`
+    # propagates it, and the script then died on this very assignment BEFORE
+    # saying anything at all — exit 1 with no output. The whole design of "no
+    # fourth exit code, matched on OUTPUT" rests on the sentence being
+    # printed, so a silent exit here sends a scheduled deploy back to the
+    # generic "did not finish" this was written to replace.
+    _recorded_code="$(printf '%s' "$_flat_config" \
       | grep -Eo '"course_code"[[:space:]]*:[[:space:]]*"[^"]*"' \
-      | head -n 1 | sed -E 's/.*"([^"]*)"[[:space:]]*$/\1/')"
+      | head -n 1 | sed -E 's/.*"([^"]*)"[[:space:]]*$/\1/' || true)"
     if [[ -n "$_recorded_code" ]]; then _reference_code="$_recorded_code"; fi
     echo ""
     echo "❌ ${_reference_code} ${REFERENCE_COURSE_REFUSAL}"

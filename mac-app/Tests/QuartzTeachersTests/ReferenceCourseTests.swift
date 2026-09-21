@@ -307,6 +307,11 @@ final class ReferenceCourseTests: XCTestCase {
             XCTAssertNotNil(entry["why"] as? String, "\(name) is left writable for a reason; say it.")
             named.insert(name)
         }
+        XCTAssertTrue(
+            ReferenceLock.isNeverLocked("something.tmp"),
+            "Anything half-written is left alone, whatever its name — a locked .tmp is an atomic "
+            + "write nobody can finish OR clean up."
+        )
         XCTAssertEqual(
             named, ReferenceLock.neverLocked,
             "Every name here is something that has to be WRITTEN while the course is open — a locked "

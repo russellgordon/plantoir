@@ -1057,6 +1057,12 @@ def main():
     # host and exits before this is entered — that door has its own check, in
     # the launcher, and verify.sh greps both launchers for it.
     course_dir = toolchain_paths.COURSES_DIR / args.course
+    if reference_course.cannot_tell(course_dir):
+        # FAIL CLOSED, the same way the launchers do: a settings file that is
+        # there and will not open is not a settings file that says no.
+        print(f"❌ Plantoir cannot tell whether {args.course} is kept for reference —")
+        print("   its settings file could not be read. Nothing was published.")
+        sys.exit(1)
     if reference_course.is_reference(course_dir):
         print("❌ " + reference_course.refusal_sentence(
             reference_course.display_code(course_dir)
