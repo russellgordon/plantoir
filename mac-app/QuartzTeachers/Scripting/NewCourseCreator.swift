@@ -104,6 +104,25 @@ class NewCourseCreator {
         Task {
             await runner.waitUntilFinished()
             installedExampleCode = NewCourseCreator.exampleCourseCode(in: runner.transcript.displayText)
+            // The same line a course made through the wizard leaves, because
+            // this button makes a course too — one a teacher will later ask
+            // about by name. It is written AFTER the run and from the run's
+            // own output, never before and never guessed: the example
+            // normally installs as EXC2O but takes another code when that one
+            // is taken, so the code is not known until the script says it. A
+            // run that installed nothing says nothing, which is why this sits
+            // inside the `if let`.
+            if let installedCode = installedExampleCode {
+                ActivityTrail.note(
+                    .courseCreated,
+                    NewCourseCreator.startingContentLine(
+                        courseCode: installedCode,
+                        takesExampleContent: true,
+                        usesSkeleton: false,
+                        skeletonSubject: nil
+                    )
+                )
+            }
             isCreating = false
         }
     }
