@@ -2474,6 +2474,30 @@ box only appears if there is anything to include. The events that must be
 recorded are contract data (`activityTrail`), pinned by a test, so a new
 feature cannot ship without deciding what it leaves behind.
 
+**Making a course leaves a line saying what it started FROM, since
+2026-09-21** — `course created`, "created ICS4U from the computer studies
+skeleton", one of three shapes (the ready-made pages written for the code,
+the subject's skeleton named, or empty folders). It carries the code and
+nothing else a teacher typed: not the course name, which can hold a
+student's name or a room number, and not where it publishes.
+
+It is worth saying why this was missing, because the shape recurs. Creating
+a course DID leave a line — `taskStarted`, "started setup.sh" — and the
+pinned event list was therefore satisfied. But the launcher takes no
+arguments for a creation, so the line carried neither the code nor what the
+course was meant to become, and the trail could not answer the one question
+a report about the New Course wizard asks. Adding a single folder to a list
+recorded more (`folder created` carries the course and the list it went in).
+That asymmetry is how [#248](https://github.com/russellgordon/plantoir/issues/248)
+stayed invisible for five weeks: a teacher declined the ready-made pages for
+a code that had some, got empty folders rather than the subject's skeleton,
+and nothing written down said which of those two things the app had done.
+**An event list can only pin the events somebody thought of; what a line
+CARRIES is the half that has to be read.** The line is written before the
+launcher starts, so a creation that fails part-way still says what was asked
+for; Windows creates courses too, so the contract entry carries no
+`appliesOn`.
+
 ## The local assistant
 
 A teacher can open an assistant for one section — a window of its own, so the
