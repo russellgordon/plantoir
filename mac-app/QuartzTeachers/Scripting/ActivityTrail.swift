@@ -208,6 +208,30 @@ nonisolated enum ActivityTrail {
         /// joins this line rather than earning a rename on both platforms.
         case classCopyNotMade = "class copy not made"
 
+        /// A teacher copied one or more pages out of one course and into
+        /// another ("Copy a Page from This Course…").
+        ///
+        /// Carries the course the pages came FROM by its folder name — the
+        /// thing that tells last year's ICS4U from this year's — the course
+        /// and folder they landed in, how many pages and pictures were
+        /// created, reused, brought in under a new name and left alone, and
+        /// the backup's file name. NEVER a page's title and never anything
+        /// from inside one: `classCopyNotMade`'s own doc comment draws that
+        /// line for the same kind of act, and `sectionRestored` already
+        /// carries a backup's file name for the same reason this one does.
+        ///
+        /// One event for every outcome, written once at the END of a copy
+        /// rather than one per page. A copy that stopped part way through
+        /// says so in the same line, because the counts already show it — and
+        /// every extra event is an entry the Windows app has to account for.
+        ///
+        /// Without it, a page appearing in a course a teacher did not write
+        /// it in has no explanation anywhere: on disk a copied page looks
+        /// exactly like one they typed, and "where did this come from?" is a
+        /// question nothing else in this trail could answer. The refusals
+        /// record nothing — they answer before anything is touched.
+        case pagesCopiedFromAnotherCourse = "pages copied from another course"
+
         /// A publish set to happen on its own stopped because it needed an
         /// answer.
         ///

@@ -4075,3 +4075,21 @@ behaviour, or two behaviours?).
 ---
 
 [◀ Previous: The macOS App](09-mac-app.md) · [Back to index](README.md) · [Next: Release Strategy ▶](11-release-strategy.md)
+## One feature that is deliberately NOT on any tool surface
+
+"Copy a Page from This Course…" (issue #207) copies one page of one course into
+another, with its pictures and the pages it links to. It is reached from the
+sidebar's context menu and from nowhere else: **no MCP tool, no local-assistant
+tool, no tool-surface change at all.**
+
+Russell's decision, and the reason is the one this page already makes
+elsewhere: adding a tool is a routing change, and more choices is the classic
+way a router degrades. The feature is deterministic code — every rule in it
+would behave identically if the model were replaced by a dropdown menu — so
+there is nothing for a model to decide that the three questions on the sheet do
+not already ask.
+
+Written here so nobody adds it later thinking it was an oversight. The check
+that it stayed off is structural rather than a promise: no generated contract
+moved with the feature, so `assist-wording.json` and `assist-cases.json` cannot
+disagree with the Swift, and `--write-contracts` is not owed by it.
