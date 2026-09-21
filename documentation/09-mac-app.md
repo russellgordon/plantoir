@@ -1511,6 +1511,151 @@ that. If the two were ever coupled, an unlocked course would become a
 deployable one, and a deploy that reports success is the worst direction this
 feature can fail in.
 
+### Importing last year's folder
+
+The second way a reference course is made, and the one a teacher reaches for
+first: **File ▸ Import Courses for Reference…**, point at the folder last
+year's classes were kept in, tick what you want, press Import. It is route 1
+with a different SOURCE, and it ends in route 1's code —
+`ReferenceCopier.makeIntoAReferenceCourse` — so the neutralisation, the marker,
+the year and the lock happen in exactly one place. A second copy of that
+sequence would be a second thing to keep in step, and the thing it would
+eventually be out of step about is whether a course can reach last year's live
+website.
+
+**The source is opened for reading and for nothing else.** It may be the
+teacher's only copy of last year. Everything written goes inside the new
+folder; the neutralisation and the lock happen to the COPY. Rehearsed on
+Russell's real 2025–26 folder on 2026-09-20: a 44,532-entry manifest of
+`courses/ICS4U` — every path, size and mtime, plus a sha256 of every file
+outside `Media` — is byte-identical before and after an import
+(`68276d82cf7f73ee…` both times).
+
+**Three folder shapes are accepted**, because a teacher points at what they
+recognise: the working folder itself, the `courses` folder inside it, or ONE
+course folder. The last two resolve UPWARD and the whole shelf is offered,
+with the course they pointed at already ticked. Refusing somebody who went one
+level too deep reads as the app being broken, and resolving upward costs
+nothing. Refused: a folder with no courses in it, the working folder this
+window already has open (that is route 1, and the sentence says so by name),
+and a folder on either side of the one already open.
+
+**What is left behind is four fifths of what is on disk.** In a folder made by
+an older Plantoir, `.merged_output` is a REAL directory holding last year's
+whole built website — measured at 1.9 GB per course against 489 MB of course;
+in a folder made by a current one it is a symlink pointing out of the working
+folder altogether. A name on the skip list is therefore skipped **without
+being looked inside**, which is why the walk is hand-written rather than an
+enumerator with a filter: merely not COPYING that folder while still walking it
+costs more time than copying the course. Symlinks are copied as links and never
+followed. The rest of the list, with a reason each, is
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.importing.leftBehind` — the archive list, plus yesterday's
+config, plus a Finder duplicate of a config found in a real course, plus what
+an external disk leaves in a folder.
+
+**`.obsidian` is copied, deliberately.** Opening the course in Obsidian is the
+point of keeping it, and Plantoir opens the course folder AS the vault; without
+those 312 KB the vault opens with first-run prompts, none of the teacher's
+plugins and none of the folder state that makes last year's material
+navigable. Its `workspace.json` holds paths into the OLD folder, which are dead
+links Obsidian rewrites on first open — not worth stripping.
+
+**Page frontmatter is never rewritten.** A reference course is a faithful
+record of what students actually saw, `draft: true` and all; the build already
+reads the older spelling correctly. (#207's rule — a page copied INTO a live
+course starts hidden — belongs to the copy, not to the import.)
+
+#### What the copy costs, measured, and why it is still cancellable
+
+`FileManager.copyItem` **clones** within one APFS volume: ICS4U's 485 MB of
+media, 638 files, copied in **0.09 s**, and all four real courses — 1.36 GB —
+imported through the real interface in under two seconds. That is not the case
+to design for. The same bytes off a USB disk, a network share or a drive that
+has to spin up are minutes, so the copy reports progress in bytes, can be
+stopped between files, and runs off the main actor.
+
+It runs there by being `nonisolated async` rather than by `Task.detached`:
+Swift runs a `nonisolated async` function on the shared executor, and it stays
+an ordinary child of the calling task, so **the Stop button's `cancel()`
+reaches it**. A detached task would not be cancelled by it, which is the trap
+worth writing down. There is no sleep anywhere in the path and no timer.
+
+**Nothing half-made is left behind, and the order matters.** Whatever was
+being made when a course failed — or when the teacher pressed Stop — is
+UNLOCKED and then removed. `removeItem` and `rm -rf` both refuse a locked
+tree, and this is reachable rather than theoretical: the lock travels through a
+copy, so importing from a folder that already holds a reference course hands
+the copy its locked files. The lock is cleared the moment the copy finishes,
+before the site markers are renamed aside, so the risky stretch works on an
+ordinary folder throughout.
+
+**One course failing does not take the others.** Each ticked course is
+imported on its own; one that cannot be — its code already kept for reference
+under that school year, a folder that cannot be read, a disk that filled — is
+reported by name with what happened, and the run carries on. A folder of four
+where one clashes imports three. Only Stop ends a run early, and it has its own
+trail event rather than being recorded as a failure: a teacher who stops
+something chose to.
+
+#### The school year is proposed from the pages, and the newest page was rejected
+
+The year pre-selected for each course is **the one most of its pages were last
+changed in**, ties going to the newer year; a year outside the offered list
+proposes nothing. The teacher changes it, and the sheet says nothing about how
+it was arrived at.
+
+The obvious rule — the newest page — was measured and thrown away. One page is
+exactly what gets touched by accident: opening last year's folder to look
+something up, or a sync putting a fresh date on one note. On the real folder,
+measured 2026-09-20:
+
+| Course | Newest page | Commonest year | Taught in |
+|---|---|---|---|
+| CODING | 2025-11-27 | 2025–26 (19 of 19) | 2025–26 |
+| ICS3U | 2026-06-08 | 2025–26 (223 of 320) | 2025–26 |
+| ICS4U | **2026-09-11** | 2025–26 (201 of 287) | 2025–26 |
+| MPM2DE | 2026-06-02 | 2025–26 (151 of 151) | 2025–26 |
+
+The newest page gets ICS4U wrong — it proposes 2026–27 off a single note
+touched a week before the import. The commonest year gets all four right.
+
+#### Where the interface lives, and two SwiftUI facts behind it
+
+The menu item is in the **File menu**, beside Open Working Folder…, because it
+is the same kind of act: it starts by choosing a folder. It is deliberately NOT
+on the sidebar's `+` button, which opens the New Course wizard on a single
+click — putting a menu in front of the thing a teacher presses most often to
+add a course buys nothing.
+
+The chooser and the sheet are attached to the SIDEBAR rather than to the
+window's own view, and as a `ViewModifier` rather than as two more lines on the
+sidebar's modifier chain. Both are forced:
+
+- a second `.fileImporter` on the SAME view is a shape SwiftUI has been known
+  to present only the first of, and the window's view already has one;
+- adding them to the sidebar's chain directly took the type-checker past its
+  limit — "unable to type-check this expression in reasonable time". Two other
+  groups of modifiers there are already wrapped up the same way.
+
+After an import the sidebar **reveals** what arrived
+(`WorkspaceModel.revealReferenceCourse`): both the Reference Courses group and
+the school year inside it are opened. A course that lands behind two closed
+triangles reads as a course that did not land.
+
+#### Rejected
+
+- **Forking the copier.** Two implementations of the neutralise-mark-lock
+  sequence, drifting apart about the dangerous half. The tail of
+  `keepACopy` was extracted instead, and both routes call it.
+- **Zip and backup archives as a source.** `CourseRestorer.unpack` already
+  handles all three zip shapes, so it is a small piece of work, but it is a
+  second way IN before the first one has been used by anybody. Deferred.
+- **An editable folder name per row.** Route 1 offers one because it makes one
+  copy; a list of four rows each with a name field is clutter in front of a
+  decision nobody wants to make. The names are derived by the same rule
+  (`CODE-YYYY`, `-2` … `-9` when taken) and are not shown.
+
 ## What an archive or a backup is CALLED, and the calendar it is stamped in
 
 Three kinds of zip share `courses/_backups/<CODE>/` and are told apart only by
