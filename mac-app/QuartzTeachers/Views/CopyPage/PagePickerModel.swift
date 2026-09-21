@@ -28,13 +28,32 @@ class PagePickerModel {
 
     var highlightedRowId: String?
 
-    /// Escape closes the list without blurring the field, so somebody can
-    /// carry on typing. Any typing, or focus returning, cancels it.
-    var wasDismissed: Bool = false
+    /// Whether the list is closed although the field has focus.
+    ///
+    /// **It starts TRUE, and that is a deliberate departure from the control
+    /// this was ported from.** A sheet gives its first text field focus as it
+    /// opens, so a list that opens on focus alone opened over the two
+    /// questions underneath it the instant the teacher chose the menu item —
+    /// seen on a real course, where it covered "Copy into" and "Folder"
+    /// completely. Where the picker is the only control on its row, opening
+    /// on focus is right; here it is the first of three questions, so the
+    /// list opens when the teacher TYPES or presses the chevron, and not
+    /// merely because the sheet put the caret somewhere.
+    var wasDismissed: Bool = true
 
     /// What has actually been CHOSEN, which is not the same as what has been
     /// typed. Half a name in the field is not a selection.
     private(set) var chosenPage: CopyablePage?
+
+    /// True while the next change to `searchText` is one this model made
+    /// rather than one the teacher typed.
+    ///
+    /// The field's text is a binding, so a change made HERE comes back as
+    /// though somebody had typed it — and "somebody typed" means "open the
+    /// list". Measured by driving the real app: after "Copy another" cleared
+    /// the field, the list opened over the two questions underneath it,
+    /// exactly the fault `wasDismissed` starting true was meant to close.
+    private var theNextTextChangeIsMine: Bool = false
 
     // MARK: - Computed properties
 
@@ -162,9 +181,20 @@ class PagePickerModel {
         }
     }
 
+    /// Back to an empty field with the list closed — what "Copy another"
+    /// leaves behind, and the same state the sheet opens in.
+    func startOver() {
+        theNextTextChangeIsMine = true
+        searchText = ""
+        chosenPage = nil
+        highlightedRowId = nil
+        wasDismissed = true
+    }
+
     /// Taking a row: the one way a page becomes chosen.
     func choose(_ page: CopyablePage) {
         chosenPage = page
+        theNextTextChangeIsMine = true
         searchText = page.pageName
         highlightedRowId = nil
         wasDismissed = true
@@ -179,6 +209,10 @@ class PagePickerModel {
     /// highlight — the field shows one string, so a chosen page whose name is
     /// being edited is no longer what the field says.
     func noteTyping() {
+        if theNextTextChangeIsMine {
+            theNextTextChangeIsMine = false
+            return
+        }
         wasDismissed = false
         highlightedRowId = nil
         if let chosenPage, chosenPage.pageName != searchText {
@@ -186,7 +220,10 @@ class PagePickerModel {
         }
     }
 
-    func noteFocusGained() {
+    /// The chevron: the deliberate "show me everything" gesture.
+    ///
+    /// Focus does NOT do this — see `wasDismissed`.
+    func reveal() {
         wasDismissed = false
     }
 

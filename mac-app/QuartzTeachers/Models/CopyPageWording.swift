@@ -109,8 +109,17 @@ nonisolated enum CopyPageWording {
         return "“\(page)” is already in this course, so it was left as it is — links will lead to the one that is here."
     }
 
-    static func theseLinksWillNotLeadAnywhereYet(names: String) -> String {
-        return "These links will not lead anywhere yet: \(names)."
+    /// Each name in quotation marks, and that is not decoration: a real page
+    /// on a real course is called "Operators, Selection, Iteration", and a
+    /// list joined with commas read as three separate pages. Quoting each one
+    /// is the difference between a sentence a teacher can act on and one they
+    /// have to guess at.
+    static func theseLinksWillNotLeadAnywhereYet(names: [String]) -> String {
+        var quoted: [String] = []
+        for name in names {
+            quoted.append("“\(name)”")
+        }
+        return "These links will not lead anywhere yet: \(quoted.joined(separator: ", "))."
     }
 
     static func thatCourseIsDeployingRightNow(course: String) -> String {
@@ -119,6 +128,12 @@ nonisolated enum CopyPageWording {
 
     static func thisCourseHasNoPagesToCopy(course: String) -> String {
         return "\(course) has no pages in shared folders to copy"
+    }
+
+    /// The destination's folders are all missing from disk, so a page has
+    /// nowhere to land — and Plantoir never makes a folder for this.
+    static func thatCourseHasNowhereToPutIt(course: String) -> String {
+        return "\(course) has no folder for a page to go in yet"
     }
 
     /// The refusal that follows the read-back guard: the page was written,
@@ -140,6 +155,38 @@ nonisolated enum CopyPageWording {
     /// teacher's own DIFFERENT picture under the name the copy wanted.
     static func thePicturesCouldNotBePointedAtTheirNewNames(page: String) -> String {
         return "“\(page)” was not copied: one of its pictures had to come in under a new name and Plantoir could not be certain the page would find it."
+    }
+
+    /// The copy's own settings block is written in a way Plantoir and the
+    /// website builder could read differently.
+    ///
+    /// Two shapes are known and each was reproduced: a block closed by an
+    /// INDENTED `---`, which this app reads as the end and the builder does
+    /// not (issue #188) — so the copy reads hidden here and is PUBLISHED
+    /// there — and a block carrying a YAML anchor or alias, which the builder
+    /// refuses to parse at all. Measured at 0 of 777 real pages; refused
+    /// anyway, because the promise this feature makes is certainty.
+    static func thePageIsWrittenInAWayPlantoirCannotBeSureOf(page: String) -> String {
+        return "“\(page)” was not copied: its settings are written in a way Plantoir cannot be sure of, and a copy must never turn up where students can read it."
+    }
+
+    /// The worst outcome the read-back can reach: the copy could not be shown
+    /// to be hidden AND could not be taken away again.
+    ///
+    /// A different sentence from `theCopyCouldNotBeMadeHidden`, because that
+    /// one says the page was not copied — and here it is still there. The
+    /// path is named, because the teacher has to go and remove it.
+    static func theCopyIsStillThereAndMustBeRemoved(page: String, at path: String) -> String {
+        return "“\(page)” could not be shown to be hidden from students and could not be removed again. It is at \(path) — take it out before you deploy that course."
+    }
+
+    /// The backup could not be written, in plain words.
+    ///
+    /// Said instead of the file system's own — a teacher who pressed Copy
+    /// once read "Could not write the archive: zip warning: …", which names a
+    /// program they have never heard of.
+    static func theCopyOfTheCourseCouldNotBeSaved(course: String) -> String {
+        return "A copy of \(course) could not be saved, so nothing was copied. Check there is room on the disk and try again."
     }
 
     /// Something the file system refused, said without its own words.

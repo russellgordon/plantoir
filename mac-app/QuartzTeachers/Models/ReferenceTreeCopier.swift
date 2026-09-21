@@ -378,12 +378,20 @@ nonisolated enum ReferenceTreeCopier {
         }
     }
 
-    /// The file-system path of one named thing inside a folder, with the
-    /// name's bytes kept — for asking about it (size, contents, the locked
-    /// flag) rather than writing it.
+    /// A `URL` for one named thing inside a folder — for ASKING about it
+    /// (size, contents, the locked flag), and NEVER for writing it.
     ///
-    /// `URL(fileURLWithPath:)` is given the whole path as one string, so
-    /// nothing is appended and nothing is re-spelled.
+    /// **This DOES re-spell the name, and that is why nothing writes through
+    /// it.** Measured: `URL(fileURLWithPath:)` handed the whole path as one
+    /// string decomposes it exactly as `appendingPathComponent` does —
+    /// `App\u{00e9}tit` (`c3 a9`) comes back out of `.path` as `65 cc 81`.
+    /// A LOOKUP survives that on APFS and HFS+, which compare names without
+    /// regard to normalisation, so reading is safe here; a WRITE would land
+    /// under the wrong name, which is what `create` and `copyFile` avoid by
+    /// appending raw bytes to `pathBytes(of:)`. On a volume that compares
+    /// names byte for byte, a read through this would fail — in the safe
+    /// direction, since a page that cannot be read back is deleted and
+    /// reported.
     static func url(named nameBytes: [UInt8], inFolderAt folderURL: URL) -> URL {
         return URL(fileURLWithPath: folderURL.path + "/" + String(decoding: nameBytes, as: UTF8.self))
     }
