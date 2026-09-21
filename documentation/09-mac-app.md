@@ -1523,7 +1523,10 @@ course in it does no work at all.
   `ditto` and `shutil.copy2` all carry the flag; only a plain `cp -R` or a zip
   round trip loses it. `ReferenceLock.clearLock` is the one place that clears
   it, and whatever copies pages between courses must call it — a page a teacher
-  cannot edit, with no explanation, reads as "the app is broken".
+  cannot edit, with no explanation, reads as "the app is broken". Since
+  2026-09-21 something does: "Copy a Page from This Course…" clears the flag on
+  every page it writes and every picture it copies, and a must-fail test locks
+  a source course and proves it.
 
 ### What Finder does with one — measured, because decision (n) asked
 

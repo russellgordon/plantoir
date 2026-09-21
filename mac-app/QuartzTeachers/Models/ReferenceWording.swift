@@ -45,9 +45,16 @@ nonisolated enum ReferenceWording {
     /// Why an act that would change the course is not available.
     ///
     /// Says what the course IS and stops. It does not tell the teacher to
-    /// copy anything: in this release there is nothing in Plantoir that
-    /// copies pages between courses, and a sentence that sends them to do it
-    /// by hand would be sending them somewhere the pages arrive locked.
+    /// copy anything, and that stays true now that Plantoir HAS a way — "Copy
+    /// a Page from This Course…", on this course's own row, added 2026-09-21
+    /// with issue #207. The sentence is a refusal about CHANGING this course;
+    /// naming a different feature inside it is a non-sequitur, and the menu
+    /// item sits one line away in the menu they are already looking at.
+    /// (Until #207 the reason was that nothing copied pages at all and a
+    /// hand copy arrives locked. The second half of that is still true — see
+    /// `aCopyTakenOutStaysLocked` — and the first half stopped being true in
+    /// the same release, which is why the reason is written out again here
+    /// rather than left to be believed.)
     static func staysAsItIs(course: String) -> String {
         return "\(course) is kept for reference, so it stays as it is."
     }
@@ -109,10 +116,14 @@ nonisolated enum ReferenceWording {
 
     /// The one line about a page taken out by hand.
     ///
-    /// Here because in this release nothing in Plantoir copies pages between
-    /// courses, so a teacher who wants one does it in Finder — and it arrives
-    /// locked, with no explanation, which is the fault that gets reported as
-    /// "the app is broken". Said once, beside the sentence above.
+    /// Here because a teacher who drags a page out in Finder gets one that
+    /// is locked, with no explanation, which is the fault that gets reported
+    /// as "the app is broken". Said once, beside the sentence above.
+    ///
+    /// Still true, and still needed, now that "Copy a Page from This Course…"
+    /// exists: that arrives UNLOCKED, because it clears the flag on every
+    /// file it writes (`ReferenceLock.clearLock`). This sentence is about the
+    /// copy a teacher makes THEMSELVES, which Plantoir has no say over.
     static let aCopyTakenOutStaysLocked: String =
         "A file you copy out of it stays locked until you untick Locked in Get Info."
 

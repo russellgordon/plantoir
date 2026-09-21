@@ -749,12 +749,13 @@ nonisolated enum AssistWording {
     ///
     /// `course` is the code a TEACHER reads — `ICS3U`, never the folder name.
     ///
-    /// **It does not tell them to copy anything**, and that was decided rather
-    /// than overlooked: nothing in this release copies pages between courses,
-    /// so the advice would send a teacher to do it by hand — where the page
-    /// arrives locked, with no explanation, which is the fault that gets
-    /// reported as "the app is broken". The way out it names is the course
-    /// they are actually teaching.
+    /// **It does not tell them to copy anything**, and that was decided
+    /// rather than overlooked. It stayed decided when Plantoir gained "Copy a
+    /// Page from This Course…" (issue #207, same release): this is a refusal
+    /// about DEPLOYING, the way out it names is the course they are actually
+    /// teaching, and a refusal that advertises an unrelated feature is one a
+    /// teacher has to read twice. The menu item is on the course's own row,
+    /// where they will meet it.
     static func deployRefusedForAReferenceCourse(course: String) -> String {
         return "\(course) is kept for reference, so it is never deployed. "
              + "Deploy the course you are teaching instead."

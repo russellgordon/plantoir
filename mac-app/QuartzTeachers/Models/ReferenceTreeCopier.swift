@@ -263,6 +263,131 @@ nonisolated enum ReferenceTreeCopier {
         }
     }
 
+    /// The names of the things directly inside a folder, as the BYTES the
+    /// file system gave, in a stable order.
+    ///
+    /// The reading half of this file's rule, for a caller that copies a
+    /// handful of named files rather than a whole course — "Copy a Page from
+    /// This Course…" resolving a page's pictures against the course's `Media`
+    /// folder. Measured on this Mac: `readdir`,
+    /// `FileManager.contentsOfDirectory(at:)` → `lastPathComponent` and
+    /// `contentsOfDirectory(atPath:)` all hand back the stored bytes
+    /// unchanged, so the READ was never the problem — it is the WRITE that
+    /// re-spells a name, which is what `create` and `copyFile` below exist
+    /// for.
+    static func names(inFolderAt folderURL: URL) -> [[UInt8]] {
+        guard let directory = opendir(ReferenceTreeCopier.path(
+            ReferenceTreeCopier.pathBytes(of: folderURL), []
+        )) else {
+            return []
+        }
+        defer { closedir(directory) }
+
+        var found: [[UInt8]] = []
+        while let entry = readdir(directory) {
+            var name: [UInt8] = []
+            let length: Int = Int(entry.pointee.d_namlen)
+            withUnsafeBytes(of: entry.pointee.d_name) { raw in
+                for index in 0..<length {
+                    name.append(raw[index])
+                }
+            }
+            if name == Array(".".utf8) || name == Array("..".utf8) {
+                continue
+            }
+            found.append(name)
+        }
+        found.sort { first, second in
+            return String(decoding: first, as: UTF8.self) < String(decoding: second, as: UTF8.self)
+        }
+        return found
+    }
+
+    /// Writes a NEW file whose name is exactly these bytes, and refuses if
+    /// anything is already there.
+    ///
+    /// **`Data.write(to:options:.withoutOverwriting)` cannot be used for a
+    /// name that has to survive**, and that is measured rather than assumed:
+    /// building the destination with `appendingPathComponent` passes the name
+    /// through `URL`'s file-system representation, which DECOMPOSES it. Same
+    /// Mac, same run — a file read back as `41 70 70 c3 a9 …` (NFC) was
+    /// written out as `41 70 70 65 cc 81 …` (NFD). A page that embeds the
+    /// picture still spells the name the old way, so on a volume that
+    /// compares names byte for byte the embed no longer resolves and the
+    /// picture vanishes from the built site with no error anywhere.
+    ///
+    /// `O_EXCL` is the same "never overwrite" guarantee `.withoutOverwriting`
+    /// gives, taken from the system call it is built on: there is no
+    /// check-then-write window, and a file that appears in between makes this
+    /// throw rather than replace.
+    static func create(_ data: Data, named nameBytes: [UInt8], inFolderAt folderURL: URL) throws {
+        var relative: [UInt8] = []
+        relative.append(contentsOf: nameBytes)
+        let target: [CChar] = ReferenceTreeCopier.path(
+            ReferenceTreeCopier.pathBytes(of: folderURL), relative
+        )
+        let name: String = String(decoding: nameBytes, as: UTF8.self)
+
+        let descriptor: Int32 = open(target, O_CREAT | O_EXCL | O_WRONLY, 0o644)
+        if descriptor < 0 {
+            throw Trouble.couldNotCopy(name: name, reason: ReferenceTreeCopier.reason(errno))
+        }
+        defer { close(descriptor) }
+
+        var written: Int = 0
+        let bytes: [UInt8] = Array(data)
+        while written < bytes.count {
+            let count: Int = bytes.withUnsafeBufferPointer { buffer in
+                guard let base = buffer.baseAddress else {
+                    return -1
+                }
+                return write(descriptor, base + written, bytes.count - written)
+            }
+            if count <= 0 {
+                throw Trouble.couldNotCopy(name: name, reason: ReferenceTreeCopier.reason(errno))
+            }
+            written += count
+        }
+    }
+
+    /// Copies one file between two folders, keeping the name's bytes — and
+    /// refusing if anything is already at the destination.
+    ///
+    /// `COPYFILE_CLONE` implies `COPYFILE_EXCL`, measured: a second
+    /// `copyfile` onto the same destination returns −1 with `EEXIST` rather
+    /// than replacing what is there. So "never overwrite the teacher's
+    /// picture" is the system call's own guarantee here, not a check this
+    /// code does first.
+    static func copyFile(
+        named sourceNameBytes: [UInt8],
+        fromFolderAt sourceFolderURL: URL,
+        into destinationFolderURL: URL,
+        as destinationNameBytes: [UInt8]
+    ) throws {
+        let from: [CChar] = ReferenceTreeCopier.path(
+            ReferenceTreeCopier.pathBytes(of: sourceFolderURL), sourceNameBytes
+        )
+        let to: [CChar] = ReferenceTreeCopier.path(
+            ReferenceTreeCopier.pathBytes(of: destinationFolderURL), destinationNameBytes
+        )
+        if copyfile(from, to, nil, copyfile_flags_t(COPYFILE_CLONE)) != 0 {
+            throw Trouble.couldNotCopy(
+                name: String(decoding: sourceNameBytes, as: UTF8.self),
+                reason: ReferenceTreeCopier.reason(errno)
+            )
+        }
+    }
+
+    /// The file-system path of one named thing inside a folder, with the
+    /// name's bytes kept — for asking about it (size, contents, the locked
+    /// flag) rather than writing it.
+    ///
+    /// `URL(fileURLWithPath:)` is given the whole path as one string, so
+    /// nothing is appended and nothing is re-spelled.
+    static func url(named nameBytes: [UInt8], inFolderAt folderURL: URL) -> URL {
+        return URL(fileURLWithPath: folderURL.path + "/" + String(decoding: nameBytes, as: UTF8.self))
+    }
+
     /// One file, one folder or one symlink — the only place bytes become a
     /// path, so the two loops above cannot disagree about a name.
     private static func copy(_ item: Item, from source: [UInt8], into destination: [UInt8]) throws {

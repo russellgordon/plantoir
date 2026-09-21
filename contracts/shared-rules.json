@@ -336,6 +336,11 @@
         "why": "A reference course is built under a hidden name and renamed into place last, so an import the app never finished leaves a folder nothing can see - and therefore nothing would ever remove. This is the line that says the disk space came back, and the answer to 'my import did not finish and now there is no trace of it'."
       },
       {
+        "carries": "the course the pages came FROM by its folder name, the course and folder they landed in, how many pages and pictures were created, reused, brought in under a new name and left alone, and the backup's file name",
+        "event": "pages copied from another course",
+        "why": "A page appearing in a course a teacher did not write it in has no explanation anywhere else: on disk a copied page looks exactly like one they typed, and 'where did this come from?' is a question nothing else in this trail could answer. One line at the END of a copy, in every outcome - a copy that stopped part way says so in the same line, because the counts already show it. NEVER a page's title and never anything from inside one, the line classCopyNotMade's own entry draws for the same kind of act."
+      },
+      {
         "carries": "the course that was in hand and was not kept, and the name of the folder it was coming from",
         "event": "course import for reference stopped",
         "why": "Its own event rather than a failure: a teacher who presses Stop chose to, and a line calling that a failure is a line that misleads whoever reads it back. It is also what explains a folder that is NOT there - the course in hand is removed on the way out, so without this line the trail shows an import that started and nothing about how it ended."
@@ -3831,7 +3836,7 @@
     },
     "refusal": {
       "sentence": "{course} is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
-      "rule": "Every door a deploy can start at refuses a reference course, with this sentence, BEFORE anything is stopped, built or uploaded. {course} is the code a TEACHER reads. The sentence says what the course is and names the way out - the course being taught - and it deliberately does NOT tell the teacher to copy anything: nothing in this release copies pages between courses, and a page taken out by hand arrives locked.",
+      "rule": "Every door a deploy can start at refuses a reference course, with this sentence, BEFORE anything is stopped, built or uploaded. {course} is the code a TEACHER reads. The sentence says what the course is and names the way out - the course being taught - and it deliberately does NOT tell the teacher to copy anything. That stayed decided when Plantoir gained 'Copy a Page from This Course...' in the same release (issue #207): this is a refusal about DEPLOYING, and a refusal that advertises an unrelated feature is one a teacher has to read twice. The menu item is on the course's own row, where they will meet it.",
       "doesNotDependOnTheLock": "The refusal is gated on the MARKER alone and never on whether the files happen to be locked. An entirely unlocked reference course - one restored from a backup, or one whose folder has been on a second Mac - is refused at every door just the same. Both suites pin it. If the two were ever coupled, unlocking a course would make it deployable, and a deploy that reports success is the worst direction this feature can fail in.",
       "gateByDirection": "Refuse what would START a deploy; never refuse what STOPS one. Cancelling a scheduled deploy is always allowed, on every surface, however the course is marked - a course marked by hand while an alarm was already set must still be able to have that alarm turned off from the app. Whatever writes the marker cancels the course's scheduled deploys in the same act, and so does the pass that meets a reference course when the working folder is read.",
       "failClosedInTheShell": "The host-side check in deploy.sh and deploy.ps1 reads course_config.json in PLAIN SHELL - no host python3, which that path does not otherwise need on a product whose first-run promise is 'no Homebrew, no admin rights'. It fails CLOSED: a settings file that is there and cannot be read refuses, saying so. A settings file that is ABSENT is not this check's business - the launcher's own 'course folder not found' answers that - and a malformed one reads as NOT a reference course in the shared Python, because a course nobody can open must not become undeployable by accident.",
@@ -3952,6 +3957,7 @@
       "theReadOnlySummary": "What a reference course's row opens instead of the settings form: the code a teacher reads and the course name; the school year, with the one action a frozen course still offers; the sections; the FOLDER name, which is the one place a folder name is the fact; and wording.neverDeployed, wording.pagesAreLocked and wording.aCopyTakenOutStaysLocked. No fields, no Save, and no control that can never become available.",
       "whatIsOffered": [
         "Preview - the whole point of keeping the course",
+        "Copy a Page from This Course... - ALLOWED, and offered on every course row. It only READS this course; what it writes goes into a course the teacher TEACHES, chosen inside the sheet, which is never a reference course. Copying a page out of last year is a large part of why the course was kept, and the copy arrives UNLOCKED (see frozen.copyingOut) and hidden from students. Issue #207",
         "Open in Obsidian, with the calm note in front of it the first time",
         "Back Up Now - it only READS the course, and a restored backup is still a reference course",
         "Remove - unlocks first, same confirmation, same words",
@@ -3976,7 +3982,7 @@
       "groupTitle": "Reference Courses",
       "keepACopyMenuItem": "Keep a Copy for Reference…",
       "setSchoolYearMenuItem": "Set School Year…",
-      "rule": "{course} is the code a TEACHER reads - ICS3U, never the folder name. The register is calm: a teacher who kept a course for reference asked for this, so being told about it reads as a fact rather than a warning. No 'cannot', no 'error', no icon, and never a word about how it is done. Said by the app when an act that would change the course is not available; the sentence does NOT tell the teacher to copy anything, because in this release nothing in Plantoir copies pages between courses and a page taken out by hand arrives locked.",
+      "rule": "{course} is the code a TEACHER reads - ICS3U, never the folder name. The register is calm: a teacher who kept a course for reference asked for this, so being told about it reads as a fact rather than a warning. No 'cannot', no 'error', no icon, and never a word about how it is done. Said by the app when an act that would change the course is not available; the sentence does NOT tell the teacher to copy anything. Plantoir DOES copy pages between courses since issue #207 - 'Copy a Page from This Course...', on this course's own row - and the sentence still does not mention it: it is a refusal about changing THIS course, and naming a different feature inside it is a non-sequitur. A page a teacher takes out BY HAND still arrives locked, which is what wording.aCopyTakenOutStaysLocked is for.",
       "machineryCheck": "No 'lock flag', 'immutable', 'permission', 'chflags', 'script' or 'container' in any sentence here. 'Locked' on its own is allowed: it is the word Finder and Get Info already use, and it is what a teacher sees on the file.",
       "theCannotTellSentence": "Said by the LAUNCHERS only, as 'cannotTellHeadline - <one of the two reasons>. Nothing was published.' Both launchers carry it as a constant and a test compares them against these keys, the same arrangement refusal.sentence has. app-rules.json -> failureExplanations turns it back into the teacher's sentence when a deploy set to happen on its own hits it, which is the population it exists for: that one runs with the app closed, and the app reads such a course as ORDINARY, so the teacher can schedule it and only the launcher will refuse.",
       "whyTheLaunchersStillSayPublished": "'Nothing was published.' is the launchers' own long-standing house sentence - five times in each of them on dev, asserted by two shared Python tests - and it is deliberately NOT changed to 'deployed' here. Russell's decision (r) governs the APP's sentences and every new key name, and every sentence in this block follows it; one launcher run saying both words for the same act would be worse than one word that is old. A launcher vocabulary sweep is its own piece of work."
@@ -4038,7 +4044,7 @@
         "theOnlySection": "The sidebar turns that into removing the whole COURSE, so it takes the unlock-then-remove path above."
       },
       "restoring": "A zip round trip carries the MODE and loses the flag - measured - so a restored reference course arrives thawed. The marker travels in the config, so the marker is what puts the lock back: every restore path unlocks what it is about to write over and locks again afterwards, asked of the config as it is AFTER the restore. A backup made before the course was kept for reference therefore restores a course that is not one, which is right.",
-      "copyingOut": "The flag TRAVELS. FileManager.copyItem, cp -p, ditto and shutil.copy2 all carry it; only a plain cp -R or a zip round trip loses it. So anything copied out of a reference course arrives locked unless it is cleared, and a page a teacher cannot edit with no explanation reads as 'the app is broken'. Whatever copies pages between courses must clear it.",
+      "copyingOut": "The flag TRAVELS. FileManager.copyItem, cp -p, ditto and shutil.copy2 all carry it; only a plain cp -R or a zip round trip loses it. So anything copied out of a reference course arrives locked unless it is cleared, and a page a teacher cannot edit with no explanation reads as 'the app is broken'. Whatever copies pages between courses must clear it, and since issue #207 something does: 'Copy a Page from This Course...' clears the flag on every page it writes and every picture it copies, proved by a must-fail test that locks the source first.",
       "reAsserted": "The lock is asserted, VERIFIED by reading the flag back, and re-asserted. Setting it without checking is not enough: in a cloud-synced folder the file provider models the locked bit itself, does not store it, and clears it locally about a second after an upload starts - no error, no log line. So the lock is per-Mac, a folder that has been on a second Mac comes back unlocked, and the re-assertion points are when the folder is read and when the teacher acts on the course. Files that did not take are left for the next pass and COUNTED on the trail. Never a timer and never a sleep: a delay chosen to let something settle is a guess that stops working on a slower machine.",
       "honestLimits": "Stated plainly in the documentation and NEVER in the GUI. With the directories unlocked a new file can still be ADDED to one. Anybody who means to can clear the flag. The lock is per-Mac, and an edit arriving from another device is not blocked by it. What the lock does stop is every ordinary edit, save, rename and delete of the material that is there, which is what a teacher will meet - it is a statement of intent, not a security boundary. The refusal to deploy does NOT depend on it in any way: an entirely unlocked reference course is refused at every door just the same."
     },
@@ -4268,5 +4274,1185 @@
         "machineryCheck": "No sentence here names a symlink, a build output, a script, a container or a flag. Nothing says 'cannot' where 'is not' will do. The size a teacher reads is the size that will be COPIED, with last year's built website already taken out of it."
       }
     }
+  },
+  "copyingAPageBetweenCourses": {
+    "note": "Copying ONE page out of one course and into another, with the pictures and files it shows - 'Copy a Page from This Course...' on any course row in the sidebar. Shared because both apps offer it, both write the same frontmatter, and the one thing it must never get wrong is the same on both: a copy that turns up where students can read it. Issue #207.",
+    "rule": "A copy ALWAYS arrives hidden from students, in every section of the course it lands in. Nothing already in the destination is ever changed, renamed or written over. Anything the page names that is not carried is LISTED - never dropped in silence.",
+    "whereItIsOffered": {
+      "onEveryCourseRow": true,
+      "includingACourseKeptForReference": true,
+      "why": "The source is only ever READ, so a course kept for reference offers this for the same reason it offers Preview and Back Up Now. It is the point of keeping the course rather than an exception to its being frozen. The DESTINATION is never a reference course and never the source itself.",
+      "theDestinationList": "The courses the teacher teaches, by the code a teacher reads, minus the source course. A course kept for reference is never a destination: it is frozen."
+    },
+    "whatMayBeCopied": {
+      "rule": "A page directly inside a TOP-LEVEL shared folder of the source course, and nothing else.",
+      "nested": "Only the folder's own top level is listed. Measured: 0 of 452 real shared pages, 0 of 38 example-content payloads and 0 of 2,038 skeleton pages sit in a subfolder, and build_site.py's discover_shared_items scans the course root only. So a source subfolder path is never mirrored and no folder is ever created for one.",
+      "theFolderItLandsIn": "A TOP-LEVEL shared folder of the DESTINATION that is both listed in shared_folders AND present on disk. A listed folder that is not on disk is not offered, because writing into it would mean creating it. The question starts on the source page's own folder when the destination has one of that name, and on the first otherwise."
+    },
+    "whatIsNeverCopied": [
+      {
+        "what": "a class page",
+        "why": "A class belongs to a timetable. Landing one in another course would need a date, a number and a whole second set of refusals. Russell, explicitly: class pages are omitted by design."
+      },
+      {
+        "what": "a folder's index.md",
+        "why": "An index is the way IN to a folder, not a page anybody links to."
+      },
+      {
+        "what": "a page at the course root",
+        "why": "Russell's rule. Those are the course's own front matter - Learning Goals, Key Links - and they are not folder content."
+      },
+      {
+        "what": "a page inside a section<N> folder",
+        "why": "It belongs to one section's classes rather than to the course."
+      },
+      {
+        "what": "anything in Media that nothing on the page points at",
+        "why": "The page's pictures and files come along; the rest of the course's Media does not."
+      }
+    ],
+    "hidden": {
+      "rule": "The copied page carries publishForSection<N>: false for EVERY section the destination has, and then a plain publish: false as the LAST line of its frontmatter.",
+      "theOrderIsLoadBearing": "Per-section keys FIRST, then the plain key. Measured: writing publish: false first makes the per-section writer a complete no-op - its 'already says it' gate reads the plain key and returns the text unchanged, so NO publishForSection key is written at all.",
+      "whyThePlainKeyAtAll": "It is what keeps the copy hidden in a section the destination gains LATER, by any route. Measured: all 156 of one real course's shared pages, composed with the per-section keys alone, come out VISIBLE in a section 4 they were never told about, because Quartz publishes a page that says nothing.",
+      "whatComesOffFirst": "The source's own publishForSection<N>, draftSection<N> and createdSection<N>, and the plain publish: and draft:. The plain pair is stripped with the READER's key matcher and its continuation rule, never a prefix test: a naive strip of a draft: whose value sits on the line BELOW it orphans that line, YAML folds it into the last key written as the plain scalar 'false true', and the build does not hide a string that is not 'false' - so the page is PUBLISHED. Measured. The house format drops the plain keys anyway: setup_course.py's per_section_frontmatter removes plain created/publish/draft when it splits a page into per-section pairs.",
+      "whatIsKept": "Everything else the teacher wrote, created: included. A page copied from last year shows last year's date until they change it; they see the page in Obsidian before publishing, and silently rewriting a date in their own frontmatter is the larger sin.",
+      "sectionsAreReReadBeforeWriting": "The destination's section numbers are read from course_config.json again immediately before the text is composed, rather than taken from the plan. A section added in another window between the two would otherwise leave the copy with nothing said about it.",
+      "readBackAndDelete": {
+        "value": true,
+        "rule": "After the page is written it is READ BACK FROM DISK and asked, for every section the destination has AND for one section number it does not have, whether it is hidden. The test is 'is not hidden', not 'is visible', so a value the app cannot read counts as failure. If the answer is not certainly hidden everywhere, the file just written is DELETED and the page is reported as not copied.",
+        "nothingTouchesThePageAfterIt": "Media names are settled and the embeds rewritten BEFORE the page is written, so the read-back is the last thing that touches the page's bytes. The locked flag is cleared BEFORE the read-back, because a locked file could not be deleted - and deleting it is what the guard has to be able to do.",
+        "why": "This is the last line of defence on the one failure that reports success: a page that arrives visible and is deployed to students. It errs toward no page at all."
+      }
+    },
+    "neverOverwritten": {
+      "everyWriteIsCreateExclusive": "A page is created with O_CREAT | O_EXCL and a picture with copyfile's COPYFILE_CLONE, which implies COPYFILE_EXCL. Measured on an APFS case-insensitive volume: both refuse a destination that already exists, one differing only by CASE, one differing only by extension case, and one differing only by how an accent is spelled. There is no check-then-write window.",
+      "aLateCollisionIsASkip": "A file that appears between the plan and the write is reported as the ordinary 'already here' skip, in the same words the index would have produced - never as an error and never as an overwrite.",
+      "theNameIndex": "A page name already ANYWHERE in the destination course - any folder, shared or per-section, at any depth - means the page is not copied and is named in the summary; the links then lead to the page that is already there. Never renamed, never overwritten. Names are compared with the .md dropped, NFC-composed and case-folded. Composed as well as folded because AssistSectionGraph.normalized only lowercases, and on a case-SENSITIVE volume the file system would not refuse the write while Quartz would still slug the two pages to one page.",
+      "theBuiltWebsiteIsNotIndexed": ".merged_output, node_modules, .git, .quartz-cache, .cache and .obsidian are left out of the index: everything in them is generated."
+    },
+    "namesAreBytes": {
+      "rule": "A file name is carried as the BYTES the file system gave and written back as those same bytes. It is turned into text only to show somebody, and normalised only to COMPARE.",
+      "why": "Measured on macOS 26.6: reading a name back through readdir, FileManager.contentsOfDirectory(at:) and contentsOfDirectory(atPath:) all preserve the bytes, but WRITING through a URL built with appendingPathComponent DECOMPOSES it - a name stored as c3 a9 was written out as 65 cc 81. The page that embeds the picture still spells the name the old way, so on a volume that compares names byte for byte the embed stops resolving and the picture vanishes from the built site with no error anywhere. Four files in one real course are of that shape.",
+      "renamedFilesToo": "A file brought in under a new name keeps the SOURCE's byte form for the part of the name that came from the source; only an ASCII suffix is added, before the last dot."
+    },
+    "picturesAndFiles": {
+      "whereTheyAreFound": "Every place the page names something local: ![[x.png]] embeds, [[x.pdf]] links that point at a FILE rather than a page, HTML src and href attributes, and Markdown link destinations. Measured across 777 real markdown files: 1,474 embeds (1,274 of them media), 1,222 links of which 250 point at a file (235 PDFs), 5 HTML attributes naming a local file - one of them a live 1.1 MB picture on a copyable page - and 526 Markdown links, every one of them https://.",
+      "fencedCodeIsLeftAlone": "A name inside a fenced code block is prose about a file rather than a use of one, and rewriting it would edit an example a teacher wrote. Inline code spans are not tracked, which is the same known gap WikiLinkRewriter has.",
+      "sameNameSameFile": "Reused silently. Nothing is copied and nothing is said, beyond the count.",
+      "sameNameDifferentFile": "The incoming file comes in under a NEW name and only the COPIED page is pointed at it. The teacher's own file is untouched. The new name is '<name> (from <source course folder>)<extension>' - the course's FOLDER name, because every picture comes from Media and saying so would say nothing, while ICS4U-2025 says which course it came out of. If that name is taken, a number is added, and if a bounded search still finds nothing free the file is not copied and is listed.",
+      "comparedBySizeThenBytes": "Contents are compared only when the sizes match, and are read in chunks: a real picture here can be hundreds of megabytes.",
+      "theRewriteIsVerified": "After the embeds are rewritten the page is scanned AGAIN with the same scanner, and if it still names any file that was renamed the PAGE IS NOT COPIED and says so. Direction of error: no page at all, rather than a page showing the teacher's own DIFFERENT picture under the name the copy wanted.",
+      "theMediaFolderIsTheOneFolderMade": "If the destination has no Media folder it is created. It is not a folder a teacher chooses or can rename - Plantoir looks after it - and the site-health repair already creates it when it is missing. No other folder is ever created."
+    },
+    "linksLeadingNowhere": {
+      "rule": "Anything the page names that is neither carried nor already in the destination is LISTED for the teacher, in the words the page used.",
+      "aPageTheDestinationAlreadyHas": "Not listed: the link works.",
+      "aFileFoundOnlyByFoldingInvisibleSpaces": "Carried under its REAL name AND listed. Measured in a real course: a page links to a PDF with ordinary spaces while the file in Media carries a no-break space after each en-dash, so the link does not resolve in the SOURCE either and the teacher may want to fix it."
+    },
+    "theBackup": {
+      "oneCopyOfTheDESTINATION": true,
+      "oncePerSheetNotOncePerPress": "Taken before the first write of a sheet session. Measured on a real course with the app's own zip command: 9.7 s and 467 MB, because Media is not excluded from an archive. Five presses of 'Copy another' would be fifty seconds of waiting and 2.3 GB of copies - and a second backup taken after the first copy is a way back that already contains the first copy.",
+      "offTheMainActor": "The zip runs off the caller's actor with a calm stated wait. On the mac that takes @concurrent rather than merely nonisolated async, for the reason referenceCourses.frozen.offTheMainActor records.",
+      "madeByTheTeacher": "It is a teacher's backup, so it is never pruned: only the assistant's own backups are. Its file name is shown at the end and goes on the trail, the way a section restore's does.",
+      "theSourceIsNeverBackedUp": "Nothing is written to the source course - no backup, no lease, no cache."
+    },
+    "refusals": [
+      {
+        "when": "the destination course is mid-deploy",
+        "how": "asked again on the main actor immediately before the first write",
+        "wording": "thatCourseIsDeployingRightNow"
+      },
+      {
+        "when": "there is no other course to copy into",
+        "wording": "thereIsNoCourseToCopyInto"
+      },
+      {
+        "when": "the source has no pages in shared folders",
+        "wording": "thisCourseHasNoPagesToCopy"
+      }
+    ],
+    "notRefusedWhileAPreviewIsRunning": "A preview only READS. The narrow 'is a deploy running' question is asked rather than the broad 'is this course busy' one, which is the same distinction the site-health repair learned the hard way.",
+    "theCopyArrivesUnlocked": "Every page written and every picture copied has the locked flag cleared, even when the source is a course kept for reference whose files all carry it. A page a teacher cannot edit, with no explanation, reads as 'the app is broken'.",
+    "notOnAnyToolSurface": "Russell, explicitly: no MCP tool, no local-assistant tool, no tool-surface change at all. It is deterministic code reached from a menu, and adding a tool is a routing change.",
+    "wording": {
+      "rule": "{course} is the code a TEACHER reads - ICS4U, never the folder name. Plain words for the things a teacher can see: pages, pictures and files, folders, courses. Never a word about how it is done. A site is DEPLOYED and a page is PUBLISHED.",
+      "machineryCheck": "No sentence here may contain: frontmatter, wikilink, embed, media folder, walk, graph, script, container, toolchain, docker, yaml, symlink, actor, thread.",
+      "menuItem": "Copy a Page from This Course…",
+      "sheetTitle": "Copy a page from {course}",
+      "whichPage": "Page",
+      "whichCourse": "Copy into",
+      "whichFolder": "Folder",
+      "pagePickerPrompt": "Search",
+      "noPagesMatch": "No page of that name in this course.",
+      "copiesStartHidden": "Copies start hidden, so nothing changes on any website until you publish them.",
+      "datesAreKept": "The pages keep the dates they had.",
+      "nothingIsWrittenOver": "Nothing already in that course is changed or written over.",
+      "nothingWasCopied": "Nothing was copied.",
+      "copyAnother": "Copy another",
+      "thereIsNoCourseToCopyInto": "There is no other course to copy into yet",
+      "savingACopyFirst": "Saving a copy of {course} first…",
+      "theBackupTaken": "A copy of {course} from before this is saved as {named}.",
+      "copiedInto": "Copied {pages} pages into {course}, in {folder}.",
+      "willBringPicturesAndFiles": "Brings {count} pictures and files, {size}.",
+      "picturesAlreadyThere": "{count} are already in this course and will be used as they are.",
+      "picturesBroughtInUnderANewName": "{count} have the same name as something different already here, so they come in under a new name.",
+      "aPageOfThatNameIsAlreadyHere": "“{page}” is already in this course, so it was left as it is — links will lead to the one that is here.",
+      "theseLinksWillNotLeadAnywhereYet": "These links will not lead anywhere yet: {names}.",
+      "thatCourseIsDeployingRightNow": "Available once {course}’s deploy has finished",
+      "thisCourseHasNoPagesToCopy": "{course} has no pages in shared folders to copy",
+      "theCopyCouldNotBeMadeHidden": "“{page}” was not copied: Plantoir could not be certain it would arrive hidden from students, and a copy must never turn up where students can read it.",
+      "thePicturesCouldNotBePointedAtTheirNewNames": "“{page}” was not copied: one of its pictures had to come in under a new name and Plantoir could not be certain the page would find it.",
+      "thePageCouldNotBeWritten": "“{page}” could not be copied.",
+      "aPictureCouldNotBeCopied": "“{name}” could not be copied, so the page that shows it will not find it."
+    },
+    "theTrail": {
+      "event": "pages copied from another course",
+      "carries": "the course the pages came FROM by its folder name, the course and folder they landed in, how many pages and pictures were created, reused, brought in under a new name and left alone, and the backup's file name",
+      "never": "a page's title, a page's contents, a picture's name",
+      "oneLineAtTheEnd": "Written once at the end of a copy, in every outcome. A copy that stopped part way says so in the same line, because the counts already show it. The three refusals record nothing: they answer before anything is touched."
+    },
+    "rejected": [
+      {
+        "what": "copying several pages at once",
+        "why": "Russell, explicitly: not in this release. 'Copy another' covers the second page at the cost of one press."
+      },
+      {
+        "what": "an MCP tool or a local-assistant tool",
+        "why": "Russell, explicitly. Adding a tool is a routing change, and more choices is the classic way a router degrades."
+      },
+      {
+        "what": "creating a folder in the destination",
+        "why": "A new top-level folder would also have to be registered in shared_folders or the site never builds it - a settings decision with its own refusals. Media is the one exception, because Plantoir looks after it."
+      },
+      {
+        "what": "mirroring a source SUBfolder path",
+        "why": "Measured zero: 0 of 452 real shared pages, 0 of 38 payloads and 0 of 2,038 skeleton pages sit in a subfolder. The case never fires, landing flat is one line instead of ten, and it creates nothing."
+      },
+      {
+        "what": "undo of any kind",
+        "why": "The backup is the way back and it is one file. The assistant's change history holds TEXT, so a picture cannot travel through it at all - an undo that took the pages and left 300 MB of images behind would be worse than none."
+      },
+      {
+        "what": "a backup that leaves Media out, to make it quick",
+        "why": "Restoring one would DELETE every picture in the course. The ten seconds buys a way back that is actually a way back."
+      },
+      {
+        "what": "a progress bar or a size refusal",
+        "why": "Measured 879 MB/s on an internal SSD; the worst real copy is 306 files and 302 MB in 0.47 s. The backup is the pause, not the copy. The size is STATED instead, because a refusal would invent a threshold nobody measured."
+      },
+      {
+        "what": "rewriting links in the copied page to point at pages that were skipped",
+        "why": "They already point at the right NAME, and the destination's own page of that name answers them."
+      }
+    ],
+    "frontmatterCases": [
+      {
+        "name": "a page with no visibility key at all, one-section destination",
+        "why": "182 of 494 real copyable pages are this shape.",
+        "source": "---\ntitle: Recursion\ntags:\n  - concept\n---\nBody\n",
+        "sections": [
+          1
+        ],
+        "mustContain": [
+          "publishForSection1: false",
+          "publish: false",
+          "title: Recursion"
+        ],
+        "mustNotContain": [
+          "publishForSection2"
+        ],
+        "hiddenInSections": [
+          1,
+          2,
+          7
+        ]
+      },
+      {
+        "name": "a page carrying draftSection keys, two-section destination",
+        "why": "549 draftSection<N> keys across the real courses - the only visibility shape that exists in the wild.",
+        "source": "---\ntitle: Arrays\ndraftSection1: true\ndraftSection2: false\ncreatedSection1: 2025-10-14\ncreated: 2025-10-14\n---\nBody\n",
+        "sections": [
+          1,
+          2
+        ],
+        "mustContain": [
+          "publishForSection1: false",
+          "publishForSection2: false",
+          "publish: false",
+          "created: 2025-10-14"
+        ],
+        "mustNotContain": [
+          "draftSection1",
+          "draftSection2",
+          "createdSection1"
+        ],
+        "hiddenInSections": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "name": "a page carrying publishForSection1: true",
+        "why": "The inherited key beats everything written afterwards if it is not stripped.",
+        "source": "---\ntitle: Loops\npublishForSection1: true\n---\nBody\n",
+        "sections": [
+          1,
+          2,
+          3
+        ],
+        "mustContain": [
+          "publishForSection1: false",
+          "publishForSection2: false",
+          "publishForSection3: false",
+          "publish: false"
+        ],
+        "mustNotContain": [
+          "publishForSection1: true"
+        ],
+        "hiddenInSections": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "name": "a page carrying a plain draft: true",
+        "source": "---\ntitle: Files\ndraft: true\n---\nBody\n",
+        "sections": [
+          1
+        ],
+        "mustContain": [
+          "publishForSection1: false",
+          "publish: false"
+        ],
+        "mustNotContain": [
+          "draft: true"
+        ],
+        "hiddenInSections": [
+          1,
+          5
+        ]
+      },
+      {
+        "name": "a page whose draft: value is on the line BELOW it",
+        "why": "The measured failure: a naive strip orphans the value line, it folds into the last key written as the plain scalar 'false true', and the build PUBLISHES the page.",
+        "source": "---\ndraft:\n  true\ntitle: X\n---\nBody\n",
+        "sections": [
+          1,
+          2,
+          3
+        ],
+        "mustContain": [
+          "publishForSection1: false",
+          "publish: false",
+          "title: X"
+        ],
+        "mustNotContain": [
+          "false true",
+          "  true"
+        ],
+        "hiddenInSections": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "name": "a page carrying a plain publish: true",
+        "source": "---\ntitle: Y\npublish: true\n---\nBody\n",
+        "sections": [
+          2,
+          5
+        ],
+        "mustContain": [
+          "publishForSection2: false",
+          "publishForSection5: false",
+          "publish: false"
+        ],
+        "mustNotContain": [
+          "publish: true",
+          "publishForSection1"
+        ],
+        "hiddenInSections": [
+          2,
+          5,
+          1,
+          9
+        ]
+      },
+      {
+        "name": "section numbers that are not 1...N",
+        "why": "section_numbers need not start at 1 or be contiguous.",
+        "source": "---\ntitle: Z\n---\nBody\n",
+        "sections": [
+          3,
+          4
+        ],
+        "mustContain": [
+          "publishForSection3: false",
+          "publishForSection4: false",
+          "publish: false"
+        ],
+        "mustNotContain": [
+          "publishForSection1",
+          "publishForSection2"
+        ],
+        "hiddenInSections": [
+          3,
+          4,
+          1,
+          2
+        ]
+      },
+      {
+        "name": "a page with no frontmatter at all",
+        "source": "Just a body, no keys.\n",
+        "sections": [
+          1
+        ],
+        "mustContain": [
+          "publishForSection1: false",
+          "publish: false",
+          "Just a body"
+        ],
+        "mustNotContain": [],
+        "hiddenInSections": [
+          1,
+          2
+        ]
+      }
+    ],
+    "cases": [
+      {
+        "name": "a page with two embedded pictures",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "![[one.png]] and ![[two.png]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            },
+            {
+              "name": "two.png",
+              "bytes": "bbb"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [
+            "one.png",
+            "two.png"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "the destination does not have that folder, so the page lands in the folder chosen",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Tasks"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Tasks"
+        },
+        "expect": {
+          "pages": [
+            "Tasks/Recursion.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a page of that name is already somewhere else in the destination",
+        "why": "The name index is the WHOLE course, not the folder it would land in.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "![[one.png]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts",
+            "Tasks"
+          ],
+          "pages": [
+            "Tasks/Recursion.md"
+          ],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [
+            {
+              "name": "Recursion",
+              "reason": "aPageOfThatNameIsAlreadyHere"
+            }
+          ],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a page of that name is already there, differing only by case",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Arrays.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            "Concepts/arrays.md"
+          ],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Arrays.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [
+            {
+              "name": "Arrays",
+              "reason": "aPageOfThatNameIsAlreadyHere"
+            }
+          ],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a page of that name is already there, differing only by how the accent is spelled",
+        "why": "One real file in one real course is not NFC. On a case-sensitive volume the file system would not refuse the write, and Quartz would slug the two pages to one.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Café.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            "Concepts/Café.md"
+          ],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Café.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [
+            {
+              "name": "Café",
+              "reason": "aPageOfThatNameIsAlreadyHere"
+            }
+          ],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a picture of the same name and the same bytes is reused silently",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "![[one.png]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [
+            "one.png"
+          ],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a picture of the same name and DIFFERENT bytes comes in under a new name",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "![[one.png]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "zzzz"
+            }
+          ]
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [
+            "one (from ICS4U-2025).png"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {
+            "one.png": "one (from ICS4U-2025).png"
+          },
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "the renamed name is itself already taken, so a number is added",
+        "why": "The second time a page is copied out of the same course, which is exactly what 'Copy another' makes easy.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "![[one.png]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "zzzz"
+            },
+            {
+              "name": "one (from ICS4U-2025).png",
+              "bytes": "yyy"
+            }
+          ]
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [
+            "one (from ICS4U-2025) 2.png"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {
+            "one.png": "one (from ICS4U-2025) 2.png"
+          },
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a link that points at a FILE rather than a page",
+        "why": "235 of the 250 file-pointing links in four real courses are PDFs. A scan of embeds alone would drop every one of them.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Tasks"
+          ],
+          "pages": [
+            {
+              "path": "Tasks/Culminating.md",
+              "text": "See [[handout.pdf|the handout]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "handout.pdf",
+              "bytes": "%PDF"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Tasks"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Tasks/Culminating.md",
+          "intoFolder": "Tasks"
+        },
+        "expect": {
+          "pages": [
+            "Tasks/Culminating.md"
+          ],
+          "mediaCreated": [
+            "handout.pdf"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "an HTML img src pointing into the course's Media",
+        "why": "Measured on a real copyable page: a 1.1 MB picture that an embeds-only scan leaves behind, and which the destination's own file of that name would silently replace.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Messaging.md",
+              "text": "<img src=\"/Media/dragons%20key.png\" width=\"400\">\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "dragons key.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Messaging.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Messaging.md"
+          ],
+          "mediaCreated": [
+            "dragons key.png"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a picture named inside a fenced code block is left alone",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Teaching.md",
+              "text": "Write it like this:\n\n```\n![[one.png]]\n```\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Teaching.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Teaching.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a link that leads nowhere is listed, never invented",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "See [[Stack Frames]] and [[gone.png]]\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": [
+            "Stack Frames",
+            "gone.png"
+          ]
+        }
+      },
+      {
+        "name": "a link to a page the destination already has is NOT listed",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "See [[Arrays]]\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            "Concepts/Arrays.md"
+          ],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a picture whose name is spelled with a composed accent",
+        "why": "Names are bytes: the file is carried under the source's own spelling, never a re-spelling.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Tutorials"
+          ],
+          "pages": [
+            {
+              "path": "Tutorials/Bone.md",
+              "text": "![[Bone Appétit.jpg]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "Bone Appétit.jpg",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Tutorials"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Tutorials/Bone.md",
+          "intoFolder": "Tutorials"
+        },
+        "expect": {
+          "pages": [
+            "Tutorials/Bone.md"
+          ],
+          "mediaCreated": [
+            "Bone Appétit.jpg"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a picture whose name is spelled with a decomposed accent",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Tutorials"
+          ],
+          "pages": [
+            {
+              "path": "Tutorials/Bone.md",
+              "text": "![[Bone Appétit.jpg]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "Bone Appétit.jpg",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Tutorials"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Tutorials/Bone.md",
+          "intoFolder": "Tutorials"
+        },
+        "expect": {
+          "pages": [
+            "Tutorials/Bone.md"
+          ],
+          "mediaCreated": [
+            "Bone Appétit.jpg"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "the same picture named twice on one page is carried once",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "![[one.png]] again ![[Media/one.png]] and ![[one.png|300]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [
+            "one.png"
+          ],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "index pages, root pages and per-section pages are not offered",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/index.md",
+              "text": "x"
+            },
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "x"
+            },
+            {
+              "path": "Learning Goals.md",
+              "text": "x"
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 1.md",
+              "text": "x"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "offers": [
+          "Concepts/Recursion.md"
+        ]
+      }
+    ]
   }
 }
