@@ -1964,7 +1964,49 @@ list of forbidden shapes had thought of:
 
 So the last clause became a **WHITELIST rather than a list of exclusions**, and
 that is the durable lesson: excluding the shapes you have thought of loses to a
-generator that thinks of others. A census of the frontmatter of all 12,668
+generator that thinks of others.
+
+**And a whitelist of SHAPES lost to the next generator, for the same reason one
+step down: a shape still admits arbitrary CHARACTERS.** An extended fuzz found
+**3,311** of 60,000 pages certified and not hidden, every one of them making
+`frontmatter.load` RAISE — a YAML-1.1 bool word used as a key (`yes:`), a
+`U+2028`/`U+2029`/`U+0085` inside a value, a `\u{0B}` or `\u{1C}`–`\u{1F}`
+anywhere, `title: "a"b"`, `title: ,comma` — and one more found by extending it
+again here, a list item at column 0 mixed with mapping keys.
+
+So the guard stopped modelling PyYAML altogether and now certifies a **small
+regular language**: anchored line patterns over an explicit character
+whitelist.
+
+| part | what is certified |
+|---|---|
+| key | `[A-Za-z][A-Za-z0-9_-]*`, and never a YAML 1.1 bool or null word |
+| line | blank · `# comment` · `key:` · `key: VALUE` · `  - VALUE` under a `key:` line |
+| value | a plain scalar opening with a letter, digit or `_`, with no `: `, no ` #` and no trailing `:` · `"…"` with no `"` and no `\` · `'…'` with no `'` · `[]` |
+| anywhere | no C0 control but the line break, no DEL, no `U+0085`/`U+2028`/`U+2029`, no `U+FEFF` after the first scalar, no `U+FFFD` |
+
+**It is far narrower than YAML, deliberately, and a page outside it is not
+copied** — with a plain sentence, and a teacher can always copy such a page by
+hand.
+
+It was derived from the census rather than imagined, and the census is what
+keeps the false-refusal count at zero: the frontmatter of all 12,668 shipped
+and real pages uses **17 distinct keys**, every one of them matching that
+pattern and none a bool word; no value contains `: `, ` #` or a trailing `:`;
+and not one page carries a control character, a `U+0085`, a `U+2028`, a
+`U+2029` or a stray `U+FEFF`. The single widening the census forced was `_` as
+a value's first character — 9,803 values — which PyYAML reads as a plain
+string.
+
+**The root of all of this is in the BUILD, not in the copy, and it is left
+alone.** `build_site.py` catches a parse failure, prints one warning and
+returns, so the page reaches Quartz with no settings resolved — and Quartz
+publishes a page that says nothing. The one input that makes the build unable
+to read a page's settings is also the one that puts it in front of students.
+That is pre-existing, it is shared Python, and changing it is Russell's
+decision: it is written up in
+`scratchpad/findings/an-unparseable-settings-block-is-published.md` rather than
+fixed here. A census of the frontmatter of all 12,668
 shipped and real pages found exactly four shapes —
 `key: value` with a plain scalar (48,091 lines), an indented list item
 (14,462), `key:` with its value below (10,561), and a quoted scalar (13) —
@@ -1986,12 +2028,13 @@ python-frontmatter 1.3.0 / PyYAML 6.0.3, the image's own pins, running
 
 | corpus | certified & hidden | **certified & NOT hidden** | refused |
 |---|---|---|---|
-| grammar, seed 207207 | 23,086 | **0** | 36,914 |
-| grammar, seed 4242 | 22,917 | **0** | 37,083 |
-| grammar, seed 90210 | 22,999 | **0** | 37,001 |
-| cross product | 6,240 | **0** | 9,952 |
+| extended grammar, 3 seeds | 16,319 / 16,384 / 16,300 | **0** | — |
+| extended again, here, 3 seeds | 18,374 / 18,367 / 18,396 | **0** | — |
+| original grammar, 2 seeds | 22,958 / 22,742 | **0** | — |
+| cross product | 5,908 | **0** | — |
 | 11,891 shipped pages | 11,891 | **0** | **0** |
 | 777 real pages | 777 | **0** | **0** |
+| 172 ICS4U shared pages | 172 | **0** | **0** |
 
 The earlier run of the cross product is kept for the record: (8 opening fences × 11 closing fences
 × 23 bodies × 4 tails × LF/CRLF), each composed by the real Swift and then read
