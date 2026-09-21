@@ -124,16 +124,63 @@ enum ReferenceCopier {
             throw Problem.couldNotCopy(error.localizedDescription)
         }
 
-        let copy: Course
+        let made: Made
         do {
-            let configuration: CourseConfiguration = try CourseConfiguration(
-                contentsOf: destinationURL.appendingPathComponent("course_config.json")
+            made = try ReferenceCopier.makeIntoAReferenceCourse(
+                at: destinationURL, schoolYear: schoolYear, at: moment
             )
-            copy = Course(code: folderName, directoryURL: destinationURL, configuration: configuration)
         } catch {
+            // Still an ordinary folder: the lock is the last step INSIDE that
+            // function, so anything that failed before it left a folder that
+            // removes cleanly. The clear is belt and braces for the one case
+            // that is not ours — a source that was itself frozen, whose flags
+            // travelled with the copy.
+            ReferenceLock.clearLock(at: destinationURL)
             try? fileManager.removeItem(at: destinationURL)
             throw Problem.couldNotCopy(error.localizedDescription)
         }
+
+        ActivityTrail.note(
+            .courseKeptForReference,
+            ReferenceCopier.trailLine(for: made, copiedFrom: course.displayCode)
+        )
+        return made
+    }
+
+    /// Turns a folder that has just been COPIED into a reference course: cut
+    /// loose from last year's websites, marked, filed under its year, left
+    /// with nowhere to deploy to, and locked — in that order.
+    ///
+    /// **The one implementation of the dangerous sequence**, called by both
+    /// ways a reference course is made: "Keep a Copy for Reference…" above,
+    /// and "Import Courses for Reference…" (`ReferenceImporter`), which is
+    /// the same act with a different source. A second copy of this order is a
+    /// second thing to keep in step, and the thing it would be out of step
+    /// about is whether a course can reach last year's live website.
+    ///
+    /// Two things the caller owes, because only the caller knows them:
+    ///
+    /// * the folder is an ORDINARY, unlocked copy when this is called. The
+    ///   lock travels through `FileManager.copyItem`, so a copy taken from a
+    ///   course that is already frozen arrives frozen — and then the site
+    ///   markers cannot be renamed aside and the folder cannot be removed
+    ///   either. Both callers clear it the moment their copy finishes,
+    ///   because both need an ordinary folder for their own failure path.
+    /// * removing the folder if this throws. What was half-made is the
+    ///   caller's to clean up, and only it knows whether the folder was there
+    ///   before.
+    static func makeIntoAReferenceCourse(
+        at destinationURL: URL,
+        schoolYear: Int?,
+        at moment: Date = Date()
+    ) throws -> Made {
+        let folderName: String = destinationURL.lastPathComponent
+        let configuration: CourseConfiguration = try CourseConfiguration(
+            contentsOf: destinationURL.appendingPathComponent("course_config.json")
+        )
+        let copy: Course = Course(
+            code: folderName, directoryURL: destinationURL, configuration: configuration
+        )
 
         // Cut every section loose from the website it was publishing to,
         // BEFORE the marker is written — so a failure here leaves a folder
@@ -156,12 +203,7 @@ enum ReferenceCopier {
         copy.configuration.keptForReference = true
         copy.configuration.referenceSchoolYear = schoolYear
         copy.configuration.neutraliseForReference()
-        do {
-            try copy.configuration.write(to: copy.configFileURL)
-        } catch {
-            try? fileManager.removeItem(at: destinationURL)
-            throw Problem.couldNotCopy(error.localizedDescription)
-        }
+        try copy.configuration.write(to: copy.configFileURL)
 
         // Through the same re-assertion everything else uses, rather than a
         // lock of its own: "right after a reference course is made" is one of
@@ -178,17 +220,12 @@ enum ReferenceCopier {
             )
         }
 
-        let made: Made = Made(
+        return Made(
             folderName: folderName,
             displayCode: copy.displayCode,
             schoolYear: schoolYear,
             sectionCount: copy.sectionNumbers.count
         )
-        ActivityTrail.note(
-            .courseKeptForReference,
-            ReferenceCopier.trailLine(for: made, copiedFrom: course.displayCode)
-        )
-        return made
     }
 
     /// The trail line — what a teacher would recognise, and enough to explain
