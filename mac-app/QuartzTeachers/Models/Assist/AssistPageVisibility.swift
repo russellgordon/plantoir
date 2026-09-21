@@ -40,7 +40,12 @@ import Foundation
 /// page's folder really decides. Until 2026-09-18 the reading branched as
 /// well, and a course-level page carrying a plain `publish: false` was
 /// therefore reported visible while the build hid it.
-enum AssistPageVisibility {
+/// **`nonisolated`, since 2026-09-21**: every function here but the last is
+/// pure over its arguments — strings in, strings out — and "Copy a Page from
+/// This Course…" composes a copied page's frontmatter OFF the main actor,
+/// beside a backup that takes ten seconds. The one exception is
+/// `isSectionLocal`, which reads a `Course` and stays where the course is.
+nonisolated enum AssistPageVisibility {
 
     // MARK: - Functions
 
@@ -365,6 +370,7 @@ enum AssistPageVisibility {
 
     /// True when this page lives in one section's own folder, and so carries
     /// the plain keys rather than the per-section ones.
+    @MainActor
     static func isSectionLocal(pageAt url: URL, forSection sectionNumber: Int, in course: Course) -> Bool {
         let folder: String = course.sectionDirectoryURL(forSection: sectionNumber)
             .standardizedFileURL.path

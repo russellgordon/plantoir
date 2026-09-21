@@ -206,7 +206,7 @@ enum CourseArchiver {
     /// teacher actually wrote and can always be produced again.
     ///
     /// The same list the setup wizard uses for its own backups.
-    static let excludedFromArchives: [String] = [
+    nonisolated static let excludedFromArchives: [String] = [
         ".merged_output",
         "node_modules",
         ".git",
@@ -219,8 +219,36 @@ enum CourseArchiver {
         ".DS_Store",
     ]
 
+    /// The same backup as `backUpCourse`, for a caller that has a FOLDER
+    /// rather than a loaded course — and that is not on the main actor.
+    ///
+    /// **Split out because a real backup takes real time.** Measured on
+    /// Russell's ICS4U with this very command: **9.7 s and 467 MB**, because
+    /// `Media` is not in `excludedFromArchives` and 487 MB of pictures are
+    /// zipped every time. "Copy a Page from This Course…" takes one of these
+    /// before it writes anything, and on the main actor that is ten seconds
+    /// of a window that cannot draw. `Course` is `@Observable` and not
+    /// `Sendable`, so the folder and the code are what cross rather than the
+    /// course itself.
+    ///
+    /// `madeBy: .teacher` always, and deliberately: the teacher asked for
+    /// this. Only `.assistant` backups are pruned, so nothing here is ever
+    /// deleted on their behalf — see `pruneBackups`.
+    nonisolated static func backUpCourseOffTheMainActor(
+        courseDirectoryURL: URL,
+        code: String,
+        coursesDirectoryURL: URL
+    ) throws -> URL {
+        return try archive(
+            folderURL: courseDirectoryURL,
+            named: timestampedName(prefix: "\(code)_backup"),
+            forCourseCode: code,
+            coursesDirectoryURL: coursesDirectoryURL
+        )
+    }
+
     /// Zips a folder into `courses/_backups/<CODE>/<name>.zip`.
-    private static func archive(
+    nonisolated private static func archive(
         folderURL: URL,
         named archiveName: String,
         forCourseCode courseCode: String,
@@ -268,7 +296,7 @@ enum CourseArchiver {
     /// The moment is spelled by `ArchiveStamp`, which is also what reads it
     /// back — a writer with a formatter of its own is how the two came to
     /// disagree in the first place.
-    private static func timestampedName(prefix: String, suffix: String = "") -> String {
+    nonisolated private static func timestampedName(prefix: String, suffix: String = "") -> String {
         return "\(prefix)_\(ArchiveStamp.text(for: Date()))\(suffix).zip"
     }
 }
