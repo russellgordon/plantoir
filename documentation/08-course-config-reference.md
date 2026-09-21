@@ -108,7 +108,7 @@ course, with no way back to live, that the launchers then published.
 number. Every other spelling somebody plainly MEANT — `"true"`, `1`, `True`, a
 key written with backslash-u escapes — makes the launchers refuse with "cannot
 tell", which publishes nothing and freezes nothing, while this app treats the
-course as ordinary. The four readers and the twenty-two inputs they are
+course as ordinary. The four readers and the twenty-six inputs they are
 asserted to agree on are `shared-rules.json` → `referenceCourses.markerAgreement`.
 
 **The marker is not the defence on its own, and that is the part worth
