@@ -1062,6 +1062,43 @@ is why `verify.sh` greps **both** `deploy.sh` and `deploy.ps1` for this guard
 as well as for that one. The structural check costs six lines and makes the
 Windows obligation visible from this side rather than only in an issue.
 
+### Three readers, one rule — and the table that keeps them honest
+
+`scripts/reference_course.py`, `deploy.sh` and `deploy.ps1` all answer "is this
+course kept for reference?", and two of them have no JSON parser. So the
+question is ONE regular expression over the whole settings file as a single
+string, in three dialects, with a table of seventeen inputs all three are
+asserted to agree on:
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.markerAgreement`, run by `scripts/test_reference_course.py`
+against the real launcher.
+
+**The table exists because the three did NOT agree, in the dangerous
+direction.** `grep` works a LINE AT A TIME, so `[[:space:]]` cannot span a
+newline: a config whose key and colon sat on different lines was a reference
+course to the Python and an ordinary course to the launcher — and the launcher
+published it, exit 0, `✅ Published: 1 file(s) updated.` Found by review on
+2026-09-20. The cure is `tr '\n' ' '` before the `grep`, which also makes bash
+agree with PowerShell, whose `-match` uses .NET regex where `\s` already
+matches a newline.
+
+Two decisions inside the table are worth carrying:
+
+- **When in doubt, REFUSE.** The directions are not comparable — a live course
+  wrongly refused is loud and harmless, a reference course wrongly deployed
+  reports success. So a marker nested inside another object is refused, even
+  though a JSON parser would not call it the top-level key.
+- **Except where the APPS decide it.** A marker whose value is the string
+  `"true"`, or the number `1`, reads as FALSE in `CourseConfiguration` on both
+  platforms — so that course is in the sidebar and its Deploy button works.
+  A launcher refusing it would disagree with the app about the same file,
+  which protects nothing and strands the teacher between two answers.
+
+And one measured surprise, kept in the table because it looks like a hazard and
+is not: the marker's own text inside a course NAME does not match any of the
+three patterns, because JSON escapes the quotes inside a string value. The
+escaping is what tells a value from a key, for free, in all three dialects.
+
 ### Plain shell, failing CLOSED, and no new exit code
 
 The launcher's check reads `course_config.json` with `grep` — **no host
@@ -1071,7 +1108,9 @@ Homebrew, no admin rights"; adding one here would break publishing for a teacher
 whose Command Line Tools are missing.
 
 It **fails closed**: a settings file that is there and cannot be read refuses
-and says so. A settings file that is ABSENT is not its business — the course
+and says so — and `deploy.py` asks the same question through
+`reference_course.cannot_tell()`, so running it directly gives the same answer
+rather than a quieter one. A settings file that is ABSENT is not its business — the course
 folder check further down answers that in its own words. The shared Python is
 the other way round on purpose: a malformed config reads as NOT a reference
 course, because a course nobody can open must not become undeployable by
@@ -1086,6 +1125,14 @@ which is how every other launcher failure already becomes a sentence. That case
 matters most for a deploy set to happen on its own: it runs with the app closed,
 and without it the app shows the generic "did not finish" while the real reason
 sits in a log nobody opens.
+
+**Which is why every assignment in that shell block ends `|| true`.** `deploy.sh`
+runs under `set -euo pipefail`, and `grep -Eo` exits 1 when a config carries the
+marker and no `course_code` — so the script died on the line that reads the code,
+BEFORE the echo, and exited 1 with no output at all. Fails closed, publishes
+nothing, and says nothing: the one shape that defeats matching on output. Found
+by review on 2026-09-20; `test_a_marker_with_no_course_code_still_says_the_sentence`
+asserts the SENTENCE rather than the exit code.
 
 ### The refusal does NOT depend on the lock
 

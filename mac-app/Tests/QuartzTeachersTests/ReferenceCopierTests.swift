@@ -229,6 +229,110 @@ final class ReferenceCopierTests: XCTestCase {
         )
     }
 
+    /// A copy taken FROM a course that is already frozen.
+    ///
+    /// The lock travels through `FileManager.copyItem`, so before the fix the
+    /// copy arrived frozen — and then the two steps that follow could not
+    /// happen: the site markers could not be renamed aside, and the
+    /// half-written folder could not be removed. The teacher was left with a
+    /// folder they could delete from neither the app nor Finder.
+    ///
+    /// Nothing offers this today — "Keep a Copy for Reference…" is withheld
+    /// on a reference course — and it is fixed anyway, because a guard that
+    /// depends on a menu item being withheld somewhere else is a guard one
+    /// edit from being gone.
+    func testACopyTakenFromAFrozenCourseIsMadeAndIsDeletable() throws {
+        try prepare()
+        let live: Course = try makeLiveCourse()
+        try ReferenceCopier.keepACopy(
+            of: live, named: "ICS3U-2025", schoolYear: 2025,
+            coursesDirectoryURL: coursesDirectoryURL
+        )
+        let frozenURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U-2025")
+        let frozen: Course = Course(
+            code: "ICS3U-2025",
+            directoryURL: frozenURL,
+            configuration: try CourseConfiguration(
+                contentsOf: frozenURL.appendingPathComponent("course_config.json")
+            )
+        )
+        XCTAssertTrue(
+            ReferenceLock.isLocked(
+                frozenURL.appendingPathComponent("section1").appendingPathComponent("index.md")
+            ),
+            "The source has to be really locked, or this test proves nothing."
+        )
+        // Put a live site marker back on the frozen course, so the copy has
+        // something to rename aside — the step that failed first.
+        let markers: URL = frozenURL.appendingPathComponent(".netlify_sites")
+        try Data("{\"site_id\": \"still-here\"}".utf8)
+            .write(to: markers.appendingPathComponent("section1.json"))
+        // Locked like everything else in the course, which is the whole
+        // point: a LOCKED marker is what `moveItem` refuses.
+        ReferenceLock.lock(courseDirectory: frozenURL)
+        XCTAssertTrue(ReferenceLock.isLocked(markers.appendingPathComponent("section1.json")))
+
+        // A minute later, because a released marker is named after the
+        // SECOND it was released in — two releases inside one second would
+        // collide on the file name, which is `DeployCommand.releaseSite`'s
+        // own frozen naming and nothing to do with the lock.
+        let second: ReferenceCopier.Made = try ReferenceCopier.keepACopy(
+            of: frozen, named: "ICS3U-2024", schoolYear: 2024,
+            coursesDirectoryURL: coursesDirectoryURL,
+            at: Date().addingTimeInterval(60)
+        )
+        XCTAssertEqual(second.displayCode, "ICS3U")
+
+        let secondURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U-2024")
+        let names: [String] = try FileManager.default.contentsOfDirectory(
+            atPath: secondURL.appendingPathComponent(".netlify_sites").path
+        )
+        XCTAssertFalse(
+            names.contains("section1.json"),
+            "The marker could not be renamed aside on a locked copy — the neutralisation half-happened."
+        )
+
+        // And the whole thing can be taken away again.
+        ReferenceLock.unlock(courseDirectory: secondURL)
+        XCTAssertNoThrow(try FileManager.default.removeItem(at: secondURL))
+    }
+
+    /// A copy that fails part-way leaves nothing undeletable.
+    func testAFailedCopyLeavesNothingBehind() throws {
+        try prepare()
+        let live: Course = try makeLiveCourse()
+        try ReferenceCopier.keepACopy(
+            of: live, named: "ICS3U-2025", schoolYear: 2025,
+            coursesDirectoryURL: coursesDirectoryURL
+        )
+        let frozenURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U-2025")
+        let frozen: Course = Course(
+            code: "ICS3U-2025",
+            directoryURL: frozenURL,
+            configuration: try CourseConfiguration(
+                contentsOf: frozenURL.appendingPathComponent("course_config.json")
+            )
+        )
+        // Make the copy fail AFTER the contents are in: the settings file is
+        // gone, so reading the copy's config throws.
+        ReferenceLock.unlock(courseDirectory: frozenURL)
+        try FileManager.default.removeItem(at: frozen.configFileURL)
+        ReferenceLock.lock(courseDirectory: frozenURL)
+
+        XCTAssertThrowsError(
+            try ReferenceCopier.keepACopy(
+                of: frozen, named: "ICS3U-2024", schoolYear: 2024,
+                coursesDirectoryURL: coursesDirectoryURL
+            )
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: coursesDirectoryURL.appendingPathComponent("ICS3U-2024").path
+            ),
+            "A half-written copy must be an ordinary folder that goes away cleanly."
+        )
+    }
+
     func testAFolderNameAlreadyTakenIsRefusedBeforeAnythingIsWritten() throws {
         try prepare()
         let live: Course = try makeLiveCourse()

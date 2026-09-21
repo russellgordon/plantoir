@@ -46,6 +46,19 @@ final class ReferenceRefusalTests: XCTestCase {
             .appendingPathComponent("reference-refusal-\(UUID().uuidString)")
         let coursesURL: URL = root.appendingPathComponent("courses")
         try fileManager.createDirectory(at: coursesURL, withIntermediateDirectories: true)
+        // Hermetic, and it is not a formality: `chooseWorkspace` reloads the
+        // courses, which runs the reference upkeep, which ASKS FOR THE
+        // AGENTS. Without this override that question reaches the teacher's
+        // own ~/Library/LaunchAgents. Nothing here can match one — the
+        // agents are filtered on their recorded working folder and this one
+        // is a fresh temp dir — but a test that believes it is hermetic and
+        // is not will be believed by the next person to add to it.
+        let agentsDirectory: URL = root.appendingPathComponent("LaunchAgents")
+        try fileManager.createDirectory(at: agentsDirectory, withIntermediateDirectories: true)
+        ScheduledDeploy.launchAgentsDirectoryOverride = agentsDirectory
+        ScheduledDeploy.scheduledScriptsDirectoryOverride = root.appendingPathComponent("scheduled")
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent("trail"))
         for launcher in ["preview.sh", "deploy.sh"] {
             try "#!/bin/bash\n".write(
                 to: root.appendingPathComponent(launcher), atomically: true, encoding: .utf8
@@ -80,6 +93,9 @@ final class ReferenceRefusalTests: XCTestCase {
         let treeRoot: URL = root
         addTeardownBlock {
             MainActor.assumeIsolated {
+                ScheduledDeploy.launchAgentsDirectoryOverride = nil
+                ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+                ActivityTrail.store = previousTrail
                 ReferenceLock.clearLock(at: treeRoot)
             }
             try? FileManager.default.removeItem(at: treeRoot)
@@ -262,12 +278,42 @@ final class ReferenceRefusalTests: XCTestCase {
             + "nothing can see."
         )
 
+        // Driven from each tool's OWN SCHEMA, never from a fixed dictionary.
+        // The first version of this test passed `course` to every write tool,
+        // including `undo_last_change`, which declares no parameters at all —
+        // so it proved the gate against an argument no client ever sends.
+        var toolsWithNoCourseArgument: [String] = []
+        for tool in AssistToolRunner.mcpTools where !tool.readOnly {
+            if tool.parameters["course"] == nil {
+                toolsWithNoCourseArgument.append(tool.name)
+            }
+        }
+        XCTAssertEqual(
+            toolsWithNoCourseArgument, ["undo_last_change"],
+            "A write tool with no `course` argument cannot be gated by its arguments. Exactly one "
+            + "exists, and it is gated by the course the pending change belongs to. A new one has "
+            + "to be given the same treatment deliberately — which is what this assertion asks for."
+        )
+
         var refusedNames: [String] = []
         var ranNames: [String] = []
         for tool in AssistToolRunner.mcpTools where !tool.readOnly {
-            let outcome: AssistToolOutcome = await runner.run(
-                call: call(tool.name, ["course": "ICS3U-2025", "section": 1])
-            )
+            // The one tool with no `course` is gated by the pending change's
+            // course instead, and has its own test — it cannot be driven from
+            // here, because a pending change on a reference course would have
+            // to have been WRITTEN to one first, which is the thing that
+            // cannot happen.
+            if toolsWithNoCourseArgument.contains(tool.name) {
+                continue
+            }
+            var arguments: [String: Any] = [:]
+            if tool.parameters["course"] != nil {
+                arguments["course"] = "ICS3U-2025"
+            }
+            if tool.parameters["section"] != nil {
+                arguments["section"] = 1
+            }
+            let outcome: AssistToolOutcome = await runner.run(call: call(tool.name, arguments))
             // Two sentences, chosen by what was asked for: a deploy is told it
             // is never deployed, everything else that the course stays as it
             // is. Both are refusals at the same gate.
@@ -306,6 +352,58 @@ final class ReferenceRefusalTests: XCTestCase {
             call: call("check_section", ["course": "ICS3U-2025", "section": 1])
         )
         XCTAssertFalse(outcome.detail.contains("kept for reference"), outcome.detail)
+    }
+
+    /// `undo_last_change` names no course, so it is gated by the course the
+    /// PENDING change belongs to — the real schema, not an injected argument.
+    ///
+    /// **Why this test can only go this far, said rather than left as a
+    /// weakness.** To watch the gate REFUSE an undo, this conversation would
+    /// have to have written to a reference course first — which is what every
+    /// other guard in this file exists to prevent. So what is pinned is the
+    /// shape: undo answers from the history rather than from an argument, and
+    /// when the history is empty it says its own sentence rather than
+    /// silently doing nothing. The assertion that no OTHER write tool may
+    /// arrive without a `course` argument is in the gate test above, and that
+    /// is what stops this becoming a hole later.
+    func testUndoIsGatedByTheCourseItWouldTouch() async throws {
+        try prepare()
+        let nothing: AssistToolOutcome = await runner.run(call: call("undo_last_change", [:]))
+        XCTAssertEqual(nothing.detail, AssistWording.nothingToUndo)
+    }
+
+    // MARK: - The two acts, backstopped
+
+    /// `ScheduledDeploy.scheduleDeploy` is the function that WRITES the
+    /// plist; `problem()` is only advice about it.
+    func testWritingTheScheduleItselfRefuses() throws {
+        try prepare()
+        let problem: String? = ScheduledDeploy.scheduleDeploy(
+            course: reference,
+            sectionNumber: 1,
+            when: Date().addingTimeInterval(3600),
+            workspaceURL: root,
+            cloudflareAccountID: "",
+            runner: SilentLaunchControl()
+        )
+        XCTAssertEqual(problem, expectedRefusal)
+    }
+
+    /// `MultiDestinationDeployRunner.run` is the function that starts
+    /// `deploy.sh`. It simply does not start.
+    func testTheDeployRunnerItselfDoesNotStart() async throws {
+        try prepare()
+        let deployRunner: MultiDestinationDeployRunner = MultiDestinationDeployRunner()
+        await deployRunner.run(
+            course: reference,
+            sectionNumber: 1,
+            destinations: reference.configuration.allDeployDestinations,
+            cloudflareAccountID: "",
+            workingDirectory: root,
+            needsBuild: false
+        )
+        XCTAssertTrue(deployRunner.legs.isEmpty, "Not one leg may be started.")
+        XCTAssertFalse(deployRunner.isRunning)
     }
 
     // MARK: - The refusal does not depend on the lock
@@ -351,12 +449,11 @@ final class ReferenceRefusalTests: XCTestCase {
     /// this the app shows the generic "did not finish" and the real reason
     /// stays in a file nobody opens.
     func testTheLaunchersRefusalBecomesTheSentenceTheTeacherReads() {
-        let output: String = """
-        🔎 Checking whether your website builder is up to date…
-
-        ❌ ICS3U is kept for reference, so it is never deployed. Deploy the course you are teaching instead.
-
-        """
+        // NAMED, never quoted. Russell edits these sentences, and a test that
+        // types one out is a copy that keeps passing after the product's
+        // words change.
+        let output: String = "🔎 Checking whether your website builder is up to date…\n\n"
+            + "❌ " + expectedRefusal + "\n"
         XCTAssertEqual(FailureExplainer.explanation(in: output), expectedRefusal)
     }
 

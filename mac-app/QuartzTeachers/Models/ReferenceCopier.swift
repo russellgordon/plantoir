@@ -99,6 +99,21 @@ enum ReferenceCopier {
         do {
             try fileManager.createDirectory(at: destinationURL, withIntermediateDirectories: false)
             try ReferenceCopier.copyContents(of: course.directoryURL, into: destinationURL)
+            // The lock TRAVELS through `FileManager.copyItem`, so a copy taken
+            // from a course that is already frozen arrives frozen — and then
+            // the two steps below cannot happen: the site markers cannot be
+            // renamed aside, and the half-written folder cannot be removed.
+            // Measured: `moveItem` and `removeItem` both refuse a locked tree
+            // outright, so the failure path left a folder the teacher could
+            // delete from neither the app nor Finder.
+            //
+            // Cleared HERE, immediately, so the copy is an ordinary folder for
+            // the whole of the risky stretch and the "lock LAST" order below
+            // still holds. Nothing today copies from a frozen course — "Keep a
+            // Copy for Reference…" is withheld on one — but a guard that
+            // depends on a menu item being withheld somewhere else is a guard
+            // one edit from being gone.
+            ReferenceLock.clearLock(at: destinationURL)
         } catch {
             // Nothing is locked yet, so the half-written folder is an
             // ordinary one and goes away cleanly.
@@ -148,7 +163,20 @@ enum ReferenceCopier {
             throw Problem.couldNotCopy(error.localizedDescription)
         }
 
-        ReferenceLock.lock(courseDirectory: destinationURL)
+        // Through the same re-assertion everything else uses, rather than a
+        // lock of its own: "right after a reference course is made" is one of
+        // the points the rule names, and a second way of doing it is a second
+        // thing to keep in step. It also VERIFIES — in a cloud-synced folder
+        // the file provider clears the flag again while the copy uploads, and
+        // this is where that shows up as a count on the trail rather than as
+        // a course that quietly is not frozen.
+        let locked: ReferenceLock.Outcome = ReferenceLock.ensureLocked(copy)
+        if locked.didNotTake > 0 {
+            ActivityTrail.note(
+                .referenceCoursePagesLockedAgain,
+                ReferenceCourseUpkeep.trailLine(for: locked, course: copy.displayCode)
+            )
+        }
 
         let made: Made = Made(
             folderName: folderName,
@@ -166,9 +194,10 @@ enum ReferenceCopier {
     /// The trail line — what a teacher would recognise, and enough to explain
     /// a report months later.
     static func trailLine(for made: Made, copiedFrom source: String) -> String {
-        let year: String = made.schoolYear.map { startingYear in
-            return SchoolYear.label(forStartingYear: startingYear)
-        } ?? "no school year"
+        var year: String = "no school year"
+        if let startingYear = made.schoolYear {
+            year = SchoolYear.label(forStartingYear: startingYear)
+        }
         let sections: String = made.sectionCount == 1 ? "1 section" : "\(made.sectionCount) sections"
         return "kept a copy of \(source) for reference as \(made.folderName) — "
              + "shown as \(made.displayCode), \(year), \(sections)"

@@ -1408,6 +1408,14 @@ something settle is a guess that stops working on a slower machine. The count
 that would not take goes on the trail, which is what turns "my reference course
 let me edit a page" into an explanation.
 
+Two names are never locked that are easy to miss, and both are halves of the
+build's own atomic write of `course_config.json`: the `.backup.json` beside it
+and the `.json.tmp` that exists only between the `open()` and the
+`os.replace()`. A build interrupted between the two leaves the `.tmp` on disk —
+and a LOCKED one would fail every later preflight twice over, at the write and
+again at the cleanup, so that course's settings could never be reconciled
+again. Anything ending `.tmp` is left alone for the same reason.
+
 **Cost, measured on this Mac** (APFS, local disk; 1,220 files — 900 under
 `Media` plus 320 pages): **59.5 ms** for the pass that locks everything, and
 **23 ms** for a pass over a course already frozen. A folder with no reference
@@ -1427,6 +1435,15 @@ course in it does no work at all.
   removing a section changes the course, so "frozen" already requires it. The
   sidebar does not offer the item; the refusal exists so no other caller gets
   past it.
+- **A copy taken FROM a frozen course clears the lock at once**, before the
+  site markers are renamed aside and before anything can fail. The flag
+  travels through `copyItem`, and a locked copy can be neither finished (a
+  locked marker cannot be renamed) nor cleaned up (`removeItem` refuses a
+  locked tree) — which left a folder the teacher could delete from neither
+  the app nor Finder. Found by review, 2026-09-20. Nothing offers this today
+  ("Keep a Copy for Reference…" is withheld on a reference course) and it is
+  fixed anyway: a guard that depends on a menu item being withheld elsewhere
+  is one edit from being gone.
 - **Anything copied OUT arrives locked.** `FileManager.copyItem`, `cp -p`,
   `ditto` and `shutil.copy2` all carry the flag; only a plain `cp -R` or a zip
   round trip loses it. `ReferenceLock.clearLock` is the one place that clears

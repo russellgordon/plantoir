@@ -3598,6 +3598,119 @@
       "alsoRenamedAside": ".netlify_sites/section<N>.json and .cloudflare_sites/section<N>.json become the frozen previous-marker name (file-formats.json → firstDeployMarkers). Renamed rather than deleted: the file holds the site id and the admin address, which a teacher may still want. Two fail-safes fall out of one rename — a deploy that somehow ran would make a NEW site rather than overwrite last year's live one, and a section that has never deployed cannot be scheduled.",
       "kept": "Per-page visibility frontmatter is KEPT exactly as it is: it is last year's record of what students actually saw, and it is what makes a preview of a reference course show a sensible site rather than everything."
     },
+    "markerAgreement": {
+      "rule": "THREE implementations answer 'is this course kept for reference?' - scripts/reference_course.py, deploy.sh and deploy.ps1 - and two of them are plain shell with no JSON parser. So the question is one regular expression, run over the WHOLE settings file as a single string: the quoted key, a colon with any whitespace (newlines included) on either side, and the word true in any case, unquoted. Every row below is asserted to give the same answer in all three.",
+      "whyItMatters": "The one door the shared Python never reaches is deploy.sh's folder publish: it copies host-side with rsync and exits 0 before the container is started. So a disagreement between the shell and the Python IS a deploy of a frozen course. Measured on 2026-09-20, before this table existed: a config whose key and colon sat on different lines was a reference course to the Python and an ordinary one to the launcher, because grep works a LINE AT A TIME - and the launcher published it, exit 0, saying 'Published: 1 file(s) updated.'",
+      "pattern": {
+        "python": "\"kept_for_reference\"\\s*:\\s*[Tt][Rr][Uu][Ee]",
+        "dotNet": "\"kept_for_reference\"\\s*:\\s*true",
+        "posixEre": "\"kept_for_reference\"[[:space:]]*:[[:space:]]*[Tt][Rr][Uu][Ee]",
+        "why": "Three dialects of one rule, and each line of it is load-bearing. The POSIX form is run by grep, which reads a line at a time, so deploy.sh flattens the file with `tr '\\n' ' '` FIRST - without that, [[:space:]] cannot span a newline. The .NET form needs no flattening (\\s matches a newline there) and needs no case class either, because PowerShell's -match is case-INSENSITIVE by default; the other two spell the case out rather than relying on a flag the three dialects do not share. Python's re.search is given the whole file as read."
+      },
+      "whenInDoubtRefuse": "The two directions are not comparable. A live course wrongly refused is loud and harmless - the teacher sees a refusal and says so. A reference course wrongly deployed REPORTS SUCCESS and nobody finds out. So every ambiguity here is resolved by refusing: a marker nested inside another OBJECT is refused, because plain shell cannot tell it from the real key and one answer shared by three implementations beats three answers that are each right about something different. The marker's text inside a string VALUE needs no such sacrifice - JSON escapes the quotes, so no pattern matches it - and that row is in the table with its measurement, because it looks like a hazard and is not.",
+      "whatIsDeliberatelyNotRefused": "A marker whose value is the STRING \"true\", and one whose value is the number 1. Both read as FALSE in CourseConfiguration on both platforms, so those courses appear in the sidebar as ordinary courses and deploy from the button - a launcher that refused them would disagree with the app about the same file, which protects nothing and strands the teacher between two answers. The apps decide this row, not caution. Likewise a malformed config with NO marker in it: a course nobody can open must not become undeployable by accident. A malformed config that DOES carry the marker is refused, because there is nothing accidental about it.",
+      "cases": [
+        {
+          "name": "the marker, plainly",
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": true\n}\n",
+          "expect": "refused"
+        },
+        {
+          "name": "the marker set to false",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"kept_for_reference\": false\n}\n",
+          "expect": "allowed"
+        },
+        {
+          "name": "no marker at all",
+          "configText": "{\n  \"course_code\": \"ICS4U\"\n}\n",
+          "expect": "allowed",
+          "why": "Absent means false. Every course written before this key existed says exactly this."
+        },
+        {
+          "name": "the key and its value on different lines",
+          "configText": "{\"course_code\":\"ICS3U\",\"kept_for_reference\"\n : true, \"section_numbers\":[1]}\n",
+          "expect": "refused",
+          "why": "THE ROW THIS TABLE EXISTS FOR. Reachable by a hand edit or a reformatter; no writer in the product produces it. Before the fix, this deployed."
+        },
+        {
+          "name": "tabs and extra spaces around the colon",
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\"\t :   true\n}\n",
+          "expect": "refused"
+        },
+        {
+          "name": "Windows line endings",
+          "configText": "{\r\n  \"course_code\": \"ICS3U\",\r\n  \"kept_for_reference\": true\r\n}\r\n",
+          "expect": "refused",
+          "why": "The same file written on the other platform. A carriage return is whitespace in all three dialects."
+        },
+        {
+          "name": "a byte-order mark at the head of the file",
+          "bom": true,
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": true\n}\n",
+          "expect": "refused",
+          "why": "The launchers' grep never noticed a BOM. The Python did, and refused to parse the whole file - so it read as an ordinary course. Closed by opening the file as utf-8-sig, which costs nothing."
+        },
+        {
+          "name": "the value in capitals",
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": TRUE\n}\n",
+          "expect": "refused",
+          "why": "Not valid JSON, so the apps cannot open this course at all and refusing costs a teacher nothing they could have used. Somebody hand-edited it meaning true."
+        },
+        {
+          "name": "the value as a string",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"kept_for_reference\": \"true\"\n}\n",
+          "expect": "allowed",
+          "why": "Reads as FALSE in both apps, so the course is in the sidebar and its Deploy button works. The launcher agrees with the app rather than inventing a third answer."
+        },
+        {
+          "name": "the value as the number 1",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"kept_for_reference\": 1\n}\n",
+          "expect": "allowed",
+          "why": "The same reasoning as the string. The key is a boolean on both platforms."
+        },
+        {
+          "name": "malformed JSON carrying the marker",
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": true,\n",
+          "expect": "refused"
+        },
+        {
+          "name": "malformed JSON with no marker",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n",
+          "expect": "allowed",
+          "why": "The one place this errs toward allowing, deliberately: a course nobody can open must not become undeployable by accident."
+        },
+        {
+          "name": "an empty settings file",
+          "configText": "",
+          "expect": "allowed"
+        },
+        {
+          "name": "no settings file at all",
+          "noConfigFile": true,
+          "expect": "allowed",
+          "why": "Not this check's business. The launcher's own course-folder check answers it, in its own words."
+        },
+        {
+          "name": "a settings file that cannot be read",
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": true\n}\n",
+          "unreadable": true,
+          "expect": "refused",
+          "why": "FAIL CLOSED. 'Cannot tell' is not 'no'. The launchers say so in a sentence of their own; the Python is asked the same question through cannot_tell(), so deploy.py run directly gives the same answer."
+        },
+        {
+          "name": "the marker's text inside a course NAME",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"course_name\": \"\\\"kept_for_reference\\\": true\"\n}\n",
+          "expect": "allowed",
+          "why": "MEASURED, and it turned out better than expected. A text rule looked as if it must mistake this for the real key - but JSON ESCAPES the quotes inside a string value, so what is actually in the file is \\\"kept_for_reference\\\", with backslashes, and none of the three patterns match it. The escaping is what tells a value from a key, for free, in all three dialects. The row is kept because the reasoning is not obvious and somebody will otherwise re-derive it as a hazard."
+        },
+        {
+          "name": "the key nested inside another object",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"something\": { \"kept_for_reference\": true }\n}\n",
+          "expect": "refused",
+          "why": "Same reason. Refusing a course whose settings carry that text somewhere odd is the cheap direction."
+        }
+      ]
+    },
     "refusal": {
       "sentence": "{course} is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
       "rule": "Every door a deploy can start at refuses a reference course, with this sentence, BEFORE anything is stopped, built or uploaded. {course} is the code a TEACHER reads. The sentence says what the course is and names the way out - the course being taught - and it deliberately does NOT tell the teacher to copy anything: nothing in this release copies pages between courses, and a page taken out by hand arrives locked.",
@@ -3697,6 +3810,7 @@
           "why": "Gate by DIRECTION: this is the act that STOPS a deploy. Refusing it would strand an alarm set before the course was marked, with no way to turn it off from the app."
         }
       ],
+      "aToolThatNamesNoCourse": "One write tool declares no course argument at all - undo_last_change, which takes back whatever this conversation last did. It is gated by the course the PENDING CHANGE belongs to, read from the conversation's own history, rather than by an argument no client sends. A test asserts it is the ONLY non-readOnly tool without a course parameter, so a second one has to be given the same treatment deliberately instead of slipping past a gate that reads an argument and gives up when it is empty.",
       "howTheWriteGateIsChosen": "On the tool's OWN readOnly flag, never a hand-kept list of names - the same reasoning the window binding uses for gating on the schema. The three exemptions above are DATA rather than code, and a test asserts that the non-readOnly tools minus those three are exactly the set the gate refuses, so adding a tool fails the suite rather than opening a hole. And it is never gated on 'is this the course the session greeted': there is no such binding over MCP, and inventing one here to then except it would remove a capability that is the point of having a reference course at all."
     },
     "wording": {
@@ -3717,6 +3831,10 @@
         {
           "name": "course_config.backup.json",
           "why": "Written beside it by that same preflight, with shutil.copy2, which raises on a locked destination."
+        },
+        {
+          "name": "course_config.json.tmp",
+          "why": "The other half of that atomic write - it exists only between the open() and the os.replace(). A build interrupted between the two leaves it on disk, and a LOCKED one would then fail every later preflight twice over: the write into it and the cleanup that removes it. That course's settings could never be reconciled again. Anything ending .tmp is left alone for the same reason, whatever its name."
         },
         {
           "name": ".obsidian",

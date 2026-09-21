@@ -255,6 +255,12 @@ if (Test-Path -LiteralPath $referenceCfg) {
     Write-Host "   its settings file could not be read. Nothing was published."
     exit 1
   }
+  # .NET regex: `\s` matches a newline, so no flattening is needed here — and
+  # `-match` is case-INSENSITIVE by default in PowerShell, which is why the
+  # bash twin spells the value out as [Tt][Rr][Uu][Ee] rather than relying on
+  # a `-i` the two shells would not share. The table of inputs both launchers
+  # and the shared Python must agree on is
+  # contracts/shared-rules.json -> referenceCourses.markerAgreement.
   if ($referenceText -match '"kept_for_reference"\s*:\s*true') {
     # The code a TEACHER reads, which for a reference course is deliberately
     # not the folder name. Falls back to the folder when there is none.
