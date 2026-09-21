@@ -4496,6 +4496,47 @@
           "builderAgrees": false
         },
       {
+        "name": "a list whose indentation DECREASES",
+        "why": "A ParserError, and about 230 of every 100,000 pages a generator that enumerates this language's OWN grammar produces - by far the commonest way left to publish a page the app had called hidden. Every item under one key must carry exactly the first item's indent.",
+        "text": "---\npublishForSection1: false\ntags:\n    - a\n  - b\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "a list whose indentation is constant",
+        "text": "---\npublishForSection1: false\ntags:\n  - a\n  - b\npublish: false\n---\nBody\n",
+        "builderAgrees": true
+      },
+      {
+        "name": "a date PyYAML resolves and cannot CONSTRUCT",
+        "why": "A teacher's typo. 2025-09-93 resolves as a timestamp and raises a ValueError on construction, so the build reads no keys. Resolving and constructing are two steps and only the second can fail.",
+        "text": "---\npublishForSection1: false\ncreated: 2025-09-93\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "the 29th of February in a year that is not a leap year",
+        "why": "On a real page of Russell's. It is certified here because its offset carries no colon, so PyYAML does NOT resolve it as a timestamp at all and reads it as a string - which is why the rule follows PyYAML's own patterns rather than refusing everything date-shaped.",
+        "text": "---\npublishForSection1: false\ncreated: 2026-02-29T07:00:00.000-0400\npublish: false\n---\nBody\n",
+        "builderAgrees": true
+      },
+      {
+        "name": "the same date with a resolver-matching offset",
+        "why": "With a colon in the offset it DOES resolve as a timestamp, and 2026 is not a leap year, so it cannot be constructed.",
+        "text": "---\npublishForSection1: false\ncreated: 2026-02-29T07:00:00.000-04:00\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "a combining mark fused with the space after a colon",
+        "why": "Swift compares Strings and Characters by GRAPHEME, so the mark fuses with the space and contains(\": \") misses a \": \" PyYAML sees - a ScannerError. Every test in the guard runs over unicode scalars because of this one.",
+        "text": "---\npublishForSection1: false\ntitle: a: ́b\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "a digit-led value that matches no resolver at all",
+        "why": "It cannot be anything but a string, and constructing a string cannot fail.",
+        "text": "---\npublishForSection1: false\ntitle: 3rd Edition\npublish: false\n---\nBody\n",
+        "builderAgrees": true
+      },
+      {
         "name": "a YAML-1.1 bool word as a KEY",
         "why": "`yes:` loads as a True KEY rather than a string, and build_site.py then raises on it. When the build cannot parse the block it reads NO keys, so the page is PUBLISHED everywhere.",
         "text": "---\npublishForSection1: false\nyes: value\npublish: false\n---\nBody\n",

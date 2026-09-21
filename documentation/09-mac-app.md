@@ -2028,13 +2028,52 @@ python-frontmatter 1.3.0 / PyYAML 6.0.3, the image's own pins, running
 
 | corpus | certified & hidden | **certified & NOT hidden** | refused |
 |---|---|---|---|
-| extended grammar, 3 seeds | 16,319 / 16,384 / 16,300 | **0** | — |
-| extended again, here, 3 seeds | 18,374 / 18,367 / 18,396 | **0** | — |
-| original grammar, 2 seeds | 22,958 / 22,742 | **0** | — |
+| **inside-the-language, 5 seeds × 100,000** | 52,101 / 52,053 / 52,354 / 19,885 / 52,644 | **0** | — |
+| extended grammar | 16,310 | **0** | — |
+| extended again, here | 18,243 | **0** | — |
+| original grammar | 22,977 | **0** | — |
 | cross product | 5,908 | **0** | — |
 | 11,891 shipped pages | 11,891 | **0** | **0** |
 | 777 real pages | 777 | **0** | **0** |
 | 172 ICS4U shared pages | 172 | **0** | **0** |
+
+**And a language lost to a generator that enumerated the language ITSELF.**
+`gen4` walks this grammar to depth 3 over its own admitted atoms and mutates
+one character, so about 70% of its pages are certified rather than 28% — it
+lives INSIDE the language, which is why it finds what junk generators cannot.
+100,000 pages × 3 seeds: **240 / 233 / 224** certified and not hidden. Three
+causes, all of them the same event again:
+
+- **a list whose indentation DECREASES** (`tags:` / `    - a` / `  - b`) — a
+  `ParserError`, and ~230 of every 100,000. The rule now records the first
+  item's indent and requires every later one to match it; a blank line or a
+  comment ends the list, which no real page does inside one.
+- **a plain scalar PyYAML RESOLVES but cannot CONSTRUCT** — `2025-09-93`, a
+  teacher's date typo, raises a `ValueError`. Resolving and constructing are
+  two steps and only the second can fail. The rule follows **PyYAML's own
+  implicit patterns**: a digit-led value matching none of them is a string
+  and cannot raise; one matching the timestamp pattern is range-checked, leap
+  years included; one matching int or float must be a plain integer of at
+  most 15 digits or a simple decimal. Following PyYAML rather than refusing
+  everything date-shaped is what keeps the false-refusal count at zero —
+  **all 1,016 digit-led values in the corpus are timestamps whose offset
+  carries no colon, which PyYAML does not resolve as timestamps at all**, and
+  one real page of Russell's carries `2026-02-29` in a year that is not a
+  leap year.
+- **`title: a:␣◌́b`** — a `ScannerError`, because Swift's `String.contains`
+  compares GRAPHEMES and the combining mark fuses with the space, so the test
+  missed a `": "` PyYAML saw. **Every test in the guard now runs over unicode
+  scalars**, and a combining mark anywhere is refused as well (0 of 1,173,290
+  scalars in the corpus is one). On the other platform the trap is inverted:
+  `string.Contains` is ordinal by default there, and the culture-sensitive
+  overloads are what would introduce it.
+
+**Stated honestly: this is fuzz-clean, not proven.** Five independent
+generators, roughly a million composed pages, zero certified-and-not-hidden
+and zero false refusals — and each of the four rounds that got here was found
+by a generator the round before had not imagined. What the guard really offers
+is a language small enough that its argument can be read and narrow enough
+that what it refuses is written down.
 
 The earlier run of the cross product is kept for the record: (8 opening fences × 11 closing fences
 × 23 bodies × 4 tails × LF/CRLF), each composed by the real Swift and then read

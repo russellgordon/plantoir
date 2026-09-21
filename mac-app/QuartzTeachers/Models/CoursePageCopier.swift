@@ -250,162 +250,181 @@ nonisolated enum CopiedPageText {
     /// Whether the build's region is inside the small REGULAR LANGUAGE this
     /// app can show the build reads exactly as it does.
     ///
-    /// **A whitelist of line SHAPES was not enough, and the reason is worth
-    /// carrying away: a shape still admits arbitrary CHARACTERS.** An
-    /// extended grammar fuzz put 60,000 pages through the shape whitelist and
-    /// found **3,311** it certified and the real build did not hide. Every
-    /// one made `frontmatter.load` RAISE, whereupon `build_site.py` prints a
-    /// warning and RETURNS — so the build reads NO keys at all and the page
-    /// is published everywhere. Five causes, and all five are characters
-    /// rather than structure:
+    /// **Three rounds of fuzzing got this here, and each round was one level
+    /// below the last.** A list of forbidden shapes lost to a generator that
+    /// thought of others. A whitelist of line SHAPES lost to one that thought
+    /// about CHARACTERS (3,311 of 60,000). This language — anchored line
+    /// patterns over an explicit character whitelist — then lost about 230
+    /// per 100,000 to a generator that enumerated the language's OWN grammar
+    /// and mutated one character, which is the only kind that lives inside
+    /// it. Those last three causes are closed below, and every one of them
+    /// was the same event: `frontmatter.load` RAISES, the build reads no keys
+    /// at all, and Quartz publishes a page that says nothing.
     ///
-    /// * a YAML-1.1 bool or null WORD as a key (`yes: value`), which the
-    ///   loader turns into a non-string key and `process_frontmatter` then
-    ///   trips over;
-    /// * `U+2028`, `U+2029` or `U+0085` inside a value — line breaks to
-    ///   PyYAML and not to `components(separatedBy: "\n")`;
-    /// * `\u{0B}`, `\u{0C}` or `\u{1C}`–`\u{1F}` anywhere (a `ReaderError`);
-    /// * `title: "a"b"` — a quote inside a double-quoted scalar;
-    /// * `title: ,comma` — a plain scalar opening with a flow indicator.
+    /// **Every test here runs over UNICODE SCALARS, never over `Character`s.**
+    /// That is not tidiness: Swift compares `String`s and `Character`s by
+    /// GRAPHEME, so a combining mark fuses with the space beside it and
+    /// `contains(": ")` misses a `": "` that PyYAML sees perfectly well —
+    /// `title: a:␣◌́b` was certified and raised a `ScannerError`. The
+    /// equivalent trap on the other platform is the opposite way round:
+    /// `string.Contains` is ordinal by default there, and the
+    /// culture-sensitive overloads are the ones that would introduce it.
     ///
-    /// So this stopped trying to MODEL PyYAML and now certifies a language
-    /// small enough to be shown safe: a handful of anchored line patterns
-    /// over an explicit character whitelist. **It is far narrower than YAML,
-    /// deliberately**, and a page outside it is not copied — with a plain
-    /// sentence, and a teacher can always copy such a page by hand.
-    ///
-    /// Checked against the census rather than imagined: the frontmatter of
-    /// all 11,891 pages Plantoir ships and all 777 pages of four real courses
-    /// uses **17 distinct keys**, every one of them `[A-Za-z][A-Za-z0-9_-]*`
-    /// and none a bool or null word; no value contains `: `, ` #` or a
-    /// trailing `:`; and not one of the 12,668 carries a single control
-    /// character, `U+0085`, `U+2028`, `U+2029` or a stray `U+FEFF`. The one
-    /// widening the census forced is `_` as a value's first character
-    /// (9,803 values), which PyYAML reads as a plain string.
+    /// **What this can and cannot promise.** It is FUZZ-CLEAN against five
+    /// independent generators — a fixed-slot cross product, two grammar
+    /// generators, a hostile extension of one, and a generator that
+    /// enumerates this language itself — over roughly a million composed
+    /// pages, with zero certified-and-not-hidden and zero false refusals on
+    /// the 12,668 pages Plantoir ships and four real courses carry. It is not
+    /// PROVEN. It is a language small enough that the argument for it can be
+    /// read, and narrow enough that what it refuses is written down.
     static func regionIsOnlyShapesTheBuildAgreesOn(
         _ lines: [String], from: Int, to: Int
     ) -> Bool {
-        var mayBeFollowedByListItems: Bool = false
+        // The indent the current list's items must all share, or nil when no
+        // list is open. A list whose items step OUT is a `ParserError` — and
+        // it was ~230 of every 100,000 pages the inside-the-language
+        // generator produced, by far the commonest way left to publish a
+        // page this app had called hidden.
+        var listIndent: Int? = nil
+        var aListMayStart: Bool = false
+
         for index in from..<to {
-            let line: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
-            guard CopiedPageText.everyCharacterIsOnTheList(line) else {
+            let line: [Unicode.Scalar] = CopiedPageText.scalars(
+                PageFrontmatter.trimmingCarriageReturn(lines[index])
+            )
+            guard CopiedPageText.everyScalarIsOnTheList(line) else {
                 return false
             }
-            var bare: Substring = Substring(line)
+            var bare: ArraySlice<Unicode.Scalar> = line[...]
             while bare.last == " " {
                 bare = bare.dropLast()
             }
             if bare.isEmpty {
+                // A blank line ENDS a list. No real page has one inside a
+                // list, and a list that resumes after a gap is a shape this
+                // app would have to reason about rather than recognise.
+                listIndent = nil
+                aListMayStart = false
                 continue
             }
-            if bare.hasPrefix(" ") {
-                // The ONLY indented shape: an item of a list whose key is on
-                // the line above.
-                var item: Substring = bare
-                while item.first == " " {
-                    item = item.dropFirst()
+            if bare.first == " " {
+                var indent: Int = 0
+                while bare.first == " " {
+                    bare = bare.dropFirst()
+                    indent += 1
                 }
-                guard mayBeFollowedByListItems, item.hasPrefix("- ") else {
+                guard bare.count > 2, bare.first == "-", bare.dropFirst().first == " " else {
                     return false
                 }
-                guard CopiedPageText.isAValueOnTheList(String(item.dropFirst(2))) else {
+                if let listIndent {
+                    guard indent == listIndent else {
+                        return false
+                    }
+                } else {
+                    guard aListMayStart else {
+                        return false
+                    }
+                    listIndent = indent
+                }
+                guard CopiedPageText.isAValueOnTheList(Array(bare.dropFirst(2))) else {
                     return false
                 }
                 continue
             }
-            mayBeFollowedByListItems = false
-            if bare.hasPrefix("#") {
+
+            listIndent = nil
+            aListMayStart = false
+            if bare.first == "#" {
                 continue
             }
-            // A list item at COLUMN 0 is refused. Mixed with mapping keys it
-            // is a `ParserError`, and the build then reads no keys at all —
-            // measured, the last 156 failures of an extended fuzz were this
-            // one shape. Not one of the 12,668 shipped and real pages has a
-            // top-level list item; every list in them is indented under its
-            // key.
-            guard let name = CopiedPageText.keyNamed(String(bare)) else {
+            guard let name = CopiedPageText.keyNamed(Array(bare)) else {
                 return false
             }
-            var rest: Substring = bare.dropFirst(name.count)
+            var rest: ArraySlice<Unicode.Scalar> = bare.dropFirst(name)
             guard rest.first == ":" else {
                 return false
             }
             rest = rest.dropFirst()
             if rest.isEmpty {
-                mayBeFollowedByListItems = true
+                aListMayStart = true
                 continue
             }
             guard rest.first == " " else {
-                // `key:value` is one long scalar to YAML, and `key:` followed
-                // by a NO-BREAK space is not a mapping at all.
                 return false
             }
             rest = rest.dropFirst()
-            guard CopiedPageText.isAValueOnTheList(String(rest)) else {
+            guard CopiedPageText.isAValueOnTheList(Array(rest)) else {
                 return false
             }
         }
         return true
     }
 
-    /// The characters a settings block may contain at all.
-    ///
-    /// Everything the build's reader treats as a line break, a control or a
-    /// broken encoding is refused wherever it appears — not because each has
-    /// been reasoned about, but because the census says real data contains
-    /// none of them and a page that does is one this app cannot be sure of.
-    static func everyCharacterIsOnTheList(_ line: String) -> Bool {
-        for character in line.unicodeScalars {
-            let value: UInt32 = character.value
+    static func scalars(_ text: String) -> [Unicode.Scalar] {
+        var result: [Unicode.Scalar] = []
+        for scalar in text.unicodeScalars {
+            result.append(scalar)
+        }
+        return result
+    }
+
+    /// The scalars a settings block may contain at all.
+    static func everyScalarIsOnTheList(_ line: [Unicode.Scalar]) -> Bool {
+        for scalar in line {
+            let value: UInt32 = scalar.value
             if value < 0x20 {
-                // The region is already split on `\n`, and a `\r` not
-                // followed by one is refused before this. Nothing else below
-                // a space belongs in a settings block.
                 return false
             }
             if value == 0x7F || value == 0x85 || value == 0x2028 || value == 0x2029 {
                 return false
             }
             if value == 0xFEFF || value == 0xFFFD {
-                // A byte-order mark after the first scalar, or the
-                // replacement character, which means the source was not
-                // valid UTF-8 in the first place.
+                return false
+            }
+            // A COMBINING MARK anywhere. It is what made a grapheme-based
+            // test miss a `": "`, and no frontmatter scalar in the 12,668
+            // shipped and real pages is one — measured, 0 of 1,173,290.
+            if scalar.properties.generalCategory == .spacingMark
+                || scalar.properties.generalCategory == .nonspacingMark
+                || scalar.properties.generalCategory == .enclosingMark {
                 return false
             }
         }
         return true
     }
 
-    /// The key this line names, or nil when it is not one this app certifies.
-    ///
-    /// `[A-Za-z][A-Za-z0-9_-]*`, and never a YAML 1.1 bool or null word: the
-    /// loader turns `yes:` into a `True` KEY, which is not a string, and the
-    /// build then raises on it.
-    static func keyNamed(_ line: String) -> String? {
+    /// How many scalars the key at the start of this line occupies, or nil
+    /// when it is not a key this app certifies.
+    static func keyNamed(_ line: [Unicode.Scalar]) -> Int? {
         var name: String = ""
-        for character in line {
-            if character == ":" {
+        var count: Int = 0
+        for scalar in line {
+            if scalar == ":" {
                 break
             }
-            let isOrdinary: Bool = (character >= "a" && character <= "z")
-                || (character >= "A" && character <= "Z")
-                || (character >= "0" && character <= "9")
-                || character == "_" || character == "-"
+            let value: UInt32 = scalar.value
+            let isOrdinary: Bool = (value >= 97 && value <= 122)
+                || (value >= 65 && value <= 90)
+                || (value >= 48 && value <= 57)
+                || value == 95 || value == 45
             if !isOrdinary {
                 return nil
             }
-            name.append(character)
+            name.unicodeScalars.append(scalar)
+            count += 1
         }
-        guard let first = name.first else {
+        guard let first = name.unicodeScalars.first else {
             return nil
         }
-        if !((first >= "a" && first <= "z") || (first >= "A" && first <= "Z")) {
+        let firstValue: UInt32 = first.value
+        if !((firstValue >= 97 && firstValue <= 122) || (firstValue >= 65 && firstValue <= 90)) {
             return nil
         }
         if CopiedPageText.boolOrNullWords.contains(name.lowercased()) {
             return nil
         }
-        return name
+        return count
     }
 
     /// The words YAML 1.1 reads as a boolean or a null, whatever their case.
@@ -413,12 +432,23 @@ nonisolated enum CopiedPageText {
         "y", "n", "yes", "no", "on", "off", "true", "false", "null", "nul", "none",
     ]
 
-    /// A value this app certifies: a plain scalar opening with a letter, a
-    /// digit or an underscore; a double-quoted scalar with no quote and no
-    /// backslash in it; a single-quoted scalar with no quote in it; or an
-    /// empty flow sequence.
-    static func isAValueOnTheList(_ value: String) -> Bool {
-        var tidied: Substring = Substring(value)
+    /// A value this app certifies.
+    ///
+    /// A plain scalar opening with a LETTER or `_` can only ever resolve to a
+    /// string, because every one of PyYAML's implicit resolvers for int,
+    /// float, timestamp, bool and null is anchored and begins with a digit,
+    /// a sign, a dot or one of the bool/null words — and the bool/null words
+    /// are refused. A string is constructed by returning it, so it cannot
+    /// raise.
+    ///
+    /// A plain scalar opening with a DIGIT can. PyYAML RESOLVES
+    /// `2025-09-93` as a timestamp and then FAILS TO CONSTRUCT it — a
+    /// teacher's date typo raises a `ValueError`, the build reads no keys,
+    /// and the page is published. So a digit-led value is certified only when
+    /// it is one of three shapes this app can check, or when it provably
+    /// matches no resolver at all.
+    static func isAValueOnTheList(_ value: [Unicode.Scalar]) -> Bool {
+        var tidied: ArraySlice<Unicode.Scalar> = value[...]
         while tidied.last == " " {
             tidied = tidied.dropLast()
         }
@@ -429,8 +459,7 @@ nonisolated enum CopiedPageText {
             guard tidied.count >= 2, tidied.last == "\"" else {
                 return false
             }
-            let inside: Substring = tidied.dropFirst().dropLast()
-            for character in inside where character == "\"" || character == "\\" {
+            for scalar in tidied.dropFirst().dropLast() where scalar == "\"" || scalar == "\\" {
                 return false
             }
             return true
@@ -439,23 +468,305 @@ nonisolated enum CopiedPageText {
             guard tidied.count >= 2, tidied.last == "'" else {
                 return false
             }
-            for character in tidied.dropFirst().dropLast() where character == "'" {
+            for scalar in tidied.dropFirst().dropLast() where scalar == "'" {
                 return false
             }
             return true
         }
-        // `tags: []` is on 54 real pages; no other flow value is certified.
-        if tidied == "[]" {
+        if tidied.count == 2 && tidied.first == "[" && tidied.last == "]" {
             return true
         }
-        let opensPlainly: Bool = first.isLetter || first.isNumber || first == "_"
-        guard opensPlainly else {
+        // `: ` or ` #` anywhere, or a trailing `:`, asked of SCALARS.
+        var previous: Unicode.Scalar? = nil
+        for scalar in tidied {
+            if previous == ":" && scalar == " " {
+                return false
+            }
+            if previous == " " && scalar == "#" {
+                return false
+            }
+            previous = scalar
+        }
+        if tidied.last == ":" {
             return false
         }
-        if tidied.contains(": ") || tidied.contains(" #") || tidied.hasSuffix(":") {
+
+        let firstValue: UInt32 = first.value
+        let opensWithALetter: Bool = first.properties.isAlphabetic || firstValue == 95
+        if opensWithALetter {
+            return true
+        }
+        let opensWithADigit: Bool = firstValue >= 48 && firstValue <= 57
+        guard opensWithADigit else {
             return false
+        }
+        return CopiedPageText.aDigitLedValueThatAlwaysConstructs(Array(tidied))
+    }
+
+    /// Whether a digit-led plain scalar is one the build always CONSTRUCTS.
+    ///
+    /// **Resolving and constructing are two different steps, and only the
+    /// second can raise.** PyYAML first RESOLVES a plain scalar against a
+    /// table of anchored patterns to decide its type, then CONSTRUCTS a value
+    /// of that type. `2025-09-93` resolves as a timestamp and then fails to
+    /// construct — a teacher's date typo, `ValueError`, the build reads no
+    /// keys, and the page is published. `0x_` resolves as an integer and
+    /// fails the same way.
+    ///
+    /// So a digit-led value is certified when it matches NO resolver — it is
+    /// then a string, and constructing a string cannot fail — or when it
+    /// matches one and this app can check that it constructs.
+    ///
+    /// **Following PyYAML's own patterns is what keeps the false-refusal
+    /// count at zero**, and it was not optional: all 1,016 digit-led values
+    /// in the corpus are timestamps of the shape
+    /// `2025-09-08T12:58:19.000-0400`, whose offset carries no colon — so
+    /// PyYAML does NOT resolve them as timestamps at all and reads them as
+    /// strings. A rule that refused everything date-SHAPED would have
+    /// refused every one of them, including one real page of Russell's whose
+    /// date is `2026-02-29` in a year that is not a leap year.
+    static func aDigitLedValueThatAlwaysConstructs(_ value: [Unicode.Scalar]) -> Bool {
+        if CopiedPageText.matchesTheTimestampResolver(value) {
+            return CopiedPageText.isARealDateOrTimestamp(value)
+        }
+        if CopiedPageText.matchesTheNumberResolvers(value) {
+            return CopiedPageText.isASimpleNumber(value)
+        }
+        // No resolver matches, so the build reads it as a string.
+        return true
+    }
+
+    /// PyYAML's implicit timestamp pattern, digit-led branch: a bare
+    /// `YYYY-MM-DD`, or a date and time whose offset is `Z`, `±H`, `±HH` or
+    /// `±HH:MM` — a four-digit offset with no colon does NOT match.
+    static func matchesTheTimestampResolver(_ value: [Unicode.Scalar]) -> Bool {
+        var rest: ArraySlice<Unicode.Scalar> = value[...]
+        guard CopiedPageText.take(&rest, digits: 4), CopiedPageText.take(&rest, "-"),
+              CopiedPageText.take(&rest, digits: 1, upTo: 2), CopiedPageText.take(&rest, "-"),
+              CopiedPageText.take(&rest, digits: 1, upTo: 2) else {
+            return false
+        }
+        if rest.isEmpty {
+            // Only the four-two-two spelling is a bare timestamp.
+            return value.count == 10
+        }
+        if rest.first == "T" || rest.first == "t" {
+            rest = rest.dropFirst()
+        } else if rest.first == " " || rest.first == "\t" {
+            while rest.first == " " || rest.first == "\t" {
+                rest = rest.dropFirst()
+            }
+        } else {
+            return false
+        }
+        guard CopiedPageText.take(&rest, digits: 1, upTo: 2), CopiedPageText.take(&rest, ":"),
+              CopiedPageText.take(&rest, digits: 2), CopiedPageText.take(&rest, ":"),
+              CopiedPageText.take(&rest, digits: 2) else {
+            return false
+        }
+        if rest.first == "." {
+            rest = rest.dropFirst()
+            while let scalar = rest.first, scalar.value >= 48, scalar.value <= 57 {
+                rest = rest.dropFirst()
+            }
+        }
+        if rest.isEmpty {
+            return true
+        }
+        while rest.first == " " || rest.first == "\t" {
+            rest = rest.dropFirst()
+        }
+        if rest.first == "Z" || rest.first == "z" {
+            return rest.count == 1
+        }
+        guard rest.first == "+" || rest.first == "-" else {
+            return false
+        }
+        rest = rest.dropFirst()
+        guard CopiedPageText.take(&rest, digits: 1, upTo: 2) else {
+            return false
+        }
+        if rest.isEmpty {
+            return true
+        }
+        guard CopiedPageText.take(&rest, ":"), CopiedPageText.take(&rest, digits: 2) else {
+            return false
+        }
+        return rest.isEmpty
+    }
+
+    /// PyYAML's implicit int and float patterns, digit-led branches — the
+    /// ones that can be resolved and then fail to construct.
+    static func matchesTheNumberResolvers(_ value: [Unicode.Scalar]) -> Bool {
+        for scalar in value {
+            let ok: Bool = (scalar.value >= 48 && scalar.value <= 57)
+                || scalar == "_" || scalar == "." || scalar == ":"
+                || scalar == "x" || scalar == "X" || scalar == "b" || scalar == "B"
+                || scalar == "e" || scalar == "E" || scalar == "+" || scalar == "-"
+                || (scalar.value >= 97 && scalar.value <= 102)
+                || (scalar.value >= 65 && scalar.value <= 70)
+            if !ok {
+                // A character no int or float pattern admits, so neither can
+                // match and the build reads a string.
+                return false
+            }
         }
         return true
+    }
+
+    /// The numbers this app will vouch for: a plain integer of at most 15
+    /// digits with no underscores and no leading zero unless it is exactly
+    /// `0`, or a simple decimal.
+    static func isASimpleNumber(_ value: [Unicode.Scalar]) -> Bool {
+        var digits: Int = 0
+        var dots: Int = 0
+        var digitsAfterDot: Int = 0
+        for scalar in value {
+            if scalar == "." {
+                dots += 1
+                continue
+            }
+            guard scalar.value >= 48, scalar.value <= 57 else {
+                return false
+            }
+            if dots > 0 {
+                digitsAfterDot += 1
+            } else {
+                digits += 1
+            }
+        }
+        if dots == 0 {
+            if digits < 1 || digits > 15 {
+                return false
+            }
+            return digits == 1 || value.first != "0"
+        }
+        return dots == 1 && digits >= 1 && digits <= 15
+            && digitsAfterDot >= 1 && digitsAfterDot <= 15
+    }
+
+    static func take(_ rest: inout ArraySlice<Unicode.Scalar>, _ scalar: Unicode.Scalar) -> Bool {
+        guard rest.first == scalar else {
+            return false
+        }
+        rest = rest.dropFirst()
+        return true
+    }
+
+    static func take(
+        _ rest: inout ArraySlice<Unicode.Scalar>, digits least: Int, upTo most: Int = 0
+    ) -> Bool {
+        let ceiling: Int = most == 0 ? least : most
+        var taken: Int = 0
+        while taken < ceiling, let scalar = rest.first, scalar.value >= 48, scalar.value <= 57 {
+            rest = rest.dropFirst()
+            taken += 1
+        }
+        return taken >= least
+    }
+
+    /// A calendar date, optionally with a time, that PyYAML can construct.
+    static func isARealDateOrTimestamp(_ value: [Unicode.Scalar]) -> Bool {
+        guard value.count >= 8 else {
+            return false
+        }
+        let year: Int = CopiedPageText.number(value, 0, 4)
+        var index: Int = 5
+        var month: Int = Int(value[index].value - 48)
+        if index + 1 < value.count, value[index + 1] != "-" {
+            month = month * 10 + Int(value[index + 1].value - 48)
+            index += 1
+        }
+        index += 2
+        var day: Int = Int(value[index].value - 48)
+        if index + 1 < value.count,
+           value[index + 1].value >= 48, value[index + 1].value <= 57 {
+            day = day * 10 + Int(value[index + 1].value - 48)
+            index += 1
+        }
+        guard month >= 1, month <= 12, day >= 1,
+              day <= CopiedPageText.daysIn(month: month, year: year) else {
+            return false
+        }
+        var rest: ArraySlice<Unicode.Scalar> = value.dropFirst(index + 1)
+        if rest.isEmpty {
+            return true
+        }
+        rest = rest.dropFirst()
+        while rest.first == " " || rest.first == "\t" {
+            rest = rest.dropFirst()
+        }
+        var hour: Int = 0
+        var taken: Int = 0
+        while taken < 2, let scalar = rest.first, scalar.value >= 48, scalar.value <= 57 {
+            hour = hour * 10 + Int(scalar.value - 48)
+            rest = rest.dropFirst()
+            taken += 1
+        }
+        guard hour <= 23, rest.first == ":" else {
+            return false
+        }
+        rest = rest.dropFirst()
+        let minute: Int = CopiedPageText.number(Array(rest), 0, 2)
+        rest = rest.dropFirst(3)
+        let second: Int = CopiedPageText.number(Array(rest), 0, 2)
+        guard minute >= 0, minute <= 59, second >= 0, second <= 59 else {
+            return false
+        }
+        // The offset's own ranges. Everything past the seconds was already
+        // shown to match the resolver's shape.
+        var tail: ArraySlice<Unicode.Scalar> = rest.dropFirst(2)
+        if tail.first == "." {
+            tail = tail.dropFirst()
+            while let scalar = tail.first, scalar.value >= 48, scalar.value <= 57 {
+                tail = tail.dropFirst()
+            }
+        }
+        while tail.first == " " || tail.first == "\t" {
+            tail = tail.dropFirst()
+        }
+        if tail.isEmpty || tail.first == "Z" || tail.first == "z" {
+            return true
+        }
+        tail = tail.dropFirst()
+        var offsetHour: Int = 0
+        var offsetTaken: Int = 0
+        while offsetTaken < 2, let scalar = tail.first, scalar.value >= 48, scalar.value <= 57 {
+            offsetHour = offsetHour * 10 + Int(scalar.value - 48)
+            tail = tail.dropFirst()
+            offsetTaken += 1
+        }
+        guard offsetHour <= 23 else {
+            return false
+        }
+        if tail.first == ":" {
+            return CopiedPageText.number(Array(tail.dropFirst()), 0, 2) <= 59
+        }
+        return true
+    }
+
+    static func number(_ scalars: [Unicode.Scalar], _ start: Int, _ length: Int) -> Int {
+        var total: Int = 0
+        for index in start..<(start + length) {
+            guard index < scalars.count,
+                  scalars[index].value >= 48, scalars[index].value <= 57 else {
+                return -1
+            }
+            total = total * 10 + Int(scalars[index].value - 48)
+        }
+        return total
+    }
+
+    static func daysIn(month: Int, year: Int) -> Int {
+        switch month {
+        case 1, 3, 5, 7, 8, 10, 12:
+            return 31
+        case 4, 6, 9, 11:
+            return 30
+        default:
+            let isLeap: Bool = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+            return isLeap ? 29 : 28
+        }
     }
 
     /// True when this top-level line names any of the four keys that decide
