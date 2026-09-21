@@ -27,7 +27,7 @@ enum PageFrontmatter {
 
     /// One key's value exactly as written, or nil when the key is absent.
     /// Top-level keys only: an indented `title:` belongs to some other mapping.
-    static func rawValue(forKey key: String, in pageText: String) -> String? {
+    nonisolated static func rawValue(forKey key: String, in pageText: String) -> String? {
         guard let block = block(in: pageText) else {
             return nil
         }

@@ -576,7 +576,7 @@
     },
     "stopsAtAClassPage": {
       "value": true,
-      "appliesTo": ["publishing", "the dates a class brings"],
+      "appliesTo": ["publishing", "the dates a class brings", "copying a page into another course"],
       "why": "A class goes up when the teacher names that class. A link that lands on another class publishes nothing and is not followed through, so material reachable only THROUGH another class belongs to that class and goes up with it. Publishing Day 4's worksheet because Day 3 links to Day 4 puts it in front of students a day early and dates it to the wrong lesson. Decided 2026-09-19 (issue #173), after the two apps were found to disagree: Windows stopped, the mac walked through. REJECTED: the middle position - do not publish the linked class, but walk past it to the material beyond - for the same two reasons. UNPUBLISHING is deliberately NOT in this list: its reach is the sibling decision, held as issue #201, and until that lands an unpublish still walks through a class page on both platforms.",
       "theNamedPagesAreNeverStopped": "The rule is about pages REACHED. Naming two classes makes both of them starting points, and publishing a whole unit names every class in it, so nothing is lost by asking for more.",
       "saidToTheTeacher": "The plan and the reply name the linked classes that were left alone, so a teacher is not surprised by a link students cannot follow yet - but only the ones students cannot already see, since 'publish it when you get to that class' is false about a class that is already published.",
@@ -4402,6 +4402,12 @@
       "nothingWasCopied": "Nothing was copied.",
       "copyAnother": "Copy another",
       "thereIsNoCourseToCopyInto": "There is no other course to copy into yet",
+      "alsoCopyLinkedPages": "Also copy the pages this page links to",
+      "embeddedPagesAlwaysComeAlong": "This page is shown inside another one, so it comes along.",
+      "aClassPageWasLeftAlone": "\u201c{page}\u201d is one of that course's classes, so it was left where it is.",
+      "anIndexPageIsNotCopied": "\u201c{page}\u201d is the way in to a folder rather than a page, so it was not copied.",
+      "aPageAtTheCourseRootIsNotCopied": "\u201c{page}\u201d sits outside the course's folders, so it was not copied.",
+      "aPageInsideOneSectionsFolderIsNotCopied": "\u201c{page}\u201d belongs to one section's classes, so it was not copied.",
       "savingACopyFirst": "Saving a copy of {course} first…",
       "theBackupTaken": "A copy of {course} from before this is saved as {named}.",
       "copiedInto": "Copied {pages} pages into {course}, in {folder}.",
@@ -5570,6 +5576,423 @@
           "mediaCreated": [
             "one.png"
           ],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "the page links to two shared pages, and one of those links to a third",
+        "why": "The #173 walk is transitive and is CALLED rather than re-implemented.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "See [[Stacks]] and [[Frames]]\n"
+            },
+            {
+              "path": "Concepts/Stacks.md",
+              "text": "See [[Heaps]]\n"
+            },
+            {
+              "path": "Concepts/Frames.md",
+              "text": "Body\n"
+            },
+            {
+              "path": "Concepts/Heaps.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md",
+            "Concepts/Stacks.md",
+            "Concepts/Frames.md",
+            "Concepts/Heaps.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a link that lands on a class page stops the walk and the class is left alone",
+        "why": "Issue #173: a class goes up when the teacher names THAT class. The walk neither collects it nor enters it, so material reachable only through it stays with it.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "See [[Unit 1, Day 3]]\n"
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 3.md",
+              "text": "See [[Worksheet]]\n"
+            },
+            {
+              "path": "Concepts/Worksheet.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [
+            {
+              "name": "Unit 1, Day 3",
+              "reason": "aClassPageWasLeftAlone"
+            }
+          ],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a link that lands on a folder's index page is listed, never copied",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "See [[index]]\n"
+            },
+            {
+              "path": "Concepts/index.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [
+            {
+              "name": "index",
+              "reason": "anIndexPageIsNotCopied"
+            }
+          ],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a link that lands on a page at the course root is listed, never copied",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "See [[Learning Goals]]\n"
+            },
+            {
+              "path": "Learning Goals.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [
+            {
+              "name": "Learning Goals",
+              "reason": "aPageAtTheCourseRootIsNotCopied"
+            }
+          ],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a link that lands on a page inside a section folder is listed, never copied",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "See [[Private Notes]]\n"
+            },
+            {
+              "path": "section1/Handouts/Private Notes.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [
+            {
+              "name": "Private Notes",
+              "reason": "aPageInsideOneSectionsFolderIsNotCopied"
+            }
+          ],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a page EMBEDDED in the one being copied comes along and is marked required",
+        "why": "Leaving it behind would put a hole in the page that shows it. Measured rare: 85 page-embeds in one real course and all 85 are on index pages, which are never copyable.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "Look: ![[Stacks]]\n"
+            },
+            {
+              "path": "Concepts/Stacks.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes",
+          "keepNone": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md",
+            "Concepts/Stacks.md"
+          ],
+          "required": [
+            "Stacks"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a linked page lands in ITS OWN folder when the destination has one of that name",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts",
+            "Tasks"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "See [[Culminating]]\n"
+            },
+            {
+              "path": "Tasks/Culminating.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts",
+            "Tasks"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md",
+            "Tasks/Culminating.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
+        "name": "a linked page lands in the folder CHOSEN when the destination has no folder of its own name",
+        "why": "Plantoir never creates a top-level folder.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts",
+            "Tasks"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "See [[Culminating]]\n"
+            },
+            {
+              "path": "Tasks/Culminating.md",
+              "text": "Body\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts",
+          "alsoCopiesLinkedPages": "yes"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Recursion.md",
+            "Concepts/Culminating.md"
+          ],
+          "mediaCreated": [],
           "mediaReused": [],
           "mediaRenamed": {},
           "skipped": [],

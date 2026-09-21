@@ -148,6 +148,11 @@ nonisolated struct CopyCourseFacts: Sendable, Equatable {
 
     let isKeptForReference: Bool
 
+    /// What THIS course calls the folders its class pages live in. Carried
+    /// because the #173 walk stops at a class page, and only the course's own
+    /// settings can say which folders those are.
+    let classFolderNames: [String]
+
     // MARK: - Computed properties
 
     var directoryURL: URL {
@@ -189,7 +194,8 @@ nonisolated struct CopyCourseFacts: Sendable, Equatable {
             directoryPath: course.directoryURL.path,
             sectionNumbers: course.sectionNumbers,
             sharedFolderNames: folders,
-            isKeptForReference: course.isKeptForReference
+            isKeptForReference: course.isKeptForReference,
+            classFolderNames: ClassFolder.names(for: course)
         )
     }
 
@@ -278,6 +284,15 @@ nonisolated struct CoursePageCopyRequest: Sendable {
     let destination: CopyCourseFacts
     let destinationFolderName: String
 
+    /// Whether the pages this page LINKS to come along too. The teacher's
+    /// answer to the sheet's one checkbox; on by default.
+    var alsoCopiesLinkedPages: Bool = false
+
+    /// The linked pages the teacher left TICKED, by lowercased title. Empty
+    /// means "the plan has not been shown yet, so take them all" — which is
+    /// what the first plan needs in order to have something to show.
+    var keptLinkedPages: Set<String>? = nil
+
     // MARK: - Computed properties
 
     var sourcePageURL: URL {
@@ -295,13 +310,31 @@ nonisolated struct CoursePageCopyRequest: Sendable {
 // MARK: - The plan
 
 /// Where one page will land.
-nonisolated struct CopiedPagePlacement: Sendable, Equatable {
+nonisolated struct CopiedPagePlacement: Sendable, Equatable, Identifiable {
 
     // MARK: - Stored properties
 
     let sourceFolderName: String
     let fileName: ExactName
     let destinationFolderName: String
+
+    /// True for the page the teacher NAMED, false for one its links reached.
+    var isTheNamedPage: Bool = true
+
+    /// True when this page is shown INSIDE another page being copied
+    /// (`![[Some Note]]`), so it comes along whether or not the teacher ticks
+    /// it — the page it is shown in would otherwise have a hole in it.
+    ///
+    /// Measured rare: 85 page-embeds across one real course and ALL 85 are on
+    /// `index.md` pages, which are never copyable. Built because the rule is
+    /// right and it is ten lines.
+    var isRequired: Bool = false
+
+    // MARK: - Computed properties
+
+    var id: String {
+        return sourceFolderName + "/" + fileName.text
+    }
 
     // MARK: - Computed properties
 
@@ -342,6 +375,10 @@ nonisolated struct CopySkip: Sendable, Equatable {
     /// A stable key for the contract — never the sentence, which is product
     /// wording and will be reworded.
     enum Reason: String, Sendable {
+        case aClassPageWasLeftAlone
+        case anIndexPageIsNotCopied
+        case aPageAtTheCourseRootIsNotCopied
+        case aPageInsideOneSectionsFolderIsNotCopied
         case aPageOfThatNameIsAlreadyHere
         case thePageCouldNotBeRead
         case theCopyCouldNotBeMadeHidden
@@ -410,6 +447,15 @@ nonisolated struct CoursePageCopyPlan: Sendable {
     var changesNothing: Bool {
         return pages.isEmpty
     }
+
+    /// The pages the named one's links reached — the checklist's rows.
+    var linkedPages: [CopiedPagePlacement] {
+        var result: [CopiedPagePlacement] = []
+        for placement in pages where !placement.isTheNamedPage {
+            result.append(placement)
+        }
+        return result
+    }
 }
 
 // MARK: - The planner
@@ -456,6 +502,16 @@ nonisolated enum CoursePageCopyPlanner {
         return found
     }
 
+    /// The same survey, off the caller's actor — for the sheet, which asks
+    /// for it before the teacher has agreed to anything.
+    ///
+    /// `@concurrent` for the same reason the copy is: the walk reads every
+    /// page of the source course.
+    @concurrent
+    static func planning(_ request: CoursePageCopyRequest) async -> CoursePageCopyPlan {
+        return CoursePageCopyPlanner.plan(request)
+    }
+
     /// What one copy will do.
     static func plan(_ request: CoursePageCopyRequest) -> CoursePageCopyPlan {
         let index: DestinationIndex = DestinationIndex(of: request.destination)
@@ -497,11 +553,56 @@ nonisolated enum CoursePageCopyPlanner {
         var arriving: Set<String> = []
         arriving.insert(request.page.fileName.pageComparisonKey)
 
-        let gathered: GatheredReferences = CoursePageCopyPlanner.gather(
-            referencesIn: pageText,
-            source: request.source,
-            destination: index,
-            alsoArriving: arriving
+        var placements: [CopiedPagePlacement] = [placement]
+        var skips: [CopySkip] = []
+        var texts: [String] = [pageText]
+
+        if request.alsoCopiesLinkedPages {
+            let followed: FollowedPages = CoursePageCopyPlanner.following(
+                request, from: pageText, destination: index
+            )
+            for linked in followed.pages {
+                arriving.insert(linked.fileName.pageComparisonKey)
+                placements.append(linked)
+            }
+            for text in followed.texts {
+                texts.append(text)
+            }
+            for skip in followed.skipped {
+                skips.append(skip)
+            }
+        }
+
+        var media: [CopiedMediaPlacement] = []
+        var leadingNowhere: [String] = []
+        var ranOutOfNames: Bool = false
+        var mediaNamesTaken: Set<String> = index.mediaNames
+        var mediaSeen: Set<String> = []
+        for text in texts {
+            let gathered: GatheredReferences = CoursePageCopyPlanner.gather(
+                referencesIn: text,
+                source: request.source,
+                destination: index,
+                alsoArriving: arriving,
+                namesAlreadyTaken: mediaNamesTaken,
+                alreadyGathered: mediaSeen
+            )
+            for item in gathered.media {
+                media.append(item)
+                mediaSeen.insert(item.sourceName.comparisonKey)
+                mediaNamesTaken.insert(item.destinationName.comparisonKey)
+            }
+            for name in gathered.linksLeadingNowhere where !leadingNowhere.contains(name) {
+                leadingNowhere.append(name)
+            }
+            if gathered.aPictureCouldNotBeGivenAFreeName {
+                ranOutOfNames = true
+            }
+        }
+        let gathered: GatheredReferences = GatheredReferences(
+            media: media,
+            linksLeadingNowhere: leadingNowhere,
+            aPictureCouldNotBeGivenAFreeName: ranOutOfNames
         )
 
         if gathered.aPictureCouldNotBeGivenAFreeName {
@@ -516,12 +617,133 @@ nonisolated enum CoursePageCopyPlanner {
             )
         }
 
+        // A page already named in a SKIP is not also reported as a link that
+        // leads nowhere. Both are true, and saying it twice is noise: the
+        // skip names the page AND the reason it stayed, which is the more
+        // useful of the two sentences.
+        var alreadyExplained: Set<String> = []
+        for skip in skips {
+            alreadyExplained.insert(ExactName(skip.name).pageComparisonKey)
+        }
+        var nowhere: [String] = []
+        for target in gathered.linksLeadingNowhere {
+            var lastComponent: String = target
+            if let lastSlash = target.lastIndex(of: "/") {
+                lastComponent = String(target[target.index(after: lastSlash)...])
+            }
+            if alreadyExplained.contains(ExactName(lastComponent).pageComparisonKey) {
+                continue
+            }
+            nowhere.append(target)
+        }
+
         return CoursePageCopyPlan(
-            pages: [placement],
+            pages: placements,
             media: gathered.media,
-            skipped: [],
-            linksLeadingNowhere: gathered.linksLeadingNowhere
+            skipped: skips,
+            linksLeadingNowhere: nowhere
         )
+    }
+
+    /// What following the named page's links reaches.
+    struct FollowedPages: Sendable {
+        let pages: [CopiedPagePlacement]
+        let texts: [String]
+        let skipped: [CopySkip]
+    }
+
+    /// The pages the named page links to, and what was left alone.
+    ///
+    /// The walk itself is `AssistSectionGraph.reachFollowingLinks`, CALLED and
+    /// not changed: it is transitive and it STOPS at a class page, which
+    /// issue #173 settled and `followingLinks.stopsAtAClassPage` pins. What is
+    /// added here is the classification afterwards — only a page directly
+    /// inside a top-level shared folder travels, and every other kind is
+    /// LISTED with the reason it stayed.
+    ///
+    /// **Where a linked page lands**: in the folder it sits in in the SOURCE
+    /// when the destination both lists that folder and has it on disk;
+    /// otherwise in the folder the teacher chose. No folder is ever created.
+    static func following(
+        _ request: CoursePageCopyRequest,
+        from pageText: String,
+        destination index: DestinationIndex
+    ) -> FollowedPages {
+        let source: CoursePageCopySource = CoursePageCopySource(of: request.source)
+        let startTitle: String = request.page.fileName.pageText.lowercased()
+        guard let start = source.graph.page(titled: startTitle) else {
+            return FollowedPages(pages: [], texts: [], skipped: [])
+        }
+        let reach: AssistLinkedReach = source.graph.reachFollowingLinks(from: [start])
+
+        // A page shown INSIDE the named page comes along whether or not the
+        // teacher ticks it.
+        var required: Set<String> = []
+        for embedded in CoursePageCopySource.pagesEmbeddedIn(pageText) {
+            required.insert(embedded)
+        }
+
+        var pages: [CopiedPagePlacement] = []
+        var texts: [String] = []
+        var skipped: [CopySkip] = []
+        var namesTaken: Set<String> = index.pageNames
+        namesTaken.insert(request.page.fileName.pageComparisonKey)
+
+        for found in reach.classPagesStoppedAt {
+            skipped.append(CopySkip(name: found.title, reason: .aClassPageWasLeftAlone))
+        }
+
+        for found in reach.pages {
+            let lowercasedTitle: String = found.lowercasedTitle
+            let kind: SourcePageKind = source.kinds[lowercasedTitle] ?? .atTheCourseRoot
+            guard kind == .copyable else {
+                skipped.append(CopySkip(
+                    name: found.title, reason: CoursePageCopyPlanner.reason(for: kind)
+                ))
+                continue
+            }
+            guard let fileName = source.fileNames[lowercasedTitle] else {
+                continue
+            }
+            if namesTaken.contains(fileName.pageComparisonKey) {
+                skipped.append(CopySkip(
+                    name: found.title, reason: .aPageOfThatNameIsAlreadyHere
+                ))
+                continue
+            }
+            let isRequired: Bool = required.contains(lowercasedTitle)
+            if !isRequired, let kept = request.keptLinkedPages,
+               !kept.contains(lowercasedTitle) {
+                continue
+            }
+            namesTaken.insert(fileName.pageComparisonKey)
+
+            let sourceFolder: String = source.folderNames[lowercasedTitle] ?? ""
+            var landsIn: String = request.destinationFolderName
+            if request.destination.sharedFolderNames.contains(sourceFolder) {
+                landsIn = sourceFolder
+            }
+            pages.append(CopiedPagePlacement(
+                sourceFolderName: sourceFolder,
+                fileName: fileName,
+                destinationFolderName: landsIn,
+                isTheNamedPage: false,
+                isRequired: isRequired
+            ))
+            texts.append((try? String(contentsOf: found.fileURL, encoding: .utf8)) ?? "")
+        }
+        return FollowedPages(pages: pages, texts: texts, skipped: skipped)
+    }
+
+    static func reason(for kind: SourcePageKind) -> CopySkip.Reason {
+        switch kind {
+        case .folderIndex:
+            return .anIndexPageIsNotCopied
+        case .insideOneSectionsFolder:
+            return .aPageInsideOneSectionsFolderIsNotCopied
+        case .atTheCourseRoot, .copyable:
+            return .aPageAtTheCourseRootIsNotCopied
+        }
     }
 
     // MARK: - Private helpers
@@ -560,12 +782,14 @@ nonisolated enum CoursePageCopyPlanner {
         referencesIn pageText: String,
         source: CopyCourseFacts,
         destination: DestinationIndex,
-        alsoArriving: Set<String> = []
+        alsoArriving: Set<String> = [],
+        namesAlreadyTaken: Set<String>? = nil,
+        alreadyGathered: Set<String> = []
     ) -> GatheredReferences {
         let sourceMedia: [String: ExactName] = CoursePageCopyPlanner.mediaNames(in: source)
         var media: [CopiedMediaPlacement] = []
-        var mediaKeysTaken: Set<String> = []
-        var namesTaken: Set<String> = destination.mediaNames
+        var mediaKeysTaken: Set<String> = alreadyGathered
+        var namesTaken: Set<String> = namesAlreadyTaken ?? destination.mediaNames
         var leadingNowhere: [String] = []
         var reportedNowhere: Set<String> = []
         var ranOutOfNames: Bool = false
@@ -835,5 +1059,158 @@ nonisolated struct DestinationIndex: Sendable {
         mediaNames = media
         mediaNamesByKey = byKey
         mediaFolderURL = mediaURL
+    }
+}
+
+// MARK: - The source course, read once
+
+/// What KIND of page this is, which decides whether a link that reaches it
+/// brings it along.
+nonisolated enum SourcePageKind: String, Sendable {
+
+    /// Directly inside a top-level shared folder. The only kind that travels.
+    case copyable
+
+    /// A folder's landing page. The way IN to a folder, never a page anybody
+    /// links to on purpose.
+    case folderIndex
+
+    /// A page at the course root — the course's own front matter.
+    case atTheCourseRoot
+
+    /// A page inside a `section<N>` folder. It belongs to one section's
+    /// classes.
+    case insideOneSectionsFolder
+}
+
+/// Every page of the source course, read once, with the #173 walk's own graph
+/// built over it.
+///
+/// **The walk is CALLED, not re-implemented.** `reachFollowingLinks` is the
+/// rule issue #173 settled and the contract pins; this builds the
+/// `AssistSectionPage` values it takes from plain facts rather than from a
+/// `Course`, so the same function can run off the main actor beside a copy
+/// that may be hundreds of megabytes.
+///
+/// **Every page of the course goes in, not only the copyable ones**, and that
+/// is what makes the stop real: a link that lands on a class page has to FIND
+/// the class page in order to stop at it. Measured across two real courses:
+/// the walk stopped at a class page zero times, because shared pages there
+/// never link to a lesson. The rule is implemented anyway.
+nonisolated struct CoursePageCopySource: Sendable {
+
+    // MARK: - Stored properties
+
+    let graph: AssistSectionGraph
+
+    /// By lowercased page title — the form links resolve in.
+    let kinds: [String: SourcePageKind]
+    let folderNames: [String: String]
+    let fileNames: [String: ExactName]
+
+    // MARK: - Initializer
+
+    init(of course: CopyCourseFacts) {
+        let survey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.walk(
+            courseAt: course.directoryURL, leavingBehind: DestinationIndex.leftOutOfTheIndex
+        )
+        var pages: [AssistSectionPage] = []
+        var kindByTitle: [String: SourcePageKind] = [:]
+        var folderByTitle: [String: String] = [:]
+        var nameByTitle: [String: ExactName] = [:]
+
+        for item in survey.items where !item.isDirectory {
+            let relativePath: String = item.text
+            if !relativePath.lowercased().hasSuffix(".md") {
+                continue
+            }
+            var components: [String] = []
+            for piece in relativePath.components(separatedBy: "/") where !piece.isEmpty {
+                components.append(piece)
+            }
+            guard let last = components.last else {
+                continue
+            }
+            let fileName: ExactName = ExactName(last)
+            let title: String = fileName.pageText
+            let lowercasedTitle: String = title.lowercased()
+
+            var kind: SourcePageKind = .atTheCourseRoot
+            var folderName: String = ""
+            var pathWithinSection: String = last
+            if components.count == 1 {
+                kind = .atTheCourseRoot
+            } else if components[0].lowercased().hasPrefix("section") {
+                kind = .insideOneSectionsFolder
+                var rest: [String] = components
+                rest.removeFirst()
+                pathWithinSection = rest.joined(separator: "/")
+            } else if last.lowercased() == "index.md" {
+                kind = .folderIndex
+                folderName = components[0]
+            } else if components.count == 2 && course.sharedFolderNames.contains(components[0]) {
+                kind = .copyable
+                folderName = components[0]
+            } else {
+                // A page nested deeper inside a shared folder, or in a folder
+                // the settings do not list. Neither is offered, and a link
+                // that reaches one is listed rather than followed.
+                kind = .atTheCourseRoot
+                folderName = components[0]
+            }
+
+            let fileURL: URL = URL(fileURLWithPath: course.directoryPath + "/" + relativePath)
+            let text: String = (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
+            pages.append(AssistSectionPage(
+                title: title,
+                displayTitle: title,
+                fileURL: fileURL,
+                relativePath: relativePath,
+                isSectionLocal: kind == .insideOneSectionsFolder,
+                isVisibleToStudents: true,
+                visibilityIsCertain: true,
+                date: nil,
+                linkedTitles: AssistSectionGraph.linkTargets(in: text),
+                classFolderNames: course.classFolderNames,
+                pathWithinSection: pathWithinSection
+            ))
+            // First one wins, and the walk is in a stable order, so two
+            // folders holding a page of the same name always answer the same.
+            if kindByTitle[lowercasedTitle] == nil {
+                kindByTitle[lowercasedTitle] = kind
+                folderByTitle[lowercasedTitle] = folderName
+                nameByTitle[lowercasedTitle] = fileName
+            }
+        }
+
+        graph = AssistSectionGraph(courseCode: course.code, sectionNumber: 0, pages: pages)
+        kinds = kindByTitle
+        folderNames = folderByTitle
+        fileNames = nameByTitle
+    }
+
+    // MARK: - Functions
+
+    /// Every page a `![[Some Note]]` embed on these pages names.
+    ///
+    /// A page shown INSIDE another comes along whether or not it is ticked:
+    /// leaving it behind would put a hole in the page that shows it.
+    static func pagesEmbeddedIn(_ text: String) -> [String] {
+        var found: [String] = []
+        for line in text.components(separatedBy: "\n") {
+            var rest: Substring = Substring(line)
+            while let start = rest.range(of: "![[") {
+                rest = rest[start.upperBound...]
+                guard let end = rest.firstIndex(where: { character in
+                    return character == "]" || character == "|" || character == "#"
+                }) else {
+                    break
+                }
+                let target: String = String(rest[rest.startIndex..<end])
+                found.append(AssistSectionGraph.normalized(target))
+                rest = rest[end...]
+            }
+        }
+        return found
     }
 }

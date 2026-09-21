@@ -114,6 +114,29 @@ nonisolated enum CopyPageWording {
     /// list joined with commas read as three separate pages. Quoting each one
     /// is the difference between a sentence a teacher can act on and one they
     /// have to guess at.
+    /// The checkbox that turns the linked pages on and off.
+    static let alsoCopyLinkedPages: String = "Also copy the pages this page links to"
+
+    /// Beside a linked page that cannot be unticked.
+    static let embeddedPagesAlwaysComeAlong: String =
+        "This page is shown inside another one, so it comes along."
+
+    static func aClassPageWasLeftAlone(page: String) -> String {
+        return "“\(page)” is one of that course's classes, so it was left where it is."
+    }
+
+    static func anIndexPageIsNotCopied(page: String) -> String {
+        return "“\(page)” is the way in to a folder rather than a page, so it was not copied."
+    }
+
+    static func aPageAtTheCourseRootIsNotCopied(page: String) -> String {
+        return "“\(page)” sits outside the course's folders, so it was not copied."
+    }
+
+    static func aPageInsideOneSectionsFolderIsNotCopied(page: String) -> String {
+        return "“\(page)” belongs to one section's classes, so it was not copied."
+    }
+
     static func theseLinksWillNotLeadAnywhereYet(names: [String]) -> String {
         var quoted: [String] = []
         for name in names {

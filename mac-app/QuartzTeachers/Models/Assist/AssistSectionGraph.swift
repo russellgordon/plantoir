@@ -1,7 +1,11 @@
 import Foundation
 
 /// One page of a section, as the tools see it.
-struct AssistSectionPage {
+///
+/// `nonisolated`: a plain value with no course in it. Copying a page between
+/// courses builds these off the main actor, so that the #173 walk below can be
+/// CALLED rather than re-implemented.
+nonisolated struct AssistSectionPage {
 
     // MARK: - Stored properties
 
@@ -114,7 +118,7 @@ struct AssistSectionPage {
 }
 
 /// A link on one page that leads to another.
-struct AssistSectionLink {
+nonisolated struct AssistSectionLink {
 
     // MARK: - Stored properties
 
@@ -130,7 +134,7 @@ struct AssistSectionLink {
 /// teacher has to be TOLD was left alone. Returning only the first made the
 /// stop invisible — a plan quietly smaller than the one the teacher pictured,
 /// with no way to tell "it decided" from "it missed it".
-struct AssistLinkedReach {
+nonisolated struct AssistLinkedReach {
 
     // MARK: - Stored properties
 
@@ -151,7 +155,7 @@ struct AssistLinkedReach {
 /// link — publishing a class along with what it uses, checking what students
 /// would meet — works from the same picture rather than each walking the folder
 /// its own way.
-struct AssistSectionGraph {
+nonisolated struct AssistSectionGraph {
 
     // MARK: - Stored properties
 
@@ -196,6 +200,7 @@ struct AssistSectionGraph {
     // MARK: - Functions
 
     /// Read one section's pages off disk.
+    @MainActor
     static func read(forSection sectionNumber: Int, in course: Course, workspaceURL: URL?) -> AssistSectionGraph {
         var pages: [AssistSectionPage] = []
         for pageURL in ClassPages.pagesOfSection(sectionNumber, in: course) {
@@ -450,6 +455,7 @@ struct AssistSectionGraph {
     /// lesson. Shared pages live outside the section folder and fall back to
     /// their own last two components, which is enough for the rule to see the
     /// folder they sit in.
+    @MainActor
     static func pathWithinSection(of url: URL, forSection sectionNumber: Int, in course: Course) -> String {
         let full: String = url.standardizedFileURL.path
         let root: String = course.sectionDirectoryURL(forSection: sectionNumber)
