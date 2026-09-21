@@ -96,9 +96,33 @@ enum ReferenceCopier {
             throw Problem.folderAlreadyExists(folderName)
         }
 
+        // Built under a HIDDEN name and renamed into place as the last act.
+        // The course being copied is a LIVE one, so until the marker is
+        // written and the site markers are renamed aside the copy is an
+        // ordinary course pointing at the ORIGINAL's class website — and a
+        // crash in that window would leave one in the sidebar. The window is
+        // small here (a local clone) and it is the same window the importer
+        // had; one answer for both. `ReferenceStaging` says why a dot-folder
+        // closes it.
+        let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
+            ReferenceStaging.stagingName(for: folderName)
+        )
+        if !ReferenceStaging.someoneIsWorkingOn(
+            stagingURL.lastPathComponent, inCoursesDirectory: coursesDirectoryURL
+        ) {
+            ReferenceStaging.remove(at: stagingURL)
+        }
+        // A second window reading this working folder sweeps leftover staging
+        // folders; this says the folder is in use so that the sweep leaves it
+        // alone. Quick here — a local clone — but "quick" is not a guarantee.
+        ReferenceStaging.takeLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+        defer {
+            ReferenceStaging.releaseLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+        }
+
         do {
-            try fileManager.createDirectory(at: destinationURL, withIntermediateDirectories: false)
-            try ReferenceCopier.copyContents(of: course.directoryURL, into: destinationURL)
+            try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+            try ReferenceCopier.copyContents(of: course.directoryURL, into: stagingURL)
             // The lock TRAVELS through `FileManager.copyItem`, so a copy taken
             // from a course that is already frozen arrives frozen — and then
             // the two steps below cannot happen: the site markers cannot be
@@ -113,27 +137,84 @@ enum ReferenceCopier {
             // Copy for Reference…" is withheld on one — but a guard that
             // depends on a menu item being withheld somewhere else is a guard
             // one edit from being gone.
-            ReferenceLock.clearLock(at: destinationURL)
+            ReferenceLock.clearLock(at: stagingURL)
         } catch {
             // Nothing is locked yet, so the half-written folder is an
             // ordinary one and goes away cleanly.
-            try? fileManager.removeItem(at: destinationURL)
+            ReferenceStaging.remove(at: stagingURL)
             if let problem = error as? Problem {
                 throw problem
             }
             throw Problem.couldNotCopy(error.localizedDescription)
         }
 
-        let copy: Course
+        let staged: Made
         do {
-            let configuration: CourseConfiguration = try CourseConfiguration(
-                contentsOf: destinationURL.appendingPathComponent("course_config.json")
+            staged = try ReferenceCopier.makeIntoAReferenceCourse(
+                at: stagingURL, schoolYear: schoolYear, at: moment
             )
-            copy = Course(code: folderName, directoryURL: destinationURL, configuration: configuration)
+            // The one step that makes it visible, and the only one that has
+            // to be atomic: a rename within `courses/`. Measured: a folder
+            // whose contents carry the lock renames cleanly, and the lock
+            // survives.
+            try fileManager.moveItem(at: stagingURL, to: destinationURL)
         } catch {
-            try? fileManager.removeItem(at: destinationURL)
+            // The lock may be ON by now — it is applied inside the call
+            // above — so the clear comes first, and both are `ReferenceStaging`'s
+            // job rather than two more lines here.
+            ReferenceStaging.remove(at: stagingURL)
             throw Problem.couldNotCopy(error.localizedDescription)
         }
+
+        // `staged` was made under the hidden name; everything else in it was
+        // read from the settings and is right.
+        let made: Made = Made(
+            folderName: folderName,
+            displayCode: staged.displayCode,
+            schoolYear: staged.schoolYear,
+            sectionCount: staged.sectionCount
+        )
+        ActivityTrail.note(
+            .courseKeptForReference,
+            ReferenceCopier.trailLine(for: made, copiedFrom: course.displayCode)
+        )
+        return made
+    }
+
+    /// Turns a folder that has just been COPIED into a reference course: cut
+    /// loose from last year's websites, marked, filed under its year, left
+    /// with nowhere to deploy to, and locked — in that order.
+    ///
+    /// **The one implementation of the dangerous sequence**, called by both
+    /// ways a reference course is made: "Keep a Copy for Reference…" above,
+    /// and "Import Courses for Reference…" (`ReferenceImporter`), which is
+    /// the same act with a different source. A second copy of this order is a
+    /// second thing to keep in step, and the thing it would be out of step
+    /// about is whether a course can reach last year's live website.
+    ///
+    /// Two things the caller owes, because only the caller knows them:
+    ///
+    /// * the folder is an ORDINARY, unlocked copy when this is called. The
+    ///   lock travels through `FileManager.copyItem`, so a copy taken from a
+    ///   course that is already frozen arrives frozen — and then the site
+    ///   markers cannot be renamed aside and the folder cannot be removed
+    ///   either. Both callers clear it the moment their copy finishes,
+    ///   because both need an ordinary folder for their own failure path.
+    /// * removing the folder if this throws. What was half-made is the
+    ///   caller's to clean up, and only it knows whether the folder was there
+    ///   before.
+    static func makeIntoAReferenceCourse(
+        at destinationURL: URL,
+        schoolYear: Int?,
+        at moment: Date = Date()
+    ) throws -> Made {
+        let folderName: String = destinationURL.lastPathComponent
+        let configuration: CourseConfiguration = try CourseConfiguration(
+            contentsOf: destinationURL.appendingPathComponent("course_config.json")
+        )
+        let copy: Course = Course(
+            code: folderName, directoryURL: destinationURL, configuration: configuration
+        )
 
         // Cut every section loose from the website it was publishing to,
         // BEFORE the marker is written — so a failure here leaves a folder
@@ -156,12 +237,7 @@ enum ReferenceCopier {
         copy.configuration.keptForReference = true
         copy.configuration.referenceSchoolYear = schoolYear
         copy.configuration.neutraliseForReference()
-        do {
-            try copy.configuration.write(to: copy.configFileURL)
-        } catch {
-            try? fileManager.removeItem(at: destinationURL)
-            throw Problem.couldNotCopy(error.localizedDescription)
-        }
+        try copy.configuration.write(to: copy.configFileURL)
 
         // Through the same re-assertion everything else uses, rather than a
         // lock of its own: "right after a reference course is made" is one of
@@ -178,17 +254,27 @@ enum ReferenceCopier {
             )
         }
 
-        let made: Made = Made(
+        // Asked of the INDEPENDENT census rather than of the walk that just
+        // ran: a walk that stopped early reports success about the files it
+        // reached, which is exactly how nine editable pages once sat inside
+        // a course the app called frozen. A course made here and not
+        // completely locked is worth a line whichever way it happened —
+        // nothing is put in front of the teacher, because the course is real
+        // and the next re-assertion takes another pass at it.
+        if !locked.everythingThatShouldBeLockedIs {
+            ActivityTrail.note(
+                .referenceCoursePagesLockedAgain,
+                "made \(copy.displayCode) for reference and \(locked.lockedOnDisk) of "
+                + "\(locked.shouldBeLocked) of its files are locked"
+            )
+        }
+
+        return Made(
             folderName: folderName,
             displayCode: copy.displayCode,
             schoolYear: schoolYear,
             sectionCount: copy.sectionNumbers.count
         )
-        ActivityTrail.note(
-            .courseKeptForReference,
-            ReferenceCopier.trailLine(for: made, copiedFrom: course.displayCode)
-        )
-        return made
     }
 
     /// The trail line — what a teacher would recognise, and enough to explain
@@ -206,33 +292,41 @@ enum ReferenceCopier {
     // MARK: - Private helpers
 
     /// Copies everything the teacher wrote, and nothing that is rebuilt.
+    /// Copies everything the teacher wrote, and nothing that is rebuilt —
+    /// through the SAME copier the import uses.
+    ///
+    /// It used to have a loop of its own: `contentsOfDirectory`, then
+    /// `copyItem` to `destination.appendingPathComponent(child.lastPathComponent)`.
+    /// That preserved the names INSIDE each folder and decomposed the
+    /// top-level ones, because the rebuilt component goes through `URL`'s
+    /// file-system representation — measured, a folder called `Thème` arrived
+    /// spelled the other way, and a page that links to something inside it by
+    /// the old spelling no longer resolves in the built site. Nothing in the
+    /// four real courses measured has a non-ASCII top-level name, so nobody
+    /// had met it; that is luck, not a design.
     private static func copyContents(of sourceURL: URL, into destinationURL: URL) throws {
-        let fileManager: FileManager = FileManager.default
-        let children: [URL] = try fileManager.contentsOfDirectory(
-            at: sourceURL, includingPropertiesForKeys: nil, options: []
-        )
-        for child in children {
-            let name: String = child.lastPathComponent
-            if ReferenceCopier.isLeftBehind(name) {
-                continue
-            }
-            try fileManager.copyItem(at: child, to: destinationURL.appendingPathComponent(name))
+        var leftBehind: Set<String> = []
+        for name in CourseArchiver.excludedFromArchives {
+            leftBehind.insert(name)
         }
+        for name in ReferenceCopier.alsoLeftBehind {
+            leftBehind.insert(name)
+        }
+        let survey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.survey(
+            courseAt: sourceURL, leavingBehind: leftBehind
+        )
+        if let unreadable = survey.unreadableFolders.first {
+            throw ReferenceTreeCopier.Trouble.couldNotRead(name: unreadable)
+        }
+        try ReferenceTreeCopier.copySynchronously(
+            survey, from: sourceURL, into: destinationURL
+        )
 
         // Leases belong to processes on whichever machine wrote them, so a
         // copied one names a process that was never doing anything here.
         let leases: URL = destinationURL
             .appendingPathComponent(".internal").appendingPathComponent("activity")
-        try? fileManager.removeItem(at: leases)
+        try? FileManager.default.removeItem(at: leases)
     }
 
-    private static func isLeftBehind(_ name: String) -> Bool {
-        for excluded in CourseArchiver.excludedFromArchives where excluded == name {
-            return true
-        }
-        for excluded in ReferenceCopier.alsoLeftBehind where excluded == name {
-            return true
-        }
-        return false
-    }
 }

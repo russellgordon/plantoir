@@ -565,6 +565,53 @@ class TheBuiltSiteShowsTheRealCode(unittest.TestCase):
         )
 
 
+class ACourseCodeMayNotBeginWithADot(unittest.TestCase):
+    """The launchers refuse a hidden name outright.
+
+    Plantoir builds a reference course under a hidden folder inside
+    `courses/` — `.plantoir-importing-<folder>` — and renames it into place as
+    the last act. Handed that hidden name, `deploy.sh` treated it as an
+    ordinary course: the uppercased name still resolves on a
+    case-insensitive volume, and during the copy there is no marker yet for
+    the reference guard to find. Measured before the guard existed: the run
+    went past the reference check and stopped later, for an unrelated reason.
+
+    The app can never pass such a name — discovery skips hidden entries and a
+    course code may not begin with a dot — but a person or another program
+    can type one, and the guard belongs where the argument arrives rather
+    than in a comment saying it cannot happen.
+    """
+
+    def setUp(self):
+        if not _bash_can_reach_a_scratch_folder():
+            self.skipTest("bash cannot read a scratch folder here")
+
+    def test_deploy_refuses_it_before_anything_else(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = _a_working_folder(
+                tmp, ".plantoir-importing-ICS4U-2025",
+                {"course_code": "ICS4U", "section_numbers": [1]},
+            )
+            done = _run_launcher(
+                folder,
+                [".plantoir-importing-ICS4U-2025", "1",
+                 "--to-folder", str(folder / "out"), "--non-interactive"],
+            )
+            said = done.stdout.decode("utf-8", "replace")
+            self.assertEqual(done.returncode, 1, said)
+            self.assertIn("cannot begin with a dot", said)
+            self.assertFalse((folder / "out").exists(),
+                             "the refusal came after something was written")
+
+    def test_every_launcher_carries_the_same_refusal(self):
+        # Structural, and it is how the two PowerShell twins are covered at
+        # all from this side: nothing here can run them.
+        for name in ("deploy.sh", "preview.sh", "deploy.ps1", "preview.ps1"):
+            text = (REPOSITORY_ROOT / name).read_text(encoding="utf-8")
+            self.assertIn("cannot begin with a dot", text,
+                          f"{name} does not refuse a course code beginning with a dot")
+
+
 class TheImageCarriesTheModule(unittest.TestCase):
 
     def test_the_dockerfile_bakes_it(self):

@@ -442,6 +442,40 @@ nonisolated enum ActivityTrail {
         /// leaves no lines at all.
         case referenceCoursePagesLockedAgain = "reference course pages locked again"
 
+        /// A course was brought in from another folder and kept for
+        /// reference: which folder it was read from, the folder it was given
+        /// here, the code and school year it shows, and how many sections
+        /// came across. The folder it was READ from is the half a copy does
+        /// not have, and it is the answer to "where did this ICS4U come
+        /// from". Never the contents of a page.
+        case courseImportedForReference = "course imported for reference"
+
+        /// One course of an import did not come across, and the rest did.
+        /// Carries which course and why — a course code already kept for
+        /// reference under that school year, a folder that could not be read,
+        /// a disk that filled. Written per COURSE, because "the import
+        /// failed" is exactly the report that cannot be looked into: a run of
+        /// four courses that imports three is the ordinary shape of this.
+        case courseCouldNotBeImportedForReference = "course could not be imported for reference"
+
+        /// The teacher stopped an import part way. Carries the course that
+        /// was in hand, which was not kept, and the folder it was coming
+        /// from. Its own event rather than a failure: a teacher who stops
+        /// something chose to, and a line calling that a failure is a line
+        /// that misleads whoever reads it back.
+        case courseImportForReferenceStopped = "course import for reference stopped"
+
+        /// A working folder was opened and an unfinished import was found in
+        /// it and tidied away. Carries which course it was going to be.
+        ///
+        /// A reference course is built under a hidden name and renamed into
+        /// place last, so a quit or a crash part way leaves a hidden folder
+        /// nothing can see — and therefore nothing would ever remove. This
+        /// is the one line that says the disk space came back, and it is
+        /// also how "my import did not finish and now there is no trace of
+        /// it" gets an answer.
+        case unfinishedImportForReferenceTidiedAway = "unfinished import for reference tidied away"
+
         /// A reference course was filed under a different school year — the
         /// one thing about a frozen course a teacher can still change.
         /// Carries the code they read, the folder, and both years.
