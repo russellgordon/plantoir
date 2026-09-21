@@ -48,6 +48,23 @@ final class AssistToolRunner {
 
     // MARK: - Stored properties
 
+    /// Which client this runner is answering.
+    ///
+    /// The tools are one surface with two clients, and this is the ONE thing
+    /// that differs beyond the length of the list: a reference course is not
+    /// shown to the local model at all (decision d), while a Claude or Codex
+    /// session is told about it on purpose, because reading one is the point
+    /// of keeping it. `list_courses` is the only tool that asks.
+    ///
+    /// Defaults to `.local`, so the only caller that has to say anything is
+    /// the MCP server.
+    nonisolated enum Surface: Sendable {
+        case local
+        case mcp
+    }
+
+    private let surface: Surface
+
     /// Where the courses are.
     private let workspace: WorkspaceModel
 
@@ -154,7 +171,9 @@ final class AssistToolRunner {
          siteWork: AssistSiteWork? = nil,
          today: @escaping () -> CalendarDay = { return CalendarDay.today() },
          launchControl: LaunchControlRunning = LaunchControl(),
-         openMainWindow: (@MainActor () -> Void)? = nil) {
+         openMainWindow: (@MainActor () -> Void)? = nil,
+         surface: Surface = .local) {
+        self.surface = surface
         self.workspace = workspace
         self.siteWork = siteWork ?? AssistToolchainWork(workspace: workspace)
         self.readToday = today
@@ -257,9 +276,111 @@ final class AssistToolRunner {
         }
     }
 
+    /// Tools that may still be run on a course kept for reference, although
+    /// they are not read-only.
+    ///
+    /// Three of them, each for its own reason, and all three are contract DATA
+    /// (`shared-rules.json` → `referenceCourses.refusal.toolsStillAllowed`)
+    /// rather than a judgement made here — a test asserts that the
+    /// non-`readOnly` tools minus these three are exactly the set the gate
+    /// refuses, so adding a tool fails the suite rather than opening a hole.
+    ///
+    /// * `rebuild_preview` — a reference course may be previewed; that is how
+    ///   a teacher reads last year's pages with their images and links. It
+    ///   writes into the build tree, never into the course.
+    /// * `back_up_course` — it reads the course and writes a zip OUTSIDE it.
+    /// * `cancel_scheduled_deploy` — **gate by direction.** This is the act
+    ///   that STOPS a deploy, and refusing it would strand an alarm set before
+    ///   the course was marked, with no way to turn it off from the app.
+    static let toolsAllowedOnAReferenceCourse: Set<String> = [
+        "rebuild_preview",
+        "back_up_course",
+        "cancel_scheduled_deploy",
+    ]
+
+    /// The two tools that put a site on the web, so the write gate can say
+    /// which of the two refusals applies.
+    ///
+    /// Their `plan_` twins are read-only and so never meet the gate; they are
+    /// refused in `scheduleRequest` instead, with the same deploy sentence, so
+    /// a plan never describes a deploy that cannot happen.
+    static let toolsThatDeploy: Set<String> = ["deploy_section", "schedule_deploy"]
+
+    /// Whether this call would write to a course that is kept for reference.
+    ///
+    /// Gated on the tool's OWN `readOnly` flag, never on a hand-kept list of
+    /// names — the same reasoning the window binding uses for gating on the
+    /// schema, and for the same reason: a list somewhere else is a list
+    /// somebody forgets on the day they add a tool.
+    ///
+    /// **Never gated on "is this the course the session greeted".** There is
+    /// no such binding over MCP — a session is scoped to the working folder —
+    /// and inventing one here in order to except it would take away the
+    /// capability a reference course exists for, which is being READ by a
+    /// Claude or Codex session working in the live course.
+    private func courseKeptForReference(namedIn call: AssistToolCall) -> Course? {
+        guard let tool = definition(named: call.function.name) else {
+            return nil
+        }
+        if tool.readOnly {
+            return nil
+        }
+        if AssistToolRunner.toolsAllowedOnAReferenceCourse.contains(tool.name) {
+            return nil
+        }
+        var code: String = AssistToolRunner.text("course", in: call.argumentValues)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if code.isEmpty {
+            // **A write tool that names no course is gated by the course it
+            // would actually TOUCH.** Exactly one exists — `undo_last_change`
+            // declares no parameters at all — and what it would touch is the
+            // change waiting in this conversation's history, which knows its
+            // own course. Reading the argument and giving up when it is empty
+            // was fail-OPEN on the argument, and the test that "proved"
+            // otherwise passed a `course` the schema does not have.
+            //
+            // Nothing else may join it quietly: a test asserts that
+            // `undo_last_change` is the ONLY non-read-only tool without a
+            // `course` parameter, so a future one fails the suite rather than
+            // slipping past this.
+            guard let pending = history.nextToUndo else {
+                return nil
+            }
+            code = pending.courseCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if code.isEmpty {
+            return nil
+        }
+        for candidate in workspace.courses
+        where candidate.code.lowercased() == code.lowercased() && candidate.isKeptForReference {
+            return candidate
+        }
+        return nil
+    }
+
     /// Run one tool.
     func run(call: AssistToolCall) async -> AssistToolOutcome {
         let arguments: [String: Any] = call.argumentValues
+
+        // Nothing writes to a course kept for reference, whichever client is
+        // calling. First, before the tool is dispatched at all: a refusal that
+        // arrives after the work has started is not a refusal.
+        if let reference = courseKeptForReference(namedIn: call) {
+            // Two sentences, chosen by what was ASKED FOR rather than by what
+            // was refused. "It is never deployed" answers a question nobody
+            // asked of "add a class to ICS3U", and "it stays as it is" leaves
+            // a teacher who asked for a deploy wondering whether deploying it
+            // later would work.
+            if AssistToolRunner.toolsThatDeploy.contains(call.function.name) {
+                return AssistToolOutcome.refused(
+                    AssistWording.deployRefusedForAReferenceCourse(course: reference.displayCode)
+                )
+            }
+            return AssistToolOutcome.refused(
+                AssistToolRefusal.keptForReference(reference.displayCode).message
+            )
+        }
+
         switch call.function.name {
         case "list_pages":
             return listPages(arguments)
@@ -1482,6 +1603,14 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(refusal(from: found).message)
         }
 
+        // BEFORE the preview is stopped, deliberately. A refusal placed any
+        // later kills a preview the teacher was reading, for nothing.
+        if located.course.isKeptForReference {
+            return AssistToolOutcome.refused(
+                AssistWording.deployRefusedForAReferenceCourse(course: located.course.displayCode)
+            )
+        }
+
         _ = await stopThePreviewBeforeWriting(
             for: located.course, sectionNumber: located.sectionNumber
         )
@@ -1531,6 +1660,18 @@ final class AssistToolRunner {
         let found: Result<Located, AssistToolRefusal> = locate(arguments)
         guard case .success(let located) = found else {
             return .failure(refusal(from: found))
+        }
+        // Here rather than only in `scheduleDeploy`, so `plan_scheduled_deploy`
+        // refuses too: a plan that DESCRIBES a deploy which cannot happen
+        // teaches a session to go and try it.
+        if located.course.isKeptForReference {
+            return .failure(
+                .notInThisBuild(
+                    AssistWording.deployRefusedForAReferenceCourse(
+                        course: located.course.displayCode
+                    )
+                )
+            )
         }
         let raw: String = text("when", in: arguments)
         guard let when = AssistToolRunner.moment(named: raw) else {
@@ -3042,7 +3183,19 @@ final class AssistToolRunner {
     /// did not expect. Windows' version answers the same three things, so a
     /// Claude Code session sees the same shape on either platform.
     private func listCourses() -> AssistToolOutcome {
-        let courses: [Course] = workspace.courses
+        // **The local window never lists a reference course.** `list_courses`
+        // is MCP-only as a TOOL, but the app reaches it too: "what courses do
+        // i have?" is matched in code by `AssistCardCommand.fixedShapes`, and
+        // what comes back is shown to the teacher. Decision (d) says the
+        // local assistant is told nothing about a reference course, so this is
+        // where that is true rather than nearly true.
+        var courses: [Course] = []
+        for course in workspace.courses {
+            if surface == .local && course.isKeptForReference {
+                continue
+            }
+            courses.append(course)
+        }
         guard courses.isEmpty == false else {
             return AssistToolOutcome.read(
                 AssistWording.noCoursesYet, detail: AssistWording.noCoursesYet
@@ -3058,6 +3211,20 @@ final class AssistToolRunner {
             let sectionList: String = sections.isEmpty
                 ? "none yet"
                 : sections.joined(separator: ", ")
+            if course.isKeptForReference {
+                // Everything a session needs to say "last year's ICS3U" and
+                // then ADDRESS it: the name `locate` accepts, the code a
+                // teacher reads, what kind of course it is, and which year.
+                // Not a teacher surface, so all three can be shown at once.
+                lines.append(
+                    "\(course.code) — \(course.configuration.courseName)\n"
+                    + "  course code: \(course.displayCode)\n"
+                    + "  kept for reference — never deployed"
+                    + "\n  school year: \(AssistToolRunner.schoolYearText(of: course, today: readToday()))"
+                    + "\n  sections: \(sectionList)"
+                )
+                continue
+            }
             lines.append(
                 "\(course.code) — \(course.configuration.courseName)\n"
                 + "  sections: \(sectionList)\n"
@@ -3077,6 +3244,30 @@ final class AssistToolRunner {
             ? "There is 1 course in this working folder."
             : "There are \(courses.count) courses in this working folder."
         return AssistToolOutcome.read(summary, detail: said, showingTheTeacher: said)
+    }
+
+    /// One line per reference course, for the MCP session briefing: the name
+    /// it is addressed by, the code a teacher reads, and the school year.
+    ///
+    /// Public because the server builds the briefing and the runner is what
+    /// knows the courses. Empty when there are none, which is most folders.
+    func referenceCourseBriefingLines() -> [String] {
+        var lines: [String] = []
+        for course in workspace.courses where course.isKeptForReference {
+            lines.append(
+                "  \(course.code) — \(course.displayCode), "
+                + AssistToolRunner.schoolYearText(of: course, today: readToday())
+            )
+        }
+        return lines
+    }
+
+    /// "2025–26", or "Other" — the label a session repeats back to a teacher.
+    static func schoolYearText(of course: Course, today: CalendarDay) -> String {
+        guard let year = course.schoolYear(on: today) else {
+            return SchoolYear.otherGroupName
+        }
+        return SchoolYear.label(forStartingYear: year)
     }
 
     private struct PlannedReDate {
@@ -3359,6 +3550,20 @@ final class AssistToolRunner {
         for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
             course = candidate
         }
+        // **A reference course is addressed by its FOLDER NAME and nothing
+        // else.** A bare `ICS3U` resolves to the live ICS3U exactly as it
+        // always has; if there is no live one and a reference course carries
+        // that code, this REFUSES and names the candidates rather than
+        // guessing. A session asked to read last year's material and handed
+        // this year's would report on the wrong course and never know — and
+        // the two deliberately show the same code, so the guess would be
+        // right-looking every time.
+        if course == nil {
+            let candidates: [String] = referenceCoursesShowing(code: code)
+            if !candidates.isEmpty {
+                return .failure(.askedForACourseByItsCodeAlone(code, candidates))
+            }
+        }
         guard let course else {
             return .failure(.noSuchCourse(code))
         }
@@ -3377,6 +3582,23 @@ final class AssistToolRunner {
             return .success(Located(course: course, sectionNumber: only))
         }
         return .failure(.noSuchSection(course.code, 0))
+    }
+
+    /// The folder names of every reference course showing this code.
+    ///
+    /// Sorted, so the sentence a session reads is the same every time.
+    private func referenceCoursesShowing(code: String) -> [String] {
+        let wanted: String = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if wanted.isEmpty {
+            return []
+        }
+        var result: [String] = []
+        for candidate in workspace.courses
+        where candidate.isKeptForReference && candidate.displayCode.lowercased() == wanted {
+            result.append(candidate.code)
+        }
+        result.sort()
+        return result
     }
 
     private func refusal(from result: Result<Located, AssistToolRefusal>) -> AssistToolRefusal {

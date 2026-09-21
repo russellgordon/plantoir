@@ -1320,6 +1320,272 @@ because the obvious home is wrong twice over:
 step to a removal adds it there rather than in the view. The view keeps one
 call, the confirmation's extra sentence and the "Could not remove" alert.
 
+## A reference course, and what FROZEN means on disk
+
+A reference course is last year's course — or a course full of example content
+— kept in this year's sidebar to be read, and never deployed. The rules both
+apps share are
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses`; the two config keys are in
+[`08-course-config-reference.md`](08-course-config-reference.md); the refusal at
+every door is in [`07-deployment.md`](07-deployment.md). What is here is the
+mac's own half: the lock.
+
+### The mechanism, and the two things that were measured and rejected
+
+`chflags uchg` — the user-immutable flag, which is Finder's **Locked** badge —
+on every content FILE and on no directory. `ReferenceLock`. Modes are left
+exactly as they are, and both of the obvious alternatives were tried:
+
+- **`chmod a-w` alone protects nothing an editor actually does.** Measured: a
+  rename-over — a new file moved onto the old name, which is how every serious
+  editor saves — SUCCEEDED and replaced the page's contents, and `rm -f`
+  deleted it. `uchg` refuses writing in place, the rename-over, a rename and a
+  delete, all four.
+- **Mode `444` as well as the flag BREAKS THE PREVIEW BUILD, and it breaks it
+  in the direction that matters.** `build_site.py` copies each page into the
+  build tree with `shutil.copy2` — which carries the mode and, on macOS, the
+  flag — and then rewrites the copy's frontmatter, which is where `draft: true`
+  becomes `publish: false`. The build tree is a HOST BIND MOUNT, where the
+  container's root does not get its usual permission override: measured inside
+  the real image, the rewrite fails with one warning line per page, the copy
+  keeps `draft: true` and gains no `publish` key, and `patches/publish.ts`
+  publishes anything that does not say `publish: false`. **Every page the
+  teacher had hidden would have appeared in the preview of their frozen
+  course.** With the flag alone and the mode left at 644 the same build writes
+  `publish: false` correctly — and the source is still refused, even to
+  container root, because the Colima mount carries the flag through.
+
+**Directories are never locked**, and that is measured too: with the course
+folder locked, creating `.merged_output` inside it fails — and
+`BuildOutputLocation.ensureLink` has to create that symlink on every read of
+the folder, as do the launchers before every build. Locking the folders would
+kill the preview a reference course exists to give.
+
+### What is deliberately left writable, and why each one
+
+`course_config.json` (the school year can be changed, and the build's preflight
+rewrites it), `course_config.backup.json` (written beside it by that same
+preflight, with `shutil.copy2`, which raises on a locked destination),
+`.obsidian/` and everything under it, `.merged_output`, and `.DS_Store`.
+
+**Obsidian writes four files into `.obsidian/` within seconds of opening a
+vault** — measured on a throwaway vault, 2026-09-20: `app.json`,
+`appearance.json`, `core-plugins.json` (696 B) and `workspace.json` (4,843 B).
+Opening a reference course in Obsidian is the whole point of keeping one, so
+that folder cannot be inside the lock.
+
+One writer CAN still meet a locked file: the build's exclusion note, which
+rewrites a folder's `index.md`. It returns without writing when the note
+already matches and it catches the write failure, so on a reference course it
+is a warning line at worst rather than a failed build. Named here so nobody
+reads it as a bug.
+
+### The walk itself — and the bug that hid in it
+
+`contentFiles` skips the never-locked names, and `skipDescendants()` is for a
+never-locked **FOLDER**. Called on a never-locked FILE — `course_config.json`,
+which every course has at its top level — the enumerator applies the skip to
+the next directory it has not descended into, so **the folder after it was
+never walked and never locked.** Measured on a real course: 842 of 934 files
+walked, 27 real pages left editable, and *which* folder was lost moved between
+passes with readdir order — which is why the course came out mostly locked,
+never entirely locked, and nothing looked wrong. Found by the branch-B
+implementer on 2026-09-20, in the real app.
+
+The cure is to ask whether the skipped thing IS a directory. The lesson is the
+other half, and the first attempt at it was wrong in a way worth recording: **a
+count produced BY the walk cannot audit the walk.** Comparing "how many the
+walk saw" with "how many of those are locked" is algebraically "nothing failed
+to take" — the broken walk passed it, with nine pages editable on disk.
+
+What runs now is an **independent census**: a plain full enumeration with no
+skip logic at all, classifying each regular file by the never-locked rule
+alone, and comparing what should be locked with what the file system says is.
+That is the 934 against the walk's 842. A mismatch goes on the trail with both
+numbers, and the sentence that tells a teacher their pages are locked is **not
+shown** — which also covers the volume that cannot carry the flag at all,
+where nothing could be locked and the old code said it was.
+
+**The walk runs off the caller's actor, and on this target that takes
+`@concurrent`.** `mac-app/project.yml` sets `SWIFT_APPROACHABLE_CONCURRENCY`,
+which turns on `NonisolatedNonsendingByDefault` — under that rule a plain
+`nonisolated async` function runs on its **caller's** actor, so the obvious
+spelling would have kept every `stat` on the main actor while reading as
+though it did not. Measured both ways; `testTheLockWalkDoesNotRunOnTheMainThread`
+pins it rather than trusting the annotation. No `DispatchQueue`, no sleeps.
+
+### Asserted, VERIFIED, re-asserted — and never with a timer
+
+`ReferenceCourseUpkeep.bringUpToDate` runs whenever a working folder is read
+and again whenever a reference course is made. It locks what is unlocked,
+**reads the flag back**, and counts both. Three reasons the lock cannot be
+assumed once, all measured:
+
+- **A cloud-synced folder strips it.** `fileproviderd` models the locked bit
+  itself (`m:rw-l` in its own log), asks the CloudDocs provider to create the
+  item with it, gets back an item without it, and reconciles *downward* — which
+  clears `uchg` on the live file about a second after an upload starts, with no
+  error and no log line naming the file. A course copied into iCloud Drive
+  arrives thawed within about three seconds. Eviction ("Optimise Mac Storage")
+  is harmless: the flag survives evict and re-download intact.
+- **The flag is never uploaded**, so the lock is **per-Mac**. A second Mac sees
+  ordinary writable files, and an edit arriving from another device is not
+  blocked by it.
+- **A zip round trip loses it.** `zip`/`unzip` carry the mode and not the flag,
+  so a restored backup comes back unlocked — which is why `CourseRestorer`
+  re-locks from the marker in the restored config.
+
+Where the lock does not take, the file is left for the NEXT pass. There is no
+retry after a guessed delay, and there must never be one: a delay chosen to let
+something settle is a guess that stops working on a slower machine. The count
+that would not take goes on the trail, which is what turns "my reference course
+let me edit a page" into an explanation.
+
+Two names are never locked that are easy to miss, and both are halves of the
+build's own atomic write of `course_config.json`: the `.backup.json` beside it
+and the `.json.tmp` that exists only between the `open()` and the
+`os.replace()`. A build interrupted between the two leaves the `.tmp` on disk —
+and a LOCKED one would fail every later preflight twice over, at the write and
+again at the cleanup, so that course's settings could never be reconciled
+again. Anything ending `.tmp` is left alone for the same reason.
+
+**A real-image gate**, since 2026-09-20: `verify.sh` builds a course whose
+every content file carries `uchg`, in the dev-test image, over a `$HOME` bind
+mount — and checks that it builds at all, that a page hidden in the SOURCE is
+hidden in the built site, that building again over the existing build works,
+and that the source comes back byte-for-byte and still locked. The hidden page
+uses the LEGACY `draft:` spelling deliberately, because `publish: false` needs
+no rewrite and would stay hidden even when the rewrite fails.
+
+**And what the mac's own limit hides from Windows.** `preview.ps1` and
+`deploy.ps1` point `PLANTOIR_WORK_DIR` at a HOST folder under `%LOCALAPPDATA%`
+and build natively rather than as root — so there a read-only attribute DOES
+travel into the build tree, the frontmatter rewrite WOULD fail, and a page the
+teacher hid WOULD be published. The trap the mac cannot reproduce is live on
+the other platform, and the `windows` issue says so.
+
+**What that gate is NOT.** The plan's ruling asked for a must-fail proof —
+the same case with mode 444 showing the hidden page — and it does not
+reproduce through the real launcher. The 444 fault needs the build tree to be
+the host bind mount, where container root does not get its usual permission
+override; `preview.sh --build-only` builds in the container's own
+`/tmp/quartz-builds` and syncs `public/` out afterwards, so the rewrite happens
+on container-local storage, where root *can* write a 444 file. Run with
+`chmod 444` as well as the flag, the case still passed. The original
+measurement stands — it was taken against a bind mount on purpose, and it is
+still why the mechanism is the flag alone — but the standing gate is on
+everything else.
+
+**Cost, measured on this Mac** (APFS, local disk; 1,220 files — 900 under
+`Media` plus 320 pages): **59.5 ms** for the pass that locks everything, and
+**23 ms** for a pass over a course already frozen. A folder with no reference
+course in it does no work at all.
+
+### What removal, restore and copying do about it
+
+- **Removing the whole course unlocks first.** `FileManager.removeItem` and
+  `rm -rf` both refuse a locked tree — the message a teacher would otherwise
+  have read is *"“ICS3U-2025” couldn't be removed because you don't have
+  permission to access it."*, which is the file system's words, not the
+  product's. The unlock sits in `ScheduledDeployCleanup.removeCourse`, after
+  the scheduled-deploy cancel and before the archive, so the one thing that can
+  still stop a removal is the cancel. The confirmation says nothing about the
+  lock: that would be the app talking about its own plumbing.
+- **The settings FORM is not shown at all** on a reference course: the row
+  opens a short read-only summary instead. The form carried a "Deploying"
+  section, and a reference course is deliberately left with no deploy folder —
+  so it asked the teacher to choose one for a course it had just called never
+  deployed, and greyed Save for ever with no explanation. Worse, Save WORKED
+  for everything else, because `course_config.json` is never locked: a teacher
+  could rename a frozen course, change its graded folders, or quietly undo the
+  neutralisation that makes an older Plantoir refuse it. `frozen.rule` says
+  Plantoir offers nothing that changes a page, a setting or the shape of the
+  course; that sentence was false as shipped and is true now.
+- **The Site Health repair BUTTON is not drawn.** The model already returned
+  no attempts — and the view drew the button anyway, so pressing it said
+  *"That is already put right. Nothing needed changing."* about a folder that
+  was really missing. The findings still report; the action is gone.
+- **Removing one SECTION is refused**, with `ReferenceWording.staysAsItIs` —
+  removing a section changes the course, so "frozen" already requires it. The
+  sidebar does not offer the item; the refusal exists so no other caller gets
+  past it.
+- **A copy taken FROM a frozen course clears the lock at once**, before the
+  site markers are renamed aside and before anything can fail. The flag
+  travels through `copyItem`, and a locked copy can be neither finished (a
+  locked marker cannot be renamed) nor cleaned up (`removeItem` refuses a
+  locked tree) — which left a folder the teacher could delete from neither
+  the app nor Finder. Found by review, 2026-09-20. Nothing offers this today
+  ("Keep a Copy for Reference…" is withheld on a reference course) and it is
+  fixed anyway: a guard that depends on a menu item being withheld elsewhere
+  is one edit from being gone.
+- **Anything copied OUT arrives locked.** `FileManager.copyItem`, `cp -p`,
+  `ditto` and `shutil.copy2` all carry the flag; only a plain `cp -R` or a zip
+  round trip loses it. `ReferenceLock.clearLock` is the one place that clears
+  it, and whatever copies pages between courses must call it — a page a teacher
+  cannot edit, with no explanation, reads as "the app is broken".
+
+### What Finder does with one — measured, because decision (n) asked
+
+Dragging a locked reference course to the Trash **works**. Measured on a
+throwaway folder with `FileManager.trashItem`, which is the API Finder's own
+"Move to Trash" uses: it SUCCEEDED on a course whose pages carry `uchg`, and
+the folder landed in `~/.Trash` with its locks intact. So a teacher who bypasses
+Plantoir and drags the folder away is not stopped, and Finder does not prompt
+for the folder (it prompts per LOCKED ITEM only on some paths — not on this
+one, where the move is a rename within the volume).
+
+What that means in practice: the course leaves the sidebar, Plantoir stops
+seeing it, and **emptying the Trash is where the lock bites** — the Finder
+asks for confirmation to delete locked items. The teacher's own Remove is the
+supported route and unlocks first, so they never meet that; this is written
+down because "what happens if I just drag it out" is the first thing somebody
+will try, and an answer of "nobody measured" is worse than either outcome.
+
+### The interface: withheld, not merely refused
+
+Every act that would CHANGE a reference course is **not offered** — hidden,
+never greyed. A greyed control that can never become available is a standing
+invitation to wonder what is wrong, and the sidebar already follows that rule
+for Schedule/Cancel Deploy. The refusals stay underneath it, so any other
+caller still meets one; the list of both is
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.interface`.
+
+**One of them is not a menu item and is the reason this section exists.**
+`SiteHealthRepair` CREATES files inside the course — a `Media` folder, a
+section's front page — and the directories are deliberately left unlocked so
+the preview can work, so those writes would have SUCCEEDED on a frozen course.
+The lock refuses nothing there; the guard does. Found by review, 2026-09-20,
+with the same shape in Course Settings' folder rename, the unit-word rename,
+Add Section, Rename Course and "Restore Section N…".
+
+**The calm note appears BEFORE Obsidian, once per course.** Not after, and
+that placement is forced by what could not be measured: whether Obsidian tells
+a teacher that a save failed, or swallows what they typed, is unknown — so a
+note that arrived afterwards would be the worst of both. It claims only that
+Plantoir keeps the pages locked and that they stay as they were. It may not
+say they cannot be changed (the lock is per-Mac, and a cloud folder strips it
+while files upload) and it may not promise the teacher will be told when an
+edit fails. `LockedPagesNote` remembers which courses have had it.
+
+### The honest limits — in here, and never in the GUI
+
+With the directories unlocked a new file can still be ADDED to one. Anybody who
+means to can clear the flag. The lock is per-Mac, and an incoming change from
+another device is not blocked by it (not directly measured — it needs two Macs
+— but `fileproviderd` demonstrably clears the flag on its own initiative, so
+expect it to get through; the direction it errs in is less protection, never a
+stuck sync). What the lock DOES stop is every ordinary edit, save, rename and
+delete of the material that is there, which is what a teacher will meet. It is
+a statement of intent, not a security boundary.
+
+**And the refusal to deploy does not depend on it in any way.** An entirely
+unlocked reference course is refused at every door just the same; a test pins
+that. If the two were ever coupled, an unlocked course would become a
+deployable one, and a deploy that reports success is the worst direction this
+feature can fail in.
+
 ## What an archive or a backup is CALLED, and the calendar it is stamped in
 
 Three kinds of zip share `courses/_backups/<CODE>/` and are told apart only by

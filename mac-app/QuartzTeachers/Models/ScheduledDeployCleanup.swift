@@ -46,10 +46,11 @@ enum ScheduledDeployCleanup {
 
     /// Why a scheduled deploy was turned off, in the words the trail uses.
     ///
-    /// One trail event with three reasons rather than three events: a teacher
-    /// reading the trail wants to know their overnight deploy was turned off
-    /// and by what, and the difference between two ways of removing something
-    /// means nothing to them.
+    /// One trail event with several reasons rather than one event each: a
+    /// teacher reading the trail wants to know their overnight deploy was
+    /// turned off and by what, and the difference between two ways of removing
+    /// something means nothing to them. Three when this was written; four
+    /// since a course could be kept for reference.
     nonisolated enum Reason {
 
         /// The whole course was removed from the sidebar.
@@ -62,6 +63,11 @@ enum ScheduledDeployCleanup {
         /// allows.
         case theDayItWasSetForHadGoneBy
 
+        /// The course is kept for reference now, so it is never deployed —
+        /// and an alarm set before that is an alarm for a deploy that will be
+        /// refused at half six with nobody there to read the refusal.
+        case theCourseIsKeptForReference
+
         // MARK: - Computed properties
 
         /// The end of the trail line: "turned off a scheduled deploy …".
@@ -73,6 +79,8 @@ enum ScheduledDeployCleanup {
                 return "because that section was removed"
             case .theDayItWasSetForHadGoneBy:
                 return "because the day it was set for had gone by"
+            case .theCourseIsKeptForReference:
+                return "because the course is kept for reference"
             }
         }
     }
@@ -290,6 +298,18 @@ enum ScheduledDeployCleanup {
                 problem: couldNotTurnItOff(courseCode: course.code, sections: outcome.unstopped)
             )
         }
+        // A reference course's pages are locked, and `FileManager.removeItem`
+        // refuses a locked tree outright ("Operation not permitted"). Unlocked
+        // AFTER the cancel and BEFORE the archive, so the one thing that can
+        // still stop a removal is the cancel — and so a course whose removal
+        // fails for some other reason is left unlocked rather than half
+        // frozen; the next folder read locks it again.
+        //
+        // The teacher is told nothing about this. A delete confirmation that
+        // mentioned the lock would be the app talking about its own plumbing.
+        if course.isKeptForReference {
+            ReferenceLock.unlock(courseDirectory: course.directoryURL)
+        }
         do {
             try CourseArchiver.archiveAndRemoveCourse(
                 course, coursesDirectoryURL: coursesDirectoryURL
@@ -315,6 +335,22 @@ enum ScheduledDeployCleanup {
         coursesDirectoryURL: URL,
         runner: LaunchControlRunning = LaunchControl()
     ) -> RemovalResult {
+        // A reference course is frozen, and removing a section CHANGES it —
+        // so this is refused rather than unlocked. The sidebar does not offer
+        // the item at all, which is where a teacher meets this; the refusal
+        // is here so that no other caller can get past it, and so that what
+        // they read is a sentence rather than the file system's own words
+        // about an operation not being permitted.
+        //
+        // Removing the WHOLE course is a different act and is allowed: it is
+        // the teacher putting the shelf away, not changing what is on it.
+        if course.isKeptForReference {
+            return RemovalResult(
+                stoppedSections: [],
+                didRemove: false,
+                problem: ReferenceWording.staysAsItIs(course: course.displayCode)
+            )
+        }
         let workingFolderURL: URL = coursesDirectoryURL.deletingLastPathComponent()
         let agents: [ScheduledDeploy.Agent] = agentsOwnedBy(
             courseCode: course.code,

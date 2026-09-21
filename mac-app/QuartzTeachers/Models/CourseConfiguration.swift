@@ -313,6 +313,92 @@ class CourseConfiguration {
         return nil
     }
 
+    /// Whether this course is kept for reference: last year's course, or a
+    /// course full of example content, sitting in this year's sidebar so the
+    /// teacher can read it — and which Plantoir never deploys.
+    ///
+    /// **Absent means false**, which is what every course written before this
+    /// key existed says, and it is the only safe direction: a course that
+    /// forgot to say it is ordinary is a course a teacher can still deploy,
+    /// while the reverse would make a live course silently undeployable.
+    ///
+    /// The marker is NOT the defence on its own. A reference course is also
+    /// left with nowhere to deploy to (`neutraliseForReference`), so an OLDER
+    /// Plantoir sharing the same folder — one that has never heard of this key
+    /// — refuses it too, in sentences it already ships.
+    /// **Read STRICTLY: a real JSON `true` and nothing else.**
+    ///
+    /// Not `boolValue`, and that is measured rather than fastidious.
+    /// `JSONSerialization` hands back an `NSNumber` for `1`, and `NSNumber`
+    /// conditionally bridges to `Bool` for 0 and 1 — so `as? Bool` reads
+    /// `"kept_for_reference": 1` (and `1.0`) as TRUE, while all three
+    /// launchers read the same file as an ordinary course and DEPLOY it.
+    /// Both directions of the fault at once: the app freezes and locks a
+    /// course, with no way back to live, that the launchers then publish.
+    ///
+    /// `CFBooleanGetTypeID` is the only reading that tells a JSON boolean
+    /// from a number, and it keeps this key strict without widening
+    /// `boolValue`, which every other boolean setting uses. The four readers
+    /// — this app, `deploy.sh`, `deploy.ps1` and `reference_course.py` — then
+    /// agree on every row of
+    /// `contracts/shared-rules.json` → `referenceCourses.markerAgreement`,
+    /// which is where the spellings a person plainly MEANT are dealt with:
+    /// the launchers refuse those with "cannot tell", which deploys nothing
+    /// and freezes nothing, and this app treats them as an ordinary course.
+    var keptForReference: Bool {
+        get { return strictBoolValue(forKey: "kept_for_reference") }
+        set { values["kept_for_reference"] = newValue }
+    }
+
+    /// Which school year a reference course was taught in, as the calendar
+    /// year it STARTED in: `2025` for 2025–26.
+    ///
+    /// Absent, null, or anything that is not a year reads as "Other" — the
+    /// rule is `SchoolYear.offeredYear(storedYear:on:)`, and the label
+    /// ("2025–26", with an en dash) is derived rather than stored so the dash
+    /// never reaches the file format.
+    ///
+    /// Nil clears the key rather than writing `null`: a course nobody has
+    /// filed under a year writes the same file it always did.
+    var referenceSchoolYear: Int? {
+        get { return optionalIntValue(forKey: "reference_school_year") }
+        set {
+            guard let newValue else {
+                values.removeValue(forKey: "reference_school_year")
+                return
+            }
+            values["reference_school_year"] = newValue
+        }
+    }
+
+    /// Leaves this course with NOWHERE TO DEPLOY TO, as the second half of
+    /// making it a reference course.
+    ///
+    /// The marker above is what this version of Plantoir reads. This is what
+    /// every OTHER version reads: a teacher may keep their working folder in
+    /// iCloud Drive and open it on a second Mac still running an older
+    /// Plantoir, which has never heard of `kept_for_reference` and would show
+    /// a working Deploy button aimed at last year's real class site.
+    ///
+    /// Measured on a real previous-generation working folder: those configs
+    /// carry no `deploy_target` at all, and an absent `deploy_target` reads as
+    /// `"netlify"` — so a plain copy really would arrive ready to deploy.
+    /// Written as a folder deploy with no folder, every shipped version
+    /// refuses it with a sentence it already has
+    /// (`MultiDestinationDeployRunner.refusalReason` and
+    /// `ScheduledDeploy.problem`).
+    ///
+    /// The site markers are dealt with separately, by whatever COPIES the
+    /// course: they are files rather than settings.
+    func neutraliseForReference() {
+        values["deploy_target"] = "local_folder"
+        values["deploy_folder_path"] = ""
+        values.removeValue(forKey: "additional_deploy_targets")
+        // A reference course must never claim last year's domain — the live
+        // course that replaces it may be using it.
+        values.removeValue(forKey: "custom_domains")
+    }
+
     var customShortName: String {
         get { return stringValue(forKey: "custom_short_name") }
         set { values["custom_short_name"] = newValue }
@@ -740,10 +826,20 @@ class CourseConfiguration {
     /// Changes the course code recorded in the settings, so it matches the
     /// folder the course lives in after a rename.
     ///
-    /// Both have to move together. The app reads a course's code from its
-    /// FOLDER name, while the site builder and the social-card maker read it
-    /// from here — so a pair that disagree produce a sidebar saying one thing
-    /// and a published page saying another, with no error anywhere.
+    /// Both have to move together **for a course a teacher teaches**. The app
+    /// reads a course's code from its FOLDER name, while the site builder and
+    /// the social-card maker read it from here — so a pair that disagree
+    /// produce a sidebar saying one thing and a deployed page saying another,
+    /// with no error anywhere.
+    ///
+    /// **A reference course is the one exception, and it disagrees on
+    /// purpose.** Its folder carries a year suffix so two ICS3Us can sit side
+    /// by side, while `course_code` stays the real code the teacher
+    /// recognises — which is also what keeps its preview's site title, grade
+    /// label and social card right. The second half of the warning above
+    /// cannot happen there, because a reference course is never deployed;
+    /// what a teacher READS comes from `Course.displayCode`. So
+    /// `CourseRenamer` must not rewrite `course_code` on one.
     func setCourseCode(_ courseCode: String) {
         values["course_code"] = courseCode
     }
@@ -1066,11 +1162,42 @@ class CourseConfiguration {
         return ""
     }
 
+    /// A whole number, or nil when the key is absent or holds something that
+    /// is not one. Unlike `intValue(forKey:fallback:)` this keeps the
+    /// difference between "no answer" and a number, which is what a key
+    /// whose absence MEANS something needs.
+    private func optionalIntValue(forKey key: String) -> Int? {
+        guard let stored = values[key] as? NSNumber else {
+            return nil
+        }
+        let whole: Int = stored.intValue
+        if Double(whole) != stored.doubleValue {
+            return nil
+        }
+        return whole
+    }
+
     private func intValue(forKey key: String, fallback: Int) -> Int {
         if let stored = values[key] as? NSNumber {
             return stored.intValue
         }
         return fallback
+    }
+
+    /// A real JSON boolean `true`, and nothing else — not `1`, not `1.0`,
+    /// not `"true"`, not `TRUE`.
+    ///
+    /// `CFGetTypeID` is the discriminator, because Swift's own `is Bool` is
+    /// not one: measured, an `NSNumber` holding 1 satisfies `is Bool` exactly
+    /// as `kCFBooleanTrue` does.
+    private func strictBoolValue(forKey key: String) -> Bool {
+        guard let stored = values[key] else {
+            return false
+        }
+        guard CFGetTypeID(stored as CFTypeRef) == CFBooleanGetTypeID() else {
+            return false
+        }
+        return (stored as? NSNumber)?.boolValue == true
     }
 
     private func boolValue(forKey key: String, fallback: Bool) -> Bool {

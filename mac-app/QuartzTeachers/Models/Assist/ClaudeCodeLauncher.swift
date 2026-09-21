@@ -129,7 +129,12 @@ nonisolated enum ClaudeCodeLauncher {
     /// started, so the caller can say so rather than leaving a teacher looking
     /// at nothing.
     @discardableResult
-    static func open(workspacePath: String, courseCode: String, courseName: String) -> Bool {
+    static func open(
+        workspacePath: String,
+        courseCode: String,
+        courseName: String,
+        referenceCourses: [String] = []
+    ) -> Bool {
         guard let claude: String = findClaude(),
               let server: String = findServer() else {
             return false
@@ -142,7 +147,9 @@ nonisolated enum ClaudeCodeLauncher {
             return false
         }
 
-        let prompt: String = greeting(courseCode: courseCode, courseName: courseName)
+        let prompt: String = greeting(
+            courseCode: courseCode, courseName: courseName, referenceCourses: referenceCourses
+        )
 
         let scriptPath: String
         do {
@@ -177,7 +184,15 @@ nonisolated enum ClaudeCodeLauncher {
     /// because the safety of every write here depends on a plan being shown to
     /// the teacher first — and an assistant that starts by reading is far more
     /// useful than one that starts by asking what to do.
-    static func greeting(courseCode: String, courseName: String) -> String {
+    /// - Parameter referenceCourses: courses kept for reference that show the
+    ///   SAME code as this one, each as "ICS3U-2025 (2025–26)". Empty for the
+    ///   overwhelming majority of courses, and then the greeting is exactly
+    ///   the paragraph it has always been.
+    static func greeting(
+        courseCode: String,
+        courseName: String,
+        referenceCourses: [String] = []
+    ) -> String {
         var text: String = "I'm a teacher working on \(courseCode)"
         let trimmedName: String = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedName.isEmpty && trimmedName != courseCode {
@@ -187,7 +202,53 @@ nonisolated enum ClaudeCodeLauncher {
         text.append("Start by listing its sections so we both know what's there. ")
         text.append("Before changing anything, use the matching plan tool first and show me what it says, ")
         text.append("in plain words, and wait for me to agree.")
+        // **Decision (s): the two Revise doors are NOT offered on a reference
+        // course. Instead a LIVE course's session is told the reference
+        // courses exist**, so the agent's first reply can tell the teacher
+        // they may point it at last year's material. Named here rather than
+        // left to `list_courses`, because this paragraph is the one thing the
+        // teacher and the agent both read at launch.
+        //
+        // It promises nothing Plantoir does: the agent reads them with its
+        // own file tools and with the read tools it already has. In v1.3.0
+        // there is no copy feature, and a sentence pointing at one would be
+        // pointing at #207.
+        if !referenceCourses.isEmpty {
+            let listed: String = referenceCourses.joined(separator: ", ")
+            text.append(" I also keep earlier \(courseCode) courses for reference: \(listed). ")
+            text.append("You can read them and build on what is there; they are never deployed, ")
+            text.append("and nothing in them can be changed.")
+        }
         return text.replacingOccurrences(of: "\"", with: "'")
+    }
+
+    /// The reference courses a session on `course` should be told about:
+    /// those showing the SAME code, each as "ICS3U-2025 (2025–26)".
+    ///
+    /// Same code only. A teacher opening an assistant on ICS3U is not helped
+    /// by being told about last year's MPM2D, and a greeting that lists a
+    /// teacher's whole shelf is one they stop reading.
+    @MainActor
+    static func referenceCoursesToMention(
+        for course: Course,
+        among courses: [Course],
+        today: CalendarDay = CalendarDay.today()
+    ) -> [String] {
+        if course.isKeptForReference {
+            return []
+        }
+        var listed: [String] = []
+        for candidate in courses
+        where candidate.isKeptForReference
+            && candidate.displayCode.lowercased() == course.displayCode.lowercased() {
+            var year: String = SchoolYear.otherGroupName
+            if let startingYear = candidate.schoolYear(on: today) {
+                year = SchoolYear.label(forStartingYear: startingYear)
+            }
+            listed.append("\(candidate.code) (\(year))")
+        }
+        listed.sort()
+        return listed
     }
 
     /// The connection, written per course into the app's own data directory.
