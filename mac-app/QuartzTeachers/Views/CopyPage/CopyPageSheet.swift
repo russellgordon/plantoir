@@ -67,9 +67,14 @@ struct CopyPageSheet: View {
     /// The plan the teacher is looking at, when there is a checklist to show.
     @State var shownPlan: CoursePageCopyPlan?
 
-    /// The linked pages still ticked, by lowercased title. A page shown
-    /// INSIDE another is not in here and cannot be taken out.
+    /// The linked pages still ticked, by lowercased title.
     @State var keptLinkedPages: Set<String> = []
+
+    /// Every linked page the FIRST plan found — the checklist's ROWS, which
+    /// never change while the sheet is open. Unticking used to remove a page
+    /// from the plan and therefore from the list, so it could not be put back
+    /// or even seen.
+    @State var candidates: [CopiedPagePlacement] = []
 
     // MARK: - Computed properties
 
@@ -321,6 +326,8 @@ struct CopyPageSheet: View {
     @ViewBuilder
     func checklist(_ plan: CoursePageCopyPlan) -> some View {
         CopyPageChecklist(
+            candidates: candidates,
+            chosenPage: picker.chosenPage?.pageName ?? "",
             plan: plan,
             courseName: destinationFacts?.displayName ?? "",
             folderName: destinationFolderName,
@@ -547,6 +554,7 @@ struct CopyPageSheet: View {
                 ticked.insert(linked.pageName.lowercased())
             }
             keptLinkedPages = ticked
+            candidates = plan.linkedPages
             shownPlan = plan
             stage = .checking
         }
@@ -628,6 +636,7 @@ struct CopyPageSheet: View {
         problem = nil
         shownPlan = nil
         keptLinkedPages = []
+        candidates = []
         stage = .choosing
         picker.startOver()
         loadTheSource()

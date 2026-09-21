@@ -133,6 +133,51 @@ nonisolated enum CopyPageWording {
     static let embeddedPagesAlwaysComeAlong: String =
         "This page is shown inside another one, so it comes along."
 
+    // MARK: - The checklist's own sentences, in the FUTURE
+    //
+    // Every sentence the checklist can show has a twin here, keyed separately
+    // from the result screen's. The two screens are one word apart and that
+    // word is the whole difference: on the checklist NOTHING has happened
+    // yet, and a teacher who reads "so it was left as it is" above a Copy
+    // button has been told their decision was already taken.
+
+    static func willBeLeftAsItIs(page: String) -> String {
+        return "“\(page)” is already in this course, so it will be left as it is — links will lead to the one that is here."
+    }
+
+    static func aClassPageWillBeLeftAlone(page: String) -> String {
+        return "“\(page)” is one of that course's classes, so it will be left where it is."
+    }
+
+    static func anIndexPageWillNotBeCopied(page: String) -> String {
+        return "“\(page)” is the way in to a folder rather than a page, so it will not be copied."
+    }
+
+    static func aPageAtTheCourseRootWillNotBeCopied(page: String) -> String {
+        return "“\(page)” sits outside the course's folders, so it will not be copied."
+    }
+
+    static func aPageInsideOneSectionsFolderWillNotBeCopied(page: String) -> String {
+        return "“\(page)” belongs to one section's classes, so it will not be copied."
+    }
+
+    static func thePageCouldNotBeRead(page: String) -> String {
+        return "“\(page)” could not be read, so it will not be copied."
+    }
+
+    static func picturesWillComeInUnderANewName(count: Int) -> String {
+        if count == 1 {
+            return "1 will have the same name as something different already here, so it will come in under a new name."
+        }
+        return "\(count) will have the same name as something different already here, so they will come in under new names."
+    }
+
+    /// The row for the page the teacher chose — shown first, ticked and not
+    /// untickable, so the header's count and the list agree.
+    static let thePageYouChose: String = "the page you chose"
+
+    // MARK: - The result screen's sentences, in the past
+
     static func aClassPageWasLeftAlone(page: String) -> String {
         return "“\(page)” is one of that course's classes, so it was left where it is."
     }

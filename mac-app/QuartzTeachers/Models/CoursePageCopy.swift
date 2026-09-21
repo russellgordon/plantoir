@@ -430,6 +430,11 @@ nonisolated struct CoursePageCopyPlan: Sendable {
     /// could not find. NEVER dropped silently; this is the list.
     let linksLeadingNowhere: [String]
 
+    /// Which pages SHOW each page, by lowercased name — so the checklist can
+    /// say a row comes along while anything that shows it is ticked, and let
+    /// it become an ordinary row when nothing does.
+    var pagesThatShowEachPage: [String: [String]] = [:]
+
     // MARK: - Computed properties
 
     /// The pictures and files that will actually be written.
@@ -577,6 +582,7 @@ nonisolated enum CoursePageCopyPlanner {
         var placements: [CopiedPagePlacement] = [placement]
         var skips: [CopySkip] = []
         var texts: [String] = [pageText]
+        var shownBy: [String: [String]] = [:]
 
         if request.alsoCopiesLinkedPages {
             let followed: FollowedPages = CoursePageCopyPlanner.following(
@@ -592,6 +598,7 @@ nonisolated enum CoursePageCopyPlanner {
             for skip in followed.skipped {
                 skips.append(skip)
             }
+            shownBy = followed.pagesThatShowEachPage
         }
 
         var media: [CopiedMediaPlacement] = []
@@ -677,7 +684,8 @@ nonisolated enum CoursePageCopyPlanner {
             pages: placements,
             media: gathered.media,
             skipped: skips,
-            linksLeadingNowhere: nowhere
+            linksLeadingNowhere: nowhere,
+            pagesThatShowEachPage: shownBy
         )
     }
 
@@ -686,6 +694,9 @@ nonisolated enum CoursePageCopyPlanner {
         let pages: [CopiedPagePlacement]
         let texts: [String]
         let skipped: [CopySkip]
+
+        /// Which pages show each page, by lowercased name.
+        let pagesThatShowEachPage: [String: [String]]
     }
 
     /// The pages the named page links to, and what was left alone.
@@ -708,7 +719,9 @@ nonisolated enum CoursePageCopyPlanner {
         let source: CoursePageCopySource = CoursePageCopySource(of: request.source)
         let startTitle: String = request.page.fileName.pageText.lowercased()
         guard let start = source.graph.page(titled: startTitle) else {
-            return FollowedPages(pages: [], texts: [], skipped: [])
+            return FollowedPages(
+                pages: [], texts: [], skipped: [], pagesThatShowEachPage: [:]
+            )
         }
         let reach: AssistLinkedReach = source.graph.reachFollowingLinks(from: [start])
 
@@ -718,8 +731,11 @@ nonisolated enum CoursePageCopyPlanner {
         // unticking E puts a hole in L, which is the exact failure the rule
         // exists to prevent.
         var required: Set<String> = []
+        var shownBy: [String: [String]] = [:]
+        let namedKey: String = request.page.fileName.pageText.lowercased()
         for embedded in CoursePageCopySource.pagesEmbeddedIn(pageText) {
             required.insert(embedded)
+            shownBy[embedded, default: []].append(namedKey)
         }
         for found in reach.pages {
             guard let text = try? String(contentsOf: found.fileURL, encoding: .utf8) else {
@@ -727,6 +743,7 @@ nonisolated enum CoursePageCopyPlanner {
             }
             for embedded in CoursePageCopySource.pagesEmbeddedIn(text) {
                 required.insert(embedded)
+                shownBy[embedded, default: []].append(found.lowercasedTitle)
             }
         }
 
@@ -779,7 +796,9 @@ nonisolated enum CoursePageCopyPlanner {
             ))
             texts.append((try? String(contentsOf: found.fileURL, encoding: .utf8)) ?? "")
         }
-        return FollowedPages(pages: pages, texts: texts, skipped: skipped)
+        return FollowedPages(
+            pages: pages, texts: texts, skipped: skipped, pagesThatShowEachPage: shownBy
+        )
     }
 
     static func reason(for kind: SourcePageKind) -> CopySkip.Reason {
