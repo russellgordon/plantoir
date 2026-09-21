@@ -268,11 +268,47 @@ final class ReferenceCourseTests: XCTestCase {
     func testTheSentenceIsTheContractsSentence() throws {
         let rules: [String: Any] = try ReferenceCourseTests.rules()
         let wording: [String: Any] = try XCTUnwrap(rules["wording"] as? [String: Any])
-        let template: String = try XCTUnwrap(wording["staysAsItIs"] as? String)
         XCTAssertEqual(
-            ReferenceWording.staysAsItIs(course: "{course}"), template,
+            ReferenceWording.staysAsItIs(course: "{course}"),
+            wording["staysAsItIs"] as? String,
             "The app and the contract have to say the same sentence, or Windows implements a different one."
         )
+        XCTAssertEqual(ReferenceWording.pagesAreLocked, wording["pagesAreLocked"] as? String)
+        XCTAssertEqual(
+            ReferenceWording.aCopyTakenOutStaysLocked,
+            wording["aCopyTakenOutStaysLocked"] as? String
+        )
+        XCTAssertEqual(
+            ReferenceWording.neverDeployed(course: "{course}"),
+            wording["neverDeployed"] as? String
+        )
+        XCTAssertEqual(
+            ReferenceWording.copyIsASnapshot(course: "{course}"),
+            wording["copyIsASnapshot"] as? String
+        )
+        XCTAssertEqual(ReferenceWording.groupTitle, wording["groupTitle"] as? String)
+        XCTAssertEqual(ReferenceWording.keepACopyMenuItem, wording["keepACopyMenuItem"] as? String)
+        XCTAssertEqual(
+            ReferenceWording.setSchoolYearMenuItem, wording["setSchoolYearMenuItem"] as? String
+        )
+        XCTAssertEqual(
+            ReferenceCourseRule.Trouble.codeAlreadyInThatYear(code: "{code}", schoolYear: nil).sentence,
+            wording["codeAlreadyWithNoYear"] as? String
+        )
+    }
+
+    /// The calm note claims no more than the measurements support.
+    ///
+    /// It may not say the pages CANNOT be changed — the lock is per-Mac, and
+    /// a folder in iCloud Drive has it cleared while files upload — and it
+    /// may not promise the teacher will be TOLD when an edit fails, because
+    /// what Obsidian does with a locked page could not be measured.
+    func testTheCalmNotePromisesNoMoreThanIsTrue() {
+        let note: String = ReferenceWording.pagesAreLocked.lowercased()
+        for overclaim in ["cannot", "can't", "never be changed", "impossible", "error", "warning"] {
+            XCTAssertFalse(note.contains(overclaim), "The note says “\(overclaim)”: \(note)")
+        }
+        XCTAssertTrue(note.contains("locked"))
     }
 
     /// Rule 1, asked of the sentences themselves: nothing a teacher reads

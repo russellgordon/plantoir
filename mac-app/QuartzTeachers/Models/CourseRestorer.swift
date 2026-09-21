@@ -224,6 +224,14 @@ enum CourseRestorer {
         if !fileManager.fileExists(atPath: courseURL.path) {
             throw Problem.courseMissing(item.courseCode)
         }
+        // Putting ONE section back changes the course. Restoring the WHOLE
+        // course is a different act and stays available: that is the teacher
+        // putting a copy of the shelf back, not editing what is on it.
+        if let configuration = try? CourseConfiguration(
+            contentsOf: courseURL.appendingPathComponent("course_config.json")
+        ), configuration.keptForReference {
+            throw ReferenceCourseIsFrozen(displayCode: configuration.courseCode)
+        }
         unlockIfKeptForReference(courseAt: courseURL)
         defer { lockIfKeptForReference(courseAt: courseURL) }
 

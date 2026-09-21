@@ -31,6 +31,11 @@ enum SectionAdder {
     /// written over — a folder already at the destination stops the add,
     /// because whatever is in the way may be newer work.
     static func addSection(_ sectionNumber: Int, to course: Course) throws {
+        // Adding a section re-runs the course setup, which rewrites the
+        // course's folders. A course kept for reference does not gain one.
+        if course.isKeptForReference {
+            throw ReferenceCourseIsFrozen(displayCode: course.displayCode)
+        }
         if course.sectionNumbers.contains(sectionNumber) {
             throw Problem.sectionAlreadyListed(course.code, sectionNumber)
         }

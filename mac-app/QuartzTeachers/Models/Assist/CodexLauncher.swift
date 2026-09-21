@@ -78,7 +78,12 @@ nonisolated enum CodexLauncher {
     /// started, so the caller can say so rather than leaving a teacher looking
     /// at nothing.
     @discardableResult
-    static func open(workspacePath: String, courseCode: String, courseName: String) -> Bool {
+    static func open(
+        workspacePath: String,
+        courseCode: String,
+        courseName: String,
+        referenceCourses: [String] = []
+    ) -> Bool {
         guard let codex: String = findCodex(),
               let server: String = ClaudeCodeLauncher.findServer() else {
             return false
@@ -91,7 +96,8 @@ nonisolated enum CodexLauncher {
                 courseCode: courseCode,
                 courseName: courseName,
                 codexPath: codex,
-                serverPath: server
+                serverPath: server,
+                referenceCourses: referenceCourses
             )
         } catch {
             return false
@@ -111,11 +117,14 @@ nonisolated enum CodexLauncher {
         courseCode: String,
         courseName: String,
         codexPath: String,
-        serverPath: String
+        serverPath: String,
+        referenceCourses: [String] = []
     ) throws -> String {
         // The greeting is the SAME paragraph both doors send. It names no
         // product, and a teacher who tries both should get the same session.
-        let prompt: String = ClaudeCodeLauncher.greeting(courseCode: courseCode, courseName: courseName)
+        let prompt: String = ClaudeCodeLauncher.greeting(
+            courseCode: courseCode, courseName: courseName, referenceCourses: referenceCourses
+        )
 
         let scriptPath: String = try writeLauncherScript(
             workspacePath: workspacePath,

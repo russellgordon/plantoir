@@ -3813,8 +3813,43 @@
       "aToolThatNamesNoCourse": "One write tool declares no course argument at all - undo_last_change, which takes back whatever this conversation last did. It is gated by the course the PENDING CHANGE belongs to, read from the conversation's own history, rather than by an argument no client sends. A test asserts it is the ONLY non-readOnly tool without a course parameter, so a second one has to be given the same treatment deliberately instead of slipping past a gate that reads an argument and gives up when it is empty.",
       "howTheWriteGateIsChosen": "On the tool's OWN readOnly flag, never a hand-kept list of names - the same reasoning the window binding uses for gating on the schema. The three exemptions above are DATA rather than code, and a test asserts that the non-readOnly tools minus those three are exactly the set the gate refuses, so adding a tool fails the suite rather than opening a hole. And it is never gated on 'is this the course the session greeted': there is no such binding over MCP, and inventing one here to then except it would remove a capability that is the point of having a reference course at all."
     },
+    "interface": {
+      "group": "Reference Courses, folded into school-year sub-groups inside it. Newest year first, 'Other' last, and a group with nothing in it is NOT DRAWN - an empty '2023-24' is a row that teaches a teacher to stop reading the sidebar. Every group's fold state is remembered with the folder, the outer one and each year, the same way Archived and Backups already are.",
+      "withheldNotRefused": "Every act that would CHANGE a reference course is not offered at all - hidden, never greyed. A greyed control that can never become available is a standing invitation to wonder what is wrong, and this sidebar already follows that rule for Schedule/Cancel Deploy. The refusals stay underneath: a teacher meets the absence, and any other caller meets the refusal.",
+      "whatIsWithheld": [
+        "the section window's Deploy button",
+        "Schedule Deploy... (Cancel Deploy at... is always offered - gate by direction)",
+        "Rename Course (the folder carries the year and course_code carries the real code; the two are allowed to disagree only here, and a rename would collapse them)",
+        "Add Section...",
+        "Remove Section N (removing the whole course stays)",
+        "Course Settings' writes: the folder and unit-word renames, and Restore Section N...",
+        "Site Health repairs, which CREATE files inside the course - and would succeed, because the folders are deliberately left unlocked so the preview can work",
+        "Revise with Claude... and Revise with Codex...",
+        "Revise with Local AI Assistant...",
+        "Keep a Copy for Reference... (a copy of a frozen copy has no purpose a teacher would recognise)"
+      ],
+      "whatIsOffered": [
+        "Preview - the whole point of keeping the course",
+        "Open in Obsidian, with the calm note in front of it the first time",
+        "Back Up Now - it only READS the course, and a restored backup is still a reference course",
+        "Remove - unlocks first, same confirmation, same words",
+        "Set School Year... - the one thing a frozen course still lets a teacher change, and it is a label on the shelf rather than a page"
+      ],
+      "theCalmNote": "Shown when the copy is made AND before the teacher opens the course in Obsidian - once per course, remembered. In FRONT of them rather than after, because what Obsidian shows somebody typing into a locked page could not be measured and silent loss is not ruled out. It claims no more than wording.pagesAreLocked says: not that the pages cannot be changed (the lock is per-Mac and a cloud folder strips it while files upload), and not that the teacher will be TOLD when an edit fails. No warning icon, no 'cannot', no 'error'.",
+      "theLocalAssistant": "Not offered on a reference course and told nothing about one. The menu item is not drawn; a window request naming one opens no window, which also closes the deploy approval card as a door by construction; and list_courses does not list them to the LOCAL client - which matters because 'what courses do i have?' is matched in code and its answer is shown to the teacher.",
+      "theMCPSurface": "The opposite, deliberately: reading a reference course is the point of keeping it. The session briefing (initialize.instructions) names each one, list_courses marks the kind and the year, and every write refuses. A course is ADDRESSED by its folder name; a bare course code resolves to the LIVE course exactly as before, and if there is no live one it REFUSES and names the candidates rather than guessing - the two deliberately show the same code, so a guess would look right every time."
+    },
     "wording": {
       "staysAsItIs": "{course} is kept for reference, so it stays as it is.",
+      "pagesAreLocked": "Plantoir keeps this course's pages locked, so they stay as they were.",
+      "aCopyTakenOutStaysLocked": "A file you copy out of it stays locked until you untick Locked in Get Info.",
+      "neverDeployed": "{course} is kept for reference. Preview it to read its pages; it is never deployed.",
+      "copyIsASnapshot": "This records {course} as it is today. You can keep teaching it as usual \u2014 nothing here changes. To take a fresher copy later, delete this one first, then copy again.",
+      "codeAlreadyInThatYear": "You already have a {code} kept for reference from {year}. Choose a different school year.",
+      "codeAlreadyWithNoYear": "You already have a {code} kept for reference with no school year. Choose a school year for this one.",
+      "groupTitle": "Reference Courses",
+      "keepACopyMenuItem": "Keep a Copy for Reference…",
+      "setSchoolYearMenuItem": "Set School Year…",
       "rule": "{course} is the code a TEACHER reads - ICS3U, never the folder name. The register is calm: a teacher who kept a course for reference asked for this, so being told about it reads as a fact rather than a warning. No 'cannot', no 'error', no icon, and never a word about how it is done. Said by the app when an act that would change the course is not available; the sentence does NOT tell the teacher to copy anything, because in this release nothing in Plantoir copies pages between courses and a page taken out by hand arrives locked.",
       "machineryCheck": "No 'lock flag', 'immutable', 'permission', 'chflags', 'script' or 'container' in any sentence here. 'Locked' on its own is allowed: it is the word Finder and Get Info already use, and it is what a teacher sees on the file."
     },

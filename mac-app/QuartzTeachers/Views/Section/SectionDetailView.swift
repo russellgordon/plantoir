@@ -246,7 +246,8 @@ struct SectionDetailView: View {
                         // it, and the notice floated mid-window. See the view's
                         // own comment for the measurement.
                         NoPreviewPlaceholderView(
-                            deploysToLocalFolder: course.configuration.deploysToLocalFolder
+                            deploysToLocalFolder: course.configuration.deploysToLocalFolder,
+                            keptForReferenceCode: course.isKeptForReference ? course.displayCode : ""
                         )
                     }
                 }
@@ -352,6 +353,13 @@ struct SectionDetailView: View {
                 // `publish:` flag decides whether students see it); the
                 // whole site is deployed. One word for both had the
                 // teacher and the assistant talking past each other.
+                // NOT DRAWN on a course kept for reference. The refusal
+                // behind it stays — every other way in still meets it — but a
+                // teacher meets this as a button that is not there, which is
+                // the same rule the sidebar follows for Schedule Deploy…: a
+                // greyed-out control that can never become available is a
+                // standing invitation to wonder what is wrong.
+                if !course.isKeptForReference {
                 Button("Deploy", systemImage: "paperplane.fill") {
                     startDeploy()
                 }
@@ -366,6 +374,7 @@ struct SectionDetailView: View {
                 .disabled(deployRunner.isRunning || isPreparingDeploy)
                 .help("Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
+                }
 
                 Button("Open in Browser", systemImage: "safari") {
                     openInBrowser()
@@ -1016,6 +1025,12 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // One of the moments the teacher ACTS on a reference course, so the
+        // lock is re-asserted here: a folder that came back from a backup, or
+        // from a second Mac, is not locked until somebody asks. Cheap — a
+        // stat per file, measured at ~23 ms on a 1,220-file course — and
+        // quiet unless it actually had to lock something.
+        ReferenceLock.ensureLocked(course)
         // The folder this preview belongs to, noted at the moment it is
         // decided — which is HERE, not at the appearance. The appearance
         // notes only the key this section registered under, and it can

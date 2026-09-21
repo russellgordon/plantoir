@@ -1450,6 +1450,50 @@ course in it does no work at all.
   it, and whatever copies pages between courses must call it — a page a teacher
   cannot edit, with no explanation, reads as "the app is broken".
 
+### What Finder does with one — measured, because decision (n) asked
+
+Dragging a locked reference course to the Trash **works**. Measured on a
+throwaway folder with `FileManager.trashItem`, which is the API Finder's own
+"Move to Trash" uses: it SUCCEEDED on a course whose pages carry `uchg`, and
+the folder landed in `~/.Trash` with its locks intact. So a teacher who bypasses
+Plantoir and drags the folder away is not stopped, and Finder does not prompt
+for the folder (it prompts per LOCKED ITEM only on some paths — not on this
+one, where the move is a rename within the volume).
+
+What that means in practice: the course leaves the sidebar, Plantoir stops
+seeing it, and **emptying the Trash is where the lock bites** — the Finder
+asks for confirmation to delete locked items. The teacher's own Remove is the
+supported route and unlocks first, so they never meet that; this is written
+down because "what happens if I just drag it out" is the first thing somebody
+will try, and an answer of "nobody measured" is worse than either outcome.
+
+### The interface: withheld, not merely refused
+
+Every act that would CHANGE a reference course is **not offered** — hidden,
+never greyed. A greyed control that can never become available is a standing
+invitation to wonder what is wrong, and the sidebar already follows that rule
+for Schedule/Cancel Deploy. The refusals stay underneath it, so any other
+caller still meets one; the list of both is
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.interface`.
+
+**One of them is not a menu item and is the reason this section exists.**
+`SiteHealthRepair` CREATES files inside the course — a `Media` folder, a
+section's front page — and the directories are deliberately left unlocked so
+the preview can work, so those writes would have SUCCEEDED on a frozen course.
+The lock refuses nothing there; the guard does. Found by review, 2026-09-20,
+with the same shape in Course Settings' folder rename, the unit-word rename,
+Add Section, Rename Course and "Restore Section N…".
+
+**The calm note appears BEFORE Obsidian, once per course.** Not after, and
+that placement is forced by what could not be measured: whether Obsidian tells
+a teacher that a save failed, or swallows what they typed, is unknown — so a
+note that arrived afterwards would be the worst of both. It claims only that
+Plantoir keeps the pages locked and that they stay as they were. It may not
+say they cannot be changed (the lock is per-Mac, and a cloud folder strips it
+while files upload) and it may not promise the teacher will be told when an
+edit fails. `LockedPagesNote` remembers which courses have had it.
+
 ### The honest limits — in here, and never in the GUI
 
 With the directories unlocked a new file can still be ADDED to one. Anybody who

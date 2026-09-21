@@ -24,6 +24,16 @@ enum WindowFolderMemory {
         var archivedExpanded: Bool = false
         var backupsExpanded: Bool = false
 
+        /// The "Reference Courses" group and each school-year group inside
+        /// it, remembered the same way and for the same reason: a teacher
+        /// who folded last year's shelf away should not find it open again
+        /// every time they reopen the window.
+        ///
+        /// A year is its starting calendar year; "Other" is 0, which is not
+        /// a year and never will be — the offered range starts at 2022.
+        var referenceExpanded: Bool = false
+        var expandedReferenceYears: [Int] = []
+
         /// The selected course, section, or archived item, in
         /// `SidebarSelection`'s storage form; empty for none.
         var selection: String = ""
@@ -132,10 +142,36 @@ enum WindowFolderMemory {
                 "expanded": entry.expandedCourses.joined(separator: ","),
                 "archived": entry.archivedExpanded ? "1" : "0",
                 "backups": entry.backupsExpanded ? "1" : "0",
+                "reference": entry.referenceExpanded ? "1" : "0",
+                "referenceYears": WindowFolderMemory.joined(entry.expandedReferenceYears),
                 "selection": entry.selection,
             ])
         }
         defaults.set(stored, forKey: storageKey)
+    }
+
+    /// The years as one string, in the same comma-joined shape the course
+    /// codes already use — an absent key reads as none, so an entry written
+    /// by an older build simply has no reference groups open.
+    static func joined(_ years: [Int]) -> String {
+        var spelled: [String] = []
+        for year in years.sorted() {
+            spelled.append(String(year))
+        }
+        return spelled.joined(separator: ",")
+    }
+
+    static func years(_ stored: String?) -> [Int] {
+        guard let stored, !stored.isEmpty else {
+            return []
+        }
+        var result: [Int] = []
+        for piece in stored.components(separatedBy: ",") {
+            if let year = Int(piece) {
+                result.append(year)
+            }
+        }
+        return result
     }
 
     private static func loadIfNeeded(defaults: UserDefaults) {
@@ -171,6 +207,8 @@ enum WindowFolderMemory {
                         expandedCourses: expandedCourses,
                         archivedExpanded: pair["archived"] == "1",
                         backupsExpanded: pair["backups"] == "1",
+                        referenceExpanded: pair["reference"] == "1",
+                        expandedReferenceYears: WindowFolderMemory.years(pair["referenceYears"]),
                         selection: pair["selection"] ?? ""
                     ))
                 }

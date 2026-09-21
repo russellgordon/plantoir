@@ -67,7 +67,15 @@ enum CourseCodeRule {
             case .tooLong:
                 return "A course code can be at most \(CourseCodeRule.mostCharacters) characters."
             case .alreadyTaken(let code):
-                return "A course named \(code) already exists — choose a different code."
+                // Points at the path rather than just refusing (Russell's
+                // decision): the commonest reason a teacher meets this in
+                // September is that last year's course of the same code is
+                // still here. "Keep a copy of it for reference and then
+                // remove it" is the order those two things have to happen in
+                // — the copy is made FROM the live course, so removing it
+                // first would leave nothing to copy.
+                return "A course named \(code) already exists. "
+                     + "If that's last year's, keep a copy of it for reference and then remove it."
             }
         }
 
