@@ -794,6 +794,30 @@ def resolve_section_emoji(config: dict, section_number: int) -> str:
 # --- ADD: Resolve per-section 'show section marker' flag ---------------------
 
 # --- ADD: Resolve header label (course code vs custom short name for clubs) ---
+def displayed_course_code(config: dict, folder_name: str) -> str:
+    """
+    The code a TEACHER reads, for anything the built site shows them.
+
+    The folder name for every ordinary course — the two agree, and the app's
+    renamer moves them together — and the settings' own `course_code` for a
+    course kept for reference, whose folder carries a school-year suffix on
+    purpose so two ICS4Us can sit side by side.
+
+    **Never for a PATH.** Every folder, every build id and every output
+    directory stays on the launcher's argument; this is for titles and labels
+    only. Falls back to the folder when the settings say nothing, because a
+    title naming nothing at all is worse than one naming a folder.
+    """
+    recorded = str(config.get("course_code") or "").strip()
+    if not recorded:
+        return folder_name
+    if not bool(config.get("kept_for_reference") is True):
+        # An ordinary course: the two agree, and if they ever did not, the
+        # folder is what everything else in this build is using.
+        return folder_name
+    return recorded
+
+
 def resolve_header_label(config: dict, course_code: str) -> str:
     """Return the label that appears beside the emoji in the page title.
 
@@ -5100,7 +5124,7 @@ def build_section_site(
         # The explanatory sections are a separate choice, and one that only
         # exists while the map does.
         if build_curriculum_coverage(
-                content_root, course_code,
+                content_root, displayed_course_code(config, course_code),
                 class_folders=class_folders_here,
                 graded_folders=graded_folders_here,
                 graded_was_configured=graded_was_configured_here,
@@ -5167,7 +5191,20 @@ def build_section_site(
     # Update page title (now with per-section emoji and optional section marker)
     config_path = output_dir / "quartz.config.ts"
     page_emoji = resolve_section_emoji(config, section_number)
-    header_label = resolve_header_label(config, course_code)
+    # The code a TEACHER reads, which is not always the folder name.
+    #
+    # `course_code` here is the LAUNCHER's argument — the folder — and every
+    # path in this build is rightly built from it. The title is not a path. A
+    # course kept for reference lives in `ICS4U-2025` and its settings say
+    # `ICS4U`, deliberately (contracts/shared-rules.json -> referenceCourses.
+    # identity), and the teacher reads the second one everywhere. Measured on
+    # a real imported course: the preview header said "ICS4U-2025 S1".
+    #
+    # It matters for the GRADE LABEL too, and more quietly: `get_grade_label`
+    # reads the fourth character, so a suffix that shifts that position gives
+    # a wrong grade. `ICS4U-2025` happens to survive it; `MADW-09-2025` does
+    # not.
+    header_label = resolve_header_label(config, displayed_course_code(config, course_code))
     update_page_title(config_path, header_label, section_number, page_emoji, show_marker)
     patch_default_date_type(config_path)
 

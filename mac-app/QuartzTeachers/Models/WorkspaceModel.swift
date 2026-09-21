@@ -155,6 +155,8 @@ class WorkspaceModel {
                     expandedCourses: model.expandedCourseCodes.sorted(),
                     archivedExpanded: model.isShowingArchived,
                     backupsExpanded: model.isShowingBackups,
+                    referenceExpanded: model.isShowingReferenceCourses,
+                    expandedReferenceYears: Array(model.expandedReferenceYears),
                     selection: model.selection?.storageValue ?? ""
                 ))
             }
@@ -215,6 +217,23 @@ class WorkspaceModel {
     /// Whether the sidebar's Backups group is open.
     var isShowingBackups: Bool = false
 
+    /// The reference course whose "Set School Year…" sheet should open, by
+    /// folder name, or nil for none.
+    ///
+    /// On the MODEL rather than on the sidebar's own `@State` because two
+    /// places ask for it — the course's context menu and the read-only
+    /// summary in the detail pane — and the sheet itself is presented once,
+    /// by the sidebar, which owns every sheet in this window.
+    var schoolYearRequestCode: String?
+
+    /// Whether the "Reference Courses" group is folded open. Remembered with
+    /// the folder, exactly as Archived and Backups are.
+    var isShowingReferenceCourses: Bool = false
+
+    /// Which school-year sub-groups are folded open, by
+    /// `ReferenceYearGroup.id`. Remembered the same way.
+    var expandedReferenceYears: Set<Int> = []
+
     /// The backup a restore confirmation is being shown for, if any.
     var backupRestoreRequest: BackupItem?
 
@@ -245,7 +264,24 @@ class WorkspaceModel {
     var renameNotice: CourseRenamer.Notice?
 
     /// The current sidebar selection.
-    var selection: SidebarSelection?
+    var selection: SidebarSelection? {
+        didSet {
+            // The third of the rulings' re-assertion points: SELECTING a
+            // reference course. The other two are the folder being read and
+            // the teacher previewing it or opening it in Obsidian.
+            //
+            // Cheap and quiet: a stat per file (~23 ms on a 1,220-file
+            // course, measured) and nothing written anywhere unless it
+            // actually had to lock something. Skipped entirely when the
+            // selection did not change, because a sidebar redraw sets this
+            // more often than a teacher clicks.
+            guard oldValue != selection, let course = selectedCourse,
+                  course.isKeptForReference else {
+                return
+            }
+            ReferenceLock.ensureLockedInBackground(course)
+        }
+    }
 
     /// True while the folder-picker sheet should be shown.
     var isChoosingWorkspace: Bool = false
@@ -321,6 +357,117 @@ class WorkspaceModel {
             if codeMatches || nameMatches {
                 result.append(course)
             }
+        }
+        return result
+    }
+
+    /// The courses a teacher is TEACHING — everything the sidebar's own
+    /// "Courses & Clubs" group has always shown.
+    ///
+    /// **Downstream of `filteredCourses`**, deliberately: the filter's own
+    /// contract cases are written against that property, and putting the
+    /// split in front of it would make them mean something else.
+    var teachingCourses: [Course] {
+        var result: [Course] = []
+        for course in filteredCourses where !course.isKeptForReference {
+            result.append(course)
+        }
+        return result
+    }
+
+    /// The courses kept for reference, in their own group.
+    var referenceCourses: [Course] {
+        var result: [Course] = []
+        for course in filteredCourses where course.isKeptForReference {
+            result.append(course)
+        }
+        return result
+    }
+
+    /// One school year's shelf.
+    struct ReferenceYearGroup: Identifiable {
+
+        // MARK: - Stored properties
+
+        /// The starting calendar year, or nil for "Other".
+        let schoolYear: Int?
+
+        /// The courses in it, in the order the sidebar shows them.
+        let courses: [Course]
+
+        // MARK: - Computed properties
+
+        /// "2025–26", or "Other".
+        var title: String {
+            guard let schoolYear else {
+                return ReferenceWording.otherYearTitle
+            }
+            return SchoolYear.label(forStartingYear: schoolYear)
+        }
+
+        /// A stable identity for the fold state and for `ForEach`. A year
+        /// that is not a year is `0`, which is not one either.
+        var id: Int {
+            return schoolYear ?? ReferenceYearGroup.otherIdentifier
+        }
+
+        /// What "Other" is remembered as. Not a year, and never one: the
+        /// offered range starts at 2022.
+        static let otherIdentifier: Int = 0
+    }
+
+    /// The reference courses grouped by school year — **newest first, "Other"
+    /// last, and a group with nothing in it is not drawn at all.**
+    ///
+    /// An empty "2023–24" is a row that teaches a teacher to stop reading the
+    /// sidebar, so the groups are built from the courses that are there
+    /// rather than from the years that could be.
+    ///
+    /// Takes the day rather than reading the clock, like everything else that
+    /// touches a school year: which years are OFFERED grows with time, and a
+    /// stored year outside the offered range reads as "Other".
+    func referenceYearGroups(on day: CalendarDay = CalendarDay.today()) -> [ReferenceYearGroup] {
+        var byYear: [Int: [Course]] = [:]
+        var withNoYear: [Course] = []
+        for course in referenceCourses {
+            guard let year = course.schoolYear(on: day) else {
+                withNoYear.append(course)
+                continue
+            }
+            var inThatYear: [Course] = byYear[year] ?? []
+            inThatYear.append(course)
+            byYear[year] = inThatYear
+        }
+
+        var years: [Int] = []
+        for (year, _) in byYear {
+            years.append(year)
+        }
+        years.sort()
+        years.reverse()
+
+        var groups: [ReferenceYearGroup] = []
+        for year in years {
+            groups.append(ReferenceYearGroup(schoolYear: year, courses: byYear[year] ?? []))
+        }
+        if !withNoYear.isEmpty {
+            groups.append(ReferenceYearGroup(schoolYear: nil, courses: withNoYear))
+        }
+        return groups
+    }
+
+    /// What is already on the shelf, for the uniqueness rule.
+    func shelvedReferenceCourses(on day: CalendarDay = CalendarDay.today()) -> [ReferenceCourseRule.Shelved] {
+        var result: [ReferenceCourseRule.Shelved] = []
+        // Asked of EVERY course, not of `referenceCourses`, which is behind
+        // the filter field: a code is taken whether or not the teacher
+        // happens to be filtering the sidebar right now.
+        for course in courses where course.isKeptForReference {
+            result.append(ReferenceCourseRule.Shelved(
+                displayCode: course.displayCode,
+                schoolYear: course.schoolYear(on: day),
+                folderName: course.code
+            ))
         }
         return result
     }
@@ -1031,6 +1178,14 @@ class WorkspaceModel {
             return firstCourse.code < secondCourse.code
         }
         courses = loadedCourses
+        // A reference course says it is frozen; this is what makes that still
+        // true after a restore, after a second Mac has had the folder, or
+        // after somebody marked a course by hand. Quiet and cheap when there
+        // is nothing to do, which is every ordinary folder — it walks only
+        // the courses that claim to be kept for reference.
+        ReferenceCourseUpkeep.bringUpToDateInBackground(
+            loadedCourses, inWorkingFolder: workspaceURL
+        )
         placeBuiltSitesOutsideTheFolder(for: loadedCourses, everythingIn: entryURLs)
         archivedItems = WorkspaceModel.findArchivedItems(in: coursesDirectoryURL)
         backupItems = WorkspaceModel.findBackupItems(in: coursesDirectoryURL)
@@ -1189,8 +1344,17 @@ class WorkspaceModel {
     /// row or one of its sections is what is selected. A teacher who has
     /// clicked into Section 2 and presses Return means the course it belongs
     /// to; there is nothing else in a section's row to rename.
+    /// **Never a course kept for reference**, from any route. The context
+    /// menu already hid the item; the Edit menu and the Return key did not,
+    /// and both set `renamingCourseCode` on a row that draws no editing
+    /// field — so nothing appeared to happen AND the code was never cleared,
+    /// which left Return-to-rename dead for every other course in the window
+    /// until it was closed.
     var courseThatCanBeRenamed: Course? {
-        return selectedCourse
+        guard let course = selectedCourse, !course.isKeptForReference else {
+            return nil
+        }
+        return course
     }
 
     /// Why the selected course cannot be renamed right now, or nil when it

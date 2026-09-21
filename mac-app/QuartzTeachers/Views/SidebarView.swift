@@ -41,6 +41,14 @@ struct SidebarView: View {
     /// The course "Add Section…" was chosen on, while its sheet is up.
     @State var addSectionCourse: Course?
 
+    /// The course a "Keep a Copy for Reference…" sheet is open for.
+    @State var keepACopyCourse: Course?
+
+
+    /// The reference course whose calm locked-pages note is showing, before
+    /// the teacher goes into Obsidian.
+    @State var lockedPagesNoteCourse: Course?
+
     /// The section "Schedule Deploy…" was chosen on, while its sheet is up.
     @State var scheduleRequest: ScheduledDeployRequest?
 
@@ -80,7 +88,7 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             List(selection: $workspace.selection) {
                 Section("Courses & Clubs") {
-                    ForEach(workspace.filteredCourses) { course in
+                    ForEach(workspace.teachingCourses) { course in
                         DisclosureGroup(isExpanded: expansionBinding(for: course.code)) {
                             ForEach(course.sectionNumbers, id: \.self) { sectionNumber in
                                 // Asked of launchd during the row's render,
@@ -138,6 +146,12 @@ struct SidebarView: View {
                                         // greyed-out line — a menu that
                                         // teaches teachers to stop reading it
                                         // is worse than a shorter menu.
+                                        // Gate by DIRECTION: "Schedule
+                                        // Deploy…" is not offered on a
+                                        // reference course, and "Cancel
+                                        // Deploy at…" always is — an alarm
+                                        // set before the course was kept
+                                        // must still be turnable off.
                                         if let scheduledFor {
                                             Button("Cancel Deploy at \(ScheduledDeploy.timeText(scheduledFor))…", systemImage: "clock") {
                                                 cancelScheduleRequest = ScheduledDeployRequest(
@@ -147,7 +161,7 @@ struct SidebarView: View {
                                                 )
                                             }
                                             .accessibilityIdentifier("cancelScheduledDeploy-\(course.code)-section\(sectionNumber)")
-                                        } else {
+                                        } else if !course.isKeptForReference {
                                             Button("Schedule Deploy…", systemImage: "clock") {
                                                 scheduleRequest = ScheduledDeployRequest(
                                                     course: course,
@@ -179,30 +193,60 @@ struct SidebarView: View {
                                 .contextMenu {
                                     reviseWithClaudeItem(course: course)
                                     reviseWithCodexItem(course: course)
-                                    openInObsidianItem(revealing: course.directoryURL, vaultURL: course.directoryURL)
+                                    if course.isKeptForReference {
+                                        openInObsidianItem(forReferenceCourse: course)
+                                    } else {
+                                        openInObsidianItem(
+                                            revealing: course.directoryURL, vaultURL: course.directoryURL
+                                        )
+                                    }
                                     Divider()
                                     // Renaming moves the folder a preview is
                                     // serving out of, so it waits for the
                                     // same quiet moment adding a section
                                     // does — and says so in the same words.
-                                    Button("Rename Course", systemImage: "pencil") {
-                                        workspace.renamingCourseCode = course.code
+                                    // A course kept for reference is FROZEN,
+                                    // so every item that would change it is
+                                    // not drawn at all — hidden rather than
+                                    // greyed, which is the rule this menu
+                                    // already follows for Schedule/Cancel:
+                                    // a menu that teaches a teacher to stop
+                                    // reading it is worse than a short one.
+                                    // What it gains instead is the one thing
+                                    // it CAN change, which is a label on the
+                                    // shelf rather than a page.
+                                    if course.isKeptForReference {
+                                        Button(ReferenceWording.setSchoolYearMenuItem, systemImage: "calendar") {
+                                            workspace.schoolYearRequestCode = course.code
+                                        }
+                                        .accessibilityIdentifier("setSchoolYear-\(course.code)")
+                                        Divider()
+                                    } else {
+                                        Button(ReferenceWording.keepACopyMenuItem, systemImage: "books.vertical") {
+                                            keepACopyCourse = course
+                                        }
+                                        .disabled(busyReason != nil)
+                                        .accessibilityIdentifier("keepACopy-\(course.code)")
+                                        Divider()
+                                        Button("Rename Course", systemImage: "pencil") {
+                                            workspace.renamingCourseCode = course.code
+                                        }
+                                        .disabled(busyReason != nil)
+                                        .accessibilityIdentifier("renameCourse-\(course.code)")
+                                        Divider()
+                                        // Adding a section re-runs the course
+                                        // setup, which rewrites the course's
+                                        // folders — never while a preview or
+                                        // publish could be reading them.
+                                        Button("Add Section…", systemImage: "doc.badge.plus") {
+                                            addSectionCourse = course
+                                        }
+                                        .disabled(busyReason != nil)
+                                        if let busyReason {
+                                            Text(busyReason)
+                                        }
+                                        Divider()
                                     }
-                                    .disabled(busyReason != nil)
-                                    .accessibilityIdentifier("renameCourse-\(course.code)")
-                                    Divider()
-                                    // Adding a section re-runs the course
-                                    // setup, which rewrites the course's
-                                    // folders — never while a preview or
-                                    // publish could be reading them.
-                                    Button("Add Section…", systemImage: "doc.badge.plus") {
-                                        addSectionCourse = course
-                                    }
-                                    .disabled(busyReason != nil)
-                                    if let busyReason {
-                                        Text(busyReason)
-                                    }
-                                    Divider()
                                     // Backing up only READS the course, so
                                     // it stays available even mid-preview —
                                     // the moment before risky editing is
@@ -216,6 +260,8 @@ struct SidebarView: View {
                         }
                     }
                 }
+
+                referenceCoursesSection
 
                 if !workspace.backupItems.isEmpty {
                     // Saved copies of whole courses, above Archived: these
@@ -449,6 +495,21 @@ struct SidebarView: View {
             Text(removalProblem ?? "")
         }
         .modifier(OutsideAgentAlerts(claudeProblem: $claudeProblem, codexProblem: $codexProblem))
+        .sheet(item: $keepACopyCourse) { course in
+            KeepACopyForReferenceSheet(course: course) { folderName in
+                workspace.reloadCourses()
+                workspace.isShowingReferenceCourses = true
+                workspace.selection = SidebarSelection.course(folderName)
+            }
+        }
+        .sheet(isPresented: schoolYearSheetIsPresented) {
+            if let course = schoolYearCourse {
+                SetSchoolYearSheet(course: course) {
+                    workspace.reloadCourses()
+                }
+            }
+        }
+        .modifier(LockedPagesNoteAlert(course: $lockedPagesNoteCourse))
         .sheet(item: $addSectionCourse) { course in
             AddSectionSheet(course: course) { sectionNumber in
                 workspace.reloadCourses()
@@ -889,7 +950,7 @@ struct SidebarView: View {
         guard let when = request.when else {
             return "This section will no longer deploy on its own."
         }
-        return "\(request.course.code) Section \(request.sectionNumber) is set to deploy on its own at \(ScheduledDeploy.timeText(when)) on \(ScheduledDeploy.dayText(when)). Cancelling means it will not go out then, and the site stays as it is until you deploy it yourself."
+        return "\(request.course.displayCode) Section \(request.sectionNumber) is set to deploy on its own at \(ScheduledDeploy.timeText(when)) on \(ScheduledDeploy.dayText(when)). Cancelling means it will not go out then, and the site stays as it is until you deploy it yourself."
     }
 
     func cancelScheduledDeploy(_ request: ScheduledDeployRequest) {
@@ -917,6 +978,124 @@ struct SidebarView: View {
 
     /// The open/closed state of one course's disclosure triangle, living
     /// on the window's model so restoration can bring it back.
+    /// The "Reference Courses" group: courses kept to be read, never
+    /// deployed, filed by the school year they were taught in.
+    ///
+    /// **Two levels of folding, and nothing is drawn that is empty.** The
+    /// outer group appears only when there is at least one reference course;
+    /// a year group appears only when it holds one. An empty "2023–24" is a
+    /// row that teaches a teacher to stop reading the sidebar.
+    ///
+    /// The rows are deliberately plainer than a live course's: no scheduled
+    /// deploy clock and no stopped-publish badge, because neither can exist
+    /// on a course that is never deployed. That is not a simplification — it
+    /// is the absence of two things this kind of course does not have.
+    @ViewBuilder
+    var referenceCoursesSection: some View {
+        let groups: [WorkspaceModel.ReferenceYearGroup] = workspace.referenceYearGroups()
+        if !groups.isEmpty {
+            Section(isExpanded: referenceGroupBinding) {
+                ForEach(groups) { group in
+                    DisclosureGroup(isExpanded: referenceYearBinding(for: group.id)) {
+                        ForEach(group.courses) { course in
+                            referenceCourseRow(course)
+                        }
+                    } label: {
+                        Label(group.title, systemImage: "calendar")
+                            .accessibilityIdentifier("referenceYear-\(group.id)")
+                    }
+                }
+            } header: {
+                Text(ReferenceWording.groupTitle)
+            }
+        }
+    }
+
+    @ViewBuilder
+    func referenceCourseRow(_ course: Course) -> some View {
+        DisclosureGroup(isExpanded: expansionBinding(for: course.code)) {
+            ForEach(course.sectionNumbers, id: \.self) { sectionNumber in
+                Label("Section \(sectionNumber)", systemImage: "book")
+                    .tag(SidebarSelection.section(course.code, sectionNumber))
+                    .accessibilityIdentifier("sidebar-\(course.code)-section\(sectionNumber)")
+                    .contextMenu {
+                        openInObsidianItem(forReferenceCourse: course)
+                        Divider()
+                        folderMenuItems(for: course.sectionDirectoryURL(forSection: sectionNumber))
+                    }
+            }
+        } label: {
+            CourseRowLabel(course: course, isBeingRenamed: false)
+                .tag(SidebarSelection.course(course.code))
+                .accessibilityIdentifier("sidebar-\(course.code)")
+                .contextMenu {
+                    openInObsidianItem(forReferenceCourse: course)
+                    Divider()
+                    Button(ReferenceWording.setSchoolYearMenuItem, systemImage: "calendar") {
+                        workspace.schoolYearRequestCode = course.code
+                    }
+                    .accessibilityIdentifier("setSchoolYear-\(course.code)")
+                    Divider()
+                    // Backing up only READS the course, and a reference
+                    // course restores as a reference course — the marker
+                    // travels in its settings, and the restore locks it
+                    // again.
+                    Button("Back Up Now", systemImage: "clock.arrow.circlepath") {
+                        workspace.backUp(course)
+                    }
+                    Divider()
+                    folderMenuItems(for: course.directoryURL)
+                }
+        }
+    }
+
+    /// The reference course the "Set School Year…" sheet is for, looked up
+    /// from the model's request.
+    var schoolYearCourse: Course? {
+        guard let code = workspace.schoolYearRequestCode else {
+            return nil
+        }
+        for candidate in workspace.courses where candidate.code == code {
+            return candidate
+        }
+        return nil
+    }
+
+    var schoolYearSheetIsPresented: Binding<Bool> {
+        return Binding(
+            get: { return schoolYearCourse != nil },
+            set: { showing in
+                if !showing {
+                    workspace.schoolYearRequestCode = nil
+                }
+            }
+        )
+    }
+
+    var referenceGroupBinding: Binding<Bool> {
+        return Binding(
+            get: { return workspace.isShowingReferenceCourses },
+            set: { isOpen in
+                workspace.isShowingReferenceCourses = isOpen
+                WorkspaceModel.rememberOpenFolders()
+            }
+        )
+    }
+
+    func referenceYearBinding(for identifier: Int) -> Binding<Bool> {
+        return Binding(
+            get: { return workspace.expandedReferenceYears.contains(identifier) },
+            set: { isOpen in
+                if isOpen {
+                    workspace.expandedReferenceYears.insert(identifier)
+                } else {
+                    workspace.expandedReferenceYears.remove(identifier)
+                }
+                WorkspaceModel.rememberOpenFolders()
+            }
+        )
+    }
+
     func expansionBinding(for courseCode: String) -> Binding<Bool> {
         return Binding(
             get: { workspace.expandedCourseCodes.contains(courseCode) },
@@ -941,6 +1120,34 @@ struct SidebarView: View {
         .disabled(!FolderActions.obsidianIsInstalled)
     }
 
+    /// The same item on a course kept for reference, with the calm note in
+    /// front of it the first time.
+    ///
+    /// **In front of it, not after it**, which is the placement decision the
+    /// Obsidian measurement forced: what Obsidian SHOWS a teacher who types
+    /// into a locked page could not be measured, so silent loss is not ruled
+    /// out — and a note that arrives only after they have typed would be the
+    /// worst of both. Once per course is enough; after that the item opens
+    /// Obsidian directly, like any other course's.
+    @ViewBuilder
+    func openInObsidianItem(forReferenceCourse course: Course) -> some View {
+        Button("Open in Obsidian", systemImage: "square.and.pencil") {
+            // Locked again first: this is one of the moments the teacher
+            // ACTS on a reference course, and a folder that came back from a
+            // second Mac, or from a backup, is not locked until somebody
+            // asks.
+            ReferenceLock.ensureLockedInBackground(course)
+            if LockedPagesNote.hasBeenShown(courseCode: course.code) {
+                FolderActions.openInObsidian(revealing: course.directoryURL, vaultURL: course.directoryURL)
+                return
+            }
+            lockedPagesNoteCourse = course
+        }
+        .disabled(!FolderActions.obsidianIsInstalled)
+        .accessibilityIdentifier("openInObsidian-\(course.code)")
+    }
+
+
     /// Opens a Claude Code session in a terminal, connected to this course
     /// through Plantoir's MCP server.
     ///
@@ -948,7 +1155,14 @@ struct SidebarView: View {
     /// Claude should not be shown a menu item that opens onto an error.
     @ViewBuilder
     func reviseWithClaudeItem(course: Course) -> some View {
-        if ClaudeCodeLauncher.isAvailable, let folder = workspace.workspaceURL {
+        // NOT offered on a reference course (decision s). The door's whole
+        // purpose is changing a course, and a session opened on one that
+        // cannot change would be an invitation to find that out by trying.
+        // A LIVE course's session is told the reference courses exist
+        // instead — see the greeting.
+        if ClaudeCodeLauncher.isAvailable,
+           !course.isKeptForReference,
+           let folder = workspace.workspaceURL {
             Button(ClaudeCodeLauncher.menuItemTitle, systemImage: "sparkles") {
                 reviseWithClaude(course: course, folder: folder)
             }
@@ -960,7 +1174,10 @@ struct SidebarView: View {
         if ClaudeCodeLauncher.open(
             workspacePath: folder.path,
             courseCode: course.code,
-            courseName: course.configuration.courseName
+            courseName: course.configuration.courseName,
+            referenceCourses: ClaudeCodeLauncher.referenceCoursesToMention(
+                for: course, among: workspace.courses
+            )
         ) {
             return
         }
@@ -979,7 +1196,9 @@ struct SidebarView: View {
     /// own Mac.
     @ViewBuilder
     func reviseWithCodexItem(course: Course) -> some View {
-        if CodexLauncher.isAvailable, let folder = workspace.workspaceURL {
+        if CodexLauncher.isAvailable,
+           !course.isKeptForReference,
+           let folder = workspace.workspaceURL {
             Button(CodexLauncher.menuItemTitle, systemImage: "sparkles") {
                 reviseWithCodex(course: course, folder: folder)
             }
@@ -991,7 +1210,10 @@ struct SidebarView: View {
         if CodexLauncher.open(
             workspacePath: folder.path,
             courseCode: course.code,
-            courseName: course.configuration.courseName
+            courseName: course.configuration.courseName,
+            referenceCourses: ClaudeCodeLauncher.referenceCoursesToMention(
+                for: course, among: workspace.courses
+            )
         ) {
             return
         }
@@ -1010,7 +1232,14 @@ struct SidebarView: View {
     /// a standing invitation to wonder what is wrong.
     @ViewBuilder
     func reviseWithAIItem(course: Course, sectionNumber: Int) -> some View {
-        if AssistHardwareBudget.current().canRunAssistant, let folder = workspace.workspaceURL {
+        // HIDDEN on a reference course, not disabled — the same rule already
+        // written here for a Mac that cannot run the assistant, and decision
+        // (d): the local assistant is not offered on one at all, and is told
+        // nothing about one. A greyed line would be a menu teaching a teacher
+        // to stop reading it.
+        if AssistHardwareBudget.current().canRunAssistant,
+           !course.isKeptForReference,
+           let folder = workspace.workspaceURL {
             // Read HERE, during the row's render, not inside the button's
             // closure — the registry is observable, so the row redraws and
             // the menu is right the moment an assistant opens or closes.
@@ -1092,9 +1321,9 @@ struct SidebarView: View {
             removalRequest = RemovalRequest(
                 courseCode: course.code,
                 sectionNumber: nil,
-                title: "Remove \(course.code)?",
+                title: "Remove \(course.displayCode)?",
                 message: withScheduledDeployWarning(
-                    "Nothing is deleted. \(course.code) and all of its sections move to Archived, at the bottom of the sidebar, where you can get them back.",
+                    "Nothing is deleted. \(course.displayCode) and all of its sections move to Archived, at the bottom of the sidebar, where you can get them back.",
                     courseCode: course.code,
                     sectionNumber: nil
                 )
@@ -1114,9 +1343,9 @@ struct SidebarView: View {
                 removalRequest = RemovalRequest(
                     courseCode: course.code,
                     sectionNumber: nil,
-                    title: "Remove \(course.code)?",
+                    title: "Remove \(course.displayCode)?",
                     message: withScheduledDeployWarning(
-                        "Section \(sectionNumber) is the only section of \(course.code), so the whole course moves to Archived. Nothing is deleted — you can get it back from the bottom of the sidebar.",
+                        "Section \(sectionNumber) is the only section of \(course.displayCode), so the whole course moves to Archived. Nothing is deleted — you can get it back from the bottom of the sidebar.",
                         courseCode: course.code,
                         sectionNumber: nil
                     )
@@ -1125,7 +1354,7 @@ struct SidebarView: View {
                 removalRequest = RemovalRequest(
                     courseCode: course.code,
                     sectionNumber: sectionNumber,
-                    title: "Remove Section \(sectionNumber) of \(course.code)?",
+                    title: "Remove Section \(sectionNumber) of \(course.displayCode)?",
                     message: withScheduledDeployWarning(
                         "Nothing is deleted. This section moves to Archived, at the bottom of the sidebar, where you can get it back.",
                         courseCode: course.code,
@@ -1270,7 +1499,11 @@ struct CourseRowLabel: View {
         if isBeingRenamed {
             CourseCodeField(course: course)
         } else {
-            Label(course.code, systemImage: "books.vertical")
+            // `displayCode`, not `code`: decision (h) — a teacher reads
+            // ICS3U, never the folder name. The year group above this row
+            // already says 2025–26, so the suffix would be redundant as
+            // well as wrong.
+            Label(course.displayCode, systemImage: "books.vertical")
         }
     }
 }
@@ -1448,6 +1681,57 @@ struct CourseCodeField: View {
 /// chain, whose own body is type-checked on its own, is the smallest cut that
 /// puts it back — and it keeps the two doors' failure paths side by side,
 /// which is where they belong.
+/// The calm note about a reference course's pages, shown once per course
+/// BEFORE the teacher goes into Obsidian.
+///
+/// A modifier rather than three more lines on the sidebar's body, for a
+/// reason worth writing down: the body reached the point where the Swift
+/// compiler gave up type-checking it ("unable to type-check this expression
+/// in reasonable time"), which is what every other alert here was eventually
+/// pulled out for.
+private struct LockedPagesNoteAlert: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Binding var course: Course?
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content.alert(
+            ReferenceWording.pagesAreLockedTitle,
+            isPresented: isPresented,
+            presenting: course
+        ) { shown in
+            Button("Open in Obsidian") {
+                LockedPagesNote.remember(courseCode: shown.code)
+                course = nil
+                FolderActions.openInObsidian(
+                    revealing: shown.directoryURL, vaultURL: shown.directoryURL
+                )
+            }
+            Button("Not Now", role: .cancel) {
+                course = nil
+            }
+        } message: { _ in
+            // No warning icon and no "cannot": a teacher who kept this course
+            // for reference asked for it, so it reads as a fact.
+            Text(ReferenceWording.pagesAreLocked + "\n\n" + ReferenceWording.aCopyTakenOutStaysLocked)
+        }
+    }
+
+    private var isPresented: Binding<Bool> {
+        return Binding(
+            get: { return course != nil },
+            set: { showing in
+                if !showing {
+                    course = nil
+                }
+            }
+        )
+    }
+}
+
 private struct OutsideAgentAlerts: ViewModifier {
 
     // MARK: - Stored properties

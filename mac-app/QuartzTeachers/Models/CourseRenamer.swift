@@ -143,6 +143,15 @@ enum CourseRenamer {
         existingCodes: [String],
         runner: LaunchControlRunning = LaunchControl()
     ) throws -> Outcome {
+        // A reference course's folder name carries its school year and its
+        // `course_code` is deliberately the real code — the one pair in the
+        // product allowed to disagree. Renaming rewrites `course_code` to
+        // match the folder, which would replace the code a teacher reads with
+        // a suffixed one on every surface. The year is changed from its own
+        // menu item instead; the folder is not renamed at all.
+        if course.isKeptForReference {
+            throw ReferenceCourseIsFrozen(displayCode: course.displayCode)
+        }
         let newCode: String = CourseCodeRule.normalized(requestedCode)
         if let reason = CourseCodeRule.problem(
             requestedCode, existingCodes: existingCodes, currentCode: course.code

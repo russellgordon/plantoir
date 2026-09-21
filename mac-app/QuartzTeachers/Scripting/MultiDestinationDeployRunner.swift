@@ -179,6 +179,18 @@ class MultiDestinationDeployRunner {
         workingDirectory: URL,
         needsBuild: Bool
     ) async {
+        // The backstop on the function that actually starts `deploy.sh`. Its
+        // two callers — the Deploy button and the headless assistant path —
+        // both refuse a course kept for reference before they get here, and
+        // this is here for the same reason they each have one: a deploy that
+        // reports success on a frozen course is the worst direction this can
+        // fail in, and a single guard is a single edit from being gone.
+        //
+        // Silent rather than a message: nothing can be said from here that
+        // the caller has not already said, and the run simply does not start.
+        if course.isKeptForReference {
+            return
+        }
         legs = []
         for destination in destinations {
             legs.append(Leg(destination: destination))

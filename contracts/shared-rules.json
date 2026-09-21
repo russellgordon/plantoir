@@ -301,9 +301,24 @@
         "appliesOnWhy": "NOT permanent, and this one is an acknowledged exception rather than the ordinary use - read contracts/README.md's \"Four ways out\" passage, which rejects exactly this move, and its Named gaps section, which records why it was taken here anyway. Windows could ask the same question: it has publishes and it has a quit. The honest alternative reddens their ContractTests with a failure only they can mend (a NamedGapLedger entry is theirs to write), on a release where nobody is on that side. The cost is real and is stated rather than hidden: appliesOn has NO mend-check, so the day Windows implements this, nothing anywhere goes red to say the contract is now lying. What points at it instead is this sentence, the README's Named-gaps entry, and the windows issue that carries the work. Adopt the rule (quittingWhileWorkIsUnderWay, below) and this line together, or neither - a line saying a teacher was asked, in an app that asks nothing, would be worse than no line - and delete both appliesOn keys when you do."
       },
       {
-        "carries": "the course, the section, and WHY - which of the three things that turn one off without being asked did it",
+        "carries": "the course, the section, and WHY - which of the things that turn one off without being asked did it",
         "event": "scheduled deploy turned off",
-        "why": "A deploy the teacher set to happen on its own was turned off by something other than them asking for it: the course was removed, the section was removed, or the day it was set for had gone by. Without this line a teacher whose site stopped updating has nothing anywhere explaining it - the alarm simply is not there any more, which reads exactly like one that was never set, and that is the same silence 'scheduled publish needed an answer' exists to break, one step further back. ONE event with three reasons rather than three events: somebody reading the trail wants to know their overnight deploy was turned off and by what, and the difference between two ways of removing something means nothing to them. It says DEPLOY where its three neighbours say publish, because a site is deployed and a page is published (Russell, 2026-09-20); the shipped names are left alone rather than renamed here, since a NEW name carrying the old vocabulary is the expensive mistake - this list pins it on both platforms. NOT written by the teacher's own Cancel item, nor by the assistant's cancel_scheduled_deploy: those are the teacher asking, and the trail already carries what they asked for. No appliesOn, deliberately - Windows cancels on removing a SECTION and not on removing a COURSE (Plantoir.Core/Models/CourseArchiver.cs), so two of the three reasons are theirs whatever they decide about the third."
+        "why": "A deploy the teacher set to happen on its own was turned off by something other than them asking for it: the course was removed, the section was removed, or the day it was set for had gone by. Without this line a teacher whose site stopped updating has nothing anywhere explaining it - the alarm simply is not there any more, which reads exactly like one that was never set, and that is the same silence 'scheduled publish needed an answer' exists to break, one step further back. ONE event with several reasons rather than one event each (three when it was written; a fourth since a course could be kept for reference): somebody reading the trail wants to know their overnight deploy was turned off and by what, and the difference between two ways of removing something means nothing to them. It says DEPLOY where its three neighbours say publish, because a site is deployed and a page is published (Russell, 2026-09-20); the shipped names are left alone rather than renamed here, since a NEW name carrying the old vocabulary is the expensive mistake - this list pins it on both platforms. NOT written by the teacher's own Cancel item, nor by the assistant's cancel_scheduled_deploy: those are the teacher asking, and the trail already carries what they asked for. No appliesOn, deliberately - Windows cancels on removing a SECTION and not on removing a COURSE (Plantoir.Core/Models/CourseArchiver.cs), so two of the three reasons are theirs whatever they decide about the third."
+      },
+      {
+        "carries": "the folder it was given, the code and school year it shows, how many sections came across, and which course it was copied from",
+        "event": "course kept for reference",
+        "why": "A reference course is a course that appeared in the sidebar without the teacher creating one, and which can never be deployed. Without this line a report of 'where did ICS3U-2025 come from' or 'why will this one not publish' has nothing anywhere behind it. It names the FOLDER and the displayed code separately because they deliberately differ, and that difference is the first thing somebody reading a report will want to check. The source path never appears raw - a course is named, not a path - and the contents of a page never appear at all."
+      },
+      {
+        "carries": "the code the teacher reads, the folder it lives in, and the school year before and after",
+        "event": "reference course school year changed",
+        "why": "The ONE thing a frozen course still lets a teacher change, so rule 5 applies to it like any other feature. It names both the code and the folder because those two deliberately differ on a reference course, and a report saying 'ICS3U moved' would not say WHICH of the three ICS3Us on the shelf did. Not written when the sheet is cancelled, and not written when the write fails - the teacher is told about that in a sentence of its own."
+      },
+      {
+        "carries": "the course, how many pages had to be locked again, and how many would not stay locked",
+        "event": "reference course pages locked again",
+        "why": "Written ONLY when a pass actually did something, so a folder in a steady state leaves no lines at all. It is the answer to the one report this feature can produce that would otherwise be unexplainable: 'my reference course let me edit a page'. A count of 37 after a restore is a backup coming back unlocked, because a zip carries the mode and not the flag; a handful that would not stay locked, over and over, is usually a folder kept in a cloud drive whose file provider clears the locked bit while a file uploads - but the LINE says only the count, deliberately, because a volume with no support for the flag at all produces the same count and naming a cause would be a confident wrong diagnosis. Neither is a failure to put in front of the teacher, and neither is retried after a delay - the next pass is the mechanism."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -993,6 +1008,12 @@
     "order": "CANCEL FIRST, then archive and remove - and this is the opposite of a RENAME's order, deliberately. A rename that cancelled before a failed move would silently drop a deploy for a course still sitting there under its old name, so it archives first; a REMOVAL that archived before a failed cancel would leave the very thing this rule exists to prevent, a course that is gone with a live alarm still addressed to it. So: a cancel that FAILS stops the removal, and the teacher is told in a plain sentence. If the removal then fails, the deploy stays cancelled and the sentence says so.",
     "scopedToOneWorkingFolder": "Everything that cancels, lists or SHOWS a scheduled deploy asks the plist which working folder it belongs to, and leaves alone anything belonging to another. Paths compared with POSIX realpath, never Foundation's resolvingSymlinksInPath - the latter strips /private where the former keeps it, and two spellings of one folder comparing as DIFFERENT would scope every job out silently. The reason is not hypothetical: an agent's label is the course code and the section number and nothing else, so a teacher holding last year's working folder and this year's, both with ICS3U section 1, has ONE alarm between them; without this, removing the course in the folder that does not own it would cancel the other folder's live deploy and report success. That the two folders share one alarm at all is a separate fault with its own issue - a folder-scoped label would orphan every plist a teacher already holds.",
     "cases": [
+      {
+        "act": "a course kept for reference is met when the working folder is read",
+        "cancels": "everyAlarmThisFolderHasForTheCourse",
+        "provedBy": "run",
+        "why": "A reference course is never deployed, so an alarm still addressed to one is a deploy that will be refused at half six with nobody there to read the refusal. Reached when the folder is READ rather than only when a course is made one, because the marker can also arrive by hand in an editor, or from another Mac - and the course that owns the alarm is the one that was live yesterday. Scoped to THIS working folder like every other case here."
+      },
       {
         "act": "remove one section of a course that has more than one",
         "cancels": "thatSectionOnly",
@@ -3389,5 +3410,639 @@
       "mac"
     ],
     "appliesOnWhy": "Written on the mac 2026-09-19 with the quit-path fix it belongs to. An acknowledged EXCEPTION, not a permanent difference: Windows could ask the same question, and contracts/README.md's \"Four ways out\" passage rejects softening a contract this way. Taken here because the alternative reddens a suite nobody is watching with a failure only Windows can mend, and recorded in the README's Named gaps section so the file does not argue both sides. Two honest costs: appliesOn has no mend-check, so nothing will go red when Windows adopts this; and the block-level appliesOn KEY ITSELF is read by no test on either platform, so that key is documentation rather than a gate. The block's own cases are run on the mac (QuitConfirmationTests) and by nothing on Windows. The SHAPE is portable - what counts as under way, what never counts, and when never to ask are all platform-neutral; only the signal that says the system is logging out differs (kAEQuitReason here, WM_QUERYENDSESSION there). Adopt this and the \"quit asked about work under way\" trail line together, or neither, and delete both appliesOn keys when you do."
+  },
+  "referenceCourses": {
+    "note": "A REFERENCE COURSE is last year's course — or a course full of example content — kept in this year's sidebar so a teacher can read it, and which Plantoir never deploys. It is FROZEN: its pages are locked on disk, and every action that would change a page, a setting or the shape of the course is withheld. This block is the whole rule as data: how one is marked, how the school years are named and offered, when a code may not join the shelf, and what is done to the course's deploying settings so that an OLDER copy of either app — one that has never heard of the marker — refuses it too.",
+    "markerKey": "kept_for_reference",
+    "absentMeansFalse": true,
+    "schoolYearKey": "reference_school_year",
+    "schoolYearAbsentMeans": "Other",
+    "identity": {
+      "folderName": "The folder under courses/ — ICS3U-2025. It is IDENTITY: the launcher argument, the built-site folder, the preview lease, the backup zip's name and the scheduled-deploy identifier are all built from it, so two ICS3Us never collide.",
+      "courseCode": "course_code stays the REAL code — ICS3U, unchanged from the course it was copied from. That is also what keeps the preview's site title, grade label and social card right, and it is why the folder and the key are allowed to disagree here and nowhere else.",
+      "displayedToTheTeacher": "The real code. A teacher reads ICS3U in the sidebar, the window title, every alert and every sentence; the folder name appears only where a folder name is the fact — Obsidian's own vault switcher, for one, which opens the course folder AS the vault and shows its name.",
+      "why": "A separate display_code key was REJECTED: it would be a third spelling of the same fact, and it would leave the site builder putting ICS3U-2025 in the site title of a course whose preview the teacher is reading."
+    },
+    "schoolYearLabel": {
+      "rule": "A school year is named for the calendar year it STARTS in and is stored as that integer. The label is derived: the starting year, an EN DASH (U+2013), and the last two digits of the following year.",
+      "why": "Storing the integer keeps the dash out of the file format entirely, and one rule in one place means the two apps cannot render the same year two ways.",
+      "cases": [
+        {
+          "startingYear": 2022,
+          "expect": "2022–23"
+        },
+        {
+          "startingYear": 2025,
+          "expect": "2025–26"
+        },
+        {
+          "startingYear": 2099,
+          "expect": "2099–00",
+          "why": "The century rolls; the label is the last two digits of the following year and nothing more. Pinned so neither app invents a four-digit second half."
+        }
+      ]
+    },
+    "schoolYearsOffered": {
+      "rule": "Newest first, from the school year containing today down to the floor. A new school year appears on 1 AUGUST — the year containing today is today.month >= 8 ? today.year : today.year - 1. The current school year IS offered, and is first. 'No year' is offered too, and is always last; it is an absence rather than a year, so it is not in this list.",
+      "floor": 2022,
+      "rollsOverInMonth": 8,
+      "currentYearIsOffered": true,
+      "why": "The rule is INHERITED rather than invented: Windows already ships Timetable.AcademicYearStarting with exactly this shape, documented as 'a school year is named for the calendar year it starts in, and starts in the late summer'. Ontario and BC both start in September, so 1 August leaves a month of headroom for a teacher setting up over the summer. The top end is derived from the day and never written down, so the list grows by itself; the floor is Russell's and does not move. Every function takes the DAY rather than reading the clock, or none of these cases could be run at all.",
+      "cases": [
+        {
+          "today": "2026-07-31",
+          "expect": [2025, 2024, 2023, 2022],
+          "why": "The day before the rollover: 2026–27 is not offered yet."
+        },
+        {
+          "today": "2026-08-01",
+          "expect": [2026, 2025, 2024, 2023, 2022],
+          "why": "The rollover day itself, and the first day 2026–27 appears."
+        },
+        {
+          "today": "2026-09-20",
+          "expect": [2026, 2025, 2024, 2023, 2022]
+        },
+        {
+          "today": "2030-08-01",
+          "expect": [2030, 2029, 2028, 2027, 2026, 2025, 2024, 2023, 2022],
+          "why": "Nine years, grown by itself, with nothing hard-coded at the top."
+        }
+      ]
+    },
+    "schoolYearRead": {
+      "rule": "A stored reference_school_year reads as the year when it is a whole number within the offered list for today, and as 'Other' otherwise.",
+      "why": "Anything else — a missing key, a null, a hand-edited 2019, a 2031 written on a Mac with a wrong clock, a word, a true — lands in 'Other', which a teacher can see and can change. The alternative is a group labelled 0000–01 built out of a value that coerced to zero. A year ABOVE the range today joins its own group on the day that year arrives, because the range only grows at the top. A JSON true needs no case of its own in the code: true and 1 are indistinguishable without CFGetTypeID, and both read as the year 1, which is out of range either way.",
+      "cases": [
+        {
+          "name": "the ordinary case",
+          "storedValue": 2025,
+          "today": "2026-09-20",
+          "expect": 2025
+        },
+        {
+          "name": "no key at all",
+          "storedIsAbsent": true,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "an explicit null",
+          "storedValue": null,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "below the floor",
+          "storedValue": 2019,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "beyond today",
+          "storedValue": 2031,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "not a number",
+          "storedValue": "last year",
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "a boolean",
+          "storedValue": true,
+          "today": "2026-09-20",
+          "expect": null
+        },
+        {
+          "name": "the current school year, which is offered",
+          "storedValue": 2026,
+          "today": "2026-09-20",
+          "expect": 2026,
+          "why": "A teacher may keep a copy of a course they are teaching this year — the other semester's, or one they will not run again in this order."
+        }
+      ]
+    },
+    "codeUniqueWithinAGroup": {
+      "rule": "Within one school-year group — including 'Other' — no two reference courses may share a course code. Refused with a sentence when a course is put on the shelf and again when its year is changed. The courses a teacher TEACHES are in no group at all and are never consulted.",
+      "why": "Three rows all saying ICS3U under one year is a teacher's mistake made permanent; the same three under 2024–25, 2025–26 and 'Other' is exactly what they meant. It is also what makes 'take a fresh copy' an ordered act — delete the reference copy first, then copy again — rather than a way to end up with two of the same thing.",
+      "cases": [
+        {
+          "name": "the same code in the same year",
+          "shelf": [{"code": "ICS3U", "year": 2025}],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "expect": "refused"
+        },
+        {
+          "name": "the same code in different years",
+          "shelf": [{"code": "ICS3U", "year": 2024}],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "expect": "allowed"
+        },
+        {
+          "name": "one with a year and one without",
+          "shelf": [{"code": "ICS3U", "year": null}],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "expect": "allowed"
+        },
+        {
+          "name": "two with no year at all",
+          "shelf": [{"code": "ICS3U", "year": null}],
+          "placing": {"code": "ICS3U", "year": null},
+          "expect": "refused",
+          "why": "'Other' is a group like any other. Two ADA1Os of example content with nothing to tell them apart is the row a teacher cannot read."
+        },
+        {
+          "name": "a different code in the same year",
+          "shelf": [{"code": "ICS3U", "year": 2025}],
+          "placing": {"code": "ICS4U", "year": 2025},
+          "expect": "allowed"
+        },
+        {
+          "name": "beside the LIVE course of the same code",
+          "shelf": [],
+          "liveCourses": ["ICS3U"],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "expect": "allowed",
+          "why": "The ordinary case, not an exception: a teacher keeps last year's ICS3U while teaching this year's. The rule never looks at the courses being taught."
+        },
+        {
+          "name": "re-filing a course into the year it is already in",
+          "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025"}],
+          "placing": {"code": "ICS3U", "year": 2025},
+          "ignoringFolderName": "ICS3U-2025",
+          "expect": "allowed",
+          "why": "Changing a course's school year must not find the course itself sitting where it is about to move from."
+        }
+      ]
+    },
+    "neutralises": {
+      "rule": "Whatever makes a course a reference course writes these settings in the same act, so the course has nowhere to deploy to whatever is reading it.",
+      "why": "The marker is what THIS version reads. This is what every other version reads — including an older Plantoir on a second Mac sharing the folder over iCloud Drive. Every shipped version refuses a folder deploy with no folder, with sentences it already has. Measured: a real previous-generation working folder carries no deploy_target at all, and an absent deploy_target reads as 'netlify', so a plain copy would have arrived with a working Deploy button aimed at last year's live class site.",
+      "keys": [
+        {
+          "key": "deploy_target",
+          "becomes": "local_folder"
+        },
+        {
+          "key": "deploy_folder_path",
+          "becomes": ""
+        },
+        {
+          "key": "additional_deploy_targets",
+          "becomes": "removed"
+        },
+        {
+          "key": "custom_domains",
+          "becomes": "removed",
+          "why": "A reference course must never claim last year's domain — the live course that replaced it may be using it."
+        }
+      ],
+      "alsoRenamedAside": ".netlify_sites/section<N>.json and .cloudflare_sites/section<N>.json become the frozen previous-marker name (file-formats.json → firstDeployMarkers). Renamed rather than deleted: the file holds the site id and the admin address, which a teacher may still want. Two fail-safes fall out of one rename — a deploy that somehow ran would make a NEW site rather than overwrite last year's live one, and a section that has never deployed cannot be scheduled.",
+      "kept": "Per-page visibility frontmatter is KEPT exactly as it is: it is last year's record of what students actually saw, and it is what makes a preview of a reference course show a sensible site rather than everything."
+    },
+    "markerAgreement": {
+      "rule": "FOUR implementations answer 'is this course kept for reference?' - the APP itself, scripts/reference_course.py, deploy.sh and deploy.ps1 - and two of them are plain shell with no JSON parser. So the question is one regular expression, run over the WHOLE settings file as a single string: the quoted key, a colon with any whitespace (newlines included) on either side, and the word true in any case, unquoted. Every row below carries the deploy outcome all four must produce, and what the APP reads the row as.",
+      "theAppIsTheFourthReader": "Added after the app was measured reading `\"kept_for_reference\": 1` as TRUE while all three launchers read it as an ordinary course and deployed it - JSONSerialization hands back an NSNumber and NSNumber conditionally bridges to Bool for 0 and 1, so `as? Bool` said true. Both directions of the fault at once: the app FREEZES AND LOCKS a course, with no way back to live, that the launchers then publish. CourseConfiguration now reads this one key through CFBooleanGetTypeID - a real JSON boolean and nothing else - and every row states appReadsAsReference so the four can never silently disagree again.",
+      "theInvariant": "Wherever the APP reads a course as kept for reference, every launcher must REFUSE. The reverse is allowed: a launcher may refuse something the app calls ordinary (that is the 'cannot tell' rule below), because refusing publishes nothing and freezes nothing. A test asserts the implication on every row.",
+      "cannotTell": "A marker that is THERE with a value that is neither true nor false - `1`, `\"true\"`, `True`, a key written with backslash-u escapes - is something a person plainly MEANT. The launchers refuse it with a sentence of its own ('cannot tell whether this course is kept for reference ... its settings say something other than true or false'), which deploys nothing and freezes nothing; the app treats such a course as ordinary, so the launcher's refusal is what the teacher meets. Leniency in the APP was considered and REJECTED: the app's reading does two things rather than one - it refuses a deploy AND it locks every file, with no way back - so a false positive there is not loud and harmless, it is a live course the teacher cannot edit and cannot un-reference.",
+      "whyItMatters": "The one door the shared Python never reaches is deploy.sh's folder publish: it copies host-side with rsync and exits 0 before the container is started. So a disagreement between the shell and the Python IS a deploy of a frozen course. Measured on 2026-09-20, before this table existed: a config whose key and colon sat on different lines was a reference course to the Python and an ordinary one to the launcher, because grep works a LINE AT A TIME - and the launcher published it, exit 0, saying 'Published: 1 file(s) updated.'",
+      "pattern": {
+        "python": "\"[^\"]*ept_for_reference\"\\s*:\\s*[Tt][Rr][Uu][Ee]",
+        "dotNet": "\"[^\"]*ept_for_reference\"\\s*:\\s*[Tt][Rr][Uu][Ee]",
+        "posixEre": "\"[^\"]*ept_for_reference\"[[:space:]]*:[[:space:]]*[Tt][Rr][Uu][Ee]",
+        "presentDotNet": "\"[^\"]*ept_for_reference\"",
+        "falseDotNet": "\"[^\"]*ept_for_reference\"\\s*:\\s*[Ff][Aa][Ll][Ss][Ee]",
+        "escapedKeyPython": "[{,]\\s*\"[^\"]*\\\\u[0-9a-fA-F]{4}[^\"]*\"\\s*:",
+        "escapedKeyDotNet": "[{,]\\s*\"[^\"]*\\\\u[0-9a-fA-F]{4}[^\"]*\"\\s*:",
+        "escapedKeyPosixEre": "[{,][[:space:]]*\"[^\"]*\\\\u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][^\"]*\"[[:space:]]*:",
+        "whyEscapedKey": "An object KEY written with a backslash-u escape - ANY key, not just this one - makes the text readers say 'cannot tell'. A key escaped ALL the way through is decoded by the app and by the Python's parsed half, which both call it a reference course and FREEZE it, while a text reader sees nothing and the folder publish goes through at exit 0. Measured: it deployed. Every key Plantoir and the shared Python write is plain ASCII, so an escaped key is never ours. KEYS ONLY: json.dump escapes non-ASCII in VALUES by default, so a course name with an accent and every emojis value legitimately carry backslash-u - the [{,] anchor is what tells a key from a value, since a key follows an opening brace or a comma and a value never does. Proven against copies of the four real previous-generation configs, all 38 example-content payloads, the app's own writer with accents and emoji, and hand-made values containing escaped quotes and colons: no false refusal.",
+        "presentPosixEre": "\"[^\"]*ept_for_reference\"",
+        "falsePosixEre": "\"[^\"]*ept_for_reference\"[[:space:]]*:[[:space:]]*[Ff][Aa][Ll][Ss][Ee]",
+        "whyPresent": "The PRESENCE test, and the false test beside it. A marker that is there with a value that is neither reads as 'cannot tell' and the launchers refuse. `[^\"]*ept_for_reference` also catches a key written with backslash-u escapes in its first characters, and cannot match an ordinary key.",
+        "why": "Three dialects of one rule, and each line of it is load-bearing. The POSIX form is run by grep, which reads a line at a time, so deploy.sh flattens the file with `tr '\\n' ' '` FIRST - without that, [[:space:]] cannot span a newline. The .NET form needs no flattening, because backslash-s matches a newline there. All three spell the VALUE's case out and are matched CASE-SENSITIVELY: deploy.ps1 used -match, which is case-insensitive in PowerShell and applied that to the KEY as well - so `KEPT_FOR_REFERENCE` refused there while the mac and the Python allowed it, stranding a Windows teacher with a live course whose Deploy button could never work. JSON keys are case-sensitive; -cmatch, and the value's case written out. Python's re.search is given the whole file as read."
+      },
+      "whenInDoubtRefuse": "The two directions are not comparable. A live course wrongly refused is loud and harmless - the teacher sees a refusal and says so. A reference course wrongly deployed REPORTS SUCCESS and nobody finds out. So every ambiguity here is resolved by refusing: a marker nested inside another OBJECT is refused, because plain shell cannot tell it from the real key and one answer shared by three implementations beats three answers that are each right about something different. The marker's own text inside a string VALUE is a narrower case than it looks, and the exact rule is worth stating because it is not the flat 'no pattern matches a value': a config is refused when it carries a QUOTED TOKEN - key or value - whose text ends in the key's tail and is not followed by true or false. The marker's text written plainly inside a value therefore DOES read as 'cannot tell' (measured), while the only way that text legitimately reaches a value is through escaped quotes, which never match. No realistic config was found that is refused by this: it would need a course name, folder name or path that literally ends in the key's tail.",
+      "whatIsDeliberatelyNotRefused": "A malformed config with NO marker in it: a course nobody can open must not become undeployable by accident. A malformed config that DOES carry the marker is refused, because there is nothing accidental about it. (This key used to say the opposite about `\"true\"` and `1` - that both read FALSE in CourseConfiguration on both platforms and so should deploy. The mac half of that was measured FALSE on 2026-09-20 and both rows are now 'cannot tell'.)",
+      "cases": [
+        {
+          "name": "the marker, plainly",
+          "appReadsAsReference": true,
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": true\n}\n",
+          "expect": "refused"
+        },
+        {
+          "name": "the marker set to false",
+          "appReadsAsReference": false,
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"kept_for_reference\": false\n}\n",
+          "expect": "allowed"
+        },
+        {
+          "name": "no marker at all",
+          "appReadsAsReference": false,
+          "configText": "{\n  \"course_code\": \"ICS4U\"\n}\n",
+          "expect": "allowed",
+          "why": "Absent means false. Every course written before this key existed says exactly this."
+        },
+        {
+          "name": "the key and its value on different lines",
+          "appReadsAsReference": true,
+          "configText": "{\"course_code\":\"ICS3U\",\"kept_for_reference\"\n : true, \"section_numbers\":[1]}\n",
+          "expect": "refused",
+          "why": "THE ROW THIS TABLE EXISTS FOR. Reachable by a hand edit or a reformatter; no writer in the product produces it. Before the fix, this deployed."
+        },
+        {
+          "name": "tabs and extra spaces around the colon",
+          "appReadsAsReference": true,
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\"\t :   true\n}\n",
+          "expect": "refused"
+        },
+        {
+          "name": "Windows line endings",
+          "appReadsAsReference": true,
+          "configText": "{\r\n  \"course_code\": \"ICS3U\",\r\n  \"kept_for_reference\": true\r\n}\r\n",
+          "expect": "refused",
+          "why": "The same file written on the other platform. A carriage return is whitespace in all three dialects."
+        },
+        {
+          "name": "a byte-order mark at the head of the file",
+          "appReadsAsReference": true,
+          "bom": true,
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": true\n}\n",
+          "expect": "refused",
+          "why": "The launchers' grep never noticed a BOM. The Python did, and refused to parse the whole file - so it read as an ordinary course. Closed by opening the file as utf-8-sig, which costs nothing."
+        },
+        {
+          "name": "the value in capitals",
+          "appReadsAsReference": false,
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": TRUE\n}\n",
+          "expect": "refused",
+          "why": "Not valid JSON, so the apps cannot open this course at all and refusing costs a teacher nothing they could have used. Somebody hand-edited it meaning true."
+        },
+        {
+          "name": "the value as a string",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"kept_for_reference\": \"true\"\n}\n",
+          "expect": "refused",
+          "appReadsAsReference": false,
+          "why": "CANNOT TELL. Somebody plainly meant the marker and wrote the value wrong. The app reads a real JSON boolean and nothing else, so it shows an ordinary course; the launchers refuse, which publishes nothing and freezes nothing. Refusing costs a teacher one puzzled moment on a course they hand-edited."
+        },
+        {
+          "name": "the value as the number 1",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"kept_for_reference\": 1\n}\n",
+          "expect": "refused",
+          "appReadsAsReference": false,
+          "why": "THE ROW THE APP WAS ADDED FOR. It used to read TRUE here - NSNumber bridges to Bool for 0 and 1 - so the app froze and locked a course every launcher then deployed. The app is strict now and the launchers say 'cannot tell'."
+        },
+        {
+          "name": "the value as the number 1.0",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"kept_for_reference\": 1.0\n}\n",
+          "expect": "refused",
+          "appReadsAsReference": false,
+          "why": "The same bridge, measured: 1.0 read as true as well."
+        },
+        {
+          "name": "the value as the number 0",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"kept_for_reference\": 0\n}\n",
+          "expect": "refused",
+          "appReadsAsReference": false,
+          "why": "Cannot tell, and deliberately NOT read as false: a zero is as much a hand-edit as a one, and guessing which way somebody meant it is the thing this rule refuses to do."
+        },
+        {
+          "name": "the key written with unicode escapes ALL the way",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"\\u006b\\u0065pt_for_reference\": true\n}\n",
+          "expect": "refused",
+          "appReadsAsReference": true,
+          "why": "THE ROW THE ESCAPED-KEY RULE WAS ADDED FOR. Measured before it: the app decoded the escape, called it a reference course and LOCKED it, while the real deploy.sh walked straight past and published from --to-folder. A text reader cannot see this key at all, so the rule is about the ESCAPE rather than about the marker: any object key carrying a backslash-u escape reads as 'cannot tell'."
+        },
+        {
+          "name": "an accented course NAME, as json.dump writes it",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"course_name\": \"Caf\\u00e9 Num\\u00e9rique\"\n}\n",
+          "expect": "allowed",
+          "appReadsAsReference": false,
+          "why": "The row that keeps the rule above honest. Python's json.dump escapes non-ASCII in VALUES by default, so accents and every emojis value carry backslash-u legitimately - refusing on those would refuse real courses. Proven against the four real previous-generation configs, all 38 example-content payloads and the app's own writer."
+        },
+        {
+          "name": "a value that ends in an escaped quote and a colon",
+          "configText": "{\n  \"course_name\": \"caf\\u00e9\\\" : x\"\n}\n",
+          "expect": "allowed",
+          "appReadsAsReference": false,
+          "why": "The adversarial shape the escaped-key rule has to survive: a VALUE carrying both an escape and a colon. The [{,] anchor is what saves it - a key follows an opening brace or a comma, and this token follows a colon."
+        },
+        {
+          "name": "a key that merely ENDS in the marker's tail",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"accept_for_reference\": true\n}\n",
+          "expect": "refused",
+          "appReadsAsReference": false,
+          "why": "The one shape refused with the REFERENCE-COURSE sentence rather than 'cannot tell', because the widened pattern is `\"[^\"]*ept_for_reference\"` and this key ends in that tail. No such key exists in the product; the row is here so the surface is written down rather than discovered."
+        },
+        {
+          "name": "the key written with unicode escapes",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"\\u006bept_for_reference\": true\n}\n",
+          "expect": "refused",
+          "appReadsAsReference": true,
+          "why": "All four agree it IS a reference course. JSON resolves the escape, so the app and the parsed half of the Python see the real key - and the TEXT pattern is written `\"[^\"]*ept_for_reference\"` for exactly this: no ordinary key ends in those characters, so widening it costs nothing and catches every partially-escaped spelling."
+        },
+        {
+          "name": "the key in capitals",
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"KEPT_FOR_REFERENCE\": true\n}\n",
+          "expect": "allowed",
+          "appReadsAsReference": false,
+          "why": "JSON keys are case-sensitive, so this is NOT the marker and every reader agrees it is an ordinary course. It is in the table because deploy.ps1's -match was case-INSENSITIVE and refused it, which would have stranded a Windows teacher with a live course whose Deploy button could never work. -cmatch, and the value's case spelled out instead."
+        },
+        {
+          "name": "the settings file is a FOLDER",
+          "configIsADirectory": true,
+          "expect": "allowed",
+          "appReadsAsReference": false,
+          "why": "Not a settings file at all, so not this check's business - the course-folder check answers it. In the table because PowerShell's Test-Path matches containers too, so deploy.ps1 refused it while the other three allowed it. -PathType Leaf."
+        },
+        {
+          "name": "malformed JSON carrying the marker",
+          "appReadsAsReference": false,
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": true,\n",
+          "expect": "refused",
+          "why": "The app cannot open the course at all; the three text readers refuse the deploy. Nothing is frozen and nothing is published."
+        },
+        {
+          "name": "malformed JSON with no marker",
+          "appReadsAsReference": false,
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n",
+          "expect": "allowed",
+          "why": "The one place this errs toward allowing, deliberately: a course nobody can open must not become undeployable by accident."
+        },
+        {
+          "name": "an empty settings file",
+          "appReadsAsReference": false,
+          "configText": "",
+          "expect": "allowed"
+        },
+        {
+          "name": "no settings file at all",
+          "appReadsAsReference": false,
+          "noConfigFile": true,
+          "expect": "allowed",
+          "why": "Not this check's business. The launcher's own course-folder check answers it, in its own words."
+        },
+        {
+          "name": "a settings file that cannot be read",
+          "appReadsAsReference": false,
+          "configText": "{\n  \"course_code\": \"ICS3U\",\n  \"kept_for_reference\": true\n}\n",
+          "unreadable": true,
+          "expect": "refused",
+          "why": "FAIL CLOSED. 'Cannot tell' is not 'no'. The launchers say so in a sentence of their own; the Python is asked the same question through cannot_tell(), so deploy.py run directly gives the same answer."
+        },
+        {
+          "name": "the marker's text inside a course NAME",
+          "appReadsAsReference": false,
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"course_name\": \"\\\"kept_for_reference\\\": true\"\n}\n",
+          "expect": "allowed",
+          "why": "MEASURED, and it turned out better than expected. A text rule looked as if it must mistake this for the real key - but JSON ESCAPES the quotes inside a string value, so what is actually in the file is \\\"kept_for_reference\\\", with backslashes, and none of the three patterns match it. The escaping is what tells a value from a key, for free, in all three dialects. The row is kept because the reasoning is not obvious and somebody will otherwise re-derive it as a hazard."
+        },
+        {
+          "name": "the key nested inside another object",
+          "appReadsAsReference": false,
+          "configText": "{\n  \"course_code\": \"ICS4U\",\n  \"something\": { \"kept_for_reference\": true }\n}\n",
+          "expect": "refused",
+          "why": "Same reason. Refusing a course whose settings carry that text somewhere odd is the cheap direction."
+        }
+      ]
+    },
+    "refusal": {
+      "sentence": "{course} is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
+      "rule": "Every door a deploy can start at refuses a reference course, with this sentence, BEFORE anything is stopped, built or uploaded. {course} is the code a TEACHER reads. The sentence says what the course is and names the way out - the course being taught - and it deliberately does NOT tell the teacher to copy anything: nothing in this release copies pages between courses, and a page taken out by hand arrives locked.",
+      "doesNotDependOnTheLock": "The refusal is gated on the MARKER alone and never on whether the files happen to be locked. An entirely unlocked reference course - one restored from a backup, or one whose folder has been on a second Mac - is refused at every door just the same. Both suites pin it. If the two were ever coupled, unlocking a course would make it deployable, and a deploy that reports success is the worst direction this feature can fail in.",
+      "gateByDirection": "Refuse what would START a deploy; never refuse what STOPS one. Cancelling a scheduled deploy is always allowed, on every surface, however the course is marked - a course marked by hand while an alarm was already set must still be able to have that alarm turned off from the app. Whatever writes the marker cancels the course's scheduled deploys in the same act, and so does the pass that meets a reference course when the working folder is read.",
+      "failClosedInTheShell": "The host-side check in deploy.sh and deploy.ps1 reads course_config.json in PLAIN SHELL - no host python3, which that path does not otherwise need on a product whose first-run promise is 'no Homebrew, no admin rights'. It fails CLOSED: a settings file that is there and cannot be read refuses, saying so. A settings file that is ABSENT is not this check's business - the launcher's own 'course folder not found' answers that - and a malformed one reads as NOT a reference course in the shared Python, because a course nobody can open must not become undeployable by accident.",
+      "exitCode": 1,
+      "whyNotANewExitCode": "deploy.sh states its own invariant: exit 3 means 'a question nobody was there to answer' and nothing else, and every other exit is 0 or 1. A fourth code would have to be read by the scheduled wrapper, by ScheduledPublishOutcome and by the Windows twin before it meant anything. Exit 1, matched on OUTPUT by an app-rules.json -> failureExplanations case, which is how every other launcher failure already becomes a sentence.",
+      "doors": [
+        {
+          "door": "the section window's Deploy button",
+          "chokepoint": "SectionDetailView.deployAndWait, first check",
+          "alsoCaughtBy": "the button is not drawn at all on a reference course"
+        },
+        {
+          "door": "the local assistant's deploy_section, window branch",
+          "chokepoint": "AssistToolRunner.deploySection, before the preview is stopped",
+          "why": "Placed before the stop, not after: a refusal any later kills a preview the teacher was reading, for nothing."
+        },
+        {
+          "door": "the local assistant's deploy_section, headless branch",
+          "chokepoint": "AssistToolRunner.deploySection",
+          "alsoCaughtBy": "AssistToolchainWork.deploy"
+        },
+        {
+          "door": "the deploy approval card's Go button",
+          "chokepoint": "AssistToolRunner.deploySection",
+          "why": "Closed by construction as well: the local assistant is never offered on a reference course, and a window request naming one is refused, so the card cannot be reached with one in hand."
+        },
+        {
+          "door": "deploy_section over MCP",
+          "chokepoint": "AssistToolRunner.run(call:), the write gate",
+          "alsoCaughtBy": "AssistToolRunner.deploySection, AssistToolchainWork.deploy"
+        },
+        {
+          "door": "the local assistant's schedule_deploy",
+          "chokepoint": "AssistToolRunner.scheduleRequest",
+          "alsoCaughtBy": "ScheduledDeploy.problem"
+        },
+        {
+          "door": "schedule_deploy over MCP",
+          "chokepoint": "AssistToolRunner.run(call:), the write gate",
+          "alsoCaughtBy": "AssistToolRunner.scheduleRequest, ScheduledDeploy.problem"
+        },
+        {
+          "door": "the sidebar's Schedule Deploy… sheet",
+          "chokepoint": "ScheduledDeploy.problem, first check",
+          "why": "Refused whatever time was asked for, before 'that time has already passed'."
+        },
+        {
+          "door": "a scheduled deploy already on disk, firing at its moment",
+          "chokepoint": "deploy.sh's host-side check",
+          "why": "The alarm was written before the course was marked. It is also cancelled when the folder is next read, but the Mac may not have been opened since - so the launcher has to refuse on its own."
+        },
+        {
+          "door": "plan_scheduled_deploy (MCP only)",
+          "chokepoint": "AssistToolRunner.scheduleRequest",
+          "why": "Publishes nothing, but it would DESCRIBE a deploy that cannot happen - which teaches a session to try."
+        },
+        {
+          "door": "./deploy.sh <CODE> <N> by hand, to a web host",
+          "chokepoint": "deploy.sh's host-side check",
+          "alsoCaughtBy": "deploy.py's own check"
+        },
+        {
+          "door": "./deploy.sh <CODE> <N> --to-folder <path>",
+          "chokepoint": "deploy.sh's host-side check, and ONLY that",
+          "why": "THE TRAP. The folder publish is done with rsync on the HOST and exits 0 before the container is ever started, so deploy.py is never entered on this path. A refusal written only in the shared Python leaves this door wide open. Same shape as the live-reload defect of 2026-09-05, which is why verify.sh greps both launchers for it."
+        },
+        {
+          "door": "deploy.bat -> deploy.ps1",
+          "chokepoint": "deploy.ps1's host-side check",
+          "why": "Windows' own. Its folder branch never enters the container either."
+        },
+        {
+          "door": "python3 scripts/deploy.py --course … --section …",
+          "chokepoint": "deploy.py, first thing in main()",
+          "why": "Before the 'section directory not found' check, so a course with no build yet is still told the real reason."
+        },
+        {
+          "door": "verify-deploy.sh / verify-deploy.ps1",
+          "chokepoint": "inherits the two above",
+          "why": "A harness rather than a door, and it is where the refusal is proved against the REAL launcher rather than a unit test."
+        }
+      ],
+      "toolsStillAllowed": [
+        {
+          "tool": "rebuild_preview",
+          "why": "A reference course may be previewed - that is how a teacher reads last year's pages with their images and links. It writes into the build tree, never into the course."
+        },
+        {
+          "tool": "back_up_course",
+          "why": "It reads the course and writes a zip into courses/_backups/, outside the course folder. The moment before risky editing is exactly when a copy is wanted, and a restored backup is still a reference course because the marker travels in the config."
+        },
+        {
+          "tool": "cancel_scheduled_deploy",
+          "why": "Gate by DIRECTION: this is the act that STOPS a deploy. Refusing it would strand an alarm set before the course was marked, with no way to turn it off from the app."
+        }
+      ],
+      "aToolThatNamesNoCourse": "One write tool declares no course argument at all - undo_last_change, which takes back whatever this conversation last did. It is gated by the course the PENDING CHANGE belongs to, read from the conversation's own history, rather than by an argument no client sends. A test asserts it is the ONLY non-readOnly tool without a course parameter, so a second one has to be given the same treatment deliberately instead of slipping past a gate that reads an argument and gives up when it is empty.",
+      "howTheWriteGateIsChosen": "On the tool's OWN readOnly flag, never a hand-kept list of names - the same reasoning the window binding uses for gating on the schema. The three exemptions above are DATA rather than code, and a test asserts that the non-readOnly tools minus those three are exactly the set the gate refuses, so adding a tool fails the suite rather than opening a hole. And it is never gated on 'is this the course the session greeted': there is no such binding over MCP, and inventing one here to then except it would remove a capability that is the point of having a reference course at all."
+    },
+    "interface": {
+      "group": "Reference Courses, folded into school-year sub-groups inside it. Newest year first, 'Other' last, and a group with nothing in it is NOT DRAWN - an empty '2023-24' is a row that teaches a teacher to stop reading the sidebar. Every group's fold state is remembered with the folder, the outer one and each year, the same way Archived and Backups already are.",
+      "withheldNotRefused": "Every act that would CHANGE a reference course is not offered at all - hidden, never greyed. A greyed control that can never become available is a standing invitation to wonder what is wrong, and this sidebar already follows that rule for Schedule/Cancel Deploy. The refusals stay underneath: a teacher meets the absence, and any other caller meets the refusal.",
+      "whatIsWithheld": [
+        "the section window's Deploy button",
+        "Schedule Deploy... (Cancel Deploy at... is always offered - gate by direction)",
+        "Rename Course (the folder carries the year and course_code carries the real code; the two are allowed to disagree only here, and a rename would collapse them)",
+        "Add Section...",
+        "Remove Section N (removing the whole course stays)",
+        "the Course Settings FORM itself - a reference course's row opens a short read-only summary instead (the real code and name, its school year with the Set School Year... action beside it, its sections, and the two sentences). The form asked a never-deployed course to choose a deploy folder, greyed Save for ever with no explanation, and let every OTHER setting be saved - including the deploying settings whose emptiness is what makes an older Plantoir refuse the course",
+        "Course Settings' writes: the folder and unit-word renames, and Restore Section N...",
+        "the Site Health REPAIR button. The findings may still be reported; the button may not be drawn, because a repair returns no attempts on a frozen course and the zero-attempt branch reads as 'That is already put right. Nothing needed changing.' - about a folder that is really missing",
+        "Rename from EVERY route, not just the context menu: the Edit menu item and the Return key both went through courseThatCanBeRenamed, which said yes, set a rename in motion on a row that draws no editing field, and left Return-to-rename dead for every other course in the window",
+        "Site Health repairs, which CREATE files inside the course - and would succeed, because the folders are deliberately left unlocked so the preview can work",
+        "Revise with Claude... and Revise with Codex...",
+        "Revise with Local AI Assistant...",
+        "Keep a Copy for Reference... (a copy of a frozen copy has no purpose a teacher would recognise)"
+      ],
+      "theReadOnlySummary": "What a reference course's row opens instead of the settings form: the code a teacher reads and the course name; the school year, with the one action a frozen course still offers; the sections; the FOLDER name, which is the one place a folder name is the fact; and wording.neverDeployed, wording.pagesAreLocked and wording.aCopyTakenOutStaysLocked. No fields, no Save, and no control that can never become available.",
+      "whatIsOffered": [
+        "Preview - the whole point of keeping the course",
+        "Open in Obsidian, with the calm note in front of it the first time",
+        "Back Up Now - it only READS the course, and a restored backup is still a reference course",
+        "Remove - unlocks first, same confirmation, same words",
+        "Set School Year... - the one thing a frozen course still lets a teacher change, and it is a label on the shelf rather than a page"
+      ],
+      "theCalmNote": "Shown when the copy is made AND before the teacher opens the course in Obsidian - once per course, remembered. In FRONT of them rather than after, because what Obsidian shows somebody typing into a locked page could not be measured and silent loss is not ruled out. It claims no more than wording.pagesAreLocked says: not that the pages cannot be changed (the lock is per-Mac and a cloud folder strips it while files upload), and not that the teacher will be TOLD when an edit fails. No warning icon, no 'cannot', no 'error'.",
+      "theLocalAssistant": "Not offered on a reference course and told nothing about one. The menu item is not drawn; a window request naming one opens no window, which also closes the deploy approval card as a door by construction; and list_courses does not list them to the LOCAL client - which matters because 'what courses do i have?' is matched in code and its answer is shown to the teacher.",
+      "theMCPSurface": "The opposite, deliberately: reading a reference course is the point of keeping it. The session briefing (initialize.instructions) names each one, list_courses marks the kind and the year, and every write refuses. A course is ADDRESSED by its folder name; a bare course code resolves to the LIVE course exactly as before, and if there is no live one it REFUSES and names the candidates rather than guessing - the two deliberately show the same code, so a guess would look right every time."
+    },
+    "wording": {
+      "staysAsItIs": "{course} is kept for reference, so it stays as it is.",
+      "couldNotSetSchoolYear": "{course}'s school year could not be saved. Try again in a moment.",
+      "cannotTellHeadline": "Plantoir cannot tell whether {course} is kept for reference",
+      "cannotTellBecauseUnreadable": "its settings file could not be read",
+      "cannotTellBecauseOddValue": "its settings say something other than true or false",
+      "pagesAreLocked": "Plantoir keeps this course's pages locked, so they stay as they were.",
+      "aCopyTakenOutStaysLocked": "A file you copy out of it stays locked until you untick Locked in Get Info.",
+      "neverDeployed": "{course} is kept for reference. Preview it to read its pages; it is never deployed.",
+      "copyIsASnapshot": "This records {course} as it is today. You can keep teaching it as usual \u2014 nothing here changes. To take a fresher copy later, delete this one first, then copy again.",
+      "codeAlreadyInThatYear": "You already have a {code} kept for reference from {year}. Choose a different school year.",
+      "codeAlreadyWithNoYear": "You already have a {code} kept for reference with no school year. Choose a school year for this one.",
+      "groupTitle": "Reference Courses",
+      "keepACopyMenuItem": "Keep a Copy for Reference…",
+      "setSchoolYearMenuItem": "Set School Year…",
+      "rule": "{course} is the code a TEACHER reads - ICS3U, never the folder name. The register is calm: a teacher who kept a course for reference asked for this, so being told about it reads as a fact rather than a warning. No 'cannot', no 'error', no icon, and never a word about how it is done. Said by the app when an act that would change the course is not available; the sentence does NOT tell the teacher to copy anything, because in this release nothing in Plantoir copies pages between courses and a page taken out by hand arrives locked.",
+      "machineryCheck": "No 'lock flag', 'immutable', 'permission', 'chflags', 'script' or 'container' in any sentence here. 'Locked' on its own is allowed: it is the word Finder and Get Info already use, and it is what a teacher sees on the file.",
+      "theCannotTellSentence": "Said by the LAUNCHERS only, as 'cannotTellHeadline - <one of the two reasons>. Nothing was published.' Both launchers carry it as a constant and a test compares them against these keys, the same arrangement refusal.sentence has. app-rules.json -> failureExplanations turns it back into the teacher's sentence when a deploy set to happen on its own hits it, which is the population it exists for: that one runs with the app closed, and the app reads such a course as ORDINARY, so the teacher can schedule it and only the launcher will refuse.",
+      "whyTheLaunchersStillSayPublished": "'Nothing was published.' is the launchers' own long-standing house sentence - five times in each of them on dev, asserted by two shared Python tests - and it is deliberately NOT changed to 'deployed' here. Russell's decision (r) governs the APP's sentences and every new key name, and every sentence in this block follows it; one launcher run saying both words for the same act would be worse than one word that is old. A launcher vocabulary sweep is its own piece of work."
+    },
+    "frozen": {
+      "theWalk": "Every content FILE, at every depth. skipDescendants() is for a never-locked FOLDER and must never be called for a never-locked FILE: the enumerator applies the skip to the next directory it has not descended into, so the folder AFTER course_config.json - which every course has at its top level - was never walked and never locked. Measured on a real course: 842 of 934 files walked, 27 real pages left editable, and WHICH folder was lost moved between passes with readdir order, so the course came out mostly locked and never entirely locked. Counting what the pass WALKED against what is locked afterwards does NOT catch this - a walk that skips a folder never counts that folder, so the two numbers agree and the fault reports success (it did: nine pages editable, everything-is-locked true). What catches it is an independent CENSUS taken after the pass: a plain full listing of the course with no skip logic at all, each regular file classified by the never-locked rule alone, and the number that SHOULD be locked compared with the number whose flag says locked. A mismatch is put on the trail with both numbers, and the sentence that says the pages are kept locked is not shown. Measured with the old fault put back: 13 of 16.",
+      "offTheMainActor": "The walk runs off the caller's actor - measured at ~24 ms with nothing to do and ~80 ms for a full pass on 1,220 files, which is not a teacher's click to wait for after every sheet. On the mac that takes @concurrent, not merely `nonisolated async`: the target builds with SWIFT_APPROACHABLE_CONCURRENCY, under which a nonisolated async function runs on its CALLER's actor - so the obvious spelling would have kept every stat on the main actor while reading as though it did not. A test asserts the work is not on the main thread rather than trusting the annotation. No DispatchQueue and no sleeps anywhere.",
+      "rule": "The pages of a reference course are LOCKED ON DISK - Finder's Locked, the user-immutable flag - on every content FILE and on no directory. Plantoir itself offers nothing that changes a page, a setting or the shape of the course.",
+      "mechanism": "chflags uchg, and only that. Modes are left exactly as they are.",
+      "whyNotPermissions": "Measured twice over. (1) chmod a-w does not stop a RENAME-OVER, which is how every serious editor saves: the measurement replaced a page's contents at exit 0, and rm -f deleted it. The immutable flag refuses both, and refuses a rename and a delete as well. (2) Mode 444 BREAKS THE PREVIEW BUILD, which is the finding that settled it: build_site.py copies each page into the build tree with shutil.copy2 (mode and flags travel), then rewrites the copy's frontmatter, which is where draft: true becomes publish: false. The build tree in THAT measurement was a host bind mount, where the container's root does NOT get its usual permission override - measured inside the real image - so the rewrite fails with one warning per page, the copy keeps draft: true and gains no publish key, and the Explorer publishes anything that does not say publish: false. Every page the teacher had HIDDEN would have appeared in the preview of their frozen course. With the flag alone and the mode left at 644, the same build writes publish: false correctly AND the source is still refused even to container root. WHERE THE MAC ACTUALLY BUILDS, said so that reason is not read as a description of the shipping pipeline: toolchain_paths.WORK_DIR, the container's own /tmp/quartz-builds, with only public/ synced out - so on the mac the rewrite happens on container-local storage where root CAN write a 444 file, and the must-fail does not reproduce through the launcher. Reason (1), that chmod a-w does not stop a rename-over, carries the decision on its own and is untouched by this. ON WINDOWS THE FAULT IS REACHABLE: preview.ps1 and deploy.ps1 point PLANTOIR_WORK_DIR at a HOST folder under %LOCALAPPDATA% and build natively rather than as root, so a read-only attribute travels into the build tree, the frontmatter rewrite would fail, and a page the teacher HID would be published. Whatever mechanism Windows chooses, run a real build of a locked course and check that a hidden page is still hidden.",
+      "whyNotDirectories": "Measured: with the course folder locked, creating the .merged_output symlink inside it fails - and BuildOutputLocation has to create that link on every reload, as do the launchers before every build. Locking the folders would kill the preview a reference course exists to give.",
+      "neverLocked": [
+        {
+          "name": "course_config.json",
+          "why": "The school year can be changed later, and the build's own preflight rewrites this file whenever a folder list changes."
+        },
+        {
+          "name": "course_config.backup.json",
+          "why": "Written beside it by that same preflight, with shutil.copy2, which raises on a locked destination."
+        },
+        {
+          "name": "course_config.json.tmp",
+          "why": "The other half of that atomic write - it exists only between the open() and the os.replace(). A build interrupted between the two leaves it on disk, and a LOCKED one would then fail every later preflight twice over: the write into it and the cleanup that removes it. That course's settings could never be reconciled again. Anything ending .tmp is left alone for the same reason, whatever its name."
+        },
+        {
+          "name": ".obsidian",
+          "why": "Obsidian writes workspace.json the moment a vault is opened, and opening the course in Obsidian is the whole point of keeping it. The folder and everything under it - plugins, themes, snippets - are outside the lock."
+        },
+        {
+          "name": ".merged_output",
+          "why": "The built website. A symlink out of the folder, rebuilt rather than kept, and never locked through the link."
+        },
+        {
+          "name": ".DS_Store",
+          "why": "Finder's own bookkeeping. Nothing a teacher wrote."
+        }
+      ],
+      "whatPlantoirStillWrites": [
+        {
+          "what": "the .merged_output link",
+          "why": "Created or repaired on every read of the folder, and by the launchers before every build. Inside the course folder, which is why the directories stay unlocked."
+        },
+        {
+          "what": "course_config.json, by the build's preflight",
+          "why": "Folder and file discovery reconciles the lists whenever the teacher's folders and the config disagree. Bookkeeping about what is there, not a change to a page."
+        },
+        {
+          "what": ".obsidian/, by Obsidian",
+          "why": "On open. Outside the lock deliberately."
+        },
+        {
+          "what": "an exclusion note inside a folder's index.md",
+          "why": "The one writer that CAN meet a locked file. It returns without writing when the note already matches, and it catches the write failure, so on a reference course it is a warning line at worst - not a failed build. Named here so neither platform reads it as a bug."
+        }
+      ],
+      "removing": {
+        "aWholeCourse": "Allowed, and it unlocks first. Measured: FileManager.removeItem and rm -rf both refuse a locked tree. The unlock happens after the scheduled-deploy cancel and before the archive, so the one thing that can stop a removal is still the cancel. The teacher is told nothing about the lock - a delete confirmation that mentioned it would be the app talking about its own plumbing.",
+        "oneSection": "REFUSED, with wording.staysAsItIs. Removing a section changes the course, so 'frozen' already requires it. The sidebar does not offer the item; the refusal exists so no other caller can get past it, and so what a teacher reads is a sentence rather than the file system's own words about an operation not being permitted.",
+        "theOnlySection": "The sidebar turns that into removing the whole COURSE, so it takes the unlock-then-remove path above."
+      },
+      "restoring": "A zip round trip carries the MODE and loses the flag - measured - so a restored reference course arrives thawed. The marker travels in the config, so the marker is what puts the lock back: every restore path unlocks what it is about to write over and locks again afterwards, asked of the config as it is AFTER the restore. A backup made before the course was kept for reference therefore restores a course that is not one, which is right.",
+      "copyingOut": "The flag TRAVELS. FileManager.copyItem, cp -p, ditto and shutil.copy2 all carry it; only a plain cp -R or a zip round trip loses it. So anything copied out of a reference course arrives locked unless it is cleared, and a page a teacher cannot edit with no explanation reads as 'the app is broken'. Whatever copies pages between courses must clear it.",
+      "reAsserted": "The lock is asserted, VERIFIED by reading the flag back, and re-asserted. Setting it without checking is not enough: in a cloud-synced folder the file provider models the locked bit itself, does not store it, and clears it locally about a second after an upload starts - no error, no log line. So the lock is per-Mac, a folder that has been on a second Mac comes back unlocked, and the re-assertion points are when the folder is read and when the teacher acts on the course. Files that did not take are left for the next pass and COUNTED on the trail. Never a timer and never a sleep: a delay chosen to let something settle is a guess that stops working on a slower machine.",
+      "honestLimits": "Stated plainly in the documentation and NEVER in the GUI. With the directories unlocked a new file can still be ADDED to one. Anybody who means to can clear the flag. The lock is per-Mac, and an edit arriving from another device is not blocked by it. What the lock does stop is every ordinary edit, save, rename and delete of the material that is there, which is what a teacher will meet - it is a statement of intent, not a security boundary. The refusal to deploy does NOT depend on it in any way: an entirely unlocked reference course is refused at every door just the same."
+    },
+    "rejected": [
+      {
+        "what": "A second display_code key",
+        "why": "A third spelling of one fact, and it would leave the site builder writing ICS3U-2025 into the site title and social card of a course whose preview the teacher is reading."
+      },
+      {
+        "what": "Renaming Course.code to folderName",
+        "why": "273 call sites across 55 files for a rename that buys clarity and no behaviour, inside a piece whose dangerous half is the refusal."
+      },
+      {
+        "what": "A lower-case folder suffix (ICS3U-examples)",
+        "why": "The launchers put their course argument through tr '[:lower:]' '[:upper:]' before building courses/<CODE>, so the folder would simply not be found. Every proposed folder name is upper case, and a test pins that it survives being normalised again."
+      },
+      {
+        "what": "A free-text label beside the code instead of a school year",
+        "why": "Russell's decision: rows are told apart by school year. A typed label is a second naming system to validate, and two teachers' labels for the same thing would not sort."
+      },
+      {
+        "what": "A reference/ sibling folder beside courses/",
+        "why": "Everything that finds a course walks courses/ — discovery, the launchers, the build output link, the backups list. A second home would be a second answer to 'where are the courses', and the marker gives the same separation for one key."
+      }
+    ]
   }
 }

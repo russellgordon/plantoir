@@ -428,6 +428,24 @@ nonisolated enum ActivityTrail {
         /// completely different report from a publish that died on its own.
         /// Carries what was under way, in the words the teacher was shown.
         case quitAskedAboutWorkUnderWay = "quit asked about work under way"
+
+        /// A course was kept for reference: which folder it was given, the
+        /// code and school year it shows, how many sections came across, and
+        /// which course it was copied from. Never the contents of a page.
+        case courseKeptForReference = "course kept for reference"
+
+        /// A reference course's pages were locked again, with the count —
+        /// because a backup came back unlocked, or a folder that syncs
+        /// cleared the locks while it uploaded, or the folder had been opened
+        /// on a Mac that had never heard of reference courses. Written only
+        /// when a pass actually did something, so a folder in a steady state
+        /// leaves no lines at all.
+        case referenceCoursePagesLockedAgain = "reference course pages locked again"
+
+        /// A reference course was filed under a different school year — the
+        /// one thing about a frozen course a teacher can still change.
+        /// Carries the code they read, the folder, and both years.
+        case referenceCourseSchoolYearChanged = "reference course school year changed"
     }
 
     // MARK: - Stored properties

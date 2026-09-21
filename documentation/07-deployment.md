@@ -1010,6 +1010,192 @@ changing `BuildFreshness`, which the Deploy button uses too, so it is its own
 piece of work with its own measurement; giving the rebuild its own exit code
 was rejected as a launcher contract change Windows shares.
 
+## A course kept for reference is never deployed — fifteen doors, one rule
+
+A REFERENCE COURSE is last year's course, or a course full of example content,
+kept in this year's sidebar to be read. It may be previewed; it is never
+deployed. The keys are in
+[`08-course-config-reference.md`](08-course-config-reference.md), the lock is in
+[`09-mac-app.md`](09-mac-app.md), and the whole rule as data — including the
+door table below — is
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.refusal`.
+
+**A missed door is a deploy that REPORTS SUCCESS**, which is the worst
+direction this feature can fail in. So the doors were enumerated from the code
+twice, independently — by the plan and then by its review, which went looking
+for a sixteenth and found none — and each refusal has a test PROVED to fail
+with that refusal turned off.
+
+| Door | Caught at |
+|---|---|
+| The section window's **Deploy** button | `SectionDetailView.refusalForAReferenceCourse`, first thing in `deployAndWait()` (and the button is not drawn at all) |
+| The local assistant's `deploy_section`, window branch | `AssistToolRunner.deploySection`, **before the preview is stopped** |
+| …its headless branch | the same, plus `AssistToolchainWork.deploy` |
+| The deploy approval card's **Go** | the same — and closed by construction: the assistant is never offered on a reference course |
+| `deploy_section` over **MCP** | the write gate in `AssistToolRunner.run(call:)`, then the two above |
+| `schedule_deploy`, local and over MCP | `AssistToolRunner.scheduleRequest`, then `ScheduledDeploy.problem` |
+| The sidebar's **Schedule Deploy…** sheet | `ScheduledDeploy.problem`, **before** "that time has already passed" |
+| A scheduled deploy **already on disk**, firing | `deploy.sh`'s own check |
+| `plan_scheduled_deploy` (MCP only) | `AssistToolRunner.scheduleRequest` |
+| `./deploy.sh <CODE> <N>` by hand, to a web host | `deploy.sh`, then `deploy.py` |
+| **`./deploy.sh <CODE> <N> --to-folder <path>`** | **`deploy.sh` and ONLY `deploy.sh`** |
+| `deploy.bat` → `deploy.ps1` | `deploy.ps1`'s own check |
+| `python3 scripts/deploy.py …` | `deploy.py`, first thing in `main()` |
+| `verify-deploy.sh` / `.ps1` | inherits the two launchers' |
+
+### Why door 12 needs the SHELL and not only `deploy.py`
+
+The folder destination does its work with `rsync` **on the host** and `exit 0`s
+before the container is ever started (`deploy.sh`, the `--to-folder` branch).
+`deploy.py` is never entered on that path. A refusal written only in the shared
+Python therefore leaves the folder destination wide open — and this is measured
+rather than argued: with the launcher's check removed, the launcher published a
+frozen course and said
+
+```
+✅ Published: 1 file(s) updated.
+```
+
+exit 0. That is the same shape as the live-reload defect of 2026-09-05, which
+is why `verify.sh` greps **both** `deploy.sh` and `deploy.ps1` for this guard
+as well as for that one. The structural check costs six lines and makes the
+Windows obligation visible from this side rather than only in an issue.
+
+### FOUR readers, one rule — and the table that keeps them honest
+
+The APP, `scripts/reference_course.py`, `deploy.sh` and `deploy.ps1` all answer
+"is this course kept for reference?", and two of them have no JSON parser. So
+the question is ONE regular expression over the whole settings file as a single
+string, in three dialects, with a table of **twenty-six** inputs all four are
+asserted to agree on:
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.markerAgreement`, run by `scripts/test_reference_course.py`
+against the real launcher.
+
+**The table exists because the three did NOT agree, in the dangerous
+direction.** `grep` works a LINE AT A TIME, so `[[:space:]]` cannot span a
+newline: a config whose key and colon sat on different lines was a reference
+course to the Python and an ordinary course to the launcher — and the launcher
+published it, exit 0, `✅ Published: 1 file(s) updated.` Found by review on
+2026-09-20. The cure is `tr '\n' ' '` before the `grep`, which also makes bash
+agree with PowerShell, whose `-cmatch` uses .NET regex where `\s` already
+matches a newline. (`-cmatch`, not `-match`: PowerShell's default match is
+case-INSENSITIVE and that applied to the KEY as well, so
+`"KEPT_FOR_REFERENCE": true` refused on Windows while the mac and the Python
+allowed it. JSON keys are case-sensitive; the value's case is written out
+instead.)
+
+**The app is the fourth reader, and it joined after it disagreed.** Measured:
+`JSONSerialization` hands back an `NSNumber` for `1`, and `NSNumber`
+conditionally bridges to `Bool` for 0 and 1 — so `"kept_for_reference": 1`
+read TRUE in the app, which FROZE AND LOCKED the course, while all three
+launchers read the same file as ordinary and deployed it. The app now reads
+this one key through `CFBooleanGetTypeID`, and every row of the table states
+what the app reads it as, with one invariant asserted on both sides:
+**wherever the app says reference, every launcher must refuse.**
+
+Two decisions inside the table are worth carrying:
+
+- **When in doubt, REFUSE.** The directions are not comparable — a live course
+  wrongly refused is loud and harmless, a reference course wrongly deployed
+  reports success. So a marker nested inside another object is refused, even
+  though a JSON parser would not call it the top-level key.
+- **"Cannot tell" for anything somebody plainly MEANT.** A marker whose value
+  is the string `"true"`, the number `1`, `True`, or whose key is written with
+  `\u` escapes, is refused with a sentence of its own — which publishes
+  nothing and freezes nothing. The app reads a real JSON boolean and nothing
+  else, so it shows an ordinary course, and the launcher's refusal is what the
+  teacher meets. Leniency in the APP was considered and rejected: its reading
+  locks the course, with no way back, so a false positive there is not loud
+  and harmless.
+
+And the exact surface, because "no pattern matches a value" turned out to be
+only half true: a config is refused when it carries a **quoted token — key or
+value — whose text ends in the key's tail** and is not followed by `true` or
+`false`. The marker's own text reaches a VALUE only through escaped quotes,
+which never match, so no realistic config is refused; what would be is a
+course name, folder name or path that literally ends in `ept_for_reference`.
+The one shape refused with the *reference-course* sentence rather than "cannot
+tell" is a key like `accept_for_reference`, and it is a row in the table so the
+surface is written down rather than discovered.
+
+**A key written with `\u` escapes is refused whatever the key is** — that rule
+is about the ESCAPE, not the marker. A key escaped all the way through is
+decoded by the app, which freezes and locks the course, while a text reader
+sees nothing at all: measured, it deployed. Every key Plantoir and the shared
+Python write is plain ASCII. **Values are deliberately left alone**, because
+`json.dump` escapes non-ASCII there by default and accents and emoji are
+ordinary; the `[{,]` anchor is what tells a key from a value. Proven against
+copies of the four real previous-generation configs, all 38 example-content
+payloads and hand-made values carrying escaped quotes and colons: no false
+refusal.
+
+### Plain shell, failing CLOSED, and no new exit code
+
+The launcher's check reads `course_config.json` with `grep` — **no host
+`python3`**. Everything before the flag loop, and the whole folder publish, needs
+no interpreter on the host today, and this product's first-run promise is "no
+Homebrew, no admin rights"; adding one here would break publishing for a teacher
+whose Command Line Tools are missing.
+
+It **fails closed**: a settings file that is there and cannot be read refuses
+and says so — and `deploy.py` asks the same question through
+`reference_course.cannot_tell()`, so running it directly gives the same answer
+rather than a quieter one. A settings file that is ABSENT is not its business — the course
+folder check further down answers that in its own words. The shared Python is
+the other way round on purpose: a malformed config reads as NOT a reference
+course, because a course nobody can open must not become undeployable by
+accident, and the marker is not the only defence anyway.
+
+**No fourth exit code.** `deploy.sh` states its own invariant — exit 3 means "a
+question nobody was there to answer" and nothing else, every other exit is 0 or
+1 — and a new code would have to be read by the scheduled wrapper, by
+`ScheduledPublishOutcome` and by the Windows twin before it meant anything.
+Exit 1, matched on OUTPUT by an `app-rules.json` → `failureExplanations` case,
+which is how every other launcher failure already becomes a sentence. That case
+matters most for a deploy set to happen on its own: it runs with the app closed,
+and without it the app shows the generic "did not finish" while the real reason
+sits in a log nobody opens.
+
+**Which is why every assignment in that shell block ends `|| true`.** `deploy.sh`
+runs under `set -euo pipefail`, and `grep -Eo` exits 1 when a config carries the
+marker and no `course_code` — so the script died on the line that reads the code,
+BEFORE the echo, and exited 1 with no output at all. Fails closed, publishes
+nothing, and says nothing: the one shape that defeats matching on output. Found
+by review on 2026-09-20; `test_a_marker_with_no_course_code_still_says_the_sentence`
+asserts the SENTENCE rather than the exit code.
+
+### The refusal does NOT depend on the lock
+
+Gated on the marker alone, never on whether the files happen to be locked, and
+a test pins it. If the two were coupled, a course restored from a backup — or
+one whose folder had been on a second Mac, where the locks do not travel —
+would silently become deployable.
+
+### And the fail-safe, for a Plantoir that has never heard of any of this
+
+A teacher may keep their working folder in iCloud Drive and open it on a second
+Mac still running an older release. That copy does not know the marker. So
+whatever makes a course a reference course ALSO writes `deploy_target:
+"local_folder"` with an empty `deploy_folder_path`, drops
+`additional_deploy_targets` and `custom_domains`, and renames the
+`.netlify_sites/` and `.cloudflare_sites/` markers aside to the frozen
+`section<N>.previous-<stamp>.json` name. Every shipped version refuses a folder
+deploy with no folder, in sentences it already has
+(`MultiDestinationDeployRunner.refusalReason`, `ScheduledDeploy.problem`), and a
+section that has never deployed cannot be scheduled at all.
+
+**What that leaves, stated rather than hidden.** An older Plantoir refreshes
+`.toolchain/` back to its own copies, so an old `./deploy.sh` run by hand on
+that Mac could still reach Netlify — and, with the markers renamed aside, it
+would create a **brand-new site** rather than overwrite last year's. Litter,
+not damage. It cannot be closed by construction and belongs in the release
+note. Worth knowing too: the fail-safe's words on an older app are an
+invitation — *"Choose the folder this course deploys into."* — so a determined
+teacher can undo it. That is the honest cost of a defence written in a file
+format an old version can read.
+
 ## A scheduled deploy that outlived its course
 
 Added 2026-09-20, [issue #236](https://github.com/russellgordon/plantoir/issues/236).

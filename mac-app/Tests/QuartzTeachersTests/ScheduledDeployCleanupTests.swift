@@ -172,7 +172,7 @@ final class ScheduledDeployCleanupTests: XCTestCase {
     func testEveryCancellationCaseInTheContractHolds() throws {
         let rule: [String: Any] = try Self.section("scheduledDeployCancellation")
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 9, "The case list has lost cases.")
+        XCTAssertGreaterThanOrEqual(cases.count, 10, "The case list has lost cases.")
 
         for oneCase in cases {
             let act: String = try XCTUnwrap(oneCase["act"] as? String)
@@ -208,6 +208,26 @@ final class ScheduledDeployCleanupTests: XCTestCase {
             XCTAssertTrue(agentExists(sectionNumber: 1), "\(act): section 1's deploy must stand")
             XCTAssertFalse(agentExists(sectionNumber: 2), act)
             XCTAssertEqual(cancels, "thatSectionOnly")
+
+        case "a course kept for reference is met when the working folder is read":
+            // The marker can arrive by hand, or from another Mac, on a course
+            // that was live yesterday and still owns its alarms.
+            let course: Course = try makeCourse()
+            course.configuration.keptForReference = true
+            try course.configuration.write(to: course.configFileURL)
+            try writeAgent(sectionNumber: 1)
+            try writeAgent(sectionNumber: 2)
+            ReferenceCourseUpkeep.bringUpToDate(
+                [course], inWorkingFolder: workingFolderURL, runner: launchControl
+            )
+            XCTAssertFalse(agentExists(sectionNumber: 1), act)
+            XCTAssertFalse(agentExists(sectionNumber: 2), act)
+            XCTAssertTrue(
+                trailText().contains("because the course is kept for reference"),
+                "\(act): the trail has to say why the alarm went."
+            )
+            XCTAssertEqual(cancels, "everyAlarmThisFolderHasForTheCourse")
+            ReferenceLock.unlock(courseDirectory: course.directoryURL)
 
         case "remove a whole course":
             let course: Course = try makeCourse()

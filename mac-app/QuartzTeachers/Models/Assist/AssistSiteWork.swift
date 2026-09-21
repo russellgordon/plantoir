@@ -132,6 +132,17 @@ final class AssistToolchainWork: AssistSiteWork {
     /// the console the teacher is looking at — `AssistToolRunner.deploySection`
     /// decides which, and this runs when nothing is on screen to press.
     func deploy(course: Course, sectionNumber: Int) async -> AssistSiteWorkResult {
+        // The backstop on the headless path — what an MCP client and a
+        // scheduled deploy take. The runner refuses first; this is here
+        // because a deploy that reports success on a course kept for
+        // reference is the worst direction this can fail in, and one guard in
+        // one function is one edit away from being gone.
+        if course.isKeptForReference {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.deployRefusedForAReferenceCourse(course: course.displayCode)
+            )
+        }
         guard let workspaceURL = workspace.workspaceURL else {
             return AssistSiteWorkResult(
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message

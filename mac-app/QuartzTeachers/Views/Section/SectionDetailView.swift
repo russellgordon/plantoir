@@ -185,7 +185,10 @@ struct SectionDetailView: View {
     /// part of the section's name, and "Deploying ICS3U-S1 — Edited" reads
     /// as though "Edited" were something being deployed.
     var sectionName: String {
-        return "\(course.code)-S\(sectionNumber)"
+        // `displayCode`: a reference course's window says "ICS3U-S1", never
+        // "ICS3U-2025-S1". Identical to `code` for every course a teacher
+        // teaches.
+        return "\(course.displayCode)-S\(sectionNumber)"
     }
 
     /// What the window's title bar says — the name, plus the marker when
@@ -246,7 +249,8 @@ struct SectionDetailView: View {
                         // it, and the notice floated mid-window. See the view's
                         // own comment for the measurement.
                         NoPreviewPlaceholderView(
-                            deploysToLocalFolder: course.configuration.deploysToLocalFolder
+                            deploysToLocalFolder: course.configuration.deploysToLocalFolder,
+                            keptForReferenceCode: course.isKeptForReference ? course.displayCode : ""
                         )
                     }
                 }
@@ -352,6 +356,13 @@ struct SectionDetailView: View {
                 // `publish:` flag decides whether students see it); the
                 // whole site is deployed. One word for both had the
                 // teacher and the assistant talking past each other.
+                // NOT DRAWN on a course kept for reference. The refusal
+                // behind it stays — every other way in still meets it — but a
+                // teacher meets this as a button that is not there, which is
+                // the same rule the sidebar follows for Schedule Deploy…: a
+                // greyed-out control that can never become available is a
+                // standing invitation to wonder what is wrong.
+                if !course.isKeptForReference {
                 Button("Deploy", systemImage: "paperplane.fill") {
                     startDeploy()
                 }
@@ -366,6 +377,7 @@ struct SectionDetailView: View {
                 .disabled(deployRunner.isRunning || isPreparingDeploy)
                 .help("Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
+                }
 
                 Button("Open in Browser", systemImage: "safari") {
                     openInBrowser()
@@ -487,7 +499,16 @@ struct SectionDetailView: View {
         .alert(healthAlertTitle, isPresented: healthDialogBinding) {
             switch healthDialog {
             case .findings:
-                if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
+                // No repair on a course kept for reference. The findings
+                // themselves still REPORT — a teacher may want to know a
+                // folder is missing — but the button would have offered to
+                // fix it and then said "That is already put right. Nothing
+                // needed changing." about a folder that is really gone,
+                // because the repair returns no attempts and the zero-attempt
+                // branch reads as "nothing needed doing". Found by review,
+                // 2026-09-20.
+                if !course.isKeptForReference,
+                   let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
                     Button(title) {
                         // The marker is refreshed because a repair CHANGES the
                         // section's content on the teacher's behalf, and
@@ -1016,6 +1037,12 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // One of the moments the teacher ACTS on a reference course, so the
+        // lock is re-asserted here: a folder that came back from a backup, or
+        // from a second Mac, is not locked until somebody asks. Cheap — a
+        // stat per file, measured at ~23 ms on a 1,220-file course — and
+        // quiet unless it actually had to lock something.
+        ReferenceLock.ensureLockedInBackground(course)
         // The folder this preview belongs to, noted at the moment it is
         // decided — which is HERE, not at the appearance. The appearance
         // notes only the key this section registered under, and it can
@@ -1173,6 +1200,31 @@ struct SectionDetailView: View {
         }
     }
 
+    /// Why this course is never deployed, or nil when it is an ordinary one.
+    ///
+    /// **A static function rather than three lines inside `deployAndWait`**,
+    /// for the reason `ScheduledDeployCleanup` exists: nothing in the suite
+    /// constructs this view — every reference to it is to a static member — so
+    /// a guard living inside an instance method could be proved only by
+    /// proving something else, and an edit that dropped it would leave the
+    /// suite green. A missed deploy door is a deploy that reports success.
+    ///
+    /// `isAboutTheDestination` so the window raises it as an alert: it is a
+    /// fact about the course rather than something that went wrong while
+    /// running, which is the same distinction the destination refusals make.
+    /// A teacher never normally meets it — the Deploy button is not drawn on a
+    /// reference course at all.
+    static func refusalForAReferenceCourse(_ course: Course) -> AssistSiteWorkResult? {
+        guard course.isKeptForReference else {
+            return nil
+        }
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.deployRefusedForAReferenceCourse(course: course.displayCode),
+            isAboutTheDestination: true
+        )
+    }
+
     /// The Deploy button. The work itself is `deployAndWait()`, so the
     /// assistant can press the same button and be told how it went.
     func startDeploy() {
@@ -1200,6 +1252,17 @@ struct SectionDetailView: View {
     /// caller is how a Cloudflare course quietly starts deploying to Netlify
     /// from one of the two paths, so there is only ever one.
     func deployAndWait() async -> AssistSiteWorkResult {
+        // FIRST — before the busy check, before the destination check, before
+        // any preview is stopped. A course kept for reference is never
+        // deployed, and the teacher meets that as a missing button rather
+        // than as a refusal; this is what catches every other way in.
+        //
+        // `isAboutTheDestination` so the window raises it as an alert: it is
+        // a fact about the course rather than something that went wrong while
+        // running, which is the same distinction the destination refusals make.
+        if let refusal = SectionDetailView.refusalForAReferenceCourse(course) {
+            return refusal
+        }
         guard let workspaceURL = workspace.workspaceURL else {
             return AssistSiteWorkResult(
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message

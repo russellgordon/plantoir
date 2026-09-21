@@ -82,6 +82,11 @@ COPY scripts/page_visibility.py /opt/scripts/page_visibility.py
 COPY scripts/stop_preview.py /opt/scripts/stop_preview.py
 COPY scripts/setup_course.py /opt/scripts/setup_course.py
 COPY scripts/build_site.py /opt/scripts/build_site.py
+# Is this course kept for reference, and therefore never deployed? deploy.py
+# imports it by bare name, which only resolves if it is baked in beside it —
+# and `test_baked_modules.py` fails the image build rather than letting a
+# missing copy turn into an ImportError at a teacher's publish.
+COPY scripts/reference_course.py /opt/scripts/reference_course.py
 COPY scripts/deploy.py /opt/scripts/deploy.py
 COPY scripts/social_card.py /opt/scripts/social_card.py
 # deploy.py's Netlify ad-badge suppression lives in this sibling module —
