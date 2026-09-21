@@ -1,7 +1,9 @@
 """Check the generated skeletons before they ship.
 
-A skeleton is installed for every Ontario course code that has no example
-content, so a mistake here is a mistake in about 1,900 courses. The checks
+A skeleton is installed for every Ontario course code whose teacher is not
+taking example content — the ~1,900 codes that have no payload, and the 38
+that have one the teacher declined — so a mistake here is a mistake in
+about 1,900 courses. The checks
 are deliberately blunt: every link resolves, every page is titled, every
 sentinel is where the installer expects it, and no template token survived
 into the output.
