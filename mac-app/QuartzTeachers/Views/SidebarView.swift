@@ -44,6 +44,14 @@ struct SidebarView: View {
     /// The course a "Keep a Copy for Reference…" sheet is open for.
     @State var keepACopyCourse: Course?
 
+    /// The course a "Copy a Page from This Course…" sheet is open for.
+    ///
+    /// Any course — live or kept for reference. It is the SOURCE, and the
+    /// sheet only ever reads it: a reference course is kept to be read, so
+    /// copying a page OUT of one is the point of having it rather than an
+    /// exception to its being frozen.
+    @State var copyPageCourse: Course?
+
 
     /// The reference course whose calm locked-pages note is showing, before
     /// the teacher goes into Obsidian.
@@ -247,6 +255,8 @@ struct SidebarView: View {
                                         }
                                         Divider()
                                     }
+                                    copyAPageItem(course: course)
+                                    Divider()
                                     // Backing up only READS the course, so
                                     // it stays available even mid-preview —
                                     // the moment before risky editing is
@@ -516,6 +526,9 @@ struct SidebarView: View {
                     workspace.reloadCourses()
                 }
             }
+        }
+        .sheet(item: $copyPageCourse) { course in
+            CopyPageSheet(source: course)
         }
         .modifier(LockedPagesNoteAlert(course: $lockedPagesNoteCourse))
         .sheet(item: $addSectionCourse) { course in
@@ -975,6 +988,27 @@ struct SidebarView: View {
         scheduleGeneration += 1
     }
 
+    /// "Copy a Page from This Course…" — on EVERY course row, live and kept
+    /// for reference alike.
+    ///
+    /// It is the one act a frozen course still offers that produces
+    /// something, and it is allowed for the same reason Preview and Back Up
+    /// Now are: it READS this course and writes nothing to it. What it writes
+    /// goes into a course the teacher teaches, which is chosen inside the
+    /// sheet and is never a reference course.
+    ///
+    /// Drawn even when this course has no pages to copy: the sheet says so
+    /// in its own words, and a menu item that appears and disappears with the
+    /// contents of a folder is harder to find again than one that is always
+    /// there.
+    @ViewBuilder
+    func copyAPageItem(course: Course) -> some View {
+        Button(CopyPageWording.menuItem, systemImage: "doc.on.doc") {
+            copyPageCourse = course
+        }
+        .accessibilityIdentifier("copyAPage-\(course.code)")
+    }
+
     /// Why the course is busy — previewing or publishing, in any window
     /// showing this working folder — or nil when it isn't.
     func busyReason(for course: Course) -> String? {
@@ -1043,6 +1077,8 @@ struct SidebarView: View {
                         workspace.schoolYearRequestCode = course.code
                     }
                     .accessibilityIdentifier("setSchoolYear-\(course.code)")
+                    Divider()
+                    copyAPageItem(course: course)
                     Divider()
                     // Backing up only READS the course, and a reference
                     // course restores as a reference course — the marker
