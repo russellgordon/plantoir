@@ -1542,12 +1542,16 @@ def find_skeleton_dir(course_code: str) -> Path | None:
     """
     The starting skeleton for this course code.
 
-    A couple of dozen course codes have real example content, and the list
-    grows; every other Ontario
-    code gets a skeleton shaped for its SUBJECT — a drama course opens with
-    Conventions and Warm-Ups, a chemistry course with Investigations and
-    Safety in the Lab. The mapping is by three-letter prefix (ADA, SCH,
-    MCV…), falling back to the generic skeleton for club and custom codes.
+    Every Ontario code has one, shaped for its SUBJECT — a drama course
+    opens with Conventions and Warm-Ups, a chemistry course with
+    Investigations and Safety in the Lab. The mapping is by three-letter
+    prefix (ADA, SCH, MCV…), falling back to the generic skeleton for club
+    and custom codes.
+
+    This deliberately knows nothing about example content: a code with
+    ready-made pages has a skeleton too, and gets it whenever the teacher
+    turns the pages down. The caller decides which of the two is being
+    offered.
     """
     prefix = (course_code or "")[:3].upper()
     for root in SKELETON_ROOTS:
@@ -1566,6 +1570,36 @@ def find_skeleton_dir(course_code: str) -> Path | None:
         if candidate.is_dir() and (candidate / "manifest.json").exists():
             return candidate
     return None
+
+
+def starting_point_intro(course_code: str, label: str, has_payload: bool) -> str:
+    """
+    What is printed above "Start this course from that skeleton?".
+
+    Two openings, because two different things are true. For a code with no
+    ready-made course, saying so is the point — it is why a skeleton is
+    being offered at all. For a code that HAS one, the teacher has just
+    been asked about it and said no, and telling them there is none would
+    be plainly untrue. The app shows this console output to the teacher, so
+    it is a sentence they read (GitHub issue #248).
+
+    The rest of the paragraph is identical either way, and is the same
+    description the app's own caption gives.
+    """
+    subject = (label or "this subject").lower()
+    if has_payload:
+        opening = f"\n🧱 There is also a starting point shaped for {subject}:"
+    else:
+        opening = (
+            f"\n🧱 There is no ready-made course for {course_code}, but there is a"
+            f"\nstarting point shaped for {subject}:"
+        )
+    return (
+        opening
+        + "\nfolders that suit the subject, four units of class pages to rename,"
+        + "\na page explaining what the site can do, and placeholders saying"
+        + "\nwhat belongs where."
+    )
 
 
 def curriculum_page_names(payload_dir: Path, manifest: dict) -> set:
@@ -2266,10 +2300,13 @@ def setup_course(no_backup: bool = False):
         if prepopulate_example:
             example_manifest = manifest
 
-    # ---------- A starting skeleton for every other course code ------------
-    # No ready-made course exists for this code, but the SHAPE of one does:
-    # folders that suit the subject, a semester of class pages to rename, a
-    # site tour, and placeholder pages that say what belongs in them.
+    # ---------- A starting skeleton for a course taking no ready-made pages -
+    # The SHAPE of a course, where the pages themselves are not being
+    # taken: folders that suit the subject, a semester of class pages to
+    # rename, a site tour, and placeholder pages that say what belongs in
+    # them. Offered to every code that is not pouring in example content —
+    # including one that HAS example content the teacher just declined,
+    # which is what the apps got wrong and this has always got right.
     skeleton_payload = None
     skeleton_manifest = None
     use_skeleton = False
@@ -2278,10 +2315,7 @@ def setup_course(no_backup: bool = False):
         if candidate:
             skeleton_manifest = load_example_content_manifest(candidate)
             label = skeleton_manifest.get("label", "this subject")
-            print(f"\n🧱 There is no ready-made course for {course_code}, but there is a")
-            print(f"starting point shaped for {label.lower()}: folders that suit the")
-            print("subject, four units of class pages to rename, a page explaining what")
-            print("the site can do, and placeholders saying what belongs where.")
+            print(starting_point_intro(course_code, label, bool(example_payload)))
             use_skeleton = prompt_yes_no_default(
                 "Start this course from that skeleton?",
                 bool(saved_config.get("use_skeleton", True))

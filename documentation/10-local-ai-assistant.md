@@ -1938,7 +1938,7 @@ ask:
 
 | Key | What it decides |
 |---|---|
-| `use_skeleton` | Whether a course with no ready-made payload starts from its subject's skeleton — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing at all. |
+| `use_skeleton` | Whether a course that is NOT TAKING a ready-made payload starts from its subject's skeleton — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing at all. |
 | `prepopulate_example_content` | Whether one of the 38 ready-made courses is poured in. |
 | `include_curriculum_pages` | Whether that payload's Curriculum folder comes with it. |
 
@@ -1956,9 +1956,16 @@ whether a teacher gets to make it. Silence was never an option either way,
 because the next change to that default in the Python would move Windows and
 not the mac.
 
-The mac writes each of these as `capabilityExists && teacherSaidYes` —
-`hasSkeleton(code) && startsFromSkeleton` — so a stale `true` in an old config
-can never mean anything.
+The mac writes each of these as `capabilityExists && teacherSaidYes` — for
+`use_skeleton`, `hasSkeleton(forCode:takingExampleContent:) && startsFromSkeleton`
+— so a stale `true` in an old config can never mean anything. The capability
+half took the second argument on 2026-09-21
+([#248](https://github.com/russellgordon/plantoir/issues/248)): it used to ask
+only whether example content EXISTED for the code, which made it false for all
+38 payload codes whatever the teacher chose, so declining the ready-made pages
+wrote `use_skeleton: false` and the course arrived with empty folders. The
+question is whether the teacher is TAKING the example content, and Windows'
+`SkeletonCatalog.HasSkeleton` owes the same argument.
 
 ### A divergence flagged by sweeping, 2026-08-16 — checked again 2026-08-23, not present
 

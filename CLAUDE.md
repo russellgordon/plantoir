@@ -824,8 +824,9 @@ relies on are in
 — use that skill for any payload work rather than reasoning from scratch.
 
 Adding a course code is pure content: drop in a payload, no code changes. The
-wizard discovers it by the manifest's existence, and the payload automatically
-retires that code's skeleton.
+wizard discovers it by the manifest's existence, and the payload retires that
+code's skeleton for a teacher who TAKES it — decline it and the course still
+starts from the subject's skeleton (#248).
 
 Every other Ontario code (~1,900 of them) gets a **skeleton** from
 `support/skeletons/<family>/`: `families.json` maps 499 three-letter prefixes to

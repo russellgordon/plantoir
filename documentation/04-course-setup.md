@@ -48,17 +48,20 @@ course from the top of its New Course sheet.
 
 ### 0b. Starting content for the course code
 
-Once a code has been entered (step 1), the wizard offers ONE of two kinds
-of starting content, and never both:
+Once a code has been entered (step 1), the wizard offers up to two kinds of
+starting content — a course takes at most one of them, but which ones are
+OFFERED is two separate questions:
 
-- **Example content**, when `support/example_content/<CODE>/` exists —
-  thirty-seven course codes as of August 2026, and growing; the code counts
-  the folders rather than trusting a number, and so should you. A payload is a complete working
-  course written for that code: a semester of class pages, concept and task
-  pages, and (optionally) every Ministry expectation as its own page. The
-  payload's `manifest.json` is the course's ENTIRE structure, so step 5's
-  questions are skipped: the pages were written for exactly those folders.
-- **A skeleton**, for every other Ontario code — around 1,900 of them.
+- **Example content**, when `support/example_content/<CODE>/` exists — 38
+  course codes as of September 2026, and growing; the code counts the
+  folders rather than trusting a number, and so should you. A payload is a
+  complete working course written for that code: a semester of class pages,
+  concept and task pages, and (optionally) every Ministry expectation as its
+  own page. The payload's `manifest.json` is the course's ENTIRE structure,
+  so step 5's questions are skipped: the pages were written for exactly
+  those folders.
+- **A skeleton**, for EVERY Ontario code — around 1,900 of which have no
+  payload, and 38 of which have one they may decline.
   `support/skeletons/families.json` maps the code's three-letter prefix to
   one of fifty subject families (ADA drama, AMU music, SCH chemistry, MCV
   calculus, TXJ hairstyling…), falling back to a generic skeleton for club
@@ -69,6 +72,45 @@ of starting content, and never both:
   become the DEFAULT answers to step 5's questions rather than replacing
   them.
 
+**The rule, once, because three surfaces ask it:** a skeleton is OFFERED for
+a code when a family exists for its prefix AND the teacher is not taking the
+example content written for that code. It lives in ONE function —
+`SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:)` on the mac,
+`SkeletonCatalog.HasSkeleton` on Windows — read by the toggle's visibility,
+by what the structure editor adopts, and by `use_skeleton` in the file.
+Neither app takes a default value for the second argument, so a call site
+that has not been made to think about the example-content toggle fails to
+compile.
+
+Both apps asked the wrong question until 2026-09-21
+([#248](https://github.com/russellgordon/plantoir/issues/248)): "does
+example content EXIST for this code?" rather than "is the teacher TAKING
+it?". So for all 38 payload codes the skeleton toggle was never shown, the
+structure editor adopted nothing, and `use_skeleton: false` was written
+whatever the teacher had chosen — a teacher who declined the ready-made
+pages got EMPTY folders. MEASURED, by driving the real `setup_course.py`
+through a pty: an ICS4U made that way holds **18 `.md` files**; the same
+code with `use_skeleton: true` holds **47**, and its tree and its
+`course_config.json` are byte-identical to what ICS2O — same family, no
+payload — has always produced. The command-line wizard was never wrong:
+`find_skeleton_dir` has never looked at payloads, so the whole fault was in
+the two apps, and it stood from 2026-08-13 to 2026-09-21 because nothing in
+`contracts/` asked the question in the teacher's terms.
+
+What was REJECTED while fixing it, so it is not proposed again: a
+curriculum-pages toggle for a skeleton that ships a `Curriculum` folder (the
+`fixed` and `control` pty runs produce identical trees, so adding one would
+make a payload code behave unlike its own family); one "empty folders"
+sentence covering all three situations, which would have reworded what
+~1,900 codes read to fix a sentence 38 of them see; and anything
+retroactive for courses already created this way — Russell's call, having
+deleted and remade the one course it affected. Worth knowing and not a
+regression: the skeleton's `Curriculum/index.md` and its expectation pages
+install even though the app writes `include_curriculum_pages: false`,
+because the install gate is `skeleton_curriculum in shared_folders`
+(`setup_course.py`), not `include_curriculum`. Identical in the
+no-payload control, so it is not this feature's to fix.
+
 **Both apps' wizards let the teacher decline a skeleton, and the structure
 editor must follow them in BOTH directions.** Turning "Start from a
 <subject> skeleton" ON adopts that subject's five lists; turning it OFF puts
@@ -78,10 +120,22 @@ which have no LCS variant — for each list still EQUAL to what the adoption
 put there, and leaves the rest as the teacher left them — except the marks
 pool, which is kept where the teacher ticked it but narrowed to the folders
 the course will actually have (below). With nothing adopted there is nothing
-to compare against and nothing changes. A teacher
-who has declined the skeleton then reads the same sentence as one whose code
-has no skeleton at all ("Example content isn't available for this course
-code yet…"), because the course starts empty either way.
+to compare against and nothing changes. The example-content
+toggle moves the editor the same way, in both directions: turning it OFF
+adopts the skeleton it has just revealed, turning it back ON restores. The
+way back is not optional — without it a teacher who changed their mind would
+get a different file from the one they would have got without changing it.
+
+**Three situations, two sentences.** A teacher who has declined the skeleton
+for a code with no ready-made pages reads the same sentence as one whose
+code has no skeleton at all ("Example content isn't available for this
+course code yet…"), because the course starts empty either way. A teacher
+who declined ready-made pages AND then the skeleton reads a SECOND sentence
+("This course will start with empty folders ready for your own pages"),
+because the first one's opening clause is false for a code they were offered
+example content for one question ago. The two share no accessibility
+identifier, so a test can say which one is on screen. All of it is in
+`contracts/shared-rules.json` → `wizard.whenTheNoteIsShown`.
 
 Russell decided this for Windows on 2026-09-06 and Windows shipped it on
 2026-09-07; the mac copied it on 2026-09-18 ([issue
@@ -93,7 +147,7 @@ folders with none of its pages, while `course_config.json` said
 `use_skeleton: false`. A wizard that lies about what it is about to make is
 a worse product than one that never asked.
 
-The rule and its thirteen cases are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+The rule and its seventeen cases are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `wizard.skeletonToggle`, run on the mac by `SharedRulesContractTests`;
 `WizardStructureTests` covers what cases cannot reach — the pieces the rule
 is assembled from, and a scan proving the toggle is WIRED, a control with no
@@ -485,12 +539,15 @@ Windows needs exactly three UI behaviours:
 - **Starting Content section** in the new-course wizard: "Pre-populate
   course with example content" (default ON) with "Include Ontario
   curriculum pages" beneath it (default ON, disabled when the first is
-  off). When no content exists for the code, this is where the SKELETON
-  toggle goes instead (entry 123) — "Start from a <subject> skeleton" —
-  and the quiet "empty folders" caption is now the last resort, for a code
-  with neither. (Both apps also show that caption while the skeleton
-  toggle is OFF, and the toggle puts the defaults back when it goes off:
-  step 0b above has that rule, which postdates this list.)
+  off). The SKELETON toggle goes BELOW that block (entry 123) — "Start
+  from a <subject> skeleton" — and since 2026-09-21 it is a sibling of it
+  rather than its `else`, so a code with ready-made pages shows it the
+  moment those pages are turned down (#248). The quiet "empty folders"
+  caption is the last resort, for a code with neither. (Both apps also
+  show a caption while the skeleton toggle is OFF — which of the two
+  sentences depends on whether the code has ready-made pages — and the
+  toggle puts the defaults back when it goes off: step 0b above has that
+  rule, which postdates this list.)
 - **Structure lock**: when pre-populating, HIDE the folders/files
   editor behind a caption — the payload's manifest is the entire
   structure authority and the Python wizard skips all structure
