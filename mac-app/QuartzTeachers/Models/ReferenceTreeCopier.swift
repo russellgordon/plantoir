@@ -13,8 +13,28 @@ import Foundation
 /// cancelled between files, and runs off the main actor — all three of which
 /// need the file list in hand before the copying starts.
 ///
-/// **`nonisolated`, deliberately**: every function here is called from a
-/// detached task, and nothing it touches belongs to the interface.
+/// **Names are carried as the bytes the file system gave, and that is the
+/// whole reason this file talks to POSIX instead of to `FileManager`.**
+/// A name is read with `readdir`, kept as bytes, and handed to `copyfile()`
+/// as bytes. Rebuilding a destination from `URL.lastPathComponent` — which is
+/// what this file did until 2026-09-20 — passes the name through
+/// `URL`'s file-system representation, and that DECOMPOSES it: measured, a
+/// file created as `App\u{00e9}tit.jpg` (`c3 a9`) arrived as
+/// `Appe\u{0301}tit.jpg` (`65 cc 81`).
+///
+/// That is not cosmetic. The page that embeds the image still spells the name
+/// the old way, so the embed no longer resolves, and Quartz then emits neither
+/// the `<img>` nor the asset — the picture simply vanishes from the built
+/// site, with no error anywhere. Four files in Russell's own ICS4U are of this
+/// shape. Measured, same source name, three ways:
+///
+/// | how the copy is made | name on disk afterwards |
+/// |---|---|
+/// | `copyItem` of the whole DIRECTORY (route 1) | unchanged |
+/// | per-file `copyItem` to a REBUILT `URL` | **decomposed** |
+/// | `readdir` bytes → `copyfile()` | unchanged, both forms |
+///
+/// **`nonisolated` and `@concurrent`, deliberately**: see `copy`.
 nonisolated enum ReferenceTreeCopier {
 
     // MARK: - Types
@@ -24,8 +44,10 @@ nonisolated enum ReferenceTreeCopier {
 
         // MARK: - Stored properties
 
-        /// Where it sits inside the course — `Media/diagram.png`.
-        let relativePath: String
+        /// Where it sits inside the course — `Media/diagram.png` — as the
+        /// BYTES the file system gave, joined with `/`. Never a `String`:
+        /// the bytes are the name, and anything else is a re-spelling of it.
+        let relativePath: [UInt8]
 
         /// Folders are made rather than copied, so the order matters: the
         /// walk lists a folder before anything inside it.
@@ -34,9 +56,21 @@ nonisolated enum ReferenceTreeCopier {
         /// Zero for a folder and for a symlink.
         let byteCount: Int64
 
+        /// The source's permissions, so a copied folder is as open as the one
+        /// it came from. Files carry their own through `copyfile`.
+        let mode: mode_t
+
         /// When it was last changed, for the school-year proposal. Nil when
         /// the file system would not say.
         let modified: Date?
+
+        // MARK: - Computed properties
+
+        /// The name as text, for a message or a suffix test. Read-only, and
+        /// never used to build a path.
+        var text: String {
+            return String(decoding: relativePath, as: UTF8.self)
+        }
     }
 
     /// What one walk found, for the sheet to show before anything is copied.
@@ -53,14 +87,20 @@ nonisolated enum ReferenceTreeCopier {
         /// for `ReferenceImportSource.suggestedSchoolYear`.
         let pageYears: [Int]
 
-        /// The names that were left behind, deduplicated, in the order they
-        /// were met. What the summary tells the teacher was not copied.
-        let leftBehind: [String]
+        /// Folders inside the course that could not be read at all.
+        ///
+        /// **Never silently skipped.** A folder the old disk will not hand
+        /// over contributes no files, and an import that copied none of them
+        /// and reported success would be the quiet kind of data loss: the
+        /// teacher would find out next year. The course is refused instead,
+        /// naming the folder.
+        let unreadableFolders: [String]
     }
 
     /// Why a copy stopped.
     enum Trouble: LocalizedError, Equatable {
         case couldNotCopy(name: String, reason: String)
+        case couldNotRead(name: String)
 
         // MARK: - Computed properties
 
@@ -68,6 +108,8 @@ nonisolated enum ReferenceTreeCopier {
             switch self {
             case .couldNotCopy(let name, let reason):
                 return "\(name) could not be copied: \(reason)"
+            case .couldNotRead(let name):
+                return ReferenceImportWording.couldNotReadFolder(folder: name)
             }
         }
     }
@@ -91,24 +133,24 @@ nonisolated enum ReferenceTreeCopier {
     /// course it came from.
     static func walk(courseAt courseURL: URL, leavingBehind leftBehindNames: Set<String>) -> Survey {
         var items: [Item] = []
-        var leftBehind: [String] = []
+        var unreadable: [String] = []
         var fileCount: Int = 0
         var byteCount: Int64 = 0
         var pageCount: Int = 0
         var pageYears: [Int] = []
 
         ReferenceTreeCopier.walk(
-            folderAt: courseURL,
-            relativePath: "",
+            folderAt: ReferenceTreeCopier.pathBytes(of: courseURL),
+            relativePath: [],
             leftBehindNames: leftBehindNames,
             items: &items,
-            leftBehind: &leftBehind
+            unreadable: &unreadable
         )
 
         for item in items where !item.isDirectory {
             fileCount += 1
             byteCount += item.byteCount
-            if item.relativePath.hasSuffix(".md") {
+            if item.text.hasSuffix(".md") {
                 pageCount += 1
                 if let modified = item.modified {
                     // `CalendarDay.today(_:)` is "the calendar day this
@@ -129,7 +171,7 @@ nonisolated enum ReferenceTreeCopier {
             byteCount: byteCount,
             pageCount: pageCount,
             pageYears: pageYears,
-            leftBehind: leftBehind
+            unreadableFolders: unreadable
         )
     }
 
@@ -152,13 +194,20 @@ nonisolated enum ReferenceTreeCopier {
     /// `reportingEveryBytes`, plus once at the end. It is called on whatever
     /// thread the copy is running on, so a caller that touches the interface
     /// hops to the main actor itself.
-    /// **`async` and `nonisolated`, which is what puts it off the main
-    /// actor**: Swift runs a `nonisolated async` function on the shared
-    /// executor rather than on the caller's actor, so the window keeps
-    /// drawing while a slow disk is read — and because it is an ordinary
-    /// child of the calling task rather than a detached one, `Task.cancel()`
-    /// on the import reaches the loop below. A detached task would not be
-    /// cancelled by it, which is the trap this comment exists for.
+    ///
+    /// **`@concurrent`, and that attribute is load-bearing.** A plain
+    /// `nonisolated async` function would run on its CALLER's actor in this
+    /// project, because `project.yml` sets `SWIFT_APPROACHABLE_CONCURRENCY:
+    /// YES` — which turns on `NonisolatedNonsendingByDefault`. Measured: the
+    /// same function body reports `Thread.isMainThread == true` with that
+    /// flag and `false` with `@concurrent`. Without it the loop below holds
+    /// the main actor for the whole copy: the progress bar cannot draw and
+    /// **the Stop button cannot be clicked at all** — on the slow external
+    /// disk this file exists to serve, that is minutes of a frozen window.
+    /// `Task.detached` would also leave the main actor and was rejected: it
+    /// is not a child of the calling task, so `run?.cancel()` would not reach
+    /// the loop. `@concurrent` leaves the actor and stays a child.
+    @concurrent
     static func copy(
         _ survey: Survey,
         from courseURL: URL,
@@ -166,27 +215,39 @@ nonisolated enum ReferenceTreeCopier {
         reportingEveryBytes: Int64 = 4 * 1024 * 1024,
         progress: @Sendable (Int64) -> Void
     ) async throws {
-        let fileManager: FileManager = FileManager.default
+        let source: [UInt8] = ReferenceTreeCopier.pathBytes(of: courseURL)
+        let destination: [UInt8] = ReferenceTreeCopier.pathBytes(of: destinationURL)
         var copiedBytes: Int64 = 0
         var reportedBytes: Int64 = 0
 
         for item in survey.items {
             try Task.checkCancellation()
 
-            let source: URL = courseURL.appendingPathComponent(item.relativePath)
-            let destination: URL = destinationURL.appendingPathComponent(item.relativePath)
-            do {
-                if item.isDirectory {
-                    try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
-                } else {
-                    try fileManager.copyItem(at: source, to: destination)
-                    copiedBytes += item.byteCount
+            let from: [CChar] = ReferenceTreeCopier.path(source, item.relativePath)
+            let to: [CChar] = ReferenceTreeCopier.path(destination, item.relativePath)
+
+            if item.isDirectory {
+                if mkdir(to, item.mode & 0o7777) != 0 {
+                    throw Trouble.couldNotCopy(
+                        name: item.text, reason: ReferenceTreeCopier.reason(errno)
+                    )
                 }
-            } catch {
+                // `mkdir` is filtered by the process umask, so the folder is
+                // made and then given the permissions the source had.
+                _ = chmod(to, item.mode & 0o7777)
+                continue
+            }
+
+            // `copyfile` with the source and destination as BYTES. The name
+            // is never re-spelled, `COPYFILE_CLONE` keeps the file system's
+            // own fast path (485 MB in 0.09 s on one APFS volume), and it
+            // copies a symlink AS a link rather than following it.
+            if copyfile(from, to, nil, copyfile_flags_t(COPYFILE_CLONE)) != 0 {
                 throw Trouble.couldNotCopy(
-                    name: item.relativePath, reason: error.localizedDescription
+                    name: item.text, reason: ReferenceTreeCopier.reason(errno)
                 )
             }
+            copiedBytes += item.byteCount
 
             if copiedBytes - reportedBytes >= reportingEveryBytes {
                 reportedBytes = copiedBytes
@@ -201,79 +262,138 @@ nonisolated enum ReferenceTreeCopier {
 
     /// One folder, then everything in it. Folders come before their contents
     /// so the copy can make each one before writing into it.
+    ///
+    /// `readdir` rather than `FileManager`, for the names: see the note at
+    /// the top of this file.
     private static func walk(
-        folderAt folderURL: URL,
-        relativePath: String,
+        folderAt folderPath: [UInt8],
+        relativePath: [UInt8],
         leftBehindNames: Set<String>,
         items: inout [Item],
-        leftBehind: inout [String]
+        unreadable: inout [String]
     ) {
-        let fileManager: FileManager = FileManager.default
-        guard let children = try? fileManager.contentsOfDirectory(
-            at: folderURL,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey],
-            options: []
-        ) else {
+        guard let directory = opendir(ReferenceTreeCopier.path(folderPath, [])) else {
+            var name: String = String(decoding: relativePath, as: UTF8.self)
+            if name.isEmpty {
+                name = String(decoding: folderPath, as: UTF8.self)
+            }
+            unreadable.append(name)
             return
         }
+        defer { closedir(directory) }
 
-        var sorted: [URL] = children
-        sorted.sort { first, second in
-            return first.lastPathComponent < second.lastPathComponent
+        var children: [[UInt8]] = []
+        while let entry = readdir(directory) {
+            var name: [UInt8] = []
+            let length: Int = Int(entry.pointee.d_namlen)
+            withUnsafeBytes(of: entry.pointee.d_name) { raw in
+                for index in 0..<length {
+                    name.append(raw[index])
+                }
+            }
+            if name == Array(".".utf8) || name == Array("..".utf8) {
+                continue
+            }
+            children.append(name)
+        }
+        // A stable order, so two walks of the same folder agree and a test
+        // can say what it expects.
+        children.sort { first, second in
+            return String(decoding: first, as: UTF8.self) < String(decoding: second, as: UTF8.self)
         }
 
-        for child in sorted {
-            let name: String = child.lastPathComponent
-            if leftBehindNames.contains(name) {
-                var alreadyNoted: Bool = false
-                for noted in leftBehind where noted == name {
-                    alreadyNoted = true
-                }
-                if !alreadyNoted {
-                    leftBehind.append(name)
-                }
+        for name in children {
+            // Every name on the skip list is ASCII, so comparing the text is
+            // exact here however the rest of the tree is spelled.
+            if leftBehindNames.contains(String(decoding: name, as: UTF8.self)) {
                 continue
             }
 
-            let childPath: String = relativePath.isEmpty ? name : relativePath + "/" + name
-            let values: URLResourceValues? = try? child.resourceValues(
-                forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]
-            )
+            var childRelative: [UInt8] = relativePath
+            if !childRelative.isEmpty {
+                childRelative.append(ReferenceTreeCopier.separator)
+            }
+            childRelative.append(contentsOf: name)
 
-            // A symlink is copied AS a link: `copyItem` copies the link
-            // itself, so nothing is followed and nothing outside the course
-            // is read.
-            if values?.isSymbolicLink == true {
+            var childPath: [UInt8] = folderPath
+            childPath.append(ReferenceTreeCopier.separator)
+            childPath.append(contentsOf: name)
+
+            var status: stat = stat()
+            if lstat(ReferenceTreeCopier.path(childPath, []), &status) != 0 {
+                unreadable.append(String(decoding: childRelative, as: UTF8.self))
+                continue
+            }
+
+            // A symlink is copied AS a link, so nothing is followed and
+            // nothing outside the course is read.
+            if (status.st_mode & S_IFMT) == S_IFLNK {
                 items.append(Item(
-                    relativePath: childPath, isDirectory: false, byteCount: 0, modified: nil
+                    relativePath: childRelative, isDirectory: false,
+                    byteCount: 0, mode: status.st_mode, modified: nil
                 ))
                 continue
             }
 
-            if values?.isDirectory == true {
+            if (status.st_mode & S_IFMT) == S_IFDIR {
                 items.append(Item(
-                    relativePath: childPath, isDirectory: true, byteCount: 0, modified: nil
+                    relativePath: childRelative, isDirectory: true,
+                    byteCount: 0, mode: status.st_mode, modified: nil
                 ))
                 ReferenceTreeCopier.walk(
-                    folderAt: child,
-                    relativePath: childPath,
+                    folderAt: childPath,
+                    relativePath: childRelative,
                     leftBehindNames: leftBehindNames,
                     items: &items,
-                    leftBehind: &leftBehind
+                    unreadable: &unreadable
                 )
                 continue
             }
 
-            var byteCount: Int64 = 0
-            if let size = values?.fileSize {
-                byteCount = Int64(size)
-            }
             items.append(Item(
-                relativePath: childPath,
+                relativePath: childRelative,
                 isDirectory: false,
-                byteCount: byteCount,
-                modified: values?.contentModificationDate
+                byteCount: Int64(status.st_size),
+                mode: status.st_mode,
+                modified: Date(timeIntervalSince1970: TimeInterval(status.st_mtimespec.tv_sec))
             ))
         }
+    }
+
+    /// `/`.
+    private static let separator: UInt8 = 47
+
+    /// A folder's path as bytes.
+    ///
+    /// From the `String`, not from `URL`'s file-system representation: the
+    /// latter is what decomposes a name, and while a LOOKUP survives that on
+    /// an APFS volume (which compares names normalisation-insensitively), a
+    /// network share or an exFAT disk — exactly where an old working folder
+    /// tends to live — does not.
+    private static func pathBytes(of url: URL) -> [UInt8] {
+        return Array(url.path.utf8)
+    }
+
+    /// `root` + `/` + `relative`, null-terminated, for POSIX.
+    private static func path(_ root: [UInt8], _ relative: [UInt8]) -> [CChar] {
+        var bytes: [UInt8] = root
+        if !relative.isEmpty {
+            bytes.append(ReferenceTreeCopier.separator)
+            bytes.append(contentsOf: relative)
+        }
+        var result: [CChar] = []
+        for byte in bytes {
+            result.append(CChar(bitPattern: byte))
+        }
+        result.append(0)
+        return result
+    }
+
+    /// What the system said went wrong, in its own words.
+    private static func reason(_ code: Int32) -> String {
+        guard let text = strerror(code) else {
+            return "error \(code)"
+        }
+        return String(cString: text)
     }
 }

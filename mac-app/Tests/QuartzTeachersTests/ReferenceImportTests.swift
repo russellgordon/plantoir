@@ -202,6 +202,9 @@ final class ReferenceImportTests: XCTestCase {
             if testCase["openFolderIsTheRoot"] as? Bool == true {
                 openFolderURL = folderURL
             }
+            if let child = testCase["openFolderIsAChildNamed"] as? String {
+                openFolderURL = folderURL.appendingPathComponent(child)
+            }
 
             let outcome: ReferenceImportSource.Outcome = ReferenceImportSource.resolve(
                 chosen: chosenURL,
@@ -239,7 +242,7 @@ final class ReferenceImportTests: XCTestCase {
 
     /// A course whose settings cannot be read is not offered at all — copying
     /// it would make a reference course of nothing.
-    func testACourseWithUnreadableSettingsIsNotOffered() throws {
+    func testACourseWithUnreadableSettingsIsShownAndCannotBeTicked() throws {
         try prepare()
         try makeOldCourse(code: "ICS3U")
         let broken: URL = oldFolderURL.appendingPathComponent("courses").appendingPathComponent("BROKE")
@@ -250,8 +253,20 @@ final class ReferenceImportTests: XCTestCase {
         guard case .found(let source) = read(oldFolderURL) else {
             return XCTFail("The old folder was refused.")
         }
-        XCTAssertEqual(source.courses.count, 1)
-        XCTAssertEqual(source.courses.first?.courseCode, "ICS3U")
+        XCTAssertEqual(source.courses.count, 2, "A broken course is SHOWN, not hidden.")
+        var unreadable: ReferenceImportSource.FoundCourse?
+        for course in source.courses where course.folderName == "BROKE" {
+            unreadable = course
+        }
+        XCTAssertEqual(
+            unreadable?.problem, ReferenceImportWording.settingsCouldNotBeRead,
+            "The row says why it cannot come across."
+        )
+        XCTAssertFalse(
+            source.tickedWhenOpened.contains("BROKE"),
+            "A course that cannot come across must not arrive ticked."
+        )
+        XCTAssertTrue(source.tickedWhenOpened.contains("ICS3U"))
     }
 
     // MARK: - What is left behind
@@ -678,6 +693,208 @@ final class ReferenceImportTests: XCTestCase {
         ))
     }
 
+    // MARK: - The names on disk
+
+    /// **The bytes of a file name are carried through unchanged.**
+    ///
+    /// Measured on Russell's own ICS4U: a per-file copy to a rebuilt `URL`
+    /// turned `App\u{00e9}tit` (`c3 a9`) into `Appe\u{0301}tit`
+    /// (`65 cc 81`), the page that embeds it still spelled it the old way,
+    /// and the image then vanished from the built site — no error anywhere.
+    /// Both spellings are tested side by side, because the fix must not
+    /// "correct" either of them.
+    func testAFileNameKeepsItsExactBytes() async throws {
+        try prepare()
+        let courseURL: URL = try makeOldCourse(code: "ICS4U", sections: [1])
+        let composed: String = "Bone App\u{00e9}tit.md"
+        let decomposed: String = "Cre\u{0301}me Bru\u{0302}le\u{0301}e.md"
+        for name in [composed, decomposed] {
+            // Written with POSIX `open`, so the bytes on disk are exactly
+            // these and nothing has normalised them on the way in.
+            let path: String = courseURL.appendingPathComponent("Media").path + "/" + name
+            let file: Int32 = open(path, O_CREAT | O_WRONLY, 0o644)
+            XCTAssertGreaterThan(file, -1, "could not write \(name)")
+            _ = write(file, "x", 1)
+            close(file)
+        }
+        let sourceNames: Set<[UInt8]> = ReferenceImportTests.entryBytes(
+            inFolder: courseURL.appendingPathComponent("Media").path
+        )
+
+        guard case .found(let source) = read(oldFolderURL) else {
+            return XCTFail("The old folder was refused.")
+        }
+        _ = await importEverything(from: source)
+
+        let copiedNames: Set<[UInt8]> = ReferenceImportTests.entryBytes(
+            inFolder: coursesDirectoryURL.appendingPathComponent("ICS4U-2025")
+                .appendingPathComponent("Media").path
+        )
+        XCTAssertEqual(
+            copiedNames, sourceNames,
+            "A name came across re-spelled. The page that links to it still spells it the old way, "
+            + "so the link no longer resolves and the file disappears from the built site."
+        )
+    }
+
+    // MARK: - Nothing is visible until it is safe
+
+    /// The staging folder is invisible to everything that looks for a course.
+    ///
+    /// Pinned rather than assumed: the whole fail-safe rests on it.
+    func testAStagingFolderIsNotACourseAndIsNotABackupOrAnArchive() throws {
+        try prepare()
+        let staging: URL = coursesDirectoryURL.appendingPathComponent(
+            ReferenceStaging.stagingName(for: "ICS4U-2025")
+        )
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: [
+            "course_code": "ICS4U", "section_numbers": [1],
+        ]).write(to: staging.appendingPathComponent("course_config.json"))
+
+        let workspace: WorkspaceModel = WorkspaceModel()
+        workspace.chooseWorkspace(at: workingFolderURL)
+        for course in workspace.courses {
+            XCTAssertFalse(
+                ReferenceStaging.isStagingName(course.code),
+                "A half-made import showed up in the sidebar as a course."
+            )
+        }
+        for item in WorkspaceModel.findBackupItems(in: coursesDirectoryURL) {
+            XCTAssertFalse(ReferenceStaging.isStagingName(item.courseCode))
+        }
+        for item in WorkspaceModel.findArchivedItems(in: coursesDirectoryURL) {
+            XCTAssertFalse(ReferenceStaging.isStagingName(item.courseCode))
+        }
+    }
+
+    /// An import that never finished is tidied away the next time the folder
+    /// is read — and a teacher's own dot-folder is never touched.
+    func testAnUnfinishedImportIsSweptAndOtherDotFoldersAreNot() throws {
+        try prepare()
+        let fileManager: FileManager = FileManager.default
+        let staging: URL = coursesDirectoryURL.appendingPathComponent(
+            ReferenceStaging.stagingName(for: "ICS4U-2025")
+        )
+        try fileManager.createDirectory(
+            at: staging.appendingPathComponent("section1"), withIntermediateDirectories: true
+        )
+        let page: URL = staging.appendingPathComponent("section1").appendingPathComponent("index.md")
+        try Data("# half made\n".utf8).write(to: page)
+        // Locked, as it is by the time the rename is the only step left.
+        ReferenceLock.lock(courseDirectory: staging)
+        XCTAssertTrue(ReferenceLock.isLocked(page))
+
+        // Somebody else's dot-folder, which is not ours to remove.
+        let theirs: URL = coursesDirectoryURL.appendingPathComponent(".internal")
+        try fileManager.createDirectory(at: theirs, withIntermediateDirectories: true)
+
+        let swept: [String] = ReferenceStaging.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL)
+        XCTAssertEqual(swept, ["ICS4U-2025"], "The leftover names the course it was going to be.")
+        XCTAssertFalse(fileManager.fileExists(atPath: staging.path))
+        XCTAssertTrue(
+            fileManager.fileExists(atPath: theirs.path),
+            "The sweep took a folder that was not one of ours."
+        )
+    }
+
+    /// While the copy is running there is nothing under `courses/` but the
+    /// hidden folder — no half-made course, and no live site markers.
+    func testACourseIsNeverVisibleBeforeItIsNeutralised() async throws {
+        try prepare()
+        try makeOldCourse(code: "ICS4U", sections: [1])
+        guard case .found(let source) = read(oldFolderURL) else {
+            return XCTFail("The old folder was refused.")
+        }
+        let found: ReferenceImportSource.FoundCourse = try XCTUnwrap(source.courses.first)
+
+        // Cancelled before the first file, which leaves the run at exactly
+        // the point the old code left a live-looking course behind.
+        let coursesDirectoryURL: URL = self.coursesDirectoryURL
+        let run: Task<[ReferenceImporter.Outcome], Never> = Task { @MainActor in
+            return await ReferenceImporter.importCourses(
+                [ReferenceImporter.Request(course: found, schoolYear: 2025)],
+                into: coursesDirectoryURL,
+                existingFolderNames: [],
+                alreadyShelved: [],
+                from: source.rootURL,
+                progress: { _ in }
+            )
+        }
+        run.cancel()
+        _ = await run.value
+
+        let left: [String] = try FileManager.default.contentsOfDirectory(
+            atPath: coursesDirectoryURL.path
+        )
+        XCTAssertEqual(left, [], "Something was left under courses/ — visible or hidden.")
+    }
+
+    // MARK: - Where the work runs
+
+    /// The copy runs OFF the main actor, so the progress bar can draw and the
+    /// Stop button can be pressed.
+    ///
+    /// `@concurrent` is what does it. A plain `nonisolated async` function
+    /// runs on its CALLER's actor in this project, because `project.yml` sets
+    /// `SWIFT_APPROACHABLE_CONCURRENCY: YES` — and the copy's loop has no
+    /// suspension point, so on the slow disk this is all written for the main
+    /// actor would be held for the whole copy and Stop could not be clicked
+    /// at all. `ReferenceImportSource.read` and the survey carry the same
+    /// attribute for the same reason.
+    func testTheCopyDoesNotRunOnTheMainThread() async throws {
+        try prepare()
+        let courseURL: URL = try makeOldCourse(code: "ICS4U", sections: [1])
+        let survey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.survey(
+            courseAt: courseURL, leavingBehind: ReferenceImporter.leftBehindNames
+        )
+        let destination: URL = rootURL.appendingPathComponent("copied-off-the-main-thread")
+        // The copy fills a folder that is already there; making it is the
+        // caller's step, exactly as the importer does it.
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+
+        let wasOnTheMainThread: LockedBox = LockedBox()
+        try await ReferenceTreeCopier.copy(survey, from: courseURL, into: destination) { _ in
+            wasOnTheMainThread.record(Thread.isMainThread)
+        }
+        XCTAssertEqual(
+            wasOnTheMainThread.value, false,
+            "The copy ran on the main thread: the window is frozen for its whole length and the "
+            + "Stop button cannot be clicked."
+        )
+    }
+
+    // MARK: - A folder that cannot be read
+
+    /// A folder the disk will not hand over is never skipped in silence.
+    func testAnUnreadableFolderRefusesTheCourseByName() async throws {
+        try prepare()
+        let courseURL: URL = try makeOldCourse(code: "ICS4U", sections: [1])
+        let shut: URL = courseURL.appendingPathComponent("Locked Away")
+        try FileManager.default.createDirectory(at: shut, withIntermediateDirectories: true)
+        try Data("# page\n".utf8).write(to: shut.appendingPathComponent("page.md"))
+        // Readable by nobody, which is what a bad sector or a folder from
+        // another account looks like from here.
+        try FileManager.default.setAttributes(
+            [FileAttributeKey.posixPermissions: 0], ofItemAtPath: shut.path
+        )
+        addTeardownBlock {
+            try? FileManager.default.setAttributes(
+                [FileAttributeKey.posixPermissions: 0o755], ofItemAtPath: shut.path
+            )
+        }
+
+        guard case .found(let source) = read(oldFolderURL) else {
+            return XCTFail("The old folder was refused.")
+        }
+        let found: ReferenceImportSource.FoundCourse = try XCTUnwrap(source.courses.first)
+        XCTAssertEqual(
+            found.problem, ReferenceImportWording.couldNotReadFolder(folder: "Locked Away"),
+            "The sheet says which folder could not be read, before anything is copied."
+        )
+        XCTAssertFalse(source.tickedWhenOpened.contains(found.id))
+    }
+
     // MARK: - The sentences
 
     func testTheSentencesAreTheContractsSentences() throws {
@@ -704,6 +921,14 @@ final class ReferenceImportTests: XCTestCase {
             wording["holdsTheFolderYouHaveOpen"] as? String
         )
         XCTAssertEqual(ReferenceImportWording.schoolYearLabel, wording["schoolYearLabel"] as? String)
+        XCTAssertEqual(
+            ReferenceImportWording.settingsCouldNotBeRead,
+            wording["settingsCouldNotBeRead"] as? String
+        )
+        XCTAssertEqual(
+            ReferenceImportWording.couldNotReadFolder(folder: "{folder}"),
+            wording["couldNotReadFolder"] as? String
+        )
         XCTAssertEqual(
             ReferenceImportWording.builtWebsitesAreNotCopied,
             wording["builtWebsitesAreNotCopied"] as? String
@@ -844,6 +1069,31 @@ final class ReferenceImportTests: XCTestCase {
         }
     }
 
+    /// Every entry name in a folder, as the BYTES the file system holds —
+    /// never as a `String`, which is what hides this whole class of fault.
+    private static func entryBytes(inFolder path: String) -> Set<[UInt8]> {
+        var found: Set<[UInt8]> = []
+        guard let directory = opendir(path) else {
+            return found
+        }
+        defer { closedir(directory) }
+        while let entry = readdir(directory) {
+            var name: [UInt8] = []
+            let length: Int = Int(entry.pointee.d_namlen)
+            withUnsafeBytes(of: entry.pointee.d_name) { raw in
+                for index in 0..<length {
+                    name.append(raw[index])
+                }
+            }
+            let text: String = String(decoding: name, as: UTF8.self)
+            if text == "." || text == ".." || text == ".DS_Store" {
+                continue
+            }
+            found.insert(name)
+        }
+        return found
+    }
+
     private static func moment(year: Int, month: Int, day: Int) -> Date {
         var components: DateComponents = DateComponents()
         components.year = year
@@ -853,5 +1103,33 @@ final class ReferenceImportTests: XCTestCase {
         var calendar: Calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone.current
         return calendar.date(from: components) ?? Date()
+    }
+}
+
+/// Somewhere a `@Sendable` closure running off the main actor can leave an
+/// answer for the test that is waiting for it.
+final class LockedBox: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    private let lock: NSLock = NSLock()
+    private var answer: Bool?
+
+    // MARK: - Computed properties
+
+    var value: Bool? {
+        lock.lock()
+        defer { lock.unlock() }
+        return answer
+    }
+
+    // MARK: - Functions
+
+    func record(_ isOnTheMainThread: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        if answer == nil {
+            answer = isOnTheMainThread
+        }
     }
 }

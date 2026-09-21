@@ -96,9 +96,22 @@ enum ReferenceCopier {
             throw Problem.folderAlreadyExists(folderName)
         }
 
+        // Built under a HIDDEN name and renamed into place as the last act.
+        // The course being copied is a LIVE one, so until the marker is
+        // written and the site markers are renamed aside the copy is an
+        // ordinary course pointing at the ORIGINAL's class website — and a
+        // crash in that window would leave one in the sidebar. The window is
+        // small here (a local clone) and it is the same window the importer
+        // had; one answer for both. `ReferenceStaging` says why a dot-folder
+        // closes it.
+        let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
+            ReferenceStaging.stagingName(for: folderName)
+        )
+        ReferenceStaging.remove(at: stagingURL)
+
         do {
-            try fileManager.createDirectory(at: destinationURL, withIntermediateDirectories: false)
-            try ReferenceCopier.copyContents(of: course.directoryURL, into: destinationURL)
+            try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+            try ReferenceCopier.copyContents(of: course.directoryURL, into: stagingURL)
             // The lock TRAVELS through `FileManager.copyItem`, so a copy taken
             // from a course that is already frozen arrives frozen — and then
             // the two steps below cannot happen: the site markers cannot be
@@ -113,33 +126,43 @@ enum ReferenceCopier {
             // Copy for Reference…" is withheld on one — but a guard that
             // depends on a menu item being withheld somewhere else is a guard
             // one edit from being gone.
-            ReferenceLock.clearLock(at: destinationURL)
+            ReferenceLock.clearLock(at: stagingURL)
         } catch {
             // Nothing is locked yet, so the half-written folder is an
             // ordinary one and goes away cleanly.
-            try? fileManager.removeItem(at: destinationURL)
+            ReferenceStaging.remove(at: stagingURL)
             if let problem = error as? Problem {
                 throw problem
             }
             throw Problem.couldNotCopy(error.localizedDescription)
         }
 
-        let made: Made
+        let staged: Made
         do {
-            made = try ReferenceCopier.makeIntoAReferenceCourse(
-                at: destinationURL, schoolYear: schoolYear, at: moment
+            staged = try ReferenceCopier.makeIntoAReferenceCourse(
+                at: stagingURL, schoolYear: schoolYear, at: moment
             )
+            // The one step that makes it visible, and the only one that has
+            // to be atomic: a rename within `courses/`. Measured: a folder
+            // whose contents carry the lock renames cleanly, and the lock
+            // survives.
+            try fileManager.moveItem(at: stagingURL, to: destinationURL)
         } catch {
-            // Still an ordinary folder: the lock is the last step INSIDE that
-            // function, so anything that failed before it left a folder that
-            // removes cleanly. The clear is belt and braces for the one case
-            // that is not ours — a source that was itself frozen, whose flags
-            // travelled with the copy.
-            ReferenceLock.clearLock(at: destinationURL)
-            try? fileManager.removeItem(at: destinationURL)
+            // The lock may be ON by now — it is applied inside the call
+            // above — so the clear comes first, and both are `ReferenceStaging`'s
+            // job rather than two more lines here.
+            ReferenceStaging.remove(at: stagingURL)
             throw Problem.couldNotCopy(error.localizedDescription)
         }
 
+        // `staged` was made under the hidden name; everything else in it was
+        // read from the settings and is right.
+        let made: Made = Made(
+            folderName: folderName,
+            displayCode: staged.displayCode,
+            schoolYear: staged.schoolYear,
+            sectionCount: staged.sectionCount
+        )
         ActivityTrail.note(
             .courseKeptForReference,
             ReferenceCopier.trailLine(for: made, copiedFrom: course.displayCode)

@@ -72,6 +72,23 @@ nonisolated enum ReferenceImportWording {
     /// The label over each row's year list.
     static let schoolYearLabel: String = "School year"
 
+    /// A course that cannot come across, said beside its own row.
+    ///
+    /// Shown rather than hidden: a teacher whose only course has unreadable
+    /// settings was told "there are no courses in that folder", which is a
+    /// different thing and sends them to look in the wrong place.
+    static let settingsCouldNotBeRead: String =
+        "Its settings could not be read, so it cannot be brought across."
+
+    /// A folder inside a course that the disk would not hand over.
+    ///
+    /// Said before anything is copied, and again as the reason if it happens
+    /// during the copy. A folder that could not be read contributes no pages,
+    /// and an import that quietly left it out would be found out next year.
+    static func couldNotReadFolder(folder: String) -> String {
+        return "\(folder) could not be read, so this course was left as it is."
+    }
+
     /// Said once under the list, about what does not come across.
     static let builtWebsitesAreNotCopied: String =
         "Last year's finished websites are not copied. Preview a course and Plantoir builds it again."

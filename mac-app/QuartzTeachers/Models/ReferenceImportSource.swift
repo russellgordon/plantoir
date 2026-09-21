@@ -45,11 +45,14 @@ nonisolated struct ReferenceImportSource: Sendable {
         let fileCount: Int
         let byteCount: Int64
 
-        /// What was left behind, by name, so the summary can say so
-        /// honestly. Counted rather than sized on purpose: measuring
-        /// `.merged_output` means walking the 1.9 GB of last year's built
-        /// website that the whole point is to not touch.
-        let leftBehind: [String]
+        /// Why this course cannot be brought across, or nil when it can.
+        ///
+        /// **A course with a problem is SHOWN rather than hidden**, with its
+        /// reason beside it and its tick disabled. Leaving it out was the
+        /// first shape of this, and it told a teacher whose only course had
+        /// unreadable settings "there are no courses in that folder" — which
+        /// is not what happened, and sends them to look in the wrong place.
+        let problem: String?
 
         /// The school year this course most plausibly was, or nil when the
         /// dates do not say. A PROPOSAL: the teacher changes it in the sheet,
@@ -126,10 +129,13 @@ nonisolated struct ReferenceImportSource: Sendable {
     /// an output, which is the kind of thing a contract case can run.
     var tickedWhenOpened: Set<String> {
         if let chosenCourseFolderName {
-            return [chosenCourseFolderName]
+            for course in courses where course.id == chosenCourseFolderName && course.problem == nil {
+                return [chosenCourseFolderName]
+            }
+            return []
         }
         var everything: Set<String> = []
-        for course in courses {
+        for course in courses where course.problem == nil {
             everything.insert(course.id)
         }
         return everything
@@ -178,23 +184,39 @@ nonisolated struct ReferenceImportSource: Sendable {
     /// The same, off the main actor.
     ///
     /// Reading a folder of four courses walks about 2,600 files, and a folder
-    /// on a disk that has to spin up walks them slowly. `nonisolated async`
-    /// is what moves the work off the interface's thread: Swift runs such a
-    /// function on the shared executor rather than on the caller's actor.
+    /// on a disk that has to spin up walks them slowly.
+    ///
+    /// **`@concurrent` is what moves it off the interface's thread.** A plain
+    /// `nonisolated async` function would run on its CALLER's actor here,
+    /// because `project.yml` sets `SWIFT_APPROACHABLE_CONCURRENCY: YES` —
+    /// measured, the same body reports `Thread.isMainThread == true` without
+    /// the attribute and `false` with it. Without it the sheet's spinner
+    /// could not spin while this ran.
+    @concurrent
     static func read(
         chosen: URL,
         workingFolderURL: URL?,
-        leavingBehind leftBehindNames: Set<String>
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay = CalendarDay.today()
     ) async -> Outcome {
         return ReferenceImportSource.resolve(
-            chosen: chosen, workingFolderURL: workingFolderURL, leavingBehind: leftBehindNames
+            chosen: chosen,
+            workingFolderURL: workingFolderURL,
+            leavingBehind: leftBehindNames,
+            on: day
         )
     }
 
+    /// `day` is carried all the way down to the school-year proposal rather
+    /// than left to the clock: the sheet has a day of its own so the year
+    /// list cannot change under the teacher mid-sheet, and a proposal read
+    /// off a different day from the list it is chosen in is a proposal that
+    /// is sometimes not in the list.
     static func resolve(
         chosen: URL,
         workingFolderURL: URL?,
-        leavingBehind leftBehindNames: Set<String>
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay = CalendarDay.today()
     ) -> Outcome {
         let fileManager: FileManager = FileManager.default
         let chosenURL: URL = chosen.standardizedFileURL
@@ -230,11 +252,20 @@ nonisolated struct ReferenceImportSource: Sendable {
         }
 
         // One course folder: its settings are right there.
+        //
+        // **Its neighbours are offered only when it really is sitting in a
+        // `courses` folder.** A course folder anywhere else — one dragged
+        // onto the Desktop, say — is offered ON ITS OWN, because "everything
+        // beside it" would then mean every course-shaped folder on the
+        // Desktop, with the trail line naming the home folder as the source.
+        var loneCourse: Bool = false
         if coursesURL == nil {
             let config: URL = chosenURL.appendingPathComponent(ReferenceImportSource.configFileName)
             if fileManager.fileExists(atPath: config.path) {
-                coursesURL = chosenURL.deletingLastPathComponent()
+                let parent: URL = chosenURL.deletingLastPathComponent()
+                coursesURL = parent
                 chosenCourseFolderName = chosenName
+                loneCourse = parent.lastPathComponent != "courses"
             }
         }
 
@@ -242,15 +273,35 @@ nonisolated struct ReferenceImportSource: Sendable {
             return .refused(.noCoursesThere(folderName: chosenName))
         }
 
-        let courses: [FoundCourse] = ReferenceImportSource.courses(
-            in: coursesURL, leavingBehind: leftBehindNames
-        )
+        var courses: [FoundCourse] = []
+        if loneCourse {
+            if let only = ReferenceImportSource.measure(
+                courseAt: chosenURL,
+                configURL: chosenURL.appendingPathComponent(ReferenceImportSource.configFileName),
+                leavingBehind: leftBehindNames,
+                on: day
+            ) {
+                courses.append(only)
+            }
+        } else {
+            courses = ReferenceImportSource.courses(
+                in: coursesURL, leavingBehind: leftBehindNames, on: day
+            )
+        }
         if courses.isEmpty {
             return .refused(.noCoursesThere(folderName: chosenName))
         }
 
+        // What the trail calls the source: the working folder for the two
+        // ordinary shapes, and the course folder itself for a lone one,
+        // whose parent is nobody's working folder.
+        var rootURL: URL = coursesURL.deletingLastPathComponent()
+        if loneCourse {
+            rootURL = chosenURL
+        }
+
         return .found(ReferenceImportSource(
-            rootURL: coursesURL.deletingLastPathComponent(),
+            rootURL: rootURL,
             coursesURL: coursesURL,
             courses: courses,
             chosenCourseFolderName: chosenCourseFolderName
@@ -264,7 +315,11 @@ nonisolated struct ReferenceImportSource: Sendable {
     /// is. That is what keeps `_backups` (zips of courses), `.internal`
     /// (the old folder's own bookkeeping) and any stray folder out without a
     /// list of names to maintain.
-    static func courses(in coursesURL: URL, leavingBehind leftBehindNames: Set<String>) -> [FoundCourse] {
+    static func courses(
+        in coursesURL: URL,
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay = CalendarDay.today()
+    ) -> [FoundCourse] {
         let fileManager: FileManager = FileManager.default
         guard let children = try? fileManager.contentsOfDirectory(
             at: coursesURL, includingPropertiesForKeys: [.isDirectoryKey], options: []
@@ -282,7 +337,7 @@ nonisolated struct ReferenceImportSource: Sendable {
                 continue
             }
             if let course = ReferenceImportSource.measure(
-                courseAt: child, configURL: configURL, leavingBehind: leftBehindNames
+                courseAt: child, configURL: configURL, leavingBehind: leftBehindNames, on: day
             ) {
                 found.append(course)
             }
@@ -304,14 +359,27 @@ nonisolated struct ReferenceImportSource: Sendable {
     private static func measure(
         courseAt courseURL: URL,
         configURL: URL,
-        leavingBehind leftBehindNames: Set<String>
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay
     ) -> FoundCourse? {
         guard let data = try? Data(contentsOf: configURL),
               let values = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            // A course whose settings cannot be read is not offered. Copying
-            // it would produce a folder that becomes a reference course of
-            // nothing, and the teacher can do nothing about it from here.
-            return nil
+            // SHOWN, and not tickable. Copying it would make a reference
+            // course of nothing — but leaving the row out told a teacher
+            // whose only course was this one that the folder held no courses,
+            // which is a different thing and sends them somewhere else.
+            return FoundCourse(
+                folderName: courseURL.lastPathComponent,
+                courseCode: courseURL.lastPathComponent,
+                courseName: "",
+                sectionNumbers: [],
+                pageCount: 0,
+                fileCount: 0,
+                byteCount: 0,
+                problem: ReferenceImportWording.settingsCouldNotBeRead,
+                suggestedSchoolYear: nil,
+                directoryURL: courseURL
+            )
         }
 
         var courseCode: String = ""
@@ -336,6 +404,14 @@ nonisolated struct ReferenceImportSource: Sendable {
             courseAt: courseURL, leavingBehind: leftBehindNames
         )
 
+        // A folder inside the course that the disk will not hand over is said
+        // HERE, before anything is copied, rather than discovered half way
+        // through the copy — and the row cannot be ticked.
+        var problem: String?
+        if let unreadable = walked.unreadableFolders.first {
+            problem = ReferenceImportWording.couldNotReadFolder(folder: unreadable)
+        }
+
         return FoundCourse(
             folderName: courseURL.lastPathComponent,
             courseCode: courseCode,
@@ -344,9 +420,9 @@ nonisolated struct ReferenceImportSource: Sendable {
             pageCount: walked.pageCount,
             fileCount: walked.fileCount,
             byteCount: walked.byteCount,
-            leftBehind: walked.leftBehind,
+            problem: problem,
             suggestedSchoolYear: ReferenceImportSource.suggestedSchoolYear(
-                fromPagesChangedIn: walked.pageYears
+                fromPagesChangedIn: walked.pageYears, on: day
             ),
             directoryURL: courseURL
         )

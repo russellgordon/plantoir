@@ -326,6 +326,11 @@
         "why": "Written per COURSE, because a run of four that imports three is the ordinary shape of this and 'the import failed' is exactly the report that cannot be looked into. Without it, a teacher who ticked four courses and found three has nothing to point at, and the one that is missing is the one they will ask about."
       },
       {
+        "carries": "which course an unfinished import was going to be",
+        "event": "unfinished import for reference tidied away",
+        "why": "A reference course is built under a hidden name and renamed into place last, so an import the app never finished leaves a folder nothing can see - and therefore nothing would ever remove. This is the line that says the disk space came back, and the answer to 'my import did not finish and now there is no trace of it'."
+      },
+      {
         "carries": "the course that was in hand and was not kept, and the name of the folder it was coming from",
         "event": "course import for reference stopped",
         "why": "Its own event rather than a failure: a teacher who presses Stop chose to, and a line calling that a failure is a line that misleads whoever reads it back. It is also what explains a folder that is NOT there - the course in hand is removed on the way out, so without this line the trail shows an import that started and nothing about how it ended."
@@ -4018,6 +4023,24 @@
             "expect": "refused",
             "refusal": "insideTheFolderYouHaveOpen",
             "why": "Copying a folder into itself is a folder inside itself, and the build output link would loop."
+          },
+          {
+            "name": "a folder that HOLDS the one already open",
+            "tree": ["courses/ICS3U/course_config.json", "inner/courses/ICS4U/course_config.json"],
+            "choose": ".",
+            "openFolderIsAChildNamed": "inner",
+            "expect": "refused",
+            "refusal": "holdsTheFolderYouHaveOpen",
+            "why": "The other direction of the same fault, and the one that had a sentence and no case until 2026-09-20."
+          },
+          {
+            "name": "a course folder that is not in a courses folder",
+            "tree": ["Desktop/ICS3U/course_config.json", "Desktop/ICS4U/course_config.json"],
+            "choose": "Desktop/ICS4U",
+            "expect": "accepted",
+            "expectCourses": ["ICS4U"],
+            "expectTicked": ["ICS4U"],
+            "why": "Resolving upward offers what is BESIDE the course, which is right inside a courses folder and wrong anywhere else: a course folder dragged onto the Desktop would otherwise offer every course-shaped folder on the Desktop, and name the home folder as the source. On its own instead."
           }
         ]
       },
@@ -4045,7 +4068,7 @@
           {"what": ".internal/activity", "why": "Leases name processes on whichever machine wrote them, so a copied one names a process that was never doing anything here."}
         ],
         "kept": [
-          {"what": ".obsidian", "why": "The course may be opened in Obsidian, and Plantoir opens the course folder AS a vault. Without it the vault opens with first-run prompts, none of the teacher's plugins or appearance, and none of the folder state that makes last year's material navigable. 312 KB against a 489 MB course. Its workspace.json holds paths into the OLD folder, which are dead links Obsidian rewrites on first open; not worth stripping."},
+          {"what": ".obsidian", "why": "The course may be opened in Obsidian, and Plantoir opens the course folder AS a vault. Without it the vault opens with first-run prompts, none of the teacher's plugins or appearance, and none of the folder state that makes last year's material navigable. 312 KB against a 489 MB course. Its workspace.json was MEASURED on a real imported course rather than assumed: every path in it is vault-relative (main/left/right/left-ribbon/active/lastOpenFiles), with no absolute path and no mention of the old folder, so it resolves inside the new course as it stands. Nothing needs stripping and nothing needs registering - the app opens a vault by path and registers nothing itself."},
           {"what": "the site markers", "why": "Copied, then renamed aside by the same neutralisation route 1 uses. The file holds the site id and the admin address, which a teacher may still want."},
           {"what": "every page's own visibility", "why": "A reference course is a faithful record of what students actually saw. The frontmatter of a page is NEVER rewritten on import - the build already reads the older draft: true/false correctly."}
         ]
@@ -4089,9 +4112,22 @@
           }
         ]
       },
+      "nothingIsVisibleUntilItIsSafe": {
+        "rule": "A course is copied under a HIDDEN name inside courses/ - a folder whose name begins with a fixed prefix - and is marked, filed under its year, neutralised and locked THERE. The last act is a rename into its real name, which is atomic within one folder. Nothing under courses/ is ever a course that is not already a reference course. The same staging is used by BOTH ways one is made.",
+        "why": "Until 2026-09-20 the copy was made at its final name, so for the length of the copy the folder held last year's REAL site markers beside settings with no marker and no deploy_target - which reads as Netlify. Measured: a launcher run against that half-made folder does not refuse at all. A crash, a quit or a power cut in that window left an ordinary-looking live course in the sidebar with a working Deploy button aimed at last year's class site, and if the source was itself frozen the leftover could not even be deleted. The window was about two seconds for a file system that clones, and the WHOLE COPY on an external disk - which is the case the importer is written for.",
+        "hiddenFromWhat": [
+          {"what": "the sidebar's own course discovery", "why": "It skips hidden entries. Pinned by a test rather than assumed."},
+          {"what": "the backups list", "why": "The same. Pinned by a test."},
+          {"what": "the archives list", "why": "The same. Pinned by a test."},
+          {"what": "the launchers", "why": "They take a course CODE and build courses/<CODE>, and a code may not begin with a dot, so nothing on the command line can name one."}
+        ],
+        "sweptOnLoad": "Leftovers are removed when a working folder is read - unlock first, because the lock is applied before the rename and a locked tree refuses to be removed - and ONE trail line says which courses they were going to be. Matched on the exact prefix and nothing else: a teacher's own dot-folder is never ours to take.",
+        "rejected": "Staging OUTSIDE courses/ (the system temporary folder). It is a different volume, so the last step would be a copy rather than a rename - the whole window back again, and twice the bytes."
+      },
       "oneCourseFailingDoesNotStopTheRest": {
         "rule": "Each ticked course is imported on its own. One that cannot be - its code is already kept for reference under that school year, its folder could not be read, the disk filled - is reported for that course, by name, with what happened, and the run carries on to the next. Only the teacher pressing Stop ends a run early.",
         "why": "A folder of four courses where one has a problem must import three. An import that abandons everything at the first trouble makes the teacher work out which of the four it was, and do the other three again.",
+        "theSheetMarksTheROW": "A course that cannot be filed - its code is already kept for reference under that school year - is marked BESIDE ITS OWN ROW and the others can still be imported. Refusing the whole button for one clash put this rule out of a teacher's reach: they had to notice which row it was and untick it. Import is offered while at least one ticked course can come across.",
         "nothingHalfMade": "Whatever was being made when a course failed - or when the teacher stopped it - is UNLOCKED and then removed, in that order. removeItem and rm -rf both refuse a locked tree, and a half-made folder the teacher can delete from neither the app nor Finder is a worse outcome than the failure that produced it. Possible at all only because the lock is the last step of making a reference course."
       },
       "wording": {
@@ -4104,6 +4140,8 @@
         "holdsTheFolderYouHaveOpen": "{folder} holds the folder you already have open. Choose a folder somewhere else.",
         "courseSummary": "{sections} · {pages} · {size}",
         "schoolYearLabel": "School year",
+        "settingsCouldNotBeRead": "Its settings could not be read, so it cannot be brought across.",
+        "couldNotReadFolder": "{folder} could not be read, so this course was left as it is.",
         "builtWebsitesAreNotCopied": "Last year's finished websites are not copied. Preview a course and Plantoir builds it again.",
         "importButton": "Import",
         "tickSomething": "Tick the courses you want to keep for reference.",

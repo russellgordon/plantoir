@@ -132,7 +132,7 @@ struct ImportCoursesForReferenceSheet: View {
     /// The courses that are ticked, with the year each is filed under.
     var requests: [ReferenceImporter.Request] {
         var result: [ReferenceImporter.Request] = []
-        for course in courses where ticked.contains(course.id) {
+        for course in courses where ticked.contains(course.id) && course.problem == nil {
             result.append(ReferenceImporter.Request(
                 course: course, schoolYear: schoolYear(for: course)
             ))
@@ -140,27 +140,58 @@ struct ImportCoursesForReferenceSheet: View {
         return result
     }
 
-    /// What is wrong with the choices as they stand, or nil. The same rule
-    /// the importer applies, said before the teacher presses the button
-    /// rather than afterwards.
+    /// What is wrong with a course as the choices stand, by folder name.
+    ///
+    /// The same rule the importer applies, said before the teacher presses
+    /// the button rather than afterwards — and said **per row**, because one
+    /// course that clashes must not stop the other three. That is the
+    /// contract's own `oneCourseFailingDoesNotStopTheRest`, and disabling the
+    /// button for all of them put it out of a teacher's reach.
+    var troubleByCourse: [String: String] {
+        var result: [String: String] = [:]
+        var shelved: [ReferenceCourseRule.Shelved] = workspace.shelvedReferenceCourses(on: today)
+        for course in courses {
+            if let problem = course.problem {
+                result[course.id] = problem
+                continue
+            }
+            guard ticked.contains(course.id) else {
+                continue
+            }
+            let year: Int? = schoolYear(for: course)
+            if let trouble = ReferenceCourseRule.trouble(
+                placing: course.courseCode, inYear: year, among: shelved
+            ) {
+                result[course.id] = trouble.sentence
+                continue
+            }
+            // Counted as taken for the rows below it, exactly as the importer
+            // counts a course it has just brought across.
+            shelved.append(ReferenceCourseRule.Shelved(
+                displayCode: course.courseCode, schoolYear: year, folderName: course.folderName
+            ))
+        }
+        return result
+    }
+
+    /// What to say under the list when nothing can be imported at all.
     var entryProblem: String? {
         if requests.isEmpty {
             return ReferenceImportWording.tickSomething
         }
-        var shelved: [ReferenceCourseRule.Shelved] = workspace.shelvedReferenceCourses(on: today)
-        for request in requests {
-            if let trouble = ReferenceCourseRule.trouble(
-                placing: request.course.courseCode, inYear: request.schoolYear, among: shelved
-            ) {
-                return trouble.sentence
-            }
-            shelved.append(ReferenceCourseRule.Shelved(
-                displayCode: request.course.courseCode,
-                schoolYear: request.schoolYear,
-                folderName: request.course.folderName
-            ))
+        if canImport {
+            return nil
         }
-        return nil
+        return ReferenceImportWording.tickSomething
+    }
+
+    /// True while at least one ticked course can actually come across.
+    var canImport: Bool {
+        let trouble: [String: String] = troubleByCourse
+        for request in requests where trouble[request.course.id] == nil {
+            return true
+        }
+        return false
     }
 
     // MARK: - Body
@@ -270,7 +301,7 @@ struct ImportCoursesForReferenceSheet: View {
                     startImporting()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(entryProblem != nil)
+                .disabled(!canImport)
                 .accessibilityIdentifier("importButton")
             }
         }
@@ -293,9 +324,20 @@ struct ImportCoursesForReferenceSheet: View {
                     ))
                     .font(.callout)
                     .foregroundStyle(.secondary)
+
+                    // Why this one cannot come across, beside the row it is
+                    // about rather than as one sentence under the list.
+                    if let trouble = troubleByCourse[course.id] {
+                        Text(trouble)
+                            .font(.callout)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("importTrouble-\(course.folderName)")
+                    }
                 }
             }
             .toggleStyle(.checkbox)
+            .disabled(course.problem != nil)
             .accessibilityIdentifier("importTick-\(course.folderName)")
 
             Spacer()
@@ -419,7 +461,8 @@ struct ImportCoursesForReferenceSheet: View {
         let outcome: ReferenceImportSource.Outcome = await ReferenceImportSource.read(
             chosen: chosenURL,
             workingFolderURL: workspace.workspaceURL,
-            leavingBehind: ReferenceImporter.leftBehindNames
+            leavingBehind: ReferenceImporter.leftBehindNames,
+            on: today
         )
         switch outcome {
         case .refused(let refusal):

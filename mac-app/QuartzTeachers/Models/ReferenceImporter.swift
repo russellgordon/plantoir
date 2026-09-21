@@ -149,10 +149,19 @@ enum ReferenceImporter {
                 continue
             }
 
+            // Built under a HIDDEN name and renamed into place as the last
+            // act, so nothing under `courses/` is ever a course that is not
+            // already a reference course. `ReferenceStaging` says why.
+            let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
+                ReferenceStaging.stagingName(for: folderName)
+            )
+            ReferenceStaging.remove(at: stagingURL)
+
             do {
                 let made: ReferenceCopier.Made = try await ReferenceImporter.importOneCourse(
                     request,
                     named: folderName,
+                    stagedAt: stagingURL,
                     into: destinationURL,
                     leavingBehind: namesToLeaveBehind,
                     courseNumber: courseNumber,
@@ -174,7 +183,9 @@ enum ReferenceImporter {
                 // Stopped by the teacher. What was in hand is removed —
                 // unlocked first, because a source that was itself frozen
                 // hands its locks to the copy — and the run ends here.
-                ReferenceImporter.removeWhatWasHalfMade(at: destinationURL)
+                ReferenceImporter.tidyAway(
+                    stagingURL, course: displayCode, broughtInFrom: sourceFolderURL
+                )
                 ActivityTrail.note(
                     .courseImportForReferenceStopped,
                     ReferenceImporter.stoppedTrailLine(
@@ -184,7 +195,9 @@ enum ReferenceImporter {
                 outcomes.append(.stopped)
                 return outcomes
             } catch {
-                ReferenceImporter.removeWhatWasHalfMade(at: destinationURL)
+                ReferenceImporter.tidyAway(
+                    stagingURL, course: displayCode, broughtInFrom: sourceFolderURL
+                )
                 let reason: String = error.localizedDescription
                 ActivityTrail.note(
                     .courseCouldNotBeImportedForReference,
@@ -222,10 +235,12 @@ enum ReferenceImporter {
 
     // MARK: - Private helpers
 
-    /// One course: read it, copy it, and make it into a reference course.
+    /// One course: read it, copy it under a hidden name, make it into a
+    /// reference course THERE, and rename it into place as the last act.
     private static func importOneCourse(
         _ request: Request,
         named folderName: String,
+        stagedAt stagingURL: URL,
         into destinationURL: URL,
         leavingBehind leftBehindNames: Set<String>,
         courseNumber: Int,
@@ -243,6 +258,13 @@ enum ReferenceImporter {
             courseAt: sourceURL, leavingBehind: leftBehindNames
         )
 
+        // A folder the old disk will not hand over is never skipped in
+        // silence: the course is refused, naming the folder. An import that
+        // copied none of it and reported success is the quiet kind of loss.
+        if let unreadable = survey.unreadableFolders.first {
+            throw ReferenceTreeCopier.Trouble.couldNotRead(name: unreadable)
+        }
+
         progress(Progress(
             courseCode: displayCode,
             courseNumber: courseNumber,
@@ -251,11 +273,11 @@ enum ReferenceImporter {
             totalBytes: survey.byteCount
         ))
 
-        try fileManager.createDirectory(at: destinationURL, withIntermediateDirectories: false)
+        try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
 
         let totalBytes: Int64 = survey.byteCount
         try await ReferenceTreeCopier.copy(
-            survey, from: sourceURL, into: destinationURL
+            survey, from: sourceURL, into: stagingURL
         ) { copiedBytes in
             Task { @MainActor in
                 progress(Progress(
@@ -273,21 +295,41 @@ enum ReferenceImporter {
         // then its site markers cannot be renamed aside and the folder cannot
         // be removed either. Cleared HERE, immediately, so what follows works
         // on an ordinary folder and the "lock LAST" order still holds.
-        ReferenceLock.clearLock(at: destinationURL)
+        ReferenceLock.clearLock(at: stagingURL)
 
         // Leases name processes on whichever machine wrote them, so a copied
         // one names a process that was never doing anything here.
         try? fileManager.removeItem(
-            at: destinationURL.appendingPathComponent(".internal").appendingPathComponent("activity")
+            at: stagingURL.appendingPathComponent(".internal").appendingPathComponent("activity")
         )
 
-        return try ReferenceCopier.makeIntoAReferenceCourse(
-            at: destinationURL, schoolYear: request.schoolYear
+        // Marked, filed, neutralised and LOCKED while still hidden.
+        let staged: ReferenceCopier.Made = try ReferenceCopier.makeIntoAReferenceCourse(
+            at: stagingURL, schoolYear: request.schoolYear
+        )
+
+        // The one step that makes it visible, and the only one that has to be
+        // atomic: a rename within `courses/`. Measured: a folder whose
+        // contents carry the lock renames cleanly, and the lock survives.
+        try fileManager.moveItem(at: stagingURL, to: destinationURL)
+
+        // `staged` was made under the hidden name, so the folder it reports
+        // is that one; everything else in it — the code a teacher reads, the
+        // year, the section count — was read from the settings and is right.
+        return ReferenceCopier.Made(
+            folderName: folderName,
+            displayCode: staged.displayCode,
+            schoolYear: staged.schoolYear,
+            sectionCount: staged.sectionCount
         )
     }
 
-    /// The walk, off the main actor. `nonisolated async` is what moves it
-    /// there; see `ReferenceTreeCopier.copy`.
+    /// The walk, off the main actor.
+    ///
+    /// `@concurrent` is what moves it there — a plain `nonisolated async`
+    /// function runs on its CALLER's actor in this project, which is the main
+    /// one here. See `ReferenceTreeCopier.copy` for the measurement.
+    @concurrent
     private nonisolated static func surveyOffTheMainActor(
         courseAt courseURL: URL,
         leavingBehind leftBehindNames: Set<String>
@@ -295,14 +337,28 @@ enum ReferenceImporter {
         return ReferenceTreeCopier.survey(courseAt: courseURL, leavingBehind: leftBehindNames)
     }
 
-    /// Takes away a folder this run made and did not finish.
+    /// Takes away the hidden folder this run made and did not finish.
     ///
     /// **Unlock, then remove, and in that order** — `removeItem` refuses a
     /// locked tree outright, and a half-made folder the teacher can delete
     /// from neither the app nor Finder is a worse outcome than the failure
     /// that produced it.
-    private static func removeWhatWasHalfMade(at destinationURL: URL) {
-        ReferenceLock.clearLock(at: destinationURL)
-        try? FileManager.default.removeItem(at: destinationURL)
+    ///
+    /// **A removal that FAILS says so on the trail**, rather than leaving the
+    /// run to look tidy while a folder full of last year's material sits
+    /// there. Nothing is put in front of the teacher: the folder is hidden,
+    /// the next time this working folder is read it is swept
+    /// (`ReferenceStaging.sweepLeftovers`), and the one thing they asked
+    /// about — the course — is already reported as not imported.
+    private static func tidyAway(_ stagingURL: URL, course: String, broughtInFrom sourceFolderURL: URL) {
+        if ReferenceStaging.remove(at: stagingURL) {
+            return
+        }
+        ActivityTrail.note(
+            .courseCouldNotBeImportedForReference,
+            "could not tidy away the unfinished import of \(course) "
+            + "from \(sourceFolderURL.lastPathComponent) — it is tidied away "
+            + "the next time this working folder is opened"
+        )
     }
 }
