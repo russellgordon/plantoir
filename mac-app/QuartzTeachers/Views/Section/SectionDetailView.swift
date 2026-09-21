@@ -185,7 +185,10 @@ struct SectionDetailView: View {
     /// part of the section's name, and "Deploying ICS3U-S1 — Edited" reads
     /// as though "Edited" were something being deployed.
     var sectionName: String {
-        return "\(course.code)-S\(sectionNumber)"
+        // `displayCode`: a reference course's window says "ICS3U-S1", never
+        // "ICS3U-2025-S1". Identical to `code` for every course a teacher
+        // teaches.
+        return "\(course.displayCode)-S\(sectionNumber)"
     }
 
     /// What the window's title bar says — the name, plus the marker when
@@ -496,7 +499,16 @@ struct SectionDetailView: View {
         .alert(healthAlertTitle, isPresented: healthDialogBinding) {
             switch healthDialog {
             case .findings:
-                if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
+                // No repair on a course kept for reference. The findings
+                // themselves still REPORT — a teacher may want to know a
+                // folder is missing — but the button would have offered to
+                // fix it and then said "That is already put right. Nothing
+                // needed changing." about a folder that is really gone,
+                // because the repair returns no attempts and the zero-attempt
+                // branch reads as "nothing needed doing". Found by review,
+                // 2026-09-20.
+                if !course.isKeptForReference,
+                   let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
                     Button(title) {
                         // The marker is refreshed because a repair CHANGES the
                         // section's content on the teacher's behalf, and
@@ -1030,7 +1042,7 @@ struct SectionDetailView: View {
         // from a second Mac, is not locked until somebody asks. Cheap — a
         // stat per file, measured at ~23 ms on a 1,220-file course — and
         // quiet unless it actually had to lock something.
-        ReferenceLock.ensureLocked(course)
+        ReferenceLock.ensureLockedInBackground(course)
         // The folder this preview belongs to, noted at the moment it is
         // decided — which is HERE, not at the appearance. The appearance
         // notes only the key this section registered under, and it can

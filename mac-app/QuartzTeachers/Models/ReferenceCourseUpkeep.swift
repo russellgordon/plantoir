@@ -30,6 +30,40 @@ enum ReferenceCourseUpkeep {
 
     // MARK: - Functions
 
+    /// The whole upkeep, with the LOCK WALK off the main actor.
+    ///
+    /// What stays on the main actor is what must: reading the courses, and
+    /// the scheduled-deploy cancel, which touches `launchctl` through an
+    /// injected runner a test replaces. The walk — a `stat` per file, ~24 ms
+    /// with nothing to do and ~80 ms on a full pass — is what a teacher would
+    /// otherwise wait for after every sheet, and it goes to the pool.
+    ///
+    /// The synchronous version below is kept for the copier, which locks as
+    /// its LAST step and must know it happened, and for the tests.
+    static func bringUpToDateInBackground(
+        _ courses: [Course],
+        inWorkingFolder workingFolderURL: URL?,
+        runner: LaunchControlRunning = LaunchControl()
+    ) {
+        for course in courses where course.isKeptForReference {
+            ReferenceLock.ensureLockedInBackground(course)
+            guard let workingFolderURL else {
+                continue
+            }
+            let agents: [ScheduledDeploy.Agent] = ScheduledDeployCleanup.agentsOwnedBy(
+                courseCode: course.code, sectionNumber: nil, inWorkingFolder: workingFolderURL
+            )
+            if agents.isEmpty {
+                continue
+            }
+            ScheduledDeployCleanup.cancel(
+                agents: agents, because: .theCourseIsKeptForReference, runner: runner
+            )
+        }
+    }
+
+    // MARK: - Functions
+
     /// Brings every reference course among these back to what it claims to
     /// be, and reports what it had to do.
     @discardableResult
@@ -40,11 +74,15 @@ enum ReferenceCourseUpkeep {
     ) -> ReferenceLock.Outcome {
         var lockedInAll: Int = 0
         var didNotTakeInAll: Int = 0
+        var walkedInAll: Int = 0
+        var lockedAfterwardsInAll: Int = 0
 
         for course in courses where course.isKeptForReference {
             let outcome: ReferenceLock.Outcome = ReferenceLock.ensureLocked(course)
             lockedInAll += outcome.locked
             didNotTakeInAll += outcome.didNotTake
+            walkedInAll += outcome.walked
+            lockedAfterwardsInAll += outcome.lockedAfterwards
             if !outcome.isQuiet {
                 ActivityTrail.note(
                     .referenceCoursePagesLockedAgain,
@@ -71,7 +109,12 @@ enum ReferenceCourseUpkeep {
             )
         }
 
-        return ReferenceLock.Outcome(locked: lockedInAll, didNotTake: didNotTakeInAll)
+        return ReferenceLock.Outcome(
+            locked: lockedInAll,
+            didNotTake: didNotTakeInAll,
+            walked: walkedInAll,
+            lockedAfterwards: lockedAfterwardsInAll
+        )
     }
 
     /// The line the trail carries when a pass really did something.
@@ -89,8 +132,13 @@ enum ReferenceCourseUpkeep {
         }
         if outcome.didNotTake > 0 {
             let pages: String = outcome.didNotTake == 1 ? "1 page" : "\(outcome.didNotTake) pages"
-            line += "; \(pages) would not stay locked this time, which is what a folder kept in "
-                  + "iCloud Drive does while it is uploading"
+            // The COUNT and nothing else. This used to name a cause — "which
+            // is what a folder kept in iCloud Drive does while it is
+            // uploading" — and that is a confident wrong diagnosis on the one
+            // other case that produces the same count: a volume with no
+            // support for the flag at all, where NOTHING can ever be locked.
+            // Say what happened; let whoever reads the report work out why.
+            line += "; \(pages) would not stay locked this time"
         }
         return line
     }

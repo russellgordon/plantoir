@@ -441,6 +441,11 @@ nonisolated enum ActivityTrail {
         /// when a pass actually did something, so a folder in a steady state
         /// leaves no lines at all.
         case referenceCoursePagesLockedAgain = "reference course pages locked again"
+
+        /// A reference course was filed under a different school year — the
+        /// one thing about a frozen course a teacher can still change.
+        /// Carries the code they read, the folder, and both years.
+        case referenceCourseSchoolYearChanged = "reference course school year changed"
     }
 
     // MARK: - Stored properties

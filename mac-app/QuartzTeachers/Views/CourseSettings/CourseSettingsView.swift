@@ -292,7 +292,7 @@ struct CourseSettingsView: View {
             }
             .padding(12)
         }
-        .navigationTitle(course.code)
+        .navigationTitle(course.displayCode)
         .toolbar {
             ToolbarItem {
                 Button("Open in Obsidian", systemImage: "square.and.pencil") {
