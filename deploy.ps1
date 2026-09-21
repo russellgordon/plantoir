@@ -267,6 +267,15 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
   # contracts/shared-rules.json -> referenceCourses.markerAgreement.
   # A marker that is there with a value that is neither true nor false. Same
   # rule and the same sentence as the bash twin.
+  # An object KEY written with a \u escape — see the bash twin for why, and
+  # why VALUES are left alone.
+  if ($referenceText -cmatch '[{,]\s*"[^"]*\\u[0-9a-fA-F]{4}[^"]*"\s*:') {
+    Write-Host ""
+    Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
+    Write-Host "   its settings say something other than true or false. Nothing was published."
+    Write-Host ""
+    exit 1
+  }
   if (($referenceText -cmatch '"[^"]*ept_for_reference"') -and
       -not ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Tt][Rr][Uu][Ee]') -and
       -not ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Ff][Aa][Ll][Ss][Ee]')) {

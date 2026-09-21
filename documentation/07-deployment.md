@@ -1062,12 +1062,12 @@ is why `verify.sh` greps **both** `deploy.sh` and `deploy.ps1` for this guard
 as well as for that one. The structural check costs six lines and makes the
 Windows obligation visible from this side rather than only in an issue.
 
-### Three readers, one rule — and the table that keeps them honest
+### FOUR readers, one rule — and the table that keeps them honest
 
-`scripts/reference_course.py`, `deploy.sh` and `deploy.ps1` all answer "is this
-course kept for reference?", and two of them have no JSON parser. So the
-question is ONE regular expression over the whole settings file as a single
-string, in three dialects, with a table of seventeen inputs all three are
+The APP, `scripts/reference_course.py`, `deploy.sh` and `deploy.ps1` all answer
+"is this course kept for reference?", and two of them have no JSON parser. So
+the question is ONE regular expression over the whole settings file as a single
+string, in three dialects, with a table of **twenty-six** inputs all four are
 asserted to agree on:
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `referenceCourses.markerAgreement`, run by `scripts/test_reference_course.py`
@@ -1079,8 +1079,21 @@ newline: a config whose key and colon sat on different lines was a reference
 course to the Python and an ordinary course to the launcher — and the launcher
 published it, exit 0, `✅ Published: 1 file(s) updated.` Found by review on
 2026-09-20. The cure is `tr '\n' ' '` before the `grep`, which also makes bash
-agree with PowerShell, whose `-match` uses .NET regex where `\s` already
-matches a newline.
+agree with PowerShell, whose `-cmatch` uses .NET regex where `\s` already
+matches a newline. (`-cmatch`, not `-match`: PowerShell's default match is
+case-INSENSITIVE and that applied to the KEY as well, so
+`"KEPT_FOR_REFERENCE": true` refused on Windows while the mac and the Python
+allowed it. JSON keys are case-sensitive; the value's case is written out
+instead.)
+
+**The app is the fourth reader, and it joined after it disagreed.** Measured:
+`JSONSerialization` hands back an `NSNumber` for `1`, and `NSNumber`
+conditionally bridges to `Bool` for 0 and 1 — so `"kept_for_reference": 1`
+read TRUE in the app, which FROZE AND LOCKED the course, while all three
+launchers read the same file as ordinary and deployed it. The app now reads
+this one key through `CFBooleanGetTypeID`, and every row of the table states
+what the app reads it as, with one invariant asserted on both sides:
+**wherever the app says reference, every launcher must refuse.**
 
 Two decisions inside the table are worth carrying:
 
@@ -1088,16 +1101,35 @@ Two decisions inside the table are worth carrying:
   wrongly refused is loud and harmless, a reference course wrongly deployed
   reports success. So a marker nested inside another object is refused, even
   though a JSON parser would not call it the top-level key.
-- **Except where the APPS decide it.** A marker whose value is the string
-  `"true"`, or the number `1`, reads as FALSE in `CourseConfiguration` on both
-  platforms — so that course is in the sidebar and its Deploy button works.
-  A launcher refusing it would disagree with the app about the same file,
-  which protects nothing and strands the teacher between two answers.
+- **"Cannot tell" for anything somebody plainly MEANT.** A marker whose value
+  is the string `"true"`, the number `1`, `True`, or whose key is written with
+  `\u` escapes, is refused with a sentence of its own — which publishes
+  nothing and freezes nothing. The app reads a real JSON boolean and nothing
+  else, so it shows an ordinary course, and the launcher's refusal is what the
+  teacher meets. Leniency in the APP was considered and rejected: its reading
+  locks the course, with no way back, so a false positive there is not loud
+  and harmless.
 
-And one measured surprise, kept in the table because it looks like a hazard and
-is not: the marker's own text inside a course NAME does not match any of the
-three patterns, because JSON escapes the quotes inside a string value. The
-escaping is what tells a value from a key, for free, in all three dialects.
+And the exact surface, because "no pattern matches a value" turned out to be
+only half true: a config is refused when it carries a **quoted token — key or
+value — whose text ends in the key's tail** and is not followed by `true` or
+`false`. The marker's own text reaches a VALUE only through escaped quotes,
+which never match, so no realistic config is refused; what would be is a
+course name, folder name or path that literally ends in `ept_for_reference`.
+The one shape refused with the *reference-course* sentence rather than "cannot
+tell" is a key like `accept_for_reference`, and it is a row in the table so the
+surface is written down rather than discovered.
+
+**A key written with `\u` escapes is refused whatever the key is** — that rule
+is about the ESCAPE, not the marker. A key escaped all the way through is
+decoded by the app, which freezes and locks the course, while a text reader
+sees nothing at all: measured, it deployed. Every key Plantoir and the shared
+Python write is plain ASCII. **Values are deliberately left alone**, because
+`json.dump` escapes non-ASCII there by default and accents and emoji are
+ordinary; the `[{,]` anchor is what tells a key from a value. Proven against
+copies of the four real previous-generation configs, all 38 example-content
+payloads and hand-made values carrying escaped quotes and colons: no false
+refusal.
 
 ### Plain shell, failing CLOSED, and no new exit code
 

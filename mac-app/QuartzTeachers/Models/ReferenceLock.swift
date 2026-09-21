@@ -63,14 +63,12 @@ nonisolated enum ReferenceLock {
         /// slower machine.
         let didNotTake: Int
 
-        // MARK: - Computed properties
+        /// How many files SHOULD be locked, counted by an INDEPENDENT
+        /// census — a plain full enumeration with no skip logic at all.
+        let shouldBeLocked: Int
 
-        /// How many files the walk SAW — every content file in the course,
-        /// after the never-locked names are taken out.
-        let walked: Int
-
-        /// How many of those are locked when the pass finishes.
-        let lockedAfterwards: Int
+        /// How many of them the file system says are locked, asked afterwards.
+        let lockedOnDisk: Int
 
         // MARK: - Computed properties
 
@@ -79,14 +77,34 @@ nonisolated enum ReferenceLock {
             return locked == 0 && didNotTake == 0
         }
 
-        /// True when every file the walk saw is locked.
+        /// True when the course really is frozen.
         ///
-        /// The check the old `Outcome` could not make. It is not a promise
-        /// that the WALK was complete — nothing inside this type can know
-        /// that — which is why `walked` is carried too, and why the test that
-        /// pins the walk counts files on disk rather than asking here.
-        var everythingWalkedIsLocked: Bool {
-            return lockedAfterwards == walked
+        /// **Independent of the walk, which is the whole point.** The first
+        /// version of this compared two numbers the walk itself produced —
+        /// algebraically `didNotTake == 0` — so the broken walk reported
+        /// success with nine pages editable on disk. A census taken with no
+        /// skip logic is the only count that can see a walk that stopped
+        /// early: it is the 934 against the walk's 842.
+        ///
+        /// What it gates: the sentence that tells a teacher the pages are
+        /// locked. If this is false, that sentence is not shown.
+        var everythingThatShouldBeLockedIs: Bool {
+            return shouldBeLocked == lockedOnDisk
+        }
+    }
+
+    /// What a course looks like on disk, counted independently of the walk.
+    struct Census: Equatable {
+
+        // MARK: - Stored properties
+
+        let shouldBeLocked: Int
+        let lockedOnDisk: Int
+
+        // MARK: - Computed properties
+
+        var agrees: Bool {
+            return shouldBeLocked == lockedOnDisk
         }
     }
 
@@ -145,7 +163,7 @@ nonisolated enum ReferenceLock {
     @discardableResult
     static func ensureLocked(_ course: Course) -> Outcome {
         guard course.isKeptForReference else {
-            return Outcome(locked: 0, didNotTake: 0, walked: 0, lockedAfterwards: 0)
+            return Outcome(locked: 0, didNotTake: 0, shouldBeLocked: 0, lockedOnDisk: 0)
         }
         return ReferenceLock.lock(courseDirectory: course.directoryURL)
     }
@@ -212,13 +230,18 @@ nonisolated enum ReferenceLock {
         return ReferenceLock.lock(courseDirectory: courseDirectory)
     }
 
-    /// Whether the last off-actor pass really ran off the main thread.
+    /// Whether the last pass ran on the main thread.
     ///
-    /// Written by `locking` and read by one test. A seam rather than an
-    /// assertion in the product, for the reason every other override here is
-    /// one: the thing worth pinning is a fact about the running program, and
-    /// an annotation that stops working silently is exactly what this feature
-    /// has already been bitten by once.
+    /// Written by every pass, from whichever actor is running it, and READ by
+    /// exactly one test — which is the whole arrangement and is why it is
+    /// `nonisolated(unsafe)`: two background walks can write it at once, and
+    /// a `Bool?` torn between two writers is still a `Bool?`. Nothing in the
+    /// product reads it or branches on it.
+    ///
+    /// A seam rather than an assertion, for the reason every other override
+    /// here is one: what is worth pinning is a fact about the running
+    /// program, and an annotation that silently stops working is what this
+    /// feature has already been bitten by once.
     nonisolated(unsafe) static var lastPassRanOnTheMainThread: Bool?
 
     /// The same, for a folder rather than a loaded course — what the copier
@@ -248,19 +271,74 @@ nonisolated enum ReferenceLock {
                 didNotTake += 1
             }
         }
+        // The census is taken AFTER the locking, by a different walk, and
+        // its numbers are the ones anything may act on. `walked` and
+        // `alreadyLocked` are the pass's own bookkeeping and go no further
+        // than this function — a count produced by the walk cannot audit the
+        // walk.
+        _ = walked
+        _ = alreadyLocked
+        let census: Census = ReferenceLock.census(courseDirectory: courseDirectory)
         return Outcome(
             locked: locked,
             didNotTake: didNotTake,
-            // Counted rather than assumed. A walk that silently skips part of
-            // the course used to report a perfectly healthy `locked` and
-            // `didNotTake: 0` — the count it had WALKED was the thing nobody
-            // was keeping, so the one number that could have shown the defect
-            // did not exist. `lockedAfterwards` is what every file the walk
-            // saw ended up as; a caller comparing it with `walked` can say
-            // whether the pass actually covered the course.
-            walked: walked,
-            lockedAfterwards: alreadyLocked + locked
+            shouldBeLocked: census.shouldBeLocked,
+            lockedOnDisk: census.lockedOnDisk
         )
+    }
+
+    /// What the course looks like on disk, counted with NO skip logic.
+    ///
+    /// A plain full enumeration: every regular file in the course, classified
+    /// by the never-locked rule alone, and then asked whether it is locked.
+    /// Deliberately not sharing a line of code with `contentFiles` — a census
+    /// that reused the walk would inherit the walk's bugs, which is exactly
+    /// how a broken walk came to report success.
+    ///
+    /// Symlinks are skipped (`.merged_output` is one and points out of the
+    /// folder); directories are not files.
+    static func census(courseDirectory: URL) -> Census {
+        let fileManager: FileManager = FileManager.default
+        guard let walker = fileManager.enumerator(
+            at: courseDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: []
+        ) else {
+            return Census(shouldBeLocked: 0, lockedOnDisk: 0)
+        }
+        var shouldBeLocked: Int = 0
+        var lockedOnDisk: Int = 0
+        for case let child as URL in walker {
+            let values: URLResourceValues? = try? child.resourceValues(
+                forKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+            )
+            if values?.isSymbolicLink == true || values?.isDirectory == true {
+                continue
+            }
+            // The never-locked rule, asked of the whole PATH rather than of
+            // the name alone — `.obsidian/workspace.json` is never locked
+            // because of the folder it is in.
+            if ReferenceLock.isNeverLocked(child.lastPathComponent) {
+                continue
+            }
+            var insideASkippedFolder: Bool = false
+            var folder: URL = child.deletingLastPathComponent()
+            while folder.path.count > courseDirectory.path.count {
+                if ReferenceLock.isNeverLocked(folder.lastPathComponent) {
+                    insideASkippedFolder = true
+                    break
+                }
+                folder = folder.deletingLastPathComponent()
+            }
+            if insideASkippedFolder {
+                continue
+            }
+            shouldBeLocked += 1
+            if ReferenceLock.isLocked(child) {
+                lockedOnDisk += 1
+            }
+        }
+        return Census(shouldBeLocked: shouldBeLocked, lockedOnDisk: lockedOnDisk)
     }
 
     /// Unlocks everything in the course, so it can be removed or restored
@@ -343,6 +421,12 @@ nonisolated enum ReferenceLock {
 
     /// Every file inside the course that the lock applies to: no directories,
     /// no symlinks, nothing under `neverLocked`.
+    /// The walk itself, for the one test that has to set a tree up the way a
+    /// broken pass would have left it.
+    static func contentFilesForTests(in courseDirectory: URL) -> [URL] {
+        return ReferenceLock.contentFiles(in: courseDirectory)
+    }
+
     private static func contentFiles(in courseDirectory: URL) -> [URL] {
         let fileManager: FileManager = FileManager.default
         guard let walker = fileManager.enumerator(

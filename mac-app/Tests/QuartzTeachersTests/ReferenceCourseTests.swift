@@ -397,6 +397,11 @@ final class ReferenceCourseTests: XCTestCase {
             ReferenceCourseRule.Trouble.codeAlreadyInThatYear(code: "{code}", schoolYear: nil).sentence,
             wording["codeAlreadyWithNoYear"] as? String
         )
+        XCTAssertEqual(
+            ReferenceWording.couldNotSetSchoolYear(course: "{course}"),
+            wording["couldNotSetSchoolYear"] as? String,
+            "The one sentence of this feature a Windows reader could not get as data."
+        )
     }
 
     /// The calm note claims no more than the measurements support.

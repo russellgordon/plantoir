@@ -1061,7 +1061,7 @@ def main():
         # FAIL CLOSED, the same way the launchers do: a settings file that is
         # there and will not open is not a settings file that says no.
         print(f"❌ Plantoir cannot tell whether {args.course} is kept for reference —")
-        print("   its settings file could not be read. Nothing was published.")
+        print(f"   {reference_course.why_cannot_tell(course_dir)}. Nothing was published.")
         sys.exit(1)
     if reference_course.is_reference(course_dir):
         print("❌ " + reference_course.refusal_sentence(

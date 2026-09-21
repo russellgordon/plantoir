@@ -62,8 +62,6 @@ enum ReferenceCourseUpkeep {
         }
     }
 
-    // MARK: - Functions
-
     /// Brings every reference course among these back to what it claims to
     /// be, and reports what it had to do.
     @discardableResult
@@ -74,15 +72,15 @@ enum ReferenceCourseUpkeep {
     ) -> ReferenceLock.Outcome {
         var lockedInAll: Int = 0
         var didNotTakeInAll: Int = 0
-        var walkedInAll: Int = 0
-        var lockedAfterwardsInAll: Int = 0
+        var shouldBeLockedInAll: Int = 0
+        var lockedOnDiskInAll: Int = 0
 
         for course in courses where course.isKeptForReference {
             let outcome: ReferenceLock.Outcome = ReferenceLock.ensureLocked(course)
             lockedInAll += outcome.locked
             didNotTakeInAll += outcome.didNotTake
-            walkedInAll += outcome.walked
-            lockedAfterwardsInAll += outcome.lockedAfterwards
+            shouldBeLockedInAll += outcome.shouldBeLocked
+            lockedOnDiskInAll += outcome.lockedOnDisk
             if !outcome.isQuiet {
                 ActivityTrail.note(
                     .referenceCoursePagesLockedAgain,
@@ -112,8 +110,8 @@ enum ReferenceCourseUpkeep {
         return ReferenceLock.Outcome(
             locked: lockedInAll,
             didNotTake: didNotTakeInAll,
-            walked: walkedInAll,
-            lockedAfterwards: lockedAfterwardsInAll
+            shouldBeLocked: shouldBeLockedInAll,
+            lockedOnDisk: lockedOnDiskInAll
         )
     }
 
@@ -129,6 +127,13 @@ enum ReferenceCourseUpkeep {
             line = "locked \(pages) of \(displayCode) again — it is kept for reference"
         } else {
             line = "checked that \(displayCode)’s pages are locked — it is kept for reference"
+        }
+        if !outcome.everythingThatShouldBeLockedIs {
+            // BOTH numbers, because the gap is the diagnostic: 842 against
+            // 934 is a walk that stopped early, and 0 against 934 is a volume
+            // that cannot carry the flag at all. This line is the only place
+            // either of those becomes visible.
+            line += "; \(outcome.lockedOnDisk) of \(outcome.shouldBeLocked) are locked"
         }
         if outcome.didNotTake > 0 {
             let pages: String = outcome.didNotTake == 1 ? "1 page" : "\(outcome.didNotTake) pages"

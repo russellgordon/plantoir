@@ -82,6 +82,23 @@ MARKER_PRESENT_PATTERN = r'"[^"]*ept_for_reference"'
 # The value written as a real JSON false.
 MARKER_FALSE_PATTERN = r'"[^"]*ept_for_reference"\s*:\s*[Ff][Aa][Ll][Ss][Ee]'
 
+# An object KEY written with a \u escape — any key, not just this one.
+#
+# A key escaped ALL the way through (`"\u006b\u0065pt_for_reference"`) is
+# decoded by the app and by this module's parsed half, which both call it a
+# reference course and freeze it — while a TEXT reader sees nothing and the
+# folder publish, which never enters the container, goes through at exit 0.
+# Measured. So the text readers refuse any config whose keys are escaped at
+# all: every key Plantoir or the shared Python writes is plain ASCII, so an
+# escaped key is never one of ours.
+#
+# **Keys only.** `json.dump` escapes non-ASCII in VALUES by default, so a
+# course name with an accent and every emoji setting legitimately carry
+# `\uXXXX` — refusing on those would refuse real courses. The `[{,]` anchor is
+# what tells a key from a value: a key follows an opening brace or a comma,
+# and a value never does.
+ESCAPED_KEY_PATTERN = r'[{,]\s*"[^"]*\\u[0-9a-fA-F]{4}[^"]*"\s*:'
+
 # The school year it was taught in, as the calendar year it STARTED in.
 SCHOOL_YEAR_KEY = "reference_school_year"
 
@@ -179,6 +196,8 @@ def cannot_tell(course_dir) -> bool:
     # because the launchers stop here. Refusing costs a teacher one puzzled
     # moment on a course they hand-edited; allowing costs them a frozen course
     # on the web.
+    if re.search(ESCAPED_KEY_PATTERN, text) is not None:
+        return True
     if re.search(MARKER_PATTERN, text) is not None:
         return False
     if re.search(MARKER_FALSE_PATTERN, text) is not None:
@@ -211,6 +230,22 @@ def display_code(course_dir) -> str:
     if isinstance(recorded, str) and recorded.strip():
         return recorded.strip()
     return Path(course_dir).name
+
+
+def why_cannot_tell(course_dir) -> str:
+    """
+    WHICH of the two reasons, so the sentence a teacher reads is true.
+
+    `deploy.py` printed "its settings file could not be read" for every cause,
+    including a file that opened perfectly well and simply said `1`.
+    """
+    path = Path(course_dir) / _CONFIG_NAME
+    try:
+        with open(path, "r", encoding="utf-8-sig") as handle:
+            handle.read()
+    except OSError:
+        return "its settings file could not be read"
+    return "its settings say something other than true or false"
 
 
 def refusal_sentence(course: str) -> str:

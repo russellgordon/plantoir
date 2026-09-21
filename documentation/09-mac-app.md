@@ -1394,9 +1394,18 @@ never entirely locked, and nothing looked wrong. Found by the branch-B
 implementer on 2026-09-20, in the real app.
 
 The cure is to ask whether the skipped thing IS a directory. The lesson is the
-other half: the pass now counts what it **walked** against what is locked
-afterwards, because the one number that could have shown this — how many files
-the walk saw — was the number nobody was keeping.
+other half, and the first attempt at it was wrong in a way worth recording: **a
+count produced BY the walk cannot audit the walk.** Comparing "how many the
+walk saw" with "how many of those are locked" is algebraically "nothing failed
+to take" — the broken walk passed it, with nine pages editable on disk.
+
+What runs now is an **independent census**: a plain full enumeration with no
+skip logic at all, classifying each regular file by the never-locked rule
+alone, and comparing what should be locked with what the file system says is.
+That is the 934 against the walk's 842. A mismatch goes on the trail with both
+numbers, and the sentence that tells a teacher their pages are locked is **not
+shown** — which also covers the volume that cannot carry the flag at all,
+where nothing could be locked and the old code said it was.
 
 **The walk runs off the caller's actor, and on this target that takes
 `@concurrent`.** `mac-app/project.yml` sets `SWIFT_APPROACHABLE_CONCURRENCY`,
@@ -1448,6 +1457,13 @@ hidden in the built site, that building again over the existing build works,
 and that the source comes back byte-for-byte and still locked. The hidden page
 uses the LEGACY `draft:` spelling deliberately, because `publish: false` needs
 no rewrite and would stay hidden even when the rewrite fails.
+
+**And what the mac's own limit hides from Windows.** `preview.ps1` and
+`deploy.ps1` point `PLANTOIR_WORK_DIR` at a HOST folder under `%LOCALAPPDATA%`
+and build natively rather than as root — so there a read-only attribute DOES
+travel into the build tree, the frontmatter rewrite WOULD fail, and a page the
+teacher hid WOULD be published. The trap the mac cannot reproduce is live on
+the other platform, and the `windows` issue says so.
 
 **What that gate is NOT.** The plan's ruling asked for a must-fail proof —
 the same case with mode 444 showing the hidden page — and it does not
