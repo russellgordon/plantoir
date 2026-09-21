@@ -4323,7 +4323,10 @@
         "rule": "After the page is written it is READ BACK FROM DISK and asked, for every section the destination has AND for one section number it does not have, whether it is hidden. The test is 'is not hidden', not 'is visible', so a value the app cannot read counts as failure. If the answer is not certainly hidden everywhere, the file just written is DELETED and the page is reported as not copied.",
         "nothingTouchesThePageAfterIt": "Media names are settled and the embeds rewritten BEFORE the page is written, so the read-back is the last thing that touches the page's bytes. The locked flag is cleared BEFORE the read-back, because a locked file could not be deleted - and deleting it is what the guard has to be able to do.",
         "why": "This is the last line of defence on the one failure that reports success: a page that arrives visible and is deployed to students. It errs toward no page at all.",
-        "theChecklistIsInTheFUTURE": "The screen that lists the linked pages is the one whose purpose is to let a teacher change their mind, so every sentence on it is in the future ('This will copy ...') and its counts are recomputed from the ticks as they stand. Measured: unticking ONE page of a real eleven-page set moved them by 67 MB, two files and one dead link. It said 'Copied 11 pages...' - the RESULT sentence - with a Copy button underneath it.",
+        "theChecklistIsInTheFUTURE": "The screen that lists the linked pages is the one whose purpose is to let a teacher change their mind, so EVERY sentence on it is in the future - the header, the size line, the rename line and every SKIP - and each has a twin keyed separately from the result screen's. Measured on the real app: it said 'Copied 11 pages...' (the result sentence) above a Copy button, and it said of a page nothing had been done to yet: 'is already in this course, so it was left as it is'.",
+        "theChecklistsROWSdoNotMOVE": "The rows are the full candidate set the FIRST plan found, in a stable order; only the numbers and the sentences below them are recomputed from the ticks. Drawing the list from the latest plan made an unticked page VANISH - a teacher could not put it back, or even see what they had turned off. Seen on the real app: unticking 'Command-Line Projects' removed its row. Tick state A to B and back to A must give the identical plan.",
+        "aPageSHOWNinsideanotherCOMESALONGwhileThatPageDoes": "A page embedded with ![[...]] is ticked and cannot be unticked WHILE any page that shows it is coming along, and becomes an ordinary row when none is. Leaving it behind would put a hole in the page that shows it; keeping it locked after that page is gone would be a row the teacher cannot explain.",
+        "theCHOSENpageIsTheFIRSTROW": "Ticked, not untickable, and labelled as the page they chose - so the header's count and the list agree. It said '3 pages' over two rows.",
         "whatTheReadBackCannotSeeOnItsOwn": "The app's reader is not the one that decides what students see, and two shapes were REPRODUCED where the two split - the copy certified hidden by the app and PUBLISHED by the builder. (1) A settings block closed by an INDENTED ---: the app trims leading spaces before testing a fence, python-frontmatter's boundary does not, so it finds no end, reads nothing, and Quartz publishes a page that says nothing (the divergence is issue #188). (2) A block carrying a YAML ANCHOR or ALIAS: taking the plain publish: line out can orphan an alias the rest of the block refers to, frontmatter.load then raises, build_site.py prints a warning and RETURNS, and the page reaches Quartz unresolved. Measured incidence across 777 real pages: ZERO of either. So the read-back ALSO asks a second question, stated as ONE INVARIANT rather than a list of shapes: EVERY key that hides the copy must lie inside the region the BUILD reads as frontmatter, that region must carry no OTHER visibility key, the two readers must agree about where it ENDS, and every top-level line in it must be a shape the build's YAML parser reads. Anything else is not copied, with wording.thePageIsWrittenInAWayPlantoirCannotBeSureOf. Three failures were reproduced end to end and the invariant catches all three: an indented closing fence (#188); a BLOCK SCALAR carrying a horizontal rule (description: | ... ---), where the app closes INSIDE the scalar and inserts its publish: false there while the build reads the whole block and takes the source's publish: true from the bottom - the copy reached students in section 1 while the summary said it was hidden; and a block only one of them closes, so the file becomes several documents and the parser gives up. A benign block scalar is NOT refused. MEASURED with 16,192 composed shapes against the real python-frontmatter + publish.ts rule: 7,878 certified, of which 0 are not hidden in every section; 0 false refusals over 11,891 pages Plantoir ships and 0 over 777 real pages. An & or a * inside a VALUE is not an anchor - four shipped pages were refused for a title containing '&' before that was made precise. A refusal here is always right.",
         "theDeleteIsChecked": "A page that fails the read-back is removed, and the REMOVAL is checked. '... was not copied' is the strongest promise this feature makes, and making it on an unchecked delete would let a page nobody could prove hidden sit in the teacher's course while they were told it was not there - an immutable parent folder is the realistic way it fails. When the removal fails the teacher is told something DIFFERENT, the file's path is named, and the trail line says how many could not be removed and must not be deployed."
       }
@@ -4406,6 +4409,14 @@
       "alsoCopyLinkedPages": "Also copy the pages this page links to",
       "willCopy": "This will copy {pages} pages into {course}, in {folder}.",
       "willBringPicturesAndFilesInAll": "It will bring {count} pictures and files, {size}.",
+      "picturesWillComeInUnderANewName": "{count} will have the same name as something different already here, so they will come in under new names.",
+      "thePageYouChose": "the page you chose",
+      "willBeLeftAsItIs": "\u201c{page}\u201d is already in this course, so it will be left as it is \u2014 links will lead to the one that is here.",
+      "aClassPageWillBeLeftAlone": "\u201c{page}\u201d is one of that course's classes, so it will be left where it is.",
+      "anIndexPageWillNotBeCopied": "\u201c{page}\u201d is the way in to a folder rather than a page, so it will not be copied.",
+      "aPageAtTheCourseRootWillNotBeCopied": "\u201c{page}\u201d sits outside the course's folders, so it will not be copied.",
+      "aPageInsideOneSectionsFolderWillNotBeCopied": "\u201c{page}\u201d belongs to one section's classes, so it will not be copied.",
+      "thePageCouldNotBeRead": "\u201c{page}\u201d could not be read, so it will not be copied.",
       "embeddedPagesAlwaysComeAlong": "This page is shown inside another one, so it comes along.",
       "aClassPageWasLeftAlone": "\u201c{page}\u201d is one of that course's classes, so it was left where it is.",
       "anIndexPageIsNotCopied": "\u201c{page}\u201d is the way in to a folder rather than a page, so it was not copied.",
@@ -4485,16 +4496,57 @@
           "builderAgrees": false
         },
       {
+        "name": "a LONE carriage return",
+        "why": "A lone \\r is a line break to the BUILD (python-frontmatter opens the file in text mode, where universal newlines apply) and not to the app, which splits on \\n only. Repro found by an independent grammar fuzz: a source of ---\\ntitle: Notes\\r---\\rpublish: true\\n---\\nBody text.\\n is certified, the build reads only the per-section keys, the plain publish: false falls into the BODY, and a section the course does not have is PUBLISHED. Modelling universal newlines was REJECTED - it would mean a second line splitter disagreeing with the app's own. 0 of 12,668 shipped and real pages carry one.",
+        "text": "---\npublishForSection1: false\ntitle: Notes\r---\rpublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "an indented continuation of a plain scalar that contains a colon",
+        "why": "PyYAML raises on it, and when the build cannot parse the block it reads NO keys, so the page is published whatever the copy wrote. 30 of the 36 failures the grammar fuzz found were of this kind - which is why the test is a WHITELIST of shapes rather than a list of forbidden ones.",
+        "text": "---\npublishForSection1: false\ndescription: A long note\n  about time: 10am\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "a whitespace-only line containing a TAB",
+        "why": "Whitespace to the eye, a ScannerError to PyYAML: YAML forbids a tab in indentation. No frontmatter line in the 12,668 shipped and real pages contains a tab.",
+        "text": "---\npublishForSection1: false\n   \t \npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "a key with no space after its colon",
+        "why": "key:value is one long scalar to YAML, not a mapping.",
+        "text": "---\npublishForSection1: false\ntitle:A page\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "a plain value containing a colon and a space",
+        "text": "---\npublishForSection1: false\ntitle: A page: with a colon\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "an EMPTY flow sequence is allowed",
+        "why": "tags: [] is on 54 real pages and PyYAML reads it exactly as the app's reader ignores it. The whitelist has to admit what real data contains, or a guard that is safe is also useless.",
+        "text": "---\npublishForSection1: false\ntags: []\npublish: false\n---\nBody\n",
+        "builderAgrees": true
+      },
+      {
+        "name": "a key whose value is on the lines below, as list items",
+        "why": "10,561 lines of the real corpus.",
+        "text": "---\npublishForSection1: false\ntags:\n  - one\n  - two\npublish: false\n---\nBody\n",
+        "builderAgrees": true
+      },
+      {
         "name": "a block scalar carrying a horizontal rule",
         "why": "REPRODUCED end to end: the app closes the block INSIDE the scalar and inserts its publish: false there, while the build reads the whole block and takes the source's publish: true from the bottom. The copy reached students in section 1 while the summary said it was hidden.",
         "text": "---\npublishForSection1: false\ndescription: |\n  one\npublish: false\n  ---\n  two\npublishForSection1: true\npublish: true\n---\nBody\n",
         "builderAgrees": false
       },
       {
-        "name": "a BENIGN block scalar, with no rule inside it, is NOT refused",
-        "why": "Refusing block scalars outright was the cheap answer and would have been a false refusal on perfectly ordinary data.",
+        "name": "a block scalar is refused, benign or not",
+        "why": "It was allowed while the test excluded known-bad shapes, on the grounds that refusing it outright would be a false refusal on ordinary data. The position CHANGED when an independent grammar fuzz found 36 pages certified and published, most of them parse failures no list of forbidden shapes had thought of - so the test became a WHITELIST derived from what real data contains, and a census of the frontmatter of all 12,668 shipped and real pages found NO block scalar. Refusing one therefore costs nothing measurable and buys a rule that can be shown to be safe rather than argued to be.",
         "text": "---\npublishForSection1: false\ndescription: |\n  one\n  two\npublish: false\n---\nBody\n",
-        "builderAgrees": true
+        "builderAgrees": false
       },
       {
         "name": "an unclosed quoted value",

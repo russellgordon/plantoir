@@ -161,6 +161,32 @@ nonisolated enum CopiedPageText {
     static func theBuilderWouldReadItTheSameWay(
         _ pageText: String, forSections sectionNumbers: [Int]
     ) -> Bool {
+        // **A LONE CARRIAGE RETURN is a line break to the build and not to
+        // this app**, which is a disagreement about where every line is, not
+        // merely where the block ends. `frontmatter.load` opens the file in
+        // Python's text mode, where `\r` alone ends a line; Swift's
+        // `components(separatedBy: "\n")` does not split there at all.
+        // Measured repro: a source of
+        // `---\ntitle: Notes\r---\rpublish: true\n---\nBody text.\n` is
+        // certified, and the build reads only the per-section keys while the
+        // plain `publish: false` falls into the BODY — so a section the
+        // course does not have yet is published.
+        //
+        // Modelling universal newlines was rejected: it would mean a second
+        // line splitter everywhere, disagreeing with the one the rest of the
+        // app uses. Measured, 0 of the 12,668 pages Plantoir ships and the
+        // real courses carry a lone `\r`, so refusing them costs nothing.
+        var previous: Character? = nil
+        for character in pageText {
+            if previous == "\r" && character != "\n" {
+                return false
+            }
+            previous = character
+        }
+        if previous == "\r" {
+            return false
+        }
+
         let lines: [String] = pageText.components(separatedBy: "\n")
         guard !lines.isEmpty, CopiedPageText.isAFenceTheBuilderSees(lines[0]) else {
             return false
@@ -176,22 +202,21 @@ nonisolated enum CopiedPageText {
 
         // **The two readers must agree about where the block ENDS.**
         //
-        // This is the condition that kills the whole fault class rather than
-        // one shape of it: every failure reproduced here — the indented
-        // closing fence, the block scalar carrying a horizontal rule, the
-        // source whose block only one of them closes — is the same
-        // disagreement seen from a different angle. If this app read a
-        // different region from the one the build will read, then the keys it
-        // stripped, the keys it wrote and the place it wrote them were all
-        // decided about the wrong text, and nothing downstream of that can be
-        // trusted.
-        //
-        // Measured with 16,192 composed shapes: with the multiset test alone,
-        // 2,972 pages were certified and then published or left unparsed by
-        // the real build; with this added, zero.
+        // This is the condition that kills a whole fault class rather than
+        // one shape of it: if this app read a different region from the one
+        // the build will read, then the keys it stripped, the keys it wrote
+        // and the place it wrote them were all decided about the wrong text.
         guard let appBlock = PageFrontmatter.block(in: pageText),
               appBlock.openIndex == 0,
               appBlock.closeIndex == closeIndex else {
+            return false
+        }
+
+        // **Every line must be a SHAPE on the whitelist** — see
+        // `regionIsOnlyShapesTheBuildAgreesOn`.
+        guard CopiedPageText.regionIsOnlyShapesTheBuildAgreesOn(
+            lines, from: 1, to: closeIndex
+        ) else {
             return false
         }
 
@@ -201,54 +226,20 @@ nonisolated enum CopiedPageText {
             wanted.insert("publishForSection\(sectionNumber): false")
         }
         var found: Set<String> = []
-
         for index in 1..<closeIndex {
-            let line: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
-            if line.hasPrefix("\t") {
-                return false
-            }
-            if line.hasPrefix("%") {
-                return false
-            }
-            if CopiedPageText.trimmingTrailingSpaces(line) == "..." {
-                return false
-            }
-            if line.hasPrefix(" ") {
-                // Part of some value. It cannot be a top-level key, and the
-                // anchor test below is about node values, which a continued
-                // line can carry.
-                if CopiedPageText.startsANodeThatCannotBeParsedHere(after: line) {
-                    return false
-                }
-                continue
-            }
-            if CopiedPageText.startsANodeThatCannotBeParsedHere(after: line) {
-                return false
-            }
-
-            let tidied: String = CopiedPageText.trimmingTrailingSpaces(line)
-            // **The build must be able to PARSE the region.**
-            //
-            // There is no YAML parser in Swift here, so the test is a
-            // conservative shape test instead: at column 0 a line is blank, a
-            // comment, or a mapping key, and a quoted value is closed on its
-            // own line. Anything else is "cannot be sure". When
-            // `frontmatter.load` raises, `build_site.py` prints a warning and
-            // RETURNS, and the page reaches Quartz with nothing resolved —
-            // which publishes it.
-            //
-            // Measured: refuses 0 of 11,891 pages Plantoir ships and 0 of 777
-            // real pages, and closes 856 shapes in the fuzz that were
-            // certified and then left unparsed.
-            if !CopiedPageText.isAShapeTheBuildCanRead(tidied) {
-                return false
-            }
+            let tidied: String = CopiedPageText.trimmingTrailingSpaces(
+                PageFrontmatter.trimmingCarriageReturn(lines[index])
+            )
             if wanted.contains(tidied) {
                 found.insert(tidied)
                 continue
             }
             // Any OTHER visibility key inside the build's region means the
-            // two readers disagreed about where the block ends.
+            // two readers disagreed about where the block ends, and the build
+            // takes the LAST one it sees.
+            if tidied.hasPrefix(" ") || tidied.hasPrefix("\t") {
+                continue
+            }
             if CopiedPageText.namesAVisibilityKey(tidied) {
                 return false
             }
@@ -256,72 +247,164 @@ nonisolated enum CopiedPageText {
         return found == wanted
     }
 
-    /// True when a top-level line of a settings block is a shape the build's
-    /// YAML parser reads: blank, a comment, or `key:` / `key: value` with any
-    /// quoted value closed on the same line.
-    static func isAShapeTheBuildCanRead(_ line: String) -> Bool {
-        if line.isEmpty || line.hasPrefix("#") {
-            return true
-        }
-        var name: Substring = Substring(line)
-        // A quoted key runs to its closing quote; an unclosed one is exactly
-        // the shape that makes the parser give up part way down the file.
-        if let quote = name.first, quote == "\"" || quote == "'" {
-            guard let close = name.dropFirst().firstIndex(of: quote) else {
+    /// Whether every line of the build's region is a shape this app can SHOW
+    /// the build reads the way it does.
+    ///
+    /// **A WHITELIST, and deliberately narrower than YAML.** Excluding the
+    /// shapes known to go wrong was tried and failed an independent fuzz: a
+    /// grammar-based generator over 60,000 pages found 36 the guard certified
+    /// and the build did not hide, most of them PyYAML INDENTATION errors
+    /// that no list of forbidden shapes had thought of —
+    /// `description: A long note` followed by `  about time: 10am` is an
+    /// indented continuation of a plain scalar that contains `: `, which
+    /// PyYAML refuses; and when the build cannot parse the block it reads NO
+    /// keys at all, so the page is published whatever the copy wrote.
+    ///
+    /// The list is derived from what real data actually contains. A census of
+    /// the frontmatter of all 12,668 pages Plantoir ships and all 777 pages
+    /// of four real courses found exactly FOUR shapes: `key: value` with a
+    /// plain scalar (48,091 lines), an indented list item (14,462), `key:`
+    /// with its value on the lines below (10,561), and `key: value` with a
+    /// quoted scalar (13). Blank lines and comments are allowed as well —
+    /// neither carries a key, so neither can move a page's visibility.
+    ///
+    /// Everything else is NOT COPIED, and the teacher is told so in a plain
+    /// sentence. A page Plantoir will not copy can always be copied by hand.
+    static func regionIsOnlyShapesTheBuildAgreesOn(
+        _ lines: [String], from: Int, to: Int
+    ) -> Bool {
+        var mayBeFollowedByListItems: Bool = false
+        for index in from..<to {
+            let line: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            // **A TAB anywhere refuses the line.** YAML forbids a tab in
+            // indentation, and PyYAML raises a `ScannerError` on one — which
+            // means the build reads NO keys and publishes the page. A line of
+            // `"   \t "` is whitespace to the eye and a parse error to the
+            // parser; the independent fuzz found exactly that shape. Measured:
+            // no frontmatter line in the 12,668 shipped and real pages
+            // contains a tab.
+            if line.contains("\t") {
                 return false
             }
-            name = name[name.index(after: close)...]
-        } else {
-            guard let colon = name.firstIndex(of: ":") else {
+            var bare: Substring = Substring(line)
+            while bare.last == " " {
+                bare = bare.dropLast()
+            }
+            if bare.isEmpty {
+                continue
+            }
+            if bare.hasPrefix(" ") {
+                // The ONLY indented shape on the list: an item of a list
+                // whose key is on the line above.
+                var item: Substring = bare
+                while item.first == " " {
+                    item = item.dropFirst()
+                }
+                guard mayBeFollowedByListItems, item.hasPrefix("- "), item.count > 2 else {
+                    return false
+                }
+                guard CopiedPageText.isAPlainScalar(String(item.dropFirst(2))) else {
+                    return false
+                }
+                continue
+            }
+            mayBeFollowedByListItems = false
+            if bare.hasPrefix("#") {
+                continue
+            }
+            guard let name = CopiedPageText.keyNamed(String(bare)) else {
                 return false
             }
-            name = name[colon...]
-        }
-        guard name.first == ":" else {
-            return false
-        }
-        var value: Substring = name.dropFirst()
-        if let first = value.first, first != " " && first != "\t" {
-            // `key:value` is not a mapping to YAML; it is one long scalar.
-            return false
-        }
-        while value.first == " " || value.first == "\t" {
-            value = value.dropFirst()
-        }
-        if let quote = value.first, quote == "\"" || quote == "'" {
-            guard let close = value.dropFirst().lastIndex(of: quote) else {
+            var rest: Substring = bare.dropFirst(name.count)
+            guard rest.first == ":" else {
                 return false
             }
-            _ = close
+            rest = rest.dropFirst()
+            if rest.isEmpty {
+                mayBeFollowedByListItems = true
+                continue
+            }
+            guard rest.first == " " else {
+                // `key:value` is one long scalar to YAML, not a mapping.
+                return false
+            }
+            while rest.first == " " {
+                rest = rest.dropFirst()
+            }
+            guard CopiedPageText.isAPlainScalar(String(rest)) else {
+                return false
+            }
         }
         return true
     }
 
-    /// True when this line begins a YAML node the build's parser would refuse
-    /// here — an anchor or an alias.
-    ///
-    /// Asked of the VALUE, never of the whole line: an `&` or a `*` inside a
-    /// quoted title is an ordinary character, and treating it as an anchor
-    /// refused four pages Plantoir ships.
-    static func startsANodeThatCannotBeParsedHere(after line: String) -> Bool {
-        var rest: Substring = Substring(line)
-        while rest.first == " " || rest.first == "-" {
-            rest = rest.dropFirst()
-            if rest.first == " " {
-                continue
+    /// The key this line names, or nil when it does not name one in a shape
+    /// on the list: letters, digits, spaces, dots, dashes and underscores,
+    /// optionally in matching quotes, and nothing else.
+    static func keyNamed(_ line: String) -> String? {
+        if let quote = line.first, quote == "\"" || quote == "'" {
+            guard let close = line.dropFirst().firstIndex(of: quote) else {
+                return nil
             }
-            if rest.first == "&" || rest.first == "*" {
-                return true
-            }
+            return String(line[line.startIndex...close])
         }
-        guard let colon = rest.firstIndex(of: ":") else {
+        var name: String = ""
+        for character in line {
+            if character == ":" {
+                break
+            }
+            let isOrdinary: Bool = character.isLetter || character.isNumber
+                || character == " " || character == "." || character == "-"
+                || character == "_"
+            if !isOrdinary {
+                return nil
+            }
+            name.append(character)
+        }
+        if name.isEmpty || name.hasPrefix(" ") {
+            return nil
+        }
+        return name
+    }
+
+    /// A single-line scalar the build reads as text: plain, with nothing in
+    /// it that starts a node of another kind, or a closed quoted string.
+    static func isAPlainScalar(_ value: String) -> Bool {
+        let tidied: String = CopiedPageText.trimmingTrailingSpaces(value)
+        if tidied.isEmpty {
             return false
         }
-        var value: Substring = rest[rest.index(after: colon)...]
-        while value.first == " " || value.first == "\t" {
-            value = value.dropFirst()
+        if let quote = tidied.first, quote == "\"" || quote == "'" {
+            return tidied.count >= 2 && tidied.last == quote
         }
-        return value.first == "&" || value.first == "*"
+        // A flow sequence or mapping, CLOSED on its own line and holding no
+        // further one. `tags: []` is on 54 real pages and PyYAML reads it
+        // exactly as this app's reader ignores it; what is refused is the
+        // multi-line form, where the two readers can part company about where
+        // the value ends.
+        if tidied.hasPrefix("[") || tidied.hasPrefix("{") {
+            let closer: Character = tidied.hasPrefix("[") ? "]" : "}"
+            guard tidied.last == closer else {
+                return false
+            }
+            let inside: Substring = tidied.dropFirst().dropLast()
+            for character in inside where "[]{}#&*".contains(character) {
+                return false
+            }
+            return true
+        }
+        for opener in ["&", "*", "|", ">", "!", "{", "[", "#", "%", "@", "`", "-"] {
+            if tidied.hasPrefix(opener) {
+                return false
+            }
+        }
+        // `a: b: c` is a mapping value where YAML will not have one, and an
+        // indented line carrying `: ` is the shape the independent fuzz found
+        // 30 of.
+        if tidied.contains(": ") || tidied.hasSuffix(":") {
+            return false
+        }
+        return true
     }
 
     /// True when this top-level line names any of the four keys that decide

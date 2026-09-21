@@ -3,29 +3,54 @@ import SwiftUI
 /// What the copy WILL do, before it does any of it — the screen whose whole
 /// purpose is to let a teacher change their mind.
 ///
-/// **Every sentence on it is in the future.** It used to be headed "Copied 11
-/// pages into ICS4U, in Concepts." with a Copy button underneath, which is the
-/// result sentence shown before the result.
+/// **Every sentence on it is in the future**, including the skips. It was
+/// headed with the result sentence ("Copied 11 pages…") above a Copy button,
+/// and it still said "…so it was left as it is" about a page nothing had yet
+/// been done to. Each of those has a twin in `CopyPageWording`, keyed
+/// separately from the result screen's: the two screens are one word apart and
+/// that word is the whole difference.
 ///
-/// **And the numbers follow the ticks.** They are read off the plan the host
-/// hands over, and the host works that plan out again whenever a tick changes:
-/// unticking one page of a real eleven-page set moved them by 67 MB, two files
-/// and one dead link, and the screen used to go on showing the old ones.
+/// **The ROWS come from the first plan; the NUMBERS come from the latest
+/// one.** That split is the fix for the fault a teacher met first: the list
+/// used to be drawn from the plan, so unticking a page removed its row — and
+/// with the row gone there was no way to put it back, or even to see what had
+/// been turned off. The candidate set is settled once, in a stable order, and
+/// every later plan feeds the header, the size line, the skips and the dead
+/// links.
 ///
-/// A view of its own rather than a method on the sheet, so it can be rendered
-/// to an image and looked at without a window, a workspace or a sheet — which
-/// is how it was first seen at all.
+/// **A page shown inside another is ticked and cannot be unticked WHILE
+/// anything that shows it is ticked**, and becomes an ordinary row when
+/// nothing does. Leaving it behind would put a hole in the page that shows
+/// it; keeping it locked after that page is gone would be a row a teacher
+/// cannot explain.
 struct CopyPageChecklist: View {
 
     // MARK: - Stored properties
 
+    /// Every linked page the FIRST plan found, in its order. The rows.
+    let candidates: [CopiedPagePlacement]
+
+    /// The page the teacher named, shown first so the header's count and the
+    /// list agree — it said "3 pages" over two rows.
+    let chosenPage: String
+
+    /// The latest plan. The numbers and the sentences below the list.
     let plan: CoursePageCopyPlan
+
     let courseName: String
     let folderName: String
 
-    /// The linked pages still ticked, by lowercased page name. A page shown
-    /// inside another is not in here and cannot be taken out.
+    /// The linked pages still ticked, by lowercased page name.
     @Binding var kept: Set<String>
+
+    // MARK: - Computed properties
+
+    /// Enough for about twelve rows. The largest linked set in a real course
+    /// is ten, so nothing today scrolls; the cap is here because a sheet that
+    /// grows without limit puts its own buttons off the bottom of the screen.
+    static var tallestList: CGFloat {
+        return 380
+    }
 
     // MARK: - Body
 
@@ -35,30 +60,29 @@ struct CopyPageChecklist: View {
                 pages: plan.pages.count, course: courseName, folder: folderName
             ))
 
-            // **A plain stack, not a `ScrollView`.** The worst real page
-            // measured across a whole course brings ten rows, which fits in
-            // the sheet; a `ScrollView` reserved its cap whether or not the
-            // rows needed it, and — found by rendering this screen to an
-            // image and LOOKING at it — drew a 320 pt hole with the rows
-            // nowhere in it. A list a teacher cannot see is worse than a
-            // sheet that grows, so the rows are drawn and the growth is
-            // accepted. `CopyPageChecklist.tallestList` records the number a
-            // cap would use if a course ever needs one.
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(plan.linkedPages) { linked in
-                    Toggle(isOn: tick(for: linked)) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(linked.pageName)
-                            Text(secondLine(for: linked))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+            // An explicit height, never `maxHeight` on a bare `ScrollView`:
+            // the first attempt reserved its cap whether the rows needed it
+            // or not and drew an empty hole where they should have been.
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 2) {
+                    row(named: chosenPage, second: CopyPageWording.thePageYouChose,
+                        isOn: .constant(true), isLocked: true, identifier: "chosen")
+                    ForEach(candidates) { linked in
+                        row(
+                            named: linked.pageName,
+                            second: secondLine(for: linked),
+                            isOn: tick(for: linked),
+                            isLocked: isShownInsideSomethingTicked(linked),
+                            identifier: linked.pageName
+                        )
                     }
-                    .disabled(linked.isRequired)
-                    .accessibilityIdentifier("copyPageLinked-\(linked.id)")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: min(
+                CGFloat(candidates.count + 1) * CopyPageChecklist.rowHeight,
+                CopyPageChecklist.tallestList
+            ))
 
             if !plan.media.isEmpty {
                 Text(CopyPageWording.willBringPicturesAndFilesInAll(
@@ -67,8 +91,15 @@ struct CopyPageChecklist: View {
                 ))
                 .foregroundStyle(.secondary)
             }
+            if !plan.mediaUnderANewName.isEmpty {
+                Text(CopyPageWording.picturesWillComeInUnderANewName(
+                    count: plan.mediaUnderANewName.count
+                ))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
             ForEach(plan.skipped.indices, id: \.self) { index in
-                Text(CopyPageSheet.plainSentence(for: plan.skipped[index]))
+                Text(CopyPageChecklist.sentence(for: plan.skipped[index]))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -87,31 +118,69 @@ struct CopyPageChecklist: View {
         .accessibilityIdentifier("copyPageChecklist")
     }
 
-    // MARK: - Computed properties
-
-    /// Enough for ten rows, which is the worst real case measured.
-    static var tallestList: CGFloat {
-        return 320
-    }
-
     // MARK: - Functions
 
-    /// The folder ALWAYS, and the "comes along" note as well — a required
-    /// page is the one row whose landing folder a teacher cannot change by
-    /// unticking it, so it is the one they most want to see.
+    static var rowHeight: CGFloat {
+        return 32
+    }
+
+    /// One row. The identifier and the label go on the CONTROL, not on the
+    /// label view: an identifier bound to a `Toggle`'s content is merged into
+    /// the toggle's element and the two overwrite each other — the same trap
+    /// `SearchablePickerOverlay`'s own comment records — so every checkbox
+    /// reported `copyPageChecklist` and VoiceOver said only "checkbox".
+    @ViewBuilder
+    func row(
+        named name: String, second: String, isOn: Binding<Bool>, isLocked: Bool,
+        identifier: String
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                Text(second)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .disabled(isLocked)
+        .accessibilityLabel(name)
+        .accessibilityValue(second)
+        .accessibilityIdentifier("copyPageLinked-\(identifier)")
+    }
+
+    /// The folder ALWAYS, and the "comes along" note as well — a page that
+    /// cannot be unticked is the one row whose landing folder a teacher
+    /// cannot influence, so it is the one they most want to see.
     func secondLine(for linked: CopiedPagePlacement) -> String {
-        if linked.isRequired {
+        if isShownInsideSomethingTicked(linked) {
             return linked.destinationFolderName + " · "
                 + CopyPageWording.embeddedPagesAlwaysComeAlong
         }
         return linked.destinationFolderName
     }
 
+    /// True while any page that SHOWS this one is coming along.
+    func isShownInsideSomethingTicked(_ linked: CopiedPagePlacement) -> Bool {
+        let key: String = linked.pageName.lowercased()
+        guard let showers = plan.pagesThatShowEachPage[key] else {
+            return false
+        }
+        for shower in showers {
+            if shower == chosenPage.lowercased() {
+                return true
+            }
+            if kept.contains(shower) {
+                return true
+            }
+        }
+        return false
+    }
+
     func tick(for linked: CopiedPagePlacement) -> Binding<Bool> {
         let key: String = linked.pageName.lowercased()
         return Binding(
             get: {
-                return linked.isRequired || kept.contains(key)
+                return isShownInsideSomethingTicked(linked) || kept.contains(key)
             },
             set: { isOn in
                 if isOn {
@@ -121,5 +190,32 @@ struct CopyPageChecklist: View {
                 }
             }
         )
+    }
+
+    /// What a skip reads as on THIS screen — in the future, because nothing
+    /// has happened yet.
+    static func sentence(for skip: CopySkip) -> String {
+        switch skip.reason {
+        case .aPageOfThatNameIsAlreadyHere:
+            return CopyPageWording.willBeLeftAsItIs(page: skip.name)
+        case .aClassPageWasLeftAlone:
+            return CopyPageWording.aClassPageWillBeLeftAlone(page: skip.name)
+        case .anIndexPageIsNotCopied:
+            return CopyPageWording.anIndexPageWillNotBeCopied(page: skip.name)
+        case .aPageAtTheCourseRootIsNotCopied:
+            return CopyPageWording.aPageAtTheCourseRootWillNotBeCopied(page: skip.name)
+        case .aPageInsideOneSectionsFolderIsNotCopied:
+            return CopyPageWording.aPageInsideOneSectionsFolderWillNotBeCopied(page: skip.name)
+        case .thePageCouldNotBeRead:
+            return CopyPageWording.thePageCouldNotBeRead(page: skip.name)
+        case .thePicturesCouldNotBePointedAtTheirNewNames:
+            return CopyPageWording.thePicturesCouldNotBePointedAtTheirNewNames(page: skip.name)
+        case .theCopyCouldNotBeMadeHidden, .theCopyIsStillThereAndMustBeRemoved,
+             .thePageIsWrittenInAWayPlantoirCannotBeSureOf, .thePageCouldNotBeWritten,
+             .aPictureCouldNotBeCopied:
+            // Reached only by the executor, so a plan never carries one; the
+            // result screen's own sentence is the right one if it ever does.
+            return CopyPageSheet.plainSentence(for: skip)
+        }
     }
 }

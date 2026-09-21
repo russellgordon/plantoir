@@ -552,6 +552,116 @@ final class CoursePageCopyTests: XCTestCase {
         )
     }
 
+    /// Every sentence the CHECKLIST can show is in the future, and none of
+    /// them is its result-screen twin.
+    @MainActor
+    func testEverySentenceTheChecklistShowsIsInTheFuture() {
+        let reasons: [CopySkip.Reason] = [
+            .aPageOfThatNameIsAlreadyHere, .aClassPageWasLeftAlone, .anIndexPageIsNotCopied,
+            .aPageAtTheCourseRootIsNotCopied, .aPageInsideOneSectionsFolderIsNotCopied,
+            .thePageCouldNotBeRead,
+        ]
+        for reason in reasons {
+            let skip: CopySkip = CopySkip(name: "X", reason: reason)
+            let onTheChecklist: String = CopyPageChecklist.sentence(for: skip)
+            let onTheResult: String = CopyPageSheet.plainSentence(for: skip)
+            XCTAssertNotEqual(
+                onTheChecklist, onTheResult,
+                "\(reason.rawValue) shows the RESULT sentence on the checklist, where nothing has happened yet."
+            )
+            for past in [" was ", " it was ", "were left", "was not copied", "was left"] {
+                XCTAssertFalse(
+                    onTheChecklist.contains(past),
+                    "The checklist says “\(past)” about something that has not happened: \(onTheChecklist)"
+                )
+            }
+            XCTAssertTrue(
+                onTheChecklist.contains("will"),
+                "Not in the future: \(onTheChecklist)"
+            )
+        }
+    }
+
+    /// Ticking a page off and on again gives back exactly the plan that was
+    /// there before.
+    ///
+    /// The rows are the first plan's candidate set and never move; only the
+    /// numbers follow the ticks. Drawing the list from the latest plan made
+    /// an unticked page VANISH, so it could not be put back.
+    func testTickingAPageOffAndOnAgainRestoresThePlanExactly() throws {
+        let built: Built = try buildLinkedPair()
+        var request: CoursePageCopyRequest = try XCTUnwrap(built.request)
+        request = CoursePageCopyRequest(
+            source: request.source, page: request.page, destination: request.destination,
+            destinationFolderName: request.destinationFolderName,
+            alsoCopiesLinkedPages: true, keptLinkedPages: nil
+        )
+        let first: CoursePageCopyPlan = CoursePageCopyPlanner.plan(request)
+        XCTAssertEqual(first.linkedPages.count, 2)
+
+        var kept: Set<String> = []
+        for linked in first.linkedPages {
+            kept.insert(linked.pageName.lowercased())
+        }
+        let withOneOff: Set<String> = kept.subtracting(["stacks"])
+        let bPlan: CoursePageCopyPlan = CoursePageCopyPlanner.plan(
+            CoursePageCopyRequest(
+                source: request.source, page: request.page, destination: request.destination,
+                destinationFolderName: request.destinationFolderName,
+                alsoCopiesLinkedPages: true, keptLinkedPages: withOneOff
+            )
+        )
+        XCTAssertEqual(bPlan.pages.count, first.pages.count - 1)
+
+        let backAgain: CoursePageCopyPlan = CoursePageCopyPlanner.plan(
+            CoursePageCopyRequest(
+                source: request.source, page: request.page, destination: request.destination,
+                destinationFolderName: request.destinationFolderName,
+                alsoCopiesLinkedPages: true, keptLinkedPages: kept
+            )
+        )
+        XCTAssertEqual(backAgain.pages.count, first.pages.count)
+        XCTAssertEqual(backAgain.media.count, first.media.count)
+        XCTAssertEqual(backAgain.totalBytes, first.totalBytes)
+        XCTAssertEqual(backAgain.linksLeadingNowhere, first.linksLeadingNowhere)
+        var before: [String] = []
+        for placement in first.pages {
+            before.append(placement.destinationFolderName + "/" + placement.fileName.text)
+        }
+        var after: [String] = []
+        for placement in backAgain.pages {
+            after.append(placement.destinationFolderName + "/" + placement.fileName.text)
+        }
+        XCTAssertEqual(after, before)
+    }
+
+    /// A source page with two linked pages, one of which brings a picture.
+    func buildLinkedPair() throws -> Built {
+        let coursesURL: URL = scratch.appendingPathComponent("linked")
+        let source: CopyCourseFacts = try makeCourse(
+            at: coursesURL.appendingPathComponent("ICS4U-2025"),
+            code: "ICS4U-2025", sections: [1], sharedFolders: ["Concepts"],
+            pages: [
+                ("Concepts/Recursion.md", "See [[Stacks]] and [[Frames]]\n"),
+                ("Concepts/Stacks.md", "![[one.png]]\n"),
+                ("Concepts/Frames.md", "Body\n"),
+            ],
+            media: [("one.png", "PICTURE")]
+        )
+        let destination: CopyCourseFacts = try makeCourse(
+            at: coursesURL.appendingPathComponent("ICS4U"),
+            code: "ICS4U", sections: [1, 2], sharedFolders: ["Concepts"], pages: [], media: []
+        )
+        return Built(
+            source: source, destination: destination,
+            request: CoursePageCopyRequest(
+                source: source,
+                page: CopyablePage(folderName: "Concepts", fileName: ExactName("Recursion.md")),
+                destination: destination, destinationFolderName: "Concepts"
+            )
+        )
+    }
+
     // MARK: - Off the main actor
 
     /// The backup and the copy do not run on the main thread.
@@ -699,6 +809,36 @@ final class CoursePageCopyTests: XCTestCase {
             CopyPageWording.willBringPicturesAndFilesInAll(count: 4, size: "{size}")
                 .replacingOccurrences(of: "4", with: "{count}"),
             wording["willBringPicturesAndFilesInAll"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.picturesWillComeInUnderANewName(count: 4)
+                .replacingOccurrences(of: "4", with: "{count}"),
+            wording["picturesWillComeInUnderANewName"] as? String
+        )
+        XCTAssertEqual(CopyPageWording.thePageYouChose, wording["thePageYouChose"] as? String)
+        XCTAssertEqual(
+            CopyPageWording.willBeLeftAsItIs(page: "{page}"),
+            wording["willBeLeftAsItIs"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.aClassPageWillBeLeftAlone(page: "{page}"),
+            wording["aClassPageWillBeLeftAlone"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.anIndexPageWillNotBeCopied(page: "{page}"),
+            wording["anIndexPageWillNotBeCopied"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.aPageAtTheCourseRootWillNotBeCopied(page: "{page}"),
+            wording["aPageAtTheCourseRootWillNotBeCopied"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.aPageInsideOneSectionsFolderWillNotBeCopied(page: "{page}"),
+            wording["aPageInsideOneSectionsFolderWillNotBeCopied"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.thePageCouldNotBeRead(page: "{page}"),
+            wording["thePageCouldNotBeRead"] as? String
         )
         XCTAssertEqual(
             CopyPageWording.embeddedPagesAlwaysComeAlong,

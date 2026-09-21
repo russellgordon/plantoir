@@ -1943,12 +1943,57 @@ stands in for a YAML parser Swift does not have, because when
 `frontmatter.load` raises, `build_site.py` prints a warning and RETURNS, and
 the page reaches Quartz unresolved — which publishes it.
 
-**A benign block scalar is NOT refused.** A `description: |` with no rule in it
-is read identically by both, carries no extra key, and copies. Refusing block
-scalars outright was the cheap answer and would have been a false refusal on
-ordinary data.
+**And then an INDEPENDENT fuzz broke it again, which changed the shape of the
+answer a second time.** A grammar-based generator — variable-length bodies,
+recursive block-scalar interiors, per-line mutations, rather than a fixed-slot
+cross product — put 60,000 pages through the guard and found **36** it
+certified and the real build did not hide. Two causes, neither of which any
+list of forbidden shapes had thought of:
 
-**Measured, with 16,192 composed shapes** (8 opening fences × 11 closing fences
+* **a lone `\r`.** It is a line break to the build, because
+  `frontmatter.load` opens the file in Python's text mode where universal
+  newlines apply, and it is not one to `components(separatedBy: "\n")`. The
+  repro is ordinary-looking: `---\ntitle: Notes\r---\rpublish: true\n---\n`.
+  The plain `publish: false` falls into the BODY and a section the course does
+  not have is published. Modelling universal newlines was rejected — it would
+  mean a second line splitter disagreeing with the app's own — so **a page
+  carrying a lone `\r` is not copied.** Measured: 0 of 12,668 pages.
+* **PyYAML indentation errors**, such as `description: A long note` followed by
+  `  about time: 10am`. When the build cannot parse the block it reads NO keys,
+  so the page is published whatever the copy wrote.
+
+So the last clause became a **WHITELIST rather than a list of exclusions**, and
+that is the durable lesson: excluding the shapes you have thought of loses to a
+generator that thinks of others. A census of the frontmatter of all 12,668
+shipped and real pages found exactly four shapes —
+`key: value` with a plain scalar (48,091 lines), an indented list item
+(14,462), `key:` with its value below (10,561), and a quoted scalar (13) —
+plus `tags: []` on 54 pages. Those, a blank line and a comment are what can be
+certified. Everything else, **including a block scalar**, is not copied. That
+reversed an earlier decision to allow benign block scalars: the corpus has
+none, so refusing them costs nothing measurable and buys a rule that can be
+SHOWN to be safe rather than argued to be.
+
+**The whitelist is deliberately narrower than YAML**, and a page it will not
+certify is refused with a plain sentence rather than copied and hoped for. A
+teacher can always copy such a page by hand.
+
+**Measured.** The gate is three independent seeds of the grammar generator at
+60,000 pages each, the original 16,192-shape cross product, and the
+false-refusal count — every page composed by the real Swift and then read by
+python-frontmatter 1.3.0 / PyYAML 6.0.3, the image's own pins, running
+`process_frontmatter` and `publish.ts`' rule verbatim:
+
+| corpus | certified & hidden | **certified & NOT hidden** | refused |
+|---|---|---|---|
+| grammar, seed 207207 | 23,086 | **0** | 36,914 |
+| grammar, seed 4242 | 22,917 | **0** | 37,083 |
+| grammar, seed 90210 | 22,999 | **0** | 37,001 |
+| cross product | 6,240 | **0** | 9,952 |
+| 11,891 shipped pages | 11,891 | **0** | **0** |
+| 777 real pages | 777 | **0** | **0** |
+
+The earlier run of the cross product is kept for the record: (8 opening fences × 11 closing fences
 × 23 bodies × 4 tails × LF/CRLF), each composed by the real Swift and then read
 by python-frontmatter 1.3.0 / PyYAML 6.0.3 — the image's own versions — running
 `process_frontmatter` and `publish.ts`' rule verbatim:
