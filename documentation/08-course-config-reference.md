@@ -97,6 +97,20 @@ never deploys. Two keys carry it, and the rules they obey are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `referenceCourses`, run as cases by both test suites.
 
+**Read STRICTLY: a real JSON `true` and nothing else.** Not through the
+ordinary boolean accessor, and the reason is measured: `JSONSerialization`
+hands back an `NSNumber` for `1`, and `NSNumber` conditionally bridges to
+`Bool` for 0 and 1 — so `as? Bool` read `"kept_for_reference": 1` as TRUE
+while all three launchers read the same file as an ordinary course and
+DEPLOYED it. Both directions of the fault at once: the app froze and locked a
+course, with no way back to live, that the launchers then published.
+`CFBooleanGetTypeID` is the only reading that tells a JSON boolean from a
+number. Every other spelling somebody plainly MEANT — `"true"`, `1`, `True`, a
+key written with backslash-u escapes — makes the launchers refuse with "cannot
+tell", which publishes nothing and freezes nothing, while this app treats the
+course as ordinary. The four readers and the twenty-six inputs they are
+asserted to agree on are `shared-rules.json` → `referenceCourses.markerAgreement`.
+
 **The marker is not the defence on its own, and that is the part worth
 knowing.** Whatever makes a course a reference course also writes
 `deploy_target: "local_folder"` with an empty `deploy_folder_path`, removes

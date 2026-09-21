@@ -475,6 +475,11 @@ nonisolated enum ActivityTrail {
         /// also how "my import did not finish and now there is no trace of
         /// it" gets an answer.
         case unfinishedImportForReferenceTidiedAway = "unfinished import for reference tidied away"
+
+        /// A reference course was filed under a different school year — the
+        /// one thing about a frozen course a teacher can still change.
+        /// Carries the code they read, the folder, and both years.
+        case referenceCourseSchoolYearChanged = "reference course school year changed"
     }
 
     // MARK: - Stored properties

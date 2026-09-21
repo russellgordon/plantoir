@@ -44,6 +44,10 @@ os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY_ROOT / "contracts
 import contracts  # noqa: E402
 import reference_course  # noqa: E402
 
+# `build_site` imports several siblings by bare name; the path insert above is
+# what makes that work outside the container.
+import build_site  # noqa: E402
+
 
 def _rules() -> dict:
     return contracts.section("shared-rules", "referenceCourses")
@@ -210,6 +214,10 @@ class ThreeReadersAgree(unittest.TestCase):
         if row.get("noConfigFile"):
             config.unlink()
             return folder
+        if row.get("configIsADirectory"):
+            config.unlink()
+            config.mkdir()
+            return folder
         text = row.get("configText", "")
         data = text.encode("utf-8")
         if row.get("bom"):
@@ -227,9 +235,20 @@ class ThreeReadersAgree(unittest.TestCase):
 
         launcher_source = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
         self.assertIn(agreement["pattern"]["posixEre"], launcher_source)
+        self.assertIn(agreement["pattern"]["escapedKeyPosixEre"], launcher_source)
         powershell_source = (REPOSITORY_ROOT / "deploy.ps1").read_text(encoding="utf-8")
         self.assertIn(agreement["pattern"]["dotNet"], powershell_source)
-        dot_net = re.compile(agreement["pattern"]["dotNet"], re.IGNORECASE)
+        self.assertIn(agreement["pattern"]["escapedKeyDotNet"], powershell_source)
+        self.assertEqual(
+            agreement["pattern"]["escapedKeyPython"], reference_course.ESCAPED_KEY_PATTERN
+        )
+        # Case-SENSITIVE, matching `-cmatch`: `-match` treated the KEY as
+        # case-insensitive too, so "KEPT_FOR_REFERENCE" refused on Windows
+        # while the mac and the Python allowed it.
+        dot_net = re.compile(agreement["pattern"]["dotNet"])
+        present = re.compile(agreement["pattern"]["presentDotNet"])
+        says_false = re.compile(agreement["pattern"]["falseDotNet"])
+        escaped_key = re.compile(agreement["pattern"]["escapedKeyDotNet"])
 
         for row in rows:
             name = row["name"]
@@ -237,6 +256,19 @@ class ThreeReadersAgree(unittest.TestCase):
             self.assertIn(expect, ("refused", "allowed"), name)
             folder = self._folder(row)
             course = folder / "courses" / "AGREE"
+
+            # The INVARIANT, asserted on every row: wherever the APP reads a
+            # course as kept for reference, every launcher must refuse. The
+            # reverse is allowed — a launcher may refuse what the app calls
+            # ordinary, because refusing publishes nothing and freezes
+            # nothing. The app's own reading is run from the Swift suite
+            # (`ReferenceCourseTests`), which walks these same rows.
+            if row.get("appReadsAsReference"):
+                self.assertEqual(
+                    expect, "refused",
+                    "%s: the app would FREEZE AND LOCK this course and a launcher would "
+                    "deploy it" % name
+                )
 
             if row.get("unreadable") and os.access(str(course / "course_config.json"), os.R_OK):
                 self.skipTest("this account can read a file with no permissions (root?)")
@@ -274,11 +306,18 @@ class ThreeReadersAgree(unittest.TestCase):
             # 3. PowerShell's pattern, simulated. Unreadable and missing files
             #    are about reading rather than matching, so they are not
             #    questions the pattern answers.
-            if not row.get("unreadable") and not row.get("noConfigFile"):
+            if not row.get("unreadable") and not row.get("noConfigFile") \
+                    and not row.get("configIsADirectory"):
+                text = row.get("configText", "")
+                powershell_refuses = escaped_key.search(text) is not None \
+                    or dot_net.search(text) is not None or (
+                    present.search(text) is not None
+                    and dot_net.search(text) is None
+                    and says_false.search(text) is None
+                )
                 self.assertEqual(
-                    dot_net.search(row.get("configText", "")) is not None,
-                    expect == "refused",
-                    "%s: deploy.ps1's pattern disagrees" % name
+                    powershell_refuses, expect == "refused",
+                    "%s: deploy.ps1's patterns disagree" % name
                 )
             # The mode goes back before the folder goes, or the row that
             # makes a file unreadable leaves one behind.
@@ -290,6 +329,10 @@ class ThreeReadersAgree(unittest.TestCase):
 
 
 class TheSentence(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
     def test_the_sentence_is_the_contracts_sentence(self):
         template = _rules()["refusal"]["sentence"]
@@ -304,6 +347,43 @@ class TheSentence(unittest.TestCase):
         # falling through to a deploy. It is only safe while it says the same
         # thing, which is what this pins.
         self.assertEqual(reference_course.FALLBACK_REFUSAL, _rules()["refusal"]["sentence"])
+
+    def test_both_launchers_carry_the_same_cannot_tell_sentence(self):
+        # The same arrangement the refusal sentence has: a keyed string,
+        # carried as a constant in each launcher, compared here. It exists
+        # because the app reads a course with an odd marker value as ORDINARY
+        # — so a teacher can schedule a deploy on it, and only the launcher
+        # refuses, with the app closed.
+        wording = _rules()["wording"]
+        # The two halves the launcher prints around the course's name.
+        headline_start = wording["cannotTellHeadline"].split("{course}")[0].strip()
+        headline_end = wording["cannotTellHeadline"].split("{course}")[1].strip()
+        for launcher in ["deploy.sh", "deploy.ps1"]:
+            text = (REPOSITORY_ROOT / launcher).read_text(encoding="utf-8")
+            self.assertIn(headline_start, text, launcher)
+            self.assertIn(headline_end, text, launcher)
+            self.assertIn(wording["cannotTellBecauseOddValue"], text, launcher)
+            self.assertIn(wording["cannotTellBecauseUnreadable"], text, launcher)
+
+    def test_the_python_says_which_reason(self):
+        # deploy.py printed "its settings file could not be read" for every
+        # cause, including a file that opened perfectly well and said `1`.
+        wording = _rules()["wording"]
+        folder = Path(self.tmp) / "WHY"
+        folder.mkdir()
+        (folder / "course_config.json").write_text(
+            '{"course_code": "WHY", "kept_for_reference": 1}', encoding="utf-8"
+        )
+        self.assertEqual(
+            reference_course.why_cannot_tell(folder), wording["cannotTellBecauseOddValue"]
+        )
+        (folder / "course_config.json").chmod(0o000)
+        self.addCleanup((folder / "course_config.json").chmod, 0o644)
+        if not os.access(str(folder / "course_config.json"), os.R_OK):
+            self.assertEqual(
+                reference_course.why_cannot_tell(folder),
+                wording["cannotTellBecauseUnreadable"]
+            )
 
     def test_both_launchers_carry_the_same_sentence(self):
         # The launchers cannot read the contract: the host-side check runs
@@ -441,6 +521,48 @@ class DeployPyRefusesFirst(unittest.TestCase):
         said = (result.stdout + result.stderr).decode("utf-8", "replace")
         self.assertNotIn("kept for reference", said)
         self.assertIn("Section directory not found", said)
+
+
+class TheBuiltSiteShowsTheRealCode(unittest.TestCase):
+    """The title of a reference course's PREVIEW.
+
+    Measured on a real imported course before this: the header read
+    "ICS4U-2025 S1". The plan claimed `build_site.py` put `course_code` there
+    and it did not — it passed the launcher's argument, which is the folder.
+    Decision (h): a teacher reads ICS4U.
+    """
+
+    def test_a_reference_course_is_titled_with_its_real_code(self):
+        config = {"course_code": "ICS4U", "kept_for_reference": True}
+        self.assertEqual(build_site.displayed_course_code(config, "ICS4U-2025"), "ICS4U")
+
+    def test_an_ordinary_course_is_titled_with_the_folder_exactly_as_before(self):
+        # The folder is what every path in the build uses, and for an
+        # ordinary course the two agree anyway. If they ever did NOT — a
+        # hand-edited config — the folder wins, because that is what the rest
+        # of the build is working from.
+        config = {"course_code": "ICS3U"}
+        self.assertEqual(build_site.displayed_course_code(config, "ICS3U"), "ICS3U")
+        self.assertEqual(build_site.displayed_course_code({"course_code": "MCV4U"}, "ICS3U"), "ICS3U")
+
+    def test_no_recorded_code_falls_back_to_the_folder(self):
+        self.assertEqual(build_site.displayed_course_code({}, "ADA1O-REF"), "ADA1O-REF")
+        self.assertEqual(
+            build_site.displayed_course_code({"kept_for_reference": True}, "ADA1O-REF"),
+            "ADA1O-REF"
+        )
+
+    def test_the_header_label_and_the_grade_label_follow_it(self):
+        # The grade label reads the FOURTH character, so a suffix that shifts
+        # that position gives a wrong grade. ICS4U-2025 survives by luck;
+        # MADW-09-2025 does not.
+        config = {"course_code": "MADW-09", "kept_for_reference": True}
+        code = build_site.displayed_course_code(config, "MADW-09-2025")
+        self.assertEqual(code, "MADW-09")
+        self.assertEqual(
+            build_site.resolve_header_label(config, code),
+            build_site.resolve_header_label(config, "MADW-09")
+        )
 
 
 class TheImageCarriesTheModule(unittest.TestCase):

@@ -31,6 +31,108 @@ final class ReferenceCourseTests: XCTestCase {
             "course_code": "ICS3U", "kept_for_reference": true,
         ])
         XCTAssertTrue(reference.keptForReference)
+
+        // And STRICTLY: a real JSON boolean and nothing else. `as? Bool` on
+        // the `NSNumber` these decode to says TRUE for 1 and 1.0, which is
+        // how the app came to freeze a course every launcher would deploy.
+        for truthy in ["1", "1.0", "\"true\"", "\"yes\"", "2"] {
+            let data: Data = Data(
+                "{\"course_code\": \"ICS3U\", \"kept_for_reference\": \(truthy)}".utf8
+            )
+            let decoded: [String: Any] = try XCTUnwrap(
+                try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            )
+            let configuration: CourseConfiguration = CourseConfiguration(
+                values: decoded, lastSavedData: data
+            )
+            XCTAssertFalse(
+                configuration.keptForReference,
+                "\(truthy) is not a JSON boolean, so it must not freeze and lock a course"
+            )
+        }
+    }
+
+    /// **The app is the FOURTH reader of the marker**, and these are the same
+    /// rows `scripts/test_reference_course.py` runs against `deploy.sh`,
+    /// `deploy.ps1` and the shared Python.
+    ///
+    /// It exists because the app and the three launchers disagreed, in both
+    /// directions at once: `"kept_for_reference": 1` read TRUE here —
+    /// `JSONSerialization` hands back an `NSNumber`, and `NSNumber`
+    /// conditionally bridges to `Bool` for 0 and 1 — so the app FROZE AND
+    /// LOCKED a course, with no way back to live, that every launcher then
+    /// deployed.
+    func testTheAppReadsTheMarkerTheWayTheContractSays() throws {
+        let rules: [String: Any] = try ReferenceCourseTests.rules()
+        let agreement: [String: Any] = try XCTUnwrap(rules["markerAgreement"] as? [String: Any])
+        let rows: [[String: Any]] = try XCTUnwrap(agreement["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(rows.count, 22, "The agreement table has lost rows.")
+
+        let folder: URL = try ReferenceCourseTests.temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let configURL: URL = folder.appendingPathComponent("course_config.json")
+
+        var checked: Int = 0
+        for row in rows {
+            let name: String = try XCTUnwrap(row["name"] as? String)
+            guard let text = row["configText"] as? String else {
+                // The rows about a missing, unreadable or directory-shaped
+                // settings file are about READING rather than about the
+                // marker; the launchers own those.
+                continue
+            }
+            var data: Data = Data(text.utf8)
+            if row["bom"] as? Bool == true {
+                data = Data([0xEF, 0xBB, 0xBF]) + data
+            }
+            try data.write(to: configURL)
+            if row["unreadable"] as? Bool == true {
+                // The launchers own this row — they fail CLOSED on it. What
+                // the app does is worth pinning anyway: it cannot open the
+                // course at all, so it is not in the sidebar and nothing is
+                // frozen.
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o000], ofItemAtPath: configURL.path
+                )
+                defer {
+                    try? FileManager.default.setAttributes(
+                        [.posixPermissions: 0o644], ofItemAtPath: configURL.path
+                    )
+                }
+                if FileManager.default.isReadableFile(atPath: configURL.path) {
+                    continue
+                }
+                XCTAssertNil(try? CourseConfiguration(contentsOf: configURL), name)
+                continue
+            }
+            checked += 1
+
+            // Stated on every row rather than inferred: the app and the
+            // launchers are allowed to differ in ONE direction, so a default
+            // would hide exactly the rows worth reading.
+            let expected: Bool = try XCTUnwrap(
+                row["appReadsAsReference"] as? Bool,
+                "\(name) does not say what the app reads it as"
+            )
+            guard let configuration = try? CourseConfiguration(contentsOf: configURL) else {
+                // Malformed JSON: the app cannot open the course at all, so
+                // it reads as no course rather than as a reference course.
+                XCTAssertFalse(expected, "\(name): the app cannot read this file at all")
+                continue
+            }
+            XCTAssertEqual(configuration.keptForReference, expected, name)
+
+            // The INVARIANT: wherever the app says reference, every launcher
+            // must refuse. The reverse is allowed — refusing publishes
+            // nothing and freezes nothing.
+            if configuration.keptForReference {
+                XCTAssertEqual(
+                    row["expect"] as? String, "refused",
+                    "\(name): the app would freeze and lock this course and a launcher would deploy it"
+                )
+            }
+        }
+        XCTAssertGreaterThanOrEqual(checked, 18, "Most rows carry a settings file to read.")
     }
 
     func testTheMarkerRoundTripsThroughTheFile() throws {
@@ -294,6 +396,11 @@ final class ReferenceCourseTests: XCTestCase {
         XCTAssertEqual(
             ReferenceCourseRule.Trouble.codeAlreadyInThatYear(code: "{code}", schoolYear: nil).sentence,
             wording["codeAlreadyWithNoYear"] as? String
+        )
+        XCTAssertEqual(
+            ReferenceWording.couldNotSetSchoolYear(course: "{course}"),
+            wording["couldNotSetSchoolYear"] as? String,
+            "The one sentence of this feature a Windows reader could not get as data."
         )
     }
 

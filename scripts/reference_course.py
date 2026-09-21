@@ -68,7 +68,36 @@ MARKER_KEY = "kept_for_reference"
 # launcher's check while this module called it a reference course — and the
 # folder publish, which never enters the container, went through at exit 0
 # saying "Published: 1 file(s) updated."
-MARKER_PATTERN = r'"kept_for_reference"\s*:\s*[Tt][Rr][Uu][Ee]'
+MARKER_PATTERN = r'"[^"]*ept_for_reference"\s*:\s*[Tt][Rr][Uu][Ee]'
+
+# The key being THERE at all, however it is spelled.
+#
+# `[^"]*ept_for_reference` catches the key written plainly and the key written
+# with JSON \u escapes in its first characters, and it cannot match an
+# ordinary key. It is the PRESENCE test: a marker that is there with a value
+# that is neither true nor false is something a person plainly meant, and the
+# launchers refuse it with "cannot tell" rather than guessing which way.
+MARKER_PRESENT_PATTERN = r'"[^"]*ept_for_reference"'
+
+# The value written as a real JSON false.
+MARKER_FALSE_PATTERN = r'"[^"]*ept_for_reference"\s*:\s*[Ff][Aa][Ll][Ss][Ee]'
+
+# An object KEY written with a \u escape — any key, not just this one.
+#
+# A key escaped ALL the way through (`"\u006b\u0065pt_for_reference"`) is
+# decoded by the app and by this module's parsed half, which both call it a
+# reference course and freeze it — while a TEXT reader sees nothing and the
+# folder publish, which never enters the container, goes through at exit 0.
+# Measured. So the text readers refuse any config whose keys are escaped at
+# all: every key Plantoir or the shared Python writes is plain ASCII, so an
+# escaped key is never one of ours.
+#
+# **Keys only.** `json.dump` escapes non-ASCII in VALUES by default, so a
+# course name with an accent and every emoji setting legitimately carry
+# `\uXXXX` — refusing on those would refuse real courses. The `[{,]` anchor is
+# what tells a key from a value: a key follows an opening brace or a comma,
+# and a value never does.
+ESCAPED_KEY_PATTERN = r'[{,]\s*"[^"]*\\u[0-9a-fA-F]{4}[^"]*"\s*:'
 
 # The school year it was taught in, as the calendar year it STARTED in.
 SCHOOL_YEAR_KEY = "reference_school_year"
@@ -139,7 +168,9 @@ def is_reference(course_dir) -> bool:
 
 def cannot_tell(course_dir) -> bool:
     """
-    True when a settings file is THERE and cannot be read.
+    True when the settings cannot answer the question — either the file is
+    THERE and will not open, or it carries the marker with a value that is
+    neither `true` nor `false`.
 
     "Cannot tell" is not "no", and the two must not be collapsed: a file that
     exists and refuses to open is exactly the case where refusing costs a
@@ -155,10 +186,23 @@ def cannot_tell(course_dir) -> bool:
         return False
     try:
         with open(path, "r", encoding="utf-8-sig") as handle:
-            handle.read()
+            text = handle.read()
     except OSError:
         return True
-    return False
+
+    # A spelling somebody plainly MEANT as the marker: `1`, `"true"`, a key
+    # written with \u escapes. The app reads a real JSON boolean and nothing
+    # else, so it treats these as ordinary courses — which is safe only
+    # because the launchers stop here. Refusing costs a teacher one puzzled
+    # moment on a course they hand-edited; allowing costs them a frozen course
+    # on the web.
+    if re.search(ESCAPED_KEY_PATTERN, text) is not None:
+        return True
+    if re.search(MARKER_PATTERN, text) is not None:
+        return False
+    if re.search(MARKER_FALSE_PATTERN, text) is not None:
+        return False
+    return re.search(MARKER_PRESENT_PATTERN, text) is not None
 
 
 def school_year(course_dir):
@@ -186,6 +230,22 @@ def display_code(course_dir) -> str:
     if isinstance(recorded, str) and recorded.strip():
         return recorded.strip()
     return Path(course_dir).name
+
+
+def why_cannot_tell(course_dir) -> str:
+    """
+    WHICH of the two reasons, so the sentence a teacher reads is true.
+
+    `deploy.py` printed "its settings file could not be read" for every cause,
+    including a file that opened perfectly well and simply said `1`.
+    """
+    path = Path(course_dir) / _CONFIG_NAME
+    try:
+        with open(path, "r", encoding="utf-8-sig") as handle:
+            handle.read()
+    except OSError:
+        return "its settings file could not be read"
+    return "its settings say something other than true or false"
 
 
 def refusal_sentence(course: str) -> str:

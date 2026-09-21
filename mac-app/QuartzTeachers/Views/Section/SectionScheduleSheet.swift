@@ -165,7 +165,7 @@ struct SectionScheduleSheet: View {
 
     var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("When does \(course.code) section \(sectionNumber) meet?")
+            Text("When does \(course.displayCode) section \(sectionNumber) meet?")
                 .font(.title2)
                 .accessibilityIdentifier("sectionScheduleTitle")
 

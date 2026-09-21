@@ -1381,6 +1381,40 @@ already matches and it catches the write failure, so on a reference course it
 is a warning line at worst rather than a failed build. Named here so nobody
 reads it as a bug.
 
+### The walk itself — and the bug that hid in it
+
+`contentFiles` skips the never-locked names, and `skipDescendants()` is for a
+never-locked **FOLDER**. Called on a never-locked FILE — `course_config.json`,
+which every course has at its top level — the enumerator applies the skip to
+the next directory it has not descended into, so **the folder after it was
+never walked and never locked.** Measured on a real course: 842 of 934 files
+walked, 27 real pages left editable, and *which* folder was lost moved between
+passes with readdir order — which is why the course came out mostly locked,
+never entirely locked, and nothing looked wrong. Found by the branch-B
+implementer on 2026-09-20, in the real app.
+
+The cure is to ask whether the skipped thing IS a directory. The lesson is the
+other half, and the first attempt at it was wrong in a way worth recording: **a
+count produced BY the walk cannot audit the walk.** Comparing "how many the
+walk saw" with "how many of those are locked" is algebraically "nothing failed
+to take" — the broken walk passed it, with nine pages editable on disk.
+
+What runs now is an **independent census**: a plain full enumeration with no
+skip logic at all, classifying each regular file by the never-locked rule
+alone, and comparing what should be locked with what the file system says is.
+That is the 934 against the walk's 842. A mismatch goes on the trail with both
+numbers, and the sentence that tells a teacher their pages are locked is **not
+shown** — which also covers the volume that cannot carry the flag at all,
+where nothing could be locked and the old code said it was.
+
+**The walk runs off the caller's actor, and on this target that takes
+`@concurrent`.** `mac-app/project.yml` sets `SWIFT_APPROACHABLE_CONCURRENCY`,
+which turns on `NonisolatedNonsendingByDefault` — under that rule a plain
+`nonisolated async` function runs on its **caller's** actor, so the obvious
+spelling would have kept every `stat` on the main actor while reading as
+though it did not. Measured both ways; `testTheLockWalkDoesNotRunOnTheMainThread`
+pins it rather than trusting the annotation. No `DispatchQueue`, no sleeps.
+
 ### Asserted, VERIFIED, re-asserted — and never with a timer
 
 `ReferenceCourseUpkeep.bringUpToDate` runs whenever a working folder is read
@@ -1416,6 +1450,33 @@ and a LOCKED one would fail every later preflight twice over, at the write and
 again at the cleanup, so that course's settings could never be reconciled
 again. Anything ending `.tmp` is left alone for the same reason.
 
+**A real-image gate**, since 2026-09-20: `verify.sh` builds a course whose
+every content file carries `uchg`, in the dev-test image, over a `$HOME` bind
+mount — and checks that it builds at all, that a page hidden in the SOURCE is
+hidden in the built site, that building again over the existing build works,
+and that the source comes back byte-for-byte and still locked. The hidden page
+uses the LEGACY `draft:` spelling deliberately, because `publish: false` needs
+no rewrite and would stay hidden even when the rewrite fails.
+
+**And what the mac's own limit hides from Windows.** `preview.ps1` and
+`deploy.ps1` point `PLANTOIR_WORK_DIR` at a HOST folder under `%LOCALAPPDATA%`
+and build natively rather than as root — so there a read-only attribute DOES
+travel into the build tree, the frontmatter rewrite WOULD fail, and a page the
+teacher hid WOULD be published. The trap the mac cannot reproduce is live on
+the other platform, and the `windows` issue says so.
+
+**What that gate is NOT.** The plan's ruling asked for a must-fail proof —
+the same case with mode 444 showing the hidden page — and it does not
+reproduce through the real launcher. The 444 fault needs the build tree to be
+the host bind mount, where container root does not get its usual permission
+override; `preview.sh --build-only` builds in the container's own
+`/tmp/quartz-builds` and syncs `public/` out afterwards, so the rewrite happens
+on container-local storage, where root *can* write a 444 file. Run with
+`chmod 444` as well as the flag, the case still passed. The original
+measurement stands — it was taken against a bind mount on purpose, and it is
+still why the mechanism is the flag alone — but the standing gate is on
+everything else.
+
 **Cost, measured on this Mac** (APFS, local disk; 1,220 files — 900 under
 `Media` plus 320 pages): **59.5 ms** for the pass that locks everything, and
 **23 ms** for a pass over a course already frozen. A folder with no reference
@@ -1431,6 +1492,20 @@ course in it does no work at all.
   the scheduled-deploy cancel and before the archive, so the one thing that can
   still stop a removal is the cancel. The confirmation says nothing about the
   lock: that would be the app talking about its own plumbing.
+- **The settings FORM is not shown at all** on a reference course: the row
+  opens a short read-only summary instead. The form carried a "Deploying"
+  section, and a reference course is deliberately left with no deploy folder —
+  so it asked the teacher to choose one for a course it had just called never
+  deployed, and greyed Save for ever with no explanation. Worse, Save WORKED
+  for everything else, because `course_config.json` is never locked: a teacher
+  could rename a frozen course, change its graded folders, or quietly undo the
+  neutralisation that makes an older Plantoir refuse it. `frozen.rule` says
+  Plantoir offers nothing that changes a page, a setting or the shape of the
+  course; that sentence was false as shipped and is true now.
+- **The Site Health repair BUTTON is not drawn.** The model already returned
+  no attempts — and the view drew the button anyway, so pressing it said
+  *"That is already put right. Nothing needed changing."* about a folder that
+  was really missing. The findings still report; the action is gone.
 - **Removing one SECTION is refused**, with `ReferenceWording.staysAsItIs` —
   removing a section changes the course, so "frozen" already requires it. The
   sidebar does not offer the item; the refusal exists so no other caller gets
