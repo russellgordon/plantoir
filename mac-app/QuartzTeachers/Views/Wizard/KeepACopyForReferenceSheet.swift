@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// "Keep a Copy for Reference…" — the one way a reference course is made in
-/// this release.
+/// "Keep a Copy for Reference…" — one of the two ways a reference course is
+/// made. The other is "Import Courses for Reference…"
+/// (`ImportCoursesForReferenceSheet`), which is the same act with a different
+/// source and ends in the same function.
 ///
 /// A school year, a folder name, and two sentences saying what the copy IS.
 /// The course the teacher is teaching is not touched and not mentioned again:
