@@ -114,7 +114,9 @@ struct CopyPageSheet: View {
     /// Why Copy is not available right now, or nil.
     var refusal: String? {
         if picker.pages.isEmpty {
-            return CopyPageWording.thisCourseHasNoPagesToCopy(course: source.displayCode)
+            return CopyPageWording.thisCourseHasNoPagesToCopy(
+                course: sourceFacts?.displayName ?? source.displayCode
+            )
         }
         guard let destinationCourse else {
             return CopyPageWording.thereIsNoCourseToCopyInto
@@ -161,7 +163,7 @@ struct CopyPageSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(CopyPageWording.sheetTitle(course: source.displayCode))
+            Text(CopyPageWording.sheetTitle(course: sourceFacts?.displayName ?? source.displayCode))
                 .font(.headline)
 
             if stage == .finished, let outcome {
@@ -314,74 +316,21 @@ struct CopyPageSheet: View {
 
     // MARK: - The pages this one links to
 
-    /// Every page the named page's links reach, ticked, with the folder each
-    /// will land in — and what was left alone, with the reason.
+    /// The checklist, as its own view so it can be rendered — and LOOKED at
+    /// — without a window, a workspace or a sheet around it.
     @ViewBuilder
     func checklist(_ plan: CoursePageCopyPlan) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(CopyPageWording.copiedInto(
-                pages: plan.pages.count,
-                course: destinationCourse?.displayCode ?? "",
-                folder: destinationFolderName
-            ))
-
-            ForEach(plan.linkedPages) { linked in
-                Toggle(isOn: tickBinding(for: linked)) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(linked.pageName)
-                        Text(
-                            linked.isRequired
-                                ? CopyPageWording.embeddedPagesAlwaysComeAlong
-                                : linked.destinationFolderName
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
+        CopyPageChecklist(
+            plan: plan,
+            courseName: destinationFacts?.displayName ?? "",
+            folderName: destinationFolderName,
+            kept: Binding(
+                get: { return keptLinkedPages },
+                set: { updated in
+                    keptLinkedPages = updated
+                    replan()
                 }
-                .disabled(linked.isRequired)
-                .accessibilityIdentifier("copyPageLinked-\(linked.id)")
-            }
-
-            if !plan.media.isEmpty {
-                Text(CopyPageWording.willBringPicturesAndFiles(
-                    count: plan.mediaToCreate.count,
-                    size: ReferenceImportWording.size(plan.totalBytes)
-                ))
-                .foregroundStyle(.secondary)
-            }
-            ForEach(plan.skipped.indices, id: \.self) { index in
-                Text(CopyPageSheet.plainSentence(for: plan.skipped[index]))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if !plan.linksLeadingNowhere.isEmpty {
-                Text(CopyPageWording.theseLinksWillNotLeadAnywhereYet(
-                    names: plan.linksLeadingNowhere
-                ))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            Text(CopyPageWording.copiesStartHidden)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityIdentifier("copyPageChecklist")
-    }
-
-    func tickBinding(for linked: CopiedPagePlacement) -> Binding<Bool> {
-        let key: String = linked.pageName.lowercased()
-        return Binding(
-            get: {
-                return linked.isRequired || keptLinkedPages.contains(key)
-            },
-            set: { isOn in
-                if isOn {
-                    keptLinkedPages.insert(key)
-                } else {
-                    keptLinkedPages.remove(key)
-                }
-            }
+            )
         )
     }
 
@@ -600,6 +549,16 @@ struct CopyPageSheet: View {
             keptLinkedPages = ticked
             shownPlan = plan
             stage = .checking
+        }
+    }
+
+    /// Works the plan out again from the ticks as they stand now.
+    func replan() {
+        guard let request else {
+            return
+        }
+        Task { @MainActor in
+            shownPlan = await CoursePageCopyPlanner.planning(request)
         }
     }
 

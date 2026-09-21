@@ -426,7 +426,7 @@ final class CoursePageCopyTests: XCTestCase {
             let text: String = try XCTUnwrap(oneCase["text"] as? String, name)
             let expected: Bool = try XCTUnwrap(oneCase["builderAgrees"] as? Bool, name)
             XCTAssertEqual(
-                CopiedPageText.theBuilderWouldReadItTheSameWay(text), expected,
+                CopiedPageText.theBuilderWouldReadItTheSameWay(text, forSections: [1]), expected,
                 "\(name): the builder-agreement answer is wrong for:\n\(text)"
             )
         }
@@ -516,6 +516,40 @@ final class CoursePageCopyTests: XCTestCase {
             encoding: .utf8
         )
         XCTAssertEqual(theirs, "THEIRS")
+    }
+
+    /// The read-back refuses the page AND the removal fails.
+    ///
+    /// The one outcome where "… was not copied" would be a lie, with a page
+    /// nobody could prove hidden still in the teacher's course. It cannot be
+    /// provoked end to end — the immutable parent folder that would cause it
+    /// also stops the page being written — so the decision is tested at its
+    /// own seam rather than through a path that quietly does something else.
+    func testAPageThatCouldNotBeRemovedIsNotClaimedAsNotCopied() throws {
+        let url: URL = scratch.appendingPathComponent("stuck.md")
+
+        XCTAssertEqual(
+            CoursePageCopier.refusing(url, couldBeReadButNotByTheBuilder: false) { _ in },
+            .theCopyCouldNotBeMadeHidden
+        )
+        XCTAssertEqual(
+            CoursePageCopier.refusing(url, couldBeReadButNotByTheBuilder: true) { _ in },
+            .thePageIsWrittenInAWayPlantoirCannotBeSureOf
+        )
+        struct ItWouldNotGo: Error { }
+        XCTAssertEqual(
+            CoursePageCopier.refusing(url, couldBeReadButNotByTheBuilder: false) { _ in
+                throw ItWouldNotGo()
+            },
+            .theCopyIsStillThereAndMustBeRemoved,
+            "A page that could not be removed was reported as simply not copied."
+        )
+        XCTAssertEqual(
+            CoursePageCopier.refusing(url, couldBeReadButNotByTheBuilder: true) { _ in
+                throw ItWouldNotGo()
+            },
+            .theCopyIsStillThereAndMustBeRemoved
+        )
     }
 
     // MARK: - Off the main actor
@@ -655,6 +689,16 @@ final class CoursePageCopyTests: XCTestCase {
         )
         XCTAssertEqual(
             CopyPageWording.alsoCopyLinkedPages, wording["alsoCopyLinkedPages"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.willCopy(pages: 7, course: "{course}", folder: "{folder}")
+                .replacingOccurrences(of: "7", with: "{pages}"),
+            wording["willCopy"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.willBringPicturesAndFilesInAll(count: 4, size: "{size}")
+                .replacingOccurrences(of: "4", with: "{count}"),
+            wording["willBringPicturesAndFilesInAll"] as? String
         )
         XCTAssertEqual(
             CopyPageWording.embeddedPagesAlwaysComeAlong,
@@ -1057,6 +1101,7 @@ final class CoursePageCopyTests: XCTestCase {
         return CopyCourseFacts(
             code: code,
             displayCode: code,
+            displayName: code,
             directoryPath: directoryURL.path,
             sectionNumbers: sections,
             sharedFolderNames: sharedFolders,

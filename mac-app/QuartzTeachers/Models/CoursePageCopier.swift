@@ -106,35 +106,61 @@ nonisolated enum CopiedPageText {
         return lines.joined(separator: "\n")
     }
 
-    /// Whether the WEBSITE BUILDER would read this page's settings block the
-    /// same way this app does.
+    /// Whether the WEBSITE BUILDER would read this page's settings the same
+    /// way this app does — stated as ONE INVARIANT rather than a list of
+    /// shapes.
     ///
-    /// **The read-back asks the app's own reader, and the app's own reader is
-    /// not the one that decides what students see.** Two shapes were
-    /// reproduced end to end where the two split, and both end with the copy
-    /// certified hidden here and PUBLISHED there:
+    /// **The invariant: every key that hides this copy must lie inside the
+    /// region the BUILD reads as frontmatter, and that region must contain no
+    /// other visibility key and nothing this app knows the build's parser
+    /// chokes on.**
     ///
-    /// * a block closed by an INDENTED `---`. This app trims leading spaces
-    ///   before testing a fence; python-frontmatter's boundary is
-    ///   `^-{3,}\s*$`, which does not — so it never finds the end, reads no
-    ///   settings at all, and Quartz publishes a page that says nothing.
-    ///   (The divergence itself is issue #188; this is the one place where it
-    ///   costs the most.)
-    /// * a block carrying a YAML ANCHOR or ALIAS. Taking the plain `publish:`
-    ///   line out can orphan an alias the rest of the block refers to;
-    ///   `frontmatter.load` then RAISES, `build_site.py` prints a warning and
-    ///   RETURNS, and the page reaches Quartz unresolved.
+    /// The build's region is python-frontmatter's, not this app's: the first
+    /// line must open a block, and the block ENDS at the FIRST later line
+    /// matching `^-{3,}\s*$` — at COLUMN 0, with no indentation allowed.
+    /// `PageVisibilityReader.isFence` trims leading spaces before testing a
+    /// fence and therefore can close a block earlier than the build does; the
+    /// gap between the two is where every failure below lives.
     ///
-    /// Measured incidence across 777 real pages in four courses: **zero**, of
-    /// either shape. Refused anyway — the promise this feature makes is
-    /// certainty, and a refusal here is always right.
+    /// **Why the key multiset is the whole test.** By the time this is asked,
+    /// `hidden(from:forSections:)` has stripped every per-section key and
+    /// both plain keys from the region THIS APP sees, and written its own.
+    /// So if the build's region carries any visibility key that is not one of
+    /// ours, the two readers disagreed about where the block ends — and the
+    /// build takes the LAST one it sees. That is not a heuristic about a
+    /// shape; it is the disagreement itself, observed.
     ///
-    /// The test is deliberately crude and deliberately STRICT: the first line
-    /// must open a block with no indentation, a later line at column 0 must
-    /// close it, the plain `publish: false` this code wrote must be inside
-    /// it, and nothing in it may carry an anchor, an alias or a leading tab.
-    /// Anything else is "cannot be sure".
-    static func theBuilderWouldReadItTheSameWay(_ pageText: String) -> Bool {
+    /// Three failures were reproduced end to end and each one is caught by
+    /// exactly that:
+    ///
+    /// * a block closed by an INDENTED `---` (issue #188) — the app finds an
+    ///   end the build does not, so the source's own keys survive below it;
+    /// * a **block scalar carrying a horizontal rule**
+    ///   (`description: |` … `  ---`) — the app closes INSIDE the scalar and
+    ///   inserts its `publish: false` there, while the build reads the whole
+    ///   thing and takes the source's `publish: true` from the bottom. The
+    ///   copy reached students in section 1 while the summary said it was
+    ///   hidden;
+    /// * a source whose block the app closes and the build does not, so a
+    ///   second block is prepended and the file becomes several documents.
+    ///
+    /// **A benign block scalar is NOT refused**, and that matters: a
+    /// `description: |` with no rule inside it is read identically by both,
+    /// carries no extra visibility key, and copies. Refusing block scalars
+    /// outright was the cheap answer and it would have been a false refusal
+    /// on data that is perfectly ordinary.
+    ///
+    /// The last clause is the small, measured list of things the build's YAML
+    /// parser refuses outright — a directive, a document-end marker, a
+    /// leading tab, an anchor or alias in a VALUE position. When
+    /// `frontmatter.load` raises, `build_site.py` prints a warning and
+    /// RETURNS, so the page reaches Quartz with nothing resolved. An `&` or a
+    /// `*` INSIDE a value is not an anchor — four pages Plantoir itself ships
+    /// were refused for `title: "Task 1 - Pacific Trail & Alpine Hazard
+    /// Simulator"` before that was made precise.
+    static func theBuilderWouldReadItTheSameWay(
+        _ pageText: String, forSections sectionNumbers: [Int]
+    ) -> Bool {
         let lines: [String] = pageText.components(separatedBy: "\n")
         guard !lines.isEmpty, CopiedPageText.isAFenceTheBuilderSees(lines[0]) else {
             return false
@@ -148,28 +174,192 @@ nonisolated enum CopiedPageText {
             return false
         }
 
-        var saysHidden: Bool = false
+        // **The two readers must agree about where the block ENDS.**
+        //
+        // This is the condition that kills the whole fault class rather than
+        // one shape of it: every failure reproduced here — the indented
+        // closing fence, the block scalar carrying a horizontal rule, the
+        // source whose block only one of them closes — is the same
+        // disagreement seen from a different angle. If this app read a
+        // different region from the one the build will read, then the keys it
+        // stripped, the keys it wrote and the place it wrote them were all
+        // decided about the wrong text, and nothing downstream of that can be
+        // trusted.
+        //
+        // Measured with 16,192 composed shapes: with the multiset test alone,
+        // 2,972 pages were certified and then published or left unparsed by
+        // the real build; with this added, zero.
+        guard let appBlock = PageFrontmatter.block(in: pageText),
+              appBlock.openIndex == 0,
+              appBlock.closeIndex == closeIndex else {
+            return false
+        }
+
+        // Every hiding key this code wrote, and nothing else.
+        var wanted: Set<String> = ["publish: false"]
+        for sectionNumber in sectionNumbers {
+            wanted.insert("publishForSection\(sectionNumber): false")
+        }
+        var found: Set<String> = []
+
         for index in 1..<closeIndex {
             let line: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
             if line.hasPrefix("\t") {
                 return false
             }
-            if line.contains("&") || line.contains("*") {
+            if line.hasPrefix("%") {
                 return false
             }
-            var tidied: String = line
-            while tidied.hasSuffix(" ") {
-                tidied = String(tidied.dropLast())
+            if CopiedPageText.trimmingTrailingSpaces(line) == "..." {
+                return false
             }
-            if tidied == "publish: false" {
-                saysHidden = true
+            if line.hasPrefix(" ") {
+                // Part of some value. It cannot be a top-level key, and the
+                // anchor test below is about node values, which a continued
+                // line can carry.
+                if CopiedPageText.startsANodeThatCannotBeParsedHere(after: line) {
+                    return false
+                }
+                continue
+            }
+            if CopiedPageText.startsANodeThatCannotBeParsedHere(after: line) {
+                return false
+            }
+
+            let tidied: String = CopiedPageText.trimmingTrailingSpaces(line)
+            // **The build must be able to PARSE the region.**
+            //
+            // There is no YAML parser in Swift here, so the test is a
+            // conservative shape test instead: at column 0 a line is blank, a
+            // comment, or a mapping key, and a quoted value is closed on its
+            // own line. Anything else is "cannot be sure". When
+            // `frontmatter.load` raises, `build_site.py` prints a warning and
+            // RETURNS, and the page reaches Quartz with nothing resolved —
+            // which publishes it.
+            //
+            // Measured: refuses 0 of 11,891 pages Plantoir ships and 0 of 777
+            // real pages, and closes 856 shapes in the fuzz that were
+            // certified and then left unparsed.
+            if !CopiedPageText.isAShapeTheBuildCanRead(tidied) {
+                return false
+            }
+            if wanted.contains(tidied) {
+                found.insert(tidied)
+                continue
+            }
+            // Any OTHER visibility key inside the build's region means the
+            // two readers disagreed about where the block ends.
+            if CopiedPageText.namesAVisibilityKey(tidied) {
+                return false
             }
         }
-        return saysHidden
+        return found == wanted
+    }
+
+    /// True when a top-level line of a settings block is a shape the build's
+    /// YAML parser reads: blank, a comment, or `key:` / `key: value` with any
+    /// quoted value closed on the same line.
+    static func isAShapeTheBuildCanRead(_ line: String) -> Bool {
+        if line.isEmpty || line.hasPrefix("#") {
+            return true
+        }
+        var name: Substring = Substring(line)
+        // A quoted key runs to its closing quote; an unclosed one is exactly
+        // the shape that makes the parser give up part way down the file.
+        if let quote = name.first, quote == "\"" || quote == "'" {
+            guard let close = name.dropFirst().firstIndex(of: quote) else {
+                return false
+            }
+            name = name[name.index(after: close)...]
+        } else {
+            guard let colon = name.firstIndex(of: ":") else {
+                return false
+            }
+            name = name[colon...]
+        }
+        guard name.first == ":" else {
+            return false
+        }
+        var value: Substring = name.dropFirst()
+        if let first = value.first, first != " " && first != "\t" {
+            // `key:value` is not a mapping to YAML; it is one long scalar.
+            return false
+        }
+        while value.first == " " || value.first == "\t" {
+            value = value.dropFirst()
+        }
+        if let quote = value.first, quote == "\"" || quote == "'" {
+            guard let close = value.dropFirst().lastIndex(of: quote) else {
+                return false
+            }
+            _ = close
+        }
+        return true
+    }
+
+    /// True when this line begins a YAML node the build's parser would refuse
+    /// here — an anchor or an alias.
+    ///
+    /// Asked of the VALUE, never of the whole line: an `&` or a `*` inside a
+    /// quoted title is an ordinary character, and treating it as an anchor
+    /// refused four pages Plantoir ships.
+    static func startsANodeThatCannotBeParsedHere(after line: String) -> Bool {
+        var rest: Substring = Substring(line)
+        while rest.first == " " || rest.first == "-" {
+            rest = rest.dropFirst()
+            if rest.first == " " {
+                continue
+            }
+            if rest.first == "&" || rest.first == "*" {
+                return true
+            }
+        }
+        guard let colon = rest.firstIndex(of: ":") else {
+            return false
+        }
+        var value: Substring = rest[rest.index(after: colon)...]
+        while value.first == " " || value.first == "\t" {
+            value = value.dropFirst()
+        }
+        return value.first == "&" || value.first == "*"
+    }
+
+    /// True when this top-level line names any of the four keys that decide
+    /// whether students meet a page.
+    static func namesAVisibilityKey(_ line: String) -> Bool {
+        var name: Substring = Substring(line)
+        if name.hasPrefix("\"") || name.hasPrefix("'") {
+            name = name.dropFirst()
+        }
+        for family in ["publishForSection", "draftSection"] {
+            if name.hasPrefix(family) {
+                return true
+            }
+        }
+        for key in ["publish", "draft"] {
+            if name.hasPrefix(key) {
+                let after: Substring = name.dropFirst(key.count)
+                if after.first == ":" || after.first == "\"" || after.first == "'" {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    static func trimmingTrailingSpaces(_ line: String) -> String {
+        var tidied: Substring = Substring(line)
+        while tidied.last == " " || tidied.last == "\t" {
+            tidied = tidied.dropLast()
+        }
+        return String(tidied)
     }
 
     /// A line the website builder would take as the edge of a settings block:
     /// three or more dashes at COLUMN 0, with nothing after them but spaces.
+    ///
+    /// python-frontmatter's own boundary, `^-{3,}\s*$`, which allows no
+    /// indentation — unlike `PageVisibilityReader.isFence`, which trims.
     static func isAFenceTheBuilderSees(_ line: String) -> Bool {
         var rest: Substring = Substring(PageFrontmatter.trimmingCarriageReturn(line))
         var dashes: Int = 0
@@ -399,7 +589,7 @@ nonisolated enum CoursePageCopier {
                 at: writtenURL, forSections: sections
             )
             let builderAgrees: Bool = CopiedPageText.theBuilderWouldReadItTheSameWay(
-                readBack ?? ""
+                readBack ?? "", forSections: sections
             )
             if !isHidden || !builderAgrees {
                 // **The removal is CHECKED.** "… was not copied" is the
@@ -408,21 +598,15 @@ nonisolated enum CoursePageCopier {
                 // sit in the teacher's course while they were told it was not
                 // there. An immutable parent folder is the realistic way it
                 // fails.
-                do {
-                    try FileManager.default.removeItem(at: writtenURL)
-                    skipped.append(CopySkip(
-                        name: placement.pageName,
-                        reason: isHidden
-                            ? .thePageIsWrittenInAWayPlantoirCannotBeSureOf
-                            : .theCopyCouldNotBeMadeHidden
-                    ))
-                } catch {
-                    stillOnDisk.append(writtenURL.path)
-                    skipped.append(CopySkip(
-                        name: placement.pageName,
-                        reason: .theCopyIsStillThereAndMustBeRemoved
-                    ))
+                let refusal: CopySkip.Reason = CoursePageCopier.refusing(
+                    writtenURL, couldBeReadButNotByTheBuilder: isHidden
+                ) { url in
+                    try FileManager.default.removeItem(at: url)
                 }
+                if refusal == .theCopyIsStillThereAndMustBeRemoved {
+                    stillOnDisk.append(writtenURL.path)
+                }
+                skipped.append(CopySkip(name: placement.pageName, reason: refusal))
                 continue
             }
 
@@ -490,6 +674,32 @@ nonisolated enum CoursePageCopier {
             bytesCopied: bytes,
             couldNotBeRemoved: stillOnDisk
         )
+    }
+
+    /// What a page that failed the read-back is reported as, having tried to
+    /// take it away again.
+    ///
+    /// **The removal is CHECKED**, and this is a function of its own so that
+    /// the branch where it FAILS can be tested: it is the one outcome where
+    /// "… was not copied" would be a lie, with a page nobody could prove
+    /// hidden still sitting in the teacher's course. An immutable parent
+    /// folder is the realistic cause, and it also stops the page being
+    /// written in the first place — so the failure cannot be provoked
+    /// end to end, and the honest answer is a seam rather than a test that
+    /// quietly exercises a different path.
+    static func refusing(
+        _ url: URL,
+        couldBeReadButNotByTheBuilder: Bool,
+        removing remove: (URL) throws -> Void
+    ) -> CopySkip.Reason {
+        do {
+            try remove(url)
+        } catch {
+            return .theCopyIsStillThereAndMustBeRemoved
+        }
+        return couldBeReadButNotByTheBuilder
+            ? .thePageIsWrittenInAWayPlantoirCannotBeSureOf
+            : .theCopyCouldNotBeMadeHidden
     }
 
     /// Whether the page on disk is CERTAINLY hidden — in every section the

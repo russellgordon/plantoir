@@ -132,6 +132,18 @@ nonisolated struct CopyCourseFacts: Sendable, Equatable {
     /// The code a TEACHER reads — `ICS4U`.
     let displayCode: String
 
+    /// What a teacher reads when this course has to be told apart from
+    /// another of the same code: `ICS4U · 2025–26` for one kept for
+    /// reference, and plainly `ICS4U` for one they teach.
+    ///
+    /// **Last year's ICS4U and this year's show the SAME code**, which is
+    /// #206's design — the folder carries the year and `course_code` carries
+    /// the real code. So a sheet headed "Copy a page from ICS4U" with "Copy
+    /// into ICS4U" underneath it names the same thing twice, and the teacher
+    /// has no way to tell which is which. The year is the one fact that
+    /// separates them, and it is the one the sidebar already groups by.
+    let displayName: String
+
     let directoryPath: String
 
     /// The timetable sections, as the settings said when this was read. The
@@ -188,9 +200,18 @@ nonisolated struct CopyCourseFacts: Sendable, Equatable {
                 folders.append(name)
             }
         }
+        var name: String = course.displayCode
+        if course.isKeptForReference {
+            if let year = course.schoolYear(on: CalendarDay.today()) {
+                name += " · " + SchoolYear.label(forStartingYear: year)
+            } else {
+                name += " · " + SchoolYear.otherGroupName
+            }
+        }
         return CopyCourseFacts(
             code: course.code,
             displayCode: course.displayCode,
+            displayName: name,
             directoryPath: course.directoryURL.path,
             sectionNumbers: course.sectionNumbers,
             sharedFolderNames: folders,
@@ -576,9 +597,12 @@ nonisolated enum CoursePageCopyPlanner {
         var media: [CopiedMediaPlacement] = []
         var leadingNowhere: [String] = []
         var ranOutOfNames: Bool = false
+        var whichPage: String = request.page.pageName
+        var whichPicture: String = ""
         var mediaNamesTaken: Set<String> = index.mediaNames
         var mediaSeen: Set<String> = []
-        for text in texts {
+        for whichText in texts.indices {
+            let text: String = texts[whichText]
             let gathered: GatheredReferences = CoursePageCopyPlanner.gather(
                 referencesIn: text,
                 source: request.source,
@@ -595,24 +619,36 @@ nonisolated enum CoursePageCopyPlanner {
             for name in gathered.linksLeadingNowhere where !leadingNowhere.contains(name) {
                 leadingNowhere.append(name)
             }
-            if gathered.aPictureCouldNotBeGivenAFreeName {
+            if gathered.aPictureCouldNotBeGivenAFreeName && !ranOutOfNames {
                 ranOutOfNames = true
+                whichPicture = gathered.thePictureThatCouldNotBeNamed
+                if whichText < placements.count {
+                    whichPage = placements[whichText].pageName
+                }
             }
         }
         let gathered: GatheredReferences = GatheredReferences(
             media: media,
             linksLeadingNowhere: leadingNowhere,
-            aPictureCouldNotBeGivenAFreeName: ranOutOfNames
+            aPictureCouldNotBeGivenAFreeName: ranOutOfNames,
+            thePictureThatCouldNotBeNamed: whichPicture
         )
 
         if gathered.aPictureCouldNotBeGivenAFreeName {
+            // Nothing is copied — the pages travel together or not at all,
+            // because a picture that cannot be renamed would leave whichever
+            // page shows it pointing at the teacher's own different file.
+            // The skip names THAT page, not whichever one the teacher typed,
+            // and the walk's own skips are kept rather than thrown away.
+            var stopped: [CopySkip] = skips
+            stopped.append(CopySkip(
+                name: whichPage, reason: .thePicturesCouldNotBePointedAtTheirNewNames
+            ))
+            _ = gathered.thePictureThatCouldNotBeNamed
             return CoursePageCopyPlan(
                 pages: [],
                 media: [],
-                skipped: [CopySkip(
-                    name: request.page.pageName,
-                    reason: .thePicturesCouldNotBePointedAtTheirNewNames
-                )],
+                skipped: stopped,
                 linksLeadingNowhere: gathered.linksLeadingNowhere
             )
         }
@@ -676,11 +712,22 @@ nonisolated enum CoursePageCopyPlanner {
         }
         let reach: AssistLinkedReach = source.graph.reachFollowingLinks(from: [start])
 
-        // A page shown INSIDE the named page comes along whether or not the
-        // teacher ticks it.
+        // A page shown INSIDE a page being copied comes along whether or not
+        // the teacher ticks it — and that means inside ANY of them, not only
+        // inside the one they named. If a linked page L shows page E, then
+        // unticking E puts a hole in L, which is the exact failure the rule
+        // exists to prevent.
         var required: Set<String> = []
         for embedded in CoursePageCopySource.pagesEmbeddedIn(pageText) {
             required.insert(embedded)
+        }
+        for found in reach.pages {
+            guard let text = try? String(contentsOf: found.fileURL, encoding: .utf8) else {
+                continue
+            }
+            for embedded in CoursePageCopySource.pagesEmbeddedIn(text) {
+                required.insert(embedded)
+            }
         }
 
         var pages: [CopiedPagePlacement] = []
@@ -764,6 +811,10 @@ nonisolated enum CoursePageCopyPlanner {
         /// different picture. Listing it said the opposite ("this link will
         /// not lead anywhere") about a link that leads somewhere wrong.
         let aPictureCouldNotBeGivenAFreeName: Bool
+
+        /// Which picture it was, so the summary can name the page that shows
+        /// it rather than whichever page the teacher happened to type.
+        let thePictureThatCouldNotBeNamed: String
     }
 
     /// Every picture and file a page names, resolved against the source's
@@ -793,6 +844,7 @@ nonisolated enum CoursePageCopyPlanner {
         var leadingNowhere: [String] = []
         var reportedNowhere: Set<String> = []
         var ranOutOfNames: Bool = false
+        var whichPicture: String = ""
 
         for reference in PageReferences.references(in: pageText) {
             let lastComponent: String = reference.lastComponent
@@ -868,6 +920,7 @@ nonisolated enum CoursePageCopyPlanner {
                 basedOn: sourceName, fromCourse: source.code, avoiding: namesTaken
             ) else {
                 ranOutOfNames = true
+                whichPicture = sourceName.text
                 continue
             }
             namesTaken.insert(freeName.comparisonKey)
@@ -882,7 +935,8 @@ nonisolated enum CoursePageCopyPlanner {
         return GatheredReferences(
             media: media,
             linksLeadingNowhere: leadingNowhere,
-            aPictureCouldNotBeGivenAFreeName: ranOutOfNames
+            aPictureCouldNotBeGivenAFreeName: ranOutOfNames,
+            thePictureThatCouldNotBeNamed: whichPicture
         )
     }
 
