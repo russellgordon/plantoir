@@ -2493,10 +2493,13 @@ stayed invisible for five weeks: a teacher declined the ready-made pages for
 a code that had some, got empty folders rather than the subject's skeleton,
 and nothing written down said which of those two things the app had done.
 **An event list can only pin the events somebody thought of; what a line
-CARRIES is the half that has to be read.** The line is written before the
-launcher starts, so a creation that fails part-way still says what was asked
-for; Windows creates courses too, so the contract entry carries no
-`appliesOn`.
+CARRIES is the half that has to be read.** From the WIZARD the line is
+written before the launcher starts, so a creation that fails part-way still
+says what was asked for. From **Add Example Course** it is written AFTER the
+run, and only when the run reported the code it installed under — the example
+arrives as EXC2O unless that code is taken, so a line written up front would
+name a course that may not exist, and a failed run writes nothing. Windows
+creates courses too, so the contract entry carries no `appliesOn`.
 
 ## The local assistant
 
