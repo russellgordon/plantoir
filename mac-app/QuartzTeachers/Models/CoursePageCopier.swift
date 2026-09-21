@@ -106,6 +106,86 @@ nonisolated enum CopiedPageText {
         return lines.joined(separator: "\n")
     }
 
+    /// Whether the WEBSITE BUILDER would read this page's settings block the
+    /// same way this app does.
+    ///
+    /// **The read-back asks the app's own reader, and the app's own reader is
+    /// not the one that decides what students see.** Two shapes were
+    /// reproduced end to end where the two split, and both end with the copy
+    /// certified hidden here and PUBLISHED there:
+    ///
+    /// * a block closed by an INDENTED `---`. This app trims leading spaces
+    ///   before testing a fence; python-frontmatter's boundary is
+    ///   `^-{3,}\s*$`, which does not — so it never finds the end, reads no
+    ///   settings at all, and Quartz publishes a page that says nothing.
+    ///   (The divergence itself is issue #188; this is the one place where it
+    ///   costs the most.)
+    /// * a block carrying a YAML ANCHOR or ALIAS. Taking the plain `publish:`
+    ///   line out can orphan an alias the rest of the block refers to;
+    ///   `frontmatter.load` then RAISES, `build_site.py` prints a warning and
+    ///   RETURNS, and the page reaches Quartz unresolved.
+    ///
+    /// Measured incidence across 777 real pages in four courses: **zero**, of
+    /// either shape. Refused anyway — the promise this feature makes is
+    /// certainty, and a refusal here is always right.
+    ///
+    /// The test is deliberately crude and deliberately STRICT: the first line
+    /// must open a block with no indentation, a later line at column 0 must
+    /// close it, the plain `publish: false` this code wrote must be inside
+    /// it, and nothing in it may carry an anchor, an alias or a leading tab.
+    /// Anything else is "cannot be sure".
+    static func theBuilderWouldReadItTheSameWay(_ pageText: String) -> Bool {
+        let lines: [String] = pageText.components(separatedBy: "\n")
+        guard !lines.isEmpty, CopiedPageText.isAFenceTheBuilderSees(lines[0]) else {
+            return false
+        }
+        var closeIndex: Int? = nil
+        for index in 1..<lines.count where CopiedPageText.isAFenceTheBuilderSees(lines[index]) {
+            closeIndex = index
+            break
+        }
+        guard let closeIndex else {
+            return false
+        }
+
+        var saysHidden: Bool = false
+        for index in 1..<closeIndex {
+            let line: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            if line.hasPrefix("\t") {
+                return false
+            }
+            if line.contains("&") || line.contains("*") {
+                return false
+            }
+            var tidied: String = line
+            while tidied.hasSuffix(" ") {
+                tidied = String(tidied.dropLast())
+            }
+            if tidied == "publish: false" {
+                saysHidden = true
+            }
+        }
+        return saysHidden
+    }
+
+    /// A line the website builder would take as the edge of a settings block:
+    /// three or more dashes at COLUMN 0, with nothing after them but spaces.
+    static func isAFenceTheBuilderSees(_ line: String) -> Bool {
+        var rest: Substring = Substring(PageFrontmatter.trimmingCarriageReturn(line))
+        var dashes: Int = 0
+        while rest.first == "-" {
+            dashes += 1
+            rest = rest.dropFirst()
+        }
+        if dashes < 3 {
+            return false
+        }
+        while rest.first == " " || rest.first == "\t" {
+            rest = rest.dropFirst()
+        }
+        return rest.isEmpty
+    }
+
     /// A section number the course does not have, for the read-back guard to
     /// ask about.
     static func aSectionNumberNotIn(_ sectionNumbers: [Int]) -> Int {
@@ -137,6 +217,11 @@ nonisolated struct CoursePageCopyOutcome: Sendable {
     let skipped: [CopySkip]
     let linksLeadingNowhere: [String]
     let bytesCopied: Int64
+
+    /// Pages that were written, could not be shown to be hidden, and could
+    /// NOT be taken away again. Named in the summary and on the trail,
+    /// because the teacher has to go and remove them.
+    let couldNotBeRemoved: [String]
 
     // MARK: - Computed properties
 
@@ -234,11 +319,13 @@ nonisolated enum CoursePageCopier {
                 renamed: [],
                 skipped: plan.skipped,
                 linksLeadingNowhere: plan.linksLeadingNowhere,
-                bytesCopied: 0
+                bytesCopied: 0,
+                couldNotBeRemoved: []
             )
         }
 
         var skipped: [CopySkip] = plan.skipped
+        var stillOnDisk: [String] = []
         var renamed: [CoursePageCopyOutcome.Renamed] = []
         var renaming: [String: ExactName] = [:]
         for item in plan.mediaUnderANewName {
@@ -307,11 +394,35 @@ nonisolated enum CoursePageCopier {
             // to do.
             ReferenceLock.clearLock(at: writtenURL)
 
-            if !CoursePageCopier.isCertainlyHidden(at: writtenURL, forSections: sections) {
-                try? FileManager.default.removeItem(at: writtenURL)
-                skipped.append(CopySkip(
-                    name: placement.pageName, reason: .theCopyCouldNotBeMadeHidden
-                ))
+            let readBack: String? = try? String(contentsOf: writtenURL, encoding: .utf8)
+            let isHidden: Bool = CoursePageCopier.isCertainlyHidden(
+                at: writtenURL, forSections: sections
+            )
+            let builderAgrees: Bool = CopiedPageText.theBuilderWouldReadItTheSameWay(
+                readBack ?? ""
+            )
+            if !isHidden || !builderAgrees {
+                // **The removal is CHECKED.** "… was not copied" is the
+                // strongest promise this feature makes, and making it on an
+                // unchecked `try?` would let a page nobody could prove hidden
+                // sit in the teacher's course while they were told it was not
+                // there. An immutable parent folder is the realistic way it
+                // fails.
+                do {
+                    try FileManager.default.removeItem(at: writtenURL)
+                    skipped.append(CopySkip(
+                        name: placement.pageName,
+                        reason: isHidden
+                            ? .thePageIsWrittenInAWayPlantoirCannotBeSureOf
+                            : .theCopyCouldNotBeMadeHidden
+                    ))
+                } catch {
+                    stillOnDisk.append(writtenURL.path)
+                    skipped.append(CopySkip(
+                        name: placement.pageName,
+                        reason: .theCopyIsStillThereAndMustBeRemoved
+                    ))
+                }
                 continue
             }
 
@@ -327,7 +438,8 @@ nonisolated enum CoursePageCopier {
                 renamed: [],
                 skipped: skipped,
                 linksLeadingNowhere: plan.linksLeadingNowhere,
-                bytesCopied: 0
+                bytesCopied: 0,
+                couldNotBeRemoved: stillOnDisk
             )
         }
 
@@ -357,13 +469,14 @@ nonisolated enum CoursePageCopier {
                 created += 1
                 bytes += item.byteCount
             } catch {
-                if CoursePageCopier.alreadyThere(at: destinationMedia, named: item.destinationName) {
-                    reused += 1
-                } else {
-                    skipped.append(CopySkip(
-                        name: item.sourceName.text, reason: .aPictureCouldNotBeCopied
-                    ))
-                }
+                // A file that appeared between the plan and this write is
+                // NOT reported as "already here and will be used as it is":
+                // nothing compared its bytes, and the summary would be
+                // asserting a sameness that was never checked. It is a skip,
+                // named, which is the truthful answer either way.
+                skipped.append(CopySkip(
+                    name: item.sourceName.text, reason: .aPictureCouldNotBeCopied
+                ))
             }
         }
 
@@ -374,7 +487,8 @@ nonisolated enum CoursePageCopier {
             renamed: renamed,
             skipped: skipped,
             linksLeadingNowhere: plan.linksLeadingNowhere,
-            bytesCopied: bytes
+            bytesCopied: bytes,
+            couldNotBeRemoved: stillOnDisk
         )
     }
 

@@ -4322,7 +4322,9 @@
         "value": true,
         "rule": "After the page is written it is READ BACK FROM DISK and asked, for every section the destination has AND for one section number it does not have, whether it is hidden. The test is 'is not hidden', not 'is visible', so a value the app cannot read counts as failure. If the answer is not certainly hidden everywhere, the file just written is DELETED and the page is reported as not copied.",
         "nothingTouchesThePageAfterIt": "Media names are settled and the embeds rewritten BEFORE the page is written, so the read-back is the last thing that touches the page's bytes. The locked flag is cleared BEFORE the read-back, because a locked file could not be deleted - and deleting it is what the guard has to be able to do.",
-        "why": "This is the last line of defence on the one failure that reports success: a page that arrives visible and is deployed to students. It errs toward no page at all."
+        "why": "This is the last line of defence on the one failure that reports success: a page that arrives visible and is deployed to students. It errs toward no page at all.",
+        "whatTheReadBackCannotSeeOnItsOwn": "The app's reader is not the one that decides what students see, and two shapes were REPRODUCED where the two split - the copy certified hidden by the app and PUBLISHED by the builder. (1) A settings block closed by an INDENTED ---: the app trims leading spaces before testing a fence, python-frontmatter's boundary does not, so it finds no end, reads nothing, and Quartz publishes a page that says nothing (the divergence is issue #188). (2) A block carrying a YAML ANCHOR or ALIAS: taking the plain publish: line out can orphan an alias the rest of the block refers to, frontmatter.load then raises, build_site.py prints a warning and RETURNS, and the page reaches Quartz unresolved. Measured incidence across 777 real pages: ZERO of either. So the read-back ALSO asks a second, deliberately strict question - the first line must open a block at column 0, a later line at column 0 must close it, the plain publish: false this code wrote must be inside it, and nothing in it may carry an anchor, an alias or a leading tab. Anything else is not copied, with wording.thePageIsWrittenInAWayPlantoirCannotBeSureOf. A refusal here is always right.",
+        "theDeleteIsChecked": "A page that fails the read-back is removed, and the REMOVAL is checked. '... was not copied' is the strongest promise this feature makes, and making it on an unchecked delete would let a page nobody could prove hidden sit in the teacher's course while they were told it was not there - an immutable parent folder is the realistic way it fails. When the removal fails the teacher is told something DIFFERENT, the file's path is named, and the trail line says how many could not be removed and must not be deployed."
       }
     },
     "neverOverwritten": {
@@ -4340,7 +4342,8 @@
       "whereTheyAreFound": "Every place the page names something local: ![[x.png]] embeds, [[x.pdf]] links that point at a FILE rather than a page, HTML src and href attributes, and Markdown link destinations. Measured across 777 real markdown files: 1,474 embeds (1,274 of them media), 1,222 links of which 250 point at a file (235 PDFs), 5 HTML attributes naming a local file - one of them a live 1.1 MB picture on a copyable page - and 526 Markdown links, every one of them https://.",
       "fencedCodeIsLeftAlone": "A name inside a fenced code block is prose about a file rather than a use of one, and rewriting it would edit an example a teacher wrote. Inline code spans are not tracked, which is the same known gap WikiLinkRewriter has.",
       "sameNameSameFile": "Reused silently. Nothing is copied and nothing is said, beyond the count.",
-      "sameNameDifferentFile": "The incoming file comes in under a NEW name and only the COPIED page is pointed at it. The teacher's own file is untouched. The new name is '<name> (from <source course folder>)<extension>' - the course's FOLDER name, because every picture comes from Media and saying so would say nothing, while ICS4U-2025 says which course it came out of. If that name is taken, a number is added, and if a bounded search still finds nothing free the file is not copied and is listed.",
+      "sameNameDifferentFile": "The incoming file comes in under a NEW name and only the COPIED page is pointed at it. The teacher's own file is untouched. The new name is '<name> (from <source course folder>)<extension>' - the course's FOLDER name, because every picture comes from Media and saying so would say nothing, while ICS4U-2025 says which course it came out of. If that name is taken, a number is added; and if a bounded search still finds nothing free, THE PAGE IS NOT COPIED and says so. That last part is not tidiness: the destination already HAS a file of that name with different bytes - which is why a new name was needed - so a page written with the original name would show the teacher their own DIFFERENT picture, which is the one direction this feature must never err in. Merely listing the file said the opposite about a link that leads somewhere wrong.",
+      "invisibleSpacesAreFoldedOnTheWayINOnly": "Resolving a reference against the SOURCE's Media folds U+00A0, U+202F and U+2007 to an ordinary space, so a link typed with real spaces finds a file whose name carries a no-break one. The DESTINATION name index does not fold them, so a destination holding a<NBSP>b.png and an incoming a b.png end up side by side with names that look identical. Nothing is overwritten and nothing is lost, which is the safe direction; measured, and left as it is rather than made cleverer.",
       "comparedBySizeThenBytes": "Contents are compared only when the sizes match, and are read in chunks: a real picture here can be hundreds of megabytes.",
       "theRewriteIsVerified": "After the embeds are rewritten the page is scanned AGAIN with the same scanner, and if it still names any file that was renamed the PAGE IS NOT COPIED and says so. Direction of error: no page at all, rather than a page showing the teacher's own DIFFERENT picture under the name the copy wanted.",
       "theMediaFolderIsTheOneFolderMade": "If the destination has no Media folder it is created. It is not a folder a teacher chooses or can rename - Plantoir looks after it - and the site-health repair already creates it when it is missing. No other folder is ever created."
@@ -4362,6 +4365,14 @@
         "when": "the destination course is mid-deploy",
         "how": "asked again on the main actor immediately before the first write",
         "wording": "thatCourseIsDeployingRightNow"
+      },
+      {
+        "when": "the destination's shared folders are all missing from disk, so a page has nowhere to land - and no folder is ever created for this",
+        "wording": "thatCourseHasNowhereToPutIt"
+      },
+      {
+        "when": "a copy of the destination course could not be saved - nothing is written",
+        "wording": "theCopyOfTheCourseCouldNotBeSaved"
       },
       {
         "when": "there is no other course to copy into",
@@ -4398,9 +4409,13 @@
       "picturesAlreadyThere": "{count} are already in this course and will be used as they are.",
       "picturesBroughtInUnderANewName": "{count} have the same name as something different already here, so they come in under a new name.",
       "aPageOfThatNameIsAlreadyHere": "“{page}” is already in this course, so it was left as it is — links will lead to the one that is here.",
-      "theseLinksWillNotLeadAnywhereYet": "These links will not lead anywhere yet: {names}.",
+      "theseLinksWillNotLeadAnywhereYet": "These links will not lead anywhere yet: \u201c{name}\u201d, \u201c{name}\u201d.",
       "thatCourseIsDeployingRightNow": "Available once {course}’s deploy has finished",
       "thisCourseHasNoPagesToCopy": "{course} has no pages in shared folders to copy",
+      "thatCourseHasNowhereToPutIt": "{course} has no folder for a page to go in yet",
+      "theCopyOfTheCourseCouldNotBeSaved": "A copy of {course} could not be saved, so nothing was copied. Check there is room on the disk and try again.",
+      "thePageIsWrittenInAWayPlantoirCannotBeSureOf": "\u201c{page}\u201d was not copied: its settings are written in a way Plantoir cannot be sure of, and a copy must never turn up where students can read it.",
+      "theCopyIsStillThereAndMustBeRemoved": "\u201c{page}\u201d could not be shown to be hidden from students and could not be removed again. It is at {path} \u2014 take it out before you deploy that course.",
       "theCopyCouldNotBeMadeHidden": "“{page}” was not copied: Plantoir could not be certain it would arrive hidden from students, and a copy must never turn up where students can read it.",
       "thePicturesCouldNotBePointedAtTheirNewNames": "“{page}” was not copied: one of its pictures had to come in under a new name and Plantoir could not be certain the page would find it.",
       "thePageCouldNotBeWritten": "“{page}” could not be copied.",
@@ -4446,6 +4461,54 @@
         "why": "They already point at the right NAME, and the destination's own page of that name answers them."
       }
     ],
+    "builderAgreement": {
+      "note": "Whether the WEBSITE BUILDER would read the composed page's settings block the same way the app does. A composed text that fails this is NOT COPIED, whatever the app's own reader says - the two shapes below were reproduced end to end with the copy certified hidden here and PUBLISHED there.",
+      "cases": [
+        {
+          "name": "an ordinary composed page",
+          "text": "---\npublishForSection1: false\ntitle: X\npublish: false\n---\nBody\n",
+          "builderAgrees": true
+        },
+        {
+          "name": "a settings block closed by an INDENTED fence",
+          "why": "Issue #188: the app trims leading spaces before testing a fence and python-frontmatter does not, so the builder never finds the end, reads no settings at all, and Quartz publishes a page that says nothing. Reproduced.",
+          "text": "---\npublishForSection1: false\ntitle: X\npublish: false\n  ---\nBody\n",
+          "builderAgrees": false
+        },
+        {
+          "name": "a settings block carrying a YAML alias",
+          "why": "Taking the plain publish: line out can orphan an alias the rest of the block refers to; frontmatter.load then raises, build_site.py prints a warning and RETURNS, and the page reaches Quartz unresolved.",
+          "text": "---\npublishForSection1: false\nother: *a\npublish: false\n---\nBody\n",
+          "builderAgrees": false
+        },
+        {
+          "name": "a settings block carrying a YAML anchor",
+          "text": "---\npublishForSection1: false\nthing: &a 1\npublish: false\n---\nBody\n",
+          "builderAgrees": false
+        },
+        {
+          "name": "a tab-indented settings line",
+          "text": "---\npublishForSection1: false\n\ttitle: X\npublish: false\n---\nBody\n",
+          "builderAgrees": false
+        },
+        {
+          "name": "a block with no plain publish: false in it at all",
+          "why": "The plain key is what keeps the copy hidden in a section the course gains later; a composed text without it inside the strict block is not certainly hidden.",
+          "text": "---\npublishForSection1: false\ntitle: X\n---\nBody\n",
+          "builderAgrees": false
+        },
+        {
+          "name": "a fence of more than three dashes, which the builder accepts",
+          "text": "-----\npublishForSection1: false\npublish: false\n-----\nBody\n",
+          "builderAgrees": true
+        },
+        {
+          "name": "a fence with trailing spaces, which the builder accepts",
+          "text": "---  \npublishForSection1: false\npublish: false\n---  \nBody\n",
+          "builderAgrees": true
+        }
+      ]
+    },
     "frontmatterCases": [
       {
         "name": "a page with no visibility key at all, one-section destination",
@@ -4976,6 +5039,66 @@
         }
       },
       {
+        "name": "the rename runs out of names, so the PAGE is not copied",
+        "why": "The destination already HAS a file of that name with different bytes - which is why a new name was needed - so a page written with the original name would show the teacher their own different picture, and the summary would say the opposite. Reproduced end to end with 51 same-stem files in the destination.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Recursion.md",
+              "text": "![[one.png]]\n"
+            }
+          ],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "aaa"
+            }
+          ]
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": [
+            {
+              "name": "one.png",
+              "bytes": "zzzz"
+            },
+            {
+              "name": "one (from ICS4U-2025).png",
+              "bytes": "y"
+            }
+          ],
+          "andEveryNumberedNameUpTo": 50
+        },
+        "copy": {
+          "page": "Concepts/Recursion.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [
+            {
+              "name": "Recursion",
+              "reason": "thePicturesCouldNotBePointedAtTheirNewNames"
+            }
+          ],
+          "linksLeadingNowhere": []
+        }
+      },
+      {
         "name": "the renamed name is itself already taken, so a number is added",
         "why": "The second time a page is copied out of the same course, which is exactly what 'Copy another' makes easy.",
         "source": {
@@ -5221,6 +5344,48 @@
             "Stack Frames",
             "gone.png"
           ]
+        }
+      },
+      {
+        "name": "a page that links to ITSELF is not reported as leading nowhere",
+        "why": "Measured on a real course: one Concepts page names its own title, and the page being copied is not in the destination's index at planning time - so without this the summary tells the teacher that a link to the very page they are copying will not lead anywhere.",
+        "source": {
+          "folder": "ICS4U-2025",
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [
+            {
+              "path": "Concepts/Messaging.md",
+              "text": "See [[Messaging]] for more.\n"
+            }
+          ],
+          "media": []
+        },
+        "destination": {
+          "folder": "ICS4U",
+          "sections": [
+            1
+          ],
+          "sharedFolders": [
+            "Concepts"
+          ],
+          "pages": [],
+          "media": []
+        },
+        "copy": {
+          "page": "Concepts/Messaging.md",
+          "intoFolder": "Concepts"
+        },
+        "expect": {
+          "pages": [
+            "Concepts/Messaging.md"
+          ],
+          "mediaCreated": [],
+          "mediaReused": [],
+          "mediaRenamed": {},
+          "skipped": [],
+          "linksLeadingNowhere": []
         }
       },
       {

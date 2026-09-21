@@ -345,6 +345,8 @@ nonisolated struct CopySkip: Sendable, Equatable {
         case aPageOfThatNameIsAlreadyHere
         case thePageCouldNotBeRead
         case theCopyCouldNotBeMadeHidden
+        case theCopyIsStillThereAndMustBeRemoved
+        case thePageIsWrittenInAWayPlantoirCannotBeSureOf
         case thePicturesCouldNotBePointedAtTheirNewNames
         case thePageCouldNotBeWritten
         case aPictureCouldNotBeCopied
@@ -488,9 +490,31 @@ nonisolated enum CoursePageCopyPlanner {
             destinationFolderName: request.destinationFolderName
         )
 
+        // The pages this copy is bringing count as "there": a page that links
+        // to ITSELF — measured on a real course, where one Concepts page names
+        // its own title — would otherwise be reported as a link that leads
+        // nowhere, about the very page the teacher is copying.
+        var arriving: Set<String> = []
+        arriving.insert(request.page.fileName.pageComparisonKey)
+
         let gathered: GatheredReferences = CoursePageCopyPlanner.gather(
-            referencesIn: pageText, source: request.source, destination: index
+            referencesIn: pageText,
+            source: request.source,
+            destination: index,
+            alsoArriving: arriving
         )
+
+        if gathered.aPictureCouldNotBeGivenAFreeName {
+            return CoursePageCopyPlan(
+                pages: [],
+                media: [],
+                skipped: [CopySkip(
+                    name: request.page.pageName,
+                    reason: .thePicturesCouldNotBePointedAtTheirNewNames
+                )],
+                linksLeadingNowhere: gathered.linksLeadingNowhere
+            )
+        }
 
         return CoursePageCopyPlan(
             pages: [placement],
@@ -506,6 +530,18 @@ nonisolated enum CoursePageCopyPlanner {
     struct GatheredReferences: Sendable {
         let media: [CopiedMediaPlacement]
         let linksLeadingNowhere: [String]
+
+        /// True when a picture had to come in under a new name and no free
+        /// name could be found.
+        ///
+        /// **The PAGE is then not copied at all**, and that is the whole
+        /// point of carrying this out rather than quietly listing the file:
+        /// the destination already HAS a file of that name, with different
+        /// bytes — which is exactly why a new name was needed — so a page
+        /// written with the original name would show the teacher their own,
+        /// different picture. Listing it said the opposite ("this link will
+        /// not lead anywhere") about a link that leads somewhere wrong.
+        let aPictureCouldNotBeGivenAFreeName: Bool
     }
 
     /// Every picture and file a page names, resolved against the source's
@@ -523,7 +559,8 @@ nonisolated enum CoursePageCopyPlanner {
     static func gather(
         referencesIn pageText: String,
         source: CopyCourseFacts,
-        destination: DestinationIndex
+        destination: DestinationIndex,
+        alsoArriving: Set<String> = []
     ) -> GatheredReferences {
         let sourceMedia: [String: ExactName] = CoursePageCopyPlanner.mediaNames(in: source)
         var media: [CopiedMediaPlacement] = []
@@ -531,6 +568,7 @@ nonisolated enum CoursePageCopyPlanner {
         var namesTaken: Set<String> = destination.mediaNames
         var leadingNowhere: [String] = []
         var reportedNowhere: Set<String> = []
+        var ranOutOfNames: Bool = false
 
         for reference in PageReferences.references(in: pageText) {
             let lastComponent: String = reference.lastComponent
@@ -545,7 +583,8 @@ nonisolated enum CoursePageCopyPlanner {
                 // Not a picture or file. Either it names a page the
                 // destination already has — in which case the link works and
                 // nothing is said — or it leads nowhere and is LISTED.
-                if destination.pageNames.contains(ExactName(lastComponent).pageComparisonKey) {
+                let pageKey: String = ExactName(lastComponent).pageComparisonKey
+                if destination.pageNames.contains(pageKey) || alsoArriving.contains(pageKey) {
                     continue
                 }
                 if !reportedNowhere.contains(key) {
@@ -604,10 +643,7 @@ nonisolated enum CoursePageCopyPlanner {
             guard let freeName = CoursePageCopyPlanner.freeName(
                 basedOn: sourceName, fromCourse: source.code, avoiding: namesTaken
             ) else {
-                if !reportedNowhere.contains(key) {
-                    reportedNowhere.insert(key)
-                    leadingNowhere.append(reference.target)
-                }
+                ranOutOfNames = true
                 continue
             }
             namesTaken.insert(freeName.comparisonKey)
@@ -619,7 +655,11 @@ nonisolated enum CoursePageCopyPlanner {
             ))
         }
 
-        return GatheredReferences(media: media, linksLeadingNowhere: leadingNowhere)
+        return GatheredReferences(
+            media: media,
+            linksLeadingNowhere: leadingNowhere,
+            aPictureCouldNotBeGivenAFreeName: ranOutOfNames
+        )
     }
 
     /// One more try for a name whose spaces the teacher typed and the file
@@ -752,7 +792,7 @@ nonisolated struct DestinationIndex: Sendable {
 
     let mediaFolderURL: URL
 
-    // MARK: - Stored properties
+    // MARK: - Type properties
 
     /// Generated or private, and never a page a teacher wrote.
     static let leftOutOfTheIndex: Set<String> = [

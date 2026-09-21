@@ -143,6 +143,23 @@ struct SearchablePickerField: View {
                 isFocused: hasFocus,
                 backgroundIdentifier: "\(fieldIdentifier)-background"
             ))
+            // **The whole bezel takes a click, not just the text.**
+            //
+            // A `.plain` `TextField` hit-tests its TEXT, and an EMPTY one is
+            // a caret's width of it at the leading edge — so clicking the
+            // field did nothing at all. Measured by driving the real app:
+            // `AXFocused` stayed false after a click in the middle of a
+            // 361pt-wide field, and the teacher had no way back into it once
+            // focus had gone. It never showed in the course-code field this
+            // was ported from, because that screen gives the field focus as
+            // it opens and nobody ever has to click it.
+            //
+            // Placed BEFORE the chevron's `.overlay` so the button, which
+            // sits above, still gets its own clicks.
+            .contentShape(Rectangle())
+            .onTapGesture {
+                hasFocus = true
+            }
             // The cue a Mac user already knows: a trailing chevron reads as
             // "there is a menu behind this field", the way a combo box always
             // shows one. It is a second way in, not a different control.
@@ -180,6 +197,18 @@ struct SearchablePickerField: View {
                 // bookkeeping.
                 if hasFocus != isFocused {
                     hasFocus = isFocused
+                }
+            }
+            // A host that asks for focus BEFORE this view exists gets it.
+            //
+            // `onChange` cannot carry that, because nothing changes after the
+            // view appears: measured by driving the real app, where "Copy
+            // another" set the flag while the field was still the result
+            // step's, and the teacher met an unfocused field they then had to
+            // click.
+            .onAppear {
+                if isFocused {
+                    hasFocus = true
                 }
             }
     }

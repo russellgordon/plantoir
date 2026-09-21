@@ -395,6 +395,115 @@ final class CoursePageCopyTests: XCTestCase {
         }
     }
 
+
+    // MARK: - Would the website builder read it the same way?
+
+    /// Every authored case in the contract's `builderAgreement` family.
+    ///
+    /// The app's reader is not the one that decides what students see, and
+    /// the two shapes this closes were reproduced end to end with the copy
+    /// certified hidden here and PUBLISHED there.
+    func testTheBuilderAgreementCasesAnswerAsTheContractSays() throws {
+        let family: [String: Any] = try XCTUnwrap(rules["builderAgreement"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(family["cases"] as? [[String: Any]])
+        XCTAssertGreaterThan(cases.count, 5, "The builder-agreement cases did not load.")
+        for oneCase in cases {
+            let name: String = (oneCase["name"] as? String) ?? "?"
+            let text: String = try XCTUnwrap(oneCase["text"] as? String, name)
+            let expected: Bool = try XCTUnwrap(oneCase["builderAgrees"] as? Bool, name)
+            XCTAssertEqual(
+                CopiedPageText.theBuilderWouldReadItTheSameWay(text), expected,
+                "\(name): the builder-agreement answer is wrong for:\n\(text)"
+            )
+        }
+    }
+
+    /// A source page whose settings block is closed by an INDENTED fence is
+    /// not copied, and nothing is left behind.
+    ///
+    /// MUST-FAIL. Without the second question the app's own reader certifies
+    /// the copy hidden, the build reads no settings at all, and Quartz
+    /// publishes the page to students.
+    func testAPageTheBuilderWouldReadDifferentlyIsNotCopied() async throws {
+        let built: Built = try buildPair(
+            in: "indented-fence",
+            pageText: "---\ntitle: X\npublish: true\n  ---\nbody\n",
+            sourceMedia: []
+        )
+        let outcome: CoursePageCopyOutcome = await CoursePageCopier.copying(
+            try XCTUnwrap(built.request)
+        )
+        XCTAssertTrue(outcome.createdNothing, "The page was copied.")
+        XCTAssertEqual(
+            outcome.skipped.first?.reason, .thePageIsWrittenInAWayPlantoirCannotBeSureOf
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: built.destination.directoryURL
+                .appendingPathComponent("Concepts/Recursion.md").path),
+            "The page that could not be certified was left on disk."
+        )
+        XCTAssertEqual(outcome.couldNotBeRemoved, [])
+    }
+
+    /// The read-back's DELETE branch, run through the real copy rather than
+    /// asked of `isCertainlyHidden` alone.
+    ///
+    /// A tab-indented settings line reads `cannotTell` in this app, which is
+    /// the branch that writes the file and then takes it away again — the
+    /// four most safety-critical lines in the feature, and nothing ran them
+    /// until this test.
+    func testThePageIsWrittenAndThenDeletedWhenItCannotBeProvedHidden() async throws {
+        let built: Built = try buildPair(
+            in: "tab-frontmatter",
+            pageText: "---\n\ttitle: X\npublish:\ttrue\n---\nbody\n",
+            sourceMedia: []
+        )
+        let outcome: CoursePageCopyOutcome = await CoursePageCopier.copying(
+            try XCTUnwrap(built.request)
+        )
+        XCTAssertTrue(outcome.createdNothing)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: built.destination.directoryURL
+                .appendingPathComponent("Concepts/Recursion.md").path),
+            "The page was left on disk after the guard refused it."
+        )
+        XCTAssertEqual(outcome.couldNotBeRemoved, [])
+    }
+
+    /// When an incoming picture that needs a new name cannot get one, the
+    /// PAGE is not copied.
+    ///
+    /// MUST-FAIL. With the page written anyway, its embed names a file the
+    /// destination already has with DIFFERENT bytes — so the copy shows the
+    /// teacher their own, wrong picture, and the summary says the link "will
+    /// not lead anywhere".
+    func testAPictureThatCannotBeGivenAFreeNameStopsThePage() async throws {
+        var destinationMedia: [(String, String)] = [("one.png", "THEIRS")]
+        destinationMedia.append(("one (from ICS4U-2025).png", "taken"))
+        for attempt in 2...50 {
+            destinationMedia.append(("one (from ICS4U-2025) \(attempt).png", "taken"))
+        }
+        let built: Built = try buildPair(
+            in: "rename-exhausted", destinationMedia: destinationMedia
+        )
+        let outcome: CoursePageCopyOutcome = await CoursePageCopier.copying(
+            try XCTUnwrap(built.request)
+        )
+        XCTAssertTrue(outcome.createdNothing, "The page was copied with an embed pointing at the teacher's own different picture.")
+        XCTAssertEqual(
+            outcome.skipped.first?.reason, .thePicturesCouldNotBePointedAtTheirNewNames
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: built.destination.directoryURL
+                .appendingPathComponent("Concepts/Recursion.md").path)
+        )
+        let theirs: String = try String(
+            contentsOf: built.destination.directoryURL.appendingPathComponent("Media/one.png"),
+            encoding: .utf8
+        )
+        XCTAssertEqual(theirs, "THEIRS")
+    }
+
     // MARK: - Off the main actor
 
     /// The backup and the copy do not run on the main thread.
@@ -494,8 +603,17 @@ final class CoursePageCopyTests: XCTestCase {
             wording["aPageOfThatNameIsAlreadyHere"] as? String
         )
         XCTAssertEqual(
-            CopyPageWording.theseLinksWillNotLeadAnywhereYet(names: "{names}"),
+            CopyPageWording.theseLinksWillNotLeadAnywhereYet(names: ["{name}", "{name}"]),
             wording["theseLinksWillNotLeadAnywhereYet"] as? String
+        )
+        // The reason the list is quoted at all: a real page is called
+        // "Operators, Selection, Iteration", and a comma-joined list of names
+        // read as three pages rather than one.
+        XCTAssertEqual(
+            CopyPageWording.theseLinksWillNotLeadAnywhereYet(
+                names: ["Operators, Selection, Iteration", "Command-Line Projects"]
+            ),
+            "These links will not lead anywhere yet: “Operators, Selection, Iteration”, “Command-Line Projects”."
         )
         XCTAssertEqual(
             CopyPageWording.thatCourseIsDeployingRightNow(course: "{course}"),
@@ -520,6 +638,22 @@ final class CoursePageCopyTests: XCTestCase {
         XCTAssertEqual(
             CopyPageWording.aPictureCouldNotBeCopied(name: "{name}"),
             wording["aPictureCouldNotBeCopied"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.thatCourseHasNowhereToPutIt(course: "{course}"),
+            wording["thatCourseHasNowhereToPutIt"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.theCopyOfTheCourseCouldNotBeSaved(course: "{course}"),
+            wording["theCopyOfTheCourseCouldNotBeSaved"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.thePageIsWrittenInAWayPlantoirCannotBeSureOf(page: "{page}"),
+            wording["thePageIsWrittenInAWayPlantoirCannotBeSureOf"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.theCopyIsStillThereAndMustBeRemoved(page: "{page}", at: "{path}"),
+            wording["theCopyIsStillThereAndMustBeRemoved"] as? String
         )
     }
 
@@ -559,7 +693,8 @@ final class CoursePageCopyTests: XCTestCase {
             renamed: [CoursePageCopyOutcome.Renamed(from: "one.png", to: "one (from X).png")],
             skipped: [CopySkip(name: "Arrays", reason: .aPageOfThatNameIsAlreadyHere)],
             linksLeadingNowhere: [],
-            bytesCopied: 1_000
+            bytesCopied: 1_000,
+            couldNotBeRemoved: []
         )
         let line: String = CopyPageSheet.trailLine(
             for: outcome,
@@ -580,6 +715,24 @@ final class CoursePageCopyTests: XCTestCase {
                 "The trail line names “\(pageTitle)”, which is the teacher's own content."
             )
         }
+        XCTAssertFalse(line.contains("could not be removed"))
+
+        // The one thing the line asks the teacher to DO.
+        let stuck: CoursePageCopyOutcome = CoursePageCopyOutcome(
+            pagesCreated: [], mediaCreated: 0, mediaReused: 0, renamed: [],
+            skipped: [CopySkip(name: "Recursion", reason: .theCopyIsStillThereAndMustBeRemoved)],
+            linksLeadingNowhere: [], bytesCopied: 0,
+            couldNotBeRemoved: ["/x/ICS4U/Concepts/Recursion.md"]
+        )
+        let stuckLine: String = CopyPageSheet.trailLine(
+            for: stuck, fromCourseFolder: "ICS4U-2025", intoCourse: "ICS4U",
+            folder: "Concepts", backupNamed: nil
+        )
+        XCTAssertTrue(stuckLine.contains("could not be removed and must not be deployed"))
+        XCTAssertFalse(
+            stuckLine.contains("Recursion"),
+            "The trail line names a page, which is the teacher's own content."
+        )
     }
 
     /// The event is declared in both places, which is what makes a missing one
@@ -728,7 +881,9 @@ final class CoursePageCopyTests: XCTestCase {
             sections: (destinationSpec["sections"] as? [Int]) ?? [1],
             sharedFolders: (destinationSpec["sharedFolders"] as? [String]) ?? [],
             pages: CoursePageCopyTests.pages(from: destinationSpec["pages"]),
-            media: CoursePageCopyTests.media(from: destinationSpec["media"])
+            media: CoursePageCopyTests.fillingInNumberedNames(
+                destinationSpec, onto: CoursePageCopyTests.media(from: destinationSpec["media"])
+            )
         )
         guard let copy = oneCase["copy"] as? [String: String] else {
             return Built(source: source, destination: destination, request: nil)
@@ -777,6 +932,20 @@ final class CoursePageCopyTests: XCTestCase {
             if let name = entry["name"] {
                 result.append((name, entry["bytes"] ?? "x"))
             }
+        }
+        return result
+    }
+
+    /// A case that asks for every numbered rename to be taken already —
+    /// the 51-same-stem precondition, spelled once rather than fifty times.
+    static func fillingInNumberedNames(_ spec: [String: Any], onto media: [(String, String)])
+        -> [(String, String)] {
+        guard let upTo = (spec["andEveryNumberedNameUpTo"] as? NSNumber)?.intValue else {
+            return media
+        }
+        var result: [(String, String)] = media
+        for attempt in 2...upTo {
+            result.append(("one (from ICS4U-2025) \(attempt).png", "taken"))
         }
         return result
     }

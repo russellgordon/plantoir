@@ -37,6 +37,15 @@ struct CopyPageSheet: View {
 
     @State var picker: PagePickerModel = PagePickerModel()
     @State var sourceFacts: CopyCourseFacts?
+
+    /// The destination's facts, read ONCE per choice of course rather than
+    /// during every body evaluation.
+    ///
+    /// Reading them asks the file system whether each shared folder is really
+    /// on disk, and a computed property doing that is a `stat` per folder per
+    /// redraw — eleven of them on a real course, for every keystroke in the
+    /// page field.
+    @State var destinationFacts: CopyCourseFacts?
     @State var destinationCode: String = ""
     @State var destinationFolderName: String = ""
     @State var stage: Stage = .choosing
@@ -63,6 +72,13 @@ struct CopyPageSheet: View {
             if candidate.code == source.code {
                 continue
             }
+            // The comment above is the rule, so it is applied rather than
+            // described: a course whose shared folders are all missing from
+            // disk has nowhere for a page to land, and offering it leads to a
+            // disabled Copy button with no sentence beside it.
+            if CopyCourseFacts.read(from: candidate).sharedFolderNames.isEmpty {
+                continue
+            }
             result.append(candidate)
         }
         result.sort { first, second in
@@ -78,21 +94,22 @@ struct CopyPageSheet: View {
         return nil
     }
 
-    var destinationFacts: CopyCourseFacts? {
-        guard let destinationCourse else {
-            return nil
-        }
-        return CopyCourseFacts.read(from: destinationCourse)
-    }
-
     var destinationFolderNames: [String] {
         return destinationFacts?.sharedFolderNames ?? []
     }
 
     /// Why Copy is not available right now, or nil.
     var refusal: String? {
+        if picker.pages.isEmpty {
+            return CopyPageWording.thisCourseHasNoPagesToCopy(course: source.displayCode)
+        }
         guard let destinationCourse else {
             return CopyPageWording.thereIsNoCourseToCopyInto
+        }
+        if destinationFolderNames.isEmpty {
+            return CopyPageWording.thatCourseHasNowhereToPutIt(
+                course: destinationCourse.displayCode
+            )
         }
         if let workspaceURL = workspace.workspaceURL,
            CourseActivity.coursePublishIsRunning(
@@ -149,6 +166,12 @@ struct CopyPageSheet: View {
         }
         .padding(20)
         .frame(width: 480)
+        // The work is started as a Task that outlives this view, so a sheet
+        // dismissed mid-backup would go on writing files, reloading the
+        // sidebar and putting a line on the trail after the teacher believed
+        // they had stopped. Cancel is already disabled then; this closes the
+        // other ways out.
+        .interactiveDismissDisabled(stage == .savingACopy || stage == .copying)
         // The list is rendered HERE, at the top level of the sheet — never
         // inside the form above. See `SearchablePicker`'s header for what
         // happens otherwise: the card renders at a stuck zero frame and is
@@ -201,10 +224,12 @@ struct CopyPageSheet: View {
                     picker.dismissSuggestions()
                 },
                 onRevealRequested: {
+                    // A toggle, not an open: a real combo box's arrow closes
+                    // its popup as readily as it opens it.
                     if picker.isShowingSuggestions {
                         picker.dismissSuggestions()
                     } else {
-                        picker.noteFocusGained()
+                        picker.reveal()
                     }
                 },
                 onMoveHighlight: { delta in
@@ -221,11 +246,6 @@ struct CopyPageSheet: View {
             .onChange(of: picker.searchText) {
                 picker.noteTyping()
             }
-            .onChange(of: picker.isFieldFocused) {
-                if picker.isFieldFocused {
-                    picker.noteFocusGained()
-                }
-            }
         }
 
         Picker(CopyPageWording.whichCourse, selection: $destinationCode) {
@@ -235,7 +255,7 @@ struct CopyPageSheet: View {
         }
         .accessibilityIdentifier("copyPageDestinationCourse")
         .onChange(of: destinationCode) {
-            proposeAFolder()
+            readTheDestination()
         }
 
         Picker(CopyPageWording.whichFolder, selection: $destinationFolderName) {
@@ -305,13 +325,15 @@ struct CopyPageSheet: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(outcome.skipped.indices, id: \.self) { index in
-                Text(CopyPageSheet.sentence(for: outcome.skipped[index]))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(CopyPageSheet.sentence(
+                    for: outcome.skipped[index], couldNotBeRemoved: outcome.couldNotBeRemoved
+                ))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             if !outcome.linksLeadingNowhere.isEmpty {
                 Text(CopyPageWording.theseLinksWillNotLeadAnywhereYet(
-                    names: outcome.linksLeadingNowhere.joined(separator: ", ")
+                    names: outcome.linksLeadingNowhere
                 ))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -370,12 +392,37 @@ struct CopyPageSheet: View {
 
     /// What a skip reads as. The sentence is chosen here rather than carried
     /// on the skip, so the rule and the wording stay in separate places.
-    static func sentence(for skip: CopySkip) -> String {
+    static func sentence(for skip: CopySkip, couldNotBeRemoved: [String] = []) -> String {
+        if skip.reason == .theCopyIsStillThereAndMustBeRemoved {
+            var path: String = ""
+            for candidate in couldNotBeRemoved
+            where candidate.contains("/" + skip.name + ".md") {
+                path = candidate
+            }
+            if path.isEmpty, let first = couldNotBeRemoved.first {
+                path = first
+            }
+            return CopyPageWording.theCopyIsStillThereAndMustBeRemoved(
+                page: skip.name, at: path
+            )
+        }
+        return CopyPageSheet.plainSentence(for: skip)
+    }
+
+    static func plainSentence(for skip: CopySkip) -> String {
         switch skip.reason {
         case .aPageOfThatNameIsAlreadyHere:
             return CopyPageWording.aPageOfThatNameIsAlreadyHere(page: skip.name)
         case .theCopyCouldNotBeMadeHidden:
             return CopyPageWording.theCopyCouldNotBeMadeHidden(page: skip.name)
+        case .thePageIsWrittenInAWayPlantoirCannotBeSureOf:
+            return CopyPageWording.thePageIsWrittenInAWayPlantoirCannotBeSureOf(page: skip.name)
+        case .theCopyIsStillThereAndMustBeRemoved:
+            // The path is filled in by the caller, which has the outcome's
+            // list; this is the fallback when it cannot be matched up.
+            return CopyPageWording.theCopyIsStillThereAndMustBeRemoved(
+                page: skip.name, at: ""
+            )
         case .thePicturesCouldNotBePointedAtTheirNewNames:
             return CopyPageWording.thePicturesCouldNotBePointedAtTheirNewNames(page: skip.name)
         case .thePageCouldNotBeRead, .thePageCouldNotBeWritten:
@@ -392,6 +439,17 @@ struct CopyPageSheet: View {
         if destinationCode.isEmpty, let first = destinations.first {
             destinationCode = first.code
         }
+        readTheDestination()
+    }
+
+    /// Reads the chosen destination's facts, and then proposes a folder.
+    func readTheDestination() {
+        guard let destinationCourse else {
+            destinationFacts = nil
+            destinationFolderName = ""
+            return
+        }
+        destinationFacts = CopyCourseFacts.read(from: destinationCourse)
         proposeAFolder()
     }
 
@@ -447,8 +505,14 @@ struct CopyPageSheet: View {
                     )
                     backupFileName = backupURL.lastPathComponent
                 } catch {
+                    // NEVER the file system's own words: the one error that
+                    // reaches here carried `/usr/bin/zip`'s stderr and the
+                    // word "archive", which is machinery a teacher has never
+                    // met.
                     stage = .choosing
-                    problem = error.localizedDescription
+                    problem = CopyPageWording.theCopyOfTheCourseCouldNotBeSaved(
+                        course: destinationCourse.displayCode
+                    )
                     return
                 }
             }
@@ -474,9 +538,16 @@ struct CopyPageSheet: View {
         outcome = nil
         problem = nil
         stage = .choosing
-        picker.clearSelection()
-        picker.searchText = ""
+        picker.startOver()
         loadTheSource()
+        // The caret is deliberately NOT forced back into the field here.
+        // Measured by driving the real app: asking for it while the whole
+        // step is being rebuilt put the keyboard ring on the CHEVRON instead,
+        // which is worse than no focus at all — typing went nowhere and the
+        // ring said it should have worked. Clicking the field works (see the
+        // tap target in `SearchablePickerField`), and that is the honest
+        // behaviour until the focus can be placed without guessing at when
+        // the field joins the responder chain.
     }
 
     /// The one line the trail keeps: which course the pages came from, where
@@ -504,6 +575,12 @@ struct CopyPageSheet: View {
         }
         if !outcome.skipped.isEmpty {
             line += "; \(outcome.skipped.count) not copied"
+        }
+        if !outcome.couldNotBeRemoved.isEmpty {
+            // The one thing in this line that asks the teacher to DO
+            // something: a page that could not be proved hidden and could not
+            // be taken away again is still in their course.
+            line += "; \(outcome.couldNotBeRemoved.count) could not be removed and must not be deployed"
         }
         if let backupNamed {
             line += "; saved \(backupNamed) first"
