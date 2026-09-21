@@ -44,8 +44,6 @@ struct SidebarView: View {
     /// The course a "Keep a Copy for Reference…" sheet is open for.
     @State var keepACopyCourse: Course?
 
-    /// The reference course a "Set School Year…" sheet is open for.
-    @State var schoolYearCourse: Course?
 
     /// The reference course whose calm locked-pages note is showing, before
     /// the teacher goes into Obsidian.
@@ -219,7 +217,7 @@ struct SidebarView: View {
                                     // shelf rather than a page.
                                     if course.isKeptForReference {
                                         Button(ReferenceWording.setSchoolYearMenuItem, systemImage: "calendar") {
-                                            schoolYearCourse = course
+                                            workspace.schoolYearRequestCode = course.code
                                         }
                                         .accessibilityIdentifier("setSchoolYear-\(course.code)")
                                         Divider()
@@ -512,9 +510,11 @@ struct SidebarView: View {
         // known to present only the first of — so this one lives on its own
         // view, which the window's folder chooser does too.
         .modifier(ImportCoursesForReferencePresenter())
-        .sheet(item: $schoolYearCourse) { course in
-            SetSchoolYearSheet(course: course) {
-                workspace.reloadCourses()
+        .sheet(isPresented: schoolYearSheetIsPresented) {
+            if let course = schoolYearCourse {
+                SetSchoolYearSheet(course: course) {
+                    workspace.reloadCourses()
+                }
             }
         }
         .modifier(LockedPagesNoteAlert(course: $lockedPagesNoteCourse))
@@ -958,7 +958,7 @@ struct SidebarView: View {
         guard let when = request.when else {
             return "This section will no longer deploy on its own."
         }
-        return "\(request.course.code) Section \(request.sectionNumber) is set to deploy on its own at \(ScheduledDeploy.timeText(when)) on \(ScheduledDeploy.dayText(when)). Cancelling means it will not go out then, and the site stays as it is until you deploy it yourself."
+        return "\(request.course.displayCode) Section \(request.sectionNumber) is set to deploy on its own at \(ScheduledDeploy.timeText(when)) on \(ScheduledDeploy.dayText(when)). Cancelling means it will not go out then, and the site stays as it is until you deploy it yourself."
     }
 
     func cancelScheduledDeploy(_ request: ScheduledDeployRequest) {
@@ -1040,7 +1040,7 @@ struct SidebarView: View {
                     openInObsidianItem(forReferenceCourse: course)
                     Divider()
                     Button(ReferenceWording.setSchoolYearMenuItem, systemImage: "calendar") {
-                        schoolYearCourse = course
+                        workspace.schoolYearRequestCode = course.code
                     }
                     .accessibilityIdentifier("setSchoolYear-\(course.code)")
                     Divider()
@@ -1055,6 +1055,29 @@ struct SidebarView: View {
                     folderMenuItems(for: course.directoryURL)
                 }
         }
+    }
+
+    /// The reference course the "Set School Year…" sheet is for, looked up
+    /// from the model's request.
+    var schoolYearCourse: Course? {
+        guard let code = workspace.schoolYearRequestCode else {
+            return nil
+        }
+        for candidate in workspace.courses where candidate.code == code {
+            return candidate
+        }
+        return nil
+    }
+
+    var schoolYearSheetIsPresented: Binding<Bool> {
+        return Binding(
+            get: { return schoolYearCourse != nil },
+            set: { showing in
+                if !showing {
+                    workspace.schoolYearRequestCode = nil
+                }
+            }
+        )
     }
 
     var referenceGroupBinding: Binding<Bool> {
@@ -1121,7 +1144,7 @@ struct SidebarView: View {
             // ACTS on a reference course, and a folder that came back from a
             // second Mac, or from a backup, is not locked until somebody
             // asks.
-            ReferenceLock.ensureLocked(course)
+            ReferenceLock.ensureLockedInBackground(course)
             if LockedPagesNote.hasBeenShown(courseCode: course.code) {
                 FolderActions.openInObsidian(revealing: course.directoryURL, vaultURL: course.directoryURL)
                 return
@@ -1306,9 +1329,9 @@ struct SidebarView: View {
             removalRequest = RemovalRequest(
                 courseCode: course.code,
                 sectionNumber: nil,
-                title: "Remove \(course.code)?",
+                title: "Remove \(course.displayCode)?",
                 message: withScheduledDeployWarning(
-                    "Nothing is deleted. \(course.code) and all of its sections move to Archived, at the bottom of the sidebar, where you can get them back.",
+                    "Nothing is deleted. \(course.displayCode) and all of its sections move to Archived, at the bottom of the sidebar, where you can get them back.",
                     courseCode: course.code,
                     sectionNumber: nil
                 )
@@ -1328,9 +1351,9 @@ struct SidebarView: View {
                 removalRequest = RemovalRequest(
                     courseCode: course.code,
                     sectionNumber: nil,
-                    title: "Remove \(course.code)?",
+                    title: "Remove \(course.displayCode)?",
                     message: withScheduledDeployWarning(
-                        "Section \(sectionNumber) is the only section of \(course.code), so the whole course moves to Archived. Nothing is deleted — you can get it back from the bottom of the sidebar.",
+                        "Section \(sectionNumber) is the only section of \(course.displayCode), so the whole course moves to Archived. Nothing is deleted — you can get it back from the bottom of the sidebar.",
                         courseCode: course.code,
                         sectionNumber: nil
                     )
@@ -1339,7 +1362,7 @@ struct SidebarView: View {
                 removalRequest = RemovalRequest(
                     courseCode: course.code,
                     sectionNumber: sectionNumber,
-                    title: "Remove Section \(sectionNumber) of \(course.code)?",
+                    title: "Remove Section \(sectionNumber) of \(course.displayCode)?",
                     message: withScheduledDeployWarning(
                         "Nothing is deleted. This section moves to Archived, at the bottom of the sidebar, where you can get it back.",
                         courseCode: course.code,
@@ -1484,7 +1507,11 @@ struct CourseRowLabel: View {
         if isBeingRenamed {
             CourseCodeField(course: course)
         } else {
-            Label(course.code, systemImage: "books.vertical")
+            // `displayCode`, not `code`: decision (h) — a teacher reads
+            // ICS3U, never the folder name. The year group above this row
+            // already says 2025–26, so the suffix would be redundant as
+            // well as wrong.
+            Label(course.displayCode, systemImage: "books.vertical")
         }
     }
 }

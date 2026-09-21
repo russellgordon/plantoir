@@ -108,6 +108,11 @@ struct KeepACopyForReferenceSheet: View {
 
             // The calm note, said where the teacher is deciding rather than
             // after the fact. No icon, and no "cannot".
+            //
+            // Said here BEFORE the copy exists, so there is nothing to census
+            // yet — what the copy's own pane says afterwards is gated on
+            // whether the locking actually took, which is where a volume that
+            // cannot carry the flag shows up.
             VStack(alignment: .leading, spacing: 4) {
                 Text(ReferenceWording.pagesAreLocked)
                 Text(ReferenceWording.aCopyTakenOutStaysLocked)

@@ -54,6 +54,17 @@ struct FailureExplainer {
     /// out rather than writing a second explanation of the same rule, which is
     /// how one rule ends up said two ways.
     static func keptForReferenceExplanation(in output: String) -> String? {
+        // The launcher's OTHER reference refusal, which is TWO printed lines
+        // — the headline and the reason — and reaches the teacher joined.
+        //
+        // It matters for exactly the population the one below does, and more
+        // so: the app reads a course with an odd marker value as ORDINARY, so
+        // a teacher can set it to deploy on its own, and only the launcher
+        // refuses. Without this, half six comes and the app says "did not
+        // finish".
+        if let cannotTell = cannotTellExplanation(in: output) {
+            return cannotTell
+        }
         let marker: String = "is kept for reference, so it is never deployed"
         for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
             guard line.contains(marker) else {
@@ -63,6 +74,41 @@ struct FailureExplainer {
             // The launchers put a cross in front of every refusal.
             while let first = sentence.first, first == "❌" || first == " " {
                 sentence.removeFirst()
+            }
+            return sentence.trimmingCharacters(in: .whitespaces)
+        }
+        return nil
+    }
+
+    /// "Plantoir cannot tell whether … is kept for reference — …", as the two
+    /// lines the launchers print, rejoined into the one sentence a teacher
+    /// reads.
+    ///
+    /// Matched on the headline, which is a keyed string both launchers carry
+    /// and `scripts/test_reference_course.py` compares them against — so the
+    /// three copies cannot drift into three explanations of one rule.
+    static func cannotTellExplanation(in output: String) -> String? {
+        let headline: String = "cannot tell whether"
+        let lines: [Substring] = output.split(separator: "\n", omittingEmptySubsequences: false)
+        var index: Int = 0
+        while index < lines.count {
+            let line: String = String(lines[index]).trimmingCharacters(in: .whitespaces)
+            if !line.contains(headline) {
+                index += 1
+                continue
+            }
+            var sentence: String = line
+            while let first = sentence.first, first == "❌" || first == " " {
+                sentence.removeFirst()
+            }
+            // The reason is the next line. Joined with a space, because the
+            // launcher breaks it for the width of a Terminal and the app has
+            // no such width.
+            if index + 1 < lines.count {
+                let reason: String = String(lines[index + 1]).trimmingCharacters(in: .whitespaces)
+                if !reason.isEmpty {
+                    sentence += " " + reason
+                }
             }
             return sentence.trimmingCharacters(in: .whitespaces)
         }

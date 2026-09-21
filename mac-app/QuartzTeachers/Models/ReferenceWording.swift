@@ -119,6 +119,31 @@ nonisolated enum ReferenceWording {
     /// The title over the two sentences above, wherever they need one.
     static let pagesAreLockedTitle: String = "About this course's pages"
 
+    /// The year could not be written — a full disk, a folder gone read-only.
+    static func couldNotSetSchoolYear(course: String) -> String {
+        return "\(course)'s school year could not be saved. Try again in a moment."
+    }
+
+    /// The trail line for a year that moved.
+    ///
+    /// Names BOTH the code a teacher reads and the folder, because the two
+    /// differ here on purpose and somebody reading a report months later
+    /// needs to know which course on the shelf moved.
+    static func schoolYearTrailLine(
+        course: String, folderName: String, from previous: Int?, to next: Int?
+    ) -> String {
+        return "filed \(course) (\(folderName)) under \(schoolYearName(next)) "
+             + "— it was \(schoolYearName(previous))"
+    }
+
+    /// "2025–26", or "no school year".
+    static func schoolYearName(_ startingYear: Int?) -> String {
+        guard let startingYear else {
+            return "no school year"
+        }
+        return SchoolYear.label(forStartingYear: startingYear)
+    }
+
     // MARK: - The section window
 
     /// The section window's empty state, in place of "…or Deploy to put it

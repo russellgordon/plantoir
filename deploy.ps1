@@ -245,7 +245,11 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
 # contracts/shared-rules.json -> referenceCourses.refusal.sentence.
 $REFERENCE_COURSE_REFUSAL = "is kept for reference, so it is never deployed. Deploy the course you are teaching instead."
 $referenceCfg = Join-Path -Path $ScriptDir -ChildPath ("courses\{0}\course_config.json" -f $COURSE_CODE)
-if (Test-Path -LiteralPath $referenceCfg) {
+# -PathType Leaf: Test-Path matches CONTAINERS too, so a folder named
+# course_config.json passed this and then threw inside Get-Content, refusing a
+# course the mac and the shared Python both allow. One word, and the four
+# readers agree on that row.
+if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
   $referenceText = $null
   try {
     $referenceText = Get-Content -LiteralPath $referenceCfg -Raw -ErrorAction Stop
@@ -261,7 +265,32 @@ if (Test-Path -LiteralPath $referenceCfg) {
   # a `-i` the two shells would not share. The table of inputs both launchers
   # and the shared Python must agree on is
   # contracts/shared-rules.json -> referenceCourses.markerAgreement.
-  if ($referenceText -match '"kept_for_reference"\s*:\s*true') {
+  # A marker that is there with a value that is neither true nor false. Same
+  # rule and the same sentence as the bash twin.
+  # An object KEY written with a \u escape — see the bash twin for why, and
+  # why VALUES are left alone.
+  if ($referenceText -cmatch '[{,]\s*"[^"]*\\u[0-9a-fA-F]{4}[^"]*"\s*:') {
+    Write-Host ""
+    Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
+    Write-Host "   its settings say something other than true or false. Nothing was published."
+    Write-Host ""
+    exit 1
+  }
+  if (($referenceText -cmatch '"[^"]*ept_for_reference"') -and
+      -not ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Tt][Rr][Uu][Ee]') -and
+      -not ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Ff][Aa][Ll][Ss][Ee]')) {
+    Write-Host ""
+    Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
+    Write-Host "   its settings say something other than true or false. Nothing was published."
+    Write-Host ""
+    exit 1
+  }
+  # -cmatch, case-SENSITIVE. `-match` is case-insensitive in PowerShell, and
+  # that applied to the KEY as well as the value — so "KEPT_FOR_REFERENCE"
+  # refused here while the mac and the Python allowed it, stranding a Windows
+  # teacher with a live course whose Deploy button could never work. JSON keys
+  # are case-sensitive; the value's own case is spelled out instead.
+  if ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Tt][Rr][Uu][Ee]') {
     # The code a TEACHER reads, which for a reference course is deliberately
     # not the folder name. Falls back to the folder when there is none.
     $referenceCode = $COURSE_CODE

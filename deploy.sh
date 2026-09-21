@@ -464,14 +464,52 @@ if [[ -f "$_course_config" ]]; then
   # regex, where `\s` already matches a newline, so flattening here is also
   # what makes the two launchers agree.
   _flat_config="$(printf '%s' "$_config_text" | tr '\n' ' ')"
-  # `"kept_for_reference": true`, in any case, unquoted. A false, a missing
-  # key, the STRING "true" and the number 1 all read as an ordinary course —
-  # they read as false in the app too, and a launcher that disagreed with the
-  # app about the same file would protect nothing. The table of inputs all
-  # three implementations must agree on is
+  # `"kept_for_reference": true`, in any case, unquoted. A real JSON false and
+  # a missing key read as an ordinary course; EVERY OTHER spelling — the
+  # string "true", the number 1, a key written with \u escapes — is refused
+  # just above as "cannot tell", because the app reads a real JSON boolean and
+  # nothing else, so it would treat those as ordinary and this is the only
+  # place that stops them. The table of inputs all FOUR readers (this
+  # launcher, deploy.ps1, the shared Python and the app) must agree on is
   # contracts/shared-rules.json -> referenceCourses.markerAgreement.
+  #
+  # "Nothing was published." is deliberate, in the launchers only. A site is
+  # DEPLOYED and a page is PUBLISHED (Russell, 2026-09-20), and every sentence
+  # the APP says follows that — but this is the launchers own long-standing
+  # house sentence, said five times in each of them and asserted by two shared
+  # Python tests, and one run saying both words for the same act would be
+  # worse than one word that is old. A launcher vocabulary sweep is its own
+  # piece of work.
   _reference_code="$COURSE_CODE"
-  if printf '%s' "$_flat_config" | grep -Eq '"kept_for_reference"[[:space:]]*:[[:space:]]*[Tt][Rr][Uu][Ee]'; then
+  # A marker that is THERE with a value that is neither true nor false — `1`,
+  # `"true"`, a key written with \u escapes. Somebody plainly meant it, and
+  # the app reads a real JSON boolean and nothing else, so it would treat this
+  # course as ordinary and deploy it. Refused as "cannot tell": it publishes
+  # nothing and freezes nothing, which is the only direction that is safe
+  # both ways. `"[^"]*ept_for_reference"` catches the escaped spellings and
+  # cannot match an ordinary key.
+  # An object KEY written with a \u escape, whatever the key is. A key escaped
+  # ALL the way through is decoded by the app — which freezes and locks the
+  # course — while a text reader like this one sees nothing at all, and the
+  # folder publish below never enters the container. Measured: it deployed.
+  # Every key Plantoir and the shared Python write is plain ASCII, so an
+  # escaped key is never ours.
+  #
+  # KEYS ONLY. `json.dump` escapes non-ASCII in VALUES by default, so a course
+  # name with an accent and every emoji setting carry \uXXXX legitimately. The
+  # `[{,]` anchor is what tells a key from a value.
+  _escaped_key='[{,][[:space:]]*"[^"]*\\u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][^"]*"[[:space:]]*:'
+  if printf '%s' "$_flat_config" | grep -Eq "$_escaped_key" \
+     || { printf '%s' "$_flat_config" | grep -Eq '"[^"]*ept_for_reference"' \
+       && ! printf '%s' "$_flat_config" | grep -Eq '"[^"]*ept_for_reference"[[:space:]]*:[[:space:]]*[Tt][Rr][Uu][Ee]' \
+       && ! printf '%s' "$_flat_config" | grep -Eq '"[^"]*ept_for_reference"[[:space:]]*:[[:space:]]*[Ff][Aa][Ll][Ss][Ee]'; }; then
+    echo ""
+    echo "❌ Plantoir cannot tell whether ${COURSE_CODE} is kept for reference —"
+    echo "   its settings say something other than true or false. Nothing was published."
+    echo ""
+    exit 1
+  fi
+  if printf '%s' "$_flat_config" | grep -Eq '"[^"]*ept_for_reference"[[:space:]]*:[[:space:]]*[Tt][Rr][Uu][Ee]'; then
     # The code a TEACHER reads, which for a reference course is deliberately
     # not the folder name. Falls back to the folder when there is none.
     #

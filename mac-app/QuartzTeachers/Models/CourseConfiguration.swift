@@ -326,8 +326,27 @@ class CourseConfiguration {
     /// left with nowhere to deploy to (`neutraliseForReference`), so an OLDER
     /// Plantoir sharing the same folder — one that has never heard of this key
     /// — refuses it too, in sentences it already ships.
+    /// **Read STRICTLY: a real JSON `true` and nothing else.**
+    ///
+    /// Not `boolValue`, and that is measured rather than fastidious.
+    /// `JSONSerialization` hands back an `NSNumber` for `1`, and `NSNumber`
+    /// conditionally bridges to `Bool` for 0 and 1 — so `as? Bool` reads
+    /// `"kept_for_reference": 1` (and `1.0`) as TRUE, while all three
+    /// launchers read the same file as an ordinary course and DEPLOY it.
+    /// Both directions of the fault at once: the app freezes and locks a
+    /// course, with no way back to live, that the launchers then publish.
+    ///
+    /// `CFBooleanGetTypeID` is the only reading that tells a JSON boolean
+    /// from a number, and it keeps this key strict without widening
+    /// `boolValue`, which every other boolean setting uses. The four readers
+    /// — this app, `deploy.sh`, `deploy.ps1` and `reference_course.py` — then
+    /// agree on every row of
+    /// `contracts/shared-rules.json` → `referenceCourses.markerAgreement`,
+    /// which is where the spellings a person plainly MEANT are dealt with:
+    /// the launchers refuse those with "cannot tell", which deploys nothing
+    /// and freezes nothing, and this app treats them as an ordinary course.
     var keptForReference: Bool {
-        get { return boolValue(forKey: "kept_for_reference", fallback: false) }
+        get { return strictBoolValue(forKey: "kept_for_reference") }
         set { values["kept_for_reference"] = newValue }
     }
 
@@ -1163,6 +1182,22 @@ class CourseConfiguration {
             return stored.intValue
         }
         return fallback
+    }
+
+    /// A real JSON boolean `true`, and nothing else — not `1`, not `1.0`,
+    /// not `"true"`, not `TRUE`.
+    ///
+    /// `CFGetTypeID` is the discriminator, because Swift's own `is Bool` is
+    /// not one: measured, an `NSNumber` holding 1 satisfies `is Bool` exactly
+    /// as `kCFBooleanTrue` does.
+    private func strictBoolValue(forKey key: String) -> Bool {
+        guard let stored = values[key] else {
+            return false
+        }
+        guard CFGetTypeID(stored as CFTypeRef) == CFBooleanGetTypeID() else {
+            return false
+        }
+        return (stored as? NSNumber)?.boolValue == true
     }
 
     private func boolValue(forKey key: String, fallback: Bool) -> Bool {

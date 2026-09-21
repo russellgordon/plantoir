@@ -104,13 +104,25 @@ struct SetSchoolYearSheet: View {
     // MARK: - Functions
 
     func setSchoolYear() {
+        let before: Int? = course.schoolYear(on: today)
         course.configuration.referenceSchoolYear = schoolYear
         do {
             try course.configuration.write(to: course.configFileURL)
-            dismiss()
-            onSet()
         } catch {
-            problem = error.localizedDescription
+            // Never the raw Foundation string. A teacher reads a sentence
+            // about their course, not "NSCocoaErrorDomain Code=513".
+            course.configuration.referenceSchoolYear = before
+            problem = ReferenceWording.couldNotSetSchoolYear(course: course.displayCode)
+            return
         }
+        ActivityTrail.note(
+            .referenceCourseSchoolYearChanged,
+            ReferenceWording.schoolYearTrailLine(
+                course: course.displayCode, folderName: course.code,
+                from: before, to: schoolYear
+            )
+        )
+        dismiss()
+        onSet()
     }
 }
