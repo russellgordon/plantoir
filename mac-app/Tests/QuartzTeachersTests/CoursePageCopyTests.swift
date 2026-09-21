@@ -128,7 +128,19 @@ final class CoursePageCopyTests: XCTestCase {
             for placement in plan.pages {
                 landed.append(placement.destinationFolderName + "/" + placement.fileName.text)
             }
-            XCTAssertEqual(landed, (expected["pages"] as? [String]) ?? [], "\(name): pages")
+            XCTAssertEqual(
+                landed.sorted(), ((expected["pages"] as? [String]) ?? []).sorted(),
+                "\(name): pages"
+            )
+
+            var required: [String] = []
+            for placement in plan.pages where placement.isRequired {
+                required.append(placement.pageName)
+            }
+            XCTAssertEqual(
+                required.sorted(), ((expected["required"] as? [String]) ?? []).sorted(),
+                "\(name): pages that cannot be unticked"
+            )
 
             var created: [String] = []
             for item in plan.mediaToCreate {
@@ -157,13 +169,15 @@ final class CoursePageCopyTests: XCTestCase {
                 "\(name): pictures under a new name"
             )
 
-            var skipped: [[String: String]] = []
+            var skipped: [String] = []
             for skip in plan.skipped {
-                skipped.append(["name": skip.name, "reason": skip.reason.rawValue])
+                skipped.append(skip.name + "|" + skip.reason.rawValue)
             }
-            let expectedSkips: [[String: String]] =
-                (expected["skipped"] as? [[String: String]]) ?? []
-            XCTAssertEqual(skipped, expectedSkips, "\(name): skips")
+            var expectedSkips: [String] = []
+            for entry in (expected["skipped"] as? [[String: String]]) ?? [] {
+                expectedSkips.append((entry["name"] ?? "") + "|" + (entry["reason"] ?? ""))
+            }
+            XCTAssertEqual(skipped.sorted(), expectedSkips.sorted(), "\(name): skips")
 
             XCTAssertEqual(
                 plan.linksLeadingNowhere.sorted(),
@@ -640,6 +654,29 @@ final class CoursePageCopyTests: XCTestCase {
             wording["aPictureCouldNotBeCopied"] as? String
         )
         XCTAssertEqual(
+            CopyPageWording.alsoCopyLinkedPages, wording["alsoCopyLinkedPages"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.embeddedPagesAlwaysComeAlong,
+            wording["embeddedPagesAlwaysComeAlong"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.aClassPageWasLeftAlone(page: "{page}"),
+            wording["aClassPageWasLeftAlone"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.anIndexPageIsNotCopied(page: "{page}"),
+            wording["anIndexPageIsNotCopied"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.aPageAtTheCourseRootIsNotCopied(page: "{page}"),
+            wording["aPageAtTheCourseRootIsNotCopied"] as? String
+        )
+        XCTAssertEqual(
+            CopyPageWording.aPageInsideOneSectionsFolderIsNotCopied(page: "{page}"),
+            wording["aPageInsideOneSectionsFolderIsNotCopied"] as? String
+        )
+        XCTAssertEqual(
             CopyPageWording.thatCourseHasNowhereToPutIt(course: "{course}"),
             wording["thatCourseHasNowhereToPutIt"] as? String
         )
@@ -896,6 +933,11 @@ final class CoursePageCopyTests: XCTestCase {
             folderName: String(path[path.startIndex..<slash]),
             fileName: ExactName(String(path[path.index(after: slash)...]))
         )
+        // A case that follows links says so. `keepNone` asks for an EMPTY
+        // tick list, which is how the required-embed rule is pinned: a page
+        // shown inside another comes along even when nothing is ticked.
+        let follows: Bool = copy["alsoCopiesLinkedPages"] != nil
+        let keptNone: Bool = copy["keepNone"] != nil
         return Built(
             source: source,
             destination: destination,
@@ -903,7 +945,9 @@ final class CoursePageCopyTests: XCTestCase {
                 source: source,
                 page: page,
                 destination: destination,
-                destinationFolderName: try XCTUnwrap(copy["intoFolder"], name)
+                destinationFolderName: try XCTUnwrap(copy["intoFolder"], name),
+                alsoCopiesLinkedPages: follows,
+                keptLinkedPages: keptNone ? [] : nil
             )
         )
     }
@@ -1016,7 +1060,8 @@ final class CoursePageCopyTests: XCTestCase {
             directoryPath: directoryURL.path,
             sectionNumbers: sections,
             sharedFolderNames: sharedFolders,
-            isKeptForReference: false
+            isKeptForReference: false,
+            classFolderNames: ["All Classes"]
         )
     }
 

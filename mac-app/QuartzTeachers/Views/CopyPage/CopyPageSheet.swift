@@ -21,6 +21,8 @@ struct CopyPageSheet: View {
     /// Where the sheet is.
     enum Stage: Equatable {
         case choosing
+        case working
+        case checking
         case savingACopy
         case copying
         case finished
@@ -57,6 +59,17 @@ struct CopyPageSheet: View {
 
     @State var outcome: CoursePageCopyOutcome?
     @State var problem: String?
+
+    /// Whether the pages this page links to come along. Russell's one
+    /// checkbox, on by default.
+    @State var alsoCopiesLinkedPages: Bool = true
+
+    /// The plan the teacher is looking at, when there is a checklist to show.
+    @State var shownPlan: CoursePageCopyPlan?
+
+    /// The linked pages still ticked, by lowercased title. A page shown
+    /// INSIDE another is not in here and cannot be taken out.
+    @State var keptLinkedPages: Set<String> = []
 
     // MARK: - Computed properties
 
@@ -138,7 +151,9 @@ struct CopyPageSheet: View {
             source: sourceFacts,
             page: page,
             destination: destinationFacts,
-            destinationFolderName: destinationFolderName
+            destinationFolderName: destinationFolderName,
+            alsoCopiesLinkedPages: alsoCopiesLinkedPages,
+            keptLinkedPages: stage == .checking ? keptLinkedPages : nil
         )
     }
 
@@ -151,6 +166,8 @@ struct CopyPageSheet: View {
 
             if stage == .finished, let outcome {
                 result(outcome)
+            } else if stage == .checking, let shownPlan {
+                checklist(shownPlan)
             } else {
                 questions
             }
@@ -171,7 +188,7 @@ struct CopyPageSheet: View {
         // sidebar and putting a line on the trail after the teacher believed
         // they had stopped. Cancel is already disabled then; this closes the
         // other ways out.
-        .interactiveDismissDisabled(stage == .savingACopy || stage == .copying)
+        .interactiveDismissDisabled(stage == .savingACopy || stage == .copying || stage == .working)
         // The list is rendered HERE, at the top level of the sheet — never
         // inside the form above. See `SearchablePicker`'s header for what
         // happens otherwise: the card renders at a stuck zero frame and is
@@ -265,6 +282,9 @@ struct CopyPageSheet: View {
         }
         .accessibilityIdentifier("copyPageDestinationFolder")
 
+        Toggle(CopyPageWording.alsoCopyLinkedPages, isOn: $alsoCopiesLinkedPages)
+            .accessibilityIdentifier("copyPageAlsoLinked")
+
         VStack(alignment: .leading, spacing: 4) {
             Text(CopyPageWording.copiesStartHidden)
             Text(CopyPageWording.nothingIsWrittenOver)
@@ -290,6 +310,79 @@ struct CopyPageSheet: View {
             .font(.callout)
             .foregroundStyle(.secondary)
         }
+    }
+
+    // MARK: - The pages this one links to
+
+    /// Every page the named page's links reach, ticked, with the folder each
+    /// will land in — and what was left alone, with the reason.
+    @ViewBuilder
+    func checklist(_ plan: CoursePageCopyPlan) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(CopyPageWording.copiedInto(
+                pages: plan.pages.count,
+                course: destinationCourse?.displayCode ?? "",
+                folder: destinationFolderName
+            ))
+
+            ForEach(plan.linkedPages) { linked in
+                Toggle(isOn: tickBinding(for: linked)) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(linked.pageName)
+                        Text(
+                            linked.isRequired
+                                ? CopyPageWording.embeddedPagesAlwaysComeAlong
+                                : linked.destinationFolderName
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(linked.isRequired)
+                .accessibilityIdentifier("copyPageLinked-\(linked.id)")
+            }
+
+            if !plan.media.isEmpty {
+                Text(CopyPageWording.willBringPicturesAndFiles(
+                    count: plan.mediaToCreate.count,
+                    size: ReferenceImportWording.size(plan.totalBytes)
+                ))
+                .foregroundStyle(.secondary)
+            }
+            ForEach(plan.skipped.indices, id: \.self) { index in
+                Text(CopyPageSheet.plainSentence(for: plan.skipped[index]))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !plan.linksLeadingNowhere.isEmpty {
+                Text(CopyPageWording.theseLinksWillNotLeadAnywhereYet(
+                    names: plan.linksLeadingNowhere
+                ))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(CopyPageWording.copiesStartHidden)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("copyPageChecklist")
+    }
+
+    func tickBinding(for linked: CopiedPagePlacement) -> Binding<Bool> {
+        let key: String = linked.pageName.lowercased()
+        return Binding(
+            get: {
+                return linked.isRequired || keptLinkedPages.contains(key)
+            },
+            set: { isOn in
+                if isOn {
+                    keptLinkedPages.insert(key)
+                } else {
+                    keptLinkedPages.remove(key)
+                }
+            }
+        )
     }
 
     // MARK: - What happened
@@ -377,12 +470,16 @@ struct CopyPageSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
-                .disabled(stage != .choosing)
+                .disabled(stage != .choosing && stage != .checking)
                 Button("Copy") {
-                    copy()
+                    if stage == .checking {
+                        copy()
+                    } else {
+                        lookAtWhatItWouldDo()
+                    }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!canCopy)
+                .disabled(!canCopy && stage != .checking)
                 .accessibilityIdentifier("copyPageButton")
             }
         }
@@ -429,6 +526,14 @@ struct CopyPageSheet: View {
             return CopyPageWording.thePageCouldNotBeWritten(page: skip.name)
         case .aPictureCouldNotBeCopied:
             return CopyPageWording.aPictureCouldNotBeCopied(name: skip.name)
+        case .aClassPageWasLeftAlone:
+            return CopyPageWording.aClassPageWasLeftAlone(page: skip.name)
+        case .anIndexPageIsNotCopied:
+            return CopyPageWording.anIndexPageIsNotCopied(page: skip.name)
+        case .aPageAtTheCourseRootIsNotCopied:
+            return CopyPageWording.aPageAtTheCourseRootIsNotCopied(page: skip.name)
+        case .aPageInsideOneSectionsFolderIsNotCopied:
+            return CopyPageWording.aPageInsideOneSectionsFolderIsNotCopied(page: skip.name)
         }
     }
 
@@ -471,6 +576,31 @@ struct CopyPageSheet: View {
             return
         }
         destinationFolderName = names[0]
+    }
+
+    /// Works out what the copy WOULD do, and shows the checklist when there
+    /// is something to tick. Nothing is written by this.
+    func lookAtWhatItWouldDo() {
+        guard let request else {
+            return
+        }
+        problem = nil
+        stage = .working
+        Task { @MainActor in
+            let plan: CoursePageCopyPlan = await CoursePageCopyPlanner.planning(request)
+            if plan.linkedPages.isEmpty {
+                stage = .choosing
+                copy()
+                return
+            }
+            var ticked: Set<String> = []
+            for linked in plan.linkedPages {
+                ticked.insert(linked.pageName.lowercased())
+            }
+            keptLinkedPages = ticked
+            shownPlan = plan
+            stage = .checking
+        }
     }
 
     func copy() {
@@ -537,6 +667,8 @@ struct CopyPageSheet: View {
     func copyAnother() {
         outcome = nil
         problem = nil
+        shownPlan = nil
+        keptLinkedPages = []
         stage = .choosing
         picker.startOver()
         loadTheSource()
