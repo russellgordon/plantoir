@@ -314,6 +314,21 @@
         "carries": "the course, how many pages had to be locked again, and how many would not stay locked",
         "event": "reference course pages locked again",
         "why": "Written ONLY when a pass actually did something, so a folder in a steady state leaves no lines at all. It is the answer to the one report this feature can produce that would otherwise be unexplainable: 'my reference course let me edit a page'. A count of 37 after a restore is a backup coming back unlocked, because a zip carries the mode and not the flag; a handful that would not stay locked, over and over, is a folder kept in a cloud drive whose file provider clears the locked bit while a file uploads. Neither is a failure to put in front of the teacher, and neither is retried after a delay - the next pass is the mechanism."
+      },
+      {
+        "carries": "the NAME of the folder it was read from, the folder it was given here, the code and school year it shows, and how many sections came across",
+        "event": "course imported for reference",
+        "why": "The folder it was READ from is the half a copy does not have, and it is the answer to 'where did this ICS4U come from' - a folder somewhere else on this Mac, which the teacher may have moved or deleted since. Named rather than written as a path, the same way every other line here names a course rather than a path. The contents of a page never appear."
+      },
+      {
+        "carries": "which course did not come across, and why - already kept for reference under that school year, could not be read, no room on the disk",
+        "event": "course could not be imported for reference",
+        "why": "Written per COURSE, because a run of four that imports three is the ordinary shape of this and 'the import failed' is exactly the report that cannot be looked into. Without it, a teacher who ticked four courses and found three has nothing to point at, and the one that is missing is the one they will ask about."
+      },
+      {
+        "carries": "the course that was in hand and was not kept, and the name of the folder it was coming from",
+        "event": "course import for reference stopped",
+        "why": "Its own event rather than a failure: a teacher who presses Stop chose to, and a line calling that a failure is a line that misleads whoever reads it back. It is also what explains a folder that is NOT there - the course in hand is removed on the way out, so without this line the trail shows an import that started and nothing about how it ended."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -3933,6 +3948,176 @@
         "what": "A reference/ sibling folder beside courses/",
         "why": "Everything that finds a course walks courses/ — discovery, the launchers, the build output link, the backups list. A second home would be a second answer to 'where are the courses', and the marker gives the same separation for one key."
       }
-    ]
+    ],
+    "importing": {
+      "note": "The SECOND way a reference course is made: the teacher points at the folder they kept last year's classes in and ticks the courses they want. It is the same act as 'Keep a Copy for Reference…' with a different source, and it ends in the same code — cut loose from last year's websites, marked, filed under a school year, left with nowhere to deploy to, locked. Everything in the referenceCourses block above therefore applies to an imported course without exception: the same marker, the same neutralisation, the same fifteen refusals, the same lock.",
+      "theSourceIsNeverWritten": {
+        "rule": "The chosen folder is opened for reading only. Nothing inside it is created, renamed, removed or opened for writing, and that includes the build output, the site markers and the settings. Everything the import writes is inside the NEW folder in this working folder.",
+        "why": "It may be the teacher's only copy of last year. An import that failed costs an afternoon; an import that damaged the source costs the year. The neutralisation and the lock happen to the COPY, after it is made."
+      },
+      "foldersAccepted": {
+        "rule": "Three shapes are accepted, and all three resolve to the same working folder: the folder itself (it holds a courses folder), the courses folder inside it, and ONE course folder (it holds course_config.json). A course is a folder inside courses/ that holds a course_config.json - nothing else is, which is what keeps _backups, .internal and any stray folder out without a list of names. Read by exact name, never by glob.",
+        "why": "A teacher points at what they recognise rather than at what the app expects, and refusing a folder that plainly holds a course - because they went one level too deep - reads as the app being broken. Resolving upward costs nothing and the whole shelf is then offered, with the one they pointed at already ticked.",
+        "tickedWhenOpened": "Everything, when a working folder or a courses folder was chosen: they pointed at last year and they mean last year. Only the one course, when a course folder was chosen: they were specific, and the others are offered rather than assumed.",
+        "cases": [
+          {
+            "name": "the old working folder",
+            "tree": ["courses/ICS3U/course_config.json", "courses/ICS3U/section1/index.md"],
+            "choose": ".",
+            "expect": "accepted",
+            "expectCourses": ["ICS3U"],
+            "expectTicked": ["ICS3U"]
+          },
+          {
+            "name": "the courses folder itself",
+            "tree": ["courses/ICS3U/course_config.json", "courses/ICS4U/course_config.json"],
+            "choose": "courses",
+            "expect": "accepted",
+            "expectCourses": ["ICS3U", "ICS4U"],
+            "expectTicked": ["ICS3U", "ICS4U"]
+          },
+          {
+            "name": "one course folder",
+            "tree": ["courses/ICS3U/course_config.json", "courses/ICS4U/course_config.json"],
+            "choose": "courses/ICS4U",
+            "expect": "accepted",
+            "expectCourses": ["ICS3U", "ICS4U"],
+            "expectTicked": ["ICS4U"],
+            "why": "Resolved UPWARD: the whole shelf is offered, and only the one they pointed at is ticked."
+          },
+          {
+            "name": "a folder with nothing of the kind in it",
+            "tree": ["notes/September.md"],
+            "choose": ".",
+            "expect": "refused",
+            "refusal": "noCoursesThere"
+          },
+          {
+            "name": "a courses folder holding only backups",
+            "tree": ["courses/_backups/ICS3U/ICS3U-2025-06-01.zip"],
+            "choose": ".",
+            "expect": "refused",
+            "refusal": "noCoursesThere",
+            "why": "A folder of zips is not a course: a course is a folder holding course_config.json."
+          },
+          {
+            "name": "the working folder this window already has open",
+            "tree": ["courses/ICS3U/course_config.json"],
+            "choose": ".",
+            "isTheFolderAlreadyOpen": true,
+            "expect": "refused",
+            "refusal": "theFolderYouHaveOpen",
+            "why": "That is route 1's job, and the refusal says so by name rather than leaving the teacher to guess."
+          },
+          {
+            "name": "a folder inside the one already open",
+            "tree": ["courses/ICS3U/course_config.json", "old/courses/ICS3U/course_config.json"],
+            "choose": "old",
+            "isTheFolderAlreadyOpen": false,
+            "openFolderIsTheRoot": true,
+            "expect": "refused",
+            "refusal": "insideTheFolderYouHaveOpen",
+            "why": "Copying a folder into itself is a folder inside itself, and the build output link would loop."
+          }
+        ]
+      },
+      "leftBehind": {
+        "rule": "Composed from the lists that already exist rather than written out again: what an archive leaves behind, plus what a reference copy leaves behind, plus what only an import meets. A name in the list is skipped WITHOUT being looked inside, and a symlink is copied as a link and never followed.",
+        "why": "On a folder made by an older Plantoir, .merged_output is a real directory holding last year's entire built website - measured at 1.9 GB per course against 489 MB of course, four fifths of what is on disk. Walking it to not copy it would cost more time than copying the course. On a folder made by a current Plantoir it is a symlink pointing out of the working folder, and following it would copy the built site back into the course it came from.",
+        "names": [
+          {"name": ".merged_output", "why": "Last year's built website. Rebuilt on demand; a real directory in an old folder, a symlink in a new one, skipped either way."},
+          {"name": "node_modules", "why": "Inherited from the archive list."},
+          {"name": ".git", "why": "Inherited from the archive list."},
+          {"name": ".quartz-cache", "why": "Inherited from the archive list."},
+          {"name": ".cache", "why": "Inherited from the archive list."},
+          {"name": "dist", "why": "Inherited from the archive list."},
+          {"name": "build", "why": "Inherited from the archive list."},
+          {"name": "out", "why": "Inherited from the archive list."},
+          {"name": "__pycache__", "why": "Inherited from the archive list."},
+          {"name": ".DS_Store", "why": "Finder's own bookkeeping. Nothing a teacher wrote."},
+          {"name": "course_config.backup.json", "why": "Yesterday's settings, left beside today's by the build's own bookkeeping."},
+          {"name": "course_config copy.json", "why": "A Finder duplicate, found in a real course in the measured folder. Not dangerous - the settings are read by exact name - but it is last year's clutter and a reference course should not arrive with it."},
+          {"name": ".Trashes", "why": "What a folder picks up from living on an external disk, which is exactly where an old working folder tends to be found."},
+          {"name": ".Spotlight-V100", "why": "The same."},
+          {"name": ".fseventsd", "why": "The same."}
+        ],
+        "alsoRemovedAfterTheCopy": [
+          {"what": ".internal/activity", "why": "Leases name processes on whichever machine wrote them, so a copied one names a process that was never doing anything here."}
+        ],
+        "kept": [
+          {"what": ".obsidian", "why": "The course may be opened in Obsidian, and Plantoir opens the course folder AS a vault. Without it the vault opens with first-run prompts, none of the teacher's plugins or appearance, and none of the folder state that makes last year's material navigable. 312 KB against a 489 MB course. Its workspace.json holds paths into the OLD folder, which are dead links Obsidian rewrites on first open; not worth stripping."},
+          {"what": "the site markers", "why": "Copied, then renamed aside by the same neutralisation route 1 uses. The file holds the site id and the admin address, which a teacher may still want."},
+          {"what": "every page's own visibility", "why": "A reference course is a faithful record of what students actually saw. The frontmatter of a page is NEVER rewritten on import - the build already reads the older draft: true/false correctly."}
+        ]
+      },
+      "folderNameProduced": {
+        "rule": "The same rule route 1 uses, and the same function: CODE-YYYY in upper case, or CODE-REF when no school year was chosen, with -2 to -9 tried in turn when the name is taken. The course_code inside is left exactly as it was, so the teacher reads ICS4U while the folder is ICS4U-2025.",
+        "cases": [
+          {"code": "ICS4U", "schoolYear": 2025, "existing": [], "expect": "ICS4U-2025"},
+          {"code": "ICS4U", "schoolYear": null, "existing": [], "expect": "ICS4U-REF"},
+          {"code": "ICS4U", "schoolYear": 2025, "existing": ["ICS4U-2025"], "expect": "ICS4U-2025-2"},
+          {"code": "ics4u", "schoolYear": 2025, "existing": [], "expect": "ICS4U-2025", "why": "The launchers upper-case their course argument before looking for the folder, so a lower-case folder is simply not found."}
+        ]
+      },
+      "schoolYearProposed": {
+        "rule": "The school year most of the course's pages were last changed in, ties going to the NEWER year. A year outside the offered list proposes nothing and the teacher picks. It is a starting point the teacher changes, and nothing in the interface says how it was arrived at.",
+        "why": "The NEWEST page was measured and rejected: one page is exactly what gets touched by accident - opening last year's folder to look something up, or a sync putting a fresh date on one note. On the real folder, ICS4U's newest page is dated 2026-09-11, which proposes 2026-27, while 201 of its 287 pages were last changed in 2025-26, the year it was taught. The commonest year gets all four measured courses right; the newest page gets three.",
+        "cases": [
+          {
+            "name": "one stray page cannot move the year",
+            "pageYears": [2025, 2025, 2025, 2024, 2026],
+            "today": "2026-09-20",
+            "expect": 2025
+          },
+          {
+            "name": "a tie goes to the newer year",
+            "pageYears": [2024, 2025],
+            "today": "2026-09-20",
+            "expect": 2025
+          },
+          {
+            "name": "a course older than the floor proposes nothing",
+            "pageYears": [2019, 2019],
+            "today": "2026-09-20",
+            "expect": null
+          },
+          {
+            "name": "no pages at all proposes nothing",
+            "pageYears": [],
+            "today": "2026-09-20",
+            "expect": null
+          }
+        ]
+      },
+      "oneCourseFailingDoesNotStopTheRest": {
+        "rule": "Each ticked course is imported on its own. One that cannot be - its code is already kept for reference under that school year, its folder could not be read, the disk filled - is reported for that course, by name, with what happened, and the run carries on to the next. Only the teacher pressing Stop ends a run early.",
+        "why": "A folder of four courses where one has a problem must import three. An import that abandons everything at the first trouble makes the teacher work out which of the four it was, and do the other three again.",
+        "nothingHalfMade": "Whatever was being made when a course failed - or when the teacher stopped it - is UNLOCKED and then removed, in that order. removeItem and rm -rf both refuse a locked tree, and a half-made folder the teacher can delete from neither the app nor Finder is a worse outcome than the failure that produced it. Possible at all only because the lock is the last step of making a reference course."
+      },
+      "wording": {
+        "menuItem": "Import Courses for Reference…",
+        "title": "Import courses for reference",
+        "explanation": "Plantoir copies the courses you tick into this working folder and keeps them for reference. The folder you choose is left exactly as it is.",
+        "noCoursesThere": "There are no courses in {folder}. Choose the folder you kept that year's classes in.",
+        "thatIsTheFolderYouHaveOpen": "That is the folder you already have open. To keep one of these courses for reference, use Keep a Copy for Reference… on the course itself.",
+        "insideTheFolderYouHaveOpen": "{folder} is inside the folder you already have open. Choose a folder somewhere else.",
+        "holdsTheFolderYouHaveOpen": "{folder} holds the folder you already have open. Choose a folder somewhere else.",
+        "courseSummary": "{sections} · {pages} · {size}",
+        "schoolYearLabel": "School year",
+        "builtWebsitesAreNotCopied": "Last year's finished websites are not copied. Preview a course and Plantoir builds it again.",
+        "importButton": "Import",
+        "tickSomething": "Tick the courses you want to keep for reference.",
+        "copying": "Copying {course}…",
+        "copiedSoFar": "{copied} of {total}",
+        "doneTitle": "Imported",
+        "whereTheyAre": "They are in the sidebar under Reference Courses, filed by school year.",
+        "imported": "{course} — {year}, {sections}",
+        "couldNotImport": "{course} was not imported. {reason}",
+        "noSchoolYear": "no school year",
+        "stopped": "Stopped. The courses already imported are in the sidebar; the one in progress was not kept.",
+        "rule": "{course} is the code a TEACHER reads - ICS4U, never the folder name; {folder} is the folder they chose, by its own name, because 'that folder' means nothing once the chooser has closed. The calm note about the pages being locked (referenceCourses.wording.pagesAreLocked and aCopyTakenOutStaysLocked) is shown in this sheet too, where the teacher is deciding rather than after the fact.",
+        "machineryCheck": "No sentence here names a symlink, a build output, a script, a container or a flag. Nothing says 'cannot' where 'is not' will do. The size a teacher reads is the size that will be COPIED, with last year's built website already taken out of it."
+      }
+    }
   }
 }
