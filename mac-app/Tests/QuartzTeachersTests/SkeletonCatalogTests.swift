@@ -40,20 +40,47 @@ final class SkeletonCatalogTests: XCTestCase {
         XCTAssertFalse(chemistry.sharedFolders.contains("Repertoire"))
     }
 
-    /// Example content beats a skeleton, so a code that has real pages is
-    /// never offered the placeholder ones.
+    /// Example content beats a skeleton for a teacher who is TAKING it, so
+    /// a code with real pages is offered no placeholder ones while they are.
     @MainActor
-    func testACodeWithExampleContentIsNotOfferedASkeleton() {
-        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: "ADA1O"))
-        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA2O"))
+    func testACodeWithExampleContentIsNotOfferedASkeletonWhileItIsBeingTaken() {
+        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: "ADA1O", takingExampleContent: true))
+        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA2O", takingExampleContent: true),
+                      "ADA2O has no ready-made pages, so the flag cannot matter for it")
+    }
+
+    /// …and is offered one the moment they turn the real pages down. This
+    /// is issue #248: for all 38 codes with a payload, declining the
+    /// ready-made pages gave EMPTY folders rather than the subject's shape
+    /// — an ICS4U with 18 pages where the skeleton has 47.
+    @MainActor
+    func testASkeletonIsOfferedOnceTheExampleIsDeclined() {
+        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA1O", takingExampleContent: false))
+        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ICS4U", takingExampleContent: false))
+        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA2O", takingExampleContent: false),
+                      "A code with no payload is unaffected in either direction")
+        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: "", takingExampleContent: false),
+                       "No code typed resolves no family, so there is nothing to offer")
     }
 
     @MainActor
     func testTheSubjectsFoldersAreOfferedForACodeWithoutExampleContent() throws {
         let adopted: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.structureToAdopt(
-            forCode: "AMU3M", currentSharedFolders: WizardDefaults.sharedFolders))
+            forCode: "AMU3M", takingExampleContent: true,
+            currentSharedFolders: WizardDefaults.sharedFolders))
         XCTAssertTrue(adopted.sharedFolders.contains("Repertoire"))
         XCTAssertTrue(adopted.perSectionFiles.contains("Key Links.md"))
+    }
+
+    /// The structure editor adopts for a declined payload code too — the
+    /// same rule, read through the same function.
+    @MainActor
+    func testTheSubjectsFoldersAreOfferedOnceTheExampleIsDeclined() throws {
+        let adopted: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.structureToAdopt(
+            forCode: "ADA1O", takingExampleContent: false,
+            currentSharedFolders: WizardDefaults.sharedFolders))
+        XCTAssertEqual(adopted.name, "drama")
+        XCTAssertTrue(adopted.sharedFolders.contains("Conventions"))
     }
 
     /// A teacher who has edited the folder list keeps their edit, even if
@@ -61,7 +88,10 @@ final class SkeletonCatalogTests: XCTestCase {
     @MainActor
     func testAnEditedFolderListIsNeverOverwritten() {
         XCTAssertNil(SkeletonCatalog.structureToAdopt(
-            forCode: "AMU3M", currentSharedFolders: ["Only", "Mine"]))
+            forCode: "AMU3M", takingExampleContent: true, currentSharedFolders: ["Only", "Mine"]))
+        XCTAssertNil(SkeletonCatalog.structureToAdopt(
+            forCode: "ADA1O", takingExampleContent: false, currentSharedFolders: ["Only", "Mine"]),
+            "Declining the example content is not a licence to overwrite an edited list")
     }
 
     /// Switching between two codes in the same family changes nothing, so
@@ -70,7 +100,7 @@ final class SkeletonCatalogTests: XCTestCase {
     func testTheSameFamilyTwiceChangesNothing() throws {
         let music: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.family(forCode: "AMU3M"))
         XCTAssertNil(SkeletonCatalog.structureToAdopt(
-            forCode: "AMU2O", currentSharedFolders: music.sharedFolders))
+            forCode: "AMU2O", takingExampleContent: true, currentSharedFolders: music.sharedFolders))
     }
 
     /// The folders a skeleton hides and expands are its own, not the app's
@@ -137,10 +167,11 @@ final class SkeletonCatalogTests: XCTestCase {
     }
 
     @MainActor
-    func testACodeWithExampleContentKeepsItsOwnStructure() {
+    func testACodeWithExampleContentKeepsItsOwnStructureWhileItIsBeingTaken() {
         XCTAssertNil(SkeletonCatalog.structureToAdopt(
-            forCode: "ADA1O", currentSharedFolders: WizardDefaults.sharedFolders),
-            "The example content chooses the folders for a code that has it")
+            forCode: "ADA1O", takingExampleContent: true,
+            currentSharedFolders: WizardDefaults.sharedFolders),
+            "The example content chooses the folders for a teacher who is taking it")
         let wizard: NewCourseWizardView = NewCourseWizardView()
         XCTAssertEqual(
             wizard.buildConfigurationDictionary(code: "ADA1O", name: "Drama")["use_skeleton"] as? Bool,

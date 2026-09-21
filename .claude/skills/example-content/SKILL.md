@@ -1022,8 +1022,16 @@ than hand-written:
   affected family and read it. `verify.sh` covers the toolchain, not the
   content.
 
-**A new payload retires its skeleton automatically** — example content
-always wins for a code that has it. Nothing to remove.
+**A new payload retires its skeleton for a teacher who TAKES it** —
+example content always wins when it is being taken. Nothing to remove: the
+skeleton stays, and is what the course starts from when the teacher turns
+the payload down, which is the whole of
+[#248](https://github.com/russellgordon/plantoir/issues/248). Both apps
+read the manifest's existence as retiring the skeleton outright until
+2026-09-21, so declining the ready-made pages gave EMPTY folders — 18 pages
+against the skeleton's 47, measured on ICS4U. So a payload's own shape
+matters twice over: a teacher who declines it lands on the family skeleton,
+and the two should not feel like different subjects.
 
 ## Converting an existing complete course into a payload
 

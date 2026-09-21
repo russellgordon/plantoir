@@ -131,6 +131,13 @@ else
   cat /tmp/verify_recipe_folders_test.log
 fi
 
+if (cd scripts && python3 test_starting_content_prompts.py) >/tmp/verify_starting_content_test.log 2>&1; then
+  pass "setup_course.py: what a teacher is told when a subject's skeleton is offered (scripts/test_starting_content_prompts.py)"
+else
+  fail "setup_course.py: what a teacher is told when a subject's skeleton is offered (scripts/test_starting_content_prompts.py)"
+  cat /tmp/verify_starting_content_test.log
+fi
+
 if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
   pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
 else
