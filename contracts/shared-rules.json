@@ -336,7 +336,7 @@
         "why": "A reference course is built under a hidden name and renamed into place last, so an import the app never finished leaves a folder nothing can see - and therefore nothing would ever remove. This is the line that says the disk space came back, and the answer to 'my import did not finish and now there is no trace of it'."
       },
       {
-        "carries": "the course the pages came FROM by its folder name, the course and folder they landed in, how many pages and pictures were created, reused, brought in under a new name and left alone, and the backup's file name",
+        "carries": "the course the pages came FROM by its folder name, the course and folder they landed in, how many pages and pictures were created, reused, brought in under a new name and left alone, how many could not be removed and must not be deployed, and the backup's file name",
         "event": "pages copied from another course",
         "why": "A page appearing in a course a teacher did not write it in has no explanation anywhere else: on disk a copied page looks exactly like one they typed, and 'where did this come from?' is a question nothing else in this trail could answer. One line at the END of a copy, in every outcome - a copy that stopped part way says so in the same line, because the counts already show it. NEVER a page's title and never anything from inside one, the line classCopyNotMade's own entry draws for the same kind of act."
       },
@@ -4323,7 +4323,8 @@
         "rule": "After the page is written it is READ BACK FROM DISK and asked, for every section the destination has AND for one section number it does not have, whether it is hidden. The test is 'is not hidden', not 'is visible', so a value the app cannot read counts as failure. If the answer is not certainly hidden everywhere, the file just written is DELETED and the page is reported as not copied.",
         "nothingTouchesThePageAfterIt": "Media names are settled and the embeds rewritten BEFORE the page is written, so the read-back is the last thing that touches the page's bytes. The locked flag is cleared BEFORE the read-back, because a locked file could not be deleted - and deleting it is what the guard has to be able to do.",
         "why": "This is the last line of defence on the one failure that reports success: a page that arrives visible and is deployed to students. It errs toward no page at all.",
-        "whatTheReadBackCannotSeeOnItsOwn": "The app's reader is not the one that decides what students see, and two shapes were REPRODUCED where the two split - the copy certified hidden by the app and PUBLISHED by the builder. (1) A settings block closed by an INDENTED ---: the app trims leading spaces before testing a fence, python-frontmatter's boundary does not, so it finds no end, reads nothing, and Quartz publishes a page that says nothing (the divergence is issue #188). (2) A block carrying a YAML ANCHOR or ALIAS: taking the plain publish: line out can orphan an alias the rest of the block refers to, frontmatter.load then raises, build_site.py prints a warning and RETURNS, and the page reaches Quartz unresolved. Measured incidence across 777 real pages: ZERO of either. So the read-back ALSO asks a second, deliberately strict question - the first line must open a block at column 0, a later line at column 0 must close it, the plain publish: false this code wrote must be inside it, and nothing in it may carry an anchor, an alias or a leading tab. Anything else is not copied, with wording.thePageIsWrittenInAWayPlantoirCannotBeSureOf. A refusal here is always right.",
+        "theChecklistIsInTheFUTURE": "The screen that lists the linked pages is the one whose purpose is to let a teacher change their mind, so every sentence on it is in the future ('This will copy ...') and its counts are recomputed from the ticks as they stand. Measured: unticking ONE page of a real eleven-page set moved them by 67 MB, two files and one dead link. It said 'Copied 11 pages...' - the RESULT sentence - with a Copy button underneath it.",
+        "whatTheReadBackCannotSeeOnItsOwn": "The app's reader is not the one that decides what students see, and two shapes were REPRODUCED where the two split - the copy certified hidden by the app and PUBLISHED by the builder. (1) A settings block closed by an INDENTED ---: the app trims leading spaces before testing a fence, python-frontmatter's boundary does not, so it finds no end, reads nothing, and Quartz publishes a page that says nothing (the divergence is issue #188). (2) A block carrying a YAML ANCHOR or ALIAS: taking the plain publish: line out can orphan an alias the rest of the block refers to, frontmatter.load then raises, build_site.py prints a warning and RETURNS, and the page reaches Quartz unresolved. Measured incidence across 777 real pages: ZERO of either. So the read-back ALSO asks a second question, stated as ONE INVARIANT rather than a list of shapes: EVERY key that hides the copy must lie inside the region the BUILD reads as frontmatter, that region must carry no OTHER visibility key, the two readers must agree about where it ENDS, and every top-level line in it must be a shape the build's YAML parser reads. Anything else is not copied, with wording.thePageIsWrittenInAWayPlantoirCannotBeSureOf. Three failures were reproduced end to end and the invariant catches all three: an indented closing fence (#188); a BLOCK SCALAR carrying a horizontal rule (description: | ... ---), where the app closes INSIDE the scalar and inserts its publish: false there while the build reads the whole block and takes the source's publish: true from the bottom - the copy reached students in section 1 while the summary said it was hidden; and a block only one of them closes, so the file becomes several documents and the parser gives up. A benign block scalar is NOT refused. MEASURED with 16,192 composed shapes against the real python-frontmatter + publish.ts rule: 7,878 certified, of which 0 are not hidden in every section; 0 false refusals over 11,891 pages Plantoir ships and 0 over 777 real pages. An & or a * inside a VALUE is not an anchor - four shipped pages were refused for a title containing '&' before that was made precise. A refusal here is always right.",
         "theDeleteIsChecked": "A page that fails the read-back is removed, and the REMOVAL is checked. '... was not copied' is the strongest promise this feature makes, and making it on an unchecked delete would let a page nobody could prove hidden sit in the teacher's course while they were told it was not there - an immutable parent folder is the realistic way it fails. When the removal fails the teacher is told something DIFFERENT, the file's path is named, and the trail line says how many could not be removed and must not be deployed."
       }
     },
@@ -4403,6 +4404,8 @@
       "copyAnother": "Copy another",
       "thereIsNoCourseToCopyInto": "There is no other course to copy into yet",
       "alsoCopyLinkedPages": "Also copy the pages this page links to",
+      "willCopy": "This will copy {pages} pages into {course}, in {folder}.",
+      "willBringPicturesAndFilesInAll": "It will bring {count} pictures and files, {size}.",
       "embeddedPagesAlwaysComeAlong": "This page is shown inside another one, so it comes along.",
       "aClassPageWasLeftAlone": "\u201c{page}\u201d is one of that course's classes, so it was left where it is.",
       "anIndexPageIsNotCopied": "\u201c{page}\u201d is the way in to a folder rather than a page, so it was not copied.",
@@ -4481,6 +4484,46 @@
           "text": "---\npublishForSection1: false\ntitle: X\npublish: false\n  ---\nBody\n",
           "builderAgrees": false
         },
+      {
+        "name": "a block scalar carrying a horizontal rule",
+        "why": "REPRODUCED end to end: the app closes the block INSIDE the scalar and inserts its publish: false there, while the build reads the whole block and takes the source's publish: true from the bottom. The copy reached students in section 1 while the summary said it was hidden.",
+        "text": "---\npublishForSection1: false\ndescription: |\n  one\npublish: false\n  ---\n  two\npublishForSection1: true\npublish: true\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "a BENIGN block scalar, with no rule inside it, is NOT refused",
+        "why": "Refusing block scalars outright was the cheap answer and would have been a false refusal on perfectly ordinary data.",
+        "text": "---\npublishForSection1: false\ndescription: |\n  one\n  two\npublish: false\n---\nBody\n",
+        "builderAgrees": true
+      },
+      {
+        "name": "an unclosed quoted value",
+        "why": "The parser gives up part way down the file; build_site.py prints a warning and RETURNS, so the page reaches Quartz unresolved.",
+        "text": "---\npublishForSection1: false\nweird: \"unclosed\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "a top-level line that is not a mapping key",
+        "text": "---\npublishForSection1: false\n-- -\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "a YAML directive",
+        "text": "---\npublishForSection1: false\n%YAML 1.2\npublish: false\n---\nBody\n",
+        "builderAgrees": false
+      },
+      {
+        "name": "an ampersand INSIDE a quoted title is not an anchor",
+        "why": "Four pages Plantoir itself ships carry title: \"Task 1 - Pacific Trail & Alpine Hazard Simulator\" and were refused before this was made precise.",
+        "text": "---\npublishForSection1: false\ntitle: \"Task 1 - Pacific Trail & Alpine Hazard Simulator\"\npublish: false\n---\nBody\n",
+        "builderAgrees": true
+      },
+      {
+        "name": "a second visibility key inside the build's region",
+        "why": "The multiset test: if the build's region carries a visibility key that is not one of ours, the two readers disagreed about where the block ends, and the build takes the LAST one it sees.",
+        "text": "---\npublishForSection1: false\npublish: false\npublishForSection1: true\n---\nBody\n",
+        "builderAgrees": false
+      },
         {
           "name": "a settings block carrying a YAML alias",
           "why": "Taking the plain publish: line out can orphan an alias the rest of the block refers to; frontmatter.load then raises, build_site.py prints a warning and RETURNS, and the page reaches Quartz unresolved.",

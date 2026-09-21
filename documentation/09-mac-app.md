@@ -1885,7 +1885,7 @@ duplicate keys, `publish: yes`, `PUBLISH:`, `---` inside a code fence, a
 20,000-character line, sections `[2, 5]` — is hidden in every section in both
 readers, or reads `cannotTell` in Swift and is therefore deleted.
 
-### The read-back asks TWO questions, because the app's reader is not the judge
+### The read-back asks TWO questions, and the second one is an INVARIANT
 
 After the page is written it is **read back from disk** and asked, for every
 section the destination has AND for one it does not, whether it is hidden. The
@@ -1907,11 +1907,65 @@ hidden here and PUBLISHED there:
   then raises, `build_site.py` prints a warning and RETURNS, and the page
   reaches Quartz unresolved.
 
-So `CopiedPageText.theBuilderWouldReadItTheSameWay` asks a second, deliberately
-strict question with the builder's own boundary. **Measured incidence across
-777 real pages in four courses: zero, of either shape.** Refused anyway,
-because the promise this feature makes is certainty, and a refusal here is
-always right.
+A third was found by fuzzing, and it is the one that settled the shape of the
+answer: **a block scalar carrying a horizontal rule.**
+
+```
+description: |
+  Part one
+  ---
+  Part two
+publish: true
+```
+
+The app closes the block at the indented `---` INSIDE the scalar, so it never
+sees the `publish: true` below and inserts its own `publish: false` inside the
+scalar; the builder reads the whole block and takes the LAST `publish`. The
+copy reached students in section 1 while the summary said it was hidden.
+
+Chasing shapes one at a time was clearly the wrong game, so
+`CopiedPageText.theBuilderWouldReadItTheSameWay` states **one invariant** and
+enforces it:
+
+> Every key that hides this copy must lie inside the region the BUILD reads as
+> frontmatter; that region must carry no OTHER visibility key; the two readers
+> must agree about where it ENDS; and every top-level line in it must be a
+> shape the build's YAML parser reads.
+
+Each clause earns its place. The **key multiset** is not a heuristic about a
+shape — by the time it is asked, every per-section key and both plain keys have
+been stripped from the region THIS APP sees, so a visibility key the build can
+see that this app did not write IS the disagreement, observed. **Boundary
+agreement** kills the class rather than a member of it: if the app read a
+different region, then the keys it stripped, the keys it wrote and the place it
+wrote them were all decided about the wrong text. The **parse-shape** clause
+stands in for a YAML parser Swift does not have, because when
+`frontmatter.load` raises, `build_site.py` prints a warning and RETURNS, and
+the page reaches Quartz unresolved — which publishes it.
+
+**A benign block scalar is NOT refused.** A `description: |` with no rule in it
+is read identically by both, carries no extra key, and copies. Refusing block
+scalars outright was the cheap answer and would have been a false refusal on
+ordinary data.
+
+**Measured, with 16,192 composed shapes** (8 opening fences × 11 closing fences
+× 23 bodies × 4 tails × LF/CRLF), each composed by the real Swift and then read
+by python-frontmatter 1.3.0 / PyYAML 6.0.3 — the image's own versions — running
+`process_frontmatter` and `publish.ts`' rule verbatim:
+
+| | build hides it | build does not |
+|---|---|---|
+| certified | **7,878** | **0** |
+| refused | 332 | 7,982 |
+
+and **0 false refusals** over the 11,891 pages Plantoir ships and the 777 real
+pages in four courses. The 332 are conservative refusals of pages the build
+would in fact have hidden, which is the safe direction.
+
+One clause was made precise rather than left broad: `&` and `*` are looked for
+at a VALUE position only. As a substring test they refused four pages Plantoir
+itself ships, all carrying
+`title: "Task 1 - Pacific Trail & Alpine Hazard Simulator"`.
 
 **The delete is checked.** "… was not copied" is the strongest sentence in the
 feature, and making it on an unchecked `try?` would let a page nobody could
@@ -2007,7 +2061,24 @@ never link to a lesson. The rule is implemented anyway.
 
 Only a page directly inside a top-level shared folder travels. Every other kind
 is listed with the reason it stayed. A page shown INSIDE another comes along
-whether or not it is ticked.
+whether or not it is ticked — inside ANY page being copied, not only inside the
+one the teacher named, because unticking a page that a LINKED page shows would
+put the same hole in it.
+
+**The checklist is in the FUTURE tense, and its numbers follow the ticks.** It
+is the screen whose whole purpose is to let a teacher change their mind, and it
+was headed with the RESULT sentence — "Copied 11 pages into ICS4U, in
+Concepts." — with a Copy button underneath. There was no future-tense sentence
+in the file at all; it had never been written. And the counts were computed once
+and never again: unticking one page of a real eleven-page set moved them by
+67 MB, two files and one dead link while the screen went on showing the old
+ones. The planner is pure and takes 20 ms on the largest real course, so every
+tick re-plans.
+
+`CopyPageChecklist` is a view of its own so that it can be rendered to an image
+and LOOKED at without a window, which is how it was first seen at all — and how
+a `ScrollView` that reserved its cap and drew a 320 pt hole with the rows
+nowhere in it was found and taken out.
 
 ### What was REJECTED, and why
 

@@ -109,11 +109,23 @@ nonisolated enum CopyPageWording {
         return "“\(page)” is already in this course, so it was left as it is — links will lead to the one that is here."
     }
 
-    /// Each name in quotation marks, and that is not decoration: a real page
-    /// on a real course is called "Operators, Selection, Iteration", and a
-    /// list joined with commas read as three separate pages. Quoting each one
-    /// is the difference between a sentence a teacher can act on and one they
-    /// have to guess at.
+    /// What the CHECKLIST says — the screen whose whole purpose is to let a
+    /// teacher change their mind, so every sentence on it is in the future.
+    ///
+    /// It said "Copied 11 pages into ICS4U, in Concepts." with a Copy button
+    /// underneath it, which is the result sentence on the screen before the
+    /// result. There was no future-tense sentence in this file at all: it was
+    /// never written, rather than chosen wrongly between two.
+    static func willCopy(pages: Int, course: String, folder: String) -> String {
+        let pageWord: String = pages == 1 ? "page" : "pages"
+        return "This will copy \(pages) \(pageWord) into \(course), in \(folder)."
+    }
+
+    static func willBringPicturesAndFilesInAll(count: Int, size: String) -> String {
+        let word: String = count == 1 ? "picture or file" : "pictures and files"
+        return "It will bring \(count) \(word), \(size)."
+    }
+
     /// The checkbox that turns the linked pages on and off.
     static let alsoCopyLinkedPages: String = "Also copy the pages this page links to"
 
@@ -137,6 +149,11 @@ nonisolated enum CopyPageWording {
         return "“\(page)” belongs to one section's classes, so it was not copied."
     }
 
+    /// Each name in quotation marks, and that is not decoration: a real page
+    /// on a real course is called "Operators, Selection, Iteration", and a
+    /// list joined with commas read as three separate pages. Quoting each one
+    /// is the difference between a sentence a teacher can act on and one they
+    /// have to guess at.
     static func theseLinksWillNotLeadAnywhereYet(names: [String]) -> String {
         var quoted: [String] = []
         for name in names {
