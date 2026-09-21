@@ -65,6 +65,16 @@ class NewCourseCreator {
             return
         }
 
+        ActivityTrail.note(
+            .courseCreated,
+            NewCourseCreator.startingContentLine(
+                courseCode: courseCode,
+                takesExampleContent: configuration["prepopulate_example_content"] as? Bool ?? false,
+                usesSkeleton: configuration["use_skeleton"] as? Bool ?? false,
+                skeletonSubject: NewCourseCreator.skeletonSubject(forCode: courseCode)
+            )
+        )
+
         respondedLength = 0
         responsesSent = 0
         isCreating = true
@@ -96,6 +106,43 @@ class NewCourseCreator {
             installedExampleCode = NewCourseCreator.exampleCourseCode(in: runner.transcript.displayText)
             isCreating = false
         }
+    }
+
+    /// The line the trail keeps for a new course: the code, and which of
+    /// the three starting points it began from.
+    ///
+    /// Written as a sentence a teacher would recognise rather than as the
+    /// three config keys it is read from — "created ICS4U from the computer
+    /// studies skeleton", never "use_skeleton=true". Pure, so it can be
+    /// tested without creating a course; the two flags come straight out of
+    /// the configuration the wizard just wrote, so the line says what was
+    /// actually asked for rather than what the interface last showed.
+    static func startingContentLine(courseCode: String,
+                                    takesExampleContent: Bool,
+                                    usesSkeleton: Bool,
+                                    skeletonSubject: String?) -> String {
+        if takesExampleContent {
+            return "created \(courseCode) from the ready-made pages written for it"
+        }
+        if usesSkeleton {
+            guard let skeletonSubject, !skeletonSubject.isEmpty else {
+                return "created \(courseCode) from the general course skeleton"
+            }
+            return "created \(courseCode) from the \(skeletonSubject.lowercased()) skeleton"
+        }
+        return "created \(courseCode) with empty folders"
+    }
+
+    /// The subject a code's skeleton is shaped for, or nil for the general
+    /// family — which has no subject to name.
+    static func skeletonSubject(forCode code: String) -> String? {
+        guard let family = SkeletonCatalog.family(forCode: code) else {
+            return nil
+        }
+        if family.name == SkeletonCatalog.generalFamilyName {
+            return nil
+        }
+        return family.label
     }
 
     /// Reads the installed example's code out of the output.
