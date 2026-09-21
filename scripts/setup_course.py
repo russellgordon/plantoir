@@ -2111,6 +2111,16 @@ def setup_course(no_backup: bool = False):
 
     default_code = "ICS3U"
     course_code = prompt_with_default("Enter the course code (e.g. ICS3U)", default_code).upper()
+    # A course code may not begin with a dot. Plantoir builds a reference
+    # course under a HIDDEN folder inside courses/ and renames it into place
+    # as the last act, so a dotted name is one of ITS names, not a teacher's —
+    # and a folder created here with one would be invisible in the app
+    # afterwards. The launchers refuse the same shape for the same reason.
+    while course_code.startswith("."):
+        print("❌ A course code cannot begin with a dot.")
+        course_code = prompt_with_default(
+            "Enter the course code (e.g. ICS3U)", default_code
+        ).upper()
     course_path = base_path / course_code
 
     # --- NEW: Automatic backup BEFORE any mutations -------------------------

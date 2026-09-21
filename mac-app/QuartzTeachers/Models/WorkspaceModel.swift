@@ -286,6 +286,16 @@ class WorkspaceModel {
     /// True while the folder-picker sheet should be shown.
     var isChoosingWorkspace: Bool = false
 
+    /// True while the teacher is choosing the OLD folder to import courses
+    /// for reference out of. Set by the File menu; the chooser and the sheet
+    /// that follows it live on the sidebar, beside "Keep a Copy for
+    /// Reference…", because the two are the same act from different sources.
+    var isChoosingFolderToImportFrom: Bool = false
+
+    /// The folder they chose, once they have chosen one. Nil closes the
+    /// import sheet.
+    var referenceImportRequest: ReferenceImportRequest?
+
     /// Text typed into the sidebar's filter field.
     var filterText: String = ""
 
@@ -454,6 +464,25 @@ class WorkspaceModel {
             groups.append(ReferenceYearGroup(schoolYear: nil, courses: withNoYear))
         }
         return groups
+    }
+
+    /// Opens the groups a reference course sits in, so one that has just
+    /// arrived is on screen rather than filed away behind two closed
+    /// triangles.
+    ///
+    /// Both levels, because there are two: the "Reference Courses" group and
+    /// the school year inside it. A course that lands in a shut group reads
+    /// as a course that did not land at all.
+    func revealReferenceCourse(folderName: String, on day: CalendarDay = CalendarDay.today()) {
+        for course in courses where course.code == folderName {
+            guard course.isKeptForReference else {
+                continue
+            }
+            isShowingReferenceCourses = true
+            let group: Int = course.schoolYear(on: day) ?? ReferenceYearGroup.otherIdentifier
+            expandedReferenceYears.insert(group)
+            WorkspaceModel.rememberOpenFolders()
+        }
     }
 
     /// What is already on the shelf, for the uniqueness rule.
@@ -1186,6 +1215,16 @@ class WorkspaceModel {
         ReferenceCourseUpkeep.bringUpToDateInBackground(
             loadedCourses, inWorkingFolder: workspaceURL
         )
+        // A reference course is built under a hidden name and renamed into
+        // place as the last act, so an import the app never finished — a
+        // quit, a crash, a power cut — leaves one of those behind. Nothing
+        // can see it, so nothing would ever take it away.
+        let swept: [String] = ReferenceStaging.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL)
+        if !swept.isEmpty {
+            ActivityTrail.note(
+                .unfinishedImportForReferenceTidiedAway, ReferenceStaging.trailLine(for: swept)
+            )
+        }
         placeBuiltSitesOutsideTheFolder(for: loadedCourses, everythingIn: entryURLs)
         archivedItems = WorkspaceModel.findArchivedItems(in: coursesDirectoryURL)
         backupItems = WorkspaceModel.findBackupItems(in: coursesDirectoryURL)

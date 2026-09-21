@@ -502,6 +502,14 @@ struct SidebarView: View {
                 workspace.selection = SidebarSelection.course(folderName)
             }
         }
+        // Importing last year's courses starts with a folder chooser, and the
+        // sheet that follows it sits here rather than in the window's own
+        // view because it is the same act as "Keep a Copy for Reference…"
+        // above, from a different source. It is also a second `.fileImporter`
+        // in the app, and two of them on one view is a shape SwiftUI has been
+        // known to present only the first of — so this one lives on its own
+        // view, which the window's folder chooser does too.
+        .modifier(ImportCoursesForReferencePresenter())
         .sheet(isPresented: schoolYearSheetIsPresented) {
             if let course = schoolYearCourse {
                 SetSchoolYearSheet(course: course) {
