@@ -428,6 +428,16 @@
   "failureExplanations" : {
     "cases" : [
       {
+        "expect" : "Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings say something other than true or false. Nothing was published.",
+        "output" : "❌ Plantoir cannot tell whether ICS3U-2025 is kept for reference —\n   its settings say something other than true or false. Nothing was published.",
+        "why" : "The launcher's OTHER reference refusal, and it matters for the same population as the one below: the app reads a course with an odd marker value as ORDINARY, so a teacher can set it to deploy on its own - and at half six the launcher refuses, the app is closed, and without this case the app shows the generic 'did not finish' while the real reason sits in a log nobody opens. Two lines, joined, because the launcher prints them as two. It says PUBLISHED rather than deployed because that is the launchers' own long-standing vocabulary; see shared-rules.json -> referenceCourses.wording.whyTheLaunchersStillSayPublished."
+      },
+      {
+        "expect" : "Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings file could not be read. Nothing was published.",
+        "output" : "❌ Plantoir cannot tell whether ICS3U-2025 is kept for reference —\n   its settings file could not be read. Nothing was published.",
+        "why" : "The same sentence with its other reason. The launchers fail CLOSED on a settings file that is there and will not open, and the teacher reads WHICH of the two it was."
+      },
+      {
         "expect" : "ICS3U is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
         "output" : "❌ ICS3U is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
         "why" : "The launcher's refusal, lifted out of the log and into the sentence the teacher reads. It matters most for a deploy set to happen on its own: that one runs with the app closed, and without this the app shows the generic 'did not finish' while the real reason sits in a file nobody opens. NO NEW EXIT CODE was added for it - deploy.sh states its own invariant, that exit 3 means 'a question nobody was there to answer' and nothing else, and every other exit is 0 or 1 - so this is matched on OUTPUT, which is how every other launcher failure already becomes a sentence. The line is LIFTED rather than rewritten: the launcher's output already is a sentence a teacher can act on, and a second explanation of one rule is how one rule comes to be said two ways."

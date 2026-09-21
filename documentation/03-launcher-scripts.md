@@ -894,6 +894,16 @@ deployed"; three things belong here, beside the launchers themselves:
   A settings file that is absent is left to the course-folder check further
   down, which already says that in its own words.
 
+**There are TWO refusals here, not one.** The second is "cannot tell": the
+launchers refuse when the marker is present with a value that is neither
+`true` nor `false` — `1`, `"true"`, `True` — and when any object KEY in the
+settings carries a `\u` escape. Both are spellings somebody plainly MEANT and
+neither is one the app reads as a reference course, so the launcher's refusal
+is the only thing between them and a published frozen course; it publishes
+nothing and freezes nothing. `app-rules.json` → `failureExplanations` turns
+both halves of it back into the sentence a teacher reads when a deploy set to
+happen on its own hits one.
+
 The sentence is a constant (`REFERENCE_COURSE_REFUSAL`) rather than read from
 the contract, because this runs before `BUILD_CONTEXT` is resolved and under
 `--image` it is never resolved at all. `scripts/test_reference_course.py`

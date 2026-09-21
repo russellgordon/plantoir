@@ -144,11 +144,47 @@ final class ReferenceLockTests: XCTestCase {
             "These pages are editable on a course the teacher was told stays as it was."
         )
         XCTAssertTrue(
-            outcome.everythingWalkedIsLocked,
-            "A pass that walked \(outcome.walked) files and left \(outcome.walked - outcome.lockedAfterwards) "
-            + "of them unlocked must not report success."
+            outcome.everythingThatShouldBeLockedIs,
+            "\(outcome.lockedOnDisk) of \(outcome.shouldBeLocked) locked — a pass that missed part "
+            + "of the course must not report success."
         )
-        XCTAssertGreaterThanOrEqual(outcome.walked, expected.count)
+        XCTAssertGreaterThanOrEqual(outcome.shouldBeLocked, expected.count)
+    }
+
+    /// **The census is INDEPENDENT of the walk**, which is the only way it
+    /// can see a walk that stopped early.
+    ///
+    /// The first version compared two numbers the walk itself produced, so it
+    /// was `didNotTake == 0` wearing a hat: the broken walk reported success
+    /// with nine pages editable on disk. This drives the census against a
+    /// course that has been locked by the BROKEN rule — every file locked by
+    /// hand except one folder's — and asks it to notice.
+    func testTheCensusSeesPagesTheWalkNeverReached() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let missed: URL = course.directoryURL.appendingPathComponent("College Board Curriculum")
+        try FileManager.default.createDirectory(at: missed, withIntermediateDirectories: true)
+        for page in ["One.md", "Two.md"] {
+            try Data("# page\n".utf8).write(to: missed.appendingPathComponent(page))
+        }
+
+        // Lock everything EXCEPT that folder — exactly the state the broken
+        // walk left behind.
+        for fileURL in ReferenceLock.contentFilesForTests(in: course.directoryURL)
+        where !fileURL.path.contains("College Board Curriculum") {
+            try? FileManager.default.setAttributes(
+                [.immutable: true], ofItemAtPath: fileURL.path
+            )
+        }
+
+        let census: ReferenceLock.Census = ReferenceLock.census(courseDirectory: course.directoryURL)
+        XCTAssertFalse(census.agrees, "Two pages are editable and the census must say so.")
+        XCTAssertEqual(census.shouldBeLocked - census.lockedOnDisk, 2)
+
+        // And once the real pass has run, it agrees.
+        let outcome: ReferenceLock.Outcome = ReferenceLock.ensureLocked(course)
+        XCTAssertTrue(outcome.everythingThatShouldBeLockedIs)
+        XCTAssertEqual(outcome.shouldBeLocked, outcome.lockedOnDisk)
     }
 
     /// And the folders that are skipped on purpose still are.

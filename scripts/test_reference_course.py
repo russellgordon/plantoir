@@ -235,14 +235,20 @@ class ThreeReadersAgree(unittest.TestCase):
 
         launcher_source = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
         self.assertIn(agreement["pattern"]["posixEre"], launcher_source)
+        self.assertIn(agreement["pattern"]["escapedKeyPosixEre"], launcher_source)
         powershell_source = (REPOSITORY_ROOT / "deploy.ps1").read_text(encoding="utf-8")
         self.assertIn(agreement["pattern"]["dotNet"], powershell_source)
+        self.assertIn(agreement["pattern"]["escapedKeyDotNet"], powershell_source)
+        self.assertEqual(
+            agreement["pattern"]["escapedKeyPython"], reference_course.ESCAPED_KEY_PATTERN
+        )
         # Case-SENSITIVE, matching `-cmatch`: `-match` treated the KEY as
         # case-insensitive too, so "KEPT_FOR_REFERENCE" refused on Windows
         # while the mac and the Python allowed it.
         dot_net = re.compile(agreement["pattern"]["dotNet"])
         present = re.compile(agreement["pattern"]["presentDotNet"])
         says_false = re.compile(agreement["pattern"]["falseDotNet"])
+        escaped_key = re.compile(agreement["pattern"]["escapedKeyDotNet"])
 
         for row in rows:
             name = row["name"]
@@ -303,7 +309,8 @@ class ThreeReadersAgree(unittest.TestCase):
             if not row.get("unreadable") and not row.get("noConfigFile") \
                     and not row.get("configIsADirectory"):
                 text = row.get("configText", "")
-                powershell_refuses = dot_net.search(text) is not None or (
+                powershell_refuses = escaped_key.search(text) is not None \
+                    or dot_net.search(text) is not None or (
                     present.search(text) is not None
                     and dot_net.search(text) is None
                     and says_false.search(text) is None
@@ -323,6 +330,10 @@ class ThreeReadersAgree(unittest.TestCase):
 
 class TheSentence(unittest.TestCase):
 
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
     def test_the_sentence_is_the_contracts_sentence(self):
         template = _rules()["refusal"]["sentence"]
         self.assertIn("{course}", template)
@@ -336,6 +347,43 @@ class TheSentence(unittest.TestCase):
         # falling through to a deploy. It is only safe while it says the same
         # thing, which is what this pins.
         self.assertEqual(reference_course.FALLBACK_REFUSAL, _rules()["refusal"]["sentence"])
+
+    def test_both_launchers_carry_the_same_cannot_tell_sentence(self):
+        # The same arrangement the refusal sentence has: a keyed string,
+        # carried as a constant in each launcher, compared here. It exists
+        # because the app reads a course with an odd marker value as ORDINARY
+        # — so a teacher can schedule a deploy on it, and only the launcher
+        # refuses, with the app closed.
+        wording = _rules()["wording"]
+        # The two halves the launcher prints around the course's name.
+        headline_start = wording["cannotTellHeadline"].split("{course}")[0].strip()
+        headline_end = wording["cannotTellHeadline"].split("{course}")[1].strip()
+        for launcher in ["deploy.sh", "deploy.ps1"]:
+            text = (REPOSITORY_ROOT / launcher).read_text(encoding="utf-8")
+            self.assertIn(headline_start, text, launcher)
+            self.assertIn(headline_end, text, launcher)
+            self.assertIn(wording["cannotTellBecauseOddValue"], text, launcher)
+            self.assertIn(wording["cannotTellBecauseUnreadable"], text, launcher)
+
+    def test_the_python_says_which_reason(self):
+        # deploy.py printed "its settings file could not be read" for every
+        # cause, including a file that opened perfectly well and said `1`.
+        wording = _rules()["wording"]
+        folder = Path(self.tmp) / "WHY"
+        folder.mkdir()
+        (folder / "course_config.json").write_text(
+            '{"course_code": "WHY", "kept_for_reference": 1}', encoding="utf-8"
+        )
+        self.assertEqual(
+            reference_course.why_cannot_tell(folder), wording["cannotTellBecauseOddValue"]
+        )
+        (folder / "course_config.json").chmod(0o000)
+        self.addCleanup((folder / "course_config.json").chmod, 0o644)
+        if not os.access(str(folder / "course_config.json"), os.R_OK):
+            self.assertEqual(
+                reference_course.why_cannot_tell(folder),
+                wording["cannotTellBecauseUnreadable"]
+            )
 
     def test_both_launchers_carry_the_same_sentence(self):
         # The launchers cannot read the contract: the host-side check runs

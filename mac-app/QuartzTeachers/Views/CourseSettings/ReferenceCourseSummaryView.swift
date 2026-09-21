@@ -38,6 +38,13 @@ struct ReferenceCourseSummaryView: View {
         return SchoolYear.label(forStartingYear: startingYear)
     }
 
+    /// What the course looks like on disk right now. Read when the pane is
+    /// drawn rather than kept: a folder that came back from another Mac is
+    /// not locked until something asks.
+    var census: ReferenceLock.Census {
+        return ReferenceLock.census(courseDirectory: course.directoryURL)
+    }
+
     var sectionsText: String {
         var spelled: [String] = []
         for number in course.sectionNumbers {
@@ -92,8 +99,16 @@ struct ReferenceCourseSummaryView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(ReferenceWording.neverDeployed(course: course.displayCode))
-                    Text(ReferenceWording.pagesAreLocked)
-                    Text(ReferenceWording.aCopyTakenOutStaysLocked)
+                    // Said only when it is TRUE. A volume that cannot carry
+                    // the flag — a network home — locks nothing, and telling
+                    // a teacher their pages are kept locked there would be
+                    // the product promising something it did not do. The
+                    // census is what knows, and it is independent of the walk
+                    // that does the locking.
+                    if census.agrees {
+                        Text(ReferenceWording.pagesAreLocked)
+                        Text(ReferenceWording.aCopyTakenOutStaysLocked)
+                    }
                 }
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
