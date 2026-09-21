@@ -940,15 +940,34 @@ final class SharedRulesContractTests: XCTestCase {
             )
             XCTAssertEqual(lists, expected, "wizard.skeletonToggle → \(name)")
 
-            // What the file says, where the case pins it — the rule itself,
-            // and the assertion that fails against an app asking only
-            // whether example content EXISTS for the code.
+            // What the file says, where the case pins it — read out of the
+            // PRODUCTION config writer rather than recomputed here.
+            //
+            // Recomputing `hasSkeleton(…) && skeletonIsWanted` in the runner
+            // was this assertion's first shape, and it pinned the RULE while
+            // leaving the wiring free: deleting the predicate from
+            // `buildConfigurationDictionary` left the case green, which is
+            // exactly the gap between "the rule is right" and "the file the
+            // Create button writes is right". The wizard is built through the
+            // initialiser with the state the steps left behind — the one seam
+            // that works, since `@State` never takes on a view that is not on
+            // screen (`WizardStructure.swift`).
             if let expectedUseSkeleton = testCase["expectSavedUseSkeleton"] as? Bool {
-                let savedUseSkeleton: Bool = SkeletonCatalog.hasSkeleton(
-                    forCode: code, takingExampleContent: takesExampleContent
-                ) && skeletonIsWanted
+                let wizard: NewCourseWizardView = NewCourseWizardView(
+                    courseCode: code,
+                    prepopulatesExampleContent: takesExampleContent,
+                    startsFromSkeleton: skeletonIsWanted,
+                    sharedFolders: lists.sharedFolders,
+                    sharedFiles: lists.sharedFiles,
+                    perSectionFolders: lists.perSectionFolders,
+                    perSectionFiles: lists.perSectionFiles,
+                    gradedFolders: lists.gradedFolders
+                )
+                let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+                    code: code, name: "Contract Case"
+                )
                 XCTAssertEqual(
-                    savedUseSkeleton, expectedUseSkeleton,
+                    configuration["use_skeleton"] as? Bool, expectedUseSkeleton,
                     "wizard.skeletonToggle → \(name): use_skeleton in course_config.json"
                 )
             }

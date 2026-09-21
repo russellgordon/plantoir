@@ -83,4 +83,94 @@ final class NewCourseTrailTests: XCTestCase {
     func testTheEventExists() {
         XCTAssertEqual(ActivityTrail.Event.courseCreated.rawValue, "course created")
     }
+
+    // MARK: - Every button that makes a course leaves the line
+
+    /// "Add Example Course" makes a course too, and must leave the same
+    /// line — it was the one creator that left none.
+    ///
+    /// A source scan, for two reasons a test that calls the function cannot
+    /// meet: `installExampleCourse` runs the real `setup.sh`, and the thing
+    /// most easily got wrong here is not the sentence but WHERE it is
+    /// written. The code is not known before the run — the example installs
+    /// as EXC2O unless that code is taken — so a line written up front would
+    /// name the wrong course, and a line written outside the `if let` would
+    /// claim a course that a failed run never made.
+    @MainActor
+    func testAddingTheExampleCourseLeavesTheLineToo() throws {
+        let source: String = try NewCourseTrailTests.creatorSource()
+        let body: String = try XCTUnwrap(
+            NewCourseTrailTests.body(ofFunction: "func installExampleCourse(", in: source),
+            "installExampleCourse() was not found — this scan cannot see what it records."
+        )
+
+        XCTAssertTrue(
+            body.contains(".courseCreated"),
+            "Adding the example course records nothing, so a teacher who pressed that button "
+            + "and asked about the course a week later leaves no trace of having made it "
+            + "(contracts/shared-rules.json → activityTrail.mustRecord, \"course created\")."
+        )
+        XCTAssertTrue(
+            body.contains("if let installedCode = installedExampleCode"),
+            "The line no longer waits for the code the run actually installed. The example "
+            + "takes another code when EXC2O is taken, so a line written before the run names "
+            + "a course that may not exist — and a run that installed nothing must say nothing."
+        )
+        // The sentence itself comes from the same function the wizard uses,
+        // so a reword reaches both creators at once.
+        XCTAssertTrue(
+            body.contains("startingContentLine("),
+            "The example course's line is no longer built by startingContentLine(), so the two "
+            + "creators can drift into saying different things about the same act."
+        )
+    }
+
+    /// The sentence that button leaves, spelled out once.
+    @MainActor
+    func testTheExampleCourseSaysWhereItsPagesCameFrom() {
+        XCTAssertEqual(
+            NewCourseCreator.startingContentLine(
+                courseCode: "EXC2O", takesExampleContent: true,
+                usesSkeleton: false, skeletonSubject: nil
+            ),
+            "created EXC2O from the ready-made pages written for it"
+        )
+    }
+
+    // MARK: - Functions
+
+    /// `NewCourseCreator`'s own source, read from the checkout.
+    static func creatorSource() throws -> String {
+        let fileURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // QuartzTeachersTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // mac-app
+            .appendingPathComponent("QuartzTeachers/Scripting/NewCourseCreator.swift")
+        let source: String = try String(contentsOf: fileURL, encoding: .utf8)
+        XCTAssertGreaterThan(
+            source.count, 1000,
+            "NewCourseCreator.swift was not found where this test expects it — the scan would "
+            + "pass vacuously."
+        )
+        return source
+    }
+
+    /// Everything between a function's opening line and the first line that
+    /// closes it at the function's own indentation.
+    static func body(ofFunction declaration: String, in source: String) -> String? {
+        let lines: [String] = source.components(separatedBy: "\n")
+        var collected: [String] = []
+        var isInside: Bool = false
+        for line in lines {
+            if isInside {
+                if line == "    }" {
+                    return collected.joined(separator: "\n")
+                }
+                collected.append(line)
+            } else if line.contains(declaration) {
+                isInside = true
+            }
+        }
+        return nil
+    }
 }
