@@ -453,6 +453,23 @@ nonisolated enum ActivityTrail {
         /// Carries what was under way, in the words the teacher was shown.
         case quitAskedAboutWorkUnderWay = "quit asked about work under way"
 
+        /// A teacher made a new course, and WHICH starting content it began
+        /// from: the ready-made pages written for its code, the subject's
+        /// skeleton, or empty folders. Carries the course code and nothing
+        /// else — not the name they typed, not where it publishes.
+        ///
+        /// Written because "my new course came out empty" is a report that
+        /// today's trail cannot answer at all. Until 2026-09-21 the only
+        /// line a creation left was "started setup.sh", whose arguments are
+        /// empty for a course creation — so the trail did not even carry
+        /// the code, let alone what the course was supposed to start as.
+        /// Adding one folder to a list has recorded more than making a
+        /// whole course did (`folder created`). That asymmetry is what
+        /// GitHub issue #248 was reported against: a teacher declined the
+        /// ready-made pages, got empty folders, and nothing on the trail
+        /// said which of those two things had happened.
+        case courseCreated = "course created"
+
         /// A course was kept for reference: which folder it was given, the
         /// code and school year it shows, how many sections came across, and
         /// which course it was copied from. Never the contents of a page.
