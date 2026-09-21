@@ -471,7 +471,23 @@ if [[ -f "$_course_config" ]]; then
   # three implementations must agree on is
   # contracts/shared-rules.json -> referenceCourses.markerAgreement.
   _reference_code="$COURSE_CODE"
-  if printf '%s' "$_flat_config" | grep -Eq '"kept_for_reference"[[:space:]]*:[[:space:]]*[Tt][Rr][Uu][Ee]'; then
+  # A marker that is THERE with a value that is neither true nor false — `1`,
+  # `"true"`, a key written with \u escapes. Somebody plainly meant it, and
+  # the app reads a real JSON boolean and nothing else, so it would treat this
+  # course as ordinary and deploy it. Refused as "cannot tell": it publishes
+  # nothing and freezes nothing, which is the only direction that is safe
+  # both ways. `"[^"]*ept_for_reference"` catches the escaped spellings and
+  # cannot match an ordinary key.
+  if printf '%s' "$_flat_config" | grep -Eq '"[^"]*ept_for_reference"' \
+     && ! printf '%s' "$_flat_config" | grep -Eq '"[^"]*ept_for_reference"[[:space:]]*:[[:space:]]*[Tt][Rr][Uu][Ee]' \
+     && ! printf '%s' "$_flat_config" | grep -Eq '"[^"]*ept_for_reference"[[:space:]]*:[[:space:]]*[Ff][Aa][Ll][Ss][Ee]'; then
+    echo ""
+    echo "❌ Plantoir cannot tell whether ${COURSE_CODE} is kept for reference —"
+    echo "   its settings say something other than true or false. Nothing was published."
+    echo ""
+    exit 1
+  fi
+  if printf '%s' "$_flat_config" | grep -Eq '"[^"]*ept_for_reference"[[:space:]]*:[[:space:]]*[Tt][Rr][Uu][Ee]'; then
     # The code a TEACHER reads, which for a reference course is deliberately
     # not the folder name. Falls back to the folder when there is none.
     #

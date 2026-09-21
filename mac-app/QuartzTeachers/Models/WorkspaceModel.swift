@@ -217,6 +217,15 @@ class WorkspaceModel {
     /// Whether the sidebar's Backups group is open.
     var isShowingBackups: Bool = false
 
+    /// The reference course whose "Set School Year…" sheet should open, by
+    /// folder name, or nil for none.
+    ///
+    /// On the MODEL rather than on the sidebar's own `@State` because two
+    /// places ask for it — the course's context menu and the read-only
+    /// summary in the detail pane — and the sheet itself is presented once,
+    /// by the sidebar, which owns every sheet in this window.
+    var schoolYearRequestCode: String?
+
     /// Whether the "Reference Courses" group is folded open. Remembered with
     /// the folder, exactly as Archived and Backups are.
     var isShowingReferenceCourses: Bool = false
@@ -270,13 +279,7 @@ class WorkspaceModel {
                   course.isKeptForReference else {
                 return
             }
-            let outcome: ReferenceLock.Outcome = ReferenceLock.ensureLocked(course)
-            if !outcome.isQuiet {
-                ActivityTrail.note(
-                    .referenceCoursePagesLockedAgain,
-                    ReferenceCourseUpkeep.trailLine(for: outcome, course: course.displayCode)
-                )
-            }
+            ReferenceLock.ensureLockedInBackground(course)
         }
     }
 
@@ -1180,7 +1183,9 @@ class WorkspaceModel {
         // after somebody marked a course by hand. Quiet and cheap when there
         // is nothing to do, which is every ordinary folder — it walks only
         // the courses that claim to be kept for reference.
-        ReferenceCourseUpkeep.bringUpToDate(loadedCourses, inWorkingFolder: workspaceURL)
+        ReferenceCourseUpkeep.bringUpToDateInBackground(
+            loadedCourses, inWorkingFolder: workspaceURL
+        )
         placeBuiltSitesOutsideTheFolder(for: loadedCourses, everythingIn: entryURLs)
         archivedItems = WorkspaceModel.findArchivedItems(in: coursesDirectoryURL)
         backupItems = WorkspaceModel.findBackupItems(in: coursesDirectoryURL)
@@ -1339,8 +1344,17 @@ class WorkspaceModel {
     /// row or one of its sections is what is selected. A teacher who has
     /// clicked into Section 2 and presses Return means the course it belongs
     /// to; there is nothing else in a section's row to rename.
+    /// **Never a course kept for reference**, from any route. The context
+    /// menu already hid the item; the Edit menu and the Return key did not,
+    /// and both set `renamingCourseCode` on a row that draws no editing
+    /// field — so nothing appeared to happen AND the code was never cleared,
+    /// which left Return-to-rename dead for every other course in the window
+    /// until it was closed.
     var courseThatCanBeRenamed: Course? {
-        return selectedCourse
+        guard let course = selectedCourse, !course.isKeptForReference else {
+            return nil
+        }
+        return course
     }
 
     /// Why the selected course cannot be renamed right now, or nil when it

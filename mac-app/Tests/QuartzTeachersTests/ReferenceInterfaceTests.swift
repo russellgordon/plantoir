@@ -305,6 +305,140 @@ final class ReferenceInterfaceTests: XCTestCase {
         )
     }
 
+    // MARK: - What a teacher READS — decision (h), on every surface
+
+    /// The four biggest surfaces, each checked through the same function the
+    /// view calls. They showed `ICS3U-2025`; the contract says the teacher
+    /// reads `ICS3U` "in the sidebar, the window title, every alert and every
+    /// sentence".
+    func testEveryTeacherReadSurfaceShowsTheRealCode() throws {
+        try prepare()
+        // The row label and the window titles are `displayCode` by
+        // construction; what a test can hold is the property itself and the
+        // sentence builders that take it.
+        XCTAssertEqual(reference.displayCode, "ICS3U")
+        XCTAssertEqual(reference.code, "ICS3U-2025", "Identity is still the folder.")
+
+        // The removal alert, built by the same helper the sidebar uses.
+        let removal: String = ScheduledDeployCleanup.warningForRemovingACourse(
+            courseCode: reference.displayCode, sections: [1]
+        )
+        XCTAssertTrue(removal.contains("ICS3U "), removal)
+        XCTAssertFalse(removal.contains("ICS3U-2025"), removal)
+
+        // And every sentence this feature added.
+        for sentence in [
+            AssistWording.deployRefusedForAReferenceCourse(course: reference.displayCode),
+            ReferenceWording.staysAsItIs(course: reference.displayCode),
+            ReferenceWording.neverDeployed(course: reference.displayCode),
+            ReferenceWording.copyIsASnapshot(course: reference.displayCode),
+        ] {
+            XCTAssertFalse(sentence.contains("-2025"), sentence)
+        }
+    }
+
+    /// And the invariant the rulings asked for: for every course a teacher
+    /// TEACHES, the two are the same string.
+    func testDisplayCodeEqualsTheFolderForEveryCourseBeingTaught() throws {
+        try prepare(alsoReference: [(folder: "ADA1O-REF", code: "ADA1O", year: nil)])
+        for course in workspace.courses where !course.isKeptForReference {
+            XCTAssertEqual(course.displayCode, course.code)
+        }
+    }
+
+    // MARK: - The pane a teacher lands on
+
+    /// Not the settings form: it asked a frozen course to choose a deploy
+    /// folder, greyed Save for ever, and let every other setting be saved.
+    func testAReferenceCourseGetsFactsRatherThanTheSettingsForm() throws {
+        try prepare()
+        let summary: ReferenceCourseSummaryView = ReferenceCourseSummaryView(
+            course: reference, today: today, setSchoolYear: {}
+        )
+        XCTAssertEqual(summary.schoolYearText, "2025–26")
+        XCTAssertEqual(summary.sectionsText, "1")
+
+        // The form it replaced would have shown this, on a course the app has
+        // just called never-deployed.
+        XCTAssertEqual(
+            CourseConfiguration.deployFolderProblem(
+                forPath: reference.configuration.deployFolderPath
+            ),
+            "Choose the folder this course deploys into."
+        )
+    }
+
+    // MARK: - Withheld from every route
+
+    func testRenamingIsWithheldFromTheMenuAndTheReturnKey() throws {
+        try prepare()
+        workspace.selection = SidebarSelection.course(reference.code)
+        XCTAssertNil(
+            workspace.courseThatCanBeRenamed,
+            "The Edit menu item and the Return key both go through this."
+        )
+        workspace.selection = SidebarSelection.section(reference.code, 1)
+        XCTAssertNil(workspace.courseThatCanBeRenamed)
+
+        workspace.selection = SidebarSelection.course(live.code)
+        XCTAssertEqual(workspace.courseThatCanBeRenamed?.code, live.code, "And it still works.")
+    }
+
+    /// The button, not the model. `SiteHealthRepair.repair` already returned
+    /// no attempts — and the view drew the button anyway, so pressing it said
+    /// "That is already put right. Nothing needed changing." about a folder
+    /// that was really gone.
+    func testTheSiteHealthRepairButtonIsNotDrawn() throws {
+        try prepare()
+        let findings: [SiteHealthFinding] = [
+            SiteHealthFinding(
+                name: "mediaFolderMissing",
+                sentence: "ICS3U has no Media folder.",
+                detail: "Pictures live there.",
+                fixable: true,
+                course: reference.code,
+                section: 1
+            )
+        ]
+        XCTAssertNotNil(
+            SiteHealthRepair.buttonTitle(for: findings),
+            "The button exists for an ordinary course — otherwise this proves nothing."
+        )
+        XCTAssertTrue(
+            SiteHealthRepair.repair(findings, in: reference).isEmpty,
+            "The model already refused; the VIEW drew the button anyway."
+        )
+        // And what pressing it used to say, with no attempts behind it: the
+        // zero-attempt branch reads as "nothing needed doing".
+        let outcome: SiteHealthRepair.Outcome = try XCTUnwrap(
+            SiteHealthRepair.outcome(ofRepairing: findings, in: reference)
+        )
+        XCTAssertTrue(
+            outcome.headline.contains("already put right"),
+            "This is the sentence a teacher got about a folder that is really missing: "
+            + outcome.headline
+        )
+    }
+
+    // MARK: - The one thing that still changes
+
+    func testSettingTheSchoolYearLeavesALineOnTheTrail() throws {
+        try prepare()
+        reference.configuration.referenceSchoolYear = 2024
+        try reference.configuration.write(to: reference.configFileURL)
+        ActivityTrail.note(
+            .referenceCourseSchoolYearChanged,
+            ReferenceWording.schoolYearTrailLine(
+                course: reference.displayCode, folderName: reference.code,
+                from: 2025, to: 2024
+            )
+        )
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("ICS3U (ICS3U-2025)"), trail)
+        XCTAssertTrue(trail.contains("2024–25"), trail)
+        XCTAssertTrue(trail.contains("2025–26"), trail)
+    }
+
     // MARK: - The calm note
 
     func testTheNoteIsShownOncePerCourse() throws {

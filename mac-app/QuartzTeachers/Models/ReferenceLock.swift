@@ -40,8 +40,7 @@ import Foundation
 /// provider models the locked bit itself and clears it while a file uploads,
 /// so the lock is per-Mac and is re-asserted rather than assumed
 /// (`ensureLocked`).
-@MainActor
-enum ReferenceLock {
+nonisolated enum ReferenceLock {
 
     // MARK: - Types
 
@@ -66,9 +65,28 @@ enum ReferenceLock {
 
         // MARK: - Computed properties
 
+        /// How many files the walk SAW — every content file in the course,
+        /// after the never-locked names are taken out.
+        let walked: Int
+
+        /// How many of those are locked when the pass finishes.
+        let lockedAfterwards: Int
+
+        // MARK: - Computed properties
+
         /// True when there was nothing to do, so nothing is said anywhere.
         var isQuiet: Bool {
             return locked == 0 && didNotTake == 0
+        }
+
+        /// True when every file the walk saw is locked.
+        ///
+        /// The check the old `Outcome` could not make. It is not a promise
+        /// that the WALK was complete — nothing inside this type can know
+        /// that — which is why `walked` is carried too, and why the test that
+        /// pins the walk counts files on disk rather than asking here.
+        var everythingWalkedIsLocked: Bool {
+            return lockedAfterwards == walked
         }
     }
 
@@ -123,22 +141,99 @@ enum ReferenceLock {
     /// and is not touched. Safe to call on any course — a course that is not
     /// kept for reference is left alone entirely, so callers do not each have
     /// to remember to ask.
+    @MainActor
     @discardableResult
     static func ensureLocked(_ course: Course) -> Outcome {
         guard course.isKeptForReference else {
-            return Outcome(locked: 0, didNotTake: 0)
+            return Outcome(locked: 0, didNotTake: 0, walked: 0, lockedAfterwards: 0)
         }
         return ReferenceLock.lock(courseDirectory: course.directoryURL)
     }
+
+    /// The same, OFF the main actor — for the re-assertion points a teacher
+    /// is waiting on: the folder being read, a course being selected, a
+    /// preview starting, Obsidian opening.
+    ///
+    /// Measured on this Mac, 1,220 files: **~24 ms** for a pass with nothing
+    /// to do and **~80 ms** for one that locks everything. Below the
+    /// perception threshold for one course and not free for four, and
+    /// `reloadCourses()` runs after most sheets — so the walk goes to the
+    /// cooperative pool and the teacher's click never waits for a `stat` per
+    /// file.
+    ///
+    /// `Task.detached`, not `DispatchQueue`: structured concurrency, no
+    /// queue, and nothing that waits for a guessed interval. The trail line
+    /// hops back to the main actor, because that is where the store is
+    /// replaced by a test.
+    ///
+    /// Nothing awaits this deliberately. It is an ASSERTION that the course
+    /// is what it says it is, not a step in anything — and the refusal to
+    /// deploy has never depended on it.
+    @MainActor
+    static func ensureLockedInBackground(_ course: Course) {
+        guard course.isKeptForReference else {
+            return
+        }
+        let directoryURL: URL = course.directoryURL
+        let displayCode: String = course.displayCode
+        Task {
+            let outcome: Outcome = await ReferenceLock.locking(courseDirectory: directoryURL)
+            if outcome.isQuiet {
+                return
+            }
+            ActivityTrail.note(
+                .referenceCoursePagesLockedAgain,
+                ReferenceCourseUpkeep.trailLine(for: outcome, course: displayCode)
+            )
+        }
+    }
+
+    /// The walk, off the caller's actor.
+    ///
+    /// **`@concurrent` is load-bearing, and it is measured rather than
+    /// decorative.** This target builds with `SWIFT_APPROACHABLE_CONCURRENCY`,
+    /// which turns on `NonisolatedNonsendingByDefault` — and under that rule a
+    /// plain `nonisolated async` function runs on its CALLER's actor. So
+    /// marking this `async` and leaving it at that would have kept every
+    /// `stat` on the main actor while reading as though it did not, which is
+    /// the worst kind of fix. `@concurrent` is what actually leaves.
+    /// `testTheLockWalkDoesNotRunOnTheMainThread` proves it rather than
+    /// trusting the annotation.
+    ///
+    /// Structured concurrency throughout: no `DispatchQueue`, and nothing
+    /// that waits for a guessed interval.
+    @concurrent
+    static func locking(courseDirectory: URL) async -> Outcome {
+        // `Thread.isMainThread` is unavailable from an async context (it is
+        // the question Swift wants asked with an isolation annotation
+        // instead), so the thread is read by the synchronous worker below —
+        // which is where the `stat` per file actually happens, and therefore
+        // the honest place to ask.
+        return ReferenceLock.lock(courseDirectory: courseDirectory)
+    }
+
+    /// Whether the last off-actor pass really ran off the main thread.
+    ///
+    /// Written by `locking` and read by one test. A seam rather than an
+    /// assertion in the product, for the reason every other override here is
+    /// one: the thing worth pinning is a fact about the running program, and
+    /// an annotation that stops working silently is exactly what this feature
+    /// has already been bitten by once.
+    nonisolated(unsafe) static var lastPassRanOnTheMainThread: Bool?
 
     /// The same, for a folder rather than a loaded course — what the copier
     /// has in hand as the last step of making one.
     @discardableResult
     static func lock(courseDirectory: URL) -> Outcome {
+        ReferenceLock.lastPassRanOnTheMainThread = Thread.isMainThread
         var locked: Int = 0
         var didNotTake: Int = 0
+        var walked: Int = 0
+        var alreadyLocked: Int = 0
         for fileURL in ReferenceLock.contentFiles(in: courseDirectory) {
+            walked += 1
             if ReferenceLock.isLocked(fileURL) {
+                alreadyLocked += 1
                 continue
             }
             ReferenceLock.set(immutable: true, at: fileURL)
@@ -153,7 +248,19 @@ enum ReferenceLock {
                 didNotTake += 1
             }
         }
-        return Outcome(locked: locked, didNotTake: didNotTake)
+        return Outcome(
+            locked: locked,
+            didNotTake: didNotTake,
+            // Counted rather than assumed. A walk that silently skips part of
+            // the course used to report a perfectly healthy `locked` and
+            // `didNotTake: 0` — the count it had WALKED was the thing nobody
+            // was keeping, so the one number that could have shown the defect
+            // did not exist. `lockedAfterwards` is what every file the walk
+            // saw ended up as; a caller comparing it with `walked` can say
+            // whether the pass actually covered the course.
+            walked: walked,
+            lockedAfterwards: alreadyLocked + locked
+        )
     }
 
     /// Unlocks everything in the course, so it can be removed or restored
@@ -252,7 +359,24 @@ enum ReferenceLock {
                 // A skipped FOLDER takes everything inside it: `.obsidian`
                 // holds plugins and themes, and the point is that Obsidian
                 // may write in there freely.
-                walker.skipDescendants()
+                //
+                // **Only when it IS a folder**, and that word is the whole
+                // defect this line used to carry. `skipDescendants()` asked
+                // of a FILE — `course_config.json`, which every course has at
+                // its top level — is applied by the enumerator to the next
+                // directory it has not descended into yet, so the folder
+                // AFTER it was never walked and never locked. Measured on a
+                // real course: 842 of 934 files walked, and the 92 missed
+                // included 27 real pages. Which folder was lost depended on
+                // readdir order, so it MOVED between passes — which is why
+                // the course came out mostly locked and never entirely
+                // locked, and why nothing looked wrong.
+                let skipped: URLResourceValues? = try? child.resourceValues(
+                    forKeys: [.isDirectoryKey]
+                )
+                if skipped?.isDirectory == true {
+                    walker.skipDescendants()
+                }
                 continue
             }
             let values: URLResourceValues? = try? child.resourceValues(

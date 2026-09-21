@@ -105,8 +105,19 @@ struct MainWindowView: View {
         switch workspace.selection {
         case .course(let code):
             if let course = course(withCode: code) {
-                CourseSettingsView(course: course)
+                // A course kept for reference gets FACTS, never the settings
+                // form: the form would ask it to choose a deploy folder, grey
+                // Save for ever, and let every other setting be changed on a
+                // course the app has called frozen.
+                if course.isKeptForReference {
+                    ReferenceCourseSummaryView(course: course) {
+                        workspace.schoolYearRequestCode = course.code
+                    }
                     .id(code)
+                } else {
+                    CourseSettingsView(course: course)
+                        .id(code)
+                }
             } else {
                 missingSelectionView
             }

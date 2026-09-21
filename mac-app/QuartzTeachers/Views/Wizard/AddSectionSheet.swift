@@ -64,7 +64,7 @@ struct AddSectionSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add a Section to \(course.code)")
+            Text("Add a Section to \(course.displayCode)")
                 .font(.headline)
 
             Text(existingSectionsSentence)

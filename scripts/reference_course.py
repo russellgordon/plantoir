@@ -68,7 +68,19 @@ MARKER_KEY = "kept_for_reference"
 # launcher's check while this module called it a reference course — and the
 # folder publish, which never enters the container, went through at exit 0
 # saying "Published: 1 file(s) updated."
-MARKER_PATTERN = r'"kept_for_reference"\s*:\s*[Tt][Rr][Uu][Ee]'
+MARKER_PATTERN = r'"[^"]*ept_for_reference"\s*:\s*[Tt][Rr][Uu][Ee]'
+
+# The key being THERE at all, however it is spelled.
+#
+# `[^"]*ept_for_reference` catches the key written plainly and the key written
+# with JSON \u escapes in its first characters, and it cannot match an
+# ordinary key. It is the PRESENCE test: a marker that is there with a value
+# that is neither true nor false is something a person plainly meant, and the
+# launchers refuse it with "cannot tell" rather than guessing which way.
+MARKER_PRESENT_PATTERN = r'"[^"]*ept_for_reference"'
+
+# The value written as a real JSON false.
+MARKER_FALSE_PATTERN = r'"[^"]*ept_for_reference"\s*:\s*[Ff][Aa][Ll][Ss][Ee]'
 
 # The school year it was taught in, as the calendar year it STARTED in.
 SCHOOL_YEAR_KEY = "reference_school_year"
@@ -139,7 +151,9 @@ def is_reference(course_dir) -> bool:
 
 def cannot_tell(course_dir) -> bool:
     """
-    True when a settings file is THERE and cannot be read.
+    True when the settings cannot answer the question — either the file is
+    THERE and will not open, or it carries the marker with a value that is
+    neither `true` nor `false`.
 
     "Cannot tell" is not "no", and the two must not be collapsed: a file that
     exists and refuses to open is exactly the case where refusing costs a
@@ -155,10 +169,21 @@ def cannot_tell(course_dir) -> bool:
         return False
     try:
         with open(path, "r", encoding="utf-8-sig") as handle:
-            handle.read()
+            text = handle.read()
     except OSError:
         return True
-    return False
+
+    # A spelling somebody plainly MEANT as the marker: `1`, `"true"`, a key
+    # written with \u escapes. The app reads a real JSON boolean and nothing
+    # else, so it treats these as ordinary courses — which is safe only
+    # because the launchers stop here. Refusing costs a teacher one puzzled
+    # moment on a course they hand-edited; allowing costs them a frozen course
+    # on the web.
+    if re.search(MARKER_PATTERN, text) is not None:
+        return False
+    if re.search(MARKER_FALSE_PATTERN, text) is not None:
+        return False
+    return re.search(MARKER_PRESENT_PATTERN, text) is not None
 
 
 def school_year(course_dir):
