@@ -365,6 +365,13 @@ enum SpecialFolderRenamer {
         sectionNumbers: [Int],
         fileManager: FileManager = .default
     ) throws -> FolderRenameOutcome {
+        // Asked of the config on DISK, because this function takes a folder
+        // rather than a loaded course — and a course kept for reference does
+        // not have its folders renamed. Course Settings is not offered on one;
+        // this catches every other caller.
+        if let frozen = ReferenceLock.frozenCourseOnDisk(at: courseDirectory) {
+            throw frozen
+        }
         let locations: [URL] = folderLocations(
             named: oldName, scope: scope,
             courseDirectory: courseDirectory, sectionNumbers: sectionNumbers

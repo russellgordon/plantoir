@@ -344,6 +344,12 @@ nonisolated enum UnitWordRenamer {
         in course: Course,
         coursesDirectoryURL: URL
     ) throws -> UnitWordRenameOutcome {
+        // This renames every class page in every section. On a course kept
+        // for reference it is refused rather than attempted: the sheet is not
+        // offered, and this is what catches any other caller.
+        if course.isKeptForReference {
+            throw ReferenceCourseIsFrozen(displayCode: course.displayCode)
+        }
         let texts: [String] = try readEveryPage(of: plan)
         if let problem = plan.problems.first {
             throw UnitWordRenameProblem(sentence: problem, pagesRenamed: 0, linksRewritten: 0, changedTheCourse: false)

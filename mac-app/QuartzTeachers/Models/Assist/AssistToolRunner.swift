@@ -48,6 +48,23 @@ final class AssistToolRunner {
 
     // MARK: - Stored properties
 
+    /// Which client this runner is answering.
+    ///
+    /// The tools are one surface with two clients, and this is the ONE thing
+    /// that differs beyond the length of the list: a reference course is not
+    /// shown to the local model at all (decision d), while a Claude or Codex
+    /// session is told about it on purpose, because reading one is the point
+    /// of keeping it. `list_courses` is the only tool that asks.
+    ///
+    /// Defaults to `.local`, so the only caller that has to say anything is
+    /// the MCP server.
+    nonisolated enum Surface: Sendable {
+        case local
+        case mcp
+    }
+
+    private let surface: Surface
+
     /// Where the courses are.
     private let workspace: WorkspaceModel
 
@@ -154,7 +171,9 @@ final class AssistToolRunner {
          siteWork: AssistSiteWork? = nil,
          today: @escaping () -> CalendarDay = { return CalendarDay.today() },
          launchControl: LaunchControlRunning = LaunchControl(),
-         openMainWindow: (@MainActor () -> Void)? = nil) {
+         openMainWindow: (@MainActor () -> Void)? = nil,
+         surface: Surface = .local) {
+        self.surface = surface
         self.workspace = workspace
         self.siteWork = siteWork ?? AssistToolchainWork(workspace: workspace)
         self.readToday = today
@@ -3164,7 +3183,19 @@ final class AssistToolRunner {
     /// did not expect. Windows' version answers the same three things, so a
     /// Claude Code session sees the same shape on either platform.
     private func listCourses() -> AssistToolOutcome {
-        let courses: [Course] = workspace.courses
+        // **The local window never lists a reference course.** `list_courses`
+        // is MCP-only as a TOOL, but the app reaches it too: "what courses do
+        // i have?" is matched in code by `AssistCardCommand.fixedShapes`, and
+        // what comes back is shown to the teacher. Decision (d) says the
+        // local assistant is told nothing about a reference course, so this is
+        // where that is true rather than nearly true.
+        var courses: [Course] = []
+        for course in workspace.courses {
+            if surface == .local && course.isKeptForReference {
+                continue
+            }
+            courses.append(course)
+        }
         guard courses.isEmpty == false else {
             return AssistToolOutcome.read(
                 AssistWording.noCoursesYet, detail: AssistWording.noCoursesYet
@@ -3180,6 +3211,20 @@ final class AssistToolRunner {
             let sectionList: String = sections.isEmpty
                 ? "none yet"
                 : sections.joined(separator: ", ")
+            if course.isKeptForReference {
+                // Everything a session needs to say "last year's ICS3U" and
+                // then ADDRESS it: the name `locate` accepts, the code a
+                // teacher reads, what kind of course it is, and which year.
+                // Not a teacher surface, so all three can be shown at once.
+                lines.append(
+                    "\(course.code) — \(course.configuration.courseName)\n"
+                    + "  course code: \(course.displayCode)\n"
+                    + "  kept for reference — never deployed"
+                    + "\n  school year: \(AssistToolRunner.schoolYearText(of: course, today: readToday()))"
+                    + "\n  sections: \(sectionList)"
+                )
+                continue
+            }
             lines.append(
                 "\(course.code) — \(course.configuration.courseName)\n"
                 + "  sections: \(sectionList)\n"
@@ -3199,6 +3244,30 @@ final class AssistToolRunner {
             ? "There is 1 course in this working folder."
             : "There are \(courses.count) courses in this working folder."
         return AssistToolOutcome.read(summary, detail: said, showingTheTeacher: said)
+    }
+
+    /// One line per reference course, for the MCP session briefing: the name
+    /// it is addressed by, the code a teacher reads, and the school year.
+    ///
+    /// Public because the server builds the briefing and the runner is what
+    /// knows the courses. Empty when there are none, which is most folders.
+    func referenceCourseBriefingLines() -> [String] {
+        var lines: [String] = []
+        for course in workspace.courses where course.isKeptForReference {
+            lines.append(
+                "  \(course.code) — \(course.displayCode), "
+                + AssistToolRunner.schoolYearText(of: course, today: readToday())
+            )
+        }
+        return lines
+    }
+
+    /// "2025–26", or "Other" — the label a session repeats back to a teacher.
+    static func schoolYearText(of course: Course, today: CalendarDay) -> String {
+        guard let year = course.schoolYear(on: today) else {
+            return SchoolYear.otherGroupName
+        }
+        return SchoolYear.label(forStartingYear: year)
     }
 
     private struct PlannedReDate {
@@ -3481,6 +3550,20 @@ final class AssistToolRunner {
         for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
             course = candidate
         }
+        // **A reference course is addressed by its FOLDER NAME and nothing
+        // else.** A bare `ICS3U` resolves to the live ICS3U exactly as it
+        // always has; if there is no live one and a reference course carries
+        // that code, this REFUSES and names the candidates rather than
+        // guessing. A session asked to read last year's material and handed
+        // this year's would report on the wrong course and never know — and
+        // the two deliberately show the same code, so the guess would be
+        // right-looking every time.
+        if course == nil {
+            let candidates: [String] = referenceCoursesShowing(code: code)
+            if !candidates.isEmpty {
+                return .failure(.askedForACourseByItsCodeAlone(code, candidates))
+            }
+        }
         guard let course else {
             return .failure(.noSuchCourse(code))
         }
@@ -3499,6 +3582,23 @@ final class AssistToolRunner {
             return .success(Located(course: course, sectionNumber: only))
         }
         return .failure(.noSuchSection(course.code, 0))
+    }
+
+    /// The folder names of every reference course showing this code.
+    ///
+    /// Sorted, so the sentence a session reads is the same every time.
+    private func referenceCoursesShowing(code: String) -> [String] {
+        let wanted: String = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if wanted.isEmpty {
+            return []
+        }
+        var result: [String] = []
+        for candidate in workspace.courses
+        where candidate.isKeptForReference && candidate.displayCode.lowercased() == wanted {
+            result.append(candidate.code)
+        }
+        result.sort()
+        return result
     }
 
     private func refusal(from result: Result<Located, AssistToolRefusal>) -> AssistToolRefusal {

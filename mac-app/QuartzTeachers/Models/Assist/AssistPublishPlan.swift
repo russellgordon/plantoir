@@ -1126,6 +1126,9 @@ enum AssistToolRefusal: LocalizedError, Equatable {
     /// can pin it BY NAME: this is the refusal that must never quietly become
     /// a success, and a free-text refusal is one nothing can assert on.
     case keptForReference(String)
+    /// A course was named by its CODE alone, no live course has that code,
+    /// and one or more courses kept for reference show it.
+    case askedForACourseByItsCodeAlone(String, [String])
 
     var errorDescription: String? {
         switch self {
@@ -1161,6 +1164,19 @@ enum AssistToolRefusal: LocalizedError, Equatable {
                  + "particular pages, name them."
         case .notInThisBuild(let what):
             return what
+        case .askedForACourseByItsCodeAlone(let code, let candidates):
+            // Named rather than guessed. Two courses deliberately SHOW the
+            // same code — that is what makes a reference course readable to a
+            // teacher — so a guess here would look right every time and be
+            // wrong half of it.
+            let listed: String = candidates.joined(separator: ", ")
+            if candidates.count == 1 {
+                return "No course you are teaching is called \(code). "
+                     + "\(listed) is kept for reference and shows that code — name it as \(listed)."
+            }
+            return "No course you are teaching is called \(code). "
+                 + "These are kept for reference and show that code: \(listed). "
+                 + "Name the one you mean."
         case .keptForReference(let code):
             // The FROZEN sentence, not the deploy one: this refusal covers
             // every write, and "it is never deployed" answers a question

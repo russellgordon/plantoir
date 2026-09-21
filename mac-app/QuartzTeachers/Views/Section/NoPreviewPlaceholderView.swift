@@ -33,10 +33,19 @@ struct NoPreviewPlaceholderView: View {
     /// what the Deploy button is described as doing.
     let deploysToLocalFolder: Bool
 
+    /// The code a teacher reads, for a course that is never deployed. Empty
+    /// for every ordinary course, which is all this view ever saw before.
+    var keptForReferenceCode: String = ""
+
     // MARK: - Computed properties
 
     /// What the teacher is invited to do next.
     var invitation: String {
+        // A reference course has no Deploy button, so inviting them to press
+        // one would be pointing at something that is not there.
+        if !keptForReferenceCode.isEmpty {
+            return ReferenceWording.neverDeployed(course: keptForReferenceCode)
+        }
         if deploysToLocalFolder {
             return "Click Preview to build this section's website and see it here, "
                  + "or Deploy to copy it to your deploy folder."

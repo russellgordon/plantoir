@@ -194,6 +194,26 @@ enum ReferenceLock {
         }
     }
 
+    /// The refusal for a course folder that is kept for reference, or nil
+    /// when it is an ordinary one.
+    ///
+    /// Asked of the config ON DISK, for the callers that hold a folder rather
+    /// than a loaded `Course` — the folder renamer, and anything else reached
+    /// from a path. `nonisolated` so those callers need not be main-actor.
+    nonisolated static func frozenCourseOnDisk(at courseDirectory: URL) -> ReferenceCourseIsFrozen? {
+        let configURL: URL = courseDirectory.appendingPathComponent("course_config.json")
+        guard let data = try? Data(contentsOf: configURL),
+              let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              decoded["kept_for_reference"] as? Bool == true else {
+            return nil
+        }
+        let recorded: String = (decoded["course_code"] as? String) ?? ""
+        if recorded.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return ReferenceCourseIsFrozen(displayCode: courseDirectory.lastPathComponent)
+        }
+        return ReferenceCourseIsFrozen(displayCode: recorded)
+    }
+
     /// Whether this file carries the user-immutable flag RIGHT NOW.
     ///
     /// Asked of `FileManager`, never of `URL.resourceValues`, and that is not

@@ -67,7 +67,7 @@ enum AssistMCPServer {
     static func serve(workingFolder: URL) -> Never {
         let workspace: WorkspaceModel = WorkspaceModel()
         workspace.adoptRestoredPath(workingFolder.path)
-        let runner: AssistToolRunner = AssistToolRunner(workspace: workspace)
+        let runner: AssistToolRunner = AssistToolRunner(workspace: workspace, surface: .mcp)
 
         DispatchQueue.global(qos: .userInitiated).async {
             while let line = readLine(strippingNewline: true) {
@@ -108,11 +108,24 @@ enum AssistMCPServer {
 
         switch method {
         case "initialize":
-            return success(id: identifier, result: [
+            var result: [String: Any] = [
                 "protocolVersion": "2024-11-05",
                 "capabilities": ["tools": [:] as [String: Any]],
                 "serverInfo": ["name": "plantoir", "version": "1.0"],
-            ])
+            ]
+            // Told BEFORE it can try, rather than refused after. MCP
+            // 2024-11-05 carries an `instructions` field and clients surface
+            // it as server guidance; it is MCP-only by construction, so it
+            // costs the local model's thirteen-tool surface nothing.
+            //
+            // **Not the only channel**, deliberately: whether a given client
+            // reads this could not be measured here, so `list_courses` and
+            // the launcher greetings carry the same facts. If one of the
+            // three is ignored, nothing is lost.
+            if let instructions = AssistMCPServer.instructions(for: runner) {
+                result["instructions"] = instructions
+            }
+            return success(id: identifier, result: result)
 
         case "tools/list":
             var tools: [[String: Any]] = []
@@ -164,6 +177,34 @@ enum AssistMCPServer {
         default:
             return failure(id: identifier, code: -32601, message: "Unknown method \(method).")
         }
+    }
+
+    /// What a session is told about this working folder before it does
+    /// anything — or nil when there is nothing to say.
+    ///
+    /// Only reference courses are described. Everything else a session needs
+    /// it can ask for, and a briefing that restates the obvious is one that
+    /// gets skimmed.
+    static func instructions(for runner: AssistToolRunner) -> String? {
+        let described: [String] = runner.referenceCourseBriefingLines()
+        if described.isEmpty {
+            return nil
+        }
+        var lines: [String] = []
+        lines.append(
+            "Some courses in this folder are kept for reference: they are read-only sources, "
+            + "and Plantoir never deploys them."
+        )
+        lines.append("")
+        for line in described {
+            lines.append(line)
+        }
+        lines.append("")
+        lines.append(
+            "Address one by the name on the left. Reading them works as it does anywhere else; "
+            + "anything that would change or deploy one is refused."
+        )
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - JSON-RPC plumbing
