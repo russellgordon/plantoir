@@ -247,43 +247,48 @@ nonisolated enum CopiedPageText {
         return found == wanted
     }
 
-    /// Whether every line of the build's region is a shape this app can SHOW
-    /// the build reads the way it does.
+    /// Whether the build's region is inside the small REGULAR LANGUAGE this
+    /// app can show the build reads exactly as it does.
     ///
-    /// **A WHITELIST, and deliberately narrower than YAML.** Excluding the
-    /// shapes known to go wrong was tried and failed an independent fuzz: a
-    /// grammar-based generator over 60,000 pages found 36 the guard certified
-    /// and the build did not hide, most of them PyYAML INDENTATION errors
-    /// that no list of forbidden shapes had thought of —
-    /// `description: A long note` followed by `  about time: 10am` is an
-    /// indented continuation of a plain scalar that contains `: `, which
-    /// PyYAML refuses; and when the build cannot parse the block it reads NO
-    /// keys at all, so the page is published whatever the copy wrote.
+    /// **A whitelist of line SHAPES was not enough, and the reason is worth
+    /// carrying away: a shape still admits arbitrary CHARACTERS.** An
+    /// extended grammar fuzz put 60,000 pages through the shape whitelist and
+    /// found **3,311** it certified and the real build did not hide. Every
+    /// one made `frontmatter.load` RAISE, whereupon `build_site.py` prints a
+    /// warning and RETURNS — so the build reads NO keys at all and the page
+    /// is published everywhere. Five causes, and all five are characters
+    /// rather than structure:
     ///
-    /// The list is derived from what real data actually contains. A census of
-    /// the frontmatter of all 12,668 pages Plantoir ships and all 777 pages
-    /// of four real courses found exactly FOUR shapes: `key: value` with a
-    /// plain scalar (48,091 lines), an indented list item (14,462), `key:`
-    /// with its value on the lines below (10,561), and `key: value` with a
-    /// quoted scalar (13). Blank lines and comments are allowed as well —
-    /// neither carries a key, so neither can move a page's visibility.
+    /// * a YAML-1.1 bool or null WORD as a key (`yes: value`), which the
+    ///   loader turns into a non-string key and `process_frontmatter` then
+    ///   trips over;
+    /// * `U+2028`, `U+2029` or `U+0085` inside a value — line breaks to
+    ///   PyYAML and not to `components(separatedBy: "\n")`;
+    /// * `\u{0B}`, `\u{0C}` or `\u{1C}`–`\u{1F}` anywhere (a `ReaderError`);
+    /// * `title: "a"b"` — a quote inside a double-quoted scalar;
+    /// * `title: ,comma` — a plain scalar opening with a flow indicator.
     ///
-    /// Everything else is NOT COPIED, and the teacher is told so in a plain
-    /// sentence. A page Plantoir will not copy can always be copied by hand.
+    /// So this stopped trying to MODEL PyYAML and now certifies a language
+    /// small enough to be shown safe: a handful of anchored line patterns
+    /// over an explicit character whitelist. **It is far narrower than YAML,
+    /// deliberately**, and a page outside it is not copied — with a plain
+    /// sentence, and a teacher can always copy such a page by hand.
+    ///
+    /// Checked against the census rather than imagined: the frontmatter of
+    /// all 11,891 pages Plantoir ships and all 777 pages of four real courses
+    /// uses **17 distinct keys**, every one of them `[A-Za-z][A-Za-z0-9_-]*`
+    /// and none a bool or null word; no value contains `: `, ` #` or a
+    /// trailing `:`; and not one of the 12,668 carries a single control
+    /// character, `U+0085`, `U+2028`, `U+2029` or a stray `U+FEFF`. The one
+    /// widening the census forced is `_` as a value's first character
+    /// (9,803 values), which PyYAML reads as a plain string.
     static func regionIsOnlyShapesTheBuildAgreesOn(
         _ lines: [String], from: Int, to: Int
     ) -> Bool {
         var mayBeFollowedByListItems: Bool = false
         for index in from..<to {
             let line: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
-            // **A TAB anywhere refuses the line.** YAML forbids a tab in
-            // indentation, and PyYAML raises a `ScannerError` on one — which
-            // means the build reads NO keys and publishes the page. A line of
-            // `"   \t "` is whitespace to the eye and a parse error to the
-            // parser; the independent fuzz found exactly that shape. Measured:
-            // no frontmatter line in the 12,668 shipped and real pages
-            // contains a tab.
-            if line.contains("\t") {
+            guard CopiedPageText.everyCharacterIsOnTheList(line) else {
                 return false
             }
             var bare: Substring = Substring(line)
@@ -294,16 +299,16 @@ nonisolated enum CopiedPageText {
                 continue
             }
             if bare.hasPrefix(" ") {
-                // The ONLY indented shape on the list: an item of a list
-                // whose key is on the line above.
+                // The ONLY indented shape: an item of a list whose key is on
+                // the line above.
                 var item: Substring = bare
                 while item.first == " " {
                     item = item.dropFirst()
                 }
-                guard mayBeFollowedByListItems, item.hasPrefix("- "), item.count > 2 else {
+                guard mayBeFollowedByListItems, item.hasPrefix("- ") else {
                     return false
                 }
-                guard CopiedPageText.isAPlainScalar(String(item.dropFirst(2))) else {
+                guard CopiedPageText.isAValueOnTheList(String(item.dropFirst(2))) else {
                     return false
                 }
                 continue
@@ -312,6 +317,12 @@ nonisolated enum CopiedPageText {
             if bare.hasPrefix("#") {
                 continue
             }
+            // A list item at COLUMN 0 is refused. Mixed with mapping keys it
+            // is a `ParserError`, and the build then reads no keys at all —
+            // measured, the last 156 failures of an extended fuzz were this
+            // one shape. Not one of the 12,668 shipped and real pages has a
+            // top-level list item; every list in them is indented under its
+            // key.
             guard let name = CopiedPageText.keyNamed(String(bare)) else {
                 return false
             }
@@ -325,83 +336,123 @@ nonisolated enum CopiedPageText {
                 continue
             }
             guard rest.first == " " else {
-                // `key:value` is one long scalar to YAML, not a mapping.
+                // `key:value` is one long scalar to YAML, and `key:` followed
+                // by a NO-BREAK space is not a mapping at all.
                 return false
             }
-            while rest.first == " " {
-                rest = rest.dropFirst()
-            }
-            guard CopiedPageText.isAPlainScalar(String(rest)) else {
+            rest = rest.dropFirst()
+            guard CopiedPageText.isAValueOnTheList(String(rest)) else {
                 return false
             }
         }
         return true
     }
 
-    /// The key this line names, or nil when it does not name one in a shape
-    /// on the list: letters, digits, spaces, dots, dashes and underscores,
-    /// optionally in matching quotes, and nothing else.
-    static func keyNamed(_ line: String) -> String? {
-        if let quote = line.first, quote == "\"" || quote == "'" {
-            guard let close = line.dropFirst().firstIndex(of: quote) else {
-                return nil
+    /// The characters a settings block may contain at all.
+    ///
+    /// Everything the build's reader treats as a line break, a control or a
+    /// broken encoding is refused wherever it appears — not because each has
+    /// been reasoned about, but because the census says real data contains
+    /// none of them and a page that does is one this app cannot be sure of.
+    static func everyCharacterIsOnTheList(_ line: String) -> Bool {
+        for character in line.unicodeScalars {
+            let value: UInt32 = character.value
+            if value < 0x20 {
+                // The region is already split on `\n`, and a `\r` not
+                // followed by one is refused before this. Nothing else below
+                // a space belongs in a settings block.
+                return false
             }
-            return String(line[line.startIndex...close])
+            if value == 0x7F || value == 0x85 || value == 0x2028 || value == 0x2029 {
+                return false
+            }
+            if value == 0xFEFF || value == 0xFFFD {
+                // A byte-order mark after the first scalar, or the
+                // replacement character, which means the source was not
+                // valid UTF-8 in the first place.
+                return false
+            }
         }
+        return true
+    }
+
+    /// The key this line names, or nil when it is not one this app certifies.
+    ///
+    /// `[A-Za-z][A-Za-z0-9_-]*`, and never a YAML 1.1 bool or null word: the
+    /// loader turns `yes:` into a `True` KEY, which is not a string, and the
+    /// build then raises on it.
+    static func keyNamed(_ line: String) -> String? {
         var name: String = ""
         for character in line {
             if character == ":" {
                 break
             }
-            let isOrdinary: Bool = character.isLetter || character.isNumber
-                || character == " " || character == "." || character == "-"
-                || character == "_"
+            let isOrdinary: Bool = (character >= "a" && character <= "z")
+                || (character >= "A" && character <= "Z")
+                || (character >= "0" && character <= "9")
+                || character == "_" || character == "-"
             if !isOrdinary {
                 return nil
             }
             name.append(character)
         }
-        if name.isEmpty || name.hasPrefix(" ") {
+        guard let first = name.first else {
+            return nil
+        }
+        if !((first >= "a" && first <= "z") || (first >= "A" && first <= "Z")) {
+            return nil
+        }
+        if CopiedPageText.boolOrNullWords.contains(name.lowercased()) {
             return nil
         }
         return name
     }
 
-    /// A single-line scalar the build reads as text: plain, with nothing in
-    /// it that starts a node of another kind, or a closed quoted string.
-    static func isAPlainScalar(_ value: String) -> Bool {
-        let tidied: String = CopiedPageText.trimmingTrailingSpaces(value)
-        if tidied.isEmpty {
+    /// The words YAML 1.1 reads as a boolean or a null, whatever their case.
+    static let boolOrNullWords: Set<String> = [
+        "y", "n", "yes", "no", "on", "off", "true", "false", "null", "nul", "none",
+    ]
+
+    /// A value this app certifies: a plain scalar opening with a letter, a
+    /// digit or an underscore; a double-quoted scalar with no quote and no
+    /// backslash in it; a single-quoted scalar with no quote in it; or an
+    /// empty flow sequence.
+    static func isAValueOnTheList(_ value: String) -> Bool {
+        var tidied: Substring = Substring(value)
+        while tidied.last == " " {
+            tidied = tidied.dropLast()
+        }
+        guard let first = tidied.first else {
             return false
         }
-        if let quote = tidied.first, quote == "\"" || quote == "'" {
-            return tidied.count >= 2 && tidied.last == quote
-        }
-        // A flow sequence or mapping, CLOSED on its own line and holding no
-        // further one. `tags: []` is on 54 real pages and PyYAML reads it
-        // exactly as this app's reader ignores it; what is refused is the
-        // multi-line form, where the two readers can part company about where
-        // the value ends.
-        if tidied.hasPrefix("[") || tidied.hasPrefix("{") {
-            let closer: Character = tidied.hasPrefix("[") ? "]" : "}"
-            guard tidied.last == closer else {
+        if first == "\"" {
+            guard tidied.count >= 2, tidied.last == "\"" else {
                 return false
             }
             let inside: Substring = tidied.dropFirst().dropLast()
-            for character in inside where "[]{}#&*".contains(character) {
+            for character in inside where character == "\"" || character == "\\" {
                 return false
             }
             return true
         }
-        for opener in ["&", "*", "|", ">", "!", "{", "[", "#", "%", "@", "`", "-"] {
-            if tidied.hasPrefix(opener) {
+        if first == "'" {
+            guard tidied.count >= 2, tidied.last == "'" else {
                 return false
             }
+            for character in tidied.dropFirst().dropLast() where character == "'" {
+                return false
+            }
+            return true
         }
-        // `a: b: c` is a mapping value where YAML will not have one, and an
-        // indented line carrying `: ` is the shape the independent fuzz found
-        // 30 of.
-        if tidied.contains(": ") || tidied.hasSuffix(":") {
+        // `tags: []` is on 54 real pages; no other flow value is certified.
+        if tidied == "[]" {
+            return true
+        }
+        let opensPlainly: Bool = first.isLetter || first.isNumber || first == "_"
+        guard opensPlainly else {
+            return false
+        }
+        if tidied.contains(": ") || tidied.contains(" #") || tidied.hasSuffix(":") {
             return false
         }
         return true
