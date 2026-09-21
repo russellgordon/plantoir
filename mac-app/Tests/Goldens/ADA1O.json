@@ -1,0 +1,101 @@
+{
+  "class_folder" : "All Classes",
+  "color_schemes" : {
+    "section1" : "quartz-standard"
+  },
+  "course_code" : "ADA1O",
+  "course_name" : "Golden Course",
+  "custom_short_name" : "",
+  "deploy_folder_path" : "",
+  "deploy_target" : "netlify",
+  "emojis" : {
+    "sections" : {
+      "section1" : "📚"
+    }
+  },
+  "expandable" : [
+    "Concepts",
+    "Discussions",
+    "Examples",
+    "Exercises",
+    "Portfolios",
+    "Recaps",
+    "Setup",
+    "Style",
+    "Tasks",
+    "Tutorials"
+  ],
+  "expandOnFolderClick" : false,
+  "fonts" : {
+    "default" : {
+      "body" : "Helvetica, Arial",
+      "code" : "IBM Plex Mono",
+      "header" : "Helvetica, Arial"
+    },
+    "sections" : {
+      "section1" : {
+        "body" : "Helvetica, Arial",
+        "code" : "IBM Plex Mono",
+        "header" : "Helvetica, Arial"
+      }
+    }
+  },
+  "footer_html" : "",
+  "hidden" : [
+    "Media",
+    "Ontario Curriculum",
+    "Extra Help.md",
+    "Learning Goals.md",
+    "Private Notes.md",
+    "Scratch Page.md",
+    "Key Links.md"
+  ],
+  "include_coverage_notes" : true,
+  "include_curriculum_coverage" : true,
+  "include_curriculum_pages" : true,
+  "locale" : "en-US",
+  "num_sections" : 1,
+  "per_section_files" : [
+    "Private Notes.md",
+    "Scratch Page.md",
+    "Key Links.md"
+  ],
+  "per_section_folders" : [
+    "All Classes"
+  ],
+  "prepopulate_example_content" : true,
+  "section_numbers" : [
+    1
+  ],
+  "shared_files" : [
+    "Extra Help.md",
+    "Learning Goals.md"
+  ],
+  "shared_folders" : [
+    "Concepts",
+    "Discussions",
+    "Examples",
+    "Exercises",
+    "Ontario Curriculum",
+    "Portfolios",
+    "Recaps",
+    "Setup",
+    "Style",
+    "Tasks",
+    "Tutorials"
+  ],
+  "show_grade_in_title" : {
+    "sections" : {
+      "section1" : true
+    }
+  },
+  "show_reading_time" : false,
+  "show_section_marker" : {
+    "sections" : {
+      "section1" : true
+    }
+  },
+  "unit_word" : "Unit",
+  "use_lcs_terminology" : false,
+  "use_skeleton" : false
+}
