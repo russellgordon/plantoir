@@ -423,18 +423,22 @@ nonisolated enum ScheduledPublishOutcome {
             // that a teacher meeting it does not go looking for a failure
             // there was not.
             //
-            // "too far from now" rather than "a day that has since gone by",
-            // and the difference is not style. The check is `abs(now -
+            // Russell's wording, 2026-09-20. It is written for the ordinary
+            // case — the computer was off or asleep when the moment came —
+            // because that is what nearly every teacher meeting it has had
+            // happen, and it tells them WHY. The check is `abs(now -
             // intended)`, so it also refuses a job whose moment is in the
-            // FUTURE by more than the window — reachable by a Mac whose clock
-            // was wrong when the deploy was set and was corrected afterwards.
-            // A sentence that said the day had gone by would be false in
-            // exactly that case, and a sentence that is sometimes false is
-            // worse than a vaguer one that is always true.
-            return "\(course) Section \(section) was set to deploy on its own at a time that is "
-                 + "too far from now, so Plantoir left it alone rather than putting up a site you "
-                 + "set up for a different day. Deploy it yourself whenever you are ready, and "
-                 + "schedule the next one from the section’s menu."
+            // FUTURE by more than the window (a clock that was wrong when the
+            // deploy was set and was corrected afterwards); "too long has
+            // passed" is slightly off there, and that trade was accepted
+            // knowingly: the earlier always-true wording ("at a time that is
+            // too far from now") read so awkwardly that it explained nothing.
+            // "This computer", not "this Mac": the sentence is the shared
+            // contract's, and Windows shows the same words if it adopts it.
+            return "\(course) Section \(section) was set to deploy on its own, but this computer "
+                 + "wasn’t awake at that time and too long has passed since. Plantoir left the site "
+                 + "as it was. Deploy it yourself when you’re ready, or schedule another from the "
+                 + "section’s menu."
         }
     }
 }
