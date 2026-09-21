@@ -1651,10 +1651,22 @@ the image still spelled the name the old way, so the embed no longer resolved
 and **Quartz emitted neither the `<img>` nor the asset** — the picture simply
 vanished from the built site, with no error anywhere. Four files in Russell's
 own ICS4U are of this shape. Measured three ways, same source name:
-`copyItem` of a whole DIRECTORY (route 1) preserves it, per-file `copyItem` to
-a rebuilt `URL` decomposes it, `readdir` bytes → `copyfile()` preserves both
-forms. `copyfile` with `COPYFILE_CLONE` also keeps the file system's own fast
-path, so the 0.09 s stands.
+`copyItem` of a whole DIRECTORY preserves the names INSIDE it and decomposes
+the directory's OWN name, per-file `copyItem` to a rebuilt `URL` decomposes
+it, `readdir` bytes → `copyfile()` preserves both forms. `copyfile` with
+`COPYFILE_CLONE` also keeps the file system's own fast path, so the 0.09 s
+stands.
+
+**Both routes come through this copier**, and the middle row above is why:
+"Keep a Copy for Reference…" had a loop of its own, and because it copied
+whole top-level directories it looked exempt. It was not — measured, a folder
+called `Thème` arrived spelled the other way while everything inside it was
+untouched, so a page linking into it by the old spelling would break in the
+built site exactly as the image did. Nothing in the four real courses measured
+has a non-ASCII top-level name, so nobody had met it; that is luck, not a
+design. `ReferenceTreeCopier.copySynchronously` is the entry point route 1
+uses — the same walk and the same per-item copy, without the progress and the
+cancellation it has no use for.
 
 **Page frontmatter is never rewritten.** A reference course is a faithful
 record of what students actually saw, `draft: true` and all; the build already
@@ -1713,9 +1725,33 @@ copy** on an external disk — the case the importer exists for.
 
 Hidden works because everything that looks for a course passes
 `.skipsHiddenFiles` — discovery, the backups list, the archives list — and
-three tests pin that rather than trusting it. The launchers take a course CODE
-and build `courses/<CODE>`, and a code cannot begin with a dot, so nothing on
-the command line can name one either.
+three tests pin that rather than trusting it.
+
+**The launchers are a different matter, and the first version of this page got
+it wrong.** It said a course code "cannot begin with a dot, so nothing on the
+command line can name one". They applied no shape check at all: measured,
+`deploy.sh` uppercased `.plantoir-importing-ICS4U-2025`, the case-insensitive
+volume resolved the uppercased name, and the run went straight past the
+reference gate — because during the copy there is no marker yet for that gate
+to find. So the refusal is now real rather than assumed: `deploy.sh`,
+`preview.sh` and both `.ps1` twins refuse a course argument beginning with a
+dot before anything else, `setup_course.py` refuses one at its own prompt,
+`verify.sh` greps all four structurally, and
+`scripts/test_reference_course.py` drives the real `deploy.sh` at it. A
+refusal is the safe direction: no real course code begins with a dot.
+
+A leftover that somebody is STILL WORKING ON is left alone. The import takes a
+lease naming its own process — `<FOLDER>.import.<pid>.lease` in
+`courses/.internal/activity/`, the shape `WorkLease` already uses — and the
+sweep skips a staging folder whose lease names a live process, taking the
+stale lease of one whose owner is gone. This is not a rare race: File ▸ Reload
+Courses is offered while the import sheet is up, a second window on the same
+working folder reads it, and `Plantoir --mcp-stdio` — how a Claude Code
+session starts — reads it too. Any of those used to delete the tree under the
+running copy, and after the lock and before the rename it would have thrown
+away a finished reference course. Asked of a lease rather than of the folder's
+AGE deliberately: a threshold is a guessed duration, and the case that needs
+it most is the slow disk where the guess is wrong.
 
 A leftover from an import that never finished is **swept when a working folder
 is read** (`ReferenceStaging.sweepLeftovers`): unlock, remove, one trail line

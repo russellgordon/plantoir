@@ -107,7 +107,18 @@ enum ReferenceCopier {
         let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
             ReferenceStaging.stagingName(for: folderName)
         )
-        ReferenceStaging.remove(at: stagingURL)
+        if !ReferenceStaging.someoneIsWorkingOn(
+            stagingURL.lastPathComponent, inCoursesDirectory: coursesDirectoryURL
+        ) {
+            ReferenceStaging.remove(at: stagingURL)
+        }
+        // A second window reading this working folder sweeps leftover staging
+        // folders; this says the folder is in use so that the sweep leaves it
+        // alone. Quick here — a local clone — but "quick" is not a guarantee.
+        ReferenceStaging.takeLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+        defer {
+            ReferenceStaging.releaseLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+        }
 
         do {
             try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
@@ -243,6 +254,21 @@ enum ReferenceCopier {
             )
         }
 
+        // Asked of the INDEPENDENT census rather than of the walk that just
+        // ran: a walk that stopped early reports success about the files it
+        // reached, which is exactly how nine editable pages once sat inside
+        // a course the app called frozen. A course made here and not
+        // completely locked is worth a line whichever way it happened —
+        // nothing is put in front of the teacher, because the course is real
+        // and the next re-assertion takes another pass at it.
+        if !locked.everythingThatShouldBeLockedIs {
+            ActivityTrail.note(
+                .referenceCoursePagesLockedAgain,
+                "made \(copy.displayCode) for reference and \(locked.lockedOnDisk) of "
+                + "\(locked.shouldBeLocked) of its files are locked"
+            )
+        }
+
         return Made(
             folderName: folderName,
             displayCode: copy.displayCode,
@@ -266,33 +292,41 @@ enum ReferenceCopier {
     // MARK: - Private helpers
 
     /// Copies everything the teacher wrote, and nothing that is rebuilt.
+    /// Copies everything the teacher wrote, and nothing that is rebuilt —
+    /// through the SAME copier the import uses.
+    ///
+    /// It used to have a loop of its own: `contentsOfDirectory`, then
+    /// `copyItem` to `destination.appendingPathComponent(child.lastPathComponent)`.
+    /// That preserved the names INSIDE each folder and decomposed the
+    /// top-level ones, because the rebuilt component goes through `URL`'s
+    /// file-system representation — measured, a folder called `Thème` arrived
+    /// spelled the other way, and a page that links to something inside it by
+    /// the old spelling no longer resolves in the built site. Nothing in the
+    /// four real courses measured has a non-ASCII top-level name, so nobody
+    /// had met it; that is luck, not a design.
     private static func copyContents(of sourceURL: URL, into destinationURL: URL) throws {
-        let fileManager: FileManager = FileManager.default
-        let children: [URL] = try fileManager.contentsOfDirectory(
-            at: sourceURL, includingPropertiesForKeys: nil, options: []
-        )
-        for child in children {
-            let name: String = child.lastPathComponent
-            if ReferenceCopier.isLeftBehind(name) {
-                continue
-            }
-            try fileManager.copyItem(at: child, to: destinationURL.appendingPathComponent(name))
+        var leftBehind: Set<String> = []
+        for name in CourseArchiver.excludedFromArchives {
+            leftBehind.insert(name)
         }
+        for name in ReferenceCopier.alsoLeftBehind {
+            leftBehind.insert(name)
+        }
+        let survey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.survey(
+            courseAt: sourceURL, leavingBehind: leftBehind
+        )
+        if let unreadable = survey.unreadableFolders.first {
+            throw ReferenceTreeCopier.Trouble.couldNotRead(name: unreadable)
+        }
+        try ReferenceTreeCopier.copySynchronously(
+            survey, from: sourceURL, into: destinationURL
+        )
 
         // Leases belong to processes on whichever machine wrote them, so a
         // copied one names a process that was never doing anything here.
         let leases: URL = destinationURL
             .appendingPathComponent(".internal").appendingPathComponent("activity")
-        try? fileManager.removeItem(at: leases)
+        try? FileManager.default.removeItem(at: leases)
     }
 
-    private static func isLeftBehind(_ name: String) -> Bool {
-        for excluded in CourseArchiver.excludedFromArchives where excluded == name {
-            return true
-        }
-        for excluded in ReferenceCopier.alsoLeftBehind where excluded == name {
-            return true
-        }
-        return false
-    }
 }

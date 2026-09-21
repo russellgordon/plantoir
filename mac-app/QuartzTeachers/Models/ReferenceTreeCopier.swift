@@ -30,9 +30,15 @@ import Foundation
 ///
 /// | how the copy is made | name on disk afterwards |
 /// |---|---|
-/// | `copyItem` of the whole DIRECTORY (route 1) | unchanged |
+/// | `copyItem` of a whole DIRECTORY | its CONTENTS unchanged, its own NAME **decomposed** |
 /// | per-file `copyItem` to a REBUILT `URL` | **decomposed** |
 /// | `readdir` bytes → `copyfile()` | unchanged, both forms |
+///
+/// The first row is the one that was written down wrongly twice: copying a
+/// directory preserves what is inside it, and the entry name itself still
+/// goes through `appendingPathComponent`. That is why "Keep a Copy for
+/// Reference…" comes through here too (`copySynchronously`) rather than
+/// keeping a loop of its own.
 ///
 /// **`nonisolated` and `@concurrent`, deliberately**: see `copy`.
 nonisolated enum ReferenceTreeCopier {
@@ -222,31 +228,7 @@ nonisolated enum ReferenceTreeCopier {
 
         for item in survey.items {
             try Task.checkCancellation()
-
-            let from: [CChar] = ReferenceTreeCopier.path(source, item.relativePath)
-            let to: [CChar] = ReferenceTreeCopier.path(destination, item.relativePath)
-
-            if item.isDirectory {
-                if mkdir(to, item.mode & 0o7777) != 0 {
-                    throw Trouble.couldNotCopy(
-                        name: item.text, reason: ReferenceTreeCopier.reason(errno)
-                    )
-                }
-                // `mkdir` is filtered by the process umask, so the folder is
-                // made and then given the permissions the source had.
-                _ = chmod(to, item.mode & 0o7777)
-                continue
-            }
-
-            // `copyfile` with the source and destination as BYTES. The name
-            // is never re-spelled, `COPYFILE_CLONE` keeps the file system's
-            // own fast path (485 MB in 0.09 s on one APFS volume), and it
-            // copies a symlink AS a link rather than following it.
-            if copyfile(from, to, nil, copyfile_flags_t(COPYFILE_CLONE)) != 0 {
-                throw Trouble.couldNotCopy(
-                    name: item.text, reason: ReferenceTreeCopier.reason(errno)
-                )
-            }
+            try ReferenceTreeCopier.copy(item, from: source, into: destination)
             copiedBytes += item.byteCount
 
             if copiedBytes - reportedBytes >= reportingEveryBytes {
@@ -256,6 +238,58 @@ nonisolated enum ReferenceTreeCopier {
         }
 
         progress(copiedBytes)
+    }
+
+    /// The same copy, without the waiting: no progress and no cancellation,
+    /// for the caller that has neither.
+    ///
+    /// **"Keep a Copy for Reference…" is that caller.** It copies a course
+    /// that is already in this working folder, on this volume, so the clone
+    /// is instant and there is nothing to watch — but it must carry names the
+    /// same way, and until 2026-09-20 it did not: its own loop rebuilt each
+    /// destination from `URL.lastPathComponent`, which decomposed the
+    /// TOP-LEVEL names (`Theme` with a grave accent came out decomposed)
+    /// while preserving everything inside them. One copier with two entry
+    /// points, rather than two copiers that agree about most names.
+    static func copySynchronously(
+        _ survey: Survey,
+        from courseURL: URL,
+        into destinationURL: URL
+    ) throws {
+        let source: [UInt8] = ReferenceTreeCopier.pathBytes(of: courseURL)
+        let destination: [UInt8] = ReferenceTreeCopier.pathBytes(of: destinationURL)
+        for item in survey.items {
+            try ReferenceTreeCopier.copy(item, from: source, into: destination)
+        }
+    }
+
+    /// One file, one folder or one symlink — the only place bytes become a
+    /// path, so the two loops above cannot disagree about a name.
+    private static func copy(_ item: Item, from source: [UInt8], into destination: [UInt8]) throws {
+        let from: [CChar] = ReferenceTreeCopier.path(source, item.relativePath)
+        let to: [CChar] = ReferenceTreeCopier.path(destination, item.relativePath)
+
+        if item.isDirectory {
+            if mkdir(to, item.mode & 0o7777) != 0 {
+                throw Trouble.couldNotCopy(
+                    name: item.text, reason: ReferenceTreeCopier.reason(errno)
+                )
+            }
+            // `mkdir` is filtered by the process umask, so the folder is made
+            // and then given the permissions the source had.
+            _ = chmod(to, item.mode & 0o7777)
+            return
+        }
+
+        // `copyfile` with the source and destination as BYTES. The name is
+        // never re-spelled, `COPYFILE_CLONE` keeps the file system's own fast
+        // path (485 MB in 0.09 s on one APFS volume), and it copies a symlink
+        // AS a link rather than following it.
+        if copyfile(from, to, nil, copyfile_flags_t(COPYFILE_CLONE)) != 0 {
+            throw Trouble.couldNotCopy(
+                name: item.text, reason: ReferenceTreeCopier.reason(errno)
+            )
+        }
     }
 
     // MARK: - Private helpers
