@@ -1840,6 +1840,221 @@ triangles reads as a course that did not land.
   decision nobody wants to make. The names are derived by the same rule
   (`CODE-YYYY`, `-2` … `-9` when taken) and are not shown.
 
+## Copying a page from one course into another
+
+"Copy a Page from This Course…", on every course row in the sidebar — one being
+taught or one kept for reference. Issue #207. The teacher picks a page from the
+source's shared folders, a live course to copy it into and one of that course's
+shared folders; the page arrives with every picture and file it shows, and
+optionally with the pages it links to.
+
+Two promises hold the whole thing up, and everything below is in service of
+them:
+
+1. **The copy arrives HIDDEN from students, in every section of the course it
+   lands in.**
+2. **Nothing already in that course is changed, renamed or written over.**
+
+### The four steps that make a copy hidden, and why the ORDER is the rule
+
+`CopiedPageText.hidden(from:forSections:)`:
+
+1. the source's own `publishForSection<N>`, `draftSection<N>` and
+   `createdSection<N>` come off (`AssistPageVisibility.withoutPerSectionKeys`);
+2. the plain `publish:` and `draft:` come off, with the READER's key matcher
+   and its continuation rule;
+3. `publishForSection<N>: false` for every section the destination has,
+   written DESCENDING so the file reads 1, 2, 3;
+4. a plain `publish: false`, as the LAST line of the block.
+
+**Each of the three ways to get that wrong publishes the page**, and each was
+measured:
+
+| doing it differently | what happens |
+|---|---|
+| stripping the plain keys with `hasPrefix("draft:")` | a `draft:` whose value is on the line BELOW it is orphaned; YAML folds the orphan into the last key written and the page says the plain scalar `"false true"`; `publish.ts` does not hide a string that is not `"false"`, so the page is PUBLISHED |
+| writing the plain `publish: false` FIRST | `AssistPageVisibility.setting`'s "already says it" gate reads the plain key and returns the text unchanged, so **no** `publishForSection<N>` is written at all |
+| leaving the plain key out | all **156** of one real course's shared pages come out VISIBLE in a section 4 they were never told about, because Quartz publishes a page that says nothing |
+
+Measured over the whole corpus: 156 real ICS4U shared pages × 4 section sets ×
+(every destination section plus one the course does not have) = **1,872 checks,
+0 non-hidden**, agreeing in the app's own reader AND in `build_site.py`'s
+`process_frontmatter` plus `patches/publish.ts` run verbatim. A hostile battery
+of 46 further shapes — no frontmatter, CRLF, BOM, tabs, block scalars,
+duplicate keys, `publish: yes`, `PUBLISH:`, `---` inside a code fence, a
+20,000-character line, sections `[2, 5]` — is hidden in every section in both
+readers, or reads `cannotTell` in Swift and is therefore deleted.
+
+### The read-back asks TWO questions, because the app's reader is not the judge
+
+After the page is written it is **read back from disk** and asked, for every
+section the destination has AND for one it does not, whether it is hidden. The
+test is `!= .hidden`, so a value the app cannot read counts as failure.
+
+That is necessary and it is not sufficient, which is the finding worth carrying
+away. **The app's reader is not the one that decides what students see**, and
+two shapes were reproduced end to end where the two split — the copy certified
+hidden here and PUBLISHED there:
+
+- a settings block closed by an **indented `---`**. `PageVisibilityReader`
+  trims leading spaces before testing a fence; python-frontmatter's boundary is
+  `^-{3,}\s*$` and does not. The builder never finds the end, reads no settings
+  at all, and Quartz publishes a page that says nothing. (The divergence itself
+  is [#188](https://github.com/russellgordon/plantoir/issues/188); this is the
+  place where it costs the most.)
+- a block carrying a **YAML anchor or alias**. Taking the plain `publish:` line
+  out can orphan an alias the rest of the block refers to; `frontmatter.load`
+  then raises, `build_site.py` prints a warning and RETURNS, and the page
+  reaches Quartz unresolved.
+
+So `CopiedPageText.theBuilderWouldReadItTheSameWay` asks a second, deliberately
+strict question with the builder's own boundary. **Measured incidence across
+777 real pages in four courses: zero, of either shape.** Refused anyway,
+because the promise this feature makes is certainty, and a refusal here is
+always right.
+
+**The delete is checked.** "… was not copied" is the strongest sentence in the
+feature, and making it on an unchecked `try?` would let a page nobody could
+prove hidden sit in the teacher's course while they were told it was not there.
+When the removal fails they get a different sentence naming the file's path,
+and the trail line says how many must not be deployed.
+
+### Nothing is overwritten, at the system call
+
+Every write is create-exclusive at the layer below `FileManager`: a page with
+`open(O_CREAT | O_EXCL | O_WRONLY)`, a picture with `copyfile`'s
+`COPYFILE_CLONE`, which `man copyfile` documents as implying `COPYFILE_EXCL`.
+Measured with a C probe, on APFS→APFS (the clone path), HFS+→HFS+ (the
+**fallback** path, which is the one a clone cannot take) and across volumes:
+`rc=-1 errno=17`, destination unchanged, every time — including onto a symlink,
+where the symlink's target was untouched.
+
+A file that appears between the plan and the write therefore surfaces as the
+ordinary "already here" skip, in the same words the index would have produced.
+The index itself compares names with the `.md` dropped, NFC-composed and
+case-folded, across the WHOLE destination course; `AssistSectionGraph.normalized`
+lowercases and does not compose, which is enough for a wikilink index and not
+enough for deciding whether a file is already there.
+
+### Names are BYTES
+
+Measured on macOS 26.6: reading a name back through `readdir`,
+`FileManager.contentsOfDirectory(at:)` → `lastPathComponent` and
+`contentsOfDirectory(atPath:)` all hand back the stored bytes unchanged — but
+**writing** through a `URL` re-spells it. `App\u{00e9}tit.jpg` (`c3 a9`) written
+through `appendingPathComponent` lands as `Appe\u{0301}tit.jpg` (`65 cc 81`),
+and `URL(fileURLWithPath:)` given the whole path as one string does exactly the
+same. The page that embeds the picture still spells the name the old way, so on
+a volume that compares names byte for byte the embed stops resolving and the
+picture vanishes from the built site with no error anywhere. Four files in one
+real course are of that shape.
+
+So pages and pictures are written through two byte-level primitives on
+`ReferenceTreeCopier` — the file that already owns this rule — and a name is
+normalised only to COMPARE, never to write. A must-fail test copies the same
+name in both spellings and asserts the bytes on the other side.
+
+### A picture of the same name
+
+Same name, same bytes: reused silently. Same name, DIFFERENT bytes: the
+incoming file comes in beside the teacher's under
+`<name> (from <source course folder>)<ext>`, and only the COPIED pages are
+pointed at it. The course's FOLDER name goes in the brackets rather than the
+word "Media", because every picture comes from `Media` and saying so would say
+nothing, while `ICS4U-2025` says which course it came out of.
+
+**And if no free name can be found, the PAGE is not copied.** That is not
+tidiness: the destination already HAS a file of that name with different bytes,
+so a page written with the original name would show the teacher their own,
+different picture — the one direction this feature must never err in — while
+the summary said the link led nowhere. It takes 51 same-stem files in the
+destination to reach, and it is closed because the failure path existed.
+
+After the embeds are rewritten the page is scanned AGAIN with the same scanner,
+and if it still names any renamed file the page is not copied. References are
+read from four shapes, and the list is measured rather than assumed: `![[…]]`
+embeds (1,474 across 777 real files), `[[…]]` links pointing at a FILE (250, of
+which 235 PDFs), HTML `src`/`href` (5 — one of them a live 1.1 MB picture on a
+copyable page), and Markdown destinations (526, every one `https://`). Fenced
+code is left alone. A census of the same corpus found zero unquoted attributes,
+zero reference-style link definitions, zero `<video>`/`<source>` and zero CSS
+`url()`, so the four shapes cover it.
+
+### The backup
+
+One copy of the DESTINATION course, taken before the first write of a sheet
+session — not once per press. Measured with the app's own zip command on a real
+course: **9.7 s and 467 MB**, because `Media` is not in `excludedFromArchives`.
+Five presses of "Copy another" would be fifty seconds of waiting and 2.3 GB of
+copies, and a second backup taken after the first copy is a way back that
+already contains the first copy.
+
+It runs `@concurrent`, and that attribute is load-bearing: this target builds
+with `SWIFT_APPROACHABLE_CONCURRENCY`, under which a plain `nonisolated async`
+function runs on its CALLER's actor. A test asserts the thread rather than
+trusting the annotation.
+
+### The pages this page links to
+
+`AssistSectionGraph.reachFollowingLinks` is CALLED and not changed — transitive,
+with one stop, at a class page (issue #173). `CoursePageCopySource` builds the
+`AssistSectionPage` values it takes from plain facts rather than from a
+`Course`, so the walk can run off the main actor; **every** page of the course
+goes into the graph, not only the copyable ones, because a link that lands on a
+class page has to FIND it in order to stop at it. Measured across two real
+courses: the walk stopped at a class page zero times, because shared pages there
+never link to a lesson. The rule is implemented anyway.
+
+Only a page directly inside a top-level shared folder travels. Every other kind
+is listed with the reason it stayed. A page shown INSIDE another comes along
+whether or not it is ticked.
+
+### What was REJECTED, and why
+
+| Not built | Why |
+|---|---|
+| **Copying several pages at once** | Russell, explicitly: not in this release. "Copy another" covers the second page at the cost of one press. |
+| **An MCP tool, or any assistant exposure** | Russell, explicitly. It is deterministic code reached from a menu, and adding a tool is a routing change — more choices is the classic way a router degrades. No generated contract moves, so the surface cannot drift by accident. |
+| **Class pages** | A class belongs to a timetable. Landing one in another course would need a date, a number and a second set of refusals. |
+| **Creating a folder in the destination** | A new top-level folder would also have to be registered in `shared_folders` or the site never builds it — a settings decision with its own refusals. `Media` is the one exception, because Plantoir looks after it and the site-health repair already creates it. |
+| **Mirroring a source SUBfolder path** | Measured zero: 0 of 452 real shared pages, 0 of 38 payloads and 0 of 2,038 skeleton pages sit in a subfolder, and `discover_shared_items` scans the course root only. |
+| **Undo, of any kind** | The backup is the way back and it is one file. `AssistSavedFile` holds text, so a picture cannot travel through the change history at all — an undo that took the pages and left 300 MB of images behind would be worse than none. |
+| **A backup that leaves `Media` out, to make it quick** | Restoring one would DELETE every picture in the course. The ten seconds buys a way back that is actually a way back. |
+| **A progress bar or a size refusal** | Measured 879 MB/s; the worst real copy is 306 files and 302 MB in 0.47 s. The backup is the pause, not the copy. The size is STATED instead, because a refusal would invent a threshold nobody measured. |
+| **Generalising the wizard's combo box** | The page picker is Plantoir's own course-code combo box brought back from another project and made generic there; the wizard itself is untouched, because it is the screen every teacher meets first. |
+
+### Two things only driving the real app found
+
+Both were invisible to every unit test, and both are the kind of fault a
+teacher meets in the first ten seconds.
+
+- **The picker's list opened over the two questions underneath it** the moment
+  the sheet appeared. A sheet gives its first text field focus, and the list
+  opened on focus. It now opens when the teacher TYPES or presses the chevron.
+  Where the picker is the only control on its row, opening on focus is right;
+  as the first of three questions it is not.
+- **Clicking the field did not focus it at all.** A `.plain` `TextField`
+  hit-tests its TEXT, and an empty one is a caret's width of it; measured,
+  `AXFocused` stayed false after a click in the middle of a 361 pt field. The
+  whole bezel takes a click now. It never showed in the wizard, because that
+  screen gives the field focus as it opens and nobody ever has to click it.
+
+### The honest limits
+
+- **The mid-deploy refusal is in-process only.** `CourseActivity.store` is a
+  plain static, so it sees deploys this Plantoir started and not `./deploy.sh`
+  from a Terminal, `plantoir-mcp`, or a second Plantoir. That is the seam the
+  whole app already uses rather than anything new here. It is re-asked
+  immediately before the backup and not again after it.
+- **Invisible spaces are folded on the way IN only.** Resolving a reference
+  against the SOURCE's `Media` folds U+00A0/202F/2007, so a link typed with
+  real spaces finds a file whose name carries a no-break one; the destination
+  index does not fold them, so two files whose names look identical can end up
+  side by side. Nothing is overwritten, which is the safe direction.
+- **A file beside a page rather than in `Media` is left behind**, and listed.
+  Measured: two PDFs and one `.html` across the real courses, and the only
+  pages linking them are class pages, which are never copyable.
+
 ## What an archive or a backup is CALLED, and the calendar it is stamped in
 
 Three kinds of zip share `courses/_backups/<CODE>/` and are told apart only by

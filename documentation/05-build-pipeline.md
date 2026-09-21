@@ -1197,3 +1197,25 @@ worth checking on any platform that moves build output.
 ---
 
 [◀ Previous: Course Setup](04-course-setup.md) · [Back to index](README.md) · [Next: Quartz Customizations ▶](06-quartz-customizations.md)
+
+## `Media` is mirrored WHOLE, so a picture is uploaded before its page is
+
+Every build copies the course's `Media` folder into the build tree entire —
+not the subset the published pages happen to name. So a picture that arrives
+in `Media` is in the next deploy's `public/Media` whether or not any visible
+page shows it.
+
+That has always been true of anything a teacher drops in there by hand.
+Since 2026-09-21 it is also true of something Plantoir puts there on their
+behalf: "Copy a Page from This Course…" (issue #207) copies a page's pictures
+and files into the destination's `Media`, and the page itself arrives HIDDEN.
+Measured on a real build of a real course: none of the copied pages appears in
+the built site — zero occurrences of any of their titles across 282 rendered
+pages — while the two PDFs and the 1.1 MB picture they brought ARE in
+`public/Media`.
+
+This is not a regression and it is not a leak of anything a student can find
+by reading the site: nothing links to those files until the page is published.
+It is written down because "why is last year's PDF on my site already?" is a
+question somebody will ask, and the answer is a rule about `Media` rather than
+anything the copy did.
