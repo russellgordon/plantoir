@@ -464,6 +464,17 @@ nonisolated enum ActivityTrail {
         /// something chose to, and a line calling that a failure is a line
         /// that misleads whoever reads it back.
         case courseImportForReferenceStopped = "course import for reference stopped"
+
+        /// A working folder was opened and an unfinished import was found in
+        /// it and tidied away. Carries which course it was going to be.
+        ///
+        /// A reference course is built under a hidden name and renamed into
+        /// place last, so a quit or a crash part way leaves a hidden folder
+        /// nothing can see — and therefore nothing would ever remove. This
+        /// is the one line that says the disk space came back, and it is
+        /// also how "my import did not finish and now there is no trace of
+        /// it" gets an answer.
+        case unfinishedImportForReferenceTidiedAway = "unfinished import for reference tidied away"
     }
 
     // MARK: - Stored properties

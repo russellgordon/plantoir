@@ -1558,8 +1558,28 @@ an external disk leaves in a folder.
 point of keeping it, and Plantoir opens the course folder AS the vault; without
 those 312 KB the vault opens with first-run prompts, none of the teacher's
 plugins and none of the folder state that makes last year's material
-navigable. Its `workspace.json` holds paths into the OLD folder, which are dead
-links Obsidian rewrites on first open — not worth stripping.
+navigable. Its `workspace.json` was MEASURED on a real imported course rather
+than assumed: every path in it is vault-relative, with no absolute path and no
+mention of the old folder, so it resolves inside the new course as it stands.
+(An earlier draft of this page said the opposite. Nothing needs stripping, and
+nothing needs registering either — the app opens a vault by path.)
+
+**A file name is carried as BYTES, and that is why this path talks to POSIX
+rather than to `FileManager`.** The walk reads names with `readdir` and the
+copy hands them to `copyfile()` unchanged. Building the destination from
+`URL.lastPathComponent` — which is what the first version did — passes the
+name through `URL`'s file-system representation and DECOMPOSES it: measured,
+`App\u{00e9}tit.jpg` (`c3 a9`) arrived as `Appe\u{0301}tit.jpg` (`65 cc 81`).
+
+That is not cosmetic, and it is how the fault was found: the page that embeds
+the image still spelled the name the old way, so the embed no longer resolved
+and **Quartz emitted neither the `<img>` nor the asset** — the picture simply
+vanished from the built site, with no error anywhere. Four files in Russell's
+own ICS4U are of this shape. Measured three ways, same source name:
+`copyItem` of a whole DIRECTORY (route 1) preserves it, per-file `copyItem` to
+a rebuilt `URL` decomposes it, `readdir` bytes → `copyfile()` preserves both
+forms. `copyfile` with `COPYFILE_CLONE` also keeps the file system's own fast
+path, so the 0.09 s stands.
 
 **Page frontmatter is never rewritten.** A reference course is a faithful
 record of what students actually saw, `draft: true` and all; the build already
@@ -1575,11 +1595,61 @@ to design for. The same bytes off a USB disk, a network share or a drive that
 has to spin up are minutes, so the copy reports progress in bytes, can be
 stopped between files, and runs off the main actor.
 
-It runs there by being `nonisolated async` rather than by `Task.detached`:
-Swift runs a `nonisolated async` function on the shared executor, and it stays
-an ordinary child of the calling task, so **the Stop button's `cancel()`
-reaches it**. A detached task would not be cancelled by it, which is the trap
-worth writing down. There is no sleep anywhere in the path and no timer.
+It runs there by being **`@concurrent`**, and that attribute is load-bearing:
+`nonisolated async` alone is NOT enough in this project. `project.yml` sets
+`SWIFT_APPROACHABLE_CONCURRENCY: YES`, which turns on
+`NonisolatedNonsendingByDefault` — "runs nonisolated async functions on the
+caller's actor by default". Measured, the same function body called from a
+`@MainActor` caller:
+
+| | on the main thread? |
+|---|---|
+| `nonisolated async`, flag off | no |
+| `nonisolated async`, flag on (this project) | **yes** |
+| `@concurrent`, flag on | no |
+
+The first shape of this file had the plain form and the doc comment claimed
+the opposite of what it did. The copy's loop has no suspension point, so the
+main actor was held for the whole copy: the progress bar could not draw and
+**the Stop button could not be clicked at all** — on the slow external disk
+this is all written for, minutes of a frozen window with no way out.
+
+`Task.detached` would also leave the main actor and is rejected for the reason
+it always was: it is not a child of the calling task, so `run?.cancel()` would
+not reach the loop. `@concurrent` leaves the actor and stays a child. There is
+no sleep anywhere in the path and no timer.
+
+#### Nothing is visible under `courses/` until it is safe
+
+The copy is made under a **hidden name** — `.plantoir-importing-<folder>`,
+inside `courses/` — and is marked, filed under its year, neutralised and
+locked THERE. The last act is a rename into the real name, which within one
+folder is atomic. Both ways of making a reference course do this.
+
+**The fault it closes was measured.** Until 2026-09-20 the copy was made at
+its final name, so for the length of the copy `courses/ICS4U-2025/` held last
+year's REAL site markers beside a config with no marker and no `deploy_target`
+— which reads as Netlify. `./deploy.sh` run against that half-made folder does
+not refuse at all. A crash, a quit or a power cut in that window left an
+ordinary-looking live course in the sidebar with a working Deploy button aimed
+at last year's class site; with a frozen source the leftover could not even be
+deleted. The window was about two seconds for an APFS clone and **the whole
+copy** on an external disk — the case the importer exists for.
+
+Hidden works because everything that looks for a course passes
+`.skipsHiddenFiles` — discovery, the backups list, the archives list — and
+three tests pin that rather than trusting it. The launchers take a course CODE
+and build `courses/<CODE>`, and a code cannot begin with a dot, so nothing on
+the command line can name one either.
+
+A leftover from an import that never finished is **swept when a working folder
+is read** (`ReferenceStaging.sweepLeftovers`): unlock, remove, one trail line
+naming the course it was going to be. Matched on the exact prefix and nothing
+else — `.internal` and `.obsidian` are not ours to take.
+
+*Rejected: staging in the system temporary folder.* A different volume, so the
+last step would be a copy rather than a rename — the whole window back again,
+and twice the bytes.
 
 **Nothing half-made is left behind, and the order matters.** Whatever was
 being made when a course failed — or when the teacher pressed Stop — is

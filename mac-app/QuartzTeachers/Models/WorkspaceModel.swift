@@ -1210,6 +1210,16 @@ class WorkspaceModel {
         // is nothing to do, which is every ordinary folder — it walks only
         // the courses that claim to be kept for reference.
         ReferenceCourseUpkeep.bringUpToDate(loadedCourses, inWorkingFolder: workspaceURL)
+        // A reference course is built under a hidden name and renamed into
+        // place as the last act, so an import the app never finished — a
+        // quit, a crash, a power cut — leaves one of those behind. Nothing
+        // can see it, so nothing would ever take it away.
+        let swept: [String] = ReferenceStaging.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL)
+        if !swept.isEmpty {
+            ActivityTrail.note(
+                .unfinishedImportForReferenceTidiedAway, ReferenceStaging.trailLine(for: swept)
+            )
+        }
         placeBuiltSitesOutsideTheFolder(for: loadedCourses, everythingIn: entryURLs)
         archivedItems = WorkspaceModel.findArchivedItems(in: coursesDirectoryURL)
         backupItems = WorkspaceModel.findBackupItems(in: coursesDirectoryURL)
