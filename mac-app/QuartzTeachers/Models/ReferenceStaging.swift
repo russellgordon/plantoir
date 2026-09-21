@@ -26,10 +26,16 @@ import Foundation
 ///
 /// **Dot-prefixed because everything that looks for a course skips hidden
 /// entries** — discovery, the backups list and the archives list all pass
-/// `.skipsHiddenFiles`, and three tests pin that rather than trusting it. The
-/// launchers take a course CODE and build `courses/<CODE>`, and a code cannot
-/// begin with a dot (`CourseCodeRule`), so nothing on the command line can
-/// name one of these either.
+/// `.skipsHiddenFiles`, and three tests pin that rather than trusting it.
+///
+/// **The launchers are a REFUSAL rather than an impossibility**, and this
+/// comment said the opposite until it was measured: they applied no shape
+/// check at all, `deploy.sh` uppercased the hidden name, the case-insensitive
+/// volume resolved it, and the run went past the reference gate — which finds
+/// nothing during the copy, because the marker is not written yet. All four
+/// launchers now refuse a course argument beginning with a dot before
+/// anything else. The app itself can never pass one: `CourseCodeRule` refuses
+/// a leading dot and discovery never sees these folders.
 @MainActor
 enum ReferenceStaging {
 
@@ -68,6 +74,85 @@ enum ReferenceStaging {
         return !fileManager.fileExists(atPath: stagingURL.path)
     }
 
+    // MARK: - Saying that an import is under way
+
+    /// Where a lease lives: `courses/.internal/activity/`, the folder this
+    /// product already uses to say what is going on in a working folder.
+    static func activityDirectory(inCoursesDirectory coursesDirectoryURL: URL) -> URL {
+        return coursesDirectoryURL
+            .appendingPathComponent(".internal").appendingPathComponent("activity")
+    }
+
+    /// `<FOLDER>.import.<pid>.lease` — the shape `WorkLease` already uses.
+    static func leaseName(for folderName: String, pid: Int32 = getpid()) -> String {
+        return "\(folderName).import.\(pid).lease"
+    }
+
+    /// Says that THIS process is importing into that staging folder.
+    ///
+    /// Written outside the staging folder on purpose, so removing the folder
+    /// does not remove the claim to it.
+    static func takeLease(for folderName: String, inCoursesDirectory coursesDirectoryURL: URL) {
+        let activity: URL = ReferenceStaging.activityDirectory(
+            inCoursesDirectory: coursesDirectoryURL
+        )
+        try? FileManager.default.createDirectory(at: activity, withIntermediateDirectories: true)
+        let lease: URL = activity.appendingPathComponent(ReferenceStaging.leaseName(for: folderName))
+        try? Data("\(getpid())".utf8).write(to: lease)
+    }
+
+    /// Gives it back. A lease that outlives its process is ignored rather
+    /// than trusted, so a crash costs nothing; this is the tidy path.
+    static func releaseLease(for folderName: String, inCoursesDirectory coursesDirectoryURL: URL) {
+        let lease: URL = ReferenceStaging
+            .activityDirectory(inCoursesDirectory: coursesDirectoryURL)
+            .appendingPathComponent(ReferenceStaging.leaseName(for: folderName))
+        try? FileManager.default.removeItem(at: lease)
+    }
+
+    /// Whether some LIVE process says it is importing into this staging
+    /// folder.
+    ///
+    /// `kill(pid, 0)` asks the system whether the process exists without
+    /// sending it anything. A recycled process id is the one case this cannot
+    /// see through, and it is the same caveat every lease in this product
+    /// carries; the direction it errs in is leaving a folder alone, which
+    /// costs disk space until the next open rather than destroying work.
+    static func someoneIsWorkingOn(_ stagingName: String, inCoursesDirectory coursesDirectoryURL: URL) -> Bool {
+        let folderName: String = ReferenceStaging.courseFolderName(fromStaging: stagingName)
+        let activity: URL = ReferenceStaging.activityDirectory(
+            inCoursesDirectory: coursesDirectoryURL
+        )
+        guard let leases = try? FileManager.default.contentsOfDirectory(
+            at: activity, includingPropertiesForKeys: nil, options: []
+        ) else {
+            return false
+        }
+
+        let prefix: String = "\(folderName).import."
+        var someoneIsAlive: Bool = false
+        for lease in leases {
+            let name: String = lease.lastPathComponent
+            guard name.hasPrefix(prefix), name.hasSuffix(".lease") else {
+                continue
+            }
+            let middle: String = String(
+                name.dropFirst(prefix.count).dropLast(".lease".count)
+            )
+            guard let pid = Int32(middle) else {
+                continue
+            }
+            if kill(pid, 0) == 0 {
+                someoneIsAlive = true
+                continue
+            }
+            // Its owner is gone, so the claim is stale and goes with the
+            // folder it was about.
+            try? FileManager.default.removeItem(at: lease)
+        }
+        return someoneIsAlive
+    }
+
     /// Clears away staging folders left by an import that never finished —
     /// the app quit, the Mac lost power — and says which ones it took.
     ///
@@ -75,6 +160,21 @@ enum ReferenceStaging {
     /// re-asserted there. A leftover is invisible to the sidebar, so without
     /// this it would sit in `courses/` for ever, holding a copy of a course
     /// nobody can see.
+    ///
+    /// **A folder somebody is still working on is left alone**, and that is
+    /// not a nicety. `reloadCourses` is reached by File ▸ Reload Courses
+    /// (offered while the import sheet is up), by a SECOND WINDOW on the same
+    /// working folder, and by `Plantoir --mcp-stdio` — which is how a Claude
+    /// Code session starts, and is the arrangement the product describes as
+    /// normal. Without this check, one of those sweeps the tree out from
+    /// under a running copy: the copy then fails with a system error the
+    /// teacher cannot act on, and if it lands after the lock and before the
+    /// rename, a FINISHED reference course is thrown away.
+    ///
+    /// The liveness question is asked of a lease naming a process, never of a
+    /// folder's age: a threshold is a guessed duration, and a guessed
+    /// duration is wrong on a slow disk — which is the very case an import
+    /// takes minutes on.
     @discardableResult
     static func sweepLeftovers(inCoursesDirectory coursesDirectoryURL: URL) -> [String] {
         let fileManager: FileManager = FileManager.default
@@ -88,6 +188,9 @@ enum ReferenceStaging {
         for child in children {
             let name: String = child.lastPathComponent
             guard ReferenceStaging.isStagingName(name) else {
+                continue
+            }
+            if ReferenceStaging.someoneIsWorkingOn(name, inCoursesDirectory: coursesDirectoryURL) {
                 continue
             }
             if ReferenceStaging.remove(at: child) {

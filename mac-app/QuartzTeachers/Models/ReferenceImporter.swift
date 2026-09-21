@@ -155,7 +155,23 @@ enum ReferenceImporter {
             let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
                 ReferenceStaging.stagingName(for: folderName)
             )
-            ReferenceStaging.remove(at: stagingURL)
+            // Any leftover of that name is one nobody is working on: a live
+            // owner would have made the folder name unavailable earlier, and
+            // a stale one is exactly what the sweep takes.
+            if !ReferenceStaging.someoneIsWorkingOn(
+                stagingURL.lastPathComponent, inCoursesDirectory: coursesDirectoryURL
+            ) {
+                ReferenceStaging.remove(at: stagingURL)
+            }
+            // Said before the first byte, so a Reload Courses, a second
+            // window or an `--mcp-stdio` session started mid-copy leaves this
+            // folder alone instead of sweeping it out from under us.
+            ReferenceStaging.takeLease(for: folderName, inCoursesDirectory: coursesDirectoryURL)
+            defer {
+                ReferenceStaging.releaseLease(
+                    for: folderName, inCoursesDirectory: coursesDirectoryURL
+                )
+            }
 
             do {
                 let made: ReferenceCopier.Made = try await ReferenceImporter.importOneCourse(

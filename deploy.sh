@@ -372,6 +372,21 @@ if [[ $# -lt 2 ]]; then usage; exit 1; fi
 COURSE_CODE="$1"; shift
 SECTION_NUM="$1"; shift
 
+# A course code may not begin with a dot, and the refusal is here rather than
+# in a comment claiming it cannot happen. Plantoir builds a reference course
+# under a HIDDEN folder inside courses/ and renames it into place as the last
+# act; handed that hidden name, this script used to treat it as an ordinary
+# course — the uppercased name still resolves on a case-insensitive volume —
+# and during the copy there is no marker yet to refuse it. The app can never
+# pass such a name, but a person or another program can type one.
+if [[ "$COURSE_CODE" == .* ]]; then
+  echo ""
+  echo "❌ A course code cannot begin with a dot."
+  echo "   Choose one of your courses — the codes in Plantoir's sidebar."
+  echo ""
+  exit 1
+fi
+
 # Normalize course code to uppercase
 COURSE_CODE="$(printf '%s' "$COURSE_CODE" | tr '[:lower:]' '[:upper:]')"
 

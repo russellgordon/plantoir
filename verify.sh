@@ -307,6 +307,26 @@ else
   fail "a course kept for reference is refused before anything is published (deploy.sh and deploy.ps1)"
 fi
 
+# And a course code that begins with a DOT is refused outright, in all four
+# launchers. Plantoir builds a reference course under a hidden folder inside
+# `courses/` and renames it into place as the last act; handed that hidden
+# name, a launcher treated it as an ordinary course — the uppercased name
+# still resolves on a case-insensitive volume — and during the copy there is
+# no marker yet for the guard above to find. Structural for the same reason as
+# the guard above: this is a door, and the app cannot reach it to test it.
+_dot_guard_ok=true
+for _launcher in deploy.sh preview.sh deploy.ps1 preview.ps1; do
+  if ! grep -q "cannot begin with a dot" "$_launcher"; then
+    _dot_guard_ok=false
+    echo "   $_launcher does not refuse a course code beginning with a dot"
+  fi
+done
+if [ "$_dot_guard_ok" = true ]; then
+  pass "a course code beginning with a dot is refused (all four launchers)"
+else
+  fail "a course code beginning with a dot is refused (all four launchers)"
+fi
+
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
 # the runs in THIS script, but `scripts/` is a folder reference in the app's
 # project — whatever sits in it is copied into the bundle, mirrored into every

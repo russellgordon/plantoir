@@ -824,10 +824,127 @@ final class ReferenceImportTests: XCTestCase {
         run.cancel()
         _ = await run.value
 
-        let left: [String] = try FileManager.default.contentsOfDirectory(
+        // `contentsOfDirectory(atPath:)` does NOT skip hidden entries, which
+        // is the point: a staging folder would show up here.
+        var left: [String] = try FileManager.default.contentsOfDirectory(
             atPath: coursesDirectoryURL.path
         )
-        XCTAssertEqual(left, [], "Something was left under courses/ — visible or hidden.")
+        left.sort()
+        XCTAssertEqual(
+            left, [".internal"],
+            "Something was left under courses/ — visible or hidden. Only the working folder's own "
+            + "bookkeeping folder belongs here, and the sweep is told never to touch that."
+        )
+        let leases: [String] = (try? FileManager.default.contentsOfDirectory(
+            atPath: ReferenceStaging.activityDirectory(
+                inCoursesDirectory: coursesDirectoryURL
+            ).path
+        )) ?? []
+        XCTAssertEqual(leases, [], "The import's lease outlived the import.")
+    }
+
+    // MARK: - The sweep and a run in flight
+
+    /// A staging folder somebody is still working on is left alone; one whose
+    /// owner is gone is taken.
+    ///
+    /// `reloadCourses` — and therefore the sweep — is reached by File ▸
+    /// Reload Courses, by a second window on the same folder, and by
+    /// `Plantoir --mcp-stdio`, which is how a Claude Code session starts. Any
+    /// of those landing mid-import used to delete the tree under the running
+    /// copy.
+    func testTheSweepLeavesAliveImportAloneAndTakesADeadOne() throws {
+        try prepare()
+        let fileManager: FileManager = FileManager.default
+
+        let live: URL = coursesDirectoryURL.appendingPathComponent(
+            ReferenceStaging.stagingName(for: "ICS4U-2025")
+        )
+        let dead: URL = coursesDirectoryURL.appendingPathComponent(
+            ReferenceStaging.stagingName(for: "MPM2DE-2025")
+        )
+        for folder in [live, dead] {
+            try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+
+        // This process is importing ICS4U; nobody is importing MPM2DE, and
+        // the lease that says otherwise names a process that has gone.
+        ReferenceStaging.takeLease(for: "ICS4U-2025", inCoursesDirectory: coursesDirectoryURL)
+        let activity: URL = ReferenceStaging.activityDirectory(
+            inCoursesDirectory: coursesDirectoryURL
+        )
+        let stale: URL = activity.appendingPathComponent(
+            ReferenceStaging.leaseName(for: "MPM2DE-2025", pid: ReferenceImportTests.aPidThatIsGone())
+        )
+        try Data("999999".utf8).write(to: stale)
+
+        let swept: [String] = ReferenceStaging.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL)
+
+        XCTAssertEqual(swept, ["MPM2DE-2025"])
+        XCTAssertTrue(
+            fileManager.fileExists(atPath: live.path),
+            "The sweep deleted an import that is running — the copy then fails with a system "
+            + "error, and after the lock it would throw away a finished course."
+        )
+        XCTAssertFalse(fileManager.fileExists(atPath: dead.path))
+        XCTAssertFalse(
+            fileManager.fileExists(atPath: stale.path),
+            "A lease whose owner is gone goes with the folder it was about."
+        )
+
+        ReferenceStaging.releaseLease(for: "ICS4U-2025", inCoursesDirectory: coursesDirectoryURL)
+        XCTAssertEqual(
+            ReferenceStaging.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL),
+            ["ICS4U-2025"],
+            "Once the lease is given back the folder is ordinary litter again."
+        )
+    }
+
+    // MARK: - Route 1 carries names the same way
+
+    /// "Keep a Copy for Reference…" keeps the bytes of a TOP-LEVEL name.
+    ///
+    /// Its own loop rebuilt each destination from `URL.lastPathComponent`,
+    /// which preserved everything INSIDE a folder and decomposed the folder's
+    /// own name. Both routes now go through one copier.
+    func testKeepingACopyAlsoKeepsTheExactBytesOfATopLevelName() throws {
+        try prepare()
+        let courseURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U")
+        try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: [
+            "course_code": "ICS3U", "section_numbers": [1],
+        ]).write(to: courseURL.appendingPathComponent("course_config.json"))
+
+        let composed: String = "Th\u{00e8}me"
+        let decomposed: String = "Re\u{0301}sume\u{0301}.md"
+        try FileManager.default.createDirectory(
+            atPath: courseURL.path + "/" + composed, withIntermediateDirectories: false
+        )
+        let file: Int32 = open(courseURL.path + "/" + decomposed, O_CREAT | O_WRONLY, 0o644)
+        _ = write(file, "x", 1)
+        close(file)
+        let sourceNames: Set<[UInt8]> = ReferenceImportTests.entryBytes(inFolder: courseURL.path)
+
+        let course: Course = Course(
+            code: "ICS3U",
+            directoryURL: courseURL,
+            configuration: try CourseConfiguration(
+                contentsOf: courseURL.appendingPathComponent("course_config.json")
+            )
+        )
+        _ = try ReferenceCopier.keepACopy(
+            of: course, named: "ICS3U-2025", schoolYear: 2025,
+            coursesDirectoryURL: coursesDirectoryURL
+        )
+
+        let copiedNames: Set<[UInt8]> = ReferenceImportTests.entryBytes(
+            inFolder: coursesDirectoryURL.appendingPathComponent("ICS3U-2025").path
+        )
+        XCTAssertEqual(
+            copiedNames, sourceNames,
+            "A top-level name came across re-spelled by the copy a teacher makes from a course "
+            + "they are teaching."
+        )
     }
 
     // MARK: - Where the work runs
@@ -1092,6 +1209,19 @@ final class ReferenceImportTests: XCTestCase {
             found.insert(name)
         }
         return found
+    }
+
+    /// A process id that is certainly not running: one claimed, and gone.
+    ///
+    /// `fork`-free — a short-lived `/usr/bin/true` is started and waited for,
+    /// so the id it had is free by the time this returns. Better than a large
+    /// made-up number, which a busy Mac can legitimately be using.
+    private static func aPidThatIsGone() -> Int32 {
+        let gone: Process = Process()
+        gone.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try? gone.run()
+        gone.waitUntilExit()
+        return gone.processIdentifier
     }
 
     private static func moment(year: Int, month: Int, day: Int) -> Date {
