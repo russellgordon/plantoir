@@ -45,6 +45,68 @@ final class NewCourseTrailTests: XCTestCase {
         )
     }
 
+    /// A skeleton course now comes out two ways, and they differ by
+    /// fifty-nine pages and by whether the curriculum coverage map works
+    /// at all (GitHub issue #251) — so the line says which of the two
+    /// happened. The report it exists to answer is "my new course came out
+    /// wrong"; a line that could not tell them apart could not answer it.
+    @MainActor
+    func testASkeletonCourseSaysWhetherItGotItsCurriculumPages() {
+        XCTAssertEqual(
+            NewCourseCreator.startingContentLine(
+                courseCode: "ICS4U", takesExampleContent: false,
+                usesSkeleton: true, skeletonSubject: "Computer Studies",
+                withCurriculumPages: true
+            ),
+            "created ICS4U from the computer studies skeleton with the ICS4U curriculum pages"
+        )
+        XCTAssertEqual(
+            NewCourseCreator.startingContentLine(
+                courseCode: "MCMPR11", takesExampleContent: false,
+                usesSkeleton: true, skeletonSubject: nil,
+                withCurriculumPages: true
+            ),
+            "created MCMPR11 from the general course skeleton with the MCMPR11 curriculum pages"
+        )
+
+        // The other two starting points are untouched. The ready-made
+        // pages have always carried their own curriculum, and an empty
+        // course has nothing to say about one.
+        XCTAssertEqual(
+            NewCourseCreator.startingContentLine(
+                courseCode: "ICS4U", takesExampleContent: true,
+                usesSkeleton: false, skeletonSubject: "Computer Studies",
+                withCurriculumPages: true
+            ),
+            "created ICS4U from the ready-made pages written for it"
+        )
+        XCTAssertEqual(
+            NewCourseCreator.startingContentLine(
+                courseCode: "ICS4U", takesExampleContent: false,
+                usesSkeleton: false, skeletonSubject: "Computer Studies",
+                withCurriculumPages: true
+            ),
+            "created ICS4U with empty folders"
+        )
+    }
+
+    /// The clause is read from the configuration the wizard just wrote —
+    /// `include_curriculum_pages`, the same key the launcher answers its
+    /// question with — rather than guessed from the code or the catalog.
+    @MainActor
+    func testTheClauseIsReadFromTheFileTheWizardWrote() throws {
+        let source: String = try NewCourseTrailTests.creatorSource()
+        let body: String = try XCTUnwrap(
+            NewCourseTrailTests.body(ofFunction: "func createCourse(", in: source),
+            "createCourse() was not found — this scan cannot see what it records."
+        )
+        XCTAssertTrue(
+            body.contains("withCurriculumPages: configuration[\"include_curriculum_pages\"]"),
+            "The line no longer reads the key the launcher itself answers with, so the trail "
+            + "can claim curriculum pages a course did not get, or miss ones it did."
+        )
+    }
+
     /// A code whose skeleton has no subject of its own still reads as
     /// English — the general family's label is "This Course", written for
     /// the skeleton's pages rather than for a sentence.

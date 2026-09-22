@@ -71,7 +71,8 @@ class NewCourseCreator {
                 courseCode: courseCode,
                 takesExampleContent: configuration["prepopulate_example_content"] as? Bool ?? false,
                 usesSkeleton: configuration["use_skeleton"] as? Bool ?? false,
-                skeletonSubject: NewCourseCreator.skeletonSubject(forCode: courseCode)
+                skeletonSubject: NewCourseCreator.skeletonSubject(forCode: courseCode),
+                withCurriculumPages: configuration["include_curriculum_pages"] as? Bool ?? false
             )
         )
 
@@ -133,21 +134,36 @@ class NewCourseCreator {
     /// Written as a sentence a teacher would recognise rather than as the
     /// three config keys it is read from — "created ICS4U from the computer
     /// studies skeleton", never "use_skeleton=true". Pure, so it can be
-    /// tested without creating a course; the two flags come straight out of
+    /// tested without creating a course; the flags come straight out of
     /// the configuration the wizard just wrote, so the line says what was
     /// actually asked for rather than what the interface last showed.
+    ///
+    /// A skeleton course now has two outcomes that differ by fifty-nine
+    /// pages and by whether the curriculum coverage map works at all
+    /// (GitHub issue #251), so `withCurriculumPages` tells them apart. The
+    /// report this line exists to answer is "my new course came out
+    /// wrong"; one that could not say which of the two happened could not
+    /// answer it. The example-content sentence is untouched — those pages
+    /// have always carried their own curriculum.
     static func startingContentLine(courseCode: String,
                                     takesExampleContent: Bool,
                                     usesSkeleton: Bool,
-                                    skeletonSubject: String?) -> String {
+                                    skeletonSubject: String?,
+                                    withCurriculumPages: Bool = false) -> String {
         if takesExampleContent {
             return "created \(courseCode) from the ready-made pages written for it"
         }
         if usesSkeleton {
-            guard let skeletonSubject, !skeletonSubject.isEmpty else {
-                return "created \(courseCode) from the general course skeleton"
+            var line: String
+            if let skeletonSubject, !skeletonSubject.isEmpty {
+                line = "created \(courseCode) from the \(skeletonSubject.lowercased()) skeleton"
+            } else {
+                line = "created \(courseCode) from the general course skeleton"
             }
-            return "created \(courseCode) from the \(skeletonSubject.lowercased()) skeleton"
+            if withCurriculumPages {
+                line += " with the \(courseCode) curriculum pages"
+            }
+            return line
         }
         return "created \(courseCode) with empty folders"
     }

@@ -927,6 +927,42 @@ class CourseConfiguration {
     /// trimmed, any scheme stripped, and anything from the first slash on
     /// dropped — so a pasted "https://ics3u.school.ca/" stores as
     /// "ics3u.school.ca".
+    /// Whether this course may be offered the curriculum pages written for
+    /// its code.
+    ///
+    /// Two starting points reach them, and it took until GitHub issue #251
+    /// for the second to be noticed. A teacher TAKING the ready-made pages
+    /// gets the payload's curriculum folder with them. A teacher who
+    /// DECLINES the pages still gets the subject's skeleton (#248) — and
+    /// the expectations written for their code still exist, so they come
+    /// along too rather than leaving the skeleton's placeholder folder and
+    /// a coverage map with one fake cell to colour.
+    ///
+    /// For the ~1,900 codes with no payload there is nothing to offer,
+    /// whatever the skeleton toggle says: the skeleton ships an empty
+    /// Curriculum folder, ready for expectations the teacher adds by hand.
+    ///
+    /// ONE rule, read by the three toggles, the config keys and the
+    /// coverage rule below, so that the surfaces cannot drift apart — the
+    /// same reason `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:)`
+    /// exists, and `skeletonIsOffered` is that function's own answer rather
+    /// than a second copy of its rule.
+    static func curriculumPagesOffered(
+        codeHasExampleContent: Bool,
+        payloadIncludesCurriculum: Bool,
+        prepopulatesExampleContent: Bool,
+        skeletonIsOffered: Bool,
+        startsFromSkeleton: Bool
+    ) -> Bool {
+        guard codeHasExampleContent, payloadIncludesCurriculum else {
+            return false
+        }
+        if prepopulatesExampleContent {
+            return true
+        }
+        return skeletonIsOffered && startsFromSkeleton
+    }
+
     /// Whether the curriculum coverage map should be switched on for a new
     /// course.
     ///
@@ -941,16 +977,16 @@ class CourseConfiguration {
     /// can be tested: a SwiftUI `@State` property has no backing store
     /// until the view is on screen, so a test that sets one and reads a
     /// computed result gets the default back every time.
+    /// `curriculumPagesOffered` is asked for rather than re-derived here:
+    /// the three guards this used to carry said "the teacher is taking the
+    /// payload", which stopped being the only way a course gets curriculum
+    /// pages when #251 landed.
     static func curriculumCoverageEnabled(
-        codeHasExampleContent: Bool,
-        prepopulatesExampleContent: Bool,
-        payloadIncludesCurriculum: Bool,
+        curriculumPagesOffered: Bool,
         includesCurriculumPages: Bool,
         includesCurriculumCoverage: Bool
     ) -> Bool {
-        guard codeHasExampleContent,
-              prepopulatesExampleContent,
-              payloadIncludesCurriculum,
+        guard curriculumPagesOffered,
               includesCurriculumPages else {
             return false
         }
