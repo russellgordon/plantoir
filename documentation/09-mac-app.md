@@ -1011,6 +1011,52 @@ curriculum folder is what let the retired sentence sit unguarded, and the
 banned-word sweep could not stand in for it — a banned word catches only that
 word.
 
+## The wizard's Starting Content section, and what governs what
+
+Five toggles can appear there, and their ORDER is their dependency, read
+top to bottom:
+
+```
+[ ] Pre-populate course with example content
+[x] Start from a computer studies skeleton
+[x] Include Ontario curriculum pages
+[x] Include the curriculum coverage map
+[x] Explain the map on the page
+```
+
+The three curriculum toggles used to be drawn directly under the
+example-content toggle, inside its `if`, because that was the only thing
+that could switch them on. Since
+[#251](https://github.com/russellgordon/plantoir/issues/251) the skeleton
+toggle can too — a teacher who declines the ready-made pages and keeps the
+subject's skeleton still gets the expectations written for their code — and
+three LIVE toggles sitting above an OFF one, under a caption still
+explaining the example content, read as though the wrong thing had
+happened. So they moved below the skeleton toggle. **Nothing moved for a
+teacher taking the ready-made pages**: the skeleton block draws nothing at
+all for them (`SkeletonCatalog.hasSkeleton` is false while example content
+is being taken), so the three still follow the example-content toggle
+directly, in the same order, with the same labels and the same captions.
+
+**What decides whether they are live is ONE function**,
+`CourseConfiguration.curriculumPagesOffered`: the code has a payload, that
+payload declares a curriculum folder, AND either the payload is being taken
+or a skeleton is offered and wanted. The three `.disabled(…)` modifiers,
+`effectiveCurriculumPagesEnabled`, `effectiveCurriculumCoverageEnabled` and
+the three keys in `buildConfigurationDictionary` all ask it — the same
+reason `SkeletonCatalog.hasSkeleton` exists, so the surfaces cannot drift
+apart. A consequence that falls out and is wanted:
+`wizardSharedFolderProtection` now protects a skeleton course's Curriculum
+folder in the sentences that already protect a payload course's, and its
+marks pool with it, because the coverage map counts the pages in that pool.
+
+The jurisdiction word is per code and always has been —
+`ExampleContentCatalog.jurisdictionName` reads the payload manifest, so
+MCMPR11 reads "Include British Columbia curriculum pages". The Python
+console did NOT until #251, and said "the official Ontario curriculum" to
+that teacher in the next breath; both now derive it the way
+`contracts/example-content.json` → `manifestKeys` → `jurisdiction` states.
+
 ## The caption under the four Content Structure lists
 
 The tip below the Shared folders / Shared files / Per-section folders /
@@ -2480,6 +2526,19 @@ skeleton", one of three shapes (the ready-made pages written for the code,
 the subject's skeleton named, or empty folders). It carries the code and
 nothing else a teacher typed: not the course name, which can hold a
 student's name or a room number, and not where it publishes.
+
+A skeleton line says one thing more, since 2026-09-22
+([#251](https://github.com/russellgordon/plantoir/issues/251)): whether the
+curriculum pages written for the code came with it — "created ICS4U from
+the computer studies skeleton with the ICS4U curriculum pages" — and only
+when they did. That is rule 5's "a changed behaviour changes its line too"
+rather than noise: a skeleton course now comes out two ways, they differ by
+fifty-nine pages and by whether the coverage map works at all, and a line
+that could not tell them apart could not answer the report it was added for.
+It is read from `include_curriculum_pages` in the file the wizard has just
+written — the same key the launcher answers its own question with — so the
+line says what was actually asked for rather than what the interface last
+showed.
 
 It is worth saying why this was missing, because the shape recurs. Creating
 a course DID leave a line — `taskStarted`, "started setup.sh" — and the

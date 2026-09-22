@@ -1940,7 +1940,7 @@ ask:
 |---|---|
 | `use_skeleton` | Whether a course that is NOT TAKING a ready-made payload starts from its subject's skeleton — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing at all. |
 | `prepopulate_example_content` | Whether one of the 38 ready-made courses is poured in. |
-| `include_curriculum_pages` | Whether that payload's Curriculum folder comes with it. |
+| `include_curriculum_pages` | Whether the curriculum pages written for this code come with it — taken with the payload, OR installed into the subject's skeleton when the payload is declined ([#251](https://github.com/russellgordon/plantoir/issues/251)). |
 
 **`use_skeleton` was not written by the Windows wizard at all** (checked
 2026-08-16; written since 2026-09-07, item 25). The Python then fell back to

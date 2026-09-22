@@ -38,6 +38,9 @@ Run with:
 """
 import unittest
 import tempfile
+import hashlib
+import json
+import re
 from pathlib import Path
 import sys
 
@@ -49,10 +52,32 @@ from setup_course import (  # noqa: E402
     jurisdiction_name,
     install_curriculum_from_payload,
     install_example_content,
+    expectation_renames_for_skeleton,
+    specific_expectation_stems,
     find_example_content_dir,
     find_skeleton_dir,
     load_example_content_manifest,
+    EXAMPLE_CONTENT_ROOTS,
 )
+
+NOW = "2026-09-22T09:00:00.000-0400"
+
+# A wiki link or embed, and what it points at. Used to check that nothing a
+# course ships points at an expectation page the course does not have.
+LINK_TARGET = re.compile(r"!?\[\[([^\]\[|#]+)")
+EXPECTATION_STEM = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
+
+
+def every_payload_code() -> list:
+    """Every course code with a ready-made payload, however many there are."""
+    codes = set()
+    for root in EXAMPLE_CONTENT_ROOTS:
+        if not root.is_dir():
+            continue
+        for candidate in root.iterdir():
+            if (candidate / "manifest.json").exists():
+                codes.add(candidate.name)
+    return sorted(codes)
 
 
 class StartingPointIntroTests(unittest.TestCase):
@@ -165,6 +190,24 @@ class JurisdictionNameTests(unittest.TestCase):
             "Saskatchewan"
         )
 
+    def test_the_contract_declares_the_key_both_languages_read(self):
+        # One rule, two implementations (this one and the mac's
+        # `ExampleContentCatalog.jurisdictionName`), so each is pinned to
+        # the contract's own words rather than to the other. The mac's
+        # half is `ExampleContentContractTests
+        # .testTheJurisdictionIsDerivedTheWayTheContractSays`.
+        contract = json.loads(
+            (Path(__file__).resolve().parent.parent
+             / "contracts" / "example-content.json").read_text(encoding="utf-8")
+        )
+        declared = {entry["key"]: entry for entry in contract["manifestKeys"]}
+        self.assertIn("jurisdiction", declared)
+        self.assertIn("jurisdiction_name", declared)
+        self.assertEqual(declared["jurisdiction"].get("default"), "Ontario")
+        why = declared["jurisdiction"]["why"]
+        self.assertIn('"BC" to "British Columbia"', why)
+        self.assertIn('an absent key to "Ontario"', why)
+
 
 class CurriculumFromPayloadTests(unittest.TestCase):
     """
@@ -269,6 +312,205 @@ class CurriculumFromPayloadTests(unittest.TestCase):
             with self.subTest(template=template.name):
                 self.assertIn("## Curriculum connection",
                               template.read_text(encoding="utf-8"))
+
+
+class TheTwoInstallsTogetherTests(unittest.TestCase):
+    """
+    The payload's curriculum and the skeleton, installed in the order the
+    real script installs them. Everything above tests one half at a time;
+    the ORDER is the whole mechanism, and these are the only cases that
+    would notice it being reversed.
+    """
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def install(self, code: str, payload_curriculum_first: bool = True) -> Path:
+        """Both installs, exactly as `setup_course.py` runs them."""
+        payload = find_example_content_dir(code)
+        skeleton = find_skeleton_dir(code)
+        self.assertIsNotNone(payload, code)
+        self.assertIsNotNone(skeleton, code)
+        payload_manifest = load_example_content_manifest(payload)
+        skeleton_manifest = load_example_content_manifest(skeleton)
+        curriculum_folder = skeleton_manifest.get("curriculum_folder")
+        self.assertTrue(curriculum_folder, code)
+        course_path = Path(self.temporary.name) / code
+
+        folders_for_the_skeleton = [
+            name for name in skeleton_manifest.get("shared_folders", [])
+            if name != curriculum_folder or not payload_curriculum_first
+        ]
+        renames = expectation_renames_for_skeleton(
+            skeleton, skeleton_manifest, payload, payload_manifest
+        ) if payload_curriculum_first else {}
+
+        def the_payload_curriculum():
+            install_curriculum_from_payload(
+                course_path, payload, payload_manifest, [1], NOW, curriculum_folder,
+                course_code=code, course_name="Test Course"
+            )
+
+        def the_skeleton():
+            install_example_content(
+                course_path, skeleton, skeleton_manifest, [1], NOW, True,
+                folders_for_the_skeleton,
+                list(skeleton_manifest.get("shared_files", [])),
+                list(skeleton_manifest.get("per_section_folders", [])),
+                list(skeleton_manifest.get("per_section_files", [])),
+                course_code=code, course_name="Test Course",
+                expectation_renames=renames
+            )
+
+        if payload_curriculum_first:
+            the_payload_curriculum()
+            the_skeleton()
+        else:
+            the_skeleton()
+            the_payload_curriculum()
+        return course_path
+
+    def test_the_course_holds_the_payloads_expectations_and_no_placeholder(self):
+        for code in ["ICS4U", "MCMPR11", "MTH1W"]:
+            with self.subTest(code=code):
+                course_path = self.install(code)
+                payload = find_example_content_dir(code)
+                folder = course_path / "Curriculum"
+                expected = sorted(
+                    page.name for page in
+                    (payload / "shared" / "Curriculum").glob("*.md")
+                )
+                self.assertEqual(sorted(page.name for page in folder.glob("*.md")),
+                                 expected)
+                for page in folder.glob("*.md"):
+                    self.assertNotIn("DELETE THIS PAGE",
+                                     page.read_text(encoding="utf-8"), page.name)
+
+    def test_reversing_the_order_would_leave_the_placeholders_in_place(self):
+        # Not a behaviour anyone wants — the guard rail under the one
+        # sentence the design rests on. `install_payload_file` returns
+        # without writing when the destination exists, so a skeleton
+        # installed FIRST claims index.md and A1.md before the payload's
+        # own pages can, and the teacher keeps the page that says
+        # "DELETE THIS PAGE".
+        course_path = self.install("ICS4U", payload_curriculum_first=False)
+        placeholder = course_path / "Curriculum" / "A1.1.md"
+        self.assertIn("DELETE THIS PAGE", placeholder.read_text(encoding="utf-8"))
+
+    def test_no_page_embeds_an_expectation_the_course_does_not_have(self):
+        # Every payload/family pair, because the fault this closes was
+        # invisible in 36 of the 38: skipping the skeleton's curriculum
+        # folder takes away the A1.1 its template pages embed, and only
+        # MCMPR11 and MTH1W have no A1.1 of their own to replace it. A
+        # teacher who duplicates one of those templates — which is what
+        # the page tells them to do — would publish a broken transclusion.
+        codes = every_payload_code()
+        self.assertGreaterEqual(len(codes), 38)
+        for code in codes:
+            with self.subTest(code=code):
+                course_path = self.install(code)
+                present = set()
+                for page in course_path.rglob("*.md"):
+                    present.add(page.stem)
+                missing = {}
+                for page in sorted(course_path.rglob("*.md")):
+                    for match in LINK_TARGET.finditer(page.read_text(encoding="utf-8")):
+                        target = match.group(1).strip().split("/")[-1]
+                        if EXPECTATION_STEM.match(target) and target not in present:
+                            missing.setdefault(target, page.name)
+                self.assertEqual(missing, {},
+                                 f"{code}: pages point at expectation pages that are not "
+                                 "in the course")
+
+    def test_the_two_codes_with_no_A1_1_are_really_the_two(self):
+        # The rename rule does nothing for the other 36, and a test that
+        # could not tell the difference would pass even if it did nothing
+        # anywhere.
+        retargeted = []
+        for code in every_payload_code():
+            payload = find_example_content_dir(code)
+            skeleton = find_skeleton_dir(code)
+            renames = expectation_renames_for_skeleton(
+                skeleton, load_example_content_manifest(skeleton),
+                payload, load_example_content_manifest(payload)
+            )
+            if renames:
+                retargeted.append((code, renames))
+        self.assertEqual([code for code, _ in retargeted], ["MCMPR11", "MTH1W"])
+        self.assertEqual(dict(retargeted)["MCMPR11"], {"A1.1": "D1.1"})
+        self.assertEqual(dict(retargeted)["MTH1W"], {"A1.1": "B1.1"})
+
+    def test_the_first_expectation_is_the_maps_first_expectation(self):
+        # "First" has to mean the same thing here and in
+        # build_site.py's `_collect_expectations`, which walks
+        # sorted(glob("*.md")).
+        payload = find_example_content_dir("MCMPR11")
+        stems = specific_expectation_stems(payload / "shared" / "Curriculum")
+        self.assertEqual(stems[0], "D1.1")
+
+
+class ExampleContentIsUnchangedTests(unittest.TestCase):
+    """
+    The path that must not move, pinned at the TREE rather than at the
+    configuration.
+
+    `mac-app/Tests/Goldens/` pins what the wizard WRITES — the
+    `course_config.json` dictionary — and cannot see a single file the
+    installer produced. The guard against a payload install drifting is
+    structural (a course taking example content never reaches the skeleton
+    branch at all), but it is one `if` away from not being, so the tree
+    itself is pinned here.
+
+    The two hashes were captured from `origin/dev` at e9000169 on
+    2026-09-22, BEFORE any of issue #251 was written, by running this
+    same install against that script: 295 files, identical name list,
+    identical bytes. Deterministic because the install is given a fixed
+    timestamp and no class-date reference.
+    """
+
+    PAYLOAD_FILE_COUNT = 295
+    PAYLOAD_NAMES_HASH = "6de9b151539aeb40eae91152641a3c2870d36b9618af02a49aff30e7b516e612"
+    PAYLOAD_CONTENT_HASH = "6a2276dbbedc27c504667ffcbecb7b8f4371f31a23bbc78e50ac553011b277c9"
+
+    def test_a_payload_course_is_installed_byte_for_byte_as_it_always_was(self):
+        payload = find_example_content_dir("ADA1O")
+        self.assertIsNotNone(payload)
+        manifest = load_example_content_manifest(payload)
+        with tempfile.TemporaryDirectory() as temporary:
+            course_path = Path(temporary) / "ADA1O"
+            install_example_content(
+                course_path, payload, manifest, [1, 3], NOW, True,
+                [name for name in manifest.get("shared_folders", []) if name != "Media"],
+                list(manifest.get("shared_files", [])),
+                list(manifest.get("per_section_folders", [])),
+                list(manifest.get("per_section_files", [])),
+                course_code="ADA1O", course_name="Drama"
+            )
+            files = sorted(
+                str(path.relative_to(course_path))
+                for path in course_path.rglob("*") if path.is_file()
+            )
+            self.assertEqual(len(files), self.PAYLOAD_FILE_COUNT)
+            self.assertEqual(
+                hashlib.sha256("\n".join(files).encode()).hexdigest(),
+                self.PAYLOAD_NAMES_HASH,
+                "A file appeared in or vanished from a course taking the ready-made pages."
+            )
+            digest = hashlib.sha256()
+            for name in files:
+                digest.update(name.encode())
+                digest.update(b"\0")
+                digest.update((course_path / name).read_bytes())
+                digest.update(b"\0")
+            self.assertEqual(
+                digest.hexdigest(), self.PAYLOAD_CONTENT_HASH,
+                "The bytes of a course taking the ready-made pages have changed. This path "
+                "may not move: run the install against origin/dev and diff before touching "
+                "this constant."
+            )
 
 
 if __name__ == "__main__":
