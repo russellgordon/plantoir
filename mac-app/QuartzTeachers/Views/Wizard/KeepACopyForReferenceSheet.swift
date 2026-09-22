@@ -115,7 +115,6 @@ struct KeepACopyForReferenceSheet: View {
             // cannot carry the flag shows up.
             VStack(alignment: .leading, spacing: 4) {
                 Text(ReferenceWording.pagesAreLocked)
-                Text(ReferenceWording.aCopyTakenOutStaysLocked)
             }
             .font(.callout)
             .foregroundStyle(.secondary)
