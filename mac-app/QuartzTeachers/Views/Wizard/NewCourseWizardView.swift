@@ -367,18 +367,31 @@ struct NewCourseWizardView: View {
         )
     }
 
+    /// Whether the curriculum pages written for this code can be offered
+    /// at all — taken with the payload, or brought along into the
+    /// subject's skeleton when the payload is declined (GitHub issue
+    /// #251). The rule itself lives in `CourseConfiguration` so that it
+    /// can be tested: a SwiftUI `@State` property has no backing store
+    /// until the view is on screen.
+    var curriculumPagesOffered: Bool {
+        return CourseConfiguration.curriculumPagesOffered(
+            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: courseCode),
+            payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: courseCode),
+            prepopulatesExampleContent: prepopulatesExampleContent,
+            skeletonIsOffered: SkeletonCatalog.hasSkeleton(
+                forCode: courseCode, takingExampleContent: prepopulatesExampleContent
+            ),
+            startsFromSkeleton: startsFromSkeleton
+        )
+    }
+
     var effectiveCurriculumPagesEnabled: Bool {
-        return ExampleContentCatalog.hasContent(forCode: courseCode)
-            && prepopulatesExampleContent
-            && ExampleContentCatalog.includesCurriculum(forCode: courseCode)
-            && includesCurriculumPages
+        return curriculumPagesOffered && includesCurriculumPages
     }
 
     var effectiveCurriculumCoverageEnabled: Bool {
         return CourseConfiguration.curriculumCoverageEnabled(
-            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: courseCode),
-            prepopulatesExampleContent: prepopulatesExampleContent,
-            payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: courseCode),
+            curriculumPagesOffered: curriculumPagesOffered,
             includesCurriculumPages: includesCurriculumPages,
             includesCurriculumCoverage: includesCurriculumCoverage
         )
@@ -838,8 +851,14 @@ struct NewCourseWizardView: View {
                     }
                     if ExampleContentCatalog.includesCurriculum(forCode: courseCode) {
                         VStack(alignment: .leading, spacing: 4) {
+                            // Live whenever the pages can be offered at
+                            // all — which, since GitHub issue #251, is
+                            // also the teacher who declined the ready-made
+                            // pages and kept the subject's skeleton. The
+                            // expectations written for their code exist;
+                            // greying the toggle out told them otherwise.
                             Toggle("Include \(ExampleContentCatalog.jurisdictionName(forCode: courseCode)) curriculum pages", isOn: $includesCurriculumPages)
-                                .disabled(!prepopulatesExampleContent)
+                                .disabled(!curriculumPagesOffered)
                                 .accessibilityIdentifier("curriculumToggle")
                             ExampleCaption("Every expectation as its own page, so lessons and tasks can link to exactly what they address")
                         }
@@ -849,7 +868,7 @@ struct NewCourseWizardView: View {
                             // them — but keeping the pages and declining
                             // the map is a perfectly reasonable choice.
                             Toggle("Include the curriculum coverage map", isOn: $includesCurriculumCoverage)
-                                .disabled(!prepopulatesExampleContent || !includesCurriculumPages)
+                                .disabled(!curriculumPagesOffered || !includesCurriculumPages)
                                 .accessibilityIdentifier("curriculumCoverageToggle")
                             ExampleCaption("A page showing every expectation coloured by how many pages address it — red in September, greener as the year goes on. Linked from Key Links, and kept out of the sidebar.")
                         }
@@ -857,7 +876,7 @@ struct NewCourseWizardView: View {
                             // The sections sit on the coverage page, so they
                             // cannot exist without it.
                             Toggle("Explain the map on the page", isOn: $includesCoverageNotes)
-                                .disabled(!prepopulatesExampleContent
+                                .disabled(!curriculumPagesOffered
                                           || !includesCurriculumPages
                                           || !includesCurriculumCoverage)
                                 .accessibilityIdentifier("coverageNotesToggle")
@@ -1490,6 +1509,24 @@ struct NewCourseWizardView: View {
             }
         }
 
+        // The rule the three curriculum keys are written from, asked once.
+        // It reads the code this configuration is FOR rather than the
+        // field's current contents, the same way every other key here does.
+        let pagesOffered: Bool = CourseConfiguration.curriculumPagesOffered(
+            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: code),
+            payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: code),
+            prepopulatesExampleContent: prepopulatesExampleContent,
+            skeletonIsOffered: SkeletonCatalog.hasSkeleton(
+                forCode: code, takingExampleContent: prepopulatesExampleContent
+            ),
+            startsFromSkeleton: startsFromSkeleton
+        )
+        let coverageEnabled: Bool = CourseConfiguration.curriculumCoverageEnabled(
+            curriculumPagesOffered: pagesOffered,
+            includesCurriculumPages: includesCurriculumPages,
+            includesCurriculumCoverage: includesCurriculumCoverage
+        )
+
         var config: [String: Any] = [
             "course_code": code,
             "course_name": name,
@@ -1528,28 +1565,20 @@ struct NewCourseWizardView: View {
             ) && startsFromSkeleton,
             "prepopulate_example_content": ExampleContentCatalog.hasContent(forCode: code)
                 && prepopulatesExampleContent,
-            "include_curriculum_pages": ExampleContentCatalog.hasContent(forCode: code)
-                && prepopulatesExampleContent
-                && ExampleContentCatalog.includesCurriculum(forCode: code)
-                && includesCurriculumPages,
+            // Written exactly as they are for a payload course, because
+            // the pages are the payload's either way: the teacher who
+            // declined the ready-made lessons and kept the subject's
+            // skeleton still gets the expectations written for their code
+            // (GitHub issue #251). `setup_course.py` reads these three as
+            // its answers, so false here means the launcher never runs its
+            // new branch, whatever the interface showed.
+            "include_curriculum_pages": pagesOffered && includesCurriculumPages,
             // Depends on the curriculum pages: without them the map has
             // nothing to colour, so it is forced off here as well as
             // disabled in the interface.
-            "include_curriculum_coverage": CourseConfiguration.curriculumCoverageEnabled(
-                codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: code),
-                prepopulatesExampleContent: prepopulatesExampleContent,
-                payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: code),
-                includesCurriculumPages: includesCurriculumPages,
-                includesCurriculumCoverage: includesCurriculumCoverage
-            ),
+            "include_curriculum_coverage": coverageEnabled,
             "include_coverage_notes": CourseConfiguration.coverageNotesEnabled(
-                curriculumCoverageEnabled: CourseConfiguration.curriculumCoverageEnabled(
-                    codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: code),
-                    prepopulatesExampleContent: prepopulatesExampleContent,
-                    payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: code),
-                    includesCurriculumPages: includesCurriculumPages,
-                    includesCurriculumCoverage: includesCurriculumCoverage
-                ),
+                curriculumCoverageEnabled: coverageEnabled,
                 includesCoverageNotes: includesCoverageNotes
             ),
             "use_lcs_terminology": usesLCSTerminology,

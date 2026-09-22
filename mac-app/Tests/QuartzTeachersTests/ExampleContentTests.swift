@@ -46,31 +46,71 @@ final class ExampleContentTests: XCTestCase {
     func testTheCoverageMapFollowsTheCurriculumPages() {
         // Curriculum kept, map wanted.
         XCTAssertTrue(CourseConfiguration.curriculumCoverageEnabled(
-            codeHasExampleContent: true, prepopulatesExampleContent: true,
-            payloadIncludesCurriculum: true, includesCurriculumPages: true,
+            curriculumPagesOffered: true, includesCurriculumPages: true,
             includesCurriculumCoverage: true))
 
         // Curriculum declined: the map cannot exist, whatever its toggle says.
         XCTAssertFalse(CourseConfiguration.curriculumCoverageEnabled(
-            codeHasExampleContent: true, prepopulatesExampleContent: true,
-            payloadIncludesCurriculum: true, includesCurriculumPages: false,
+            curriculumPagesOffered: true, includesCurriculumPages: false,
             includesCurriculumCoverage: true))
 
         // Curriculum kept, map declined — allowed, and respected.
         XCTAssertFalse(CourseConfiguration.curriculumCoverageEnabled(
-            codeHasExampleContent: true, prepopulatesExampleContent: true,
-            payloadIncludesCurriculum: true, includesCurriculumPages: true,
+            curriculumPagesOffered: true, includesCurriculumPages: true,
             includesCurriculumCoverage: false))
 
-        // No example content, or none poured in: nothing to measure.
+        // No curriculum pages to be had: nothing to measure.
         XCTAssertFalse(CourseConfiguration.curriculumCoverageEnabled(
-            codeHasExampleContent: false, prepopulatesExampleContent: true,
-            payloadIncludesCurriculum: true, includesCurriculumPages: true,
+            curriculumPagesOffered: false, includesCurriculumPages: true,
             includesCurriculumCoverage: true))
-        XCTAssertFalse(CourseConfiguration.curriculumCoverageEnabled(
-            codeHasExampleContent: true, prepopulatesExampleContent: false,
-            payloadIncludesCurriculum: true, includesCurriculumPages: true,
-            includesCurriculumCoverage: true))
+    }
+
+    /// Which courses may be offered the curriculum pages written for their
+    /// code. Two starting points reach them since GitHub issue #251: the
+    /// teacher taking the ready-made pages, and the teacher who declined
+    /// them and kept the subject's skeleton.
+    @MainActor
+    func testWhichCoursesAreOfferedTheirCurriculumPages() {
+        // Taking the ready-made pages — the case that has always worked.
+        XCTAssertTrue(CourseConfiguration.curriculumPagesOffered(
+            codeHasExampleContent: true, payloadIncludesCurriculum: true,
+            prepopulatesExampleContent: true,
+            skeletonIsOffered: false, startsFromSkeleton: false))
+
+        // Declined, skeleton kept: the expectations still exist, so they
+        // are still offered. This is the whole of issue #251.
+        XCTAssertTrue(CourseConfiguration.curriculumPagesOffered(
+            codeHasExampleContent: true, payloadIncludesCurriculum: true,
+            prepopulatesExampleContent: false,
+            skeletonIsOffered: true, startsFromSkeleton: true))
+
+        // Declined, and the skeleton declined too: an empty course, and
+        // nothing is poured into it.
+        XCTAssertFalse(CourseConfiguration.curriculumPagesOffered(
+            codeHasExampleContent: true, payloadIncludesCurriculum: true,
+            prepopulatesExampleContent: false,
+            skeletonIsOffered: true, startsFromSkeleton: false))
+
+        // No payload for the code: its skeleton ships an empty Curriculum
+        // folder, and there is nothing anywhere to fill it with — whatever
+        // the skeleton toggle says. This is the ~1,900.
+        for startsFromSkeleton in [true, false] {
+            XCTAssertFalse(CourseConfiguration.curriculumPagesOffered(
+                codeHasExampleContent: false, payloadIncludesCurriculum: false,
+                prepopulatesExampleContent: false,
+                skeletonIsOffered: true, startsFromSkeleton: startsFromSkeleton))
+        }
+
+        // A payload that carries no curriculum folder has no expectations
+        // to give, taken or declined.
+        XCTAssertFalse(CourseConfiguration.curriculumPagesOffered(
+            codeHasExampleContent: true, payloadIncludesCurriculum: false,
+            prepopulatesExampleContent: true,
+            skeletonIsOffered: false, startsFromSkeleton: false))
+        XCTAssertFalse(CourseConfiguration.curriculumPagesOffered(
+            codeHasExampleContent: true, payloadIncludesCurriculum: false,
+            prepopulatesExampleContent: false,
+            skeletonIsOffered: true, startsFromSkeleton: true))
     }
 
     /// The two explanatory sections live ON the coverage page, so they

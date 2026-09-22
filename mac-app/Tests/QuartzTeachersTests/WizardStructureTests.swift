@@ -489,6 +489,80 @@ final class WizardStructureTests: XCTestCase {
         }
     }
 
+    /// A teacher who declines the ready-made pages and keeps the subject's
+    /// skeleton is written the same three curriculum keys as one who takes
+    /// the pages — because the expectations written for their code exist
+    /// either way, and `setup_course.py` reads these three as its answers
+    /// (GitHub issue #251).
+    ///
+    /// Before this, all three were `false` by construction for this path,
+    /// so the launcher never ran its new branch however the interface
+    /// looked, and the course got the skeleton's placeholder Curriculum
+    /// folder: a generic index and one fake expectation for the coverage
+    /// map to colour.
+    func testDecliningTheReadyMadePagesStillWritesTheCurriculumKeys() {
+        // ICS4U is the course this was reported against; MCMPR11 is the
+        // British Columbia payload, whose standards are not Ontario's.
+        for code in ["ICS4U", "MCMPR11"] {
+            let wizard: NewCourseWizardView = NewCourseWizardView(
+                courseCode: code,
+                prepopulatesExampleContent: false,
+                startsFromSkeleton: true
+            )
+            let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+                code: code, name: "Golden Course"
+            )
+
+            XCTAssertEqual(configuration["prepopulate_example_content"] as? Bool, false, code)
+            XCTAssertEqual(configuration["use_skeleton"] as? Bool, true, code)
+            XCTAssertEqual(configuration["include_curriculum_pages"] as? Bool, true, code)
+            XCTAssertEqual(configuration["include_curriculum_coverage"] as? Bool, true, code)
+            XCTAssertEqual(configuration["include_coverage_notes"] as? Bool, true, code)
+        }
+    }
+
+    /// Declining the pages AND the skeleton is an empty course, and an
+    /// empty course has no expectations to map.
+    func testDecliningTheSkeletonTooWritesNoCurriculumKeys() {
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: "ICS4U",
+            prepopulatesExampleContent: false,
+            startsFromSkeleton: false
+        )
+        let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+            code: "ICS4U", name: "Golden Course"
+        )
+
+        XCTAssertEqual(configuration["use_skeleton"] as? Bool, false)
+        XCTAssertEqual(configuration["include_curriculum_pages"] as? Bool, false)
+        XCTAssertEqual(configuration["include_curriculum_coverage"] as? Bool, false)
+        XCTAssertEqual(configuration["include_coverage_notes"] as? Bool, false)
+    }
+
+    /// The ~1,900 codes with no ready-made pages are untouched: their
+    /// skeleton ships an empty Curriculum folder and there is nothing
+    /// anywhere to fill it with, so the keys stay false on both paths.
+    ///
+    /// The goldens above pin the whole file for AMU3M; this says out loud
+    /// which three keys are the reason, so that a future change to them
+    /// fails with an explanation rather than as a diff of a large file.
+    func testACodeWithNoReadyMadePagesIsOfferedNoCurriculum() {
+        XCTAssertFalse(ExampleContentCatalog.hasContent(forCode: "AMU3M"))
+        for startsFromSkeleton in [true, false] {
+            let wizard: NewCourseWizardView = NewCourseWizardView(
+                courseCode: "AMU3M",
+                prepopulatesExampleContent: false,
+                startsFromSkeleton: startsFromSkeleton
+            )
+            let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+                code: "AMU3M", name: "Golden Course"
+            )
+            XCTAssertEqual(configuration["include_curriculum_pages"] as? Bool, false)
+            XCTAssertEqual(configuration["include_curriculum_coverage"] as? Bool, false)
+            XCTAssertEqual(configuration["include_coverage_notes"] as? Bool, false)
+        }
+    }
+
     /// What the wizard WRITES and what its editor SHOWS have to be the same
     /// answer: a course created with the skeleton declined gets the factory
     /// folders in `course_config.json` beside `use_skeleton: false`.
