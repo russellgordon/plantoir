@@ -849,40 +849,6 @@ struct NewCourseWizardView: View {
                             .accessibilityIdentifier("prepopulateToggle")
                         ExampleCaption("Working pages written for this course — keep, edit, or delete them as you build your own site. The example content also chooses the course's folders and files, so they fit the pages.")
                     }
-                    if ExampleContentCatalog.includesCurriculum(forCode: courseCode) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            // Live whenever the pages can be offered at
-                            // all — which, since GitHub issue #251, is
-                            // also the teacher who declined the ready-made
-                            // pages and kept the subject's skeleton. The
-                            // expectations written for their code exist;
-                            // greying the toggle out told them otherwise.
-                            Toggle("Include \(ExampleContentCatalog.jurisdictionName(forCode: courseCode)) curriculum pages", isOn: $includesCurriculumPages)
-                                .disabled(!curriculumPagesOffered)
-                                .accessibilityIdentifier("curriculumToggle")
-                            ExampleCaption("Every expectation as its own page, so lessons and tasks can link to exactly what they address")
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            // The map reads the site's links to the
-                            // curriculum pages, so it cannot exist without
-                            // them — but keeping the pages and declining
-                            // the map is a perfectly reasonable choice.
-                            Toggle("Include the curriculum coverage map", isOn: $includesCurriculumCoverage)
-                                .disabled(!curriculumPagesOffered || !includesCurriculumPages)
-                                .accessibilityIdentifier("curriculumCoverageToggle")
-                            ExampleCaption("A page showing every expectation coloured by how many pages address it — red in September, greener as the year goes on. Linked from Key Links, and kept out of the sidebar.")
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            // The sections sit on the coverage page, so they
-                            // cannot exist without it.
-                            Toggle("Explain the map on the page", isOn: $includesCoverageNotes)
-                                .disabled(!curriculumPagesOffered
-                                          || !includesCurriculumPages
-                                          || !includesCurriculumCoverage)
-                                .accessibilityIdentifier("coverageNotesToggle")
-                            ExampleCaption("Two short sections at the foot of the map: what counts as addressing an expectation, and how to read it honestly — red in September is normal, red in May is not. Turn this off to publish the map on its own.")
-                        }
-                    }
                 }
                 // A SIBLING of the example-content block rather than its
                 // `else`, which is the whole of issue #248: a code with
@@ -927,6 +893,52 @@ struct NewCourseWizardView: View {
                     }
                 } else if !ExampleContentCatalog.hasContent(forCode: courseCode) {
                     noExampleContentNote
+                }
+                // BELOW the two toggles that govern them, so the
+                // dependency reads top to bottom (GitHub issue #251).
+                // They used to sit directly under the example-content
+                // toggle, which was the only thing that could switch them
+                // on; now a teacher who turns that off and keeps the
+                // subject's skeleton gets the curriculum too, and three
+                // live toggles above an off one — with a caption above
+                // them still explaining the example content — read as
+                // though the wrong thing had happened. Nothing moves for
+                // a teacher taking the ready-made pages: the skeleton
+                // block draws nothing for them, so these still follow the
+                // example-content toggle directly.
+                if ExampleContentCatalog.includesCurriculum(forCode: courseCode) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Live whenever the pages can be offered at
+                        // all — which, since GitHub issue #251, is
+                        // also the teacher who declined the ready-made
+                        // pages and kept the subject's skeleton. The
+                        // expectations written for their code exist;
+                        // greying the toggle out told them otherwise.
+                        Toggle("Include \(ExampleContentCatalog.jurisdictionName(forCode: courseCode)) curriculum pages", isOn: $includesCurriculumPages)
+                            .disabled(!curriculumPagesOffered)
+                            .accessibilityIdentifier("curriculumToggle")
+                        ExampleCaption("Every expectation as its own page, so lessons and tasks can link to exactly what they address")
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        // The map reads the site's links to the
+                        // curriculum pages, so it cannot exist without
+                        // them — but keeping the pages and declining
+                        // the map is a perfectly reasonable choice.
+                        Toggle("Include the curriculum coverage map", isOn: $includesCurriculumCoverage)
+                            .disabled(!curriculumPagesOffered || !includesCurriculumPages)
+                            .accessibilityIdentifier("curriculumCoverageToggle")
+                        ExampleCaption("A page showing every expectation coloured by how many pages address it — red in September, greener as the year goes on. Linked from Key Links, and kept out of the sidebar.")
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        // The sections sit on the coverage page, so they
+                        // cannot exist without it.
+                        Toggle("Explain the map on the page", isOn: $includesCoverageNotes)
+                            .disabled(!curriculumPagesOffered
+                                      || !includesCurriculumPages
+                                      || !includesCurriculumCoverage)
+                            .accessibilityIdentifier("coverageNotesToggle")
+                        ExampleCaption("Two short sections at the foot of the map: what counts as addressing an expectation, and how to read it honestly — red in September is normal, red in May is not. Turn this off to publish the map on its own.")
+                    }
                 }
             } header: {
                 FormSectionHeader("Starting Content")
