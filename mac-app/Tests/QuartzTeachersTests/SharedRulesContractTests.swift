@@ -952,7 +952,12 @@ final class SharedRulesContractTests: XCTestCase {
             // initialiser with the state the steps left behind — the one seam
             // that works, since `@State` never takes on a view that is not on
             // screen (`WizardStructure.swift`).
-            if let expectedUseSkeleton = testCase["expectSavedUseSkeleton"] as? Bool {
+            let expectedUseSkeleton: Bool? = testCase["expectSavedUseSkeleton"] as? Bool
+            // Absent means "not asserted", exactly as the contract says —
+            // most cases are about the five lists and say nothing about
+            // the curriculum.
+            let expectedCurriculumPages: Bool? = testCase["expectSavedIncludeCurriculumPages"] as? Bool
+            if expectedUseSkeleton != nil || expectedCurriculumPages != nil {
                 let wizard: NewCourseWizardView = NewCourseWizardView(
                     courseCode: code,
                     prepopulatesExampleContent: takesExampleContent,
@@ -966,10 +971,20 @@ final class SharedRulesContractTests: XCTestCase {
                 let configuration: [String: Any] = wizard.buildConfigurationDictionary(
                     code: code, name: "Contract Case"
                 )
-                XCTAssertEqual(
-                    configuration["use_skeleton"] as? Bool, expectedUseSkeleton,
-                    "wizard.skeletonToggle → \(name): use_skeleton in course_config.json"
-                )
+                if let expectedUseSkeleton {
+                    XCTAssertEqual(
+                        configuration["use_skeleton"] as? Bool, expectedUseSkeleton,
+                        "wizard.skeletonToggle → \(name): use_skeleton in course_config.json"
+                    )
+                }
+                if let expectedCurriculumPages {
+                    XCTAssertEqual(
+                        configuration["include_curriculum_pages"] as? Bool,
+                        expectedCurriculumPages,
+                        "wizard.skeletonToggle → \(name): include_curriculum_pages in "
+                        + "course_config.json"
+                    )
+                }
             }
         }
     }
