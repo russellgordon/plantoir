@@ -279,7 +279,6 @@ struct ImportCoursesForReferenceSheet: View {
             // after the fact. No icon, and no "cannot".
             VStack(alignment: .leading, spacing: 4) {
                 Text(ReferenceWording.pagesAreLocked)
-                Text(ReferenceWording.aCopyTakenOutStaysLocked)
             }
             .font(.callout)
             .foregroundStyle(.secondary)
@@ -407,7 +406,6 @@ struct ImportCoursesForReferenceSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(ReferenceWording.pagesAreLocked)
-                Text(ReferenceWording.aCopyTakenOutStaysLocked)
             }
             .font(.callout)
             .foregroundStyle(.secondary)

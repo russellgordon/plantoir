@@ -1760,7 +1760,7 @@ private struct LockedPagesNoteAlert: ViewModifier {
         } message: { _ in
             // No warning icon and no "cannot": a teacher who kept this course
             // for reference asked for it, so it reads as a fact.
-            Text(ReferenceWording.pagesAreLocked + "\n\n" + ReferenceWording.aCopyTakenOutStaysLocked)
+            Text(ReferenceWording.pagesAreLocked)
         }
     }
 

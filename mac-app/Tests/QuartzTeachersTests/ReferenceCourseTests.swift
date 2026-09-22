@@ -376,9 +376,9 @@ final class ReferenceCourseTests: XCTestCase {
             "The app and the contract have to say the same sentence, or Windows implements a different one."
         )
         XCTAssertEqual(ReferenceWording.pagesAreLocked, wording["pagesAreLocked"] as? String)
-        XCTAssertEqual(
-            ReferenceWording.aCopyTakenOutStaysLocked,
-            wording["aCopyTakenOutStaysLocked"] as? String
+        XCTAssertNil(
+            wording["aCopyTakenOutStaysLocked"],
+            "Retired 2026-09-22: Plantoir's own copy feature unlocks what it copies, so the hand-copy sentence went."
         )
         XCTAssertEqual(
             ReferenceWording.neverDeployed(course: "{course}"),
