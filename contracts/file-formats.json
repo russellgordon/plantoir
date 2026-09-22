@@ -192,12 +192,12 @@
         {
           "key": "prepopulate_example_content",
           "type": "boolean",
-          "why": "Whether one of the 37 ready-made courses is poured in. Written as `hasContent(code) && teacherSaidYes`, so a stale true can never mean anything."
+          "why": "Whether one of the 38 ready-made courses is poured in (counted 2026-09-22 — count the folders in support/example_content rather than trusting a number here). Written as `hasContent(code) && teacherSaidYes`, so a stale true can never mean anything."
         },
         {
           "key": "include_curriculum_pages",
           "type": "boolean",
-          "why": "Whether the payload's Curriculum folder comes with it."
+          "why": "Whether the curriculum pages written for this course code come with it — every expectation as its own page, and what the curriculum coverage map is built from. TWO starting points reach them, and this said only the first until GitHub issue #251 (2026-09-22): the teacher TAKING the payload gets its Curriculum folder, and the teacher who DECLINES the payload but keeps the subject's skeleton gets those same pages installed into the skeleton's Curriculum folder. Both apps write `curriculumPagesOffered && teacherSaidYes`, where curriculumPagesOffered is: the code has a payload, that payload declares a curriculum folder, AND either the payload is being taken or a skeleton is offered and wanted. `setup_course.py` reads this key as the answer to its own curriculum question, so an app that writes false here never runs the install branch however its interface looks — the course gets the skeleton's placeholder Curriculum folder (a generic index and one fake expectation called A1.1) and the coverage map has one fake cell to colour, with every gate on both platforms green. MEASURED: ICS4U 2 curriculum pages to 61, MCMPR11 to 59 British Columbia standards with no A1.1, ICS2O — no payload — unchanged at 2. The ~1,900 codes with no payload always write false: their skeleton ships an empty Curriculum folder, ready for expectations the teacher adds by hand."
         }
       ],
       "note": "Written by the WIZARD at course creation, not by the settings form. `setup_course.py` reads each as the default for a question it would otherwise ask — so an app that omits one leaves the Python to take its own default, and the teacher never gets the choice. All three are the TEACHER's answers, on both platforms: the wizard asks, the app writes `capabilityExists && teacherSaidYes`, and the Python's own default is a fallback that should never be the thing deciding."
