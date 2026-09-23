@@ -4981,7 +4981,7 @@
         "today": "2026-09-23",
         "treeEntries": "As olderLayout.treeEntries, plus: {\"link\": path, \"text\": \"<link text>\"} is a link whose text is exactly that (relative, as the real ones are: ./source-ics3u/s1/index.md); {\"alias\": path, \"to\": \"<path in the tree>\"} is a Finder shortcut (an alias file made with bookmarkData(options: .suitableForBookmarkFile) + writeBookmarkData) to that entry, {\"alias\": path, \"to\": null} one whose target was a folder that was then deleted, and \"thenLock\": \"<path in the tree>\" makes that folder unreadable (mode 000) after the shortcut is made - the shape of a refused Documents permission. Shortcuts are made after every file and link.",
         "recognition": {
-          "rule": "A WEBSITE FOLDER is a real folder holding a real folder quartz/, which holds a regular file quartz.config.ts and a real folder content/. Its COURSE PAGES FOLDER is the ONE real folder directly in content/ named source-<code> (any case), <code> five characters of the Ontario shape (olderLayout.codeAndYear's rule), holding at least one real s<digits> folder. A website folder with no course pages folder is not a course and is left out of every list (Math Club - Russell, 2026-09-23); with two, its row says checkoutLayoutMoreThanOneCourse. A SHORTCUT is an entry that Finder marks as an alias (isAliasFileKey) AND that lstat calls a regular file: a symbolic link also answers isAliasFileKey true, and resolving one follows it, so a link is NEVER a shortcut. Resolved with [.withoutUI, .withoutMounting]; when that fails, the bookmark's STORED path and kind are read without resolving and the stored path asked about with lstat: a stored FILE is 'leadsToAFile', EACCES/EPERM 'couldNotBeOpened', a path under /Volumes whose disk is not mounted 'diskNotConnected', anything else 'gone'. Tried in this order: (1) a shortcut chosen on its own - to a website folder: that one; one that leads nowhere or to a file: refused with its sentence; (2) a website folder, or its quartz/ or quartz/content/ folder: that one; (3) anything else inside a website folder's quartz/, found by walking the chosen path's ancestors: a later section's pages (content/source-<code>/s<M> or content/vault-<code>-s<M>, M not 1) refused checkoutLayoutOnlyTheFirstSection, anything else refused checkoutLayoutChooseTheWholeFolder - never resolved upward; (4) the CANDIDATES in the chosen folder (website folders, shortcuts leading to one, and shortcuts to a FOLDER that cannot be read through - a shortcut to a file is passed over as a file is) and in each of its children: readable candidates directly inside AND in a child, or in two or more children, refused checkoutLayoutChooseOneCourseAtATime; directly inside only, that folder; in exactly one child only, that child; only unreadable shortcuts, that folder (or the one child holding them), each shown with its reason. Nothing: nil, and noCoursesThere exactly as before. Every other entry is asked about WITHOUT following a link, and nothing below the chosen folder's children is looked at.",
+          "rule": "A WEBSITE FOLDER is a real folder holding a real folder quartz/, which holds a regular file quartz.config.ts and a real folder content/. Its COURSE PAGES FOLDER is the ONE real folder directly in content/ named source-<code> (any case), <code> five characters of the Ontario shape (olderLayout.codeAndYear's rule), holding at least one real s<digits> folder. A website folder with no course pages folder is not a course and is left out of every list (Math Club - Russell, 2026-09-23); with two, its row says checkoutLayoutMoreThanOneCourse. A SHORTCUT is an entry that Finder marks as an alias (isAliasFileKey) AND that lstat calls a regular file: a symbolic link also answers isAliasFileKey true, and resolving one follows it, so a link is NEVER a shortcut. Resolved with [.withoutUI, .withoutMounting]; when that fails, the bookmark's STORED path and kind are read without resolving and the stored path asked about with lstat: a stored FILE is 'leadsToAFile', EACCES/EPERM 'couldNotBeOpened', a path under /Volumes whose disk is not mounted 'diskNotConnected', anything else 'gone'. Tried in this order: (1) a shortcut chosen on its own - to a website folder: that one; one that leads nowhere or to a file: refused with its sentence; (2) a website folder, or its quartz/ or quartz/content/ folder: that one; (3) anything else inside a website folder's quartz/, found by walking the chosen path's ancestors: a later section's pages (content/source-<code>/s<M> or content/vault-<code>-s<M>, M not 1) refused checkoutLayoutOnlyTheFirstSection, anything else refused checkoutLayoutChooseTheWholeFolder - never resolved upward; (4) the CANDIDATES in the chosen folder (website folders, shortcuts leading to one, and shortcuts to a FOLDER that cannot be read through - a shortcut to a file is passed over as a file is) and in each of its children: readable candidates directly inside AND in a child, or in two or more children, refused checkoutLayoutChooseOneCourseAtATime; directly inside only, that folder; in exactly one child only, that child; only unreadable shortcuts, that folder (or the one child holding them), each shown with its reason. Looking at a child's candidates means listing the child's entries: a real folder among them is asked whether it is a website folder (lstat of its quartz/quartz.config.ts and quartz/content, and of content/source-*/s<N>), and a shortcut among them is RESOLVED (without a dialog and without mounting). (5) Only when all of that found nothing: the chosen folder's grandchildren - a folder two levels down holding a SHORTCUT that leads to a website folder (the school year's folder in iCloud, LCS/2024-25, whose Old ICS3U/Class Websites holds S1 and S2) - refused checkoutLayoutChooseACourseFolderInside, never imported from; the first such shortcut ends the look. At that depth only shortcuts are asked about, never the folders beside them, so a broad folder chosen by mistake does not become a look inside every folder three levels down. Nothing: nil, and noCoursesThere exactly as before. Every entry is asked about WITHOUT following a link, and nothing deeper than that is looked at.",
           "why": "Measured on Russell's folders: every shape of them - the shortcut folder, Old ICS3U, 2024-25, ICS3U, S1, S1/quartz, quartz/content, source-ics3u, vault-ics3u-s2, Math Club - returned nothing from the first two routes, so this route can never take a folder either of them reads. The children are counted rather than any folder NAME trusted: 2024-25 holds ICS3U/ and ICS4U/ (several courses) while Old ICS3U holds exactly one child of shortcuts (Class Websites) beside planning folders and a shortcut to a PDF.",
           "section": "The section a website folder built is, first, the one its front page's link TEXT names - content/index.md -> [./]source-<code>/s<N>/index.md with s<N> present (read with destinationOfSymbolicLink, never followed; S2's own publish script rewrote exactly these links to make S2's site); then the folder's own name S<N> when s<N> is present; then the only s<N> there is; otherwise the row says checkoutLayoutWhichSection. Measured: the front page and the name agree in 5 of 5 real website folders. Only section 1 comes across: a later section chosen on its own is REFUSED checkoutLayoutOnlyTheFirstSection, and in a folder of them it is SHOWN with that sentence, unticked.",
           "codeAndYear": "The code is the course pages folder's <code>, upper-cased. The year is the first of the website folder, its parent and its grandparent whose name is exactly YYYY-YY (consecutive) or carries -YYYY-YY as #254's names do, when it is one the sheet offers; otherwise the pages that will be copied propose one (schoolYearProposed). The row's name (course_name) is '<CODE> S1'.",
@@ -5801,6 +5801,44 @@
               "why": "Two children hold website folders. #254's olderLayoutChooseOneCourseAtATime names 'the Class Website folder', which is false here."
             },
             {
+              "name": "the school year's folder in iCloud, one level above the courses (LCS/2024-25)",
+              "tree": [
+                "Documents/2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                "LCS/2024-25/Old ICS3U/Thread 1/notes.txt",
+                "LCS/2024-25/Math Club/November Reports.txt",
+                {
+                  "alias": "LCS/2024-25/Old ICS3U/Class Websites/S1",
+                  "to": "Documents/2024-25/ICS3U/S1"
+                }
+              ],
+              "choose": "LCS/2024-25",
+              "expect": "refused",
+              "refusal": "checkoutLayoutChooseACourseFolderInside",
+              "refusalFolder": "2024-25",
+              "why": "Review of #256, L1: noCoursesThere said 'There are no courses in 2024-25. Choose the folder you kept that year's classes in' about the very folder that holds them, two levels down. The refusal points one level down instead (Old ICS3U works; so does Class Websites). It is a refusal and not an import: nothing is brought across from a folder the teacher did not point at."
+            },
+            {
+              "name": "a school year's folder whose only shortcuts two levels down lead nowhere",
+              "tree": [
+                "LCS/2024-25/ICD2O/Thread 1/notes.txt",
+                {
+                  "alias": "LCS/2024-25/ICD2O/Class Website/ICD2O-S2-Website",
+                  "to": null
+                }
+              ],
+              "choose": "LCS/2024-25",
+              "expect": "refused",
+              "refusal": "noCoursesThere",
+              "why": "Only a shortcut that LEADS to a website folder makes the folder a school year's; one that leads nowhere two levels down is not looked into further (choosing ICD2O shows it, with its reason)."
+            },
+            {
               "name": "a website folder with no course pages folder (Math Club) is not a course",
               "tree": [
                 "2024-25/Math Club/quartz/quartz.config.ts",
@@ -6129,7 +6167,7 @@
             ]
           },
           "lost": {
-            "rule": "A loss is something the site SHOWED that does not come across. Counted and NAMED in the summary (wording.olderLayoutLeftOut, reused) and on the trail; the import is reported as not complete.",
+            "rule": "A loss is something the site SHOWED that does not come across. Counted and NAMED in the summary (wording.olderLayoutLeftOut, reused) and on the trail; the import is reported as not complete. A linkShowedSomethingElse loss is named with where the link pointed - wording.checkoutLayoutWhatALinkShowed, {place} the link's own TEXT with './' taken off and a path in the home folder written from '~' (pointedAt in the cases) - because its name alone ('All Classes') reads as the folder of that name, which DID come across from the section's own pages (review of #256, L3).",
             "reasons": [
               "linkShowedSomethingElse",
               "linkNameWithNoPage",
@@ -6140,7 +6178,7 @@
             ]
           },
           "unitWord": {
-            "rule": "Over the pages directly in the section's class folder (the section folder whose name contains 'class' - All Classes), skipping index.md, Key Links.md and Curriculum Coverage.md: a page named '<word> <digits>, Day <letters>' is a PLACEHOLDER and is set aside (Thread 2, Day x - the build never calls it a class page either); every other page must be '<word> <digits>, Day <digits>' with ONE word (any case) and there must be at least one; then that word, else none.",
+            "rule": "Over the pages directly in the section's class folder (the section folder whose name contains 'class' - All Classes), skipping index.md, Key Links.md and Curriculum Coverage.md: a page named '<word> <digits>, Day <letters>' is a PLACEHOLDER and is set aside (Thread 2, Day x - the build never calls it a class page either), and a page with no '<word> <digits>, Day <m>' shape at all (Notes.md) is set aside too; at least one page must be '<word> <digits>, Day <digits>' and every such page must use ONE word (any case); then that word, else none. Setting a shapeless page aside is the review of #256's L2: the build restamps every page it does not call a class page, so without the key Notes.md AND every lesson are restamped, and with it only Notes.md - writing nothing is never better than writing the word the class pages use. Two words is the one real ambiguity, and still writes none.",
             "why": "Measured with the build's own pattern: ICS3U S1 has 55 pages in All Classes, 54 lessons and 'Thread 2, Day x'; ICS3U S2 59 (4 placeholders), ICS4U S1 57 (2), ICS4U S2 58 (3), 2023-24 ICS3U S1 56 (0). 'Every page' without setting placeholders aside would write the key for NONE of the four 2024-25 courses.",
             "cases": [
               {
@@ -6177,9 +6215,19 @@
                   "Thread 1, Day 1.md",
                   "Notes.md"
                 ],
+                "word": "Thread",
+                "placeholders": 0,
+                "why": "A page with no class-page shape at all is set aside, as a placeholder is (review of #256, L2). Was null until 2026-09-23: that made the build restamp the lesson's date as well as Notes.md's."
+              },
+              {
+                "pages": [
+                  "Notes.md",
+                  "Scratch Page.md",
+                  "index.md"
+                ],
                 "word": null,
                 "placeholders": 0,
-                "why": "Every page left must be a class page."
+                "why": "No page has the class-page shape, so there is no word to write."
               },
               {
                 "pages": [
@@ -6352,7 +6400,8 @@
               "expectLost": [
                 {
                   "path": "All Classes",
-                  "reason": "linkShowedSomethingElse"
+                  "reason": "linkShowedSomethingElse",
+                  "pointedAt": "source-ics3u/s2/All Classes"
                 },
                 {
                   "path": "Curriculum",
@@ -6516,13 +6565,15 @@
         "checkoutLayoutChooseTheWholeFolder": "{folder} is part of the class website kept in {website}. Choose {website} itself.",
         "checkoutLayoutOnlyTheFirstSection": "{folder} holds section {section}'s pages. Only the first section of a course kept this way can be brought across.",
         "checkoutLayoutChooseOneCourseAtATime": "{folder} holds several courses. Choose one course's folder inside it, or one class's folder.",
+        "checkoutLayoutChooseACourseFolderInside": "{folder} holds courses rather than classes. Choose one course's folder inside it, or one class's folder.",
+        "checkoutLayoutWhatALinkShowed": "what {name} showed ({place})",
         "checkoutLayoutMoreThanOneCourse": "It holds the pages of more than one course, so it can’t be brought across as one.",
         "checkoutLayoutWhichSection": "Which section it was could not be told, so it can’t be brought across.",
         "checkoutLayoutShortcutGone": "{shortcut} is a shortcut to a folder that is no longer there, so it can’t be brought across.",
         "checkoutLayoutShortcutCouldNotBeOpened": "{shortcut} is a shortcut to a folder Plantoir was not allowed to open. Allow it in System Settings › Privacy & Security › Files and Folders, then choose the folder again.",
         "checkoutLayoutShortcutOnADiskNotConnected": "{shortcut} is a shortcut to a folder on {disk}, which isn’t connected. Connect it, then choose the folder again.",
         "checkoutLayoutShortcutToAFile": "{shortcut} is a shortcut to a file, not a folder.",
-        "checkoutLayoutRule": "The checkoutLayout* sentences are said only about a class kept in the 2024-25 layout, a whole website folder per class (quartzCheckoutLayout above). {place} is where the pages are read from: ~/... inside the home folder, the whole path otherwise. {shortcut} is a Finder shortcut's own name - 'shortcut' is the one word allowed about how the folders were joined, because the teacher made them in Finder; none says alias, link, vault, checkout or Quartz. checkoutLayoutOnlyTheFirstSection is both a row's reason and the refusal when a later section is chosen on its own, {section} its number. A row reached through a shortcut says checkoutLayoutReadThroughShortcut, any other checkoutLayoutReadFrom. checkoutLayoutOnlyPagesComeAcross is said once under the list and in the summary whenever such a row is there. A loss reuses olderLayoutLeftOut.",
+        "checkoutLayoutRule": "The checkoutLayout* sentences are said only about a class kept in the 2024-25 layout, a whole website folder per class (quartzCheckoutLayout above). {place} is where the pages are read from: ~/... inside the home folder, the whole path otherwise. {shortcut} is a Finder shortcut's own name - 'shortcut' is the one word allowed about how the folders were joined, because the teacher made them in Finder; none says alias, link, vault, checkout or Quartz. checkoutLayoutOnlyTheFirstSection is both a row's reason and the refusal when a later section is chosen on its own, {section} its number. A row reached through a shortcut says checkoutLayoutReadThroughShortcut, any other checkoutLayoutReadFrom. checkoutLayoutOnlyPagesComeAcross is said once under the list and in the summary whenever such a row is there. A loss reuses olderLayoutLeftOut; a link that showed something else is one of its {names} as checkoutLayoutWhatALinkShowed, {name} the link's own name and {place} its own text with './' taken off and a home-folder path written from '~' (never the account name). checkoutLayoutChooseACourseFolderInside is the refusal for a school year's folder whose courses' shortcuts are two levels down (recognition.rule step 5).",
         "olderLayoutRule": "The olderLayout* sentences are said only about a class kept in the older folder-per-class layout (olderLayout above). {names} is the missing names in a stable order joined as 'A, B and C' (in olderLayoutLeftOut, the paths left out, and with {count} 1 the sentence reads '1 of its files or folders was not brought across'); {count} is how many shared folders and pages the class used (in olderLayoutLeftOut, how many were left out); alsoTickedForThatYear is said beside a ticked row whose code and year clash ONLY with a row ticked above it in the same sheet - nothing is kept yet, so codeAlreadyInThatYear ('You already have...') would be false - unless both are older-layout classes named as sections of the course, which get olderLayoutAnotherSectionOfTheSameCourse; {folder} is the row above, {course} the code; olderLayoutLeftOut is added to a summary line after olderLayoutImportedWithSharedMissing, or after 'imported' and a full stop; {code} is the code a chosen folder's name carries. None of them says how the shared folder was reached from the class - a teacher kept folders, and folders are what they are told about - and none says vault, link or add-on settings' contents.",
         "rule": "{course} is the code a TEACHER reads - ICS4U, never the folder name; {folder} is the folder they chose, by its own name, because 'that folder' means nothing once the chooser has closed. The calm note about the pages being locked (referenceCourses.wording.pagesAreLocked) is shown in this sheet too, where the teacher is deciding rather than after the fact.",
         "machineryCheck": "No sentence here names a symlink, a build output, a script, a container or a flag. Nothing says 'cannot' where 'is not' will do. The size a teacher reads is the size that will be COPIED, with last year's built website already taken out of it."

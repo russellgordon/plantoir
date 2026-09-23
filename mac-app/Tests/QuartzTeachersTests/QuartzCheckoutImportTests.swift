@@ -161,7 +161,7 @@ final class QuartzCheckoutImportTests: XCTestCase {
     func testRecognitionIsTheContractsCases() throws {
         let recognition: [String: Any] = try XCTUnwrap(try QuartzCheckoutImportTests.block()["recognition"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(recognition["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 31, "The contract's recognition cases did not load.")
+        XCTAssertGreaterThanOrEqual(cases.count, 33, "The contract's recognition cases did not load.")
 
         for testCase in cases {
             try prepare()
@@ -266,13 +266,23 @@ final class QuartzCheckoutImportTests: XCTestCase {
                 XCTAssertEqual(plan.leftBehind[kind] ?? 0, wantedBehind[kind.rawValue], "\(name): left behind, \(kind.rawValue)")
             }
             var lost: [String] = []
+            var pointedAt: [String: String] = [:]
             for entry in plan.lost {
                 lost.append("\(entry.path) | \(entry.reason.rawValue)")
+                if let place = entry.pointedAt {
+                    pointedAt[entry.path] = place
+                }
             }
             lost.sort()
             var wantedLost: [String] = []
             for entry in try XCTUnwrap(testCase["expectLost"] as? [[String: Any]]) {
-                wantedLost.append("\(try XCTUnwrap(entry["path"] as? String)) | \(try XCTUnwrap(entry["reason"] as? String))")
+                let path: String = try XCTUnwrap(entry["path"] as? String)
+                wantedLost.append("\(path) | \(try XCTUnwrap(entry["reason"] as? String))")
+                // Where a link that showed something else pointed, named
+                // with it (review of #256, L3).
+                if let place = entry["pointedAt"] as? String {
+                    XCTAssertEqual(pointedAt[path], place, "\(name): where \(path) pointed")
+                }
             }
             wantedLost.sort()
             XCTAssertEqual(lost, wantedLost, "\(name): what is lost, and must be named")
@@ -483,6 +493,38 @@ final class QuartzCheckoutImportTests: XCTestCase {
         XCTAssertTrue(trail.contains("lost 1: Curriculum"), "The trail does not name it: \(trail)")
     }
 
+    /// A link that showed something else is named WITH where it pointed,
+    /// so the loss is not read as the folder of the same name — which did
+    /// come across, by name, from the course's own shared pages.
+    ///
+    /// MUST-FAIL (review of #256, L3). Named by its own name alone, the
+    /// summary said "Concepts" was not brought across beside a Concepts
+    /// folder that is there.
+    func testALinkThatShowedSomethingElseIsNamedWithWhereItPointed() async throws {
+        try prepare()
+        let websiteURL: URL = try makeWebsite(at: rootURL.appendingPathComponent("Documents/2024-25/ICS3U/S1"))
+        let linkPath: String = websiteURL.appendingPathComponent("quartz/content/Concepts").path
+        try FileManager.default.removeItem(atPath: linkPath)
+        try FileManager.default.createSymbolicLink(atPath: linkPath, withDestinationPath: "./source-ics3u/s2/Concepts")
+        let imported: (outcome: ReferenceImporter.Outcome, courseURL: URL) = try await importTheTicked(websiteURL)
+        guard case .importedWithSomethingMissing(_, false, let lost) = imported.outcome else {
+            return XCTFail("What the site showed is not what came, and the import called itself complete: \(imported.outcome)")
+        }
+        let named: String = ReferenceImportWording.checkoutLayoutWhatALinkShowed(
+            name: "Concepts", place: "source-ics3u/s2/Concepts"
+        )
+        XCTAssertEqual(lost, [named])
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: imported.courseURL.appendingPathComponent("Concepts/Lists.md").path
+            ),
+            "The shared Concepts folder should still come across by name."
+        )
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("lost 1: " + named), "The trail does not say where it pointed: \(trail)")
+        XCTAssertFalse(trail.contains(NSHomeDirectory()), "A home path reached the trail.")
+    }
+
     /// The settings: one section, the class pages' word even with a
     /// placeholder page among them, and a frozen reference course.
     func testTheSettingsWritten() async throws {
@@ -613,6 +655,14 @@ final class QuartzCheckoutImportTests: XCTestCase {
                 "checkoutLayoutChooseTheWholeFolder"
             ),
             (ReferenceImportWording.checkoutLayoutChooseOneCourseAtATime(folder: "{folder}"), "checkoutLayoutChooseOneCourseAtATime"),
+            (
+                ReferenceImportWording.checkoutLayoutChooseACourseFolderInside(folder: "{folder}"),
+                "checkoutLayoutChooseACourseFolderInside"
+            ),
+            (
+                ReferenceImportWording.checkoutLayoutWhatALinkShowed(name: "{name}", place: "{place}"),
+                "checkoutLayoutWhatALinkShowed"
+            ),
             (ReferenceImportWording.checkoutLayoutMoreThanOneCourse, "checkoutLayoutMoreThanOneCourse"),
             (ReferenceImportWording.checkoutLayoutWhichSection, "checkoutLayoutWhichSection"),
             (ReferenceImportWording.checkoutLayoutShortcutGone(shortcut: "{shortcut}"), "checkoutLayoutShortcutGone"),
@@ -650,7 +700,7 @@ final class QuartzCheckoutImportTests: XCTestCase {
             }
             checked += 1
         }
-        XCTAssertEqual(checked, 12, "The new sentences did not load.")
+        XCTAssertEqual(checked, 14, "The new sentences did not load.")
     }
 
     // MARK: - Helpers
@@ -839,6 +889,8 @@ final class QuartzCheckoutImportTests: XCTestCase {
             XCTAssertEqual(section, testCase["refusalSection"] as? Int, "\(name): the section named")
         case .severalClassWebsiteCourses(let folderName):
             XCTAssertEqual(folderName, testCase["refusalFolder"] as? String, "\(name): the folder named")
+        case .classWebsiteCoursesFurtherDown(let folderName):
+            XCTAssertEqual(folderName, testCase["refusalFolder"] as? String, "\(name): the folder named")
         case .shortcutTrouble(let shortcut, _, _):
             XCTAssertEqual(shortcut, testCase["refusalShortcut"] as? String, "\(name): the shortcut named")
         default:
@@ -866,6 +918,8 @@ final class QuartzCheckoutImportTests: XCTestCase {
             return "checkoutLayoutOnlyTheFirstSection"
         case .severalClassWebsiteCourses:
             return "checkoutLayoutChooseOneCourseAtATime"
+        case .classWebsiteCoursesFurtherDown:
+            return "checkoutLayoutChooseACourseFolderInside"
         case .shortcutTrouble(_, let trouble, _):
             switch trouble {
             case .gone:

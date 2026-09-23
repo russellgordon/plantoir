@@ -948,6 +948,8 @@ final class OlderLayoutImportTests: XCTestCase {
             return "checkoutLayoutOnlyTheFirstSection"
         case .severalClassWebsiteCourses:
             return "checkoutLayoutChooseOneCourseAtATime"
+        case .classWebsiteCoursesFurtherDown:
+            return "checkoutLayoutChooseACourseFolderInside"
         case .shortcutTrouble:
             return "checkoutLayoutShortcut"
         }
