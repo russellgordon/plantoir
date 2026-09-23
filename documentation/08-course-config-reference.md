@@ -4,7 +4,10 @@
 
 `courses/<CODE>/course_config.json` is the single source of truth for a
 course. It is **written** by the setup wizard
-([`setup_course.py`](04-course-setup.md)), **read and auto-extended** by the
+([`setup_course.py`](04-course-setup.md)) — and, for one kind of course only,
+by the macOS app from scratch: a class imported from the older
+folder-per-class layout has no settings file at all, so the importer writes
+one (see "Reference courses" below) — **read and auto-extended** by the
 build ([`build_site.py`](05-build-pipeline.md) appends newly discovered
 folders/files), and **statically imported** by the patched Explorer
 components at Quartz build time
@@ -67,15 +70,17 @@ A representative example:
 | `color_schemes.section<N>` | string | setup | build → `quartz.config.ts` colors + social card | Scheme id from `support/colour_schemes.json` (43 available). The section's social sharing card is drawn in this scheme too. |
 | `custom_domains.sections.section<N>` | object (per-destination-type map, e.g. `{"netlify": "…", "cloudflare_pages": "…"}`) | app (Advanced, per-section settings — one field per configured destination) | app (published-site links, per destination) + `build_site.py` (baseUrl, via the PRIMARY destination's own entry only — one build's sitemap/RSS/social-card links can only follow one domain) | The teacher's own domain for ONE destination of the section's published site. Links after a deploy swap that destination's own host for it (path preserved, https) — never another destination's. An OLDER shape (a bare string, from before a course could have more than one destination) is still read, as the domain for whichever destination is currently primary (`deploy_target`). The domain itself must already be configured with that host (Netlify/Cloudflare Pages) — this key only changes what Plantoir LINKS to. Entries are normalized (scheme and path stripped) on the way in. |
 | `prepopulate_example_content` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the ready-made payload for this course code. |
-| `use_skeleton` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the subject skeleton instead. Mutually exclusive with the key above — a course gets one starting content source or neither. |
-| `include_curriculum_pages` | bool | setup | setup | Whether the curriculum folder was installed. Declining it strips the `%%curriculum-start%%`…`%%curriculum-end%%` passages from every payload page and unlinks inline expectation references. |
+| `use_skeleton` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the subject skeleton instead. Mutually exclusive with the key above — a course gets one starting content source or neither. Offered for a code whose prefix has a family AND whose teacher is NOT taking the ready-made payload, which is the 38 payload codes as well as the ~1,900 without one: both apps wrote `false` for a payload code whatever the teacher chose until 2026-09-21, so declining the ready-made pages gave empty folders ([#248](https://github.com/russellgordon/plantoir/issues/248); 18 pages against the skeleton's 47, measured on ICS4U). |
+| `include_curriculum_pages` | bool | setup | setup | Whether the curriculum pages written for this course code come with it — every expectation as its own page, and what the coverage map is built from. TWO starting points reach them since [#251](https://github.com/russellgordon/plantoir/issues/251) (2026-09-22): the teacher TAKING the payload gets its Curriculum folder, and the teacher who DECLINES the payload but keeps the subject's skeleton gets those same pages installed into the skeleton's Curriculum folder (ICS4U 2 pages to 61, MCMPR11 to 59 British Columbia standards, ICS2O — no payload — unchanged at 2). Declining it strips the `%%curriculum-start%%`…`%%curriculum-end%%` passages from every payload page and unlinks inline expectation references. |
 | `include_curriculum_coverage` | bool (default `true`) | setup | build | Whether the generated `Curriculum Coverage` map page is produced. |
 | `curriculum_folder` | string or null | setup | build | What this course calls the folder holding one page per expectation. Declared by every payload and skeleton manifest. The build tries it FIRST and only then falls back to scanning for a top-level folder whose name contains `curriculum` — which is still the path a from-scratch course takes, but would never have found a folder called something else entirely. |
 | `class_folder` | string or null | setup, and a rename in Course Settings | build, both apps | Which per-section folder holds this course's class pages. **Absent falls back to the GUESS** — the first per-section folder whose name contains `class`, else the first, else the literal `All Classes` — which is what every course made before 2026-09-01 relies on. The key exists because the guess quietly decided what a teacher was allowed to CALL the folder: somebody whose vocabulary is "Thread 2, Day 3" would sensibly call it `All Days`, and the guess would then point the next-class button and the coverage map at whatever folder happened to be first. **A rename writes this key even on a course that never had one**, because a rename is the one moment Plantoir witnesses the change. A stale name loses to the guess; a name differing only in case yields the folder LIST's spelling, because file paths are built from the answer. |
-| `unit_word` | string | setup (new courses); Course Settings → Rename… (a course in use — mac; Windows: [#158](https://github.com/russellgordon/plantoir/issues/158)) | build, both apps | What this course calls the first half of a class page's name — `Unit 2, Day 3`, or `Module 2, Day 3`. **Absent means `Unit`**, and so does an empty string; unlike `graded_folders`, the two are not distinguished, because there is no sensible reading of "the teacher cleared the word". Chosen when the course is made, where the ready-made pages are written in that word as they are poured; changed later from Course Settings → Rename…, which renames every class page and follows the links before writing the key (see [09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a unit"). `Day` is deliberately fixed. |
+| `unit_word` | string | setup (new courses); Course Settings → Rename… (a course in use — mac; Windows: [#158](https://github.com/russellgordon/plantoir/issues/158)); Import Courses for Reference… for a class kept a website folder per class (#256, only when its class pages agree on one word) | build, both apps | What this course calls the first half of a class page's name — `Unit 2, Day 3`, or `Module 2, Day 3`. **Absent means `Unit`**, and so does an empty string; unlike `graded_folders`, the two are not distinguished, because there is no sensible reading of "the teacher cleared the word". Chosen when the course is made, where the ready-made pages are written in that word as they are poured; changed later from Course Settings → Rename…, which renames every class page and follows the links before writing the key (see [09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a unit"). `Day` is deliberately fixed. |
 | `excluded_items` | object with `shared` and/or `per_section` arrays | Course Settings | build | Folder and file names the teacher removed in Settings, kept out of previews and deploys. **Authoritative at build time**: preflight drops an excluded name it finds back in the folder lists rather than re-adding it, and never un-hides it. Keyed by scope because the same bare name can legitimately exist in both, and the two are found by different scans. An exclusion does NOT expire when the folder is deleted and re-created — discovery is name-based, so the build cannot tell "the folder I excluded" from "the new folder I just made". |
 | `graded_folders` | array of strings | setup, and the Marks checklist in Course Settings | build, both apps | The folders whose work counts for marks, which is what makes an expectation "assessed" on the coverage map. **Absent is not empty.** Absent means the teacher has never been asked, so the historical rule applies (any folder whose name contains `task`) and an existing course keeps exactly the marks it had; `[]` means they were asked and cleared it. Seeding existing courses would not have been safe — the mathematics skeleton ships `Thinking Tasks`, which the old rule counted and a pool of `["Tasks"]` does not. **The first tick FREEZES the pool**: the moment a teacher touches the checklist, the key is written with everything the course was already counting, and the historical rule stops applying to it. **A REMOVAL does not** — taking a folder out of the course in Settings is not an answer to the marks question, so a never-asked course is left with the key ABSENT rather than frozen to the historical answer minus that folder (which, on the ordinary course whose only marked folder is `Tasks`, would be `[]`: nothing counting for marks, permanently, from a gesture the teacher was told would do one narrow thing). The rule, its second exception and what it deliberately leaves unpinned are `gradedFolders.removingAFolder`, seven cases, run on both platforms (six since 2026-09-18, the seventh since 2026-09-19). The second exception — a name the checklist STILL OFFERS keeps its place — is asked CASE-INSENSITIVELY, the way the build asks it, since 2026-09-19 ([#172](https://github.com/russellgordon/plantoir/issues/172), raised from Windows): the checklist returns names as they are spelled on disk, so an exact test drops a pooled `Tasks` when `Portfolios/tasks` survives while the build goes on counting that folder. What remains unpinned is the DROP's own comparison, which the mac makes exactly and Windows with `OrdinalIgnoreCase`. Which is why what the checklist OFFERS matters as much as what it writes — the build matches a folder at any depth, so the apps offer the two folder lists plus every folder found inside the course, four levels deep. That rule, its skip list and what it deliberately leaves out are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) → `gradedFolders.choices`, and both apps run its 14 cases. Two parts of it are easy to leave out and cost a teacher their marks: a folder named in `excluded_items` is NOT offered (it is still on disk, so the walk hands back a folder they just removed unless it is told not to), and each folder's children are sorted ORDINALLY and case-insensitively — see [`04-course-setup.md`](04-course-setup.md) for the measured table of which comparison, because the natural call on each platform is a different one. |
 | `include_coverage_notes` | bool (default `true`) | setup | build | Whether that page carries its explanatory sections ("What counts", "Reading it honestly") or the map alone. |
+| `kept_for_reference` | bool (default `false`) | app (Keep a Copy for Reference…, Import Courses for Reference…) | the app, `scripts/reference_course.py`, `deploy.sh`, `deploy.py` | `true` marks a REFERENCE COURSE: last year's course, or a course full of example content, kept in this year's sidebar to be read and never deployed. **Absent means false** — the only safe direction, since the reverse would make a live course silently undeployable. See "Reference courses" below. |
+| `reference_school_year` | integer or null | app (Keep a Copy for Reference…, Import Courses for Reference…, Set School Year…) | the app (sidebar grouping, the MCP course listing) | Which school year a reference course was taught in, as the calendar year it STARTED in: `2025` means 2025–26. The label is derived, never stored. Absent, null, or anything that is not a whole number within the offered range reads as **Other**. |
 | `use_lcs_terminology` | bool | setup | setup (starting folder and file names) | A school-specific mode: swaps the factory shared-folder and shared-file lists for one school's own words — "College Board Curriculum", "SIC Drop-In Sessions.md" and "Grove Time.md" in place of "Extra Help.md". Affects the names a new course starts with, nothing after that. |
 
 ### Publishing destination
@@ -84,7 +89,120 @@ A representative example:
 |---|---|---|---|---|
 | `deploy_target` | string (default `netlify`) | app only (Course Settings → Publishing; the wizard preserves it but never writes it) | the app, which translates it into the launcher's `--target cloudflare` / `--to-folder <path>` flags — neither the launcher nor `deploy.py` reads the key | Where this course's sections publish: `netlify`, `cloudflare_pages`, or `local_folder`. Absent means `netlify`, so every existing course keeps working untouched. See [deployment](07-deployment.md). |
 | `deploy_folder_path` | string | app (Publishing, folder mode) | the app, which passes it as `--to-folder <path>`; the launcher does the host-side copy from that flag | Only for `local_folder`: the folder sections are mirrored into, one `sectionN` subfolder each. Validated live in the app — a missing, unwritable, or file-not-folder path blocks Save rather than failing at publish time. |
+| `scheduled_deploy_may_run_late_days` | integer (default `7`; only `1`, `3`, `7` or `14` mean themselves) | app (Course Settings → Deploying). **Not the wizard**, deliberately: a course that has never been deployed cannot be scheduled at all, so the question would have no consequence at the moment it is asked | the app, at the moment a scheduled deploy FIRES — read straight out of this file by a process with no `CourseConfiguration` loaded, so changing the setting after scheduling changes what a job already set will do. Nothing in `scripts/` reads it | How late a deploy set to happen on its own may still go ahead. The Mac may have been off or asleep at the chosen time; past this window the run stands down, deploys nothing and tells the teacher. **Absent means 7, and so does anything that is not one of the four offered values** — an older build's number, a value hand-edited in — because honouring a stored `0` would stand every scheduled deploy down. There is deliberately no "always". See [deployment](07-deployment.md) → "A scheduled deploy that outlived its course", and `contracts/shared-rules.json` → `scheduledDeployCancellation`. |
 | `additional_deploy_targets` | array of `{type, path}` objects | app (Publishing, "Also publish to, for redundancy") | the app — currently config/UI only; nothing yet triggers a second deploy from it (see below) | Extra destinations this course ALSO publishes to, beyond `deploy_target` (the primary), for redundancy against one host having a bad day. `type` uses the same spellings as `deploy_target`; `path` is only present for a `local_folder` entry. **Absent entirely** (never written as `[]`) for the overwhelming majority of courses that have not opted in, so an untouched course writes the exact same file it always has. At most one entry per known type, and never a type that is already the primary — `CourseConfiguration.deployTarget`'s own setter enforces this, dropping a type from this list the moment it becomes the primary. |
+
+### Reference courses: kept, never deployed
+
+A reference course is last year's course — or a course full of example content
+— sitting in this year's sidebar so the teacher can read it, and which Plantoir
+never deploys. Two keys carry it, and the rules they obey are
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses`, run as cases by both test suites.
+
+**Read STRICTLY: a real JSON `true` and nothing else.** Not through the
+ordinary boolean accessor, and the reason is measured: `JSONSerialization`
+hands back an `NSNumber` for `1`, and `NSNumber` conditionally bridges to
+`Bool` for 0 and 1 — so `as? Bool` read `"kept_for_reference": 1` as TRUE
+while all three launchers read the same file as an ordinary course and
+DEPLOYED it. Both directions of the fault at once: the app froze and locked a
+course, with no way back to live, that the launchers then published.
+`CFBooleanGetTypeID` is the only reading that tells a JSON boolean from a
+number. Every other spelling somebody plainly MEANT — `"true"`, `1`, `True`, a
+key written with backslash-u escapes — makes the launchers refuse with "cannot
+tell", which publishes nothing and freezes nothing, while this app treats the
+course as ordinary. The four readers and the twenty-six inputs they are
+asserted to agree on are `shared-rules.json` → `referenceCourses.markerAgreement`.
+
+**The marker is not the defence on its own, and that is the part worth
+knowing.** Whatever makes a course a reference course also writes
+`deploy_target: "local_folder"` with an empty `deploy_folder_path`, removes
+`additional_deploy_targets` and `custom_domains`, and renames the
+`.netlify_sites/` and `.cloudflare_sites/` markers aside. The reason is a
+teacher with their working folder in iCloud Drive and an OLDER Plantoir on a
+second Mac: that copy has never heard of `kept_for_reference` and would show a
+working Deploy button. A folder deploy with no folder is refused by every
+shipped version, in sentences it already has —
+`MultiDestinationDeployRunner.refusalReason` and `ScheduledDeploy.problem`.
+
+Measured on a real previous-generation working folder (four courses,
+`/Users/…/Class Websites`, read-only): those configs carry **no
+`deploy_target` at all**, and an absent `deploy_target` reads as `netlify`
+([`CourseConfiguration.swift`](../mac-app/QuartzTeachers/Models/CourseConfiguration.swift),
+`build_site.py:119`) — so a plain copy really would have arrived ready to
+deploy over last year's live class site, whose id is sitting in
+`.netlify_sites/`. That measurement is the whole justification for
+neutralising rather than trusting the marker.
+
+**The folder name and `course_code` are allowed to disagree here, and
+nowhere else.** The folder is `ICS3U-2025`; `course_code` stays `ICS3U`. The
+folder is IDENTITY — the launcher argument, the built-site folder, the preview
+lease, the backup zip's name and the scheduled-deploy identifier are all built
+from it, so two ICS3Us never collide — while `course_code` is what a teacher
+reads, and what keeps the preview's site title, grade label and social card
+right. `CourseConfiguration.setCourseCode`'s own warning about a disagreeing
+pair still holds for every other course: its second half ("a deployed page
+saying another") cannot happen here, because there is no deployed page.
+
+**A class imported from the OLDER folder-per-class layout (#254) arrives with
+no settings at all**, so the importer writes them, through the same
+`CourseConfiguration.write` as everything else and with no key that is not
+already documented above: `course_code` (from the folder's name),
+`course_name` (the folder's own name, `ICS3U-S1-2023-24`), `num_sections` 1,
+`section_numbers` `[1]`, the shared and per-section folder and file lists
+(its `Thread N` folders are the per-section folders), `expandable` (every one
+of those folders), `hidden` `["Media"]`, `include_curriculum_coverage` as a
+plain `false` (the old class pages are not named the way a coverage map
+counts; a per-section map was measured to read as ON in the app's own reader
+and in `setup_course.py`), and `show_section_marker` false for `section1`
+(every import is section 1, so "S1" would be wrong for an S2).
+
+`hidden` is the set of names the site's sidebar leaves out — the Explorer's
+`omit` set, written by `update_quartz_layout`; the pages are still built and
+still reachable by link. The import writes only `Media`, because pictures are
+not pages, and the build adds `Media` itself anyway. It deliberately does NOT
+copy the wizard's own list (`WizardDefaults.hiddenItems`: Private Notes,
+Scratch Page, Key Links, Learning Goals and so on), which would hide seven of
+the ICS3U S1 entries: that list encodes how a MODERN course is organised,
+Digital Garden kept no equivalent record of what Russell hid, and a reference
+course is read to find material — every page in the sidebar is a page Copy a
+Page can offer. A teacher who wants a tidier sidebar changes `hidden` in the
+settings file like any other. Then the ordinary
+reference-course keys are added exactly as for any other import. The exact
+lists, as contract cases, are `shared-rules.json` →
+`referenceCourses.importing.olderLayout.placement`; the reasoning is
+[09 → "The older layout"](09-mac-app.md).
+
+**A class imported from the 2024–25 website-folder-per-class layout (#256)** is
+written the same way, with the same keys, and ONE more that this table already
+documents: **`unit_word`**, when the class folder's pages agree on one word
+(`Thread` in every real one, with placeholder pages like `Thread 2, Day x`, and
+pages with no class-page shape at all like `Notes.md`, set aside). Without it the build's date post-pass takes no lesson for a class page
+and restamps them all — measured on the real ICS3U S1 import, 313 pages
+restamped without the key and 143 with it. `course_name` is `<CODE> S1`
+(`ICS3U S1`), and the per-section lists are that section's own folder's
+entries, read from the source rather than from a list of names. The cases are
+`shared-rules.json` → `referenceCourses.importing.quartzCheckoutLayout.placement`;
+the reasoning is [09 → "The 2024–25 layout"](09-mac-app.md).
+
+*Rejected: a separate `display_code` key.* A third spelling of one fact, and
+it would leave `build_site.py` writing `ICS3U-2025` into the site title of a
+course whose preview a teacher is reading. *Rejected: a lower-case suffix
+(`ICS3U-examples`).* `preview.sh:143` and `deploy.sh:376` put the course
+argument through `tr '[:lower:]' '[:upper:]'`, so the folder would be looked
+for as `ICS3U-EXAMPLES` and not found.
+
+**The school year is stored as an integer and labelled by rule.** `2025` →
+"2025–26", with an EN DASH (U+2013), so the dash never reaches the file format
+and the two apps cannot render the same year two ways. A new school year
+appears on **1 August** — inherited from Windows'
+`Timetable.AcademicYearStarting`, which already ships that rule rather than
+invented a second one here — and the list runs newest-first down to a floor of
+2022–23, with the top end derived from today so it grows by itself. Anything
+stored that is not a whole number within that range reads as "Other": a
+hand-edited `2019`, a `2031` from a Mac with a wrong clock, a word, a `true`.
+That errs toward a group the teacher can see and change, rather than a group
+labelled "0000–01" built out of a value that coerced to zero.
 
 **Keys the wizard does not own survive a re-run.** `setup_course.py` builds
 the config it owns, then copies through every key already in the saved file
@@ -792,7 +910,11 @@ Keys the Windows settings UI must round-trip (per-section maps use
 - `prepopulate_example_content`, `include_curriculum_pages` (entries
   92–93) — written by the new-course wizard, read by the shared Python
   wizard as its defaults; both forced false when no example content
-  exists for the course code
+  exists for the course code. Since #251 they are no longer written
+  together: a teacher who declines the payload and keeps the subject's
+  skeleton gets `prepopulate_example_content: false` beside
+  `include_curriculum_pages: true`, which is what fetches the
+  expectations written for their code
 - `use_lcs_terminology` (entry 94) — whether the factory structure
   defaults use LCS's own set-up; the two factory sets live as
   `DEFAULT_*` vs `LCS_*` constants in `scripts/setup_course.py` and the

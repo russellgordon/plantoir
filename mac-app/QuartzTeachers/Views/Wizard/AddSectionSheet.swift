@@ -35,7 +35,7 @@ struct AddSectionSheet: View {
         if let addProblem {
             return addProblem
         }
-        return SectionAdder.entryProblem(entry, existing: existingSections, courseCode: course.code)
+        return SectionAdder.entryProblem(entry, existing: existingSections, courseCode: course.displayCode)
     }
 
     var canAdd: Bool {
@@ -51,20 +51,20 @@ struct AddSectionSheet: View {
             spelled.append("\(number)")
         }
         if spelled.isEmpty {
-            return "\(course.code) has no sections yet."
+            return "\(course.displayCode) has no sections yet."
         }
         if spelled.count == 1 {
-            return "\(course.code) already has section \(spelled[0])."
+            return "\(course.displayCode) already has section \(spelled[0])."
         }
         let allButLast: String = spelled.dropLast().joined(separator: ", ")
-        return "\(course.code) already has sections \(allButLast) and \(spelled[spelled.count - 1])."
+        return "\(course.displayCode) already has sections \(allButLast) and \(spelled[spelled.count - 1])."
     }
 
     // MARK: - Body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add a Section to \(course.code)")
+            Text("Add a Section to \(course.displayCode)")
                 .font(.headline)
 
             Text(existingSectionsSentence)

@@ -98,6 +98,9 @@ struct CourseSettingsView: View {
                         cloudflareAccountID: $settings.cloudflareAccountID,
                         additionalDeployTargets: $configuration.additionalDeployTargets
                     )
+                    ScheduledDeployLatenessPicker(
+                        days: $configuration.scheduledDeployMayRunLateDays
+                    )
                 } header: {
                     FormSectionHeader("Deploying")
                 }
@@ -289,7 +292,7 @@ struct CourseSettingsView: View {
             }
             .padding(12)
         }
-        .navigationTitle(course.code)
+        .navigationTitle(course.displayCode)
         .toolbar {
             ToolbarItem {
                 Button("Open in Obsidian", systemImage: "square.and.pencil") {

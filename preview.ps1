@@ -66,6 +66,20 @@ if ($args.Count -lt 2 -or ($args[0] -eq '--help') -or ($args[0] -eq '-h')) {
 }
 
 $COURSE  = $args[0].ToUpper()
+
+# A course code may not begin with a dot, and the refusal is here rather than
+# in a comment claiming it cannot happen. Plantoir builds a reference course
+# under a HIDDEN folder inside courses/ and renames it into place as the last
+# act; handed that hidden name, this script used to treat it as an ordinary
+# course, and during the copy there is no marker yet to refuse it. The app can
+# never pass such a name, but a person or another program can type one.
+if ($COURSE -like '.*') {
+    Write-Host ""
+    Write-Host "A course code cannot begin with a dot."
+    Write-Host "   Choose one of your courses - the codes in Plantoir's sidebar."
+    Write-Host ""
+    exit 1
+}
 $SECTION = $args[1]
 if (-not ($SECTION -as [int])) {
     Write-Host "SECTION_NUMBER must be an integer. Got: $SECTION"

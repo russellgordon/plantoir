@@ -143,6 +143,15 @@ enum CourseRenamer {
         existingCodes: [String],
         runner: LaunchControlRunning = LaunchControl()
     ) throws -> Outcome {
+        // A reference course's folder name carries its school year and its
+        // `course_code` is deliberately the real code — the one pair in the
+        // product allowed to disagree. Renaming rewrites `course_code` to
+        // match the folder, which would replace the code a teacher reads with
+        // a suffixed one on every surface. The year is changed from its own
+        // menu item instead; the folder is not renamed at all.
+        if course.isKeptForReference {
+            throw ReferenceCourseIsFrozen(displayCode: course.displayCode)
+        }
         let newCode: String = CourseCodeRule.normalized(requestedCode)
         if let reason = CourseCodeRule.problem(
             requestedCode, existingCodes: existingCodes, currentCode: course.code
@@ -164,7 +173,10 @@ enum CourseRenamer {
         // Asked BEFORE anything moves: after the move these are addressed by
         // a code no course has any more, and there would be no way to find
         // them.
-        let scheduledSections: [Int] = sectionsWithAScheduledPublish(in: course)
+        let scheduledSections: [Int] = sectionsWithAScheduledPublish(
+            in: course,
+            inWorkingFolder: coursesDirectoryURL.deletingLastPathComponent()
+        )
 
         let previousCode: String = course.code
         course.configuration.setCourseCode(newCode)
@@ -200,7 +212,10 @@ enum CourseRenamer {
         var unstopped: [Int] = []
         for sectionNumber in scheduledSections {
             let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
-                courseCode: previousCode, sectionNumber: sectionNumber, runner: runner
+                courseCode: previousCode,
+                sectionNumber: sectionNumber,
+                inWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
+                runner: runner
             )
             if problem == nil {
                 stopped.append(sectionNumber)
@@ -216,21 +231,33 @@ enum CourseRenamer {
         )
     }
 
-    /// Which of a course's sections are set to publish on their own.
+    /// Which of a course's sections are set to publish on their own, in THIS
+    /// working folder.
     ///
     /// Asked of the alarms themselves rather than of a note of ours, the way
     /// the sidebar's clock is: a teacher can take one away without telling
     /// us, and acting on a list that says otherwise is how a rename ends up
     /// reporting that it turned off something that was never on.
-    static func sectionsWithAScheduledPublish(in course: Course) -> [Int] {
+    ///
+    /// **Scoped to the working folder since 2026-09-20**, and it was a real
+    /// fault before: this used to walk `course.sectionNumbers` asking whether
+    /// `plistURL` exists, and a label is the course code and section and
+    /// nothing else — so a teacher with last year's working folder and this
+    /// year's, both holding ICS3U section 1, would have a rename in the one
+    /// cancel the other's live deploy and report success. It also missed a
+    /// section whose alarm outlived its entry in the settings, which the agent
+    /// list sees and a walk over the settings cannot.
+    static func sectionsWithAScheduledPublish(
+        in course: Course,
+        inWorkingFolder workingFolderURL: URL
+    ) -> [Int] {
         var found: [Int] = []
-        for sectionNumber in course.sectionNumbers {
-            let plistURL: URL = ScheduledDeploy.plistURL(
-                courseCode: course.code, sectionNumber: sectionNumber
-            )
-            if FileManager.default.fileExists(atPath: plistURL.path) {
-                found.append(sectionNumber)
-            }
+        for agent in ScheduledDeployCleanup.agentsOwnedBy(
+            courseCode: course.code,
+            sectionNumber: nil,
+            inWorkingFolder: workingFolderURL
+        ) {
+            found.append(agent.sectionNumber)
         }
         return found
     }

@@ -736,6 +736,42 @@ nonisolated enum AssistWording {
              + "was done. This window is for \(course)."
     }
 
+    // MARK: - A course kept for reference
+
+    /// A deploy was asked for on a course that is kept for reference.
+    ///
+    /// **The same string the shared Python says**, pinned against
+    /// `contracts/shared-rules.json` → `referenceCourses.refusal.sentence` by
+    /// a test on each side — because the launchers and `deploy.py` have to say
+    /// it too, and `scripts/contracts.py` can read that file and not
+    /// `assist-wording.json`. A teacher who is refused at the button and again
+    /// at the Terminal must not read two different explanations of one rule.
+    ///
+    /// `course` is the code a TEACHER reads — `ICS3U`, never the folder name.
+    ///
+    /// **It does not tell them to copy anything**, and that was decided
+    /// rather than overlooked. It stayed decided when Plantoir gained "Copy a
+    /// Page from This Course…" (issue #207, same release): this is a refusal
+    /// about DEPLOYING, the way out it names is the course they are actually
+    /// teaching, and a refusal that advertises an unrelated feature is one a
+    /// teacher has to read twice. The menu item is on the course's own row,
+    /// where they will meet it.
+    static func deployRefusedForAReferenceCourse(course: String) -> String {
+        return "\(course) is kept for reference, so it is never deployed. "
+             + "Deploy the course you are teaching instead."
+    }
+
+    /// The model named a course that is kept for reference.
+    ///
+    /// A third sentence rather than a second use of `askedAboutAnotherCourse`,
+    /// which ends "Open that course's section in Plantoir and ask me there."
+    /// — advice that cannot be followed here, because the assistant is not
+    /// offered on a reference course at all.
+    static func askedAboutAReferenceCourse(course: String, otherCourse: String) -> String {
+        return "\(otherCourse) is kept for reference, so I can't work in it. "
+             + "This window is for \(course)."
+    }
+
     // MARK: - Shared fragments
 
     /// One phrasing for "go and look at what happened", because it was two:

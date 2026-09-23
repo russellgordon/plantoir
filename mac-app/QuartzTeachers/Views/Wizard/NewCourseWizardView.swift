@@ -367,18 +367,31 @@ struct NewCourseWizardView: View {
         )
     }
 
+    /// Whether the curriculum pages written for this code can be offered
+    /// at all — taken with the payload, or brought along into the
+    /// subject's skeleton when the payload is declined (GitHub issue
+    /// #251). The rule itself lives in `CourseConfiguration` so that it
+    /// can be tested: a SwiftUI `@State` property has no backing store
+    /// until the view is on screen.
+    var curriculumPagesOffered: Bool {
+        return CourseConfiguration.curriculumPagesOffered(
+            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: courseCode),
+            payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: courseCode),
+            prepopulatesExampleContent: prepopulatesExampleContent,
+            skeletonIsOffered: SkeletonCatalog.hasSkeleton(
+                forCode: courseCode, takingExampleContent: prepopulatesExampleContent
+            ),
+            startsFromSkeleton: startsFromSkeleton
+        )
+    }
+
     var effectiveCurriculumPagesEnabled: Bool {
-        return ExampleContentCatalog.hasContent(forCode: courseCode)
-            && prepopulatesExampleContent
-            && ExampleContentCatalog.includesCurriculum(forCode: courseCode)
-            && includesCurriculumPages
+        return curriculumPagesOffered && includesCurriculumPages
     }
 
     var effectiveCurriculumCoverageEnabled: Bool {
         return CourseConfiguration.curriculumCoverageEnabled(
-            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: courseCode),
-            prepopulatesExampleContent: prepopulatesExampleContent,
-            payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: courseCode),
+            curriculumPagesOffered: curriculumPagesOffered,
             includesCurriculumPages: includesCurriculumPages,
             includesCurriculumCoverage: includesCurriculumCoverage
         )
@@ -391,15 +404,43 @@ struct NewCourseWizardView: View {
     }
 
     /// What a teacher is told when this course will start with nothing in
-    /// it — either because no ready-made pages exist for the code and no
-    /// skeleton does either, or because they have turned the skeleton down.
-    /// Both are the same situation, so both say the same sentence
+    /// it and no ready-made pages exist for the code — either because no
+    /// skeleton exists either, or because they have turned the skeleton
+    /// down. Both are the same situation, so both say the same sentence
     /// (`WizardWording.noExampleContentNote`, pinned by the contract).
     var noExampleContentNote: some View {
         Text(WizardWording.noExampleContentNote)
             .font(.caption)
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("noExampleContentNote")
+    }
+
+    /// The same situation for a code that DOES have ready-made pages: the
+    /// teacher declined them and then declined the skeleton too. A second
+    /// sentence, because the first one opens by saying no example content
+    /// is available for the code — which they have just been offered.
+    ///
+    /// Its own accessibility identifier rather than the other's: three
+    /// sentences across two keys now, so sharing one would leave a test
+    /// unable to say WHICH of them a teacher is reading. Windows matches
+    /// (`contracts/shared-rules.json` → `wizard.whenTheNoteIsShown`).
+    var noStartingContentNote: some View {
+        Text(WizardWording.noStartingContentNote)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("noStartingContentNote")
+    }
+
+    /// Which of the two a teacher reads, once the course is set to start
+    /// with nothing: the code's own situation decides, not the toggle they
+    /// happened to use to get there.
+    @ViewBuilder
+    var noteForACourseStartingEmpty: some View {
+        if ExampleContentCatalog.hasContent(forCode: courseCode) {
+            noStartingContentNote
+        } else {
+            noExampleContentNote
+        }
     }
 
     /// Offered above the form: someone who has never built a course learns
@@ -479,6 +520,28 @@ struct NewCourseWizardView: View {
                     adoptSkeletonStructure()
                 } else {
                     restoreGenericStructure()
+                }
+            }
+            // Its sibling, and here for the same reason: turning the
+            // example content OFF for a code that has some is what now
+            // OFFERS the skeleton, so it has to move the structure editor
+            // exactly as the skeleton toggle itself does. Without this the
+            // toggle would read on, the lists would stay factory, and the
+            // file would say `use_skeleton: true` beside folders the
+            // skeleton's pages were not written for — the same "the wizard
+            // lies about what it is about to make" bug the toggle's own
+            // handler exists to prevent, in mirror image.
+            //
+            // The way back matters just as much: a teacher who declines the
+            // example content, sees the subject's folders, and then changes
+            // their mind must get today's file back, not a course taking
+            // ready-made pages with a skeleton's folders written beside
+            // them.
+            .onChange(of: prepopulatesExampleContent) { _, takesExampleContentNow in
+                if takesExampleContentNow {
+                    restoreGenericStructure()
+                } else {
+                    adoptSkeletonStructure()
                 }
             }
             .overlayPreferenceValue(CourseCodeFieldAnchorKey.self) { anchor in
@@ -786,52 +849,96 @@ struct NewCourseWizardView: View {
                             .accessibilityIdentifier("prepopulateToggle")
                         ExampleCaption("Working pages written for this course — keep, edit, or delete them as you build your own site. The example content also chooses the course's folders and files, so they fit the pages.")
                     }
-                    if ExampleContentCatalog.includesCurriculum(forCode: courseCode) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Toggle("Include \(ExampleContentCatalog.jurisdictionName(forCode: courseCode)) curriculum pages", isOn: $includesCurriculumPages)
-                                .disabled(!prepopulatesExampleContent)
-                                .accessibilityIdentifier("curriculumToggle")
-                            ExampleCaption("Every expectation as its own page, so lessons and tasks can link to exactly what they address")
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            // The map reads the site's links to the
-                            // curriculum pages, so it cannot exist without
-                            // them — but keeping the pages and declining
-                            // the map is a perfectly reasonable choice.
-                            Toggle("Include the curriculum coverage map", isOn: $includesCurriculumCoverage)
-                                .disabled(!prepopulatesExampleContent || !includesCurriculumPages)
-                                .accessibilityIdentifier("curriculumCoverageToggle")
-                            ExampleCaption("A page showing every expectation coloured by how many pages address it — red in September, greener as the year goes on. Linked from Key Links, and kept out of the sidebar.")
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            // The sections sit on the coverage page, so they
-                            // cannot exist without it.
-                            Toggle("Explain the map on the page", isOn: $includesCoverageNotes)
-                                .disabled(!prepopulatesExampleContent
-                                          || !includesCurriculumPages
-                                          || !includesCurriculumCoverage)
-                                .accessibilityIdentifier("coverageNotesToggle")
-                            ExampleCaption("Two short sections at the foot of the map: what counts as addressing an expectation, and how to read it honestly — red in September is normal, red in May is not. Turn this off to publish the map on its own.")
-                        }
-                    }
-                } else if let skeleton = SkeletonCatalog.family(forCode: courseCode) {
+                }
+                // A SIBLING of the example-content block rather than its
+                // `else`, which is the whole of issue #248: a code with
+                // ready-made pages has a skeleton too, and the moment the
+                // teacher turns the pages down the skeleton is what the
+                // course should start from. `hasSkeleton` carries that
+                // rule for all three surfaces — this toggle, the
+                // structure editor's adoption, and `use_skeleton` in the
+                // file — so the three cannot drift apart again.
+                //
+                // Four states reach this section, and each says one thing:
+                // taking ready-made pages, the block above alone; not
+                // taking them (or having none) with a family for the
+                // prefix, the toggle here; the toggle off, one of the two
+                // notes; and no code typed at all, where no family
+                // resolves and `noExampleContentNote` is what a teacher
+                // reads before they have chosen anything.
+                if SkeletonCatalog.hasSkeleton(
+                    forCode: courseCode, takingExampleContent: prepopulatesExampleContent
+                ), let skeleton = SkeletonCatalog.family(forCode: courseCode) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Toggle("Start from a \(skeleton.label.lowercased()) skeleton", isOn: $startsFromSkeleton)
-                            .accessibilityIdentifier("skeletonToggle")
-                        ExampleCaption("There is no ready-made course for this code, but there is a starting point shaped for the subject: folders that suit it, four units of class pages to rename, a page explaining what the site can do, and placeholders saying what belongs where.")
+                        Toggle(
+                            WizardWording.skeletonToggleLabel(
+                                forFamilyNamed: skeleton.name, label: skeleton.label
+                            ),
+                            isOn: $startsFromSkeleton
+                        )
+                        .accessibilityIdentifier("skeletonToggle")
+                        if ExampleContentCatalog.hasContent(forCode: courseCode) {
+                            ExampleCaption(WizardWording.skeletonToggleCaptionWhenExampleContentIsDeclined)
+                        } else {
+                            ExampleCaption(WizardWording.skeletonToggleCaption)
+                        }
                         // With the toggle off the teacher is in exactly
-                        // the situation the no-content note below
-                        // describes, so it says so — the same sentence,
-                        // not a third one. Sharing its accessibility
-                        // identifier is safe because the two are branches
-                        // of the same `if`, so they are never on screen
-                        // at once.
+                        // the situation the no-content note describes, so
+                        // it says so — in the words that are TRUE for
+                        // this code, which is what
+                        // `noteForACourseStartingEmpty` chooses between.
                         if !startsFromSkeleton {
-                            noExampleContentNote
+                            noteForACourseStartingEmpty
                         }
                     }
-                } else {
+                } else if !ExampleContentCatalog.hasContent(forCode: courseCode) {
                     noExampleContentNote
+                }
+                // BELOW the two toggles that govern them, so the
+                // dependency reads top to bottom (GitHub issue #251).
+                // They used to sit directly under the example-content
+                // toggle, which was the only thing that could switch them
+                // on; now a teacher who turns that off and keeps the
+                // subject's skeleton gets the curriculum too, and three
+                // live toggles above an off one — with a caption above
+                // them still explaining the example content — read as
+                // though the wrong thing had happened. Nothing moves for
+                // a teacher taking the ready-made pages: the skeleton
+                // block draws nothing for them, so these still follow the
+                // example-content toggle directly.
+                if ExampleContentCatalog.includesCurriculum(forCode: courseCode) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Live whenever the pages can be offered at
+                        // all — which, since GitHub issue #251, is
+                        // also the teacher who declined the ready-made
+                        // pages and kept the subject's skeleton. The
+                        // expectations written for their code exist;
+                        // greying the toggle out told them otherwise.
+                        Toggle("Include \(ExampleContentCatalog.jurisdictionName(forCode: courseCode)) curriculum pages", isOn: $includesCurriculumPages)
+                            .disabled(!curriculumPagesOffered)
+                            .accessibilityIdentifier("curriculumToggle")
+                        ExampleCaption("Every expectation as its own page, so lessons and tasks can link to exactly what they address")
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        // The map reads the site's links to the
+                        // curriculum pages, so it cannot exist without
+                        // them — but keeping the pages and declining
+                        // the map is a perfectly reasonable choice.
+                        Toggle("Include the curriculum coverage map", isOn: $includesCurriculumCoverage)
+                            .disabled(!curriculumPagesOffered || !includesCurriculumPages)
+                            .accessibilityIdentifier("curriculumCoverageToggle")
+                        ExampleCaption("A page showing every expectation coloured by how many pages address it — red in September, greener as the year goes on. Linked from Key Links, and kept out of the sidebar.")
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        // The sections sit on the coverage page, so they
+                        // cannot exist without it.
+                        Toggle("Explain the map on the page", isOn: $includesCoverageNotes)
+                            .disabled(!curriculumPagesOffered
+                                      || !includesCurriculumPages
+                                      || !includesCurriculumCoverage)
+                            .accessibilityIdentifier("coverageNotesToggle")
+                        ExampleCaption("Two short sections at the foot of the map: what counts as addressing an expectation, and how to read it honestly — red in September is normal, red in May is not. Turn this off to publish the map on its own.")
+                    }
                 }
             } header: {
                 FormSectionHeader("Starting Content")
@@ -931,7 +1038,7 @@ struct NewCourseWizardView: View {
 
             Section {
                 if structureComesFromExampleContent {
-                    Text("The example content chooses the folders and files for this course, so every page lands where its links expect it. Turn off pre-populating to choose your own structure.")
+                    Text(WizardWording.structureFromExampleNote)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("structureFromExampleNote")
@@ -1111,7 +1218,9 @@ struct NewCourseWizardView: View {
             return
         }
         guard let skeleton = SkeletonCatalog.structureToAdopt(
-            forCode: courseCode, currentSharedFolders: sharedFolders
+            forCode: courseCode,
+            takingExampleContent: prepopulatesExampleContent,
+            currentSharedFolders: sharedFolders
         ) else {
             return
         }
@@ -1357,10 +1466,14 @@ struct NewCourseWizardView: View {
         var chosenPerSectionFiles: [String] = perSectionFiles
         var chosenGradedFolders: [String] = gradedFolders
         var skeleton: SkeletonCatalog.Family? = nil
-        if startsFromSkeleton && SkeletonCatalog.hasSkeleton(forCode: code) {
+        if startsFromSkeleton && SkeletonCatalog.hasSkeleton(
+            forCode: code, takingExampleContent: prepopulatesExampleContent
+        ) {
             skeleton = SkeletonCatalog.family(forCode: code)
             if let adopted = SkeletonCatalog.structureToAdopt(
-                forCode: code, currentSharedFolders: sharedFolders
+                forCode: code,
+                takingExampleContent: prepopulatesExampleContent,
+                currentSharedFolders: sharedFolders
             ) {
                 let lateAdoption: WizardStructure.Lists = WizardStructure.adopting(adopted)
                 chosenSharedFolders = lateAdoption.sharedFolders
@@ -1408,6 +1521,24 @@ struct NewCourseWizardView: View {
             }
         }
 
+        // The rule the three curriculum keys are written from, asked once.
+        // It reads the code this configuration is FOR rather than the
+        // field's current contents, the same way every other key here does.
+        let pagesOffered: Bool = CourseConfiguration.curriculumPagesOffered(
+            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: code),
+            payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: code),
+            prepopulatesExampleContent: prepopulatesExampleContent,
+            skeletonIsOffered: SkeletonCatalog.hasSkeleton(
+                forCode: code, takingExampleContent: prepopulatesExampleContent
+            ),
+            startsFromSkeleton: startsFromSkeleton
+        )
+        let coverageEnabled: Bool = CourseConfiguration.curriculumCoverageEnabled(
+            curriculumPagesOffered: pagesOffered,
+            includesCurriculumPages: includesCurriculumPages,
+            includesCurriculumCoverage: includesCurriculumCoverage
+        )
+
         var config: [String: Any] = [
             "course_code": code,
             "course_name": name,
@@ -1438,33 +1569,28 @@ struct NewCourseWizardView: View {
             // quietly looking somewhere else.
             "class_folder": ClassFolder.name(inPerSectionFolders: chosenPerSectionFolders),
             // The real wizard reads these as its defaults, exactly like
-            // every other answer here. False when no content exists for
-            // the code, so a stale true can never mean anything.
-            "use_skeleton": SkeletonCatalog.hasSkeleton(forCode: code) && startsFromSkeleton,
+            // every other answer here. False when no skeleton is offered
+            // for the code — including a code whose ready-made pages the
+            // teacher IS taking — so a stale true can never mean anything.
+            "use_skeleton": SkeletonCatalog.hasSkeleton(
+                forCode: code, takingExampleContent: prepopulatesExampleContent
+            ) && startsFromSkeleton,
             "prepopulate_example_content": ExampleContentCatalog.hasContent(forCode: code)
                 && prepopulatesExampleContent,
-            "include_curriculum_pages": ExampleContentCatalog.hasContent(forCode: code)
-                && prepopulatesExampleContent
-                && ExampleContentCatalog.includesCurriculum(forCode: code)
-                && includesCurriculumPages,
+            // Written exactly as they are for a payload course, because
+            // the pages are the payload's either way: the teacher who
+            // declined the ready-made lessons and kept the subject's
+            // skeleton still gets the expectations written for their code
+            // (GitHub issue #251). `setup_course.py` reads these three as
+            // its answers, so false here means the launcher never runs its
+            // new branch, whatever the interface showed.
+            "include_curriculum_pages": pagesOffered && includesCurriculumPages,
             // Depends on the curriculum pages: without them the map has
             // nothing to colour, so it is forced off here as well as
             // disabled in the interface.
-            "include_curriculum_coverage": CourseConfiguration.curriculumCoverageEnabled(
-                codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: code),
-                prepopulatesExampleContent: prepopulatesExampleContent,
-                payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: code),
-                includesCurriculumPages: includesCurriculumPages,
-                includesCurriculumCoverage: includesCurriculumCoverage
-            ),
+            "include_curriculum_coverage": coverageEnabled,
             "include_coverage_notes": CourseConfiguration.coverageNotesEnabled(
-                curriculumCoverageEnabled: CourseConfiguration.curriculumCoverageEnabled(
-                    codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: code),
-                    prepopulatesExampleContent: prepopulatesExampleContent,
-                    payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: code),
-                    includesCurriculumPages: includesCurriculumPages,
-                    includesCurriculumCoverage: includesCurriculumCoverage
-                ),
+                curriculumCoverageEnabled: coverageEnabled,
                 includesCoverageNotes: includesCoverageNotes
             ),
             "use_lcs_terminology": usesLCSTerminology,

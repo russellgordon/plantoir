@@ -206,8 +206,11 @@ final class ScheduleDeployCardTests: XCTestCase {
         let launchAgents: URL = made.root.appendingPathComponent("LaunchAgents", isDirectory: true)
         try FileManager.default.createDirectory(at: launchAgents, withIntermediateDirectories: true)
         ScheduledDeploy.launchAgentsDirectoryOverride = launchAgents
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            launchAgents.deletingLastPathComponent().appendingPathComponent("scheduled")
         defer {
             ScheduledDeploy.launchAgentsDirectoryOverride = nil
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
             try? FileManager.default.removeItem(at: made.root)
         }
 

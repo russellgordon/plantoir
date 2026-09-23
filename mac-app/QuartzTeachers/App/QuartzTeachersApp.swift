@@ -129,7 +129,10 @@ struct QuartzTeachersApp: App {
         // Not restored on relaunch: reopening would load a model before the
         // teacher had asked for one.
         WindowGroup("Assistant", id: "assistant", for: AssistWindowRequest.self) { $request in
-            if let request {
+            // A window is never opened on a course kept for reference. The
+            // menu item is not drawn on one, so this catches the ways round
+            // that: a restored scene, or a stale `openWindow(value:)`.
+            if let request, !request.namesACourseKeptForReference() {
                 AssistWindowView(
                     courseCode: request.courseCode,
                     sectionNumber: request.sectionNumber,
