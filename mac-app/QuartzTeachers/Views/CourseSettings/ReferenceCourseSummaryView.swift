@@ -107,7 +107,6 @@ struct ReferenceCourseSummaryView: View {
                     // that does the locking.
                     if census.agrees {
                         Text(ReferenceWording.pagesAreLocked)
-                        Text(ReferenceWording.aCopyTakenOutStaysLocked)
                     }
                 }
                 .foregroundStyle(.secondary)

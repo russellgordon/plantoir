@@ -1618,6 +1618,16 @@ say they cannot be changed (the lock is per-Mac, and a cloud folder strips it
 while files upload) and it may not promise the teacher will be told when an
 edit fails. `LockedPagesNote` remembers which courses have had it.
 
+It used to carry a second sentence — *"A file you copy out of it stays locked
+until you untick Locked in Get Info."* — written on the evening #207 was out
+of this release and the only way to take a page out of a reference course was
+by hand in Finder. #207 came back into the same release and its copies arrive
+unlocked, so Russell retired the sentence on 2026-09-22: a hand copy is now
+unlikely, and "Get Info" without "Finder" told a teacher nothing. The fact
+stands, for whoever meets it: a page dragged out of a reference course in
+Finder arrives locked, and Finder's Get Info panel is where it is unlocked.
+Any sentence that names Get Info must name the Finder first.
+
 ### The honest limits — in here, and never in the GUI
 
 With the directories unlocked a new file can still be ADDED to one. Anybody who
