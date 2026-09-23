@@ -159,12 +159,12 @@ enum ScheduledDeployCleanup {
         let listed: String = CourseRenamer.listed(sections)
         if sections.count == 1 {
             return "\(listed) of \(courseCode) is set to deploy on its own, and Plantoir could not "
-                + "turn that off — so nothing has been removed. Turn it off from the section’s "
-                + "menu, then try again."
+                + "turn that off — so nothing has been removed. Turn off the scheduled deploy from "
+                + "the section’s menu, then try again."
         }
         return "\(listed) of \(courseCode) are set to deploy on their own, and Plantoir could not "
-            + "turn that off — so nothing has been removed. Turn them off from the section’s "
-            + "menu, then try again."
+            + "turn that off — so nothing has been removed. Turn off the scheduled deploys from "
+            + "the section’s menu, then try again."
     }
 
     static func removalFailedAfterTurningItOff(
