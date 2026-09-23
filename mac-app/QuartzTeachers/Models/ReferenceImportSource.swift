@@ -164,9 +164,10 @@ nonisolated struct ReferenceImportSource: Sendable {
     /// rather than a working folder. Ticked on its own in that case.
     let chosenCourseFolderName: String?
 
-    /// Which rows are ticked when a folder of OLDER-layout classes was chosen,
-    /// or nil for every other shape. See `OlderCourseLayout` and
-    /// `olderLayoutTicked(_:)` for the rule.
+    /// Which rows are ticked when a folder of OLDER-layout classes (#254) or
+    /// of class website folders (#256) was chosen, or nil for every other
+    /// shape. See `olderLayoutTicked(_:)` and `checkoutLayoutTicked(_:)` for
+    /// the two rules.
     var olderLayoutTicked: Set<String>? = nil
 
     // MARK: - Computed properties
