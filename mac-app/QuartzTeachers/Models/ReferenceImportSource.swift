@@ -128,7 +128,7 @@ nonisolated struct ReferenceImportSource: Sendable {
                 return ReferenceImportWording.olderLayoutChooseOneCourseAtATime(folder: folderName)
             case .partOfAClassWebsite(let folderName, let websiteName):
                 return ReferenceImportWording.checkoutLayoutChooseTheWholeFolder(
-                    folder: folderName, checkout: websiteName
+                    folder: folderName, website: websiteName
                 )
             case .onlyTheFirstSection(let folderName, let section):
                 return ReferenceImportWording.checkoutLayoutOnlyTheFirstSection(folder: folderName, section: section)

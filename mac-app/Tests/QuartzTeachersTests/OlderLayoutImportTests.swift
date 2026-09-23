@@ -942,6 +942,14 @@ final class OlderLayoutImportTests: XCTestCase {
             return "theSharedFolder"
         case .aFolderOfOlderCourses:
             return "aFolderOfOlderCourses"
+        case .partOfAClassWebsite:
+            return "checkoutLayoutChooseTheWholeFolder"
+        case .onlyTheFirstSection:
+            return "checkoutLayoutOnlyTheFirstSection"
+        case .severalClassWebsiteCourses:
+            return "checkoutLayoutChooseOneCourseAtATime"
+        case .shortcutTrouble:
+            return "checkoutLayoutShortcut"
         }
     }
 

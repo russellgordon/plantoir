@@ -283,8 +283,8 @@ nonisolated enum ReferenceImportWording {
         + "pages stay where they are."
 
     /// A folder chosen from inside a class's website folder.
-    static func checkoutLayoutChooseTheWholeFolder(folder: String, checkout: String) -> String {
-        return "\(folder) is part of the class website kept in \(checkout). Choose \(checkout) itself."
+    static func checkoutLayoutChooseTheWholeFolder(folder: String, website: String) -> String {
+        return "\(folder) is part of the class website kept in \(website). Choose \(website) itself."
     }
 
     /// A later section: beside its row, or as the refusal when it was
