@@ -376,6 +376,10 @@ final class ReferenceCourseTests: XCTestCase {
             "The app and the contract have to say the same sentence, or Windows implements a different one."
         )
         XCTAssertEqual(ReferenceWording.pagesAreLocked, wording["pagesAreLocked"] as? String)
+        XCTAssertEqual(
+            ReferenceWording.obsidianOpensThemForReading,
+            wording["obsidianOpensThemForReading"] as? String
+        )
         XCTAssertNil(
             wording["aCopyTakenOutStaysLocked"],
             "Retired 2026-09-22: Plantoir's own copy feature unlocks what it copies, so the hand-copy sentence went."
@@ -416,6 +420,14 @@ final class ReferenceCourseTests: XCTestCase {
             XCTAssertFalse(note.contains(overclaim), "The note says “\(overclaim)”: \(note)")
         }
         XCTAssertTrue(note.contains("locked"))
+        // The Obsidian sentence says what was MEASURED (2026-09-23) and no
+        // more: reading view, a could-not-save notice, the page unchanged.
+        let obsidian: String = ReferenceWording.obsidianOpensThemForReading.lowercased()
+        XCTAssertTrue(obsidian.contains("for reading"))
+        XCTAssertTrue(obsidian.contains("stays as it was"))
+        for overclaim in ["cannot", "never", "impossible", "error", "warning", "locked"] {
+            XCTAssertFalse(obsidian.contains(overclaim), "The Obsidian sentence says “\(overclaim)”: \(obsidian)")
+        }
     }
 
     /// Rule 1, asked of the sentences themselves: nothing a teacher reads

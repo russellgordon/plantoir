@@ -104,15 +104,23 @@ nonisolated enum ReferenceWording {
     /// than caution.** It does not say the pages CANNOT be changed: the lock
     /// is per-Mac, a folder kept in iCloud Drive has it cleared while files
     /// upload, and an edit arriving from another device is not blocked. And
-    /// it does not promise the teacher will be TOLD when an edit fails —
-    /// whether Obsidian says so or swallows what was typed is exactly what
-    /// could not be measured.
+    /// it does not promise MORE than Obsidian does either.
     ///
     /// No warning icon anywhere it appears, and no "cannot" or "error": a
     /// teacher who kept a course for reference asked for this, so it reads as
     /// a fact rather than as an alarm.
     static let pagesAreLocked: String =
         "Plantoir keeps this course's pages locked, so they stay as they were."
+
+    /// What happens in Obsidian, said beside the sentence above wherever the
+    /// teacher is about to go and read. Measured by Russell on 2026-09-23 —
+    /// the one thing the run could not drive: Obsidian opens the pages in
+    /// reading view (`ReferenceReadingView`), and a page switched to editing
+    /// and typed into gets a notice that it could not be saved, with the page
+    /// left as it was. The sentence says exactly that and nothing stronger.
+    static let obsidianOpensThemForReading: String =
+        "Obsidian opens them for reading. If you switch a page to editing and type, "
+        + "Obsidian will say it couldn’t save, and the page stays as it was."
 
     // A second sentence used to follow `pagesAreLocked` here — "A file you copy
     // out of it stays locked until you untick Locked in Get Info." — written on
