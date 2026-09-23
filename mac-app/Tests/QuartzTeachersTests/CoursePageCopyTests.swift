@@ -80,6 +80,15 @@ final class CoursePageCopyTests: XCTestCase {
                     "\(name): section \(sectionNumber) does not read hidden:\n\(written)"
                 )
             }
+            // Optional: a case that must also pass the builder-agreement
+            // guard, so composing it hidden is not enough — it must COPY.
+            if let expected = oneCase["theBuilderAgrees"] as? Bool {
+                XCTAssertEqual(
+                    CopiedPageText.theBuilderWouldReadItTheSameWay(written, forSections: sections),
+                    expected,
+                    "\(name): the builder-agreement answer is wrong for:\n\(written)"
+                )
+            }
         }
     }
 
@@ -457,6 +466,46 @@ final class CoursePageCopyTests: XCTestCase {
             "The page that could not be certified was left on disk."
         )
         XCTAssertEqual(outcome.couldNotBeRemoved, [])
+    }
+
+    /// A page from the 2024–25 website-folder layout, carrying that layout's
+    /// section-2 keys, is COPIED — hidden in every section — rather than
+    /// refused. Russell's decision, 2026-09-23 (#256).
+    ///
+    /// MUST-FAIL. Without `withoutTheOldSectionTwoKeys` the composed text
+    /// still carries `draftSectionTwo:`, the builder-agreement guard refuses
+    /// any top-level line beginning `draftSection`, and the page is reported
+    /// as not copied — which is what happened to 154 of 259 real ICS3U
+    /// shared pages.
+    func testAPageCarryingTheOldSectionTwoKeysIsCopiedHidden() async throws {
+        let built: Built = try buildPair(
+            in: "old-section-two-keys",
+            pageText: "---\ndraft: false\ndraftSectionTwo: false\nenableToc: true\n"
+                + "created: 2024-10-21T07:00:00.000-0400\n"
+                + "createdForSectionTwo: 2024-09-25T07:00:00.000-0400\ntags:\n  - D3.1\n---\n"
+                + "## Introduction\n",
+            sourceMedia: []
+        )
+        let outcome: CoursePageCopyOutcome = await CoursePageCopier.copying(
+            try XCTUnwrap(built.request)
+        )
+        XCTAssertEqual(outcome.pagesCreated, ["Recursion"], "The page was not copied: \(outcome.skipped)")
+        XCTAssertEqual(outcome.skipped.count, 0)
+
+        let landed: URL = built.destination.directoryURL
+            .appendingPathComponent("Concepts/Recursion.md")
+        let text: String = try String(contentsOf: landed, encoding: .utf8)
+        for sectionNumber in [1, 2, 3] {
+            XCTAssertEqual(
+                AssistPageVisibility.answer(in: text, forSection: sectionNumber), .hidden,
+                "The copy is not hidden in section \(sectionNumber):\n\(text)"
+            )
+        }
+        for key in ["draftSectionTwo", "createdForSectionTwo"] {
+            XCTAssertFalse(text.contains(key), "The copy still carries \(key):\n\(text)")
+        }
+        XCTAssertTrue(text.contains("created: 2024-10-21T07:00:00.000-0400"), "The plain date was not kept.")
+        XCTAssertTrue(text.contains("  - D3.1"), "The tags were not kept.")
     }
 
     /// The read-back's DELETE branch, run through the real copy rather than

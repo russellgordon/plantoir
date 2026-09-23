@@ -6424,7 +6424,7 @@
             }
           ]
         },
-        "whatThePreviewShows": "Pages byte-identical, so today's build reads publishForSection1, publish, draftSection1 and draft (file-formats.json -> pageVisibility). For a SECTION 1 import that is exactly what section 1's own site read (its patched Quartz hid draft:): measured, 280 of 324 ICS3U pages and 213 of 220 ICS4U pages visible, 0 disagreements with S1's site. draftSectionTwo and createdForSectionTwo ride along inert: nothing reads them, and only section 1 comes across. Each lesson keeps its own date because unit_word is written.",
+        "whatThePreviewShows": "Pages byte-identical, so today's build reads publishForSection1, publish, draftSection1 and draft (file-formats.json -> pageVisibility). For a SECTION 1 import that is exactly what section 1's own site read (its patched Quartz hid draft:): measured, 280 of 324 ICS3U pages and 213 of 220 ICS4U pages visible, 0 disagreements with S1's site. draftSectionTwo and createdForSectionTwo ride along inert in the reference course: nothing reads them, and only section 1 comes across. Copy a Page takes both off a copied page (copyingAPageBetweenCourses.hidden.theOldSectionTwoKeys; Russell, 2026-09-23). Each lesson keeps its own date because unit_word is written.",
         "rejected": [
           {
             "what": "Resolving every entry isAliasFileKey calls an alias",
@@ -6570,6 +6570,7 @@
       "theOrderIsLoadBearing": "Per-section keys FIRST, then the plain key. Measured: writing publish: false first makes the per-section writer a complete no-op - its 'already says it' gate reads the plain key and returns the text unchanged, so NO publishForSection key is written at all.",
       "whyThePlainKeyAtAll": "It is what keeps the copy hidden in a section the destination gains LATER, by any route. Measured: all 156 of one real course's shared pages, composed with the per-section keys alone, come out VISIBLE in a section 4 they were never told about, because Quartz publishes a page that says nothing.",
       "whatComesOffFirst": "The source's own publishForSection<N>, draftSection<N> and createdSection<N>, and the plain publish: and draft:. The plain pair is stripped with the READER's key matcher and its continuation rule, never a prefix test: a naive strip of a draft: whose value sits on the line BELOW it orphans that line, YAML folds it into the last key written as the plain scalar 'false true', and the build does not hide a string that is not 'false' - so the page is PUBLISHED. Measured. The house format drops the plain keys anyway: setup_course.py's per_section_frontmatter removes plain created/publish/draft when it splits a page into per-section pairs.",
+      "theOldSectionTwoKeys": "draftSectionTwo and createdForSectionTwo - the 2024-25 website-folder layout's keys for a class's second section, and the only per-section keys a census of all four of that layout's real copies found (800 and 655 lines over 1,338 pages) - come off with the plain pair, with the same matcher and continuation rule. Russell's decision, 2026-09-23 (#256). No build since reads them, and a page still carrying draftSectionTwo would be refused by the builder-agreement guard, whose language was left unchanged: they are stripped before it is asked.",
       "whatIsKept": "Everything else the teacher wrote, created: included. A page copied from last year shows last year's date until they change it; they see the page in Obsidian before publishing, and silently rewriting a date in their own frontmatter is the larger sin.",
       "sectionsAreReReadBeforeWriting": "The destination's section numbers are read from course_config.json again immediately before the text is composed, rather than taken from the plan. A section added in another window between the two would otherwise leave the copy with nothing said about it.",
       "readBackAndDelete": {
@@ -7123,6 +7124,33 @@
           1,
           2
         ]
+      },
+      {
+        "name": "a page from the 2024-25 website-folder layout, carrying its old section-2 keys",
+        "why": "Russell's decision, 2026-09-23 (#256): draftSectionTwo and createdForSectionTwo come off the way draft: does. They were that layout's answers about its SECOND section; no build since reads either. Left on, the builder-agreement guard refused every page carrying draftSectionTwo (its top-level line begins draftSection) - measured over the real shared pages, 154 of 259 in ICS3U and 66 of 153 in ICS4U, every refusal one of those pages; stripped, 0 of 412 refused and 0 not hidden. They are stripped BEFORE the guard is asked, so the guard's language did not change. The source text is a real page's settings block. The plain created: is kept, as always.",
+        "source": "---\ndraft: true\ndraftSectionTwo: true\nenableToc: true\nexcludeBacklinks: false\ncreated: 2024-10-21T07:00:00.000-0400\ncreatedForSectionTwo: 2024-11-04T07:34:55.000-0400\ntags:\n---\nBody\n",
+        "sections": [
+          1,
+          2
+        ],
+        "mustContain": [
+          "publishForSection1: false",
+          "publishForSection2: false",
+          "publish: false",
+          "created: 2024-10-21T07:00:00.000-0400",
+          "enableToc: true"
+        ],
+        "mustNotContain": [
+          "draftSectionTwo",
+          "createdForSectionTwo",
+          "draft: true"
+        ],
+        "hiddenInSections": [
+          1,
+          2,
+          3
+        ],
+        "theBuilderAgrees": true
       }
     ],
     "cases": [
