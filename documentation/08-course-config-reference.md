@@ -4,7 +4,10 @@
 
 `courses/<CODE>/course_config.json` is the single source of truth for a
 course. It is **written** by the setup wizard
-([`setup_course.py`](04-course-setup.md)), **read and auto-extended** by the
+([`setup_course.py`](04-course-setup.md)) — and, for one kind of course only,
+by the macOS app from scratch: a class imported from the older
+folder-per-class layout has no settings file at all, so the importer writes
+one (see "Reference courses" below) — **read and auto-extended** by the
 build ([`build_site.py`](05-build-pipeline.md) appends newly discovered
 folders/files), and **statically imported** by the patched Explorer
 components at Quartz build time
@@ -140,6 +143,35 @@ reads, and what keeps the preview's site title, grade label and social card
 right. `CourseConfiguration.setCourseCode`'s own warning about a disagreeing
 pair still holds for every other course: its second half ("a deployed page
 saying another") cannot happen here, because there is no deployed page.
+
+**A class imported from the OLDER folder-per-class layout (#254) arrives with
+no settings at all**, so the importer writes them, through the same
+`CourseConfiguration.write` as everything else and with no key that is not
+already documented above: `course_code` (from the folder's name),
+`course_name` (the folder's own name, `ICS3U-S1-2023-24`), `num_sections` 1,
+`section_numbers` `[1]`, the shared and per-section folder and file lists
+(its `Thread N` folders are the per-section folders), `expandable` (every one
+of those folders), `hidden` `["Media"]`, `include_curriculum_coverage` as a
+plain `false` (the old class pages are not named the way a coverage map
+counts; a per-section map was measured to read as ON in the app's own reader
+and in `setup_course.py`), and `show_section_marker` false for `section1`
+(every import is section 1, so "S1" would be wrong for an S2).
+
+`hidden` is the set of names the site's sidebar leaves out — the Explorer's
+`omit` set, written by `update_quartz_layout`; the pages are still built and
+still reachable by link. The import writes only `Media`, because pictures are
+not pages, and the build adds `Media` itself anyway. It deliberately does NOT
+copy the wizard's own list (`WizardDefaults.hiddenItems`: Private Notes,
+Scratch Page, Key Links, Learning Goals and so on), which would hide seven of
+the ICS3U S1 entries: that list encodes how a MODERN course is organised,
+Digital Garden kept no equivalent record of what Russell hid, and a reference
+course is read to find material — every page in the sidebar is a page Copy a
+Page can offer. A teacher who wants a tidier sidebar changes `hidden` in the
+settings file like any other. Then the ordinary
+reference-course keys are added exactly as for any other import. The exact
+lists, as contract cases, are `shared-rules.json` →
+`referenceCourses.importing.olderLayout.placement`; the reasoning is
+[09 → "The older layout"](09-mac-app.md).
 
 *Rejected: a separate `display_code` key.* A third spelling of one fact, and
 it would leave `build_site.py` writing `ICS3U-2025` into the site title of a

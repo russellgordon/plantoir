@@ -47,6 +47,15 @@ enum ReferenceImporter {
     /// What happened to one course.
     enum Outcome: Equatable {
         case imported(ReferenceCopier.Made)
+
+        /// An older-layout class that came across with something MISSING:
+        /// some or all of its shared pages and pictures (none were found
+        /// beside it and none were chosen, or the folder held only some),
+        /// and/or files that were left out because they only pointed
+        /// somewhere else or would have taken a name the course uses — each
+        /// NAMED. Its own case so the summary says so; never a refusal
+        /// (Russell, decision 2).
+        case importedWithSomethingMissing(ReferenceCopier.Made, sharedPagesMissing: Bool, leftOut: [String])
         case notImported(course: String, reason: String)
 
         /// The teacher stopped it. Always last, and everything before it in
@@ -174,21 +183,59 @@ enum ReferenceImporter {
             }
 
             do {
-                let made: ReferenceCopier.Made = try await ReferenceImporter.importOneCourse(
-                    request,
-                    named: folderName,
-                    stagedAt: stagingURL,
-                    into: destinationURL,
-                    leavingBehind: namesToLeaveBehind,
-                    courseNumber: courseNumber,
-                    courseCount: requests.count,
-                    progress: progress
-                )
-                ActivityTrail.note(
-                    .courseImportedForReference,
-                    ReferenceImporter.trailLine(for: made, broughtInFrom: sourceFolderURL)
-                )
-                outcomes.append(.imported(made))
+                let made: ReferenceCopier.Made
+                if request.course.olderLayout != nil {
+                    let result: (made: ReferenceCopier.Made, plan: OlderCourseLayout.Plan) =
+                        try await ReferenceImporter.importOneOlderClass(
+                            request,
+                            named: folderName,
+                            stagedAt: stagingURL,
+                            into: destinationURL,
+                            leavingBehind: namesToLeaveBehind,
+                            courseNumber: courseNumber,
+                            courseCount: requests.count,
+                            progress: progress
+                        )
+                    made = result.made
+                    // Named after the CLASS folder, not the folder of classes
+                    // it sat in: "where did this ICS3U come from" is answered
+                    // by ICS3U-S1-2023-24.
+                    ActivityTrail.note(
+                        .courseImportedForReference,
+                        ReferenceImporter.trailLine(for: made, broughtInFrom: request.course.directoryURL)
+                    )
+                    ActivityTrail.note(
+                        .courseImportedFromTheOlderLayout,
+                        ReferenceImporter.olderLayoutTrailLine(
+                            classFolderName: request.course.folderName, made: made, plan: result.plan
+                        )
+                    )
+                    let sharedPagesMissing: Bool = !result.plan.shared.missingNames.isEmpty
+                    let leftOut: [String] = result.plan.leftOutAndLost
+                    if !sharedPagesMissing && leftOut.isEmpty {
+                        outcomes.append(.imported(made))
+                    } else {
+                        outcomes.append(.importedWithSomethingMissing(
+                            made, sharedPagesMissing: sharedPagesMissing, leftOut: leftOut
+                        ))
+                    }
+                } else {
+                    made = try await ReferenceImporter.importOneCourse(
+                        request,
+                        named: folderName,
+                        stagedAt: stagingURL,
+                        into: destinationURL,
+                        leavingBehind: namesToLeaveBehind,
+                        courseNumber: courseNumber,
+                        courseCount: requests.count,
+                        progress: progress
+                    )
+                    ActivityTrail.note(
+                        .courseImportedForReference,
+                        ReferenceImporter.trailLine(for: made, broughtInFrom: sourceFolderURL)
+                    )
+                    outcomes.append(.imported(made))
+                }
                 folderNames.append(folderName)
                 shelved.append(ReferenceCourseRule.Shelved(
                     displayCode: made.displayCode,
@@ -241,6 +288,56 @@ enum ReferenceImporter {
         let sections: String = made.sectionCount == 1 ? "1 section" : "\(made.sectionCount) sections"
         return "imported \(made.displayCode) for reference from \(sourceFolderURL.lastPathComponent) "
              + "as \(made.folderName) — \(year), \(sections)"
+    }
+
+    /// The second trail line for an older-layout class: where its shared
+    /// pages came from and HOW that folder was found, how much of what the
+    /// class used was there, what is missing, and what was left out. "Where
+    /// are this course's pictures" is the question a report about one of
+    /// these will ask, and only this line answers it. Folder and file NAMES
+    /// only; never what is written on a page.
+    static func olderLayoutTrailLine(
+        classFolderName: String,
+        made: ReferenceCopier.Made,
+        plan: OlderCourseLayout.Plan
+    ) -> String {
+        let shared: OlderCourseLayout.SharedContent = plan.shared
+        var from: String
+        switch shared.howFound {
+        case .notNeeded:
+            from = "no shared pages needed"
+        case .byItsName:
+            from = "shared pages from \(shared.folderName ?? "?") (found by its name)"
+        case .chosen:
+            from = "shared pages from \(shared.folderName ?? "?") (chosen by hand)"
+        case .none:
+            from = "no shared folder found or chosen"
+        }
+        var line: String = "imported \(classFolderName) from the older layout as \(made.folderName) — \(from)"
+        if shared.linkCount > 0 {
+            line += ", \(shared.foundNames.count) of \(shared.linkCount) brought across"
+            if shared.missingNames.isEmpty {
+                line += "; nothing missing"
+            } else {
+                line += "; missing: " + shared.missingNames.joined(separator: ", ")
+            }
+        }
+        var addOns: Int = 0
+        for entry in plan.leftOut where entry.reason == .addOns {
+            addOns += 1
+        }
+        line += "; \(plan.linksReplaced) links replaced by the shared folder's own"
+        let lost: [String] = plan.leftOutAndLost
+        if lost.isEmpty {
+            line += "; nothing else left out"
+        } else {
+            line += "; left out \(lost.count): " + lost.joined(separator: ", ")
+        }
+        line += "; \(addOns) Obsidian add-on entries left behind"
+        if plan.createsEmptyMedia {
+            line += "; an empty Media folder was made"
+        }
+        return line
     }
 
     /// The trail line for a run the teacher stopped.
@@ -337,6 +434,110 @@ enum ReferenceImporter {
             displayCode: staged.displayCode,
             schoolYear: staged.schoolYear,
             sectionCount: staged.sectionCount
+        )
+    }
+
+    /// One OLDER-layout class: planned again (the sheet's numbers were read
+    /// when it opened), copied piece by piece into the hidden folder, given
+    /// its settings, and then made into a reference course by exactly the
+    /// code every other import uses. Everything after the copy is
+    /// `importOneCourse`'s own sequence.
+    private static func importOneOlderClass(
+        _ request: Request,
+        named folderName: String,
+        stagedAt stagingURL: URL,
+        into destinationURL: URL,
+        leavingBehind leftBehindNames: Set<String>,
+        courseNumber: Int,
+        courseCount: Int,
+        progress: @escaping @Sendable @MainActor (Progress) -> Void
+    ) async throws -> (made: ReferenceCopier.Made, plan: OlderCourseLayout.Plan) {
+        let fileManager: FileManager = FileManager.default
+        let displayCode: String = request.course.courseCode
+        let shared: OlderCourseLayout.SharedContent? = request.course.olderLayout?.shared
+
+        let plan: OlderCourseLayout.Plan = await ReferenceImporter.planOffTheMainActor(
+            classFolderURL: request.course.directoryURL,
+            sharedFolderURL: shared?.folderURL,
+            howFound: shared?.howFound ?? .none,
+            leavingBehind: leftBehindNames
+        )
+        if let unreadable = plan.unreadableFolders.first {
+            throw ReferenceTreeCopier.Trouble.couldNotRead(name: unreadable)
+        }
+
+        progress(Progress(
+            courseCode: displayCode,
+            courseNumber: courseNumber,
+            courseCount: courseCount,
+            copiedBytes: 0,
+            totalBytes: plan.byteCount
+        ))
+
+        try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+
+        let totalBytes: Int64 = plan.byteCount
+        try await ReferenceTreeCopier.copy(
+            placements: plan.placements, into: stagingURL
+        ) { copiedBytes in
+            Task { @MainActor in
+                progress(Progress(
+                    courseCode: displayCode,
+                    courseNumber: courseNumber,
+                    courseCount: courseCount,
+                    copiedBytes: copiedBytes,
+                    totalBytes: totalBytes
+                ))
+            }
+        }
+
+        // Nothing supplied `Media`: an empty one, so the build does not
+        // announce on every preview what the sheet already said, and the
+        // built site's Media is not a link to nothing.
+        if plan.createsEmptyMedia {
+            try fileManager.createDirectory(
+                at: stagingURL.appendingPathComponent("Media"), withIntermediateDirectories: false
+            )
+        }
+
+        // Settings, through the one writer every other config goes through.
+        let settings: CourseConfiguration = CourseConfiguration(
+            values: plan.settingsValues(), lastSavedData: Data()
+        )
+        try settings.write(to: stagingURL.appendingPathComponent(ReferenceImportSource.configFileName))
+
+        // As `importOneCourse`: a source that was itself frozen hands its
+        // locks to the copy.
+        ReferenceLock.clearLock(at: stagingURL)
+
+        let staged: ReferenceCopier.Made = try ReferenceCopier.makeIntoAReferenceCourse(
+            at: stagingURL, schoolYear: request.schoolYear
+        )
+        try fileManager.moveItem(at: stagingURL, to: destinationURL)
+
+        let made: ReferenceCopier.Made = ReferenceCopier.Made(
+            folderName: folderName,
+            displayCode: staged.displayCode,
+            schoolYear: staged.schoolYear,
+            sectionCount: staged.sectionCount
+        )
+        return (made: made, plan: plan)
+    }
+
+    /// The older-layout plan, off the main actor. `@concurrent` for the
+    /// reason `surveyOffTheMainActor` gives.
+    @concurrent
+    private nonisolated static func planOffTheMainActor(
+        classFolderURL: URL,
+        sharedFolderURL: URL?,
+        howFound: OlderCourseLayout.HowFound,
+        leavingBehind leftBehindNames: Set<String>
+    ) async -> OlderCourseLayout.Plan {
+        return OlderCourseLayout.plan(
+            classFolderURL: classFolderURL,
+            sharedFolderURL: sharedFolderURL,
+            howFound: howFound,
+            leavingBehind: leftBehindNames
         )
     }
 
