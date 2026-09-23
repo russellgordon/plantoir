@@ -573,7 +573,7 @@ final class QuartzCheckoutImportTests: XCTestCase {
         XCTAssertTrue(trail.contains("imported ICS3U for reference from S1 as ICS3U-2024"), "\(trail)")
         XCTAssertTrue(trail.contains("imported ICS3U section 1 from "), "\(trail)")
         XCTAssertTrue(trail.contains("(through the shortcut S1) as ICS3U-2024 — section told by its front page"), "\(trail)")
-        XCTAssertTrue(trail.contains("; 13 files from source-ics3u; class pages called Thread (1 placeholder pages set aside)"), "\(trail)")
+        XCTAssertTrue(trail.contains("; 13 files from source-ics3u; class pages called Thread (1 placeholder page set aside)"), "\(trail)")
         XCTAssertTrue(trail.contains(
             "; left behind, not lost: the website's own program files (4), 7 links replaced by what they showed, "
             + "editing folders vault-ics3u-s1 (2), other sections s2 (2), Obsidian add-on entries (2); nothing lost"

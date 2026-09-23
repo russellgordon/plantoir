@@ -406,7 +406,8 @@ enum ReferenceImporter {
         if let word = plan.unitWord {
             line += "; class pages called \(word)"
             if plan.placeholderPages > 0 {
-                line += " (\(plan.placeholderPages) placeholder pages set aside)"
+                let noun: String = plan.placeholderPages == 1 ? "page" : "pages"
+                line += " (\(plan.placeholderPages) placeholder \(noun) set aside)"
             }
         } else {
             line += "; no single word for its class pages"
