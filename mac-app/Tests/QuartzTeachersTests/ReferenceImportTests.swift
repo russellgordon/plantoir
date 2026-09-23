@@ -534,6 +534,8 @@ final class ReferenceImportTests: XCTestCase {
             case .notImported(let course, let reason):
                 refused.append(course)
                 XCTAssertFalse(reason.isEmpty, "A course that did not come across says why.")
+            case .importedWithSharedPagesMissing:
+                XCTFail("A modern course has no older-layout shared pages to miss.")
             case .stopped:
                 XCTFail("Nothing was stopped.")
             }
@@ -1187,6 +1189,8 @@ final class ReferenceImportTests: XCTestCase {
             return "insideTheFolderYouHaveOpen"
         case .holdsTheFolderYouHaveOpen:
             return "holdsTheFolderYouHaveOpen"
+        case .theSharedFolder:
+            return "theSharedFolder"
         }
     }
 
