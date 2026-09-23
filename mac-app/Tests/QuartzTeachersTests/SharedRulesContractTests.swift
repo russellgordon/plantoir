@@ -764,6 +764,82 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
+    /// The third situation, and the sentences around the skeleton toggle.
+    ///
+    /// All authored, all shown by both apps, and every one of them either
+    /// new on 2026-09-21 or reworded by it (issue #248) — which is exactly
+    /// when a sentence is most likely to drift, since Windows will copy
+    /// them from here rather than from the Swift.
+    func testTheStartingContentSentencesAreTheOnesInTheContract() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("wizard")
+
+        XCTAssertEqual(
+            WizardWording.noStartingContentNote,
+            section["noStartingContentNote"] as? String,
+            "What a teacher reads after declining ready-made pages AND the skeleton. It is a "
+            + "second sentence rather than a reword of noExampleContentNote, whose first "
+            + "clause is false for a code that HAS ready-made pages — see "
+            + "wizard.whenTheNoteIsShown, situation 3."
+        )
+        XCTAssertEqual(
+            WizardWording.skeletonToggleLabelTemplate,
+            section["skeletonToggleLabel"] as? String,
+            "The skeleton toggle's own label. {subject} is the family's label, lowercased."
+        )
+        XCTAssertEqual(
+            WizardWording.skeletonToggleLabelForAGeneralSkeleton,
+            section["skeletonToggleLabelForAGeneralSkeleton"] as? String,
+            "The label for the GENERAL family, whose own label is \"This Course\" and which "
+            + "the template renders as \"Start from a this course skeleton\"."
+        )
+        XCTAssertEqual(
+            WizardWording.skeletonToggleCaption,
+            section["skeletonToggleCaption"] as? String,
+            "The caption for a code with no ready-made pages — unchanged wording, pinned for "
+            + "the first time so that the variant beside it cannot drift away from it."
+        )
+        XCTAssertEqual(
+            WizardWording.skeletonToggleCaptionWhenExampleContentIsDeclined,
+            section["skeletonToggleCaptionWhenExampleContentIsDeclined"] as? String,
+            "The caption for a code whose ready-made pages were just declined, where the one "
+            + "above opens by saying there is no ready-made course for the code."
+        )
+        XCTAssertEqual(
+            WizardWording.structureFromExampleNote,
+            section["structureFromExampleNote"] as? String,
+            "What stands in for the structure editor while the example content chooses the "
+            + "folders. Its second sentence moved with issue #248: turning pre-populating off "
+            + "now leaves the SUBJECT's lists on screen, not the factory ones."
+        )
+    }
+
+    /// The general family really is the one the label is written for, and
+    /// the template really does render the sentence that reads as a typo.
+    ///
+    /// Without this the two keys above could both be right while nothing
+    /// chose between them — and the case that matters is a real course
+    /// code, not only a club: MCMPR11's prefix is in no map entry, so the
+    /// one British Columbia code with ready-made pages falls to `general`.
+    func testTheGeneralFamilyGetsTheLabelWrittenForIt() throws {
+        let general: SkeletonCatalog.Family = try XCTUnwrap(
+            SkeletonCatalog.family(forCode: "MCMPR11")
+        )
+        XCTAssertEqual(general.name, SkeletonCatalog.generalFamilyName)
+        XCTAssertEqual(
+            WizardWording.skeletonToggleLabel(
+                forFamilyNamed: general.name, label: general.label
+            ),
+            WizardWording.skeletonToggleLabelForAGeneralSkeleton
+        )
+
+        let drama: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.family(forCode: "ADA1O"))
+        XCTAssertEqual(
+            WizardWording.skeletonToggleLabel(forFamilyNamed: drama.name, label: drama.label),
+            "Start from a drama skeleton",
+            "Every other family reads its own subject back, lowercased."
+        )
+    }
+
     // MARK: - The skeleton toggle, in both directions
 
     /// The structure editor shows what will actually be created: the toggle
@@ -784,7 +860,7 @@ final class SharedRulesContractTests: XCTestCase {
         // a floor four cases down lets four be deleted without a word, in a
         // check whose whole purpose is to notice that. Raise it with the list.
         XCTAssertGreaterThanOrEqual(
-            cases.count, 13,
+            cases.count, 17,
             "wizard.skeletonToggle has lost cases. The list is the acceptance list for both "
             + "apps; a case removed here is a behaviour neither suite checks any more."
         )
@@ -808,12 +884,19 @@ final class SharedRulesContractTests: XCTestCase {
             // Where a new wizard opens, and what the guard in
             // adoptSkeletonStructure() reads when a code is typed.
             var skeletonIsWanted: Bool = true
+            // Where the example-content toggle starts. ABSENT MEANS TRUE, as
+            // the contract says: that is where a new wizard opens, and it
+            // leaves every case written before 2026-09-21 meaning exactly
+            // what it meant. Read with `as? Bool ?? true` rather than
+            // unwrapped, so a case that says nothing about it still runs.
+            var takesExampleContent: Bool = given["takesExampleContent"] as? Bool ?? true
 
             for step in try XCTUnwrap(testCase["steps"] as? [String]) {
                 switch step {
                 case "turnOn":
                     skeletonIsWanted = true
-                    adopt(forCode: code, into: &lists, snapshot: &snapshot)
+                    adopt(forCode: code, takingExampleContent: takesExampleContent,
+                          into: &lists, snapshot: &snapshot)
                 case "turnOff":
                     skeletonIsWanted = false
                     lists = WizardStructure.restoringDefaults(
@@ -824,8 +907,28 @@ final class SharedRulesContractTests: XCTestCase {
                     // What `adoptSkeletonStructure()` does on a change to the
                     // course code — nothing at all while the toggle is off.
                     if skeletonIsWanted {
-                        adopt(forCode: otherCode, into: &lists, snapshot: &snapshot)
+                        adopt(forCode: otherCode, takingExampleContent: takesExampleContent,
+                              into: &lists, snapshot: &snapshot)
                     }
+                case "declineExampleContent":
+                    // The teacher turns the ready-made pages down, which is
+                    // what reveals the skeleton. Adopts for THIS course code,
+                    // through the same guard: a teacher who declined the
+                    // skeleton first must not be handed it back.
+                    takesExampleContent = false
+                    if skeletonIsWanted {
+                        adopt(forCode: code, takingExampleContent: takesExampleContent,
+                              into: &lists, snapshot: &snapshot)
+                    }
+                case "takeExampleContent":
+                    // …and changes their mind, which retires the skeleton
+                    // again and puts back what a teacher who never touched
+                    // the toggle would have.
+                    takesExampleContent = true
+                    lists = WizardStructure.restoringDefaults(
+                        in: lists, adopted: snapshot, usesLCSTerminology: usesLCSTerminology
+                    )
+                    snapshot = nil
                 default:
                     XCTFail("\(name): unknown step \"\(step)\"")
                 }
@@ -836,6 +939,53 @@ final class SharedRulesContractTests: XCTestCase {
                 family: family, vocabulary: vocabulary, caseName: name
             )
             XCTAssertEqual(lists, expected, "wizard.skeletonToggle → \(name)")
+
+            // What the file says, where the case pins it — read out of the
+            // PRODUCTION config writer rather than recomputed here.
+            //
+            // Recomputing `hasSkeleton(…) && skeletonIsWanted` in the runner
+            // was this assertion's first shape, and it pinned the RULE while
+            // leaving the wiring free: deleting the predicate from
+            // `buildConfigurationDictionary` left the case green, which is
+            // exactly the gap between "the rule is right" and "the file the
+            // Create button writes is right". The wizard is built through the
+            // initialiser with the state the steps left behind — the one seam
+            // that works, since `@State` never takes on a view that is not on
+            // screen (`WizardStructure.swift`).
+            let expectedUseSkeleton: Bool? = testCase["expectSavedUseSkeleton"] as? Bool
+            // Absent means "not asserted", exactly as the contract says —
+            // most cases are about the five lists and say nothing about
+            // the curriculum.
+            let expectedCurriculumPages: Bool? = testCase["expectSavedIncludeCurriculumPages"] as? Bool
+            if expectedUseSkeleton != nil || expectedCurriculumPages != nil {
+                let wizard: NewCourseWizardView = NewCourseWizardView(
+                    courseCode: code,
+                    prepopulatesExampleContent: takesExampleContent,
+                    startsFromSkeleton: skeletonIsWanted,
+                    sharedFolders: lists.sharedFolders,
+                    sharedFiles: lists.sharedFiles,
+                    perSectionFolders: lists.perSectionFolders,
+                    perSectionFiles: lists.perSectionFiles,
+                    gradedFolders: lists.gradedFolders
+                )
+                let configuration: [String: Any] = wizard.buildConfigurationDictionary(
+                    code: code, name: "Contract Case"
+                )
+                if let expectedUseSkeleton {
+                    XCTAssertEqual(
+                        configuration["use_skeleton"] as? Bool, expectedUseSkeleton,
+                        "wizard.skeletonToggle → \(name): use_skeleton in course_config.json"
+                    )
+                }
+                if let expectedCurriculumPages {
+                    XCTAssertEqual(
+                        configuration["include_curriculum_pages"] as? Bool,
+                        expectedCurriculumPages,
+                        "wizard.skeletonToggle → \(name): include_curriculum_pages in "
+                        + "course_config.json"
+                    )
+                }
+            }
         }
     }
 
@@ -2006,13 +2156,15 @@ final class SharedRulesContractTests: XCTestCase {
             .section("scheduledPublishStopped")
         let sentences: [String: Any] = try XCTUnwrap(section["sentences"] as? [String: Any])
 
-        let cases: [(ScheduledPublishOutcome.Kind, String)] = [
-            (.neededAnAnswer, "neededAnAnswer"),
-            (.buildNeededAnAnswer, "buildNeededAnAnswer"),
-            (.didNotFinish, "didNotFinish"),
-            (.succeeded, "succeeded"),
-        ]
-        for (kind, key) in cases {
+        // Walked from `allCases`, NEVER from a list retyped here. A
+        // hard-coded list of four is how `tooLateToRun` reached both the
+        // contract and the Swift on 2026-09-20 and was pinned to neither: the
+        // one sentence Windows would implement FROM the contract was the one
+        // sentence the mac did not check against it. `contractKey(for:)` is an
+        // exhaustive switch, so a sixth kind cannot compile without being
+        // given a key here.
+        for kind in ScheduledPublishOutcome.Kind.allCases {
+            let key: String = SharedRulesContractTests.contractKey(for: kind)
             let template: String = try XCTUnwrap(sentences[key] as? String)
             let expected: String = template
                 .replacingOccurrences(of: "{course}", with: "ICS3U")
@@ -2049,12 +2201,7 @@ final class SharedRulesContractTests: XCTestCase {
 
         var built: [String] = []
         for kind in ScheduledPublishOutcome.Kind.allCases {
-            switch kind {
-            case .neededAnAnswer: built.append("neededAnAnswer")
-            case .buildNeededAnAnswer: built.append("buildNeededAnAnswer")
-            case .didNotFinish: built.append("didNotFinish")
-            case .succeeded: built.append("succeeded")
-            }
+            built.append(SharedRulesContractTests.contractKey(for: kind))
         }
         built.sort()
 
@@ -2252,6 +2399,22 @@ final class SharedRulesContractTests: XCTestCase {
     // same file is the shape that drifts, and the toolchain's gate is the
     // right home for a claim about a toolchain file.
 
+    /// What the contract calls one outcome kind.
+    ///
+    /// ONE exhaustive switch, walked by the kinds test AND the sentences test,
+    /// so a kind added to the enum cannot compile until somebody has given it
+    /// a contract key — and then both tests reach it at once. Two lists, one
+    /// per test, is what let `tooLateToRun` land unpinned.
+    static func contractKey(for kind: ScheduledPublishOutcome.Kind) -> String {
+        switch kind {
+        case .neededAnAnswer: return "neededAnAnswer"
+        case .buildNeededAnAnswer: return "buildNeededAnAnswer"
+        case .didNotFinish: return "didNotFinish"
+        case .succeeded: return "succeeded"
+        case .tooLateToRun: return "tooLateToRun"
+        }
+    }
+
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -2268,11 +2431,14 @@ final class SharedRulesContractTests: XCTestCase {
     /// is never overwritten and no snapshot is taken.
     private func adopt(
         forCode code: String,
+        takingExampleContent: Bool,
         into lists: inout WizardStructure.Lists,
         snapshot: inout WizardStructure.Lists?
     ) {
         guard let adoptable = SkeletonCatalog.structureToAdopt(
-            forCode: code, currentSharedFolders: lists.sharedFolders
+            forCode: code,
+            takingExampleContent: takingExampleContent,
+            currentSharedFolders: lists.sharedFolders
         ) else {
             return
         }

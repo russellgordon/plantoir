@@ -148,6 +148,20 @@ $script:IMAGE_REF = $null
 if ($args.Count -lt 2) { Show-Help; exit 1 }
 
 $COURSE_CODE = $args[0].ToUpperInvariant()
+
+# A course code may not begin with a dot, and the refusal is here rather than
+# in a comment claiming it cannot happen. Plantoir builds a reference course
+# under a HIDDEN folder inside courses/ and renames it into place as the last
+# act; handed that hidden name, this script used to treat it as an ordinary
+# course, and during the copy there is no marker yet to refuse it. The app can
+# never pass such a name, but a person or another program can type one.
+if ($COURSE_CODE -like '.*') {
+    Write-Host ""
+    Write-Host "A course code cannot begin with a dot."
+    Write-Host "   Choose one of your courses - the codes in Plantoir's sidebar."
+    Write-Host ""
+    exit 1
+}
 $SECTION_NUM = $args[1]
 $DIAGNOSE    = ''
 $TEAM_SLUG   = ''
@@ -223,6 +237,85 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
     Write-Host ("Continuing with: {0}" -f $COURSE_CODE)
   }
   Write-Host ""
+}
+
+# ---------- A course kept for reference is never deployed ----------
+#
+# HERE, early, for the same reason deploy.sh checks here: this script's own
+# folder-publish branch copies host-side and never enters the container, so
+# deploy.py's refusal never runs on that path. A guard written only in the
+# shared Python would leave the folder destination wide open. verify.sh greps
+# BOTH launchers for this, from the mac, so its absence here is caught on that
+# side rather than only by somebody noticing.
+#
+# Plain PowerShell, reading the settings file directly: this path needs no
+# python on the host and must not start to.
+#
+# FAILS CLOSED — a settings file that is there and cannot be read refuses. A
+# settings file that is ABSENT is not this check's business; the course-folder
+# check further down says that in its own words.
+#
+# The sentence is a constant so a test can compare it with
+# contracts/shared-rules.json -> referenceCourses.refusal.sentence.
+$REFERENCE_COURSE_REFUSAL = "is kept for reference, so it is never deployed. Deploy the course you are teaching instead."
+$referenceCfg = Join-Path -Path $ScriptDir -ChildPath ("courses\{0}\course_config.json" -f $COURSE_CODE)
+# -PathType Leaf: Test-Path matches CONTAINERS too, so a folder named
+# course_config.json passed this and then threw inside Get-Content, refusing a
+# course the mac and the shared Python both allow. One word, and the four
+# readers agree on that row.
+if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
+  $referenceText = $null
+  try {
+    $referenceText = Get-Content -LiteralPath $referenceCfg -Raw -ErrorAction Stop
+  } catch {
+    Write-Host ""
+    Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
+    Write-Host "   its settings file could not be read. Nothing was published."
+    exit 1
+  }
+  # .NET regex: `\s` matches a newline, so no flattening is needed here — and
+  # `-match` is case-INSENSITIVE by default in PowerShell, which is why the
+  # bash twin spells the value out as [Tt][Rr][Uu][Ee] rather than relying on
+  # a `-i` the two shells would not share. The table of inputs both launchers
+  # and the shared Python must agree on is
+  # contracts/shared-rules.json -> referenceCourses.markerAgreement.
+  # A marker that is there with a value that is neither true nor false. Same
+  # rule and the same sentence as the bash twin.
+  # An object KEY written with a \u escape — see the bash twin for why, and
+  # why VALUES are left alone.
+  if ($referenceText -cmatch '[{,]\s*"[^"]*\\u[0-9a-fA-F]{4}[^"]*"\s*:') {
+    Write-Host ""
+    Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
+    Write-Host "   its settings say something other than true or false. Nothing was published."
+    Write-Host ""
+    exit 1
+  }
+  if (($referenceText -cmatch '"[^"]*ept_for_reference"') -and
+      -not ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Tt][Rr][Uu][Ee]') -and
+      -not ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Ff][Aa][Ll][Ss][Ee]')) {
+    Write-Host ""
+    Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
+    Write-Host "   its settings say something other than true or false. Nothing was published."
+    Write-Host ""
+    exit 1
+  }
+  # -cmatch, case-SENSITIVE. `-match` is case-insensitive in PowerShell, and
+  # that applied to the KEY as well as the value — so "KEPT_FOR_REFERENCE"
+  # refused here while the mac and the Python allowed it, stranding a Windows
+  # teacher with a live course whose Deploy button could never work. JSON keys
+  # are case-sensitive; the value's own case is spelled out instead.
+  if ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Tt][Rr][Uu][Ee]') {
+    # The code a TEACHER reads, which for a reference course is deliberately
+    # not the folder name. Falls back to the folder when there is none.
+    $referenceCode = $COURSE_CODE
+    if ($referenceText -match '"course_code"\s*:\s*"([^"]*)"') {
+      if ($Matches[1]) { $referenceCode = $Matches[1] }
+    }
+    Write-Host ""
+    Write-Host ("{0} {1}" -f $referenceCode, $REFERENCE_COURSE_REFUSAL)
+    Write-Host ""
+    exit 1
+  }
 }
 
 function Test-CarriesLiveReload([string]$root) {

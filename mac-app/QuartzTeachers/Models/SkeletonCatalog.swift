@@ -1,16 +1,21 @@
 import Foundation
 
 /// Answers one question for the new-course wizard: what shape should a
-/// course start in when no ready-made example content exists for its code?
+/// course start in when it is not taking ready-made example content?
 ///
-/// Eighteen course codes have real example content. Every other Ontario
-/// code — around 1,900 of them — gets a SKELETON instead: folders that suit
-/// the subject, a semester of class pages to rename, a site tour, and
-/// placeholder pages saying what belongs where. The pages live in the
-/// bundled `support/skeletons/<family>/` folders and are installed by the
-/// real setup wizard; the app only needs to know which family a code
-/// belongs to, so the folder list it offers matches the pages that will
-/// arrive.
+/// Thirty-eight course codes have real example content written for them.
+/// Every other Ontario code — around 1,900 of them — has a SKELETON
+/// instead: folders that suit the subject, a semester of class pages to
+/// rename, a site tour, and placeholder pages saying what belongs where.
+/// The pages live in the bundled `support/skeletons/<family>/` folders and
+/// are installed by the real setup wizard; the app only needs to know which
+/// family a code belongs to, so the folder list it offers matches the pages
+/// that will arrive.
+///
+/// A code with example content has a skeleton too, and gets it the moment
+/// the teacher turns the example content down — see
+/// `hasSkeleton(forCode:takingExampleContent:)`, which is the one place
+/// that rule lives.
 ///
 /// The mapping is by three-letter prefix — ADA is drama, AMU is music, SCH
 /// is chemistry, MCV is calculus — falling back to a generic skeleton for
@@ -32,6 +37,15 @@ enum SkeletonCatalog {
         let curriculumFolder: String?
         let gradedFolders: [String]
     }
+
+    // MARK: - Stored properties
+
+    /// The family a code with no subject of its own falls back to — club
+    /// codes, custom codes, and any prefix the map does not carry. Named
+    /// here because its own label ("This Course") is written for the
+    /// skeleton's PAGES rather than for a sentence, so the wizard has a
+    /// sentence of its own for it (`WizardWording.skeletonToggleLabel`).
+    nonisolated static let generalFamilyName: String = "general"
 
     // MARK: - Functions
 
@@ -147,11 +161,15 @@ enum SkeletonCatalog {
     }
 
     /// The structure a course of this code should adopt, or nil when
-    /// nothing should change: either the code has real example content
-    /// (which chooses its own folders), or the teacher has edited the
-    /// folder list and their edit must survive a change to the code.
-    static func structureToAdopt(forCode code: String, currentSharedFolders: [String]) -> Family? {
-        if ExampleContentCatalog.hasContent(forCode: code) {
+    /// nothing should change: either no skeleton is offered for it at all
+    /// (`hasSkeleton(forCode:takingExampleContent:)` — the example content
+    /// the teacher is TAKING chooses its own folders), or the teacher has
+    /// edited the folder list and their edit must survive a change to the
+    /// code.
+    static func structureToAdopt(forCode code: String,
+                                 takingExampleContent: Bool,
+                                 currentSharedFolders: [String]) -> Family? {
+        if !hasSkeleton(forCode: code, takingExampleContent: takingExampleContent) {
             return nil
         }
         guard let candidate = family(forCode: code) else {
@@ -230,10 +248,30 @@ enum SkeletonCatalog {
         return (hidden, expandable)
     }
 
-    /// True when a skeleton would be offered for this code — which is only
-    /// when there is no example content, since example content is better.
-    static func hasSkeleton(forCode code: String) -> Bool {
-        if ExampleContentCatalog.hasContent(forCode: code) {
+    /// True when a skeleton is OFFERED for this code: a family exists for
+    /// its prefix AND the teacher is not taking the example content written
+    /// for it.
+    ///
+    /// The whole rule, in one place, because three surfaces ask it — the
+    /// wizard's Starting Content section, the structure editor's adoption
+    /// (`structureToAdopt`), and the config writer's `use_skeleton`. Three
+    /// copies were what let them disagree.
+    ///
+    /// Example content is better than a skeleton, which is why it wins
+    /// whenever a teacher is taking it. It is not better than a skeleton
+    /// when they have just turned it DOWN, and until 2026-09-21 this
+    /// returned false for all 38 payload codes whatever the teacher chose —
+    /// so declining the ready-made pages gave EMPTY folders (measured: an
+    /// ICS4U made that way has 18 pages against the skeleton's 47, and
+    /// `course_config.json` said `use_skeleton: false` whatever the wizard
+    /// had shown). GitHub issue #248; Windows'
+    /// `SkeletonCatalog.HasSkeleton` takes the same parameter.
+    ///
+    /// `takingExampleContent:` has no default value on purpose: a call site
+    /// that has not been made to think about the example-content toggle
+    /// should fail to compile rather than quietly pick an answer.
+    static func hasSkeleton(forCode code: String, takingExampleContent: Bool) -> Bool {
+        if takingExampleContent && ExampleContentCatalog.hasContent(forCode: code) {
             return false
         }
         return family(forCode: code) != nil

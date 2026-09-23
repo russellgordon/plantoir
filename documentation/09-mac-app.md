@@ -1011,6 +1011,52 @@ curriculum folder is what let the retired sentence sit unguarded, and the
 banned-word sweep could not stand in for it — a banned word catches only that
 word.
 
+## The wizard's Starting Content section, and what governs what
+
+Five toggles can appear there, and their ORDER is their dependency, read
+top to bottom:
+
+```
+[ ] Pre-populate course with example content
+[x] Start from a computer studies skeleton
+[x] Include Ontario curriculum pages
+[x] Include the curriculum coverage map
+[x] Explain the map on the page
+```
+
+The three curriculum toggles used to be drawn directly under the
+example-content toggle, inside its `if`, because that was the only thing
+that could switch them on. Since
+[#251](https://github.com/russellgordon/plantoir/issues/251) the skeleton
+toggle can too — a teacher who declines the ready-made pages and keeps the
+subject's skeleton still gets the expectations written for their code — and
+three LIVE toggles sitting above an OFF one, under a caption still
+explaining the example content, read as though the wrong thing had
+happened. So they moved below the skeleton toggle. **Nothing moved for a
+teacher taking the ready-made pages**: the skeleton block draws nothing at
+all for them (`SkeletonCatalog.hasSkeleton` is false while example content
+is being taken), so the three still follow the example-content toggle
+directly, in the same order, with the same labels and the same captions.
+
+**What decides whether they are live is ONE function**,
+`CourseConfiguration.curriculumPagesOffered`: the code has a payload, that
+payload declares a curriculum folder, AND either the payload is being taken
+or a skeleton is offered and wanted. The three `.disabled(…)` modifiers,
+`effectiveCurriculumPagesEnabled`, `effectiveCurriculumCoverageEnabled` and
+the three keys in `buildConfigurationDictionary` all ask it — the same
+reason `SkeletonCatalog.hasSkeleton` exists, so the surfaces cannot drift
+apart. A consequence that falls out and is wanted:
+`wizardSharedFolderProtection` now protects a skeleton course's Curriculum
+folder in the sentences that already protect a payload course's, and its
+marks pool with it, because the coverage map counts the pages in that pool.
+
+The jurisdiction word is per code and always has been —
+`ExampleContentCatalog.jurisdictionName` reads the payload manifest, so
+MCMPR11 reads "Include British Columbia curriculum pages". The Python
+console did NOT until #251, and said "the official Ontario curriculum" to
+that teacher in the next breath; both now derive it the way
+`contracts/example-content.json` → `manifestKeys` → `jurisdiction` states.
+
 ## The caption under the four Content Structure lists
 
 The tip below the Shared folders / Shared files / Per-section folders /
@@ -1280,6 +1326,1496 @@ The command-line launcher does not rename: `setup_course.py`'s
 where to go. Nothing in the build changes — it reads the word from the
 configuration on every run.
 
+## Removing a course: where the cancel lives, and why not in `CourseArchiver`
+
+The sidebar's **Remove** goes through `ScheduledDeployCleanup.removeCourse` /
+`.removeSection`, not straight to `CourseArchiver`. Those turn the course's
+scheduled deploys off FIRST and archive second, and a cancel that fails stops
+the removal. The whole rule, its cases and what was rejected are in
+[`07-deployment.md`](07-deployment.md) → "A scheduled deploy that outlived its
+course"; only the placement is a mac-app fact, and it is worth having here
+because the obvious home is wrong twice over:
+
+- **Not inside `CourseArchiver`.** `CourseArchiverTests` and
+  `CourseRestorerTests` build an **ICS3U** fixture and set no
+  `ScheduledDeploy.launchAgentsDirectoryOverride`. A cancel in the archiver,
+  with the real `LaunchControl` as its default argument, would boot out and
+  delete a real ICS3U schedule on the machine running the suite — and ICS3U is
+  a course a teacher plausibly has. `LaunchControl.run` now refuses outright
+  while that override is set, so the rule is structural rather than a note to
+  whoever writes the eleventh test; `ScheduledDeployCleanupTests` pins the
+  refusal.
+- **And the wrapper SCRIPTS need the same seam, which they did not have until
+  2026-09-20.** `cancelScheduledDeploy` deletes the wrapper whatever runner it
+  was handed, and `scriptURL` had no override at all — so a test that moved only
+  the agents folder deleted `~/Library/Application Support/Plantoir/scheduled/
+  <label>.sh` for real. The teacher's ALARM survived, in their own folder, and
+  would fire on its date at a script that is gone: a scheduled deploy failing
+  for a reason nothing explains, caused by somebody running the suite weeks
+  earlier. `scheduledScriptsDirectoryOverride` closes it, and
+  `scheduledScriptsDirectoryURL()` traps in a Debug build when the agents
+  override is set and this one is not — a test that moves one and forgets the
+  other fails on the spot rather than reaching a teacher's file.
+- **Not inside `SidebarView.performRemoval` either**, which is where it started.
+  Nothing in the suite constructs that view — every reference to it is to a
+  static member — so a cancel living there could be proved only by proving the
+  helper it calls, and a later edit that dropped the call would leave the suite
+  green.
+
+**One model function per removal kind**, deliberately, so a later piece adding a
+step to a removal adds it there rather than in the view. The view keeps one
+call, the confirmation's extra sentence and the "Could not remove" alert.
+
+## A reference course, and what FROZEN means on disk
+
+A reference course is last year's course — or a course full of example content
+— kept in this year's sidebar to be read, and never deployed. The rules both
+apps share are
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses`; the two config keys are in
+[`08-course-config-reference.md`](08-course-config-reference.md); the refusal at
+every door is in [`07-deployment.md`](07-deployment.md). What is here is the
+mac's own half: the lock.
+
+### The mechanism, and the two things that were measured and rejected
+
+`chflags uchg` — the user-immutable flag, which is Finder's **Locked** badge —
+on every content FILE and on no directory. `ReferenceLock`. Modes are left
+exactly as they are, and both of the obvious alternatives were tried:
+
+- **`chmod a-w` alone protects nothing an editor actually does.** Measured: a
+  rename-over — a new file moved onto the old name, which is how every serious
+  editor saves — SUCCEEDED and replaced the page's contents, and `rm -f`
+  deleted it. `uchg` refuses writing in place, the rename-over, a rename and a
+  delete, all four.
+- **Mode `444` as well as the flag BREAKS THE PREVIEW BUILD, and it breaks it
+  in the direction that matters.** `build_site.py` copies each page into the
+  build tree with `shutil.copy2` — which carries the mode and, on macOS, the
+  flag — and then rewrites the copy's frontmatter, which is where `draft: true`
+  becomes `publish: false`. The build tree is a HOST BIND MOUNT, where the
+  container's root does not get its usual permission override: measured inside
+  the real image, the rewrite fails with one warning line per page, the copy
+  keeps `draft: true` and gains no `publish` key, and `patches/publish.ts`
+  publishes anything that does not say `publish: false`. **Every page the
+  teacher had hidden would have appeared in the preview of their frozen
+  course.** With the flag alone and the mode left at 644 the same build writes
+  `publish: false` correctly — and the source is still refused, even to
+  container root, because the Colima mount carries the flag through.
+
+**Directories are never locked**, and that is measured too: with the course
+folder locked, creating `.merged_output` inside it fails — and
+`BuildOutputLocation.ensureLink` has to create that symlink on every read of
+the folder, as do the launchers before every build. Locking the folders would
+kill the preview a reference course exists to give.
+
+### What is deliberately left writable, and why each one
+
+`course_config.json` (the school year can be changed, and the build's preflight
+rewrites it), `course_config.backup.json` (written beside it by that same
+preflight, with `shutil.copy2`, which raises on a locked destination),
+`.obsidian/` and everything under it, `.merged_output`, and `.DS_Store`.
+
+**Obsidian writes four files into `.obsidian/` within seconds of opening a
+vault** — measured on a throwaway vault, 2026-09-20: `app.json`,
+`appearance.json`, `core-plugins.json` (696 B) and `workspace.json` (4,843 B).
+Opening a reference course in Obsidian is the whole point of keeping one, so
+that folder cannot be inside the lock.
+
+One writer CAN still meet a locked file: the build's exclusion note, which
+rewrites a folder's `index.md`. It returns without writing when the note
+already matches and it catches the write failure, so on a reference course it
+is a warning line at worst rather than a failed build. Named here so nobody
+reads it as a bug.
+
+### The walk itself — and the bug that hid in it
+
+`contentFiles` skips the never-locked names, and `skipDescendants()` is for a
+never-locked **FOLDER**. Called on a never-locked FILE — `course_config.json`,
+which every course has at its top level — the enumerator applies the skip to
+the next directory it has not descended into, so **the folder after it was
+never walked and never locked.** Measured on a real course: 842 of 934 files
+walked, 27 real pages left editable, and *which* folder was lost moved between
+passes with readdir order — which is why the course came out mostly locked,
+never entirely locked, and nothing looked wrong. Found by the branch-B
+implementer on 2026-09-20, in the real app.
+
+The cure is to ask whether the skipped thing IS a directory. The lesson is the
+other half, and the first attempt at it was wrong in a way worth recording: **a
+count produced BY the walk cannot audit the walk.** Comparing "how many the
+walk saw" with "how many of those are locked" is algebraically "nothing failed
+to take" — the broken walk passed it, with nine pages editable on disk.
+
+What runs now is an **independent census**: a plain full enumeration with no
+skip logic at all, classifying each regular file by the never-locked rule
+alone, and comparing what should be locked with what the file system says is.
+That is the 934 against the walk's 842. A mismatch goes on the trail with both
+numbers, and the sentence that tells a teacher their pages are locked is **not
+shown** — which also covers the volume that cannot carry the flag at all,
+where nothing could be locked and the old code said it was.
+
+**The walk runs off the caller's actor, and on this target that takes
+`@concurrent`.** `mac-app/project.yml` sets `SWIFT_APPROACHABLE_CONCURRENCY`,
+which turns on `NonisolatedNonsendingByDefault` — under that rule a plain
+`nonisolated async` function runs on its **caller's** actor, so the obvious
+spelling would have kept every `stat` on the main actor while reading as
+though it did not. Measured both ways; `testTheLockWalkDoesNotRunOnTheMainThread`
+pins it rather than trusting the annotation. No `DispatchQueue`, no sleeps.
+
+### Asserted, VERIFIED, re-asserted — and never with a timer
+
+`ReferenceCourseUpkeep.bringUpToDate` runs whenever a working folder is read
+and again whenever a reference course is made. It locks what is unlocked,
+**reads the flag back**, and counts both. Three reasons the lock cannot be
+assumed once, all measured:
+
+- **A cloud-synced folder strips it.** `fileproviderd` models the locked bit
+  itself (`m:rw-l` in its own log), asks the CloudDocs provider to create the
+  item with it, gets back an item without it, and reconciles *downward* — which
+  clears `uchg` on the live file about a second after an upload starts, with no
+  error and no log line naming the file. A course copied into iCloud Drive
+  arrives thawed within about three seconds. Eviction ("Optimise Mac Storage")
+  is harmless: the flag survives evict and re-download intact.
+- **The flag is never uploaded**, so the lock is **per-Mac**. A second Mac sees
+  ordinary writable files, and an edit arriving from another device is not
+  blocked by it.
+- **A zip round trip loses it.** `zip`/`unzip` carry the mode and not the flag,
+  so a restored backup comes back unlocked — which is why `CourseRestorer`
+  re-locks from the marker in the restored config.
+
+Where the lock does not take, the file is left for the NEXT pass. There is no
+retry after a guessed delay, and there must never be one: a delay chosen to let
+something settle is a guess that stops working on a slower machine. The count
+that would not take goes on the trail, which is what turns "my reference course
+let me edit a page" into an explanation.
+
+Two names are never locked that are easy to miss, and both are halves of the
+build's own atomic write of `course_config.json`: the `.backup.json` beside it
+and the `.json.tmp` that exists only between the `open()` and the
+`os.replace()`. A build interrupted between the two leaves the `.tmp` on disk —
+and a LOCKED one would fail every later preflight twice over, at the write and
+again at the cleanup, so that course's settings could never be reconciled
+again. Anything ending `.tmp` is left alone for the same reason.
+
+**A real-image gate**, since 2026-09-20: `verify.sh` builds a course whose
+every content file carries `uchg`, in the dev-test image, over a `$HOME` bind
+mount — and checks that it builds at all, that a page hidden in the SOURCE is
+hidden in the built site, that building again over the existing build works,
+and that the source comes back byte-for-byte and still locked. The hidden page
+uses the LEGACY `draft:` spelling deliberately, because `publish: false` needs
+no rewrite and would stay hidden even when the rewrite fails.
+
+**And what the mac's own limit hides from Windows.** `preview.ps1` and
+`deploy.ps1` point `PLANTOIR_WORK_DIR` at a HOST folder under `%LOCALAPPDATA%`
+and build natively rather than as root — so there a read-only attribute DOES
+travel into the build tree, the frontmatter rewrite WOULD fail, and a page the
+teacher hid WOULD be published. The trap the mac cannot reproduce is live on
+the other platform, and the `windows` issue says so.
+
+**What that gate is NOT.** The plan's ruling asked for a must-fail proof —
+the same case with mode 444 showing the hidden page — and it does not
+reproduce through the real launcher. The 444 fault needs the build tree to be
+the host bind mount, where container root does not get its usual permission
+override; `preview.sh --build-only` builds in the container's own
+`/tmp/quartz-builds` and syncs `public/` out afterwards, so the rewrite happens
+on container-local storage, where root *can* write a 444 file. Run with
+`chmod 444` as well as the flag, the case still passed. The original
+measurement stands — it was taken against a bind mount on purpose, and it is
+still why the mechanism is the flag alone — but the standing gate is on
+everything else.
+
+**Cost, measured on this Mac** (APFS, local disk; 1,220 files — 900 under
+`Media` plus 320 pages): **59.5 ms** for the pass that locks everything, and
+**23 ms** for a pass over a course already frozen. A folder with no reference
+course in it does no work at all.
+
+### What removal, restore and copying do about it
+
+- **Removing the whole course unlocks first.** `FileManager.removeItem` and
+  `rm -rf` both refuse a locked tree — the message a teacher would otherwise
+  have read is *"“ICS3U-2025” couldn't be removed because you don't have
+  permission to access it."*, which is the file system's words, not the
+  product's. The unlock sits in `ScheduledDeployCleanup.removeCourse`, after
+  the scheduled-deploy cancel and before the archive, so the one thing that can
+  still stop a removal is the cancel. The confirmation says nothing about the
+  lock: that would be the app talking about its own plumbing.
+- **The settings FORM is not shown at all** on a reference course: the row
+  opens a short read-only summary instead. The form carried a "Deploying"
+  section, and a reference course is deliberately left with no deploy folder —
+  so it asked the teacher to choose one for a course it had just called never
+  deployed, and greyed Save for ever with no explanation. Worse, Save WORKED
+  for everything else, because `course_config.json` is never locked: a teacher
+  could rename a frozen course, change its graded folders, or quietly undo the
+  neutralisation that makes an older Plantoir refuse it. `frozen.rule` says
+  Plantoir offers nothing that changes a page, a setting or the shape of the
+  course; that sentence was false as shipped and is true now.
+- **The Site Health repair BUTTON is not drawn.** The model already returned
+  no attempts — and the view drew the button anyway, so pressing it said
+  *"That is already put right. Nothing needed changing."* about a folder that
+  was really missing. The findings still report; the action is gone.
+- **Removing one SECTION is refused**, with `ReferenceWording.staysAsItIs` —
+  removing a section changes the course, so "frozen" already requires it. The
+  sidebar does not offer the item; the refusal exists so no other caller gets
+  past it.
+- **A copy taken FROM a frozen course clears the lock at once**, before the
+  site markers are renamed aside and before anything can fail. The flag
+  travels through `copyItem`, and a locked copy can be neither finished (a
+  locked marker cannot be renamed) nor cleaned up (`removeItem` refuses a
+  locked tree) — which left a folder the teacher could delete from neither
+  the app nor Finder. Found by review, 2026-09-20. Nothing offers this today
+  ("Keep a Copy for Reference…" is withheld on a reference course) and it is
+  fixed anyway: a guard that depends on a menu item being withheld elsewhere
+  is one edit from being gone.
+- **Anything copied OUT arrives locked.** `FileManager.copyItem`, `cp -p`,
+  `ditto` and `shutil.copy2` all carry the flag; only a plain `cp -R` or a zip
+  round trip loses it. `ReferenceLock.clearLock` is the one place that clears
+  it, and whatever copies pages between courses must call it — a page a teacher
+  cannot edit, with no explanation, reads as "the app is broken". Since
+  2026-09-21 something does: "Copy a Page from This Course…" clears the flag on
+  every page it writes and every picture it copies, and a must-fail test locks
+  a source course and proves it.
+
+### What Finder does with one — measured, because decision (n) asked
+
+Dragging a locked reference course to the Trash **works**. Measured on a
+throwaway folder with `FileManager.trashItem`, which is the API Finder's own
+"Move to Trash" uses: it SUCCEEDED on a course whose pages carry `uchg`, and
+the folder landed in `~/.Trash` with its locks intact. So a teacher who bypasses
+Plantoir and drags the folder away is not stopped, and Finder does not prompt
+for the folder (it prompts per LOCKED ITEM only on some paths — not on this
+one, where the move is a rename within the volume).
+
+What that means in practice: the course leaves the sidebar, Plantoir stops
+seeing it, and **emptying the Trash is where the lock bites** — the Finder
+asks for confirmation to delete locked items. The teacher's own Remove is the
+supported route and unlocks first, so they never meet that; this is written
+down because "what happens if I just drag it out" is the first thing somebody
+will try, and an answer of "nobody measured" is worse than either outcome.
+
+### The interface: withheld, not merely refused
+
+Every act that would CHANGE a reference course is **not offered** — hidden,
+never greyed. A greyed control that can never become available is a standing
+invitation to wonder what is wrong, and the sidebar already follows that rule
+for Schedule/Cancel Deploy. The refusals stay underneath it, so any other
+caller still meets one; the list of both is
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.interface`.
+
+**One of them is not a menu item and is the reason this section exists.**
+`SiteHealthRepair` CREATES files inside the course — a `Media` folder, a
+section's front page — and the directories are deliberately left unlocked so
+the preview can work, so those writes would have SUCCEEDED on a frozen course.
+The lock refuses nothing there; the guard does. Found by review, 2026-09-20,
+with the same shape in Course Settings' folder rename, the unit-word rename,
+Add Section, Rename Course and "Restore Section N…".
+
+**The calm note appears BEFORE Obsidian, once per course.** It claims only
+that Plantoir keeps the pages locked and that they stay as they were — it may
+not say they cannot be changed (the lock is per-Mac, and a cloud folder strips
+it while files upload). `LockedPagesNote` remembers which courses have had it.
+
+**What Obsidian does was measured by Russell on 2026-09-23**, the one thing
+the run could not drive (synthetic input never reached Obsidian's editor):
+typing into a locked page makes Obsidian show a notice — *"Failed to save file
+… EPERM: operation not permitted … Make a backup of the contents of this file
+now to avoid losing data"* — and the page stays exactly as it was. Loud, not
+silent; the backup advice is Obsidian's generic wording and nothing is lost.
+Obsidian titles the vault by its FOLDER name (`ICS4U-2025`), which is the one
+place that name is useful: it says which ICS4U is open. The note's second
+sentence, `obsidianOpensThemForReading`, now says exactly this.
+
+**And a reference course opens in Obsidian's reading view.** Russell asked for
+a read-only mode; Obsidian has none for a vault. What it has is a per-vault
+preference, `defaultViewMode` in `.obsidian/app.json`, whose value `"preview"`
+is the reading view — the key and its values were read out of Obsidian's own
+bundle (`obsidian.asar`) rather than guessed. `ReferenceReadingView` sets it
+when a reference course is made, keeping every other key the teacher's settings
+carried, AFTER the lock — possible only because `.obsidian` is in the
+never-locked set. Pages then open rendered rather than ready to edit, and a
+teacher who switches one to editing meets the refusal above. Best effort by
+design: a settings file Obsidian could not read is left alone, and the lock,
+not the view mode, is what keeps the pages.
+
+It used to carry a second sentence — *"A file you copy out of it stays locked
+until you untick Locked in Get Info."* — written on the evening #207 was out
+of this release and the only way to take a page out of a reference course was
+by hand in Finder. #207 came back into the same release and its copies arrive
+unlocked, so Russell retired the sentence on 2026-09-22: a hand copy is now
+unlikely, and "Get Info" without "Finder" told a teacher nothing. The fact
+stands, for whoever meets it: a page dragged out of a reference course in
+Finder arrives locked, and Finder's Get Info panel is where it is unlocked.
+Any sentence that names Get Info must name the Finder first.
+
+### The honest limits — in here, and never in the GUI
+
+With the directories unlocked a new file can still be ADDED to one. Anybody who
+means to can clear the flag. The lock is per-Mac, and an incoming change from
+another device is not blocked by it (not directly measured — it needs two Macs
+— but `fileproviderd` demonstrably clears the flag on its own initiative, so
+expect it to get through; the direction it errs in is less protection, never a
+stuck sync). What the lock DOES stop is every ordinary edit, save, rename and
+delete of the material that is there, which is what a teacher will meet. It is
+a statement of intent, not a security boundary.
+
+**And the refusal to deploy does not depend on it in any way.** An entirely
+unlocked reference course is refused at every door just the same; a test pins
+that. If the two were ever coupled, an unlocked course would become a
+deployable one, and a deploy that reports success is the worst direction this
+feature can fail in.
+
+### Importing last year's folder
+
+The second way a reference course is made, and the one a teacher reaches for
+first: **File ▸ Import Courses for Reference…**, point at the folder last
+year's classes were kept in, tick what you want, press Import. It is route 1
+with a different SOURCE, and it ends in route 1's code —
+`ReferenceCopier.makeIntoAReferenceCourse` — so the neutralisation, the marker,
+the year and the lock happen in exactly one place. A second copy of that
+sequence would be a second thing to keep in step, and the thing it would
+eventually be out of step about is whether a course can reach last year's live
+website.
+
+**The source is opened for reading and for nothing else.** It may be the
+teacher's only copy of last year. Everything written goes inside the new
+folder; the neutralisation and the lock happen to the COPY. Rehearsed on
+Russell's real 2025–26 folder on 2026-09-20: a 44,532-entry manifest of
+`courses/ICS4U` — every path, size and mtime, plus a sha256 of every file
+outside `Media` — is byte-identical before and after an import
+(`68276d82cf7f73ee…` both times).
+
+**Three folder shapes are accepted**, because a teacher points at what they
+recognise: the working folder itself, the `courses` folder inside it, or ONE
+course folder. The last two resolve UPWARD and the whole shelf is offered,
+with the course they pointed at already ticked. Refusing somebody who went one
+level too deep reads as the app being broken, and resolving upward costs
+nothing. Refused: a folder with no courses in it, the working folder this
+window already has open (that is route 1, and the sentence says so by name),
+and a folder on either side of the one already open. **When none of the three
+shapes is there, the OLDER folder-per-class layout is tried next** (#254,
+"The older layout" below), **and then the 2024–25 website-folder-per-class
+layout** (#256, "The 2024–25 layout" below) — so a folder holding a `courses`
+folder or a course's settings is always read the modern way, whatever else is
+in it, and #254's shape is never claimed by #256's.
+
+**What is left behind is four fifths of what is on disk.** In a folder made by
+an older Plantoir, `.merged_output` is a REAL directory holding last year's
+whole built website — measured at 1.9 GB per course against 489 MB of course;
+in a folder made by a current one it is a symlink pointing out of the working
+folder altogether. A name on the skip list is therefore skipped **without
+being looked inside**, which is why the walk is hand-written rather than an
+enumerator with a filter: merely not COPYING that folder while still walking it
+costs more time than copying the course. On this route symlinks are copied as
+links and never followed — the only one a modern course holds is
+`.merged_output`, which is skipped by name anyway; a course made from the
+older layout never carries one at all (below). The rest of the list, with a reason each, is
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.importing.leftBehind` — the archive list, plus yesterday's
+config, plus a Finder duplicate of a config found in a real course, plus what
+an external disk leaves in a folder.
+
+**`.obsidian` is copied, deliberately.** Opening the course in Obsidian is the
+point of keeping it, and Plantoir opens the course folder AS the vault; without
+those 312 KB the vault opens with first-run prompts, none of the teacher's
+plugins and none of the folder state that makes last year's material
+navigable. Its `workspace.json` was MEASURED on a real imported course rather
+than assumed: every path in it is vault-relative, with no absolute path and no
+mention of the old folder, so it resolves inside the new course as it stands.
+(An earlier draft of this page said the opposite. Nothing needs stripping, and
+nothing needs registering either — the app opens a vault by path.) That is the
+MODERN route; a class from the older layout comes WITHOUT its add-ons, for a
+reason measured in "The older layout" below.
+
+**A file name is carried as BYTES, and that is why this path talks to POSIX
+rather than to `FileManager`.** The walk reads names with `readdir` and the
+copy hands them to `copyfile()` unchanged. Building the destination from
+`URL.lastPathComponent` — which is what the first version did — passes the
+name through `URL`'s file-system representation and DECOMPOSES it: measured,
+`App\u{00e9}tit.jpg` (`c3 a9`) arrived as `Appe\u{0301}tit.jpg` (`65 cc 81`).
+
+That is not cosmetic, and it is how the fault was found: the page that embeds
+the image still spelled the name the old way, so the embed no longer resolved
+and **Quartz emitted neither the `<img>` nor the asset** — the picture simply
+vanished from the built site, with no error anywhere. Four files in Russell's
+own ICS4U are of this shape. Measured three ways, same source name:
+`copyItem` of a whole DIRECTORY preserves the names INSIDE it and decomposes
+the directory's OWN name, per-file `copyItem` to a rebuilt `URL` decomposes
+it, `readdir` bytes → `copyfile()` preserves both forms. `copyfile` with
+`COPYFILE_CLONE` also keeps the file system's own fast path, so the 0.09 s
+stands.
+
+**Both routes come through this copier**, and the middle row above is why:
+"Keep a Copy for Reference…" had a loop of its own, and because it copied
+whole top-level directories it looked exempt. It was not — measured, a folder
+called `Thème` arrived spelled the other way while everything inside it was
+untouched, so a page linking into it by the old spelling would break in the
+built site exactly as the image did. Nothing in the four real courses measured
+has a non-ASCII top-level name, so nobody had met it; that is luck, not a
+design. `ReferenceTreeCopier.copySynchronously` is the entry point route 1
+uses — the same walk and the same per-item copy, without the progress and the
+cancellation it has no use for.
+
+**Page frontmatter is never rewritten.** A reference course is a faithful
+record of what students actually saw, `draft: true` and all; the build already
+reads the older spelling correctly. (A class from the older folder-per-class
+layout is the exception to "what students saw": its pages carry Digital
+Garden's keys, which the build does not read — see "The older layout" below.) (#207's rule — a page copied INTO a live
+course starts hidden — belongs to the copy, not to the import.)
+
+#### What the copy costs, measured, and why it is still cancellable
+
+`FileManager.copyItem` **clones** within one APFS volume: ICS4U's 485 MB of
+media, 638 files, copied in **0.09 s**, and all four real courses — 1.36 GB —
+imported through the real interface in under two seconds. That is not the case
+to design for. The same bytes off a USB disk, a network share or a drive that
+has to spin up are minutes, so the copy reports progress in bytes, can be
+stopped between files, and runs off the main actor.
+
+It runs there by being **`@concurrent`**, and that attribute is load-bearing:
+`nonisolated async` alone is NOT enough in this project. `project.yml` sets
+`SWIFT_APPROACHABLE_CONCURRENCY: YES`, which turns on
+`NonisolatedNonsendingByDefault` — "runs nonisolated async functions on the
+caller's actor by default". Measured, the same function body called from a
+`@MainActor` caller:
+
+| | on the main thread? |
+|---|---|
+| `nonisolated async`, flag off | no |
+| `nonisolated async`, flag on (this project) | **yes** |
+| `@concurrent`, flag on | no |
+
+The first shape of this file had the plain form and the doc comment claimed
+the opposite of what it did. The copy's loop has no suspension point, so the
+main actor was held for the whole copy: the progress bar could not draw and
+**the Stop button could not be clicked at all** — on the slow external disk
+this is all written for, minutes of a frozen window with no way out.
+
+`Task.detached` would also leave the main actor and is rejected for the reason
+it always was: it is not a child of the calling task, so `run?.cancel()` would
+not reach the loop. `@concurrent` leaves the actor and stays a child. There is
+no sleep anywhere in the path and no timer.
+
+#### Nothing is visible under `courses/` until it is safe
+
+The copy is made under a **hidden name** — `.plantoir-importing-<folder>`,
+inside `courses/` — and is marked, filed under its year, neutralised and
+locked THERE. The last act is a rename into the real name, which within one
+folder is atomic. Both ways of making a reference course do this.
+
+**The fault it closes was measured.** Until 2026-09-20 the copy was made at
+its final name, so for the length of the copy `courses/ICS4U-2025/` held last
+year's REAL site markers beside a config with no marker and no `deploy_target`
+— which reads as Netlify. `./deploy.sh` run against that half-made folder does
+not refuse at all. A crash, a quit or a power cut in that window left an
+ordinary-looking live course in the sidebar with a working Deploy button aimed
+at last year's class site; with a frozen source the leftover could not even be
+deleted. The window was about two seconds for an APFS clone and **the whole
+copy** on an external disk — the case the importer exists for.
+
+Hidden works because everything that looks for a course passes
+`.skipsHiddenFiles` — discovery, the backups list, the archives list — and
+three tests pin that rather than trusting it.
+
+**The launchers are a different matter, and the first version of this page got
+it wrong.** It said a course code "cannot begin with a dot, so nothing on the
+command line can name one". They applied no shape check at all: measured,
+`deploy.sh` uppercased `.plantoir-importing-ICS4U-2025`, the case-insensitive
+volume resolved the uppercased name, and the run went straight past the
+reference gate — because during the copy there is no marker yet for that gate
+to find. So the refusal is now real rather than assumed: `deploy.sh`,
+`preview.sh` and both `.ps1` twins refuse a course argument beginning with a
+dot before anything else, `setup_course.py` refuses one at its own prompt,
+`verify.sh` greps all four structurally, and
+`scripts/test_reference_course.py` drives the real `deploy.sh` at it. A
+refusal is the safe direction: no real course code begins with a dot.
+
+A leftover that somebody is STILL WORKING ON is left alone. The import takes a
+lease naming its own process — `<FOLDER>.import.<pid>.lease` in
+`courses/.internal/activity/`, the shape `WorkLease` already uses — and the
+sweep skips a staging folder whose lease names a live process, taking the
+stale lease of one whose owner is gone. This is not a rare race: File ▸ Reload
+Courses is offered while the import sheet is up, a second window on the same
+working folder reads it, and `Plantoir --mcp-stdio` — how a Claude Code
+session starts — reads it too. Any of those used to delete the tree under the
+running copy, and after the lock and before the rename it would have thrown
+away a finished reference course. Asked of a lease rather than of the folder's
+AGE deliberately: a threshold is a guessed duration, and the case that needs
+it most is the slow disk where the guess is wrong.
+
+A leftover from an import that never finished is **swept when a working folder
+is read** (`ReferenceStaging.sweepLeftovers`): unlock, remove, one trail line
+naming the course it was going to be. Matched on the exact prefix and nothing
+else — `.internal` and `.obsidian` are not ours to take.
+
+*Rejected: staging in the system temporary folder.* A different volume, so the
+last step would be a copy rather than a rename — the whole window back again,
+and twice the bytes.
+
+**Nothing half-made is left behind, and the order matters.** Whatever was
+being made when a course failed — or when the teacher pressed Stop — is
+UNLOCKED and then removed. `removeItem` and `rm -rf` both refuse a locked
+tree, and this is reachable rather than theoretical: the lock travels through a
+copy, so importing from a folder that already holds a reference course hands
+the copy its locked files. The lock is cleared the moment the copy finishes,
+before the site markers are renamed aside, so the risky stretch works on an
+ordinary folder throughout.
+
+**One course failing does not take the others.** Each ticked course is
+imported on its own; one that cannot be — its code already kept for reference
+under that school year, a folder that cannot be read, a disk that filled — is
+reported by name with what happened, and the run carries on. A folder of four
+where one clashes imports three. Only Stop ends a run early, and it has its own
+trail event rather than being recorded as a failure: a teacher who stops
+something chose to.
+
+#### The school year is proposed from the pages, and the newest page was rejected
+
+The year pre-selected for each course is **the one most of its pages were last
+changed in**, ties going to the newer year; a year outside the offered list
+proposes nothing. The teacher changes it, and the sheet says nothing about how
+it was arrived at.
+
+The obvious rule — the newest page — was measured and thrown away. One page is
+exactly what gets touched by accident: opening last year's folder to look
+something up, or a sync putting a fresh date on one note. On the real folder,
+measured 2026-09-20:
+
+| Course | Newest page | Commonest year | Taught in |
+|---|---|---|---|
+| CODING | 2025-11-27 | 2025–26 (19 of 19) | 2025–26 |
+| ICS3U | 2026-06-08 | 2025–26 (223 of 320) | 2025–26 |
+| ICS4U | **2026-09-11** | 2025–26 (201 of 287) | 2025–26 |
+| MPM2DE | 2026-06-02 | 2025–26 (151 of 151) | 2025–26 |
+
+The newest page gets ICS4U wrong — it proposes 2026–27 off a single note
+touched a week before the import. The commonest year gets all four right.
+
+#### Where the interface lives, and two SwiftUI facts behind it
+
+The menu item is in the **File menu**, beside Open Working Folder…, because it
+is the same kind of act: it starts by choosing a folder. It is deliberately NOT
+on the sidebar's `+` button, which opens the New Course wizard on a single
+click — putting a menu in front of the thing a teacher presses most often to
+add a course buys nothing.
+
+The chooser and the sheet are attached to the SIDEBAR rather than to the
+window's own view, and as a `ViewModifier` rather than as two more lines on the
+sidebar's modifier chain. Both are forced:
+
+- a second `.fileImporter` on the SAME view is a shape SwiftUI has been known
+  to present only the first of, and the window's view already has one;
+- adding them to the sidebar's chain directly took the type-checker past its
+  limit — "unable to type-check this expression in reasonable time". Two other
+  groups of modifiers there are already wrapped up the same way.
+
+After an import the sidebar **reveals** what arrived
+(`WorkspaceModel.revealReferenceCourse`): both the Reference Courses group and
+the school year inside it are opened. A course that lands behind two closed
+triangles reads as a course that did not land.
+
+#### Rejected
+
+- **Forking the copier.** Two implementations of the neutralise-mark-lock
+  sequence, drifting apart about the dangerous half. The tail of
+  `keepACopy` was extracted instead, and both routes call it.
+- **Zip and backup archives as a source.** `CourseRestorer.unpack` already
+  handles all three zip shapes, so it is a small piece of work, but it is a
+  second way IN before the first one has been used by anybody. Deferred.
+- **An editable folder name per row.** Route 1 offers one because it makes one
+  copy; a list of four rows each with a name field is clutter in front of a
+  decision nobody wants to make. The names are derived by the same rule
+  (`CODE-YYYY`, `-2` … `-9` when taken) and are not shown.
+
+#### The older layout: a folder per class (#254)
+
+Russell kept his 2023–24 courses a different way, and asked for them to come in
+through the same door (his decision 4): **one Obsidian folder per class
+section** — `ICS3U-S1-2023-24` — holding its `Thread N` folders of class pages
+at the top, `Home.md` and `All Prior Classes.md` beside them, and the shared
+folders and pages (Tasks, Concepts, Media, `Learning Goals.md`…) reached
+through LINKS into a sibling folder whose name ends in "Shared"
+(`ICS3U-2024-25 Shared`). There is no `course_config.json` anywhere, so the
+modern reading finds nothing, and only then is this shape tried
+(`OlderCourseLayout.recognise`). Each class folder becomes **one
+single-section reference course** (decision 1), made by exactly the code every
+other import ends in — so the marker, the neutralisation, the fifteen deploy
+refusals and the lock all apply unchanged. The rule itself is data:
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.importing.olderLayout`, run by `OlderLayoutImportTests`.
+
+**What the real folders are**, measured read-only under
+`~/Library/Mobile Documents/com~apple~CloudDocs/Documents/LCS/2023-24/`:
+ICS3U has two class folders and one Shared folder, **all 18 of each class's
+links dangling** (they point at `…/2023-24/Old ICS3U/…`, which no longer
+exists); ICD2O has two classes, `ICD2O-Exemplars` (named like neither),
+`ICD2O-LCS-LDPS-Collaboration` (no Thread folder) and a Shared folder, with 16
+links each that DO resolve; ICS4U 2023–24 is ONE self-contained folder with no
+links and no Shared sibling. In every case the class's link NAMES equal the
+Shared folder's top-level entries exactly — 0 missing, 0 extra.
+
+**Recognition needs BOTH a real `.obsidian` and a `Thread N` folder with a page
+directly inside it.** Each alone admits a real folder that is not a class: the
+course folders above (`ICS3U/`) have `Thread N` folders of planning — 0 pages
+directly inside any of them — and no `.obsidian`; the Collaboration folder has
+`.obsidian` and no Thread folder. All six real classes pass, with 12 to 17
+pages directly in each Thread folder. The teacher may point at a class folder,
+the `Class Website` folder, or the course folder holding one by that exact
+name. The Shared folder itself is refused with its own sentence
+(`wording.olderLayoutThatIsTheSharedFolder`), but only when it sits beside a
+class, so the sentence is true. **Nothing is ever followed**: every entry is
+asked about with `lstat`, a child that is a link is never a class and never a
+Shared folder. The school year's folder (`2023-24`, whose children are whole
+courses each holding a `Class Website`) is refused with a sentence of its own
+(`wording.olderLayoutChooseOneCourseAtATime`) that points one level down: the
+ordinary `noCoursesThere` says "Choose the folder you kept that year's classes
+in", which for this layout is the folder just chosen (found in review).
+
+**Code and year come from the name.** The code is the leading five characters
+when they are Ontario-shaped; the year is `-YYYY-YY` with the two halves
+consecutive, and it becomes the proposal when the sheet offers it — otherwise
+the pages' dates propose one, exactly as a modern course. A folder whose name
+has no code is shown, untickable, with `wording.olderLayoutNoCourseCode`
+(#206's "shown, not hidden" rule). The old section number is not carried:
+every import is `section1`.
+
+**Only the LOWEST section of one course and year is ticked when a folder of
+classes is chosen**, and only folders NAMED like a class are ticked at all
+(`ICD2O-Exemplars` is offered, unticked). The plan ticked both ICS3U sections,
+and the plan review measured what that did: the sheet opened with S2 already
+in trouble under "You already have a ICS3U kept for reference from 2023–24" —
+false, since nothing was kept yet — with advice ("Choose a different school
+year") that is wrong for a second section. The shelf holds one course per code
+per year, so **S1 and S2 of one year cannot both be kept under that year**;
+Russell accepted that (decision 1 makes S2 a second import). The unticked
+sibling says so beside itself — only when both are NAMED as sections of the
+course, so `ICD2O-Exemplars` (whose pages' dates give it the same year) is not
+called "another section" of ICD2O — and a ticked one that clashes only with a row
+in the same sheet says the same instead of "You already have…"
+(`wording.olderLayoutAnotherSectionOfTheSameCourse`). Filing S2 under Other, or
+another year, keeps it. Any OTHER clash that exists only inside the sheet —
+the measured one is ticking `ICD2O-Exemplars`, which sorts above S1 and takes
+2023 from its pages' dates — says that the row above is also ticked for that
+year (`wording.alsoTickedForThatYear`), never "You already have…", because
+nothing is kept yet. The choice of sentence is a static function
+(`ImportCoursesForReferenceSheet.troubleByCourse(courses:ticked:years:onTheShelf:)`)
+so `testAClashInsideOneSheetIsNotCalledAlreadyKept` can pin it outside the
+view.
+
+**Where everything lands** (`OlderCourseLayout.plan`, one function the sheet's
+sizes and the importer both use):
+
+| In the class folder | In the new course | Why |
+|---|---|---|
+| `Thread N/…` | `section1/Thread N/…`, each a `per_section_folders` entry | `Home.md` embeds `![[Thread 4/Day 15]]`, a PATH link that Quartz resolves from the content root; the build copies each per-section folder to `content/<name>`, so it resolves as it did. |
+| `Home.md` | `section1/index.md` — **the one rename**, bytes unchanged | With no `section1/index.md` the build writes no `index.html` and the preview waits forever. 0 real links name `Home` (Russell, decision 6). |
+| a root `index.md` | `section1/index.md` when there is no `Home.md`; left out when there is | Both would fight over the front page. 0 measured. |
+| `All Prior Classes.md` | `section1/All Prior Classes.md` (`per_section_files`) | That section's own list; Copy a Page never offers a section's page. |
+| `.obsidian/…` | the course root, **without** `plugins/` and `community-plugins.json` | See "add-ons" below. |
+| any other real entry | the course root, same name (`shared_folders` / `shared_files`) | One section, so shared vs per-section is invisible in the build; at the root Copy a Page offers it, which is the point of keeping the course. |
+| a top-level LINK | the Shared folder's REAL entry of that name, copied | "The Shared folder's real folders replace the links." |
+| a top-level link with no Shared counterpart | nothing; named as missing in the sheet (before Import and in the summary) and on the trail | Decision 2: never refused for this. |
+| any link below the top, any link inside the Shared entries, anything whose name the course uses for itself (`section1`, `course_config.json`, a shared `index.md`) | nothing; COUNTED and NAMED in the summary (`wording.olderLayoutLeftOut`) and on the trail, and the import is not reported as complete | See "no link" below. The first shape of this counted a picture dropped from `Thread 1/` together with the links that were REPLACED, and reported "nothing missing" — found in review, and now a must-fail test (`testANestedLinkLeftOutIsCountedAndNamed`). |
+
+Measured with a simulation of Quartz v4.5.0's `shortest` resolution over the
+planned content root: ICS3U S1 plus its Shared folder resolves **1,586 of
+1,587** links and embeds (the one is an absolute path to a folder that no
+longer exists); without the Shared folder, 57 of 186. Nesting the Thread
+folders under `section1/All Classes/` was REJECTED because it breaks every
+path embed; renaming the class pages into the modern `Thread N, Day M` shape
+was REJECTED for the same reason and because pages stay byte-identical
+(decision 3, `dg-*` keys and all).
+
+**The Shared folder is found by NAME, never by following a link** (decision
+2): among the class's siblings, the real folders whose name ends in "Shared"
+and begins with the class's code and a dash. One is it, whatever its year —
+the real ICS3U one is named 2024–25 beside 2023–24 classes and is right.
+Several: the one of the class's year, else none; never a guess. The class's
+link names are the manifest, and only the named entries come — files and
+folders alike. **The Shared folder is walked once from its ROOT**: the plan
+walked each entry, and the plan review measured what the copier's walk does
+with a FILE (0 items, the path listed as unreadable — which refuses the course
+or drops the page; eight of ICS3U's shared entries are pages).
+
+**"Choose Shared Folder…" is on every such row, also when one was found by
+name** (but not on a row that already has a problem — an unreadable folder or
+no course code — which cannot be imported whichever folder is chosen) — Russell overrode the plan's recommendation (decision 7): a wrong match
+must be correctable. A chosen folder is refused, with the row left as it was,
+when it is the folder this window has open (or inside it, or holding it — the
+three existing sentences), when it is itself a class, or when it holds none of
+the class's names. "Holds at least one name" alone was measured to be too
+weak: `ICS4U-2023-24`, itself a class, holds 14 of ICS3U S1's 18 names, and
+`ICD2O-2023-24 Shared` holds 15. A chosen folder whose name carries a
+different code is ACCEPTED with a warning beside the row — Russell kept things
+where he kept them, and a refusal would leave no way through. Nothing found and
+nothing chosen **imports anyway** and the summary says the shared pages and
+pictures are missing (decision 2: never refuse for this); an empty `Media`
+folder is made so the build does not announce `mediaFolderMissing` on every
+preview — measured on the rehearsal: without it the build completes and raises
+that finding; with it, none.
+
+**No link reaches a reference course.** Before this change the copier copied a
+symlink AS a link, dangling or not, and counted it as a file (measured by
+compiling the real `ReferenceTreeCopier` standalone); `ReferenceLock.census`
+skips links. Pointed at an ICD2O class, the modern route would have produced a
+course whose shared content was live links into iCloud — not copied, not
+locked, editable through the link, invisible to the container (which mounts
+`courses/`, not iCloud) — with the census reporting everything locked. So the
+planner leaves every link out, and the new
+`ReferenceTreeCopier.copy(placements:)` **refuses** one, so a future planner
+bug fails loudly. Proven by copy-and-restore: with the planner's line removed
+the copier's refusal fails nine tests; with both removed, a class with no
+Shared folder imports with four live links in it and
+`testWithoutItsSharedFolderItStillImportsAndSaysSo` catches them. The MODERN
+route's link behaviour is deliberately unchanged (its only link is
+`.merged_output`, skipped by name) — widening this piece to it was rejected as
+risk for no measured gain.
+
+**Obsidian add-ons and their settings are left behind.** Found by the plan
+review and verified (key names only; no value was ever printed): every real
+class folder carries `.obsidian/plugins/digitalgarden/data.json` with a
+non-empty `githubToken`, and `community-plugins.json` enables it — 14 files
+across the seven class-type folders name the key, 0 outside `plugins/`.
+Copied, that credential would land in the working folder, travel into every
+backup and archive zip of the course, and — once Obsidian trusts the vault's
+add-ons, which Plantoir's "Open in Obsidian" invites — give a publish command
+outside all fifteen of Plantoir's refusals. The rest of `.obsidian` comes, so
+the course opens normally and `ReferenceReadingView` still sets reading view.
+The sheet and its summary say so in plain words
+(`wording.olderLayoutAddOnsAreLeftBehind`). Whether the MODERN route needs the
+same rule is an open question for Russell, not part of this piece.
+
+**What its preview shows is more than students saw, and that is accepted.**
+The class pages carry Obsidian Digital Garden's keys (`dg-publish`,
+`dg-home`), which the build does not read, and the shared pages carry none at
+all — 78 of 78 ICS3U shared pages, 1 ICS4U page, 1 ICD2O page have no
+`dg-publish` key, and under Digital Garden a page was published only when it
+said `true`. Three pages say `dg-publish: false`. So unlike a modern reference
+course, whose visibility frontmatter IS last year's record, a preview of one of
+these shows every page except `draft: true` ones (2 in ICS3U). Russell
+accepted this for v1.3.0; what `dg-*` keys should mean when such a page is
+copied into a live course is a separate issue.
+
+**The preview is titled with the code alone.** Every import is `section1`, so
+the "S1" marker would name the wrong section for an S2, and there is no config
+key that says which section a single-section course WAS. None was invented:
+the import writes `show_section_marker` false for section 1 (an existing,
+documented key), and `course_name` carries the class folder's name. Measured:
+the built title is "📚 ICS3U".
+
+**The coverage map is off**, written as a plain `false` — the shape the wizard
+writes. A per-section map (`{"sections": {"section1": false}}`, the first
+shape) was measured in review to read as ON in two of the three readers:
+`CourseConfiguration.includesCurriculumCoverage` and `setup_course.py`'s
+`bool(...)`; only `build_site.py` read it as off. The plain value is off in all
+three, and `testTheSettingsMakeAFrozenSingleSectionReferenceCourse` reads it
+through the app's own reader. And the reason is not the one the plan gave. With
+no `class_folder` key the build's fallback takes the first per-section folder
+whose name contains "class"; no `Thread N` matches, so there is NO class folder
+and a map would count nothing and look finished. (The plan said it would count
+one Thread folder's pages; the review corrected it.) The class pages are
+called `Day N`, not `<unit word> N, Day M`, in any case.
+
+**Known limits, unmeasured or accepted:**
+
+- `Day 1` … `Day 15` repeat across the four Thread folders, and
+  `AssistSectionGraph` keeps the first page of a title it meets — so an MCP
+  read of the reference course by the title "Day 3" returns Thread 1's.
+  Nothing crashes. Not changed.
+- An iCloud file that has been evicted (dataless) must be fetched by
+  `copyfile`, and may fail offline; that course would then be reported as not
+  imported with the system's reason. 0 dataless files exist in the real source
+  today, and evicting one to measure would mean writing to a source that is
+  read-only, so this is unmeasured.
+- Obsidian resolving `[[Thread 4/Day 15]]` now that it sits under `section1/`
+  is Obsidian's own suffix matching — for Russell to check by opening an
+  imported course.
+
+**Rehearsed on the real folders, 2026-09-23**, into a scratch working folder
+under `$HOME`, through the real importer (a temporary harness calling
+`ReferenceImportSource.resolve` and `ReferenceImporter.importCourses`, not the
+sheet): ICS3U S1 with its Shared folder **1,744 files in, 1,745 out** (the
+settings), 0 links, 0 SHA-256 mismatches, 136 pages, census 1,735 of 1,735
+locked, no file naming `githubToken`, no `plugins/`; ICS3U S2 without it 67 →
+68; ICS4U 787 → 788; ICD2O S1 584 → 585. Every copy took under 0.6 s (APFS
+clones). The previews built (ICS3U: 136 pages, 2 drafts filtered, 1,284 local
+pictures referenced and 0 missing, the front page's `Thread-4/Day-15` embed
+resolved); Copy a Page listed 60 pages (60 counted independently) and copied
+one with its 82 pictures — hidden, byte-identical, nothing locked; `deploy.sh`
+refused every course, plain and `--to-folder`, exit 1, nothing written. A
+3,588-entry manifest of the three `Class Website` folders (mode, size, mtime,
+flags, link text, SHA-256) was identical before and after.
+
+*Rejected, beyond those above:* copying what each link points at (the targets
+are dead or the wrong year, and a stray link could point at the home folder);
+bringing every entry of the Shared folder rather than the named ones (no
+difference on the real data, and a chosen folder could be anything); a
+generated `index.md` that embeds `Home.md` (a page Plantoir invented, in a
+record meant to be faithful); importing S1 and S2 as one two-section course
+(out of scope); an editable course code in the sheet (every real name carries
+one). The full list, with reasons, is `olderLayout.rejected`.
+
+#### The 2024–25 layout: a website folder per class (#256)
+
+The generation between #254's layout and Plantoir's own toolchain: **one whole
+website folder per class section** — `~/Documents/Class Websites/2024-25/ICS3U/S1`
+— holding the program that built the site (`quartz/`: `quartz.config.ts`,
+`package.json`, the program itself, `public/`, `.quartz-cache`, the `post`,
+`preview` and `synclink` scripts) and, inside it, the pages under
+`quartz/content/source-<code>/{shared, s1, s2}`. The folder Obsidian opened,
+`quartz/content`, is mostly LINKS into `source-<code>` (21 of them, relative:
+`All Classes -> ./source-ics3u/s1/All Classes`), plus `vault-<code>-s<N>`
+folders made of links that were used for editing. The iCloud folder Russell
+named in the issue (`LCS/2024-25/Old ICS3U/Class Websites`) holds only two
+**Finder shortcuts**, `S1` and `S2`, leading to those website folders. The
+same File ▸ Import Courses for Reference… sheet recognises it, **third** —
+after the modern shapes and #254's layout, so neither earlier route can be
+claimed by it — and **only the FIRST section of a course kept this way comes
+across** (Russell, 2026-09-23), as one single-section reference course made by
+the same code every import ends in. The rule is data:
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.importing.quartzCheckoutLayout`, run by
+`QuartzCheckoutImportTests`; the code is `QuartzCheckoutLayout`.
+
+**A shortcut is an alias that is ALSO a regular file — and that second half is
+the trap.** Measured: `URLResourceKey.isAliasFileKey` answers **true for a
+symbolic link** as well, and `URL(resolvingAliasFileAt:)` FOLLOWS one. A
+recogniser that resolved "every alias" would follow the website folder's own
+21 links. `QuartzCheckoutLayout.isShortcut` requires `isAliasFile` AND `lstat`
+reporting `S_IFREG`; `testASymlinkIsNeverTakenForAShortcut` pins it, and
+dropping the `lstat` half fails that test and a contract case (must-fail M1).
+A shortcut is resolved with `[.withoutUI, .withoutMounting]`. The folder
+chooser resolves a shortcut the teacher CLICKS on its own
+(`NSOpenPanel.resolvesAliases` is true), so a shortcut arrives as a shortcut
+only as the child of a chosen folder — which is exactly the folder Russell
+named.
+
+**A shortcut that cannot be read through is told apart, never dropped.**
+Measured: a shortcut whose target's parent is unreadable (the shape of a
+refused Documents permission) throws the SAME error as one whose target was
+deleted. So on a throw the bookmark's STORED path and kind are read without
+resolving (`URL.resourceValues(forKeys:fromBookmarkData:)`) and the stored
+path is asked about with `lstat`: a stored FILE is "a shortcut to a file"
+(`Old ICS3U/ideas2.pdf`, real — passed over in a folder exactly as a file is,
+refused with `wording.checkoutLayoutShortcutToAFile` when chosen on its own);
+`EACCES`/`EPERM` is "not allowed to open" (the sentence says where to allow
+it); a path under `/Volumes` whose disk is not mounted is "a disk that isn't
+connected"; anything else is "no longer there". A shortcut to a FOLDER that
+cannot be read through is a ROW, shown untickable with its sentence — the real
+`2024-25/ICD2O/Class Website/ICD2O-S2-Website` leads to a Dropbox folder that
+no longer exists, and "There are no courses in Class Website" would have sent
+Russell looking in the wrong place. The disk-not-connected branch is the one
+not exercised by a test: a bookmark cannot be made to a path that does not
+exist.
+
+**What is recognised, in order** (`recognition.rule` has the whole of it): a
+shortcut chosen on its own; a website folder, or its `quartz/` or
+`quartz/content/` (one or two levels too deep reads as broken, #206's rule);
+anything else inside a website folder's `quartz/` — refused, **never resolved
+upward**, because `source-ics3u/s2` or `vault-ics3u-s2` resolved to its website
+folder would import SECTION 1, the opposite of what was pointed at (a later
+section's folder gets `checkoutLayoutOnlyTheFirstSection`, anything else
+`checkoutLayoutChooseTheWholeFolder`); then the chosen folder's entries and its
+children's are COUNTED — readable website folders in two places refuse with
+`checkoutLayoutChooseOneCourseAtATime` (`2024-25` holds `ICS3U/` and `ICS4U/`),
+in one child only read that child (`Old ICS3U` holds planning `Thread N`
+folders, a PDF shortcut and one `Class Websites`). No folder NAME is trusted.
+**What "the children's entries" means in practice** (corrected after the
+implementation review's L4, which found this paragraph said less than the code
+does): each child's entries are LISTED; a real folder among them is asked
+whether it is a website folder (`lstat` of its `quartz/quartz.config.ts` and
+`quartz/content`, and of `content/source-*/s<N>`), and every Finder shortcut
+among them is RESOLVED, with `.withoutUI` and `.withoutMounting`. Only when all
+of that finds nothing is one more level asked about, and only about SHORTCUTS
+there (`holdsWebsiteShortcutsTwoLevelsDown`): a folder two levels down holding a
+shortcut that leads to a website folder makes the chosen folder the school
+year's, refused with `checkoutLayoutChooseACourseFolderInside`, which points
+one level down and is true whether one course or several is there (so not
+`checkoutLayoutChooseOneCourseAtATime`). That is the implementation review's
+L1: iCloud's `LCS/2024-25` holds `Old ICS3U/Class Websites/S1`, and
+`noCoursesThere` pointed the teacher back at the very folder they had chosen.
+It is a refusal, never an import, because nothing should come across from a folder the teacher did not
+point at; it stops at the first such shortcut, and asks nothing about the
+folders beside the shortcuts, so a website folder three levels down is found by
+choosing the folder above it, not by a look inside every folder at that depth.
+Measured on the real folders (read-only): `LCS/2024-25` → that refusal in
+0.063 s; `LCS` itself, `~/Documents` and `~/Documents/Class Websites` → still
+`noCoursesThere` (the last is true advice: `2024-25` inside it is the folder to
+choose), in 0.002–0.033 s; `Old ICS3U`, `Old ICS4U`, `ICD2O` and `Class
+Websites` unchanged. A dead shortcut two levels down does not count (contract
+case), so `ICD2O` alone is still found by choosing it.
+
+*The plan review's F9 — "resolve shortcuts only in the chosen folder and in the
+single child" — was REJECTED*, and was not recorded as such until the
+implementation review asked. Its worry was real: resolving a shortcut asks
+about the place it leads, and a broad folder chosen by mistake could make macOS
+ask the teacher about places they never chose. It was rejected because finding
+the ONE child that holds the shortcuts (`Old ICS3U` holds `Class Websites`
+beside nine planning folders and a shortcut to a PDF) needs each child's
+shortcuts resolved: an unresolved shortcut cannot say whether it leads to a
+website folder, a file or nowhere, and a child that merely HOLDS shortcuts is
+not yet a course. What was taken from it instead: resolution never shows a dialog and
+never mounts a disk, a symbolic link is never resolved, and the one level
+added below (L1's) asks about shortcuts ONLY and ends at the first — never
+about the folders beside them, which is where another app's private folders
+would be met if the home folder were chosen. A website folder
+is `quartz/quartz.config.ts` + `quartz/content`; it is a COURSE only with one
+`content/source-<code>` holding an `s<digits>` folder. **Math Club** (no
+`source-*`, no code anywhere) is left out of every list entirely — Russell,
+2026-09-23 — so choosing it says `noCoursesThere`.
+
+**The section is what the site was BUILT from.** First the TEXT of
+`content/index.md` (a link to `source-<code>/s<N>/index.md`, read with
+`destinationOfSymbolicLink`, never followed — S2's `synclink` re-points exactly
+these links to make S2's site), then the folder's name `S<N>`, then the only
+`s<N>` there is. They agree in 5 of 5 real website folders. A later section is
+refused on its own and SHOWN, unticked, in a folder of them
+(`checkoutLayoutOnlyTheFirstSection`). *Why only the first:* S2's sites hid
+pages with `draftSectionTwo:` through their own patched filter, which today's
+build does not read, so an S2 import would have previewed 225 pages where S2's
+site showed 283 (ICS3U; 19 shown that S2 hid, 77 hidden that it showed) and 157
+against 213 (ICS4U). Russell chose the first section only over rewriting page
+frontmatter or teaching the build a key for one old layout.
+
+**Which copy: the one inside the folder pointed at.** S1's and S2's copies of
+`source-ics3u` DIFFER — 335 entries by SHA-1. `S2/quartz/synclink` (run by
+`post` before each S2 publish) `rsync -a`s S1's `content` into S2 and re-points
+the section links, so each copy is exactly what that folder's site was last
+built from; S1's is where both sections were edited and carries 2025–26
+changes. Merging them would be a course that never existed; always reading S1's
+would make the answer depend on a folder the teacher did not choose. The year
+comes from the first of the website folder, its parent and its grandparent
+named `YYYY-YY` (right in 5 of 5; the pages' dates alone are right in 4 of 5 —
+the 2023–24 folder's pages were all touched in September 2024 when it was
+copied), else from the pages.
+
+**The mapping, by NAME.** `s1/*` → `section1/` unchanged (`s1/index.md` is
+already the front page, so nothing is renamed; `All Classes` lands at
+`section1/All Classes`, the modern layout's own place, where #207's class-page
+stop finds it by folder); `shared/*` → the course root, `Media` included;
+`content/.obsidian` WITHOUT `plugins/` and `community-plugins.json` (#254's
+rule; none exist here, core plugins only). The 21 links are a MANIFEST, not a
+source: each link's TEXT, worked out against `content/` as a path, must name
+the page or folder of its OWN name in `shared/` or `s1/`, and that entry must
+be there. Where the per-section/shared split falls is read from the source,
+never from a list of names — ICS4U keeps `Grove Time.md` in `shared/`, ICS3U in
+`s1/`.
+
+**Left behind is not lost, and the code keeps them as two lists**
+(`LeftBehindKind` and `LostReason`; `placement.leftBehind.kinds` and
+`placement.lost` in the contract, asserted separately so an implementation
+that lumps them cannot pass — #254's first cut did). Machinery, counted and
+named on the trail, never a loss: the website's own program files (every file
+inside `quartz/` other than `content/`; a folder the skip list names, like
+`node_modules`, `.git` or `.quartz-cache`, counts as ONE entry and is not
+looked inside; nothing beside `quartz/` is walked, so a program folder anywhere
+cannot turn into a walk of someone's home), the links replaced by what they
+showed, the editing folders, the other sections' pages, anything else in
+`source-<code>` no link showed, the add-ons. A LOSS — counted, named in the
+summary with `olderLayoutLeftOut` and on the trail, and the import not called
+complete: a link that showed something else (named WITH where it pointed —
+`checkoutLayoutWhatALinkShowed`, the link's own text with `./` taken off and a
+home-folder path written from `~` — because by its name alone `All Classes`
+reads as the `All Classes` folder that DID come across from the section's own
+pages; the implementation review's L3) or names what is not there, a
+link inside the pages, a shared entry sharing a name with one of the section's
+own (the build would put both at `content/<name>`), a shared `index.md`,
+`section1` or `course_config.json`, and no `s1/index.md`.
+
+**`unit_word` is written, unlike #254.** The build's post-pass
+`_sync_non_class_pages_created` restamps the `created` date of every page it
+does not recognise as a class page by `class_page_pattern(unit_word)`. Absent,
+the word is "Unit" and no lesson here is a class page. Measured on the real
+ICS3U S1 import: the preview restamped **313** files without the key and
+**143** with `unit_word: Thread`. The word is found over the class folder's
+pages with PLACEHOLDERS set aside — `Thread 2, Day x`, a day that is a word
+(the build never calls those class pages either): ICS3U S1 has 55 pages in
+`All Classes`, 54 lessons and one placeholder; ICS3U S2 4 placeholders, ICS4U
+S1 2, S2 3. A rule of "every page" would have written the key for NONE of the
+four (plan review F1). Pages with no `<word> <n>, Day <m>` shape at all
+(`Notes.md`) are set aside too — the implementation review's L2, ruled by the
+director: without the key the build restamps `Notes.md` AND every lesson, with
+it only `Notes.md`, so writing nothing is never better than writing the word
+the class pages use. At least one page must have the shape, and every one that
+does must use one word; two words (`Thread 1, Day 1` beside `Unit 1, Day 2`)
+is the one real ambiguity and still writes nothing. All four real class
+folders have no shapeless page, so no real import changes.
+
+**What the preview shows.** Pages byte-identical; today's build reads
+`publishForSection1`, `publish`, `draftSection1`, `draft`, which for section 1
+is what S1's own site read. Measured: **280 of 324** ICS3U pages built — the
+same 280 S1's site showed; for ICS4U, reading the frontmatter (not a build), 213 of 220.
+`draftSectionTwo` and `createdForSectionTwo` ride along inert in the reference
+course itself; Copy a Page takes them off a copy (below).
+
+**What Copy a Page makes of these pages — Russell's decision, 2026-09-23:
+the old section-2 keys come off, the way `draft:` does.** Before it, #207's
+copier REFUSED, by name and safely, every page carrying `draftSectionTwo:`,
+because its builder-agreement guard refuses any top-level line beginning
+`draftSection` (`namesAVisibilityKey`) and `withoutPerSectionKeys` strips only
+`draftSection<digits>`. From the real ICS3U-2024 import it offered 250 pages,
+copied 97 and refused **153** — exactly the offered pages carrying the key;
+ICS4U-2024 refused 66 of 151. The main use of a reference course failed for
+60% of one course's pages, so Russell chose to strip rather than leave them
+refused. `CopiedPageText.withoutTheOldSectionTwoKeys` now takes
+`draftSectionTwo` and `createdForSectionTwo` off in step 2, with the reader's
+matcher and continuation rule, BEFORE the guard is asked — so the guard's
+language (the fuzzed whitelist) did not change and needed no re-fuzz. The pair
+is the whole list: a census of all four real copies of the layout (ICS3U and
+ICS4U, S1 and S2; 1,338 pages) found `draftSectionTwo` on 800 lines,
+`createdForSectionTwo` on 655, and no other key naming a section; the 2023–24
+layout (#254) carries neither. `createdForSectionTwo` goes too because it is a
+date for a section of a course that is not the destination, and nothing reads
+it; the plain `created:` is kept as always. **Measured, the composed text of
+every top-level page of the real shared folders:** before, ICS3U S1 154 of 259
+refused and ICS4U S1 66 of 153 (every refusal a page carrying the keys); after,
+**0 of 412 refused, 0 not hidden** in sections 1, 2 and 3, and none still
+carrying either key (S2's copies: 0 of 411). Every copy still lands hidden in
+every section of the destination. Contract:
+`copyingAPageBetweenCourses.hidden.theOldSectionTwoKeys` and the ninth
+`frontmatterCases` entry; test
+`testAPageCarryingTheOldSectionTwoKeysIsCopiedHidden` (must-fail: on the old
+copier the page is skipped as `thePageIsWrittenInAWayPlantoirCannotBeSureOf`).
+
+**Rehearsed on the real folders, 2026-09-23**, into a scratch working folder
+under `$HOME` through the real importer (a temporary harness calling
+`ReferenceImportSource.resolve` and `ReferenceImporter.importCourses`, not the
+sheet). The real recogniser read 27 real shapes (the iCloud shortcut folder,
+`Old ICS3U`, each shortcut chosen alone, `ideas2.pdf`, `Old ICS4U`, `ICD2O`,
+the whole `2024-25` in both places, every level of `S1`, `source-ics3u`, `s1`,
+`s2`, `vault-ics3u-s2`, `S2`, Math Club, `2023-24`) with the outcomes the
+contract describes. **ICS3U S1 through the iCloud shortcut folder: 3,093 files
+in, 3,094 out** (the settings), 0 missing, 0 extra, 0 SHA-256 mismatches, 0
+links, 0 names re-spelled, 324 pages, census 3,089 of 3,089 locked, in 1.0 s;
+**ICS4U S1: 616 → 618** (settings and a made `.obsidian/app.json`), census 616.
+The preview built (`/`, `Thread 5, Day 4`, the pictures); `deploy.sh` refused
+the course plain and `--to-folder`, exit 1, nothing written. An 18,279-entry
+manifest of `~/Documents/Class Websites` and the three iCloud folders (mode,
+size, mtime, flags, link text, SHA-256; `.DS_Store` compared separately, 163)
+was identical before and after.
+
+*Rejected* (the full list with reasons is `quartzCheckoutLayout.rejected`):
+resolving every `isAliasFile` entry; telling the teacher to choose the real
+folder instead of reading through a shortcut; merging the two copies or always
+reading S1's; following the links; importing section 2 (and either rewriting
+`draftSectionTwo` or teaching the build to read it); resolving a folder inside
+a website folder upward; reading the title or section out of
+`quartz.config.ts`, a program; showing Math Club as an untickable row; counting
+the program's files without a bound; leaving `unit_word` absent.
+
+## Copying a page from one course into another
+
+"Copy a Page from This Course…", on every course row in the sidebar — one being
+taught or one kept for reference. Issue #207. The teacher picks a page from the
+source's shared folders, a live course to copy it into and one of that course's
+shared folders; the page arrives with every picture and file it shows, and
+optionally with the pages it links to.
+
+Two promises hold the whole thing up, and everything below is in service of
+them:
+
+1. **The copy arrives HIDDEN from students, in every section of the course it
+   lands in.**
+2. **Nothing already in that course is changed, renamed or written over.**
+
+### The four steps that make a copy hidden, and why the ORDER is the rule
+
+`CopiedPageText.hidden(from:forSections:)`:
+
+1. the source's own `publishForSection<N>`, `draftSection<N>` and
+   `createdSection<N>` come off (`AssistPageVisibility.withoutPerSectionKeys`);
+2. the plain `publish:` and `draft:` come off, with the READER's key matcher
+   and its continuation rule — and with them the 2024–25 layout's
+   `draftSectionTwo` and `createdForSectionTwo` (#256, Russell's decision
+   2026-09-23; see "The 2024–25 layout" above for the census and numbers);
+3. `publishForSection<N>: false` for every section the destination has,
+   written DESCENDING so the file reads 1, 2, 3;
+4. a plain `publish: false`, as the LAST line of the block.
+
+**Each of the three ways to get that wrong publishes the page**, and each was
+measured:
+
+| doing it differently | what happens |
+|---|---|
+| stripping the plain keys with `hasPrefix("draft:")` | a `draft:` whose value is on the line BELOW it is orphaned; YAML folds the orphan into the last key written and the page says the plain scalar `"false true"`; `publish.ts` does not hide a string that is not `"false"`, so the page is PUBLISHED |
+| writing the plain `publish: false` FIRST | `AssistPageVisibility.setting`'s "already says it" gate reads the plain key and returns the text unchanged, so **no** `publishForSection<N>` is written at all |
+| leaving the plain key out | all **156** of one real course's shared pages come out VISIBLE in a section 4 they were never told about, because Quartz publishes a page that says nothing |
+
+Measured over the whole corpus: 156 real ICS4U shared pages × 4 section sets ×
+(every destination section plus one the course does not have) = **1,872 checks,
+0 non-hidden**, agreeing in the app's own reader AND in `build_site.py`'s
+`process_frontmatter` plus `patches/publish.ts` run verbatim. A hostile battery
+of 46 further shapes — no frontmatter, CRLF, BOM, tabs, block scalars,
+duplicate keys, `publish: yes`, `PUBLISH:`, `---` inside a code fence, a
+20,000-character line, sections `[2, 5]` — is hidden in every section in both
+readers, or reads `cannotTell` in Swift and is therefore deleted.
+
+### The read-back asks TWO questions, and the second one is an INVARIANT
+
+After the page is written it is **read back from disk** and asked, for every
+section the destination has AND for one it does not, whether it is hidden. The
+test is `!= .hidden`, so a value the app cannot read counts as failure.
+
+That is necessary and it is not sufficient, which is the finding worth carrying
+away. **The app's reader is not the one that decides what students see**, and
+two shapes were reproduced end to end where the two split — the copy certified
+hidden here and PUBLISHED there:
+
+- a settings block closed by an **indented `---`**. `PageVisibilityReader`
+  trims leading spaces before testing a fence; python-frontmatter's boundary is
+  `^-{3,}\s*$` and does not. The builder never finds the end, reads no settings
+  at all, and Quartz publishes a page that says nothing. (The divergence itself
+  is [#188](https://github.com/russellgordon/plantoir/issues/188); this is the
+  place where it costs the most.)
+- a block carrying a **YAML anchor or alias**. Taking the plain `publish:` line
+  out can orphan an alias the rest of the block refers to; `frontmatter.load`
+  then raises, `build_site.py` prints a warning and RETURNS, and the page
+  reaches Quartz unresolved.
+
+A third was found by fuzzing, and it is the one that settled the shape of the
+answer: **a block scalar carrying a horizontal rule.**
+
+```
+description: |
+  Part one
+  ---
+  Part two
+publish: true
+```
+
+The app closes the block at the indented `---` INSIDE the scalar, so it never
+sees the `publish: true` below and inserts its own `publish: false` inside the
+scalar; the builder reads the whole block and takes the LAST `publish`. The
+copy reached students in section 1 while the summary said it was hidden.
+
+Chasing shapes one at a time was clearly the wrong game, so
+`CopiedPageText.theBuilderWouldReadItTheSameWay` states **one invariant** and
+enforces it:
+
+> Every key that hides this copy must lie inside the region the BUILD reads as
+> frontmatter; that region must carry no OTHER visibility key; the two readers
+> must agree about where it ENDS; and every top-level line in it must be a
+> shape the build's YAML parser reads.
+
+Each clause earns its place. The **key multiset** is not a heuristic about a
+shape — by the time it is asked, every per-section key and both plain keys have
+been stripped from the region THIS APP sees, so a visibility key the build can
+see that this app did not write IS the disagreement, observed. **Boundary
+agreement** kills the class rather than a member of it: if the app read a
+different region, then the keys it stripped, the keys it wrote and the place it
+wrote them were all decided about the wrong text. The **parse-shape** clause
+stands in for a YAML parser Swift does not have, because when
+`frontmatter.load` raises, `build_site.py` prints a warning and RETURNS, and
+the page reaches Quartz unresolved — which publishes it.
+
+**And then an INDEPENDENT fuzz broke it again, which changed the shape of the
+answer a second time.** A grammar-based generator — variable-length bodies,
+recursive block-scalar interiors, per-line mutations, rather than a fixed-slot
+cross product — put 60,000 pages through the guard and found **36** it
+certified and the real build did not hide. Two causes, neither of which any
+list of forbidden shapes had thought of:
+
+* **a lone `\r`.** It is a line break to the build, because
+  `frontmatter.load` opens the file in Python's text mode where universal
+  newlines apply, and it is not one to `components(separatedBy: "\n")`. The
+  repro is ordinary-looking: `---\ntitle: Notes\r---\rpublish: true\n---\n`.
+  The plain `publish: false` falls into the BODY and a section the course does
+  not have is published. Modelling universal newlines was rejected — it would
+  mean a second line splitter disagreeing with the app's own — so **a page
+  carrying a lone `\r` is not copied.** Measured: 0 of 12,668 pages.
+* **PyYAML indentation errors**, such as `description: A long note` followed by
+  `  about time: 10am`. When the build cannot parse the block it reads NO keys,
+  so the page is published whatever the copy wrote.
+
+So the last clause became a **WHITELIST rather than a list of exclusions**, and
+that is the durable lesson: excluding the shapes you have thought of loses to a
+generator that thinks of others.
+
+**And a whitelist of SHAPES lost to the next generator, for the same reason one
+step down: a shape still admits arbitrary CHARACTERS.** An extended fuzz found
+**3,311** of 60,000 pages certified and not hidden, every one of them making
+`frontmatter.load` RAISE — a YAML-1.1 bool word used as a key (`yes:`), a
+`U+2028`/`U+2029`/`U+0085` inside a value, a `\u{0B}` or `\u{1C}`–`\u{1F}`
+anywhere, `title: "a"b"`, `title: ,comma` — and one more found by extending it
+again here, a list item at column 0 mixed with mapping keys.
+
+So the guard stopped modelling PyYAML altogether and now certifies a **small
+regular language**: anchored line patterns over an explicit character
+whitelist.
+
+| part | what is certified |
+|---|---|
+| key | `[A-Za-z][A-Za-z0-9_-]*`, and never a YAML 1.1 bool or null word |
+| line | blank · `# comment` · `key:` · `key: VALUE` · `  - VALUE` under a `key:` line |
+| value | a plain scalar opening with a letter, digit or `_`, with no `: `, no ` #` and no trailing `:` · `"…"` with no `"` and no `\` · `'…'` with no `'` · `[]` |
+| anywhere | no C0 control but the line break, no DEL, no `U+0085`/`U+2028`/`U+2029`, no `U+FEFF` after the first scalar, no `U+FFFD` |
+
+**It is far narrower than YAML, deliberately, and a page outside it is not
+copied** — with a plain sentence, and a teacher can always copy such a page by
+hand.
+
+It was derived from the census rather than imagined, and the census is what
+keeps the false-refusal count at zero: the frontmatter of all 12,668 shipped
+and real pages uses **17 distinct keys**, every one of them matching that
+pattern and none a bool word; no value contains `: `, ` #` or a trailing `:`;
+and not one page carries a control character, a `U+0085`, a `U+2028`, a
+`U+2029` or a stray `U+FEFF`. The single widening the census forced was `_` as
+a value's first character — 9,803 values — which PyYAML reads as a plain
+string.
+
+**The root of all of this is in the BUILD, not in the copy, and it is left
+alone.** `build_site.py` catches a parse failure, prints one warning and
+returns, so the page reaches Quartz with no settings resolved — and Quartz
+publishes a page that says nothing. The one input that makes the build unable
+to read a page's settings is also the one that puts it in front of students.
+That is pre-existing, it is shared Python, and changing it is Russell's
+decision: it is written up in
+`scratchpad/findings/an-unparseable-settings-block-is-published.md` rather than
+fixed here. A census of the frontmatter of all 12,668
+shipped and real pages found exactly four shapes —
+`key: value` with a plain scalar (48,091 lines), an indented list item
+(14,462), `key:` with its value below (10,561), and a quoted scalar (13) —
+plus `tags: []` on 54 pages. Those, a blank line and a comment are what can be
+certified. Everything else, **including a block scalar**, is not copied. That
+reversed an earlier decision to allow benign block scalars: the corpus has
+none, so refusing them costs nothing measurable and buys a rule that can be
+SHOWN to be safe rather than argued to be.
+
+**The whitelist is deliberately narrower than YAML**, and a page it will not
+certify is refused with a plain sentence rather than copied and hoped for. A
+teacher can always copy such a page by hand.
+
+**Measured.** The gate is three independent seeds of the grammar generator at
+60,000 pages each, the original 16,192-shape cross product, and the
+false-refusal count — every page composed by the real Swift and then read by
+python-frontmatter 1.3.0 / PyYAML 6.0.3, the image's own pins, running
+`process_frontmatter` and `publish.ts`' rule verbatim:
+
+| corpus | certified & hidden | **certified & NOT hidden** | refused |
+|---|---|---|---|
+| **inside-the-language, 5 seeds × 100,000** | 52,101 / 52,053 / 52,354 / 19,885 / 52,644 | **0** | — |
+| extended grammar | 16,310 | **0** | — |
+| extended again, here | 18,243 | **0** | — |
+| original grammar | 22,977 | **0** | — |
+| cross product | 5,908 | **0** | — |
+| 11,891 shipped pages | 11,891 | **0** | **0** |
+| 777 real pages | 777 | **0** | **0** |
+| 172 ICS4U shared pages | 172 | **0** | **0** |
+
+**And a language lost to a generator that enumerated the language ITSELF.**
+`gen4` walks this grammar to depth 3 over its own admitted atoms and mutates
+one character, so about 70% of its pages are certified rather than 28% — it
+lives INSIDE the language, which is why it finds what junk generators cannot.
+100,000 pages × 3 seeds: **240 / 233 / 224** certified and not hidden. Three
+causes, all of them the same event again:
+
+- **a list whose indentation DECREASES** (`tags:` / `    - a` / `  - b`) — a
+  `ParserError`, and ~230 of every 100,000. The rule now records the first
+  item's indent and requires every later one to match it; a blank line or a
+  comment ends the list, which no real page does inside one.
+- **a plain scalar PyYAML RESOLVES but cannot CONSTRUCT** — `2025-09-93`, a
+  teacher's date typo, raises a `ValueError`. Resolving and constructing are
+  two steps and only the second can fail. The rule follows **PyYAML's own
+  implicit patterns**: a digit-led value matching none of them is a string
+  and cannot raise; one matching the timestamp pattern is range-checked, leap
+  years included; one matching int or float must be a plain integer of at
+  most 15 digits or a simple decimal. Following PyYAML rather than refusing
+  everything date-shaped is what keeps the false-refusal count at zero —
+  **all 1,016 digit-led values in the corpus are timestamps whose offset
+  carries no colon, which PyYAML does not resolve as timestamps at all**, and
+  one real page of Russell's carries `2026-02-29` in a year that is not a
+  leap year.
+- **`title: a:␣◌́b`** — a `ScannerError`, because Swift's `String.contains`
+  compares GRAPHEMES and the combining mark fuses with the space, so the test
+  missed a `": "` PyYAML saw. **Every test in the guard now runs over unicode
+  scalars**, and a combining mark anywhere is refused as well (0 of 1,173,290
+  scalars in the corpus is one). On the other platform the trap is inverted:
+  `string.Contains` is ordinal by default there, and the culture-sensitive
+  overloads are what would introduce it.
+
+**Stated honestly: this is fuzz-clean, not proven.** Five independent
+generators, roughly a million composed pages, zero certified-and-not-hidden
+and zero false refusals — and each of the four rounds that got here was found
+by a generator the round before had not imagined. What the guard really offers
+is a language small enough that its argument can be read and narrow enough
+that what it refuses is written down.
+
+The earlier run of the cross product is kept for the record: (8 opening fences × 11 closing fences
+× 23 bodies × 4 tails × LF/CRLF), each composed by the real Swift and then read
+by python-frontmatter 1.3.0 / PyYAML 6.0.3 — the image's own versions — running
+`process_frontmatter` and `publish.ts`' rule verbatim:
+
+| | build hides it | build does not |
+|---|---|---|
+| certified | **7,878** | **0** |
+| refused | 332 | 7,982 |
+
+and **0 false refusals** over the 11,891 pages Plantoir ships and the 777 real
+pages in four courses. The 332 are conservative refusals of pages the build
+would in fact have hidden, which is the safe direction.
+
+One clause was made precise rather than left broad: `&` and `*` are looked for
+at a VALUE position only. As a substring test they refused four pages Plantoir
+itself ships, all carrying
+`title: "Task 1 - Pacific Trail & Alpine Hazard Simulator"`.
+
+**The delete is checked.** "… was not copied" is the strongest sentence in the
+feature, and making it on an unchecked `try?` would let a page nobody could
+prove hidden sit in the teacher's course while they were told it was not there.
+When the removal fails they get a different sentence naming the file's path,
+and the trail line says how many must not be deployed.
+
+### Nothing is overwritten, at the system call
+
+Every write is create-exclusive at the layer below `FileManager`: a page with
+`open(O_CREAT | O_EXCL | O_WRONLY)`, a picture with `copyfile`'s
+`COPYFILE_CLONE`, which `man copyfile` documents as implying `COPYFILE_EXCL`.
+Measured with a C probe, on APFS→APFS (the clone path), HFS+→HFS+ (the
+**fallback** path, which is the one a clone cannot take) and across volumes:
+`rc=-1 errno=17`, destination unchanged, every time — including onto a symlink,
+where the symlink's target was untouched.
+
+A file that appears between the plan and the write therefore surfaces as the
+ordinary "already here" skip, in the same words the index would have produced.
+The index itself compares names with the `.md` dropped, NFC-composed and
+case-folded, across the WHOLE destination course; `AssistSectionGraph.normalized`
+lowercases and does not compose, which is enough for a wikilink index and not
+enough for deciding whether a file is already there.
+
+### Names are BYTES
+
+Measured on macOS 26.6: reading a name back through `readdir`,
+`FileManager.contentsOfDirectory(at:)` → `lastPathComponent` and
+`contentsOfDirectory(atPath:)` all hand back the stored bytes unchanged — but
+**writing** through a `URL` re-spells it. `App\u{00e9}tit.jpg` (`c3 a9`) written
+through `appendingPathComponent` lands as `Appe\u{0301}tit.jpg` (`65 cc 81`),
+and `URL(fileURLWithPath:)` given the whole path as one string does exactly the
+same. The page that embeds the picture still spells the name the old way, so on
+a volume that compares names byte for byte the embed stops resolving and the
+picture vanishes from the built site with no error anywhere. Four files in one
+real course are of that shape.
+
+So pages and pictures are written through two byte-level primitives on
+`ReferenceTreeCopier` — the file that already owns this rule — and a name is
+normalised only to COMPARE, never to write. A must-fail test copies the same
+name in both spellings and asserts the bytes on the other side.
+
+### A picture of the same name
+
+Same name, same bytes: reused silently. Same name, DIFFERENT bytes: the
+incoming file comes in beside the teacher's under
+`<name> (from <source course folder>)<ext>`, and only the COPIED pages are
+pointed at it. The course's FOLDER name goes in the brackets rather than the
+word "Media", because every picture comes from `Media` and saying so would say
+nothing, while `ICS4U-2025` says which course it came out of.
+
+**And if no free name can be found, the PAGE is not copied.** That is not
+tidiness: the destination already HAS a file of that name with different bytes,
+so a page written with the original name would show the teacher their own,
+different picture — the one direction this feature must never err in — while
+the summary said the link led nowhere. It takes 51 same-stem files in the
+destination to reach, and it is closed because the failure path existed.
+
+After the embeds are rewritten the page is scanned AGAIN with the same scanner,
+and if it still names any renamed file the page is not copied. References are
+read from four shapes, and the list is measured rather than assumed: `![[…]]`
+embeds (1,474 across 777 real files), `[[…]]` links pointing at a FILE (250, of
+which 235 PDFs), HTML `src`/`href` (5 — one of them a live 1.1 MB picture on a
+copyable page), and Markdown destinations (526, every one `https://`). Fenced
+code is left alone. A census of the same corpus found zero unquoted attributes,
+zero reference-style link definitions, zero `<video>`/`<source>` and zero CSS
+`url()`, so the four shapes cover it.
+
+### The backup
+
+One copy of the DESTINATION course, taken before the first write of a sheet
+session — not once per press. Measured with the app's own zip command on a real
+course: **9.7 s and 467 MB**, because `Media` is not in `excludedFromArchives`.
+Five presses of "Copy another" would be fifty seconds of waiting and 2.3 GB of
+copies, and a second backup taken after the first copy is a way back that
+already contains the first copy.
+
+It runs `@concurrent`, and that attribute is load-bearing: this target builds
+with `SWIFT_APPROACHABLE_CONCURRENCY`, under which a plain `nonisolated async`
+function runs on its CALLER's actor. A test asserts the thread rather than
+trusting the annotation.
+
+### The pages this page links to
+
+`AssistSectionGraph.reachFollowingLinks` is CALLED and not changed — transitive,
+with one stop, at a class page (issue #173). `CoursePageCopySource` builds the
+`AssistSectionPage` values it takes from plain facts rather than from a
+`Course`, so the walk can run off the main actor; **every** page of the course
+goes into the graph, not only the copyable ones, because a link that lands on a
+class page has to FIND it in order to stop at it. Measured across two real
+courses: the walk stopped at a class page zero times, because shared pages there
+never link to a lesson. The rule is implemented anyway.
+
+Only a page directly inside a top-level shared folder travels. Every other kind
+is listed with the reason it stayed. A page shown INSIDE another comes along
+whether or not it is ticked — inside ANY page being copied, not only inside the
+one the teacher named, because unticking a page that a LINKED page shows would
+put the same hole in it.
+
+**The checklist is in the FUTURE tense, and its numbers follow the ticks.** It
+is the screen whose whole purpose is to let a teacher change their mind, and it
+was headed with the RESULT sentence — "Copied 11 pages into ICS4U, in
+Concepts." — with a Copy button underneath. There was no future-tense sentence
+in the file at all; it had never been written. And the counts were computed once
+and never again: unticking one page of a real eleven-page set moved them by
+67 MB, two files and one dead link while the screen went on showing the old
+ones. The planner is pure and takes 20 ms on the largest real course, so every
+tick re-plans.
+
+`CopyPageChecklist` is a view of its own so that it can be rendered to an image
+and LOOKED at without a window, which is how it was first seen at all — and how
+a `ScrollView` that reserved its cap and drew a 320 pt hole with the rows
+nowhere in it was found and taken out.
+
+### What was REJECTED, and why
+
+| Not built | Why |
+|---|---|
+| **Copying several pages at once** | Russell, explicitly: not in this release. "Copy another" covers the second page at the cost of one press. |
+| **An MCP tool, or any assistant exposure** | Russell, explicitly. It is deterministic code reached from a menu, and adding a tool is a routing change — more choices is the classic way a router degrades. No generated contract moves, so the surface cannot drift by accident. |
+| **Class pages** | A class belongs to a timetable. Landing one in another course would need a date, a number and a second set of refusals. |
+| **Creating a folder in the destination** | A new top-level folder would also have to be registered in `shared_folders` or the site never builds it — a settings decision with its own refusals. `Media` is the one exception, because Plantoir looks after it and the site-health repair already creates it. |
+| **Mirroring a source SUBfolder path** | Measured zero: 0 of 452 real shared pages, 0 of 38 payloads and 0 of 2,038 skeleton pages sit in a subfolder, and `discover_shared_items` scans the course root only. |
+| **Undo, of any kind** | The backup is the way back and it is one file. `AssistSavedFile` holds text, so a picture cannot travel through the change history at all — an undo that took the pages and left 300 MB of images behind would be worse than none. |
+| **A backup that leaves `Media` out, to make it quick** | Restoring one would DELETE every picture in the course. The ten seconds buys a way back that is actually a way back. |
+| **A progress bar or a size refusal** | Measured 879 MB/s; the worst real copy is 306 files and 302 MB in 0.47 s. The backup is the pause, not the copy. The size is STATED instead, because a refusal would invent a threshold nobody measured. |
+| **Generalising the wizard's combo box** | The page picker is Plantoir's own course-code combo box brought back from another project and made generic there; the wizard itself is untouched, because it is the screen every teacher meets first. |
+
+### Two things only driving the real app found
+
+Both were invisible to every unit test, and both are the kind of fault a
+teacher meets in the first ten seconds.
+
+- **The picker's list opened over the two questions underneath it** the moment
+  the sheet appeared. A sheet gives its first text field focus, and the list
+  opened on focus. It now opens when the teacher TYPES or presses the chevron.
+  Where the picker is the only control on its row, opening on focus is right;
+  as the first of three questions it is not.
+- **Clicking the field did not focus it at all.** A `.plain` `TextField`
+  hit-tests its TEXT, and an empty one is a caret's width of it; measured,
+  `AXFocused` stayed false after a click in the middle of a 361 pt field. The
+  whole bezel takes a click now. It never showed in the wizard, because that
+  screen gives the field focus as it opens and nobody ever has to click it.
+
+### The honest limits
+
+- **The mid-deploy refusal is in-process only.** `CourseActivity.store` is a
+  plain static, so it sees deploys this Plantoir started and not `./deploy.sh`
+  from a Terminal, `plantoir-mcp`, or a second Plantoir. That is the seam the
+  whole app already uses rather than anything new here. It is re-asked
+  immediately before the backup and not again after it.
+- **Invisible spaces are folded on the way IN only.** Resolving a reference
+  against the SOURCE's `Media` folds U+00A0/202F/2007, so a link typed with
+  real spaces finds a file whose name carries a no-break one; the destination
+  index does not fold them, so two files whose names look identical can end up
+  side by side. Nothing is overwritten, which is the safe direction.
+- **A file beside a page rather than in `Media` is left behind**, and listed.
+  Measured: two PDFs and one `.html` across the real courses, and the only
+  pages linking them are class pages, which are never copyable.
+
 ## What an archive or a backup is CALLED, and the calendar it is stamped in
 
 Three kinds of zip share `courses/_backups/<CODE>/` and are told apart only by
@@ -1500,6 +3036,46 @@ withheld from a report unless they tick the box that includes it — and the
 box only appears if there is anything to include. The events that must be
 recorded are contract data (`activityTrail`), pinned by a test, so a new
 feature cannot ship without deciding what it leaves behind.
+
+**Making a course leaves a line saying what it started FROM, since
+2026-09-21** — `course created`, "created ICS4U from the computer studies
+skeleton", one of three shapes (the ready-made pages written for the code,
+the subject's skeleton named, or empty folders). It carries the code and
+nothing else a teacher typed: not the course name, which can hold a
+student's name or a room number, and not where it publishes.
+
+A skeleton line says one thing more, since 2026-09-22
+([#251](https://github.com/russellgordon/plantoir/issues/251)): whether the
+curriculum pages written for the code came with it — "created ICS4U from
+the computer studies skeleton with the ICS4U curriculum pages" — and only
+when they did. That is rule 5's "a changed behaviour changes its line too"
+rather than noise: a skeleton course now comes out two ways, they differ by
+fifty-nine pages and by whether the coverage map works at all, and a line
+that could not tell them apart could not answer the report it was added for.
+It is read from `include_curriculum_pages` in the file the wizard has just
+written — the same key the launcher answers its own question with — so the
+line says what was actually asked for rather than what the interface last
+showed.
+
+It is worth saying why this was missing, because the shape recurs. Creating
+a course DID leave a line — `taskStarted`, "started setup.sh" — and the
+pinned event list was therefore satisfied. But the launcher takes no
+arguments for a creation, so the line carried neither the code nor what the
+course was meant to become, and the trail could not answer the one question
+a report about the New Course wizard asks. Adding a single folder to a list
+recorded more (`folder created` carries the course and the list it went in).
+That asymmetry is how [#248](https://github.com/russellgordon/plantoir/issues/248)
+stayed invisible for five weeks: a teacher declined the ready-made pages for
+a code that had some, got empty folders rather than the subject's skeleton,
+and nothing written down said which of those two things the app had done.
+**An event list can only pin the events somebody thought of; what a line
+CARRIES is the half that has to be read.** From the WIZARD the line is
+written before the launcher starts, so a creation that fails part-way still
+says what was asked for. From **Add Example Course** it is written AFTER the
+run, and only when the run reported the code it installed under — the example
+arrives as EXC2O unless that code is taken, so a line written up front would
+name a course that may not exist, and a failed run writes nothing. Windows
+creates courses too, so the contract entry carries no `appliesOn`.
 
 ## The local assistant
 

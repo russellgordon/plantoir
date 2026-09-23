@@ -1938,9 +1938,9 @@ ask:
 
 | Key | What it decides |
 |---|---|
-| `use_skeleton` | Whether a course with no ready-made payload starts from its subject's skeleton — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing at all. |
+| `use_skeleton` | Whether a course that is NOT TAKING a ready-made payload starts from its subject's skeleton — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing at all. |
 | `prepopulate_example_content` | Whether one of the 38 ready-made courses is poured in. |
-| `include_curriculum_pages` | Whether that payload's Curriculum folder comes with it. |
+| `include_curriculum_pages` | Whether the curriculum pages written for this code come with it — taken with the payload, OR installed into the subject's skeleton when the payload is declined ([#251](https://github.com/russellgordon/plantoir/issues/251)). |
 
 **`use_skeleton` was not written by the Windows wizard at all** (checked
 2026-08-16; written since 2026-09-07, item 25). The Python then fell back to
@@ -1956,9 +1956,16 @@ whether a teacher gets to make it. Silence was never an option either way,
 because the next change to that default in the Python would move Windows and
 not the mac.
 
-The mac writes each of these as `capabilityExists && teacherSaidYes` —
-`hasSkeleton(code) && startsFromSkeleton` — so a stale `true` in an old config
-can never mean anything.
+The mac writes each of these as `capabilityExists && teacherSaidYes` — for
+`use_skeleton`, `hasSkeleton(forCode:takingExampleContent:) && startsFromSkeleton`
+— so a stale `true` in an old config can never mean anything. The capability
+half took the second argument on 2026-09-21
+([#248](https://github.com/russellgordon/plantoir/issues/248)): it used to ask
+only whether example content EXISTED for the code, which made it false for all
+38 payload codes whatever the teacher chose, so declining the ready-made pages
+wrote `use_skeleton: false` and the course arrived with empty folders. The
+question is whether the teacher is TAKING the example content, and Windows'
+`SkeletonCatalog.HasSkeleton` owes the same argument.
 
 ### A divergence flagged by sweeping, 2026-08-16 — checked again 2026-08-23, not present
 
@@ -3847,6 +3854,57 @@ will eventually ask why the two are not the same.
   were added FIRST, before anything was touched, precisely so the extraction can
   be done later and proved not to have moved anything.
 
+## A course kept for reference: the write gate, and the seam it is NOT gated on
+
+A reference course is read-only to every tool on both surfaces. The gate is one
+check at the top of `AssistToolRunner.run(call:)`, and three decisions in it are
+worth keeping.
+
+**Gated on the tool's own `readOnly` flag, never on a list of names.** A list
+kept beside the gate is a list somebody forgets on the day they add a tool —
+the same reasoning the window binding uses for gating on the SCHEMA rather than
+on a roster. A test asserts that the non-`readOnly` tools minus the exemptions
+are exactly the set the gate refuses, so adding a tool fails the suite rather
+than opening a hole. Measured with the gate turned off: **ten** write tools
+reached a frozen course, `publish_pages`, `re_date_classes` and
+`undo_last_change` among them.
+
+**Three exemptions, and they are contract DATA** (`shared-rules.json` →
+`referenceCourses.refusal.toolsStillAllowed`), each with its reason:
+`rebuild_preview`, because a reference course may be previewed and the preview
+writes into the build tree rather than into the course; `back_up_course`,
+because it reads the course and writes a zip outside it; and
+`cancel_scheduled_deploy`, which is **gate by DIRECTION** — never refuse the act
+that STOPS a deploy. A course marked by hand while an alarm was already set must
+still be able to have that alarm turned off from the app.
+
+**Never gated on "is this the course the session greeted".** There is no such
+binding over MCP: `--mcp-stdio` takes the WORKING FOLDER, so every course in it
+is reachable and the only thing pointing a session at one course is the
+greeting. Inventing a binding here in order to except it would take away the
+capability a reference course exists for — being READ by a Claude or Codex
+session working in the live course. Do not add one believing one already
+exists.
+
+**Two sentences, chosen by what was asked for.** A deploy is told the course is
+never deployed; every other write is told it stays as it is. "It is never
+deployed" answers a question nobody asked of "add a class to ICS3U", and "it
+stays as it is" leaves somebody who asked for a deploy wondering whether it
+would work later.
+
+**The local thirteen-tool surface did not move a byte**, which is the proof
+decision (j) asked for. `contracts/assist-cases.json` → `toolSchemas`, hashed
+before and after the whole change:
+
+```
+toolSchemas.local  n=13  sha256 = 1b3666437802e1038b7801727abbe0968232c32ff878c3934136aa9dc33689f8
+toolSchemas.mcp    n=32  sha256 = 079594d16aad00a8339a6e2cf560fcb508f98711339e14c0ae07bb97f8e76c84
+```
+
+Both identical afterwards. Nothing here is a routing change, so the 29-probe
+suite does not need re-running: the gate is code in front of the dispatch, and
+the sentences are tool OUTPUT rather than definitions.
+
 ## Further reading in this repository
 
 - [`09-mac-app.md`](09-mac-app.md) — the app the assistant lives in
@@ -4024,3 +4082,21 @@ behaviour, or two behaviours?).
 ---
 
 [◀ Previous: The macOS App](09-mac-app.md) · [Back to index](README.md) · [Next: Release Strategy ▶](11-release-strategy.md)
+## One feature that is deliberately NOT on any tool surface
+
+"Copy a Page from This Course…" (issue #207) copies one page of one course into
+another, with its pictures and the pages it links to. It is reached from the
+sidebar's context menu and from nowhere else: **no MCP tool, no local-assistant
+tool, no tool-surface change at all.**
+
+Russell's decision, and the reason is the one this page already makes
+elsewhere: adding a tool is a routing change, and more choices is the classic
+way a router degrades. The feature is deterministic code — every rule in it
+would behave identically if the model were replaced by a dropdown menu — so
+there is nothing for a model to decide that the three questions on the sheet do
+not already ask.
+
+Written here so nobody adds it later thinking it was an oversight. The check
+that it stayed off is structural rather than a promise: no generated contract
+moved with the feature, so `assist-wording.json` and `assist-cases.json` cannot
+disagree with the Swift, and `--write-contracts` is not owed by it.

@@ -131,6 +131,13 @@ else
   cat /tmp/verify_recipe_folders_test.log
 fi
 
+if (cd scripts && python3 test_starting_content_prompts.py) >/tmp/verify_starting_content_test.log 2>&1; then
+  pass "setup_course.py: what a teacher who declined the ready-made pages is told, and what lands in the course (scripts/test_starting_content_prompts.py)"
+else
+  fail "setup_course.py: what a teacher who declined the ready-made pages is told, and what lands in the course (scripts/test_starting_content_prompts.py)"
+  cat /tmp/verify_starting_content_test.log
+fi
+
 if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
   pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
 else
@@ -178,6 +185,13 @@ if (cd scripts && python3 test_deploy_non_interactive.py) >/tmp/verify_deploy_no
 else
   fail "deploy: a publish nobody is there to answer questions for refuses rather than waiting or guessing (scripts/test_deploy_non_interactive.py)"
   cat /tmp/verify_deploy_non_interactive_test.log
+fi
+
+if (cd scripts && python3 test_reference_course.py) >/tmp/verify_reference_course_test.log 2>&1; then
+  pass "a course kept for reference is never deployed, at every door the shared toolchain owns (scripts/test_reference_course.py)"
+else
+  fail "a course kept for reference is never deployed, at every door the shared toolchain owns (scripts/test_reference_course.py)"
+  cat /tmp/verify_reference_course_test.log
 fi
 
 # RUNS deploy.sh, where the test above only reads it. That distinction is the
@@ -270,6 +284,54 @@ if [ "$_folder_guard_ok" = true ]; then
   pass "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
 else
   fail "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
+fi
+
+# A course kept for reference is never deployed, and the FOLDER destination is
+# the door that needs the launcher's own refusal: it publishes host-side and
+# exits 0 before the container is started, so deploy.py's check never runs on
+# that path. Exactly the shape of the guard above, and the same reason for
+# checking it structurally — a missing guard here is a deploy that REPORTS
+# SUCCESS on a frozen course, which is the worst direction this can fail in.
+_reference_guard_ok=true
+for _launcher in deploy.sh deploy.ps1; do
+  # `ept_for_reference`, not the whole key: both launchers match the key
+  # WIDENED — `"[^"]*ept_for_reference"` — so that a key written with
+  # backslash-u escapes cannot slip past a text reader. Grepping for the
+  # narrow spelling started failing the moment that landed, which is the
+  # structural check doing its job on itself.
+  if ! grep -q "ept_for_reference" "$_launcher"; then
+    _reference_guard_ok=false
+    echo "   $_launcher does not refuse a course that is kept for reference"
+  fi
+  if ! grep -q "REFERENCE_COURSE_REFUSAL" "$_launcher"; then
+    _reference_guard_ok=false
+    echo "   $_launcher carries no refusal sentence to say when it does"
+  fi
+done
+if [ "$_reference_guard_ok" = true ]; then
+  pass "a course kept for reference is refused before anything is published (deploy.sh and deploy.ps1)"
+else
+  fail "a course kept for reference is refused before anything is published (deploy.sh and deploy.ps1)"
+fi
+
+# And a course code that begins with a DOT is refused outright, in all four
+# launchers. Plantoir builds a reference course under a hidden folder inside
+# `courses/` and renames it into place as the last act; handed that hidden
+# name, a launcher treated it as an ordinary course — the uppercased name
+# still resolves on a case-insensitive volume — and during the copy there is
+# no marker yet for the guard above to find. Structural for the same reason as
+# the guard above: this is a door, and the app cannot reach it to test it.
+_dot_guard_ok=true
+for _launcher in deploy.sh preview.sh deploy.ps1 preview.ps1; do
+  if ! grep -q "cannot begin with a dot" "$_launcher"; then
+    _dot_guard_ok=false
+    echo "   $_launcher does not refuse a course code beginning with a dot"
+  fi
+done
+if [ "$_dot_guard_ok" = true ]; then
+  pass "a course code beginning with a dot is refused (all four launchers)"
+else
+  fail "a course code beginning with a dot is refused (all four launchers)"
 fi
 
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
@@ -1031,6 +1093,113 @@ else
 fi
 docker rm -f "$VERIFY_COLON_CONTAINER" >/dev/null 2>&1 || true
 rm -rf "$VERIFY_COLON_DIR" "$VERIFY_COLON_BUILDS"
+
+# -------------------- 6f. A LOCKED reference course builds ----------------
+# The case the plan's own ruling owed and did not get: the mechanism decision
+# — `chflags uchg` alone, never mode 444 — was made from a measurement, and a
+# measurement made once is not a standing gate.
+#
+# What it pins, in the REAL image, over a real bind mount:
+#   * a course whose every content file carries `uchg` builds at all;
+#   * a page hidden in the SOURCE is hidden in the built site;
+#   * building again over the existing build works;
+#   * the source is untouched, and still locked, afterwards.
+# The must-fail the plan ruling asked for — the same case with mode 444 — was
+# tried here and does NOT reproduce through the real launcher. Written down
+# rather than quietly dropped: the 444 fault needs the build tree to be the
+# HOST BIND MOUNT, where container root does not get its usual permission
+# override. `preview.sh --build-only` builds in the container's own
+# /tmp/quartz-builds and syncs public/ out afterwards, so the frontmatter
+# rewrite happens on container-local storage — where root CAN write a 444
+# file. Run with `chmod 444` as well as the flag, this case still passed.
+# The original measurement stands; it was taken against a bind mount on
+# purpose. What this case cannot be is the standing gate on THAT, so it is
+# the standing gate on everything else instead.
+#
+# Its own folder under $HOME (the VM mounts nothing else), its own container
+# and its own builds folder, every flag cleared and all three removed
+# afterwards — a locked tree that escaped would be undeletable litter.
+VERIFY_LOCK_DIR="$HOME/.plantoir-verify-locked"
+echo ""
+echo "🚦 Building a LOCKED reference course in ${DEV_TEST_IMAGE}…"
+chflags -R nouchg "$VERIFY_LOCK_DIR" 2>/dev/null || true
+rm -rf "$VERIFY_LOCK_DIR"
+mkdir -p "$VERIFY_LOCK_DIR/courses"
+cp setup.sh preview.sh deploy.sh "$VERIFY_LOCK_DIR/"
+cp -R courses/EXC2O "$VERIFY_LOCK_DIR/courses/EXC2O"
+rm -rf "$VERIFY_LOCK_DIR/courses/EXC2O/.merged_output"
+VERIFY_LOCK_COURSE="$VERIFY_LOCK_DIR/courses/EXC2O"
+# One page the teacher has held back, and one they have not.
+VERIFY_LOCK_SECTION="$VERIFY_LOCK_COURSE/section1"
+# The LEGACY spelling, deliberately: `publish: false` needs no rewrite, so it
+# would stay hidden even when the rewrite FAILS - and the rewrite failing is
+# exactly what mode 444 introduces. A real reference course is this shape:
+# measured on a previous-generation folder, 220 of its 320 pages carry `draft:`
+# and none carries the modern key.
+printf -- '---\ntitle: Held Back\ndraft: true\n---\n\nNot for students.\n' \
+  > "$VERIFY_LOCK_SECTION/Held Back.md"
+printf -- '---\ntitle: Out In The Open\npublish: true\n---\n\nFor students.\n' \
+  > "$VERIFY_LOCK_SECTION/Out In The Open.md"
+VERIFY_LOCK_ID="$(cd "$VERIFY_LOCK_DIR" && pwd -P | shasum -a 256 | cut -c1-8)"
+VERIFY_LOCK_CONTAINER="teaching-quartz-${VERIFY_LOCK_ID}"
+VERIFY_LOCK_BUILDS="${HOME%/}/Library/Application Support/Plantoir/builds/${VERIFY_LOCK_ID}"
+docker rm -f "$VERIFY_LOCK_CONTAINER" >/dev/null 2>&1 || true
+rm -rf "$VERIFY_LOCK_BUILDS"
+# Exactly what `ReferenceLock` does: every FILE, no directory, and never
+# course_config.json — the build's own preflight rewrites that one.
+find "$VERIFY_LOCK_COURSE" -type f ! -name 'course_config.json' \
+  ! -name 'course_config.backup.json' ! -name '.DS_Store' \
+  ! -path '*/.obsidian/*' -exec chflags uchg {} + 2>/dev/null || true
+VERIFY_LOCK_BEFORE="$(shasum -a 256 "$VERIFY_LOCK_SECTION/Held Back.md" | cut -d' ' -f1)"
+
+if (cd "$VERIFY_LOCK_DIR" && ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only) \
+     >/tmp/verify_locked_course.log 2>&1; then
+  pass "a course whose pages are locked builds a website"
+else
+  fail "a locked course could not be built"
+  tail -25 /tmp/verify_locked_course.log
+fi
+VERIFY_LOCK_PUBLIC="$VERIFY_LOCK_BUILDS/EXC2O/section1/public"
+if [[ -f "$VERIFY_LOCK_PUBLIC/index.html" ]]; then
+  pass "and the built site is where every reader of it looks"
+else
+  fail "no site at $VERIFY_LOCK_PUBLIC/index.html"
+fi
+# THE ONE THAT DECIDED THE MECHANISM: a page hidden in the source stays
+# hidden. With mode 444 as well as the flag, the copy's frontmatter rewrite
+# fails on the bind mount and this page is PUBLISHED.
+if [[ -e "$VERIFY_LOCK_PUBLIC/Held-Back.html" || -e "$VERIFY_LOCK_PUBLIC/Held Back.html" ]]; then
+  fail "A PAGE THE TEACHER HELD BACK WAS PUBLISHED from a locked course"
+else
+  pass "and a page hidden in the source is hidden in the built site"
+fi
+if [[ -e "$VERIFY_LOCK_PUBLIC/Out-In-The-Open.html" || -e "$VERIFY_LOCK_PUBLIC/Out In The Open.html" ]]; then
+  pass "and a page the teacher published IS in it (so the check above means something)"
+else
+  fail "the published page is missing too — this build produced nothing to judge"
+fi
+# Again, over the existing build.
+if (cd "$VERIFY_LOCK_DIR" && ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only) \
+     >>/tmp/verify_locked_course.log 2>&1; then
+  pass "and building again over the existing build works"
+else
+  fail "a second build over the existing one failed"
+  tail -25 /tmp/verify_locked_course.log
+fi
+VERIFY_LOCK_AFTER="$(shasum -a 256 "$VERIFY_LOCK_SECTION/Held Back.md" | cut -d' ' -f1)"
+if [[ "$VERIFY_LOCK_BEFORE" == "$VERIFY_LOCK_AFTER" ]]; then
+  pass "and the source page is byte-for-byte what it was"
+else
+  fail "the build CHANGED a locked source page"
+fi
+if ls -lO "$VERIFY_LOCK_SECTION/Held Back.md" | grep -q uchg; then
+  pass "and it is still locked"
+else
+  fail "the source page came back unlocked"
+fi
+docker rm -f "$VERIFY_LOCK_CONTAINER" >/dev/null 2>&1 || true
+chflags -R nouchg "$VERIFY_LOCK_DIR" 2>/dev/null || true
+rm -rf "$VERIFY_LOCK_DIR" "$VERIFY_LOCK_BUILDS"
 
 RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"
 if [[ "$RUNNING_IMAGE" == "$DEV_TEST_IMAGE" ]]; then

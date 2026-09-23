@@ -208,6 +208,30 @@ nonisolated enum ActivityTrail {
         /// joins this line rather than earning a rename on both platforms.
         case classCopyNotMade = "class copy not made"
 
+        /// A teacher copied one or more pages out of one course and into
+        /// another ("Copy a Page from This Course…").
+        ///
+        /// Carries the course the pages came FROM by its folder name — the
+        /// thing that tells last year's ICS4U from this year's — the course
+        /// and folder they landed in, how many pages and pictures were
+        /// created, reused, brought in under a new name and left alone, and
+        /// the backup's file name. NEVER a page's title and never anything
+        /// from inside one: `classCopyNotMade`'s own doc comment draws that
+        /// line for the same kind of act, and `sectionRestored` already
+        /// carries a backup's file name for the same reason this one does.
+        ///
+        /// One event for every outcome, written once at the END of a copy
+        /// rather than one per page. A copy that stopped part way through
+        /// says so in the same line, because the counts already show it — and
+        /// every extra event is an entry the Windows app has to account for.
+        ///
+        /// Without it, a page appearing in a course a teacher did not write
+        /// it in has no explanation anywhere: on disk a copied page looks
+        /// exactly like one they typed, and "where did this come from?" is a
+        /// question nothing else in this trail could answer. The refusals
+        /// record nothing — they answer before anything is touched.
+        case pagesCopiedFromAnotherCourse = "pages copied from another course"
+
         /// A publish set to happen on its own stopped because it needed an
         /// answer.
         ///
@@ -256,6 +280,30 @@ nonisolated enum ActivityTrail {
         /// told from one that never happened. Without this line the trail can
         /// answer "why did my site not update?" and cannot answer "did it?".
         case scheduledPublishFinished = "scheduled publish finished"
+
+        /// A deploy the teacher had set to happen on its own was turned off by
+        /// something OTHER than them asking for it.
+        ///
+        /// Three things turn one off without being asked: removing the course,
+        /// removing the section, and the day it was set for going by — and the
+        /// line says WHICH, in the teacher's own terms, carrying the course and
+        /// the section. One event with three reasons rather than three events:
+        /// somebody reading the trail wants to know their overnight deploy was
+        /// turned off and by what, and the difference between two ways of
+        /// removing something means nothing to them.
+        ///
+        /// Without it, a teacher whose site stopped updating has no line
+        /// anywhere explaining why — the alarm simply is not there any more,
+        /// which reads exactly like one that was never set. That is the same
+        /// silence `scheduled publish needed an answer` was built for, one step
+        /// further back.
+        ///
+        /// Says DEPLOY where its three neighbours say publish. A site is
+        /// deployed and a page is published (Russell, 2026-09-20), and the
+        /// shipped names are left alone rather than renamed here — a new name
+        /// carrying the old vocabulary is the expensive mistake, because the
+        /// contract pins it on both platforms.
+        case scheduledDeployTurnedOff = "scheduled deploy turned off"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
         case itemExcluded = "item excluded"
@@ -404,6 +452,111 @@ nonisolated enum ActivityTrail {
         /// completely different report from a publish that died on its own.
         /// Carries what was under way, in the words the teacher was shown.
         case quitAskedAboutWorkUnderWay = "quit asked about work under way"
+
+        /// A teacher made a new course, and WHICH starting content it began
+        /// from: the ready-made pages written for its code, the subject's
+        /// skeleton, or empty folders. Carries the course code and nothing
+        /// else — not the name they typed, not where it publishes.
+        ///
+        /// Written because "my new course came out empty" is a report that
+        /// today's trail cannot answer at all. Until 2026-09-21 the only
+        /// line a creation left was "started setup.sh", whose arguments are
+        /// empty for a course creation — so the trail did not even carry
+        /// the code, let alone what the course was supposed to start as.
+        /// Adding one folder to a list has recorded more than making a
+        /// whole course did (`folder created`). That asymmetry is what
+        /// GitHub issue #248 was reported against: a teacher declined the
+        /// ready-made pages, got empty folders, and nothing on the trail
+        /// said which of those two things had happened.
+        case courseCreated = "course created"
+
+        /// A course was kept for reference: which folder it was given, the
+        /// code and school year it shows, how many sections came across, and
+        /// which course it was copied from. Never the contents of a page.
+        case courseKeptForReference = "course kept for reference"
+
+        /// A reference course's pages were locked again, with the count —
+        /// because a backup came back unlocked, or a folder that syncs
+        /// cleared the locks while it uploaded, or the folder had been opened
+        /// on a Mac that had never heard of reference courses. Written only
+        /// when a pass actually did something, so a folder in a steady state
+        /// leaves no lines at all.
+        case referenceCoursePagesLockedAgain = "reference course pages locked again"
+
+        /// A course was brought in from another folder and kept for
+        /// reference: which folder it was read from, the folder it was given
+        /// here, the code and school year it shows, and how many sections
+        /// came across. The folder it was READ from is the half a copy does
+        /// not have, and it is the answer to "where did this ICS4U come
+        /// from". Never the contents of a page.
+        case courseImportedForReference = "course imported for reference"
+
+        /// A class kept in the OLDER layout (a folder per class, #254) came
+        /// across. Written right after `courseImportedForReference`, and
+        /// carries what that line cannot: the class folder's name, the shared
+        /// folder its pages and pictures came from and HOW it was found (by
+        /// its name, chosen by hand, or none), how many of the shared folders
+        /// and pages the class used were brought across out of how many and
+        /// the names of any that are missing, how many of the class's links
+        /// the shared folder's real entries REPLACED, how many things were
+        /// left out as a LOSS with each one's path (a link below the top or
+        /// inside a shared entry, a name the course uses for itself), how
+        /// many Obsidian add-on entries were left behind, and whether an empty
+        /// Media folder was made. "Where are this course's pictures" is the
+        /// question a report about one of these will ask. Names and paths
+        /// only — never what is written on a page, and never anything read
+        /// from the add-ons.
+        case courseImportedFromTheOlderLayout = "course imported from the older layout"
+
+        /// A class kept in the 2024–25 layout — a whole website folder per
+        /// class, often reached through a Finder shortcut — came across
+        /// (#256). Written right after `courseImportedForReference`, and
+        /// carries what that line cannot: where the pages were read from (a
+        /// path from the home folder) and the shortcut's name when one was
+        /// followed, the section and HOW it was told (its front page, its
+        /// folder's name, or being the only one) with any disagreement, the
+        /// course pages folder the files came from and how many, the word
+        /// its class pages use and how many placeholder pages were set aside,
+        /// and then as two separate clauses what was LEFT BEHIND by kind with
+        /// counts (the website's own program files, links replaced, editing
+        /// folders and other sections by name, add-ons) and what was LOST, by
+        /// name (a link that showed somewhere unexpected also says where it
+        /// pointed, from the home folder). S1's and S2's copies of the pages differ, so "which copy did
+        /// this come from, and what did not come" is a real question, and
+        /// only this line answers it. Names and counts only — never what is
+        /// written on a page.
+        case courseImportedFromAClassWebsiteFolder = "course imported from a class website folder"
+
+        /// One course of an import did not come across, and the rest did.
+        /// Carries which course and why — a course code already kept for
+        /// reference under that school year, a folder that could not be read,
+        /// a disk that filled. Written per COURSE, because "the import
+        /// failed" is exactly the report that cannot be looked into: a run of
+        /// four courses that imports three is the ordinary shape of this.
+        case courseCouldNotBeImportedForReference = "course could not be imported for reference"
+
+        /// The teacher stopped an import part way. Carries the course that
+        /// was in hand, which was not kept, and the folder it was coming
+        /// from. Its own event rather than a failure: a teacher who stops
+        /// something chose to, and a line calling that a failure is a line
+        /// that misleads whoever reads it back.
+        case courseImportForReferenceStopped = "course import for reference stopped"
+
+        /// A working folder was opened and an unfinished import was found in
+        /// it and tidied away. Carries which course it was going to be.
+        ///
+        /// A reference course is built under a hidden name and renamed into
+        /// place last, so a quit or a crash part way leaves a hidden folder
+        /// nothing can see — and therefore nothing would ever remove. This
+        /// is the one line that says the disk space came back, and it is
+        /// also how "my import did not finish and now there is no trace of
+        /// it" gets an answer.
+        case unfinishedImportForReferenceTidiedAway = "unfinished import for reference tidied away"
+
+        /// A reference course was filed under a different school year — the
+        /// one thing about a frozen course a teacher can still change.
+        /// Carries the code they read, the folder, and both years.
+        case referenceCourseSchoolYearChanged = "reference course school year changed"
     }
 
     // MARK: - Stored properties

@@ -114,6 +114,26 @@ unverifiable gets flagged and is NOT published as Ministry wording.
 Save the result as a structured markdown file (see the format the ADA1O
 generator parses) — it is both the generator's input and the audit trail.
 
+**A payload's `Curriculum/` folder is now installed in TWO situations, not
+one** (GitHub issue #251, 2026-09-22): when a teacher TAKES the payload, and
+when they decline it and keep the subject's skeleton instead — in which case
+the curriculum pages are the only part of the payload that travels. So the
+folder's shape is load-bearing for a course that has none of the payload's
+other pages: it must stay FLAT (no subfolders), Markdown only (no images or
+attachments), with an `index.md`, an "About These …" explainer, one page per
+specific expectation named for its code (`A1.1.md`, `D2.3.md`) and one per
+overall expectation (`A1. Something.md`). Two consequences worth knowing
+while authoring:
+
+- **A curriculum page that links OUT of the folder will dangle** in a
+  skeleton course, which has none of the payload's task pages. Four payloads
+  do this once each, in `About These Expectations.md` — CGC1W, ICS3U, ICS4U,
+  MDM4U — and it is a known, unfixed fault rather than a pattern to copy.
+- **The first specific expectation, by filename order, is what the
+  skeleton's template pages embed** when the payload has no `A1.1` of its
+  own (MCMPR11 starts at `D1.1`, MTH1W at `B1.1`). Nothing to do while
+  authoring; it is why the installer has a rename rule at all.
+
 ## Phase 2 — Design the course
 
 Choose folders that fit the SUBJECT, not the template. ADA1O's line-up for
@@ -1022,8 +1042,16 @@ than hand-written:
   affected family and read it. `verify.sh` covers the toolchain, not the
   content.
 
-**A new payload retires its skeleton automatically** — example content
-always wins for a code that has it. Nothing to remove.
+**A new payload retires its skeleton for a teacher who TAKES it** —
+example content always wins when it is being taken. Nothing to remove: the
+skeleton stays, and is what the course starts from when the teacher turns
+the payload down, which is the whole of
+[#248](https://github.com/russellgordon/plantoir/issues/248). Both apps
+read the manifest's existence as retiring the skeleton outright until
+2026-09-21, so declining the ready-made pages gave EMPTY folders — 18 pages
+against the skeleton's 47, measured on ICS4U. So a payload's own shape
+matters twice over: a teacher who declines it lands on the family skeleton,
+and the two should not feel like different subjects.
 
 ## Converting an existing complete course into a payload
 

@@ -148,11 +148,13 @@ The image is layered as follows (in order):
    - `example_course/EXC2O/` — the complete example course installable from
      the setup wizard (it, too, receives the `.obsidian` defaults on
      install).
-   - `example_content/<CODE>/` — ready-made course content for thirty-seven
-     Ontario course codes, poured into a new course of that code
+   - `example_content/<CODE>/` — ready-made course content for 38 course
+     codes (count the folders rather than trusting the number), poured into
+     a new course of that code
      ([course setup §0b](04-course-setup.md#0b-starting-content-for-the-course-code)).
    - `skeletons/<family>/` plus `families.json` — the starting shape for
-     every OTHER course code: fifty subject families mapped from the code's
+     EVERY course code, and what a course gets whenever its teacher is not
+     taking the ready-made content: fifty subject families mapped from the code's
      three-letter prefix. Generated output; the generator and its linter
      live in `.claude/skills/example-content/`.
 
