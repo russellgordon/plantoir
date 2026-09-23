@@ -1005,6 +1005,13 @@ nonisolated enum QuartzCheckoutLayout {
                 continue
             }
             if kind == S_IFDIR && text == ".obsidian" {
+                placements.append(ReferenceTreeCopier.Placement(
+                    sourceRoot: content,
+                    item: ReferenceTreeCopier.Item(
+                        relativePath: name, isDirectory: true, byteCount: 0, mode: S_IFDIR | 0o755, modified: nil
+                    ),
+                    destination: name
+                ))
                 let survey: ReferenceTreeCopier.Survey = ReferenceTreeCopier.walk(
                     courseAt: entryURL, leavingBehind: leftBehindNames
                 )
