@@ -114,6 +114,16 @@ struct ImportCoursesForReferenceSheet: View {
     /// The run itself, so Stop can cancel it.
     @State var run: Task<Void, Never>?
 
+    /// The older-layout row whose shared folder is being chosen by hand, by
+    /// folder name, and whether the chooser is up. A second chooser of the
+    /// sheet's OWN: the one that opened this sheet belongs to the sidebar.
+    @State var choosingSharedFor: String?
+    @State var isChoosingShared: Bool = false
+
+    /// Why the folder chosen for a row could not be its shared folder, by
+    /// folder name. Said beside the row; the row keeps what it had.
+    @State var sharedPickProblem: [String: String] = [:]
+
     /// The day the year lists are built from. A stored property rather than a
     /// call to the clock inside the body, so the lists cannot change under
     /// the teacher mid-sheet — and so a test can move it.
@@ -149,7 +159,8 @@ struct ImportCoursesForReferenceSheet: View {
     /// button for all of them put it out of a teacher's reach.
     var troubleByCourse: [String: String] {
         var result: [String: String] = [:]
-        var shelved: [ReferenceCourseRule.Shelved] = workspace.shelvedReferenceCourses(on: today)
+        let onTheShelf: [ReferenceCourseRule.Shelved] = workspace.shelvedReferenceCourses(on: today)
+        var shelved: [ReferenceCourseRule.Shelved] = onTheShelf
         for course in courses {
             if let problem = course.problem {
                 result[course.id] = problem
@@ -162,6 +173,19 @@ struct ImportCoursesForReferenceSheet: View {
             if let trouble = ReferenceCourseRule.trouble(
                 placing: course.courseCode, inYear: year, among: shelved
             ) {
+                // Two sections of one OLDER-layout course, both ticked for the
+                // same year: nothing is kept yet, so "You already have…" would
+                // be false. Said as what it is (#254).
+                let clashesOnlyInThisSheet: Bool = ReferenceCourseRule.trouble(
+                    placing: course.courseCode, inYear: year, among: onTheShelf
+                ) == nil
+                if clashesOnlyInThisSheet, course.olderLayout != nil,
+                   let sibling = tickedSibling(of: course, before: true) {
+                    result[course.id] = ReferenceImportWording.olderLayoutAnotherSectionOfTheSameCourse(
+                        folder: sibling.folderName
+                    )
+                    continue
+                }
                 result[course.id] = trouble.sentence
                 continue
             }
@@ -172,6 +196,15 @@ struct ImportCoursesForReferenceSheet: View {
             ))
         }
         return result
+    }
+
+    /// True when any row is an older-layout class, so the sheet says what
+    /// is left behind of those.
+    var hasOlderLayoutClasses: Bool {
+        for course in courses where course.olderLayout != nil {
+            return true
+        }
+        return false
     }
 
     /// What to say under the list when nothing can be imported at all.
@@ -219,6 +252,18 @@ struct ImportCoursesForReferenceSheet: View {
         .task {
             await readTheFolder()
         }
+        .fileImporter(
+            isPresented: $isChoosingShared,
+            allowedContentTypes: [.folder]
+        ) { result in
+            switch result {
+            case .success(let folderURL):
+                chooseShared(folderURL)
+            case .failure:
+                break
+            }
+        }
+        .fileDialogDefaultDirectory(folderBesideTheChosenClass)
     }
 
     // MARK: - The states
@@ -274,6 +319,14 @@ struct ImportCoursesForReferenceSheet: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if hasOlderLayoutClasses {
+                Text(ReferenceImportWording.olderLayoutAddOnsAreLeftBehind)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("importAddOnsNote")
+            }
 
             // The calm note, said where the teacher is deciding rather than
             // after the fact. No icon, and no "cannot".
@@ -333,6 +386,10 @@ struct ImportCoursesForReferenceSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("importTrouble-\(course.folderName)")
                     }
+
+                    if course.olderLayout != nil {
+                        olderLayoutLines(course)
+                    }
                 }
             }
             .toggleStyle(.checkbox)
@@ -351,6 +408,54 @@ struct ImportCoursesForReferenceSheet: View {
             .frame(width: 120)
             .disabled(!ticked.contains(course.id))
             .accessibilityIdentifier("importYear-\(course.folderName)")
+        }
+    }
+
+    /// Under an older-layout row: where its shared pages come from (or that
+    /// they will be missing), any warning or refusal about a folder chosen
+    /// by hand, the note beside a second section of the same course, and the
+    /// button that chooses the shared folder.
+    @ViewBuilder
+    func olderLayoutLines(_ course: ReferenceImportSource.FoundCourse) -> some View {
+        if let facts = course.olderLayout {
+            if let sentence = OlderCourseLayout.sentence(about: facts.shared) {
+                let isShort: Bool = facts.shared.state == .notFound || facts.shared.state == .partlyFound
+                Text(sentence)
+                    .font(.callout)
+                    .foregroundStyle(isShort ? Color.orange : Color.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("importShared-\(course.folderName)")
+            }
+            if let warning = facts.chosenWarning {
+                Text(warning)
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("importSharedWarning-\(course.folderName)")
+            }
+            if let problem = sharedPickProblem[course.id] {
+                Text(problem)
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("importSharedProblem-\(course.folderName)")
+            }
+            if !ticked.contains(course.id), course.problem == nil,
+               let sibling = tickedSibling(of: course, before: false) {
+                Text(ReferenceImportWording.olderLayoutAnotherSectionOfTheSameCourse(folder: sibling.folderName))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("importSibling-\(course.folderName)")
+            }
+            if facts.shared.linkCount > 0 && course.problem == nil {
+                Button(ReferenceImportWording.olderLayoutChooseSharedButton) {
+                    choosingSharedFor = course.id
+                    isChoosingShared = true
+                }
+                .controlSize(.small)
+                .accessibilityIdentifier("importChooseShared-\(course.folderName)")
+            }
         }
     }
 
@@ -404,6 +509,13 @@ struct ImportCoursesForReferenceSheet: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            if hasOlderLayoutClasses {
+                Text(ReferenceImportWording.olderLayoutAddOnsAreLeftBehind)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(ReferenceWording.pagesAreLocked)
             }
@@ -432,6 +544,14 @@ struct ImportCoursesForReferenceSheet: View {
             }
             return ReferenceImportWording.imported(
                 course: made.displayCode, year: year, sections: made.sectionCount
+            )
+        case .importedWithSharedPagesMissing(let made):
+            var year: String = ReferenceImportWording.noSchoolYear
+            if let startingYear = made.schoolYear {
+                year = SchoolYear.label(forStartingYear: startingYear)
+            }
+            return ReferenceImportWording.olderLayoutImportedWithSharedMissing(
+                course: made.displayCode, year: year
             )
         case .notImported(let course, let reason):
             return ReferenceImportWording.couldNotImport(course: course, reason: reason)
@@ -500,6 +620,90 @@ struct ImportCoursesForReferenceSheet: View {
         )
     }
 
+    /// Another older-layout section of the same course, ticked for the same
+    /// school year — the row this one would clash with. `before` limits it
+    /// to rows ABOVE this one, the order the shelf rule counts them in.
+    func tickedSibling(
+        of course: ReferenceImportSource.FoundCourse,
+        before: Bool
+    ) -> ReferenceImportSource.FoundCourse? {
+        guard course.olderLayout != nil else {
+            return nil
+        }
+        let code: String = CourseCodeRule.normalized(course.courseCode)
+        let year: Int? = schoolYear(for: course)
+        for other in courses {
+            if other.id == course.id {
+                if before {
+                    return nil
+                }
+                continue
+            }
+            guard other.olderLayout != nil, ticked.contains(other.id), other.problem == nil else {
+                continue
+            }
+            if CourseCodeRule.normalized(other.courseCode) == code && schoolYear(for: other) == year {
+                return other
+            }
+        }
+        return nil
+    }
+
+    /// Where the shared-folder chooser opens: beside the class it is for.
+    var folderBesideTheChosenClass: URL? {
+        guard let choosingSharedFor else {
+            return nil
+        }
+        for course in courses where course.id == choosingSharedFor {
+            return course.directoryURL.deletingLastPathComponent()
+        }
+        return nil
+    }
+
+    /// The teacher chose a shared folder for one row: check it off the main
+    /// actor and either re-measure that row with it or say beside the row
+    /// why it cannot be the one.
+    func chooseShared(_ folderURL: URL) {
+        guard let rowID = choosingSharedFor else {
+            return
+        }
+        var chosenCourse: ReferenceImportSource.FoundCourse?
+        for course in courses where course.id == rowID {
+            chosenCourse = course
+        }
+        guard let course = chosenCourse else {
+            return
+        }
+        let openFolderURL: URL? = workspace.workspaceURL
+        let day: CalendarDay = today
+        Task { @MainActor in
+            let choice: ReferenceImportSource.SharedChoice = await ReferenceImportSource.chooseShared(
+                for: course,
+                sharedFolderURL: folderURL,
+                workingFolderURL: openFolderURL,
+                leavingBehind: ReferenceImporter.leftBehindNames,
+                on: day
+            )
+            switch choice {
+            case .refused(let sentence):
+                sharedPickProblem[rowID] = sentence
+            case .accepted(let remeasured):
+                sharedPickProblem[rowID] = nil
+                guard var updated = source else {
+                    return
+                }
+                var index: Int = 0
+                for existing in updated.courses {
+                    if existing.id == rowID {
+                        updated.courses[index] = remeasured
+                    }
+                    index += 1
+                }
+                source = updated
+            }
+        }
+    }
+
     func startImporting() {
         guard let coursesDirectoryURL = workspace.coursesDirectoryURL,
               let source else {
@@ -530,6 +734,9 @@ struct ImportCoursesForReferenceSheet: View {
             var landed: [String] = []
             for outcome in results {
                 if case .imported(let made) = outcome {
+                    landed.append(made.folderName)
+                }
+                if case .importedWithSharedPagesMissing(let made) = outcome {
                     landed.append(made.folderName)
                 }
             }

@@ -77,6 +77,45 @@ nonisolated enum ReferenceTreeCopier {
         var text: String {
             return String(decoding: relativePath, as: UTF8.self)
         }
+
+        /// True for a symbolic link, which the walk lists and never follows.
+        ///
+        /// Asked by the older-layout import (`OlderCourseLayout.plan`), which
+        /// must never copy one: a link in a reference course is a door out of
+        /// it that the lock and the census cannot see through. See
+        /// `copy(placements:into:reportingEveryBytes:progress:)`.
+        var isSymbolicLink: Bool {
+            return (mode & S_IFMT) == S_IFLNK
+        }
+    }
+
+    /// One thing to copy from SOMEWHERE into a course, and where it lands.
+    ///
+    /// The older-layout import brings a course together from two folders —
+    /// the class's own folder and the shared folder beside it — and puts some
+    /// of it under a different path (`Thread 1/Day 1.md` becomes
+    /// `section1/Thread 1/Day 1.md`). So each item carries the folder it is
+    /// read from and the BYTES of the path it is written to; the name is
+    /// never rebuilt from text, for the reason at the top of this file.
+    struct Placement: Sendable, Equatable {
+
+        // MARK: - Stored properties
+
+        /// The folder `item.relativePath` is read from.
+        let sourceRoot: URL
+
+        /// What is copied. A folder is MADE at `destination`, never copied.
+        let item: Item
+
+        /// Where it lands inside the new course, as bytes joined with `/`.
+        let destination: [UInt8]
+
+        // MARK: - Computed properties
+
+        /// The destination as text, for a message or a test. Never a path.
+        var destinationText: String {
+            return String(decoding: destination, as: UTF8.self)
+        }
     }
 
     /// What one walk found, for the sheet to show before anything is copied.
@@ -263,6 +302,58 @@ nonisolated enum ReferenceTreeCopier {
         }
     }
 
+    /// Copies a list of placements into a folder that exists and is empty.
+    ///
+    /// The older-layout import's entry point. The same byte-for-byte copy as
+    /// `copy(_:from:into:)`, with one difference that is the point of it:
+    /// **a symbolic link is REFUSED, never copied.** The planner has already
+    /// left every link out (`OlderCourseLayout.plan`), so this should never
+    /// fire; it is here so that a future planner bug fails loudly instead of
+    /// quietly making a reference course with a live link inside it — one the
+    /// lock cannot lock, the census does not count, and the preview cannot
+    /// follow out of the working folder. The modern route keeps copying a link
+    /// as a link (its only one is `.merged_output`, which is left behind),
+    /// deliberately unchanged: see `documentation/09-mac-app.md`.
+    ///
+    /// `@concurrent` for the same measured reason as `copy(_:from:into:)`.
+    @concurrent
+    static func copy(
+        placements: [Placement],
+        into destinationURL: URL,
+        reportingEveryBytes: Int64 = 4 * 1024 * 1024,
+        progress: @Sendable (Int64) -> Void
+    ) async throws {
+        let destination: [UInt8] = ReferenceTreeCopier.pathBytes(of: destinationURL)
+        var copiedBytes: Int64 = 0
+        var reportedBytes: Int64 = 0
+
+        for placement in placements {
+            try Task.checkCancellation()
+            if placement.item.isSymbolicLink {
+                throw Trouble.couldNotCopy(
+                    name: placement.item.text,
+                    reason: "it points somewhere else rather than holding anything"
+                )
+            }
+            let from: [CChar] = ReferenceTreeCopier.path(
+                ReferenceTreeCopier.pathBytes(of: placement.sourceRoot), placement.item.relativePath
+            )
+            let to: [CChar] = ReferenceTreeCopier.path(destination, placement.destination)
+            try ReferenceTreeCopier.copy(
+                from: from, to: to, isDirectory: placement.item.isDirectory,
+                mode: placement.item.mode, name: placement.destinationText
+            )
+            copiedBytes += placement.item.byteCount
+
+            if copiedBytes - reportedBytes >= reportingEveryBytes {
+                reportedBytes = copiedBytes
+                progress(copiedBytes)
+            }
+        }
+
+        progress(copiedBytes)
+    }
+
     /// The names of the things directly inside a folder, as the BYTES the
     /// file system gave, in a stable order.
     ///
@@ -401,16 +492,29 @@ nonisolated enum ReferenceTreeCopier {
     private static func copy(_ item: Item, from source: [UInt8], into destination: [UInt8]) throws {
         let from: [CChar] = ReferenceTreeCopier.path(source, item.relativePath)
         let to: [CChar] = ReferenceTreeCopier.path(destination, item.relativePath)
+        try ReferenceTreeCopier.copy(
+            from: from, to: to, isDirectory: item.isDirectory, mode: item.mode, name: item.text
+        )
+    }
 
-        if item.isDirectory {
-            if mkdir(to, item.mode & 0o7777) != 0 {
+    /// The one place a file is cloned or a folder is made, shared by both
+    /// entry points so they cannot disagree about how.
+    private static func copy(
+        from: [CChar],
+        to: [CChar],
+        isDirectory: Bool,
+        mode: mode_t,
+        name: String
+    ) throws {
+        if isDirectory {
+            if mkdir(to, mode & 0o7777) != 0 {
                 throw Trouble.couldNotCopy(
-                    name: item.text, reason: ReferenceTreeCopier.reason(errno)
+                    name: name, reason: ReferenceTreeCopier.reason(errno)
                 )
             }
             // `mkdir` is filtered by the process umask, so the folder is made
             // and then given the permissions the source had.
-            _ = chmod(to, item.mode & 0o7777)
+            _ = chmod(to, mode & 0o7777)
             return
         }
 
@@ -420,7 +524,7 @@ nonisolated enum ReferenceTreeCopier {
         // AS a link rather than following it.
         if copyfile(from, to, nil, copyfile_flags_t(COPYFILE_CLONE)) != 0 {
             throw Trouble.couldNotCopy(
-                name: item.text, reason: ReferenceTreeCopier.reason(errno)
+                name: name, reason: ReferenceTreeCopier.reason(errno)
             )
         }
     }
@@ -537,12 +641,12 @@ nonisolated enum ReferenceTreeCopier {
     /// an APFS volume (which compares names normalisation-insensitively), a
     /// network share or an exFAT disk — exactly where an old working folder
     /// tends to live — does not.
-    private static func pathBytes(of url: URL) -> [UInt8] {
+    static func pathBytes(of url: URL) -> [UInt8] {
         return Array(url.path.utf8)
     }
 
     /// `root` + `/` + `relative`, null-terminated, for POSIX.
-    private static func path(_ root: [UInt8], _ relative: [UInt8]) -> [CChar] {
+    static func path(_ root: [UInt8], _ relative: [UInt8]) -> [CChar] {
         var bytes: [UInt8] = root
         if !relative.isEmpty {
             bytes.append(ReferenceTreeCopier.separator)
