@@ -78,7 +78,7 @@ nonisolated enum ReferenceImportWording {
     /// settings was told "there are no courses in that folder", which is a
     /// different thing and sends them to look in the wrong place.
     static let settingsCouldNotBeRead: String =
-        "Its settings could not be read, so it cannot be brought across."
+        "Its settings could not be read, so it can’t be brought across."
 
     /// A folder inside a course that the disk would not hand over.
     ///
@@ -91,7 +91,7 @@ nonisolated enum ReferenceImportWording {
 
     /// Said once under the list, about what does not come across.
     static let builtWebsitesAreNotCopied: String =
-        "Last year's finished websites are not copied. Preview a course and Plantoir builds it again."
+        "Last year's built websites are not copied. Preview a course and Plantoir builds it again."
 
     /// The button.
     static let importButton: String = "Import"
