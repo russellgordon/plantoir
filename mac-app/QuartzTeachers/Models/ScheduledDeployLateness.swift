@@ -202,7 +202,7 @@ nonisolated enum ScheduledDeployLateness {
     /// `scheduledDeployCancellation.wording` and pinned against it by a test,
     /// the same arrangement every other shared sentence uses. No machinery in
     /// it: no "job", no "agent", no "launch", no "plist".
-    static let settingTitle: String = "A scheduled deploy may still run this late"
+    static let settingTitle: String = "How late a scheduled deploy may still run"
 
     /// The sentence under the choice.
     ///
@@ -212,9 +212,9 @@ nonisolated enum ScheduledDeployLateness {
     /// than of the rule.
     static let settingCaption: String =
         "A deploy set to happen on its own runs at the time you chose. If this Mac was off or "
-        + "asleep then, it runs at the next wake instead — and this is how long after your chosen "
-        + "time that is still worth doing. Later than this, Plantoir leaves it alone rather than "
-        + "putting up a site you set up for a different day, and tells you it did."
+        + "asleep then, it runs the deploy the next time this computer wakes instead. This setting "
+        + "identifies how long after your chosen time the deploy is still worth doing. If your "
+        + "computer wakes after this time, Plantoir will cancel the scheduled deploy."
 
     /// "1 day", "3 days", "1 week", "2 weeks" — what a choice is called in the
     /// settings form.
