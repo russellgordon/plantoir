@@ -62,6 +62,12 @@ nonisolated struct ReferenceImportSource: Sendable {
         /// Where it is, over in the old folder. Only ever read.
         let directoryURL: URL
 
+        /// Set for a class folder kept in the OLDER layout (a folder per
+        /// class, #254), nil for an ordinary course. The importer takes a
+        /// different road for one — `OlderCourseLayout.plan` — and the sheet
+        /// says what was found of its shared pages beside the row.
+        var olderLayout: OlderCourseLayout.Facts? = nil
+
         // MARK: - Computed properties
 
         var id: String {
@@ -79,6 +85,12 @@ nonisolated struct ReferenceImportSource: Sendable {
         case insideTheFolderYouHaveOpen(folderName: String)
         case holdsTheFolderYouHaveOpen(folderName: String)
 
+        /// The older layout's shared folder was chosen rather than a class.
+        case theSharedFolder(folderName: String)
+
+        /// A folder of whole older-layout courses (the school year's folder).
+        case aFolderOfOlderCourses(folderName: String)
+
         // MARK: - Computed properties
 
         var sentence: String {
@@ -91,6 +103,10 @@ nonisolated struct ReferenceImportSource: Sendable {
                 return ReferenceImportWording.insideTheFolderYouHaveOpen(folder: folderName)
             case .holdsTheFolderYouHaveOpen(let folderName):
                 return ReferenceImportWording.holdsTheFolderYouHaveOpen(folder: folderName)
+            case .theSharedFolder(let folderName):
+                return ReferenceImportWording.olderLayoutThatIsTheSharedFolder(folder: folderName)
+            case .aFolderOfOlderCourses(let folderName):
+                return ReferenceImportWording.olderLayoutChooseOneCourseAtATime(folder: folderName)
             }
         }
     }
@@ -110,11 +126,19 @@ nonisolated struct ReferenceImportSource: Sendable {
     let coursesURL: URL
 
     /// What was found in it, in the order the sheet shows them: by code.
-    let courses: [FoundCourse]
+    ///
+    /// A `var` for one reason: choosing a shared folder by hand for an
+    /// older-layout class re-measures that one row in place.
+    var courses: [FoundCourse]
 
     /// The one course the teacher pointed AT, when they chose a course folder
     /// rather than a working folder. Ticked on its own in that case.
     let chosenCourseFolderName: String?
+
+    /// Which rows are ticked when a folder of OLDER-layout classes was chosen,
+    /// or nil for every other shape. See `OlderCourseLayout` and
+    /// `olderLayoutTicked(_:)` for the rule.
+    var olderLayoutTicked: Set<String>? = nil
 
     // MARK: - Computed properties
 
@@ -133,6 +157,9 @@ nonisolated struct ReferenceImportSource: Sendable {
                 return [chosenCourseFolderName]
             }
             return []
+        }
+        if let olderLayoutTicked {
+            return olderLayoutTicked
         }
         var everything: Set<String> = []
         for course in courses where course.problem == nil {
@@ -178,6 +205,11 @@ nonisolated struct ReferenceImportSource: Sendable {
     /// one they pointed at already ticked — refusing a folder that plainly
     /// holds a course, because the teacher went one level too deep, is the
     /// kind of refusal that reads as the app being broken.
+    ///
+    /// **When none of the three is there, the OLDER folder-per-class layout
+    /// is tried** (`olderLayoutOutcome`, #254) — asked second, so a folder
+    /// holding a `courses` folder or a course's settings is always read the
+    /// modern way whatever else is in it.
     ///
     /// `leavingBehind` is the whole skip list, passed in rather than read
     /// here so the measuring and the copying cannot disagree about it.
@@ -269,8 +301,13 @@ nonisolated struct ReferenceImportSource: Sendable {
             }
         }
 
+        // Nothing of the modern shape: perhaps the OLDER one (#254). Asked
+        // only now, so a folder holding a `courses` folder or a course's
+        // settings is always read the modern way, whatever else is in it.
         guard let coursesURL else {
-            return .refused(.noCoursesThere(folderName: chosenName))
+            return ReferenceImportSource.olderLayoutOutcome(
+                chosen: chosenURL, leavingBehind: leftBehindNames, on: day
+            ) ?? .refused(.noCoursesThere(folderName: chosenName))
         }
 
         var courses: [FoundCourse] = []
@@ -289,7 +326,9 @@ nonisolated struct ReferenceImportSource: Sendable {
             )
         }
         if courses.isEmpty {
-            return .refused(.noCoursesThere(folderName: chosenName))
+            return ReferenceImportSource.olderLayoutOutcome(
+                chosen: chosenURL, leavingBehind: leftBehindNames, on: day
+            ) ?? .refused(.noCoursesThere(folderName: chosenName))
         }
 
         // What the trail calls the source: the working folder for the two
@@ -350,6 +389,247 @@ nonisolated struct ReferenceImportSource: Sendable {
             return first.courseCode < second.courseCode
         }
         return found
+    }
+
+    // MARK: - Functions (the older layout, #254)
+
+    /// What the OLDER layout makes of a chosen folder, or nil when it is not
+    /// that shape either.
+    static func olderLayoutOutcome(
+        chosen chosenURL: URL,
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay
+    ) -> Outcome? {
+        switch OlderCourseLayout.recognise(chosenURL) {
+        case .nothing:
+            return nil
+        case .theSharedFolder:
+            return .refused(.theSharedFolder(folderName: chosenURL.lastPathComponent))
+        case .aFolderOfCourses:
+            return .refused(.aFolderOfOlderCourses(folderName: chosenURL.lastPathComponent))
+        case .classFolder(let classURL):
+            let course: FoundCourse = ReferenceImportSource.measureOlderClass(
+                at: classURL,
+                sharedFolderURL: OlderCourseLayout.sharedFolder(besideClassFolder: classURL),
+                howFound: .byItsName,
+                chosenWarning: nil,
+                leavingBehind: leftBehindNames,
+                on: day
+            )
+            return .found(ReferenceImportSource(
+                rootURL: classURL.deletingLastPathComponent(),
+                coursesURL: classURL.deletingLastPathComponent(),
+                courses: [course],
+                chosenCourseFolderName: classURL.lastPathComponent
+            ))
+        case .folderOfClasses(let folderURL, let classFolders):
+            var courses: [FoundCourse] = []
+            for classURL in classFolders {
+                courses.append(ReferenceImportSource.measureOlderClass(
+                    at: classURL,
+                    sharedFolderURL: OlderCourseLayout.sharedFolder(besideClassFolder: classURL),
+                    howFound: .byItsName,
+                    chosenWarning: nil,
+                    leavingBehind: leftBehindNames,
+                    on: day
+                ))
+            }
+            courses.sort { first, second in
+                if first.courseCode == second.courseCode {
+                    return first.folderName.localizedStandardCompare(second.folderName) == .orderedAscending
+                }
+                return first.courseCode < second.courseCode
+            }
+            var source: ReferenceImportSource = ReferenceImportSource(
+                rootURL: folderURL,
+                coursesURL: folderURL,
+                courses: courses,
+                chosenCourseFolderName: nil
+            )
+            source.olderLayoutTicked = ReferenceImportSource.olderLayoutTicked(courses)
+            return .found(source)
+        }
+    }
+
+    /// Which older-layout rows are ticked when a whole folder of them is
+    /// chosen.
+    ///
+    /// **Only a class NAMED like one** (`ICS3U-S1-2023-24`, `ICS4U-2023-24`),
+    /// so `ICD2O-Exemplars` is offered and not assumed. **And of several
+    /// sections of one course in one school year, only the LOWEST**: the
+    /// shelf holds one course per code per year, so ticking S1 and S2 of
+    /// 2023–24 together opened the sheet with the second one already in
+    /// trouble, under a sentence ("You already have…") that was false —
+    /// nothing was kept yet. S2 is offered, unticked, with a sentence of its
+    /// own; Russell's decision 1 makes it a second import.
+    static func olderLayoutTicked(_ courses: [FoundCourse]) -> Set<String> {
+        var ticked: Set<String> = []
+        var lowestByCourseAndYear: [String: FoundCourse] = [:]
+        for course in courses {
+            guard course.problem == nil,
+                  let facts = course.olderLayout,
+                  facts.names.looksLikeAClass else {
+                continue
+            }
+            var yearText: String = "none"
+            if let year = course.suggestedSchoolYear {
+                yearText = "\(year)"
+            }
+            let key: String = course.courseCode.uppercased() + " " + yearText
+            if let already = lowestByCourseAndYear[key],
+               let alreadyFacts = already.olderLayout,
+               (alreadyFacts.names.section ?? 0) <= (facts.names.section ?? 0) {
+                continue
+            }
+            lowestByCourseAndYear[key] = course
+        }
+        for (_, course) in lowestByCourseAndYear {
+            ticked.insert(course.id)
+        }
+        return ticked
+    }
+
+    /// One older-layout class, measured for the sheet: its code and year from
+    /// its name, its shared content, and the size of what will be COPIED —
+    /// the class's own files plus the shared ones it used, which for ICS3U S1
+    /// is 1.4 MB of class and about 870 MB of shared pictures.
+    static func measureOlderClass(
+        at classURL: URL,
+        sharedFolderURL: URL?,
+        howFound: OlderCourseLayout.HowFound,
+        chosenWarning: String?,
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay
+    ) -> FoundCourse {
+        let folderName: String = classURL.lastPathComponent
+        let names: OlderCourseLayout.NameFacts = OlderCourseLayout.nameFacts(of: folderName)
+        let plan: OlderCourseLayout.Plan = OlderCourseLayout.plan(
+            classFolderURL: classURL,
+            sharedFolderURL: sharedFolderURL,
+            howFound: howFound,
+            leavingBehind: leftBehindNames
+        )
+
+        var problem: String?
+        if names.code == nil {
+            problem = ReferenceImportWording.olderLayoutNoCourseCode
+        } else if let unreadable = plan.unreadableFolders.first {
+            problem = ReferenceImportWording.couldNotReadFolder(folder: unreadable)
+        }
+
+        // The year the NAME says, when it says one that is offered; the
+        // pages' own dates otherwise, exactly as a modern course.
+        var year: Int? = SchoolYear.offeredYear(storedYear: names.startingYear, on: day)
+        if year == nil {
+            year = ReferenceImportSource.suggestedSchoolYear(fromPagesChangedIn: plan.pageYears, on: day)
+        }
+
+        return FoundCourse(
+            folderName: folderName,
+            courseCode: names.code ?? folderName,
+            courseName: folderName,
+            sectionNumbers: [1],
+            pageCount: plan.pageCount,
+            fileCount: plan.fileCount,
+            byteCount: plan.byteCount,
+            problem: problem,
+            suggestedSchoolYear: year,
+            directoryURL: classURL,
+            olderLayout: OlderCourseLayout.Facts(
+                classFolderName: folderName,
+                names: names,
+                shared: plan.shared,
+                chosenWarning: chosenWarning
+            )
+        )
+    }
+
+    /// What choosing a shared folder by hand came to.
+    enum SharedChoice: Sendable {
+        case accepted(FoundCourse)
+        case refused(String)
+    }
+
+    /// The teacher chose the folder an older class's shared pages were kept
+    /// in: check it, and re-measure the row with it.
+    ///
+    /// Refused — with the row left as it was — when it is the folder this
+    /// window has open (or inside it, or holding it), when it is a class
+    /// itself, or when it holds none of what the class used. A different
+    /// course code in its name is a warning beside the row, not a refusal.
+    static func withSharedChosen(
+        _ course: FoundCourse,
+        sharedFolderURL chosenURL: URL,
+        workingFolderURL: URL?,
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay
+    ) -> SharedChoice {
+        let chosen: URL = chosenURL.standardizedFileURL
+        let chosenName: String = chosen.lastPathComponent
+        if let workingFolderURL {
+            let openURL: URL = workingFolderURL.standardizedFileURL
+            if ReferenceImportSource.isTheSameFolder(chosen, openURL) {
+                return .refused(ReferenceImportWording.thatIsTheFolderYouHaveOpen)
+            }
+            if ReferenceImportSource.folder(chosen, isInside: openURL) {
+                return .refused(ReferenceImportWording.insideTheFolderYouHaveOpen(folder: chosenName))
+            }
+            if ReferenceImportSource.folder(openURL, isInside: chosen) {
+                return .refused(ReferenceImportWording.holdsTheFolderYouHaveOpen(folder: chosenName))
+            }
+        }
+        if let refusal = OlderCourseLayout.refusal(
+            ofChosenSharedFolder: chosen, forClassFolder: course.directoryURL
+        ) {
+            return .refused(refusal)
+        }
+        let warning: String? = OlderCourseLayout.codeWarning(
+            forChosenSharedFolder: chosen, classCode: course.courseCode
+        )
+        var remeasured: FoundCourse = ReferenceImportSource.measureOlderClass(
+            at: course.directoryURL,
+            sharedFolderURL: chosen,
+            howFound: .chosen,
+            chosenWarning: warning,
+            leavingBehind: leftBehindNames,
+            on: day
+        )
+        // The year the teacher sees is theirs to keep: re-measuring must not
+        // move it. (The sheet keeps its own choice by row, so only the
+        // PROPOSAL is carried here.)
+        remeasured = FoundCourse(
+            folderName: remeasured.folderName,
+            courseCode: remeasured.courseCode,
+            courseName: remeasured.courseName,
+            sectionNumbers: remeasured.sectionNumbers,
+            pageCount: remeasured.pageCount,
+            fileCount: remeasured.fileCount,
+            byteCount: remeasured.byteCount,
+            problem: remeasured.problem,
+            suggestedSchoolYear: course.suggestedSchoolYear,
+            directoryURL: remeasured.directoryURL,
+            olderLayout: remeasured.olderLayout
+        )
+        return .accepted(remeasured)
+    }
+
+    /// The same, off the main actor — it walks the chosen folder, which can
+    /// be 1,600 pictures.
+    @concurrent
+    static func chooseShared(
+        for course: FoundCourse,
+        sharedFolderURL: URL,
+        workingFolderURL: URL?,
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay
+    ) async -> SharedChoice {
+        return ReferenceImportSource.withSharedChosen(
+            course,
+            sharedFolderURL: sharedFolderURL,
+            workingFolderURL: workingFolderURL,
+            leavingBehind: leftBehindNames,
+            on: day
+        )
     }
 
     // MARK: - Private helpers

@@ -1690,7 +1690,10 @@ with the course they pointed at already ticked. Refusing somebody who went one
 level too deep reads as the app being broken, and resolving upward costs
 nothing. Refused: a folder with no courses in it, the working folder this
 window already has open (that is route 1, and the sentence says so by name),
-and a folder on either side of the one already open.
+and a folder on either side of the one already open. **When none of the three
+shapes is there, the OLDER folder-per-class layout is tried next** (#254,
+"The older layout" below) — so a folder holding a `courses` folder or a
+course's settings is always read the modern way, whatever else is in it.
 
 **What is left behind is four fifths of what is on disk.** In a folder made by
 an older Plantoir, `.merged_output` is a REAL directory holding last year's
@@ -1699,8 +1702,10 @@ in a folder made by a current one it is a symlink pointing out of the working
 folder altogether. A name on the skip list is therefore skipped **without
 being looked inside**, which is why the walk is hand-written rather than an
 enumerator with a filter: merely not COPYING that folder while still walking it
-costs more time than copying the course. Symlinks are copied as links and never
-followed. The rest of the list, with a reason each, is
+costs more time than copying the course. On this route symlinks are copied as
+links and never followed — the only one a modern course holds is
+`.merged_output`, which is skipped by name anyway; a course made from the
+older layout never carries one at all (below). The rest of the list, with a reason each, is
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `referenceCourses.importing.leftBehind` — the archive list, plus yesterday's
 config, plus a Finder duplicate of a config found in a real course, plus what
@@ -1714,7 +1719,9 @@ navigable. Its `workspace.json` was MEASURED on a real imported course rather
 than assumed: every path in it is vault-relative, with no absolute path and no
 mention of the old folder, so it resolves inside the new course as it stands.
 (An earlier draft of this page said the opposite. Nothing needs stripping, and
-nothing needs registering either — the app opens a vault by path.)
+nothing needs registering either — the app opens a vault by path.) That is the
+MODERN route; a class from the older layout comes WITHOUT its add-ons, for a
+reason measured in "The older layout" below.
 
 **A file name is carried as BYTES, and that is why this path talks to POSIX
 rather than to `FileManager`.** The walk reads names with `readdir` and the
@@ -1747,7 +1754,9 @@ cancellation it has no use for.
 
 **Page frontmatter is never rewritten.** A reference course is a faithful
 record of what students actually saw, `draft: true` and all; the build already
-reads the older spelling correctly. (#207's rule — a page copied INTO a live
+reads the older spelling correctly. (A class from the older folder-per-class
+layout is the exception to "what students saw": its pages carry Digital
+Garden's keys, which the build does not read — see "The older layout" below.) (#207's rule — a page copied INTO a live
 course starts hidden — belongs to the copy, not to the import.)
 
 #### What the copy costs, measured, and why it is still cancellable
@@ -1913,6 +1922,234 @@ triangles reads as a course that did not land.
   copy; a list of four rows each with a name field is clutter in front of a
   decision nobody wants to make. The names are derived by the same rule
   (`CODE-YYYY`, `-2` … `-9` when taken) and are not shown.
+
+#### The older layout: a folder per class (#254)
+
+Russell kept his 2023–24 courses a different way, and asked for them to come in
+through the same door (his decision 4): **one Obsidian folder per class
+section** — `ICS3U-S1-2023-24` — holding its `Thread N` folders of class pages
+at the top, `Home.md` and `All Prior Classes.md` beside them, and the shared
+folders and pages (Tasks, Concepts, Media, `Learning Goals.md`…) reached
+through LINKS into a sibling folder whose name ends in "Shared"
+(`ICS3U-2024-25 Shared`). There is no `course_config.json` anywhere, so the
+modern reading finds nothing, and only then is this shape tried
+(`OlderCourseLayout.recognise`). Each class folder becomes **one
+single-section reference course** (decision 1), made by exactly the code every
+other import ends in — so the marker, the neutralisation, the fifteen deploy
+refusals and the lock all apply unchanged. The rule itself is data:
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.importing.olderLayout`, run by `OlderLayoutImportTests`.
+
+**What the real folders are**, measured read-only under
+`~/Library/Mobile Documents/com~apple~CloudDocs/Documents/LCS/2023-24/`:
+ICS3U has two class folders and one Shared folder, **all 18 of each class's
+links dangling** (they point at `…/2023-24/Old ICS3U/…`, which no longer
+exists); ICD2O has two classes, `ICD2O-Exemplars` (named like neither),
+`ICD2O-LCS-LDPS-Collaboration` (no Thread folder) and a Shared folder, with 16
+links each that DO resolve; ICS4U 2023–24 is ONE self-contained folder with no
+links and no Shared sibling. In every case the class's link NAMES equal the
+Shared folder's top-level entries exactly — 0 missing, 0 extra.
+
+**Recognition needs BOTH a real `.obsidian` and a `Thread N` folder with a page
+directly inside it.** Each alone admits a real folder that is not a class: the
+course folders above (`ICS3U/`) have `Thread N` folders of planning — 0 pages
+directly inside any of them — and no `.obsidian`; the Collaboration folder has
+`.obsidian` and no Thread folder. All six real classes pass, with 12 to 17
+pages directly in each Thread folder. The teacher may point at a class folder,
+the `Class Website` folder, or the course folder holding one by that exact
+name. The Shared folder itself is refused with its own sentence
+(`wording.olderLayoutThatIsTheSharedFolder`), but only when it sits beside a
+class, so the sentence is true. **Nothing is ever followed**: every entry is
+asked about with `lstat`, a child that is a link is never a class and never a
+Shared folder. The school year's folder (`2023-24`, whose children are whole
+courses each holding a `Class Website`) is refused with a sentence of its own
+(`wording.olderLayoutChooseOneCourseAtATime`) that points one level down: the
+ordinary `noCoursesThere` says "Choose the folder you kept that year's classes
+in", which for this layout is the folder just chosen (found in review).
+
+**Code and year come from the name.** The code is the leading five characters
+when they are Ontario-shaped; the year is `-YYYY-YY` with the two halves
+consecutive, and it becomes the proposal when the sheet offers it — otherwise
+the pages' dates propose one, exactly as a modern course. A folder whose name
+has no code is shown, untickable, with `wording.olderLayoutNoCourseCode`
+(#206's "shown, not hidden" rule). The old section number is not carried:
+every import is `section1`.
+
+**Only the LOWEST section of one course and year is ticked when a folder of
+classes is chosen**, and only folders NAMED like a class are ticked at all
+(`ICD2O-Exemplars` is offered, unticked). The plan ticked both ICS3U sections,
+and the plan review measured what that did: the sheet opened with S2 already
+in trouble under "You already have a ICS3U kept for reference from 2023–24" —
+false, since nothing was kept yet — with advice ("Choose a different school
+year") that is wrong for a second section. The shelf holds one course per code
+per year, so **S1 and S2 of one year cannot both be kept under that year**;
+Russell accepted that (decision 1 makes S2 a second import). The unticked
+sibling says so beside itself — only when both are NAMED as sections of the
+course, so `ICD2O-Exemplars` (whose pages' dates give it the same year) is not
+called "another section" of ICD2O — and a ticked one that clashes only with a row
+in the same sheet says the same instead of "You already have…"
+(`wording.olderLayoutAnotherSectionOfTheSameCourse`). Filing S2 under Other, or
+another year, keeps it. Any OTHER clash that exists only inside the sheet —
+the measured one is ticking `ICD2O-Exemplars`, which sorts above S1 and takes
+2023 from its pages' dates — says that the row above is also ticked for that
+year (`wording.alsoTickedForThatYear`), never "You already have…", because
+nothing is kept yet. The choice of sentence is a static function
+(`ImportCoursesForReferenceSheet.troubleByCourse(courses:ticked:years:onTheShelf:)`)
+so `testAClashInsideOneSheetIsNotCalledAlreadyKept` can pin it outside the
+view.
+
+**Where everything lands** (`OlderCourseLayout.plan`, one function the sheet's
+sizes and the importer both use):
+
+| In the class folder | In the new course | Why |
+|---|---|---|
+| `Thread N/…` | `section1/Thread N/…`, each a `per_section_folders` entry | `Home.md` embeds `![[Thread 4/Day 15]]`, a PATH link that Quartz resolves from the content root; the build copies each per-section folder to `content/<name>`, so it resolves as it did. |
+| `Home.md` | `section1/index.md` — **the one rename**, bytes unchanged | With no `section1/index.md` the build writes no `index.html` and the preview waits forever. 0 real links name `Home` (Russell, decision 6). |
+| a root `index.md` | `section1/index.md` when there is no `Home.md`; left out when there is | Both would fight over the front page. 0 measured. |
+| `All Prior Classes.md` | `section1/All Prior Classes.md` (`per_section_files`) | That section's own list; Copy a Page never offers a section's page. |
+| `.obsidian/…` | the course root, **without** `plugins/` and `community-plugins.json` | See "add-ons" below. |
+| any other real entry | the course root, same name (`shared_folders` / `shared_files`) | One section, so shared vs per-section is invisible in the build; at the root Copy a Page offers it, which is the point of keeping the course. |
+| a top-level LINK | the Shared folder's REAL entry of that name, copied | "The Shared folder's real folders replace the links." |
+| a top-level link with no Shared counterpart | nothing; named as missing in the sheet (before Import and in the summary) and on the trail | Decision 2: never refused for this. |
+| any link below the top, any link inside the Shared entries, anything whose name the course uses for itself (`section1`, `course_config.json`, a shared `index.md`) | nothing; COUNTED and NAMED in the summary (`wording.olderLayoutLeftOut`) and on the trail, and the import is not reported as complete | See "no link" below. The first shape of this counted a picture dropped from `Thread 1/` together with the links that were REPLACED, and reported "nothing missing" — found in review, and now a must-fail test (`testANestedLinkLeftOutIsCountedAndNamed`). |
+
+Measured with a simulation of Quartz v4.5.0's `shortest` resolution over the
+planned content root: ICS3U S1 plus its Shared folder resolves **1,586 of
+1,587** links and embeds (the one is an absolute path to a folder that no
+longer exists); without the Shared folder, 57 of 186. Nesting the Thread
+folders under `section1/All Classes/` was REJECTED because it breaks every
+path embed; renaming the class pages into the modern `Thread N, Day M` shape
+was REJECTED for the same reason and because pages stay byte-identical
+(decision 3, `dg-*` keys and all).
+
+**The Shared folder is found by NAME, never by following a link** (decision
+2): among the class's siblings, the real folders whose name ends in "Shared"
+and begins with the class's code and a dash. One is it, whatever its year —
+the real ICS3U one is named 2024–25 beside 2023–24 classes and is right.
+Several: the one of the class's year, else none; never a guess. The class's
+link names are the manifest, and only the named entries come — files and
+folders alike. **The Shared folder is walked once from its ROOT**: the plan
+walked each entry, and the plan review measured what the copier's walk does
+with a FILE (0 items, the path listed as unreadable — which refuses the course
+or drops the page; eight of ICS3U's shared entries are pages).
+
+**"Choose Shared Folder…" is on every such row, also when one was found by
+name** (but not on a row that already has a problem — an unreadable folder or
+no course code — which cannot be imported whichever folder is chosen) — Russell overrode the plan's recommendation (decision 7): a wrong match
+must be correctable. A chosen folder is refused, with the row left as it was,
+when it is the folder this window has open (or inside it, or holding it — the
+three existing sentences), when it is itself a class, or when it holds none of
+the class's names. "Holds at least one name" alone was measured to be too
+weak: `ICS4U-2023-24`, itself a class, holds 14 of ICS3U S1's 18 names, and
+`ICD2O-2023-24 Shared` holds 15. A chosen folder whose name carries a
+different code is ACCEPTED with a warning beside the row — Russell kept things
+where he kept them, and a refusal would leave no way through. Nothing found and
+nothing chosen **imports anyway** and the summary says the shared pages and
+pictures are missing (decision 2: never refuse for this); an empty `Media`
+folder is made so the build does not announce `mediaFolderMissing` on every
+preview — measured on the rehearsal: without it the build completes and raises
+that finding; with it, none.
+
+**No link reaches a reference course.** Before this change the copier copied a
+symlink AS a link, dangling or not, and counted it as a file (measured by
+compiling the real `ReferenceTreeCopier` standalone); `ReferenceLock.census`
+skips links. Pointed at an ICD2O class, the modern route would have produced a
+course whose shared content was live links into iCloud — not copied, not
+locked, editable through the link, invisible to the container (which mounts
+`courses/`, not iCloud) — with the census reporting everything locked. So the
+planner leaves every link out, and the new
+`ReferenceTreeCopier.copy(placements:)` **refuses** one, so a future planner
+bug fails loudly. Proven by copy-and-restore: with the planner's line removed
+the copier's refusal fails nine tests; with both removed, a class with no
+Shared folder imports with four live links in it and
+`testWithoutItsSharedFolderItStillImportsAndSaysSo` catches them. The MODERN
+route's link behaviour is deliberately unchanged (its only link is
+`.merged_output`, skipped by name) — widening this piece to it was rejected as
+risk for no measured gain.
+
+**Obsidian add-ons and their settings are left behind.** Found by the plan
+review and verified (key names only; no value was ever printed): every real
+class folder carries `.obsidian/plugins/digitalgarden/data.json` with a
+non-empty `githubToken`, and `community-plugins.json` enables it — 14 files
+across the seven class-type folders name the key, 0 outside `plugins/`.
+Copied, that credential would land in the working folder, travel into every
+backup and archive zip of the course, and — once Obsidian trusts the vault's
+add-ons, which Plantoir's "Open in Obsidian" invites — give a publish command
+outside all fifteen of Plantoir's refusals. The rest of `.obsidian` comes, so
+the course opens normally and `ReferenceReadingView` still sets reading view.
+The sheet and its summary say so in plain words
+(`wording.olderLayoutAddOnsAreLeftBehind`). Whether the MODERN route needs the
+same rule is an open question for Russell, not part of this piece.
+
+**What its preview shows is more than students saw, and that is accepted.**
+The class pages carry Obsidian Digital Garden's keys (`dg-publish`,
+`dg-home`), which the build does not read, and the shared pages carry none at
+all — 78 of 78 ICS3U shared pages, 1 ICS4U page, 1 ICD2O page have no
+`dg-publish` key, and under Digital Garden a page was published only when it
+said `true`. Three pages say `dg-publish: false`. So unlike a modern reference
+course, whose visibility frontmatter IS last year's record, a preview of one of
+these shows every page except `draft: true` ones (2 in ICS3U). Russell
+accepted this for v1.3.0; what `dg-*` keys should mean when such a page is
+copied into a live course is a separate issue.
+
+**The preview is titled with the code alone.** Every import is `section1`, so
+the "S1" marker would name the wrong section for an S2, and there is no config
+key that says which section a single-section course WAS. None was invented:
+the import writes `show_section_marker` false for section 1 (an existing,
+documented key), and `course_name` carries the class folder's name. Measured:
+the built title is "📚 ICS3U".
+
+**The coverage map is off**, written as a plain `false` — the shape the wizard
+writes. A per-section map (`{"sections": {"section1": false}}`, the first
+shape) was measured in review to read as ON in two of the three readers:
+`CourseConfiguration.includesCurriculumCoverage` and `setup_course.py`'s
+`bool(...)`; only `build_site.py` read it as off. The plain value is off in all
+three, and `testTheSettingsMakeAFrozenSingleSectionReferenceCourse` reads it
+through the app's own reader. And the reason is not the one the plan gave. With
+no `class_folder` key the build's fallback takes the first per-section folder
+whose name contains "class"; no `Thread N` matches, so there is NO class folder
+and a map would count nothing and look finished. (The plan said it would count
+one Thread folder's pages; the review corrected it.) The class pages are
+called `Day N`, not `<unit word> N, Day M`, in any case.
+
+**Known limits, unmeasured or accepted:**
+
+- `Day 1` … `Day 15` repeat across the four Thread folders, and
+  `AssistSectionGraph` keeps the first page of a title it meets — so an MCP
+  read of the reference course by the title "Day 3" returns Thread 1's.
+  Nothing crashes. Not changed.
+- An iCloud file that has been evicted (dataless) must be fetched by
+  `copyfile`, and may fail offline; that course would then be reported as not
+  imported with the system's reason. 0 dataless files exist in the real source
+  today, and evicting one to measure would mean writing to a source that is
+  read-only, so this is unmeasured.
+- Obsidian resolving `[[Thread 4/Day 15]]` now that it sits under `section1/`
+  is Obsidian's own suffix matching — for Russell to check by opening an
+  imported course.
+
+**Rehearsed on the real folders, 2026-09-23**, into a scratch working folder
+under `$HOME`, through the real importer (a temporary harness calling
+`ReferenceImportSource.resolve` and `ReferenceImporter.importCourses`, not the
+sheet): ICS3U S1 with its Shared folder **1,744 files in, 1,745 out** (the
+settings), 0 links, 0 SHA-256 mismatches, 136 pages, census 1,735 of 1,735
+locked, no file naming `githubToken`, no `plugins/`; ICS3U S2 without it 67 →
+68; ICS4U 787 → 788; ICD2O S1 584 → 585. Every copy took under 0.6 s (APFS
+clones). The previews built (ICS3U: 136 pages, 2 drafts filtered, 1,284 local
+pictures referenced and 0 missing, the front page's `Thread-4/Day-15` embed
+resolved); Copy a Page listed 60 pages (60 counted independently) and copied
+one with its 82 pictures — hidden, byte-identical, nothing locked; `deploy.sh`
+refused every course, plain and `--to-folder`, exit 1, nothing written. A
+3,588-entry manifest of the three `Class Website` folders (mode, size, mtime,
+flags, link text, SHA-256) was identical before and after.
+
+*Rejected, beyond those above:* copying what each link points at (the targets
+are dead or the wrong year, and a stray link could point at the home folder);
+bringing every entry of the Shared folder rather than the named ones (no
+difference on the real data, and a chosen folder could be anything); a
+generated `index.md` that embeds `Home.md` (a page Plantoir invented, in a
+record meant to be faithful); importing S1 and S2 as one two-section course
+(out of scope); an editable course code in the sheet (every real name carries
+one). The full list, with reasons, is `olderLayout.rejected`.
 
 ## Copying a page from one course into another
 

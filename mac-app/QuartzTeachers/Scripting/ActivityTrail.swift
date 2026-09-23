@@ -491,6 +491,23 @@ nonisolated enum ActivityTrail {
         /// from". Never the contents of a page.
         case courseImportedForReference = "course imported for reference"
 
+        /// A class kept in the OLDER layout (a folder per class, #254) came
+        /// across. Written right after `courseImportedForReference`, and
+        /// carries what that line cannot: the class folder's name, the shared
+        /// folder its pages and pictures came from and HOW it was found (by
+        /// its name, chosen by hand, or none), how many of the shared folders
+        /// and pages the class used were brought across out of how many and
+        /// the names of any that are missing, how many of the class's links
+        /// the shared folder's real entries REPLACED, how many things were
+        /// left out as a LOSS with each one's path (a link below the top or
+        /// inside a shared entry, a name the course uses for itself), how
+        /// many Obsidian add-on entries were left behind, and whether an empty
+        /// Media folder was made. "Where are this course's pictures" is the
+        /// question a report about one of these will ask. Names and paths
+        /// only — never what is written on a page, and never anything read
+        /// from the add-ons.
+        case courseImportedFromTheOlderLayout = "course imported from the older layout"
+
         /// One course of an import did not come across, and the rest did.
         /// Carries which course and why — a course code already kept for
         /// reference under that school year, a folder that could not be read,
