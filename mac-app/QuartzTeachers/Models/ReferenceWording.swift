@@ -114,18 +114,14 @@ nonisolated enum ReferenceWording {
     static let pagesAreLocked: String =
         "Plantoir keeps this course's pages locked, so they stay as they were."
 
-    /// The one line about a page taken out by hand.
-    ///
-    /// Here because a teacher who drags a page out in Finder gets one that
-    /// is locked, with no explanation, which is the fault that gets reported
-    /// as "the app is broken". Said once, beside the sentence above.
-    ///
-    /// Still true, and still needed, now that "Copy a Page from This Course…"
-    /// exists: that arrives UNLOCKED, because it clears the flag on every
-    /// file it writes (`ReferenceLock.clearLock`). This sentence is about the
-    /// copy a teacher makes THEMSELVES, which Plantoir has no say over.
-    static let aCopyTakenOutStaysLocked: String =
-        "A file you copy out of it stays locked until you untick Locked in Get Info."
+    // A second sentence used to follow `pagesAreLocked` here — "A file you copy
+    // out of it stays locked until you untick Locked in Get Info." — written on
+    // the evening #207 was out of this release and a teacher's only way to
+    // take a page out of a reference course was by hand in Finder. #207 came
+    // back into the same release and its copies arrive UNLOCKED, so Russell
+    // retired the sentence on 2026-09-22: a hand copy is unlikely, and "Get
+    // Info" without "Finder" told a teacher nothing. The fact itself is still
+    // true and is in documentation/09 for whoever meets it.
 
     /// The title over the two sentences above, wherever they need one.
     static let pagesAreLockedTitle: String = "About this course's pages"
