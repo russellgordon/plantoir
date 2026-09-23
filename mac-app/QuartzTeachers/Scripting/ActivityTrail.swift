@@ -508,6 +508,25 @@ nonisolated enum ActivityTrail {
         /// from the add-ons.
         case courseImportedFromTheOlderLayout = "course imported from the older layout"
 
+        /// A class kept in the 2024–25 layout — a whole website folder per
+        /// class, often reached through a Finder shortcut — came across
+        /// (#256). Written right after `courseImportedForReference`, and
+        /// carries what that line cannot: where the pages were read from (a
+        /// path from the home folder) and the shortcut's name when one was
+        /// followed, the section and HOW it was told (its front page, its
+        /// folder's name, or being the only one) with any disagreement, the
+        /// course pages folder the files came from and how many, the word
+        /// its class pages use and how many placeholder pages were set aside,
+        /// and then as two separate clauses what was LEFT BEHIND by kind with
+        /// counts (the website's own program files, links replaced, editing
+        /// folders and other sections by name, add-ons) and what was LOST, by
+        /// name (a link that showed somewhere unexpected also says where it
+        /// pointed, from the home folder). S1's and S2's copies of the pages differ, so "which copy did
+        /// this come from, and what did not come" is a real question, and
+        /// only this line answers it. Names and counts only — never what is
+        /// written on a page.
+        case courseImportedFromAClassWebsiteFolder = "course imported from a class website folder"
+
         /// One course of an import did not come across, and the rest did.
         /// Carries which course and why — a course code already kept for
         /// reference under that school year, a folder that could not be read,

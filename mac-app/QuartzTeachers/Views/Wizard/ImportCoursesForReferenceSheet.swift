@@ -252,6 +252,16 @@ struct ImportCoursesForReferenceSheet: View {
         return false
     }
 
+    /// True when any row is a class kept a website folder per class, so the
+    /// sheet says once what stays behind of those — and that it is not a
+    /// loss.
+    var hasClassWebsites: Bool {
+        for course in courses where course.checkoutLayout != nil {
+            return true
+        }
+        return false
+    }
+
     /// What to say under the list when nothing can be imported at all.
     var entryProblem: String? {
         if requests.isEmpty {
@@ -373,6 +383,14 @@ struct ImportCoursesForReferenceSheet: View {
                     .accessibilityIdentifier("importAddOnsNote")
             }
 
+            if hasClassWebsites {
+                Text(ReferenceImportWording.checkoutLayoutOnlyPagesComeAcross)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("importClassWebsiteNote")
+            }
+
             // The calm note, said where the teacher is deciding rather than
             // after the fact. No icon, and no "cannot".
             VStack(alignment: .leading, spacing: 4) {
@@ -414,13 +432,17 @@ struct ImportCoursesForReferenceSheet: View {
                         Text(course.courseName)
                             .foregroundStyle(.secondary)
                     }
-                    Text(ReferenceImportWording.courseSummary(
-                        sections: course.sectionNumbers.count,
-                        pages: course.pageCount,
-                        bytes: course.byteCount
-                    ))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    // A class website row that cannot come across was never
+                    // measured, so it has no numbers to show.
+                    if course.checkoutLayout == nil || course.problem == nil {
+                        Text(ReferenceImportWording.courseSummary(
+                            sections: course.sectionNumbers.count,
+                            pages: course.pageCount,
+                            bytes: course.byteCount
+                        ))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    }
 
                     // Why this one cannot come across, beside the row it is
                     // about rather than as one sentence under the list.
@@ -434,6 +456,15 @@ struct ImportCoursesForReferenceSheet: View {
 
                     if course.olderLayout != nil {
                         olderLayoutLines(course)
+                    }
+
+                    if let facts = course.checkoutLayout,
+                       let whereFrom = QuartzCheckoutLayout.whereFrom(facts) {
+                        Text(whereFrom)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("importReadFrom-\(course.folderName)")
                     }
                 }
             }
@@ -556,6 +587,13 @@ struct ImportCoursesForReferenceSheet: View {
 
             if hasOlderLayoutClasses {
                 Text(ReferenceImportWording.olderLayoutAddOnsAreLeftBehind)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if hasClassWebsites {
+                Text(ReferenceImportWording.checkoutLayoutOnlyPagesComeAcross)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
