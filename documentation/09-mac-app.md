@@ -1692,8 +1692,10 @@ nothing. Refused: a folder with no courses in it, the working folder this
 window already has open (that is route 1, and the sentence says so by name),
 and a folder on either side of the one already open. **When none of the three
 shapes is there, the OLDER folder-per-class layout is tried next** (#254,
-"The older layout" below) — so a folder holding a `courses` folder or a
-course's settings is always read the modern way, whatever else is in it.
+"The older layout" below), **and then the 2024–25 website-folder-per-class
+layout** (#256, "The 2024–25 layout" below) — so a folder holding a `courses`
+folder or a course's settings is always read the modern way, whatever else is
+in it, and #254's shape is never claimed by #256's.
 
 **What is left behind is four fifths of what is on disk.** In a folder made by
 an older Plantoir, `.merged_output` is a REAL directory holding last year's
@@ -2150,6 +2152,186 @@ generated `index.md` that embeds `Home.md` (a page Plantoir invented, in a
 record meant to be faithful); importing S1 and S2 as one two-section course
 (out of scope); an editable course code in the sheet (every real name carries
 one). The full list, with reasons, is `olderLayout.rejected`.
+
+#### The 2024–25 layout: a website folder per class (#256)
+
+The generation between #254's layout and Plantoir's own toolchain: **one whole
+website folder per class section** — `~/Documents/Class Websites/2024-25/ICS3U/S1`
+— holding the program that built the site (`quartz/`: `quartz.config.ts`,
+`package.json`, the program itself, `public/`, `.quartz-cache`, the `post`,
+`preview` and `synclink` scripts) and, inside it, the pages under
+`quartz/content/source-<code>/{shared, s1, s2}`. The folder Obsidian opened,
+`quartz/content`, is mostly LINKS into `source-<code>` (21 of them, relative:
+`All Classes -> ./source-ics3u/s1/All Classes`), plus `vault-<code>-s<N>`
+folders made of links that were used for editing. The iCloud folder Russell
+named in the issue (`LCS/2024-25/Old ICS3U/Class Websites`) holds only two
+**Finder shortcuts**, `S1` and `S2`, leading to those website folders. The
+same File ▸ Import Courses for Reference… sheet recognises it, **third** —
+after the modern shapes and #254's layout, so neither earlier route can be
+claimed by it — and **only the FIRST section of a course kept this way comes
+across** (Russell, 2026-09-23), as one single-section reference course made by
+the same code every import ends in. The rule is data:
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`referenceCourses.importing.quartzCheckoutLayout`, run by
+`QuartzCheckoutImportTests`; the code is `QuartzCheckoutLayout`.
+
+**A shortcut is an alias that is ALSO a regular file — and that second half is
+the trap.** Measured: `URLResourceKey.isAliasFileKey` answers **true for a
+symbolic link** as well, and `URL(resolvingAliasFileAt:)` FOLLOWS one. A
+recogniser that resolved "every alias" would follow the website folder's own
+21 links. `QuartzCheckoutLayout.isShortcut` requires `isAliasFile` AND `lstat`
+reporting `S_IFREG`; `testASymlinkIsNeverTakenForAShortcut` pins it, and
+dropping the `lstat` half fails that test and a contract case (must-fail M1).
+A shortcut is resolved with `[.withoutUI, .withoutMounting]`. The folder
+chooser resolves a shortcut the teacher CLICKS on its own
+(`NSOpenPanel.resolvesAliases` is true), so a shortcut arrives as a shortcut
+only as the child of a chosen folder — which is exactly the folder Russell
+named.
+
+**A shortcut that cannot be read through is told apart, never dropped.**
+Measured: a shortcut whose target's parent is unreadable (the shape of a
+refused Documents permission) throws the SAME error as one whose target was
+deleted. So on a throw the bookmark's STORED path and kind are read without
+resolving (`URL.resourceValues(forKeys:fromBookmarkData:)`) and the stored
+path is asked about with `lstat`: a stored FILE is "a shortcut to a file"
+(`Old ICS3U/ideas2.pdf`, real — passed over in a folder exactly as a file is,
+refused with `wording.checkoutLayoutShortcutToAFile` when chosen on its own);
+`EACCES`/`EPERM` is "not allowed to open" (the sentence says where to allow
+it); a path under `/Volumes` whose disk is not mounted is "a disk that isn't
+connected"; anything else is "no longer there". A shortcut to a FOLDER that
+cannot be read through is a ROW, shown untickable with its sentence — the real
+`2024-25/ICD2O/Class Website/ICD2O-S2-Website` leads to a Dropbox folder that
+no longer exists, and "There are no courses in Class Website" would have sent
+Russell looking in the wrong place. The disk-not-connected branch is the one
+not exercised by a test: a bookmark cannot be made to a path that does not
+exist.
+
+**What is recognised, in order** (`recognition.rule` has the whole of it): a
+shortcut chosen on its own; a website folder, or its `quartz/` or
+`quartz/content/` (one or two levels too deep reads as broken, #206's rule);
+anything else inside a website folder's `quartz/` — refused, **never resolved
+upward**, because `source-ics3u/s2` or `vault-ics3u-s2` resolved to its website
+folder would import SECTION 1, the opposite of what was pointed at (a later
+section's folder gets `checkoutLayoutOnlyTheFirstSection`, anything else
+`checkoutLayoutChooseTheWholeFolder`); then the chosen folder's entries and its
+children's are COUNTED — readable website folders in two places refuse with
+`checkoutLayoutChooseOneCourseAtATime` (`2024-25` holds `ICS3U/` and `ICS4U/`),
+in one child only read that child (`Old ICS3U` holds planning `Thread N`
+folders, a PDF shortcut and one `Class Websites`). No folder NAME is trusted,
+and nothing below the chosen folder's children is looked at. A website folder
+is `quartz/quartz.config.ts` + `quartz/content`; it is a COURSE only with one
+`content/source-<code>` holding an `s<digits>` folder. **Math Club** (no
+`source-*`, no code anywhere) is left out of every list entirely — Russell,
+2026-09-23 — so choosing it says `noCoursesThere`.
+
+**The section is what the site was BUILT from.** First the TEXT of
+`content/index.md` (a link to `source-<code>/s<N>/index.md`, read with
+`destinationOfSymbolicLink`, never followed — S2's `synclink` re-points exactly
+these links to make S2's site), then the folder's name `S<N>`, then the only
+`s<N>` there is. They agree in 5 of 5 real website folders. A later section is
+refused on its own and SHOWN, unticked, in a folder of them
+(`checkoutLayoutOnlyTheFirstSection`). *Why only the first:* S2's sites hid
+pages with `draftSectionTwo:` through their own patched filter, which today's
+build does not read, so an S2 import would have previewed 225 pages where S2's
+site showed 283 (ICS3U; 19 shown that S2 hid, 77 hidden that it showed) and 157
+against 213 (ICS4U). Russell chose the first section only over rewriting page
+frontmatter or teaching the build a key for one old layout.
+
+**Which copy: the one inside the folder pointed at.** S1's and S2's copies of
+`source-ics3u` DIFFER — 335 entries by SHA-1. `S2/quartz/synclink` (run by
+`post` before each S2 publish) `rsync -a`s S1's `content` into S2 and re-points
+the section links, so each copy is exactly what that folder's site was last
+built from; S1's is where both sections were edited and carries 2025–26
+changes. Merging them would be a course that never existed; always reading S1's
+would make the answer depend on a folder the teacher did not choose. The year
+comes from the first of the website folder, its parent and its grandparent
+named `YYYY-YY` (right in 5 of 5; the pages' dates alone are right in 4 of 5 —
+the 2023–24 folder's pages were all touched in September 2024 when it was
+copied), else from the pages.
+
+**The mapping, by NAME.** `s1/*` → `section1/` unchanged (`s1/index.md` is
+already the front page, so nothing is renamed; `All Classes` lands at
+`section1/All Classes`, the modern layout's own place, where #207's class-page
+stop finds it by folder); `shared/*` → the course root, `Media` included;
+`content/.obsidian` WITHOUT `plugins/` and `community-plugins.json` (#254's
+rule; none exist here, core plugins only). The 21 links are a MANIFEST, not a
+source: each link's TEXT, worked out against `content/` as a path, must name
+the page or folder of its OWN name in `shared/` or `s1/`, and that entry must
+be there. Where the per-section/shared split falls is read from the source,
+never from a list of names — ICS4U keeps `Grove Time.md` in `shared/`, ICS3U in
+`s1/`.
+
+**Left behind is not lost, and the code keeps them as two lists**
+(`LeftBehindKind` and `LostReason`; `placement.leftBehind.kinds` and
+`placement.lost` in the contract, asserted separately so an implementation
+that lumps them cannot pass — #254's first cut did). Machinery, counted and
+named on the trail, never a loss: the website's own program files (every file
+inside `quartz/` other than `content/`; a folder the skip list names, like
+`node_modules`, `.git` or `.quartz-cache`, counts as ONE entry and is not
+looked inside; nothing beside `quartz/` is walked, so a program folder anywhere
+cannot turn into a walk of someone's home), the links replaced by what they
+showed, the editing folders, the other sections' pages, anything else in
+`source-<code>` no link showed, the add-ons. A LOSS — counted, named in the
+summary with `olderLayoutLeftOut` and on the trail, and the import not called
+complete: a link that showed something else or names what is not there, a
+link inside the pages, a shared entry sharing a name with one of the section's
+own (the build would put both at `content/<name>`), a shared `index.md`,
+`section1` or `course_config.json`, and no `s1/index.md`.
+
+**`unit_word` is written, unlike #254.** The build's post-pass
+`_sync_non_class_pages_created` restamps the `created` date of every page it
+does not recognise as a class page by `class_page_pattern(unit_word)`. Absent,
+the word is "Unit" and no lesson here is a class page. Measured on the real
+ICS3U S1 import: the preview restamped **313** files without the key and
+**143** with `unit_word: Thread`. The word is found over the class folder's
+pages with PLACEHOLDERS set aside — `Thread 2, Day x`, a day that is a word
+(the build never calls those class pages either): ICS3U S1 has 55 pages in
+`All Classes`, 54 lessons and one placeholder; ICS3U S2 4 placeholders, ICS4U
+S1 2, S2 3. A rule of "every page" would have written the key for NONE of the
+four (plan review F1). Every other page must then be `<word> <n>, Day <m>` in
+one word, or nothing is written.
+
+**What the preview shows.** Pages byte-identical; today's build reads
+`publishForSection1`, `publish`, `draftSection1`, `draft`, which for section 1
+is what S1's own site read. Measured: **280 of 324** ICS3U pages built — the
+same 280 S1's site showed; for ICS4U, reading the frontmatter (not a build), 213 of 220.
+`draftSectionTwo` and `createdForSectionTwo` ride along inert.
+
+**What Copy a Page makes of these pages — measured, not changed here.** #207's
+copier REFUSES, by name and safely, every page whose frontmatter carries a line
+it cannot be sure the build reads the same way, and `draftSectionTwo:` is one.
+From the real ICS3U-2024 import it offered 250 pages, copied **97** (every copy
+hidden) and refused **153** — exactly the 153 offered pages carrying
+`draftSectionTwo:`; ICS4U-2024: 151 offered, 85 copied, 66 refused (66 carry
+the key). Nothing is lost or published; the teacher is told each page was not
+copied. Whether Copy a Page should strip the old section-2 keys the way it
+strips `draft:` is a decision left open, not taken in this piece.
+
+**Rehearsed on the real folders, 2026-09-23**, into a scratch working folder
+under `$HOME` through the real importer (a temporary harness calling
+`ReferenceImportSource.resolve` and `ReferenceImporter.importCourses`, not the
+sheet). The real recogniser read 27 real shapes (the iCloud shortcut folder,
+`Old ICS3U`, each shortcut chosen alone, `ideas2.pdf`, `Old ICS4U`, `ICD2O`,
+the whole `2024-25` in both places, every level of `S1`, `source-ics3u`, `s1`,
+`s2`, `vault-ics3u-s2`, `S2`, Math Club, `2023-24`) with the outcomes the
+contract describes. **ICS3U S1 through the iCloud shortcut folder: 3,093 files
+in, 3,094 out** (the settings), 0 missing, 0 extra, 0 SHA-256 mismatches, 0
+links, 0 names re-spelled, 324 pages, census 3,089 of 3,089 locked, in 1.0 s;
+**ICS4U S1: 616 → 618** (settings and a made `.obsidian/app.json`), census 616.
+The preview built (`/`, `Thread 5, Day 4`, the pictures); `deploy.sh` refused
+the course plain and `--to-folder`, exit 1, nothing written. An 18,279-entry
+manifest of `~/Documents/Class Websites` and the three iCloud folders (mode,
+size, mtime, flags, link text, SHA-256; `.DS_Store` compared separately, 163)
+was identical before and after.
+
+*Rejected* (the full list with reasons is `quartzCheckoutLayout.rejected`):
+resolving every `isAliasFile` entry; telling the teacher to choose the real
+folder instead of reading through a shortcut; merging the two copies or always
+reading S1's; following the links; importing section 2 (and either rewriting
+`draftSectionTwo` or teaching the build to read it); resolving a folder inside
+a website folder upward; reading the title or section out of
+`quartz.config.ts`, a program; showing Math Club as an untickable row; counting
+the program's files without a bound; leaving `unit_word` absent.
 
 ## Copying a page from one course into another
 
