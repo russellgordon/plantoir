@@ -256,6 +256,79 @@ nonisolated enum ReferenceImportWording {
         "Obsidian add-ons and their settings are not brought across from older class folders, "
         + "so nothing in them can publish these pages."
 
+    // MARK: - The 2024–25 layout (a website folder per class, #256)
+
+    /// Russell's 2024–25 way of keeping a course — one whole website folder
+    /// per class, often reached through Finder shortcuts. Every sentence
+    /// below is about that shape. None names what the folder holds besides
+    /// pages and pictures: "the files that built the website" is as far as
+    /// they go. `documentation/09-mac-app.md` → "The 2024–25 layout".
+
+    /// Under a row: where its pages and pictures are read from.
+    static func checkoutLayoutReadFrom(place: String) -> String {
+        return "Pages and pictures from \(place)."
+    }
+
+    /// Under a row reached through a Finder shortcut.
+    static func checkoutLayoutReadThroughShortcut(shortcut: String, place: String) -> String {
+        return "\(shortcut) is a shortcut. Its pages and pictures are read from \(place)."
+    }
+
+    /// Said once under the list, and in the summary, whenever a class kept
+    /// this way is involved. What stays behind is not a loss, and a teacher
+    /// who is told only "not brought across" would go looking for it.
+    static let checkoutLayoutOnlyPagesComeAcross: String =
+        "From a class website folder, only the pages and pictures of its first section come across. "
+        + "The files that built the website, the extra folders kept for editing, and the other sections' "
+        + "pages stay where they are."
+
+    /// A folder chosen from inside a class's website folder.
+    static func checkoutLayoutChooseTheWholeFolder(folder: String, checkout: String) -> String {
+        return "\(folder) is part of the class website kept in \(checkout). Choose \(checkout) itself."
+    }
+
+    /// A later section: beside its row, or as the refusal when it was
+    /// chosen on its own (Russell, 2026-09-23: only the first section).
+    static func checkoutLayoutOnlyTheFirstSection(folder: String, section: Int) -> String {
+        return "\(folder) holds section \(section)'s pages. Only the first section of a course kept "
+             + "this way can be brought across."
+    }
+
+    /// A folder holding several courses' folders of class websites.
+    static func checkoutLayoutChooseOneCourseAtATime(folder: String) -> String {
+        return "\(folder) holds several courses. Choose one course's folder inside it, or one class's folder."
+    }
+
+    /// A website folder holding the pages of more than one course.
+    static let checkoutLayoutMoreThanOneCourse: String =
+        "It holds the pages of more than one course, so it can’t be brought across as one."
+
+    /// A website folder whose section could not be told.
+    static let checkoutLayoutWhichSection: String =
+        "Which section it was could not be told, so it can’t be brought across."
+
+    /// A shortcut to a folder that is no longer there.
+    static func checkoutLayoutShortcutGone(shortcut: String) -> String {
+        return "\(shortcut) is a shortcut to a folder that is no longer there, so it can’t be brought across."
+    }
+
+    /// A shortcut to a folder this Mac would not let Plantoir open.
+    static func checkoutLayoutShortcutCouldNotBeOpened(shortcut: String) -> String {
+        return "\(shortcut) is a shortcut to a folder Plantoir was not allowed to open. Allow it in "
+             + "System Settings › Privacy & Security › Files and Folders, then choose the folder again."
+    }
+
+    /// A shortcut to a folder on a disk that is not connected.
+    static func checkoutLayoutShortcutOnADiskNotConnected(shortcut: String, disk: String) -> String {
+        return "\(shortcut) is a shortcut to a folder on \(disk), which isn’t connected. "
+             + "Connect it, then choose the folder again."
+    }
+
+    /// A shortcut to a file, chosen on its own.
+    static func checkoutLayoutShortcutToAFile(shortcut: String) -> String {
+        return "\(shortcut) is a shortcut to a file, not a folder."
+    }
+
     /// Names in a sentence: "Concepts, Media and Tasks".
     static func list(_ names: [String]) -> String {
         if names.isEmpty {
