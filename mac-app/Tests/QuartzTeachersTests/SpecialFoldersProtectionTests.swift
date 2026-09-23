@@ -192,6 +192,20 @@ final class SpecialFoldersProtectionTests: XCTestCase {
 
     // MARK: - Wizard protection and marks tests
 
+    /// ICS3U declines its ready-made pages and keeps the computer studies
+    /// skeleton — which, since GitHub issue #251, still gets the Ontario
+    /// expectations written for ICS3U and a coverage map built over them.
+    ///
+    /// This asserted the OPPOSITE until that landed: the Curriculum folder
+    /// was merely `.consequential` ("you can take it out, here is what you
+    /// lose") because a skeleton course's curriculum folder held two
+    /// placeholder pages worth nothing. The same sentences that protect it
+    /// for a teacher taking the payload now protect it here, because the
+    /// same pages are in it. The marks pool moves with it for the same
+    /// reason: a coverage map with an empty pool counts nothing.
+    ///
+    /// The case where nothing is offered is
+    /// `testWizardStructureProtectionForACodeWithNoReadyMadePages` below.
     func testWizardStructureProtectionWithExampleContentDeclined() {
         let skeleton: SkeletonCatalog.Family = try! XCTUnwrap(SkeletonCatalog.family(forCode: "ICS3U"))
         let wizard: NewCourseWizardView = NewCourseWizardView(
@@ -207,19 +221,15 @@ final class SpecialFoldersProtectionTests: XCTestCase {
         let curriculumProt: ItemProtection = wizard.wizardSharedFolderProtection(for: "Curriculum")
         XCTAssertEqual(
             curriculumProt,
-            .consequential(
-                title: SpecialNames.removeCurriculumFolderTitle(for: "Curriculum"),
-                message: SpecialNames.removeCurriculumFolderMessage
-            )
+            .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageMap)
         )
 
         let tasksProt: ItemProtection = wizard.wizardSharedFolderProtection(for: "Tasks")
         XCTAssertEqual(
             tasksProt,
-            .consequential(
-                title: SpecialNames.removeGradedFolderTitle(for: "Tasks"),
-                message: SpecialNames.removeGradedFolderMessage
-            )
+            .blocked(reason: SpecialNames.lastGradedFolderBlockedWizard),
+            "Tasks is this skeleton's whole marks pool, and the coverage map counts the "
+            + "pages in it."
         )
 
         let classesProt: ItemProtection = wizard.wizardPerSectionFolderProtection(for: "All Classes")
@@ -227,6 +237,39 @@ final class SpecialFoldersProtectionTests: XCTestCase {
 
         let indexProt: ItemProtection = wizard.wizardPerSectionFileProtection(for: "index.md")
         XCTAssertEqual(indexProt, .blocked(reason: SpecialNames.sectionIndexFileBlocked))
+    }
+
+    /// The ~1,900 codes with no ready-made pages keep exactly the old
+    /// answers: their skeleton's Curriculum folder is empty and there is
+    /// nothing anywhere to fill it with, so taking it out costs a teacher
+    /// nothing they have not yet done.
+    func testWizardStructureProtectionForACodeWithNoReadyMadePages() {
+        XCTAssertFalse(ExampleContentCatalog.hasContent(forCode: "ICS2O"))
+        let skeleton: SkeletonCatalog.Family = try! XCTUnwrap(SkeletonCatalog.family(forCode: "ICS2O"))
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: "ICS2O",
+            prepopulatesExampleContent: false,
+            sharedFolders: skeleton.sharedFolders,
+            sharedFiles: skeleton.sharedFiles,
+            perSectionFolders: skeleton.perSectionFolders,
+            perSectionFiles: skeleton.perSectionFiles,
+            gradedFolders: skeleton.gradedFolders
+        )
+
+        XCTAssertEqual(
+            wizard.wizardSharedFolderProtection(for: "Curriculum"),
+            .consequential(
+                title: SpecialNames.removeCurriculumFolderTitle(for: "Curriculum"),
+                message: SpecialNames.removeCurriculumFolderMessage
+            )
+        )
+        XCTAssertEqual(
+            wizard.wizardSharedFolderProtection(for: "Tasks"),
+            .consequential(
+                title: SpecialNames.removeGradedFolderTitle(for: "Tasks"),
+                message: SpecialNames.removeGradedFolderMessage
+            )
+        )
     }
 
     func testWizardGradedFoldersIncludedInConfigWhenNotUsingExampleContent() {

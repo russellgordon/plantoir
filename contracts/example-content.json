@@ -3,7 +3,7 @@
     "countNote": "Count the folders rather than trusting this number.",
     "countToday": 38,
     "rule": "A code has a payload if and only if `support/example_content/<CODE>/manifest.json` exists.",
-    "why": "Adding a course code is pure CONTENT — drop in a payload, no code changes anywhere. The existence of the manifest is the whole registration, and it retires that code's generated skeleton FOR A TEACHER WHO TAKES THE PAYLOAD. The skeleton is still there and is still what the course starts from when they decline, which is what the command-line wizard has always done and what both apps got wrong until 2026-09-21 (GitHub issue #248): they read the manifest's existence as retiring the skeleton outright, so declining the ready-made pages gave empty folders — 18 pages against the skeleton's 47, measured on ICS4U."
+    "why": "Adding a course code is pure CONTENT — drop in a payload, no code changes anywhere. The existence of the manifest is the whole registration, and it retires that code's generated skeleton FOR A TEACHER WHO TAKES THE PAYLOAD. The skeleton is still there and is still what the course starts from when they decline, which is what the command-line wizard has always done and what both apps got wrong until 2026-09-21 (GitHub issue #248): they read the manifest's existence as retiring the skeleton outright, so declining the ready-made pages gave empty folders — 18 pages against the skeleton's 47, measured on ICS4U. A teacher who DECLINES also keeps the payload's curriculum: the expectations written for their code are installed into the skeleton's Curriculum folder, which otherwise holds a generic index and one placeholder expectation called A1.1, so the curriculum coverage map has the real expectations to draw (GitHub issue #251, 2026-09-22 — ICS4U 2 curriculum pages to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them). So a payload registers TWO things a declining teacher still gets, and only the payload's lessons are actually turned down."
   },
   "layout": {
     "manifest.json": "The structure. Required.",
@@ -42,6 +42,19 @@
       "required": true,
       "type": "array of strings",
       "why": "Folders the site's explorer opens rather than navigates into."
+    },
+    {
+      "default": "Ontario",
+      "key": "jurisdiction",
+      "required": false,
+      "type": "string",
+      "why": "WHOSE curriculum the payload carries, as a short code: \"ON\" or \"BC\" today. The name a teacher reads is derived from it \u2014 \"ON\" to \"Ontario\", \"BC\" to \"British Columbia\", anything else to itself, and an absent key to \"Ontario\", because every payload written before this key existed is Ontario\u0027s. Read it rather than hard-coding a province: the mac wizard\u0027s toggle has read it since MCMPR11 landed (\"Include British Columbia curriculum pages\"), while setup_course.py told the same teacher, in the next breath, that it was offering \"the official Ontario curriculum\" \u2014 fixed 2026-09-22 with issue #251. Both implementations follow this entry (ExampleContentCatalog.jurisdictionName on the mac, jurisdiction_name in setup_course.py), and each has a test that pins the mapping, which is what stops the two copies drifting the first time a third province appears."
+    },
+    {
+      "key": "jurisdiction_name",
+      "required": false,
+      "type": "string",
+      "why": "The name to SHOW, when the code above does not map to one \u2014 a province whose short code no reader would recognise spells itself out here. Wins over `jurisdiction` wherever both are given. No payload uses it today; it exists so that adding a province is content rather than code."
     },
     {
       "key": "curriculum_folder",

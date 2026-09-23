@@ -190,6 +190,45 @@ final class ExampleContentContractTests: XCTestCase {
         return required
     }
 
+    // MARK: - The jurisdiction, which two languages derive the same way
+
+    /// `jurisdiction` and `jurisdiction_name` are declared in the contract
+    /// and read by BOTH `ExampleContentCatalog.jurisdictionName` here and
+    /// `jurisdiction_name()` in `setup_course.py`. Two implementations of
+    /// one rule drift the first time a third province appears, so each is
+    /// pinned to the contract's own words; this is the mac's half.
+    @MainActor
+    func testTheJurisdictionIsDerivedTheWayTheContractSays() throws {
+        let contract: [String: Any] = try ExampleContentContractTests.contract()
+        let keys: [[String: Any]] = try XCTUnwrap(contract["manifestKeys"] as? [[String: Any]])
+        var declared: [String: [String: Any]] = [:]
+        for entry in keys {
+            if let name = entry["key"] as? String {
+                declared[name] = entry
+            }
+        }
+        let jurisdiction: [String: Any] = try XCTUnwrap(
+            declared["jurisdiction"],
+            "The contract no longer declares `jurisdiction`, so nothing pins the two "
+            + "implementations of it together."
+        )
+        XCTAssertNotNil(declared["jurisdiction_name"])
+        XCTAssertEqual(jurisdiction["default"] as? String, "Ontario")
+        let why: String = try XCTUnwrap(jurisdiction["why"] as? String)
+
+        // The mapping, exactly as the contract states it.
+        XCTAssertTrue(why.contains("\"BC\" to \"British Columbia\""))
+        XCTAssertTrue(why.contains("an absent key to \"Ontario\""))
+
+        // …and the app's own answers, against the real payloads.
+        XCTAssertEqual(ExampleContentCatalog.jurisdictionName(forCode: "MCMPR11"),
+                       "British Columbia")
+        XCTAssertEqual(ExampleContentCatalog.jurisdictionName(forCode: "ICS4U"), "Ontario")
+        XCTAssertEqual(ExampleContentCatalog.jurisdictionName(forCode: "ZZZ9Z"), "Ontario",
+                       "A code with no payload at all still has to read as English on a "
+                       + "toggle the teacher can see.")
+    }
+
     private static func repositoryRoot() -> URL {
         return URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

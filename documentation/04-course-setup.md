@@ -97,19 +97,116 @@ payload — has always produced. The command-line wizard was never wrong:
 the two apps, and it stood from 2026-08-13 to 2026-09-21 because nothing in
 `contracts/` asked the question in the teacher's terms.
 
-What was REJECTED while fixing it, so it is not proposed again: a
-curriculum-pages toggle for a skeleton that ships a `Curriculum` folder (the
-`fixed` and `control` pty runs produce identical trees, so adding one would
-make a payload code behave unlike its own family); one "empty folders"
-sentence covering all three situations, which would have reworded what
-~1,900 codes read to fix a sentence 38 of them see; and anything
+What was REJECTED while fixing it, so it is not proposed again: one "empty
+folders" sentence covering all three situations, which would have reworded
+what ~1,900 codes read to fix a sentence 38 of them see; and anything
 retroactive for courses already created this way — Russell's call, having
-deleted and remade the one course it affected. Worth knowing and not a
-regression: the skeleton's `Curriculum/index.md` and its expectation pages
-install even though the app writes `include_curriculum_pages: false`,
-because the install gate is `skeleton_curriculum in shared_folders`
-(`setup_course.py`), not `include_curriculum`. Identical in the
-no-payload control, so it is not this feature's to fix.
+deleted and remade the one course it affected.
+
+**A third rejection was reversed the next day, and the reasoning is worth
+keeping because half of it was right.** #248 also rejected a
+curriculum-pages toggle for a skeleton that ships a `Curriculum` folder,
+on the ground that the `fixed` and `control` pty runs produce identical
+trees, so adding one would make a payload code behave unlike its own
+family. That is true for the ~1,900 codes with no payload — there is
+nothing to include, the folder is a placeholder, and the toggle would
+decide nothing. It is false for the 38 that HAVE one: the expectations
+written for their code exist, the teacher declined the lessons rather than
+the curriculum, and behaving "like its own family" is precisely what makes
+their course wrong.
+[#251](https://github.com/russellgordon/plantoir/issues/251) reversed it
+for those 38 on 2026-09-22 — see **A declined payload still gives up its
+curriculum** below.
+
+## A declined payload still gives up its curriculum
+
+Example content OFF plus the skeleton ON, for one of the 38 codes whose
+payload declares a `curriculum_folder`: the payload's curriculum pages are
+installed into the skeleton's `Curriculum` folder, the three curriculum
+answers are written exactly as they are for a payload course, and the
+curriculum coverage map is built and linked from Key Links.
+
+**Why the two halves had to ship together.** MEASURED before the fix, by
+driving the real `setup_course.py` through a pty: ICS4U that way got a
+`Curriculum/` folder of **two** files — the skeleton's generic `index.md`
+and a placeholder expectation called `A1.1` whose page reads "DELETE THIS
+PAGE" — against the payload's **61**. Forcing all three curriculum keys
+true changed *nothing*: no code path read the payload once the skeleton was
+the starting point, so `include_curriculum_pages: true` merely switched the
+map on over that one fake cell. Applying `build_site.py`'s own
+`_find_curriculum_folder` and `_collect_expectations` to the tree gave **1
+specific expectation and 0 overall**, against the payload's **47 and 12**.
+Enabling coverage without copying the pages is not half a fix; it is a
+worse state than the fault.
+
+**The install is a walk of its own** — `install_curriculum_from_payload`,
+not a narrowed second call to `install_example_content`. That installer's
+`top_level_allowed` lets any `index.md` through unconditionally, and all 38
+payloads have a `per_section/index.md`, so a narrowed call would pour the
+payload's own section landing page into a course taking none of the
+payload's pages. Measured on the prototype before it was found.
+
+**Order is the mechanism.** `install_payload_file` returns without writing
+when the destination exists, so the real expectations have to claim their
+names BEFORE the skeleton is installed, never after.
+
+**The skeleton's own curriculum folder is then skipped BY NAME**, by
+dropping it from the folder list passed to the skeleton install — never by
+turning that install's `include_curriculum` argument off. Both wrong
+prototypes are worth recording:
+
+1. Leaving the skeleton install alone gave ICS4U the right 61 pages and
+   **MCMPR11 sixty**, including the skeleton's placeholder `A1.1.md`:
+   British Columbia's codes start at `D1.1`, so nothing of the payload's
+   displaced it by name, and `_collect_expectations` would have read it as
+   a forty-eighth expectation and drawn a cell for a standard that does not
+   exist in that province. MTH1W is the other payload with no `A1.1` of its
+   own.
+2. Passing `include_curriculum=False` to the skeleton install removed the
+   placeholder and **also stripped the "Curriculum connection" block out of
+   all seven `_DUPLICATE ME.md` template pages** — that one flag does two
+   jobs, the second being `strip_curriculum_blocks` /
+   `unlink_curriculum_references` on every other page.
+
+**Measured after**, same harness: ICS4U 61 curriculum pages (47 specific,
+12 overall) and 106 `.md` in the course, MCMPR11 59 British Columbia
+standards with no `A1.1` among them and 102 `.md`, ICS2O — no payload —
+unchanged at 2 and 47. Example content ON: 205 files, tree,
+`course_config.json` and content identical to the previous script's,
+timestamps aside.
+
+**The pages are installed into the SKELETON's `curriculum_folder` name**,
+because that is the name `course_config.json` records for a course with
+`prepopulate_example_content: false`, and the name the build looks in. All
+38 payloads and all 50 skeleton families call it `Curriculum` today
+(measured 2026-09-21), so the parameter buys nothing this morning; it buys
+a future payload that disagreed landing where the build will look rather
+than in an orphan folder.
+
+**The map is all red on day one**, and that is the intended reading rather
+than a defect to special-case: coverage counts the site's own links from
+lessons to expectations, a skeleton course starts with none, and the page's
+caption already says "red in September, greener as the year goes on".
+
+**Nothing is retroactive.** A course already created as
+skeleton-without-expectations keeps its two placeholder pages; a teacher
+who wants the real ones deletes the course and remakes it.
+
+**One thing left undone, deliberately.** Four payloads' `About These …`
+explainer links once to a payload page a skeleton course will not have —
+ICS4U to `[[The Software Project]]`, ICS3U to `[[The Community App]]`,
+CGC1W to `[[The Concepts of Geographic Thinking]]`, MDM4U to `[[The
+Culminating Investigation]]`. It was left alone here rather than rewritten
+at install: it is an example-content fix, its own small piece, and the
+skeletons already ship illustrative unresolved links of their own.
+
+The old note that the skeleton's `Curriculum/index.md` and its expectation
+pages install "even though the app writes `include_curriculum_pages:
+false`" is no longer the whole story. The install gate is still
+`skeleton_curriculum in shared_folders` rather than `include_curriculum`,
+so a code with no payload behaves exactly as it always has — but for a
+payload code the app now writes `true`, and that key now decides something:
+whether the payload's expectations are fetched at all.
 
 **Both apps' wizards let the teacher decline a skeleton, and the structure
 editor must follow them in BOTH directions.** Turning "Start from a
