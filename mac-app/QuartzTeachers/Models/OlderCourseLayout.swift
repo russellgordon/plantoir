@@ -192,13 +192,40 @@ nonisolated enum OlderCourseLayout {
 
         // MARK: - Computed properties
 
-        /// How many links were left out, for the trail.
-        var linksLeftOut: Int {
-            var count: Int = 0
-            for entry in leftOut where entry.reason == .link {
-                count += 1
+        /// The class's own top-level links that the shared folder's real
+        /// entries took the place of. These are not a loss: what they showed
+        /// came across under the same name.
+        var linksReplaced: Int {
+            return shared.foundNames.count
+        }
+
+        /// Everything left out that is a LOSS, by path, and named wherever it
+        /// is reported — the summary and the trail (#254 fixes, item 1).
+        ///
+        /// Not in it: the add-ons (said once, for every older class, by
+        /// `wording.olderLayoutAddOnsAreLeftBehind`), and a class's top-level
+        /// links, each of which is either replaced by the shared folder's
+        /// real entry or already counted in `shared.missingNames`. In it: a
+        /// link anywhere BELOW the top of the class folder, any link inside
+        /// the shared folder's entries, and anything left out because the
+        /// course uses its name. The first shape of this counted a picture
+        /// dropped from `Thread 1/` together with the links that were
+        /// replaced, and called the import complete.
+        var leftOutAndLost: [String] {
+            var paths: [String] = []
+            for entry in leftOut {
+                if entry.reason == .addOns {
+                    continue
+                }
+                let isATopLevelClassLink: Bool = entry.reason == .link
+                    && !entry.inTheSharedFolder
+                    && !entry.path.contains("/")
+                if isATopLevelClassLink {
+                    continue
+                }
+                paths.append(entry.path)
             }
-            return count
+            return paths
         }
 
         // MARK: - Functions
@@ -228,7 +255,13 @@ nonisolated enum OlderCourseLayout {
                 // Off: the old class pages are called `Day N`, not
                 // `Unit N, Day M`, so no folder is a class folder and a map
                 // would count nothing and look finished.
-                "include_curriculum_coverage": ["sections": ["section1": false]],
+                //
+                // A plain `false`, the shape the wizard writes and the one
+                // every reader takes as off: `resolve_include_curriculum_
+                // coverage`, `CourseConfiguration.includesCurriculumCoverage`
+                // and `setup_course.py`'s `bool(...)`. A per-section map was
+                // measured to read as ON in the last two.
+                "include_curriculum_coverage": false,
                 // Off: every import becomes `section1`, so an "S1" in the
                 // title would be wrong for the S2 it was.
                 "show_section_marker": ["sections": ["section1": false]],
@@ -241,6 +274,10 @@ nonisolated enum OlderCourseLayout {
         case classFolder(URL)
         case folderOfClasses(URL, classFolders: [URL])
         case theSharedFolder
+        /// A folder whose children are COURSE folders each holding a
+        /// `Class Website` of classes — the school year's folder. Refused
+        /// with a sentence that says where to go instead.
+        case aFolderOfCourses
         case nothing
     }
 
@@ -417,6 +454,23 @@ nonisolated enum OlderCourseLayout {
             let classesThere: [URL] = OlderCourseLayout.classFolders(in: named)
             if !classesThere.isEmpty {
                 return .folderOfClasses(named, classFolders: classesThere)
+            }
+        }
+
+        // One level further up: the school year's folder, whose children are
+        // course folders each holding a `Class Website` of classes. Not
+        // accepted — which course is meant is the teacher's to say — but
+        // refused with a sentence that points one level down rather than
+        // `noCoursesThere`, whose advice would point back at this folder.
+        for name in ReferenceTreeCopier.names(inFolderAt: chosenURL) {
+            guard OlderCourseLayout.kind(ofEntry: name, inFolderAt: chosenURL) == S_IFDIR else {
+                continue
+            }
+            let courseURL: URL = ReferenceTreeCopier.url(named: name, inFolderAt: chosenURL)
+            let website: URL = courseURL.appendingPathComponent(OlderCourseLayout.folderOfClassesName)
+            if OlderCourseLayout.kind(of: website) == S_IFDIR,
+               !OlderCourseLayout.classFolders(in: website).isEmpty {
+                return .aFolderOfCourses
             }
         }
 
@@ -679,6 +733,16 @@ nonisolated enum OlderCourseLayout {
             for item in sharedSurvey.items {
                 let parts: [[UInt8]] = OlderCourseLayout.components(of: item.relativePath)
                 guard wanted.contains(OlderCourseLayout.composed(parts[0])) else {
+                    continue
+                }
+                // The same names the class folder may not use, for the same
+                // reason: `section1` and `course_config.json` are the course's
+                // own, and a root `index.md` would fight the front page.
+                let top: String = String(decoding: parts[0], as: UTF8.self).lowercased()
+                if reservedNames.contains(top) || top == "index.md" {
+                    if parts.count == 1 {
+                        leftOut.append(LeftOut(path: item.text, inTheSharedFolder: true, reason: .nameTheCourseUses))
+                    }
                     continue
                 }
                 if item.isSymbolicLink {

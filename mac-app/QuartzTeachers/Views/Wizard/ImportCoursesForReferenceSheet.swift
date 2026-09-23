@@ -545,14 +545,25 @@ struct ImportCoursesForReferenceSheet: View {
             return ReferenceImportWording.imported(
                 course: made.displayCode, year: year, sections: made.sectionCount
             )
-        case .importedWithSharedPagesMissing(let made):
+        case .importedWithSomethingMissing(let made, let sharedPagesMissing, let leftOut):
             var year: String = ReferenceImportWording.noSchoolYear
             if let startingYear = made.schoolYear {
                 year = SchoolYear.label(forStartingYear: startingYear)
             }
-            return ReferenceImportWording.olderLayoutImportedWithSharedMissing(
-                course: made.displayCode, year: year
-            )
+            var line: String
+            if sharedPagesMissing {
+                line = ReferenceImportWording.olderLayoutImportedWithSharedMissing(
+                    course: made.displayCode, year: year
+                )
+            } else {
+                line = ReferenceImportWording.imported(
+                    course: made.displayCode, year: year, sections: made.sectionCount
+                ) + "."
+            }
+            if !leftOut.isEmpty {
+                line += " " + ReferenceImportWording.olderLayoutLeftOut(count: leftOut.count, names: leftOut)
+            }
+            return line
         case .notImported(let course, let reason):
             return ReferenceImportWording.couldNotImport(course: course, reason: reason)
         case .stopped:
@@ -627,7 +638,10 @@ struct ImportCoursesForReferenceSheet: View {
         of course: ReferenceImportSource.FoundCourse,
         before: Bool
     ) -> ReferenceImportSource.FoundCourse? {
-        guard course.olderLayout != nil else {
+        // Only a class NAMED as a section of the course (`ICS3U-S2-2023-24`)
+        // is "another section" of it; `ICD2O-Exemplars` is not, even when its
+        // pages' dates give it the same year.
+        guard let facts = course.olderLayout, facts.names.looksLikeAClass else {
             return nil
         }
         let code: String = CourseCodeRule.normalized(course.courseCode)
@@ -639,7 +653,8 @@ struct ImportCoursesForReferenceSheet: View {
                 }
                 continue
             }
-            guard other.olderLayout != nil, ticked.contains(other.id), other.problem == nil else {
+            guard let otherFacts = other.olderLayout, otherFacts.names.looksLikeAClass,
+                  ticked.contains(other.id), other.problem == nil else {
                 continue
             }
             if CourseCodeRule.normalized(other.courseCode) == code && schoolYear(for: other) == year {
@@ -736,7 +751,7 @@ struct ImportCoursesForReferenceSheet: View {
                 if case .imported(let made) = outcome {
                     landed.append(made.folderName)
                 }
-                if case .importedWithSharedPagesMissing(let made) = outcome {
+                if case .importedWithSomethingMissing(let made, _, _) = outcome {
                     landed.append(made.folderName)
                 }
             }

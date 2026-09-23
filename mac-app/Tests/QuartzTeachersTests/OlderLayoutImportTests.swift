@@ -152,7 +152,7 @@ final class OlderLayoutImportTests: XCTestCase {
         let outcomes: [ReferenceImporter.Outcome] = await importCourses([course])
         let outcome: ReferenceImporter.Outcome = try XCTUnwrap(outcomes.first)
         switch outcome {
-        case .imported(let made), .importedWithSharedPagesMissing(let made):
+        case .imported(let made), .importedWithSomethingMissing(let made, _, _):
             return (outcome: outcome, courseURL: coursesDirectoryURL.appendingPathComponent(made.folderName))
         default:
             XCTFail("The class was not imported: \(outcomes)")
@@ -345,6 +345,11 @@ final class OlderLayoutImportTests: XCTestCase {
             XCTAssertEqual(leftOut, wantedLeftOut, "\(name): what is left out, and why")
 
             XCTAssertEqual(plan.shared.missingNames, testCase["expectMissing"] as? [String], "\(name): missing")
+            var lost: [String] = plan.leftOutAndLost
+            lost.sort()
+            var wantedLost: [String] = try XCTUnwrap(testCase["expectLost"] as? [String], "\(name): no expectLost")
+            wantedLost.sort()
+            XCTAssertEqual(lost, wantedLost, "\(name): what is lost, and must be named")
             XCTAssertEqual(plan.createsEmptyMedia, testCase["expectEmptyMedia"] as? Bool, "\(name): an empty Media")
 
             if let settings = testCase["expectSettings"] as? [String: Any] {
@@ -415,9 +420,10 @@ final class OlderLayoutImportTests: XCTestCase {
         )
 
         let imported: (outcome: ReferenceImporter.Outcome, courseURL: URL) = try await importTheClass(made.classURL)
-        guard case .imported = imported.outcome else {
-            return XCTFail("Everything the class used was there, and it did not say so: \(imported.outcome)")
+        guard case .importedWithSomethingMissing(_, false, let leftOut) = imported.outcome else {
+            return XCTFail("Two links below the top were left out, and it did not say so: \(imported.outcome)")
         }
+        XCTAssertEqual(leftOut.sorted(), ["Concepts/Elsewhere", "Thread 1/Shortcut.md"])
         let files: [String: Data] = try OlderLayoutImportTests.regularFiles(under: imported.courseURL)
         // 2 obsidian + 5 class pages + 4 shared pages + 2 pictures + settings.
         XCTAssertEqual(files.count, 14, "Files out: \(files.keys.sorted())")
@@ -430,6 +436,33 @@ final class OlderLayoutImportTests: XCTestCase {
             ordinaryFiles += 1
         }
         XCTAssertEqual(census.shouldBeLocked, ordinaryFiles, "The census counted fewer files than are there.")
+    }
+
+    /// A picture reached through a link BELOW the top of the class folder is
+    /// left out — and the import says so, by name, in the summary and on
+    /// the trail, rather than calling itself complete. (#254 fixes, item 1:
+    /// the first shape reported `.imported` and "nothing missing".)
+    func testANestedLinkLeftOutIsCountedAndNamed() async throws {
+        try prepare()
+        let made: (classURL: URL, sharedURL: URL) = try makeICS3U()
+        try FileManager.default.createSymbolicLink(
+            atPath: made.classURL.appendingPathComponent("Thread 1/diagram.png").path,
+            withDestinationPath: made.sharedURL.appendingPathComponent("Media/App\u{00e9}tit.png").path
+        )
+        let imported: (outcome: ReferenceImporter.Outcome, courseURL: URL) = try await importTheClass(made.classURL)
+        guard case .importedWithSomethingMissing(let madeCourse, false, let leftOut) = imported.outcome else {
+            return XCTFail("A picture was dropped and the import called itself complete: \(imported.outcome)")
+        }
+        XCTAssertEqual(leftOut, ["Thread 1/diagram.png"])
+        XCTAssertEqual(
+            ImportCoursesForReferenceSheet.line(for: imported.outcome),
+            ReferenceImportWording.imported(
+                course: madeCourse.displayCode, year: SchoolYear.label(forStartingYear: 2023), sections: 1
+            ) + ". " + ReferenceImportWording.olderLayoutLeftOut(count: 1, names: ["Thread 1/diagram.png"])
+        )
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("left out 1: Thread 1/diagram.png"), "The trail does not name it: \(trail)")
+        XCTAssertEqual(OlderLayoutImportTests.links(under: imported.courseURL), [])
     }
 
     /// The copier refuses a link handed to it, so a planner bug fails loudly.
@@ -534,6 +567,10 @@ final class OlderLayoutImportTests: XCTestCase {
         XCTAssertEqual(configuration.values["section_numbers"] as? [Int], [1])
         XCTAssertEqual(configuration.values["per_section_folders"] as? [String], ["Thread 1", "Thread 4"])
         XCTAssertEqual(configuration.values["shared_folders"] as? [String], ["Concepts", "Tasks"])
+        // Off through the app's OWN reader. A per-section map read as ON
+        // here, and in setup_course.py's bool(...) (#254 fixes, item 2).
+        XCTAssertFalse(configuration.includesCurriculumCoverage)
+        XCTAssertEqual(configuration.values["include_curriculum_coverage"] as? Bool, false)
         XCTAssertNotNil(CourseConfiguration.deployFolderProblem(forPath: configuration.deployFolderPath))
         XCTAssertTrue(ReferenceLock.isLocked(imported.courseURL.appendingPathComponent("section1/index.md")))
         XCTAssertTrue(ReferenceLock.isLocked(imported.courseURL.appendingPathComponent("Concepts/Lists.md")))
@@ -580,7 +617,7 @@ final class OlderLayoutImportTests: XCTestCase {
         )
 
         let imported: (outcome: ReferenceImporter.Outcome, courseURL: URL) = try await importTheClass(made.classURL)
-        guard case .importedWithSharedPagesMissing(let madeCourse) = imported.outcome else {
+        guard case .importedWithSomethingMissing(let madeCourse, true, []) = imported.outcome else {
             return XCTFail("The summary does not say the shared pages are missing: \(imported.outcome)")
         }
         XCTAssertEqual(
@@ -654,7 +691,8 @@ final class OlderLayoutImportTests: XCTestCase {
         )
         XCTAssertTrue(
             trail.contains("imported ICS3U-S1-2023-24 from the older layout as ICS3U-2023 — shared pages from "
-                           + "ICS3U-2024-25 Shared (found by its name), 4 of 4 brought across; nothing missing"),
+                           + "ICS3U-2024-25 Shared (found by its name), 4 of 4 brought across; nothing missing; "
+                           + "4 links replaced by the shared folder's own; nothing else left out"),
             "The older layout's own line is missing or wrong: \(trail)"
         )
         XCTAssertFalse(trail.contains("Day 15"), "A page's words reached the trail.")
@@ -710,6 +748,14 @@ final class OlderLayoutImportTests: XCTestCase {
         )
         XCTAssertEqual(
             ReferenceImportWording.olderLayoutAddOnsAreLeftBehind, wording["olderLayoutAddOnsAreLeftBehind"] as? String
+        )
+        XCTAssertEqual(
+            ReferenceImportWording.olderLayoutLeftOut(count: 7, names: ["{names}"]),
+            (wording["olderLayoutLeftOut"] as? String)?.replacingOccurrences(of: "{count}", with: "7")
+        )
+        XCTAssertEqual(
+            ReferenceImportWording.olderLayoutChooseOneCourseAtATime(folder: "{folder}"),
+            wording["olderLayoutChooseOneCourseAtATime"] as? String
         )
         XCTAssertEqual(ReferenceImportWording.list(["Concepts", "Media", "Tasks"]), "Concepts, Media and Tasks")
     }
@@ -814,6 +860,8 @@ final class OlderLayoutImportTests: XCTestCase {
             return "holdsTheFolderYouHaveOpen"
         case .theSharedFolder:
             return "theSharedFolder"
+        case .aFolderOfOlderCourses:
+            return "aFolderOfOlderCourses"
         }
     }
 

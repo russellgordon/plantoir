@@ -1961,7 +1961,11 @@ name. The Shared folder itself is refused with its own sentence
 (`wording.olderLayoutThatIsTheSharedFolder`), but only when it sits beside a
 class, so the sentence is true. **Nothing is ever followed**: every entry is
 asked about with `lstat`, a child that is a link is never a class and never a
-Shared folder.
+Shared folder. The school year's folder (`2023-24`, whose children are whole
+courses each holding a `Class Website`) is refused with a sentence of its own
+(`wording.olderLayoutChooseOneCourseAtATime`) that points one level down: the
+ordinary `noCoursesThere` says "Choose the folder you kept that year's classes
+in", which for this layout is the folder just chosen (found in review).
 
 **Code and year come from the name.** The code is the leading five characters
 when they are Ontario-shaped; the year is `-YYYY-YY` with the two halves
@@ -1980,7 +1984,9 @@ false, since nothing was kept yet — with advice ("Choose a different school
 year") that is wrong for a second section. The shelf holds one course per code
 per year, so **S1 and S2 of one year cannot both be kept under that year**;
 Russell accepted that (decision 1 makes S2 a second import). The unticked
-sibling says so beside itself, and a ticked one that clashes only with a row
+sibling says so beside itself — only when both are NAMED as sections of the
+course, so `ICD2O-Exemplars` (whose pages' dates give it the same year) is not
+called "another section" of ICD2O — and a ticked one that clashes only with a row
 in the same sheet says the same instead of "You already have…"
 (`wording.olderLayoutAnotherSectionOfTheSameCourse`). Filing S2 under Other, or
 another year, keeps it.
@@ -1997,7 +2003,8 @@ sizes and the importer both use):
 | `.obsidian/…` | the course root, **without** `plugins/` and `community-plugins.json` | See "add-ons" below. |
 | any other real entry | the course root, same name (`shared_folders` / `shared_files`) | One section, so shared vs per-section is invisible in the build; at the root Copy a Page offers it, which is the point of keeping the course. |
 | a top-level LINK | the Shared folder's REAL entry of that name, copied | "The Shared folder's real folders replace the links." |
-| a link with no Shared counterpart, any link below the top, any link inside the Shared entries | nothing; named on the trail and in the sheet | See "no link" below. |
+| a top-level link with no Shared counterpart | nothing; named as missing in the sheet (before Import and in the summary) and on the trail | Decision 2: never refused for this. |
+| any link below the top, any link inside the Shared entries, anything whose name the course uses for itself (`section1`, `course_config.json`, a shared `index.md`) | nothing; COUNTED and NAMED in the summary (`wording.olderLayoutLeftOut`) and on the trail, and the import is not reported as complete | See "no link" below. The first shape of this counted a picture dropped from `Thread 1/` together with the links that were REPLACED, and reported "nothing missing" — found in review, and now a must-fail test (`testANestedLinkLeftOutIsCountedAndNamed`). |
 
 Measured with a simulation of Quartz v4.5.0's `shortest` resolution over the
 planned content root: ICS3U S1 plus its Shared folder resolves **1,586 of
@@ -2020,7 +2027,8 @@ with a FILE (0 items, the path listed as unreadable — which refuses the course
 or drops the page; eight of ICS3U's shared entries are pages).
 
 **"Choose Shared Folder…" is on every such row, also when one was found by
-name** — Russell overrode the plan's recommendation (decision 7): a wrong match
+name** (but not on a row that already has a problem — an unreadable folder or
+no course code — which cannot be imported whichever folder is chosen) — Russell overrode the plan's recommendation (decision 7): a wrong match
 must be correctable. A chosen folder is refused, with the row left as it was,
 when it is the folder this window has open (or inside it, or holding it — the
 three existing sentences), when it is itself a class, or when it holds none of
@@ -2084,7 +2092,13 @@ the import writes `show_section_marker` false for section 1 (an existing,
 documented key), and `course_name` carries the class folder's name. Measured:
 the built title is "📚 ICS3U".
 
-**The coverage map is off**, and the reason is not the one the plan gave. With
+**The coverage map is off**, written as a plain `false` — the shape the wizard
+writes. A per-section map (`{"sections": {"section1": false}}`, the first
+shape) was measured in review to read as ON in two of the three readers:
+`CourseConfiguration.includesCurriculumCoverage` and `setup_course.py`'s
+`bool(...)`; only `build_site.py` read it as off. The plain value is off in all
+three, and `testTheSettingsMakeAFrozenSingleSectionReferenceCourse` reads it
+through the app's own reader. And the reason is not the one the plan gave. With
 no `class_folder` key the build's fallback takes the first per-section folder
 whose name contains "class"; no `Thread N` matches, so there is NO class folder
 and a map would count nothing and look finished. (The plan said it would count
