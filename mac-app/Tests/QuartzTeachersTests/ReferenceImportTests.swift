@@ -1193,6 +1193,16 @@ final class ReferenceImportTests: XCTestCase {
             return "theSharedFolder"
         case .aFolderOfOlderCourses:
             return "aFolderOfOlderCourses"
+        case .partOfAClassWebsite:
+            return "checkoutLayoutChooseTheWholeFolder"
+        case .onlyTheFirstSection:
+            return "checkoutLayoutOnlyTheFirstSection"
+        case .severalClassWebsiteCourses:
+            return "checkoutLayoutChooseOneCourseAtATime"
+        case .classWebsiteCoursesFurtherDown:
+            return "checkoutLayoutChooseACourseFolderInside"
+        case .shortcutTrouble:
+            return "checkoutLayoutShortcut"
         }
     }
 

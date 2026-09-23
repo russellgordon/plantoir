@@ -336,6 +336,11 @@
         "why": "Written right after 'course imported for reference' for a class kept in the older folder-per-class layout (#254). The shared pictures of such a course come from a SECOND folder, found by its name or chosen by hand, and a class whose shared folder was not found still imports - so 'where are this course's pictures' is the question a report about one will ask, and only this line answers it. Names only; never what is written on a page, and never anything read from the add-ons that were left out."
       },
       {
+        "carries": "where the pages were read from (a path from the home folder, redacted on the way in) and the Finder shortcut's name when one was followed, the section and HOW it was told (its front page's link text, its folder's name, or being the only one) with any disagreement between the front page and the name, the course pages folder the files came from (source-<code>) and how many files, the word its class pages use and how many placeholder pages (Thread 2, Day x) were set aside, then as TWO separate clauses what was LEFT BEHIND by kind with counts - the website's own program files, the folders skipped without being looked inside, the links replaced by what they showed, the editing folders and the other sections by name, anything in the course pages folder no link showed, the Obsidian add-on entries - and what was LOST, by name (a link that showed somewhere unexpected also says where it pointed, from the home folder), or 'nothing lost'; and whether an empty Media folder was made",
+        "event": "course imported from a class website folder",
+        "why": "Written right after 'course imported for reference' for a class kept in the 2024-25 layout, a whole website folder per class (#256). S1's and S2's copies of the pages DIFFER (335 entries, measured), so 'which copy did this come from, and what did not come' is a real question about one of these, and only this line answers it; left behind and lost are separate clauses so machinery is never read as a loss or a loss as machinery. Names and counts only, never what is written on a page."
+      },
+      {
         "carries": "which course did not come across, and why - already kept for reference under that school year, could not be read, no room on the disk",
         "event": "course could not be imported for reference",
         "why": "Written per COURSE, because a run of four that imports three is the ordinary shape of this and 'the import failed' is exactly the report that cannot be looked into. Without it, a teacher who ticked four courses and found three has nothing to point at, and the one that is missing is the one they will ask about."
@@ -3706,7 +3711,7 @@
         }
       ],
       "alsoRenamedAside": ".netlify_sites/section<N>.json and .cloudflare_sites/section<N>.json become the frozen previous-marker name (file-formats.json → firstDeployMarkers). Renamed rather than deleted: the file holds the site id and the admin address, which a teacher may still want. Two fail-safes fall out of one rename — a deploy that somehow ran would make a NEW site rather than overwrite last year's live one, and a section that has never deployed cannot be scheduled.",
-      "kept": "Per-page visibility frontmatter is KEPT exactly as it is: it is last year's record of what students actually saw, and it is what makes a preview of a reference course show a sensible site rather than everything. That holds for a course made from a MODERN course. It does not hold for one imported from the older folder-per-class layout (#254): its pages carry Obsidian Digital Garden's dg-* keys, which the build does not read, and its shared pages carry none at all, so its preview shows every page except draft: true ones - more than students saw. Accepted by Russell for v1.3.0; see importing.olderLayout.whatThePreviewShows."
+      "kept": "Per-page visibility frontmatter is KEPT exactly as it is: it is last year's record of what students actually saw, and it is what makes a preview of a reference course show a sensible site rather than everything. That holds for a course made from a MODERN course. It does not hold for one imported from the older folder-per-class layout (#254): its pages carry Obsidian Digital Garden's dg-* keys, which the build does not read, and its shared pages carry none at all, so its preview shows every page except draft: true ones - more than students saw. Accepted by Russell for v1.3.0; see importing.olderLayout.whatThePreviewShows. One imported from the 2024-25 website-folder-per-class layout (#256) is section 1 only, and there it DOES hold: its pages were hidden by draft:, which the build reads, so its preview matches section 1's own site (280 of 324 and 213 of 220 pages visible, 0 disagreements, measured); see importing.quartzCheckoutLayout.whatThePreviewShows."
     },
     "markerAgreement": {
       "rule": "FOUR implementations answer 'is this course kept for reference?' - the APP itself, scripts/reference_course.py, deploy.sh and deploy.ps1 - and two of them are plain shell with no JSON parser. So the question is one regular expression, run over the WHOLE settings file as a single string: the quoted key, a colon with any whitespace (newlines included) on either side, and the word true in any case, unquoted. Every row below carries the deploy outcome all four must produce, and what the APP reads the row as.",
@@ -4158,7 +4163,7 @@
         "why": "It may be the teacher's only copy of last year. An import that failed costs an afternoon; an import that damaged the source costs the year. The neutralisation and the lock happen to the COPY, after it is made."
       },
       "foldersAccepted": {
-        "rule": "Three shapes are accepted, and all three resolve to the same working folder: the folder itself (it holds a courses folder), the courses folder inside it, and ONE course folder (it holds course_config.json). A course is a folder inside courses/ that holds a course_config.json - nothing else is, which is what keeps _backups, .internal and any stray folder out without a list of names. Read by exact name, never by glob. When the chosen folder is none of these three, the OLDER folder-per-class layout is tried next (olderLayout below), and only when that finds nothing either is the folder refused with noCoursesThere.",
+        "rule": "Three shapes are accepted, and all three resolve to the same working folder: the folder itself (it holds a courses folder), the courses folder inside it, and ONE course folder (it holds course_config.json). A course is a folder inside courses/ that holds a course_config.json - nothing else is, which is what keeps _backups, .internal and any stray folder out without a list of names. Read by exact name, never by glob. When the chosen folder is none of these three, the OLDER folder-per-class layout is tried next (olderLayout below), then the 2024-25 website-folder-per-class layout (quartzCheckoutLayout below), and only when neither finds anything is the folder refused with noCoursesThere.",
         "why": "A teacher points at what they recognise rather than at what the app expects, and refusing a folder that plainly holds a course - because they went one level too deep - reads as the app being broken. Resolving upward costs nothing and the whole shelf is then offered, with the one they pointed at already ticked.",
         "tickedWhenOpened": "Everything, when a working folder or a courses folder was chosen: they pointed at last year and they mean last year. Only the one course, when a course folder was chosen: they were specific, and the others are offered rather than assumed.",
         "cases": [
@@ -4971,6 +4976,1551 @@
           {"what": "Changing the MODERN route's handling of a link in the same piece", "why": "A modern course's only link is .merged_output, which is left behind by name; widening the change risked #206's deploy verification for no measured gain. Recorded as a known limit (leftBehind.rule)."}
         ]
       },
+      "quartzCheckoutLayout": {
+        "note": "Issue #256. Russell's 2024-25 way of keeping a course: one whole WEBSITE folder per class section - ~/Documents/Class Websites/2024-25/ICS3U/S1 - holding the program that built the site (quartz/: quartz.config.ts, package.json, the program, public/, .quartz-cache, scripts) and the pages under quartz/content/source-<code>/{shared, s1, s2}. The folder Obsidian opened, quartz/content, is mostly LINKS into source-<code>, plus vault-<code>-s<N> folders made of links for editing. The iCloud folder he named in the issue (2024-25/Old ICS3U/Class Websites) holds only two Finder shortcuts, S1 and S2, leading to those website folders. The same File > Import Courses for Reference... sheet recognises it, THIRD - after the modern shapes and #254's olderLayout - and ONLY THE FIRST SECTION of a course kept this way comes across (Russell, 2026-09-23), as one single-section reference course made by exactly the code every other import ends in.",
+        "today": "2026-09-23",
+        "treeEntries": "As olderLayout.treeEntries, plus: {\"link\": path, \"text\": \"<link text>\"} is a link whose text is exactly that (relative, as the real ones are: ./source-ics3u/s1/index.md); {\"alias\": path, \"to\": \"<path in the tree>\"} is a Finder shortcut (an alias file made with bookmarkData(options: .suitableForBookmarkFile) + writeBookmarkData) to that entry, {\"alias\": path, \"to\": null} one whose target was a folder that was then deleted, and \"thenLock\": \"<path in the tree>\" makes that folder unreadable (mode 000) after the shortcut is made - the shape of a refused Documents permission. Shortcuts are made after every file and link.",
+        "recognition": {
+          "rule": "A WEBSITE FOLDER is a real folder holding a real folder quartz/, which holds a regular file quartz.config.ts and a real folder content/. Its COURSE PAGES FOLDER is the ONE real folder directly in content/ named source-<code> (any case), <code> five characters of the Ontario shape (olderLayout.codeAndYear's rule), holding at least one real s<digits> folder. A website folder with no course pages folder is not a course and is left out of every list (Math Club - Russell, 2026-09-23); with two, its row says checkoutLayoutMoreThanOneCourse. A SHORTCUT is an entry that Finder marks as an alias (isAliasFileKey) AND that lstat calls a regular file: a symbolic link also answers isAliasFileKey true, and resolving one follows it, so a link is NEVER a shortcut. Resolved with [.withoutUI, .withoutMounting]; when that fails, the bookmark's STORED path and kind are read without resolving and the stored path asked about with lstat: a stored FILE is 'leadsToAFile', EACCES/EPERM 'couldNotBeOpened', a path under /Volumes whose disk is not mounted 'diskNotConnected', anything else 'gone'. Tried in this order: (1) a shortcut chosen on its own - to a website folder: that one; one that leads nowhere or to a file: refused with its sentence; (2) a website folder, or its quartz/ or quartz/content/ folder: that one; (3) anything else inside a website folder's quartz/, found by walking the chosen path's ancestors: a later section's pages (content/source-<code>/s<M> or content/vault-<code>-s<M>, M not 1) refused checkoutLayoutOnlyTheFirstSection, anything else refused checkoutLayoutChooseTheWholeFolder - never resolved upward; (4) the CANDIDATES in the chosen folder (website folders, shortcuts leading to one, and shortcuts to a FOLDER that cannot be read through - a shortcut to a file is passed over as a file is) and in each of its children: readable candidates directly inside AND in a child, or in two or more children, refused checkoutLayoutChooseOneCourseAtATime; directly inside only, that folder; in exactly one child only, that child; only unreadable shortcuts, that folder (or the one child holding them), each shown with its reason. Looking at a child's candidates means listing the child's entries: a real folder among them is asked whether it is a website folder (lstat of its quartz/quartz.config.ts and quartz/content, and of content/source-*/s<N>), and a shortcut among them is RESOLVED (without a dialog and without mounting). (5) Only when all of that found nothing: the chosen folder's grandchildren - a folder two levels down holding a SHORTCUT that leads to a website folder (the school year's folder in iCloud, LCS/2024-25, whose Old ICS3U/Class Websites holds S1 and S2) - refused checkoutLayoutChooseACourseFolderInside, never imported from; the first such shortcut ends the look. At that depth only shortcuts are asked about, never the folders beside them, so a broad folder chosen by mistake does not become a look inside every folder three levels down. Nothing: nil, and noCoursesThere exactly as before. Every entry is asked about WITHOUT following a link, and nothing deeper than that is looked at.",
+          "why": "Measured on Russell's folders: every shape of them - the shortcut folder, Old ICS3U, 2024-25, ICS3U, S1, S1/quartz, quartz/content, source-ics3u, vault-ics3u-s2, Math Club - returned nothing from the first two routes, so this route can never take a folder either of them reads. The children are counted rather than any folder NAME trusted: 2024-25 holds ICS3U/ and ICS4U/ (several courses) while Old ICS3U holds exactly one child of shortcuts (Class Websites) beside planning folders and a shortcut to a PDF.",
+          "section": "The section a website folder built is, first, the one its front page's link TEXT names - content/index.md -> [./]source-<code>/s<N>/index.md with s<N> present (read with destinationOfSymbolicLink, never followed; S2's own publish script rewrote exactly these links to make S2's site); then the folder's own name S<N> when s<N> is present; then the only s<N> there is; otherwise the row says checkoutLayoutWhichSection. Measured: the front page and the name agree in 5 of 5 real website folders. Only section 1 comes across: a later section chosen on its own is REFUSED checkoutLayoutOnlyTheFirstSection, and in a folder of them it is SHOWN with that sentence, unticked.",
+          "codeAndYear": "The code is the course pages folder's <code>, upper-cased. The year is the first of the website folder, its parent and its grandparent whose name is exactly YYYY-YY (consecutive) or carries -YYYY-YY as #254's names do, when it is one the sheet offers; otherwise the pages that will be copied propose one (schoolYearProposed). The row's name (course_name) is '<CODE> S1'.",
+          "tickedWhenOpened": "A website folder chosen on its own: that one, when it can come across. A folder of them: every row that can come across, and of several with the same code and year only the first. Rows with a problem are shown and never ticked.",
+          "cases": [
+            {
+              "name": "the website folder of ICS3U S1, as it really is",
+              "tree": [
+                "2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                "2024-25/ICS3U/S1/quartz/package.json",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/vault-ics3u-s1/All Classes",
+                  "text": "../source-ics3u/s1/All Classes"
+                },
+                "2024-25/ICS3U/S1/quartz/content/vault-ics3u-s1/.obsidian/app.json"
+              ],
+              "choose": "2024-25/ICS3U/S1",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "frontPage",
+                  "year": 2024,
+                  "shortcut": null,
+                  "problem": null
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ],
+              "why": "Section 1, told by the TEXT of content/index.md (a link to source-ics3u/s1/index.md, read and never followed). The year from the folder named 2024-25 two levels up."
+            },
+            {
+              "name": "the front page's link points somewhere else: the folder's name tells the section",
+              "tree": [
+                "2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/index.md",
+                  "to": null
+                }
+              ],
+              "choose": "2024-25/ICS3U/S1",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "folderName",
+                  "year": 2024,
+                  "shortcut": null,
+                  "problem": null
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ],
+              "why": "A link is only ever its text here; one whose text is not source-<code>/s<N>/index.md says nothing, and the name S1 is asked next."
+            },
+            {
+              "name": "one level too deep: the quartz folder",
+              "tree": [
+                "2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                }
+              ],
+              "choose": "2024-25/ICS3U/S1/quartz",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "frontPage",
+                  "year": 2024,
+                  "shortcut": null,
+                  "problem": null
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ]
+            },
+            {
+              "name": "two levels too deep: the content folder Obsidian opened",
+              "tree": [
+                "2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                }
+              ],
+              "choose": "2024-25/ICS3U/S1/quartz/content",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "frontPage",
+                  "year": 2024,
+                  "shortcut": null,
+                  "problem": null
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ]
+            },
+            {
+              "name": "the course pages folder chosen",
+              "tree": [
+                "2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                }
+              ],
+              "choose": "2024-25/ICS3U/S1/quartz/content/source-ics3u",
+              "expect": "refused",
+              "refusal": "checkoutLayoutChooseTheWholeFolder",
+              "refusalFolder": "source-ics3u",
+              "refusalWebsite": "S1"
+            },
+            {
+              "name": "section 1's own pages chosen",
+              "tree": [
+                "2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                }
+              ],
+              "choose": "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1",
+              "expect": "refused",
+              "refusal": "checkoutLayoutChooseTheWholeFolder",
+              "refusalFolder": "s1",
+              "refusalWebsite": "S1"
+            },
+            {
+              "name": "a later section's pages chosen",
+              "tree": [
+                "2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                }
+              ],
+              "choose": "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2",
+              "expect": "refused",
+              "refusal": "checkoutLayoutOnlyTheFirstSection",
+              "refusalFolder": "s2",
+              "refusalSection": 2,
+              "why": "Never resolved UPWARD: the website folder above it would import SECTION 1, the opposite of what was pointed at."
+            },
+            {
+              "name": "a later section's editing folder chosen",
+              "tree": [
+                "2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                "2024-25/ICS3U/S1/quartz/content/vault-ics3u-s2/.obsidian/app.json"
+              ],
+              "choose": "2024-25/ICS3U/S1/quartz/content/vault-ics3u-s2",
+              "expect": "refused",
+              "refusal": "checkoutLayoutOnlyTheFirstSection",
+              "refusalFolder": "vault-ics3u-s2",
+              "refusalSection": 2
+            },
+            {
+              "name": "a folder of two website folders, S1 and S2",
+              "tree": [
+                "ICS3U/S1/quartz/quartz.config.ts",
+                "ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                "ICS3U/S2/quartz/quartz.config.ts",
+                "ICS3U/S2/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "ICS3U/S2/quartz/content/source-ics3u/s1/index.md",
+                "ICS3U/S2/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "ICS3U/S2/quartz/content/source-ics3u/s2/index.md",
+                "ICS3U/S2/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "ICS3U/S2/quartz/content/index.md",
+                  "text": "./source-ics3u/s2/index.md"
+                },
+                {
+                  "link": "ICS3U/S2/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "ICS3U/S2/quartz/content/All Classes",
+                  "text": "./source-ics3u/s2/All Classes"
+                }
+              ],
+              "choose": "ICS3U",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "frontPage",
+                  "year": null,
+                  "shortcut": null,
+                  "problem": null
+                },
+                {
+                  "row": "S2",
+                  "code": "ICS3U",
+                  "section": 2,
+                  "sectionFrom": "frontPage",
+                  "year": null,
+                  "shortcut": null,
+                  "problem": "checkoutLayoutOnlyTheFirstSection"
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ],
+              "why": "Russell, 2026-09-23: only the first section of a course kept this way can be brought across. S2 is SHOWN, with its reason, rather than hidden. No year folder and pages made today: the pages propose the contract's day's year (see yearCases).",
+              "yearFromPages": true
+            },
+            {
+              "name": "the folder of Finder shortcuts Russell named (Class Websites)",
+              "tree": [
+                "Documents/2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                "Documents/2024-25/ICS3U/S2/quartz/quartz.config.ts",
+                "Documents/2024-25/ICS3U/S2/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Documents/2024-25/ICS3U/S2/quartz/content/source-ics3u/s1/index.md",
+                "Documents/2024-25/ICS3U/S2/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Documents/2024-25/ICS3U/S2/quartz/content/source-ics3u/s2/index.md",
+                "Documents/2024-25/ICS3U/S2/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Documents/2024-25/ICS3U/S2/quartz/content/index.md",
+                  "text": "./source-ics3u/s2/index.md"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S2/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S2/quartz/content/All Classes",
+                  "text": "./source-ics3u/s2/All Classes"
+                },
+                "Old ICS3U/Class Websites/Website Favicon.acorn",
+                {
+                  "alias": "Old ICS3U/Class Websites/S1",
+                  "to": "Documents/2024-25/ICS3U/S1"
+                },
+                {
+                  "alias": "Old ICS3U/Class Websites/S2",
+                  "to": "Documents/2024-25/ICS3U/S2"
+                }
+              ],
+              "choose": "Old ICS3U/Class Websites",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "frontPage",
+                  "year": 2024,
+                  "shortcut": "S1",
+                  "problem": null
+                },
+                {
+                  "row": "S2",
+                  "code": "ICS3U",
+                  "section": 2,
+                  "sectionFrom": "frontPage",
+                  "year": 2024,
+                  "shortcut": "S2",
+                  "problem": "checkoutLayoutOnlyTheFirstSection"
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ],
+              "why": "Each row is named after the shortcut WHERE IT WAS FOUND, so two shortcuts to two folders both called S1 stay two rows. The pages are read from where the shortcut leads."
+            },
+            {
+              "name": "the folder above it, with planning folders and a shortcut to a file beside it (Old ICS3U)",
+              "tree": [
+                "Documents/2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                "Old ICS3U/Thread 1/Day 1/notes.txt",
+                "Documents/ideas.pdf",
+                {
+                  "alias": "Old ICS3U/ideas2.pdf",
+                  "to": "Documents/ideas.pdf"
+                },
+                {
+                  "alias": "Old ICS3U/Class Websites/S1",
+                  "to": "Documents/2024-25/ICS3U/S1"
+                }
+              ],
+              "choose": "Old ICS3U",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "frontPage",
+                  "year": 2024,
+                  "shortcut": "S1",
+                  "problem": null
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ],
+              "why": "A folder with exactly ONE child holding website folders is read through that child. A shortcut to a FILE is passed over exactly as a file is."
+            },
+            {
+              "name": "a SYMLINK named S1 pointing at a website folder is never a shortcut",
+              "tree": [
+                "Documents/S1/quartz/quartz.config.ts",
+                "Documents/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Documents/S1/quartz/content/source-ics3u/s1/index.md",
+                "Documents/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Documents/S1/quartz/content/source-ics3u/s2/index.md",
+                "Documents/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Documents/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "Documents/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "Documents/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                {
+                  "link": "Chosen/S1",
+                  "to": "Documents/S1"
+                }
+              ],
+              "choose": "Chosen",
+              "expect": "refused",
+              "refusal": "noCoursesThere",
+              "why": "isAliasFileKey is TRUE for a symbolic link, and resolving one follows it (measured). A shortcut is an alias that is also a regular file. The refusal is safe and says no course was found, which is true of what was chosen."
+            },
+            {
+              "name": "a SYMLINK to a website folder, chosen on its own, is not a shortcut either",
+              "tree": [
+                "Documents/S1/quartz/quartz.config.ts",
+                "Documents/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Documents/S1/quartz/content/source-ics3u/s1/index.md",
+                "Documents/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Documents/S1/quartz/content/source-ics3u/s2/index.md",
+                "Documents/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Documents/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "Documents/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "Documents/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                {
+                  "link": "Chosen/S1",
+                  "to": "Documents/S1"
+                }
+              ],
+              "choose": "Chosen/S1",
+              "expect": "refused",
+              "refusal": "noCoursesThere",
+              "why": "The folder chooser hands over what the link points at; anything else that hands over the link itself is not read through it."
+            },
+            {
+              "name": "one shortcut leads to a website, one to a folder that is gone",
+              "tree": [
+                "Documents/2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                {
+                  "alias": "Class Websites/S1",
+                  "to": "Documents/2024-25/ICS3U/S1"
+                },
+                {
+                  "alias": "Class Websites/S2",
+                  "to": null
+                }
+              ],
+              "choose": "Class Websites",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "frontPage",
+                  "year": 2024,
+                  "shortcut": "S1",
+                  "problem": null
+                },
+                {
+                  "row": "S2",
+                  "code": "S2",
+                  "section": null,
+                  "sectionFrom": null,
+                  "year": null,
+                  "shortcut": "S2",
+                  "problem": "checkoutLayoutShortcutGone"
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ],
+              "why": "A shortcut that leads nowhere is SHOWN with its reason, never dropped in silence."
+            },
+            {
+              "name": "every shortcut leads to a folder that is gone (ICD2O's Class Website)",
+              "tree": [
+                "Class Website/Website Favicon.acorn",
+                {
+                  "alias": "Class Website/ICD2O-S2-Website",
+                  "to": null
+                }
+              ],
+              "choose": "Class Website",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "ICD2O-S2-Website",
+                  "code": "ICD2O-S2-Website",
+                  "section": null,
+                  "sectionFrom": null,
+                  "year": null,
+                  "shortcut": "ICD2O-S2-Website",
+                  "problem": "checkoutLayoutShortcutGone"
+                }
+              ],
+              "expectTicked": [],
+              "why": "Measured on Russell's own folders: 2024-25/ICD2O/Class Website holds one shortcut to a folder in Dropbox that no longer exists. 'There are no courses in Class Website' would send him looking in the wrong place."
+            },
+            {
+              "name": "the course folder above a folder of dead shortcuts",
+              "tree": [
+                "ICD2O/Class Website/Website Favicon.acorn",
+                {
+                  "alias": "ICD2O/Class Website/ICD2O-S2-Website",
+                  "to": null
+                },
+                "ICD2O/Thread 1/notes.txt"
+              ],
+              "choose": "ICD2O",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "ICD2O-S2-Website",
+                  "code": "ICD2O-S2-Website",
+                  "section": null,
+                  "sectionFrom": null,
+                  "year": null,
+                  "shortcut": "ICD2O-S2-Website",
+                  "problem": "checkoutLayoutShortcutGone"
+                }
+              ],
+              "expectTicked": []
+            },
+            {
+              "name": "a shortcut to a folder this Mac will not let Plantoir open",
+              "tree": [
+                "Locked/Inside/S1/quartz/quartz.config.ts",
+                "Locked/Inside/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Locked/Inside/S1/quartz/content/source-ics3u/s1/index.md",
+                "Locked/Inside/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Locked/Inside/S1/quartz/content/source-ics3u/s2/index.md",
+                "Locked/Inside/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Locked/Inside/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "Locked/Inside/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "Locked/Inside/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                {
+                  "alias": "Class Websites/S1",
+                  "to": "Locked/Inside/S1",
+                  "thenLock": "Locked"
+                }
+              ],
+              "choose": "Class Websites",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "S1",
+                  "section": null,
+                  "sectionFrom": null,
+                  "year": null,
+                  "shortcut": "S1",
+                  "problem": "checkoutLayoutShortcutCouldNotBeOpened"
+                }
+              ],
+              "expectTicked": [],
+              "why": "Measured: a shortcut whose target's parent cannot be read throws the SAME error as a deleted target. The bookmark's stored path is read without resolving and asked about with lstat: EACCES/EPERM is 'not allowed', ENOENT is 'gone'."
+            },
+            {
+              "name": "a shortcut chosen on its own",
+              "tree": [
+                "Documents/2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                {
+                  "alias": "Class Websites/S1",
+                  "to": "Documents/2024-25/ICS3U/S1"
+                }
+              ],
+              "choose": "Class Websites/S1",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "frontPage",
+                  "year": 2024,
+                  "shortcut": "S1",
+                  "problem": null
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ],
+              "why": "The folder chooser resolves a shortcut it is handed; a drag or another caller may not."
+            },
+            {
+              "name": "a shortcut to a folder that is gone, chosen on its own",
+              "tree": [
+                {
+                  "alias": "Class Websites/S2",
+                  "to": null
+                }
+              ],
+              "choose": "Class Websites/S2",
+              "expect": "refused",
+              "refusal": "checkoutLayoutShortcutGone",
+              "refusalShortcut": "S2"
+            },
+            {
+              "name": "a shortcut to a file, chosen on its own",
+              "tree": [
+                "Documents/ideas.pdf",
+                {
+                  "alias": "Old ICS3U/ideas2.pdf",
+                  "to": "Documents/ideas.pdf"
+                }
+              ],
+              "choose": "Old ICS3U/ideas2.pdf",
+              "expect": "refused",
+              "refusal": "checkoutLayoutShortcutToAFile",
+              "refusalShortcut": "ideas2.pdf"
+            },
+            {
+              "name": "the school year's folder, holding several courses (2024-25)",
+              "tree": [
+                "2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                "2024-25/ICS3U/S2/quartz/quartz.config.ts",
+                "2024-25/ICS3U/S2/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "2024-25/ICS3U/S2/quartz/content/source-ics3u/s1/index.md",
+                "2024-25/ICS3U/S2/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS3U/S2/quartz/content/source-ics3u/s2/index.md",
+                "2024-25/ICS3U/S2/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS3U/S2/quartz/content/index.md",
+                  "text": "./source-ics3u/s2/index.md"
+                },
+                {
+                  "link": "2024-25/ICS3U/S2/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS3U/S2/quartz/content/All Classes",
+                  "text": "./source-ics3u/s2/All Classes"
+                },
+                "2024-25/ICS4U/S1/quartz/quartz.config.ts",
+                "2024-25/ICS4U/S1/quartz/content/source-ics4u/shared/Concepts/Lists.md",
+                "2024-25/ICS4U/S1/quartz/content/source-ics4u/s1/index.md",
+                "2024-25/ICS4U/S1/quartz/content/source-ics4u/s1/All Classes/Thread 1, Day 1.md",
+                "2024-25/ICS4U/S1/quartz/content/source-ics4u/s2/index.md",
+                "2024-25/ICS4U/S1/quartz/content/source-ics4u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "2024-25/ICS4U/S1/quartz/content/index.md",
+                  "text": "./source-ics4u/s1/index.md"
+                },
+                {
+                  "link": "2024-25/ICS4U/S1/quartz/content/Concepts",
+                  "text": "./source-ics4u/shared/Concepts"
+                },
+                {
+                  "link": "2024-25/ICS4U/S1/quartz/content/All Classes",
+                  "text": "./source-ics4u/s1/All Classes"
+                },
+                "2024-25/Math Club/quartz/quartz.config.ts",
+                "2024-25/Math Club/quartz/content/index.md"
+              ],
+              "choose": "2024-25",
+              "expect": "refused",
+              "refusal": "checkoutLayoutChooseOneCourseAtATime",
+              "refusalFolder": "2024-25",
+              "why": "Two children hold website folders. #254's olderLayoutChooseOneCourseAtATime names 'the Class Website folder', which is false here."
+            },
+            {
+              "name": "the school year's folder in iCloud, one level above the courses (LCS/2024-25)",
+              "tree": [
+                "Documents/2024-25/ICS3U/S1/quartz/quartz.config.ts",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Documents/2024-25/ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                "LCS/2024-25/Old ICS3U/Thread 1/notes.txt",
+                "LCS/2024-25/Math Club/November Reports.txt",
+                {
+                  "alias": "LCS/2024-25/Old ICS3U/Class Websites/S1",
+                  "to": "Documents/2024-25/ICS3U/S1"
+                }
+              ],
+              "choose": "LCS/2024-25",
+              "expect": "refused",
+              "refusal": "checkoutLayoutChooseACourseFolderInside",
+              "refusalFolder": "2024-25",
+              "why": "Review of #256, L1: noCoursesThere said 'There are no courses in 2024-25. Choose the folder you kept that year's classes in' about the very folder that holds them, two levels down. The refusal points one level down instead (Old ICS3U works; so does Class Websites). It is a refusal and not an import: nothing is brought across from a folder the teacher did not point at."
+            },
+            {
+              "name": "a school year's folder whose only shortcuts two levels down lead nowhere",
+              "tree": [
+                "LCS/2024-25/ICD2O/Thread 1/notes.txt",
+                {
+                  "alias": "LCS/2024-25/ICD2O/Class Website/ICD2O-S2-Website",
+                  "to": null
+                }
+              ],
+              "choose": "LCS/2024-25",
+              "expect": "refused",
+              "refusal": "noCoursesThere",
+              "why": "Only a shortcut that LEADS to a website folder makes the folder a school year's; one that leads nowhere two levels down is not looked into further (choosing ICD2O shows it, with its reason)."
+            },
+            {
+              "name": "a website folder with no course pages folder (Math Club) is not a course",
+              "tree": [
+                "2024-25/Math Club/quartz/quartz.config.ts",
+                "2024-25/Math Club/quartz/content/index.md"
+              ],
+              "choose": "2024-25/Math Club",
+              "expect": "refused",
+              "refusal": "noCoursesThere",
+              "why": "Russell, 2026-09-23: leave it out of the list entirely. No source-<code>, so no course code anywhere."
+            },
+            {
+              "name": "a Math Club beside a course's website folders is left out of the list",
+              "tree": [
+                "ICS3U/S1/quartz/quartz.config.ts",
+                "ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "ICS3U/S1/quartz/content/source-ics3u/s1/index.md",
+                "ICS3U/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "ICS3U/S1/quartz/content/source-ics3u/s2/index.md",
+                "ICS3U/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "ICS3U/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "ICS3U/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "ICS3U/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                "ICS3U/Math Club/quartz/quartz.config.ts",
+                "ICS3U/Math Club/quartz/content/index.md"
+              ],
+              "choose": "ICS3U",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "frontPage",
+                  "year": null,
+                  "shortcut": null,
+                  "problem": null
+                }
+              ],
+              "expectTicked": [
+                "S1"
+              ],
+              "yearFromPages": true
+            },
+            {
+              "name": "two course pages folders in one website folder",
+              "tree": [
+                "W/S1/quartz/quartz.config.ts",
+                "W/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "W/S1/quartz/content/source-ics3u/s1/index.md",
+                "W/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "W/S1/quartz/content/source-ics3u/s2/index.md",
+                "W/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "W/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "W/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "W/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                "W/S1/quartz/content/source-ics4u/s1/index.md"
+              ],
+              "choose": "W",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "S1",
+                  "code": "S1",
+                  "section": null,
+                  "sectionFrom": null,
+                  "year": null,
+                  "shortcut": null,
+                  "problem": "checkoutLayoutMoreThanOneCourse"
+                }
+              ],
+              "expectTicked": []
+            },
+            {
+              "name": "front page a real page, folder named S2: section 2, refused",
+              "tree": [
+                "W/S2/quartz/quartz.config.ts",
+                "W/S2/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "W/S2/quartz/content/source-ics3u/s1/index.md",
+                "W/S2/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "W/S2/quartz/content/source-ics3u/s2/index.md",
+                "W/S2/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                "W/S2/quartz/content/index.md"
+              ],
+              "choose": "W/S2",
+              "expect": "refused",
+              "refusal": "checkoutLayoutOnlyTheFirstSection",
+              "refusalFolder": "S2",
+              "refusalSection": 2
+            },
+            {
+              "name": "front page a real page, folder named Website, only s1",
+              "tree": [
+                "W/Website/quartz/quartz.config.ts",
+                "W/Website/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "W/Website/quartz/content/source-ics3u/s1/index.md",
+                "W/Website/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "W/Website/quartz/content/index.md"
+              ],
+              "choose": "W/Website",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "Website",
+                  "code": "ICS3U",
+                  "section": 1,
+                  "sectionFrom": "onlyOne",
+                  "year": null,
+                  "shortcut": null,
+                  "problem": null
+                }
+              ],
+              "expectTicked": [
+                "Website"
+              ],
+              "yearFromPages": true
+            },
+            {
+              "name": "front page a real page, folder named Website, s1 and s2",
+              "tree": [
+                "W/Website/quartz/quartz.config.ts",
+                "W/Website/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "W/Website/quartz/content/source-ics3u/s1/index.md",
+                "W/Website/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "W/Website/quartz/content/source-ics3u/s2/index.md",
+                "W/Website/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                "W/Website/quartz/content/index.md"
+              ],
+              "choose": "W",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "Website",
+                  "code": "ICS3U",
+                  "section": null,
+                  "sectionFrom": null,
+                  "year": null,
+                  "shortcut": null,
+                  "problem": "checkoutLayoutWhichSection"
+                }
+              ],
+              "expectTicked": []
+            },
+            {
+              "name": "the front page's link says section 2 in a folder named S1: section 2, refused",
+              "tree": [
+                "W/S1/quartz/quartz.config.ts",
+                "W/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "W/S1/quartz/content/source-ics3u/s1/index.md",
+                "W/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "W/S1/quartz/content/source-ics3u/s2/index.md",
+                "W/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "W/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s2/index.md"
+                },
+                {
+                  "link": "W/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "W/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s2/All Classes"
+                }
+              ],
+              "choose": "W/S1",
+              "expect": "refused",
+              "refusal": "checkoutLayoutOnlyTheFirstSection",
+              "refusalFolder": "S1",
+              "refusalSection": 2,
+              "why": "What the site was BUILT from beats the folder's label: S2's own publish script re-pointed exactly these links at s2."
+            },
+            {
+              "name": "quartz without quartz.config.ts is not a website folder",
+              "tree": [
+                "W/S1/quartz/content/source-ics3u/s1/index.md"
+              ],
+              "choose": "W/S1",
+              "expect": "refused",
+              "refusal": "noCoursesThere"
+            },
+            {
+              "name": "the modern shape wins",
+              "tree": [
+                "courses/ICS3U/course_config.json",
+                "S1/quartz/quartz.config.ts",
+                "S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "S1/quartz/content/source-ics3u/s1/index.md",
+                "S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "S1/quartz/content/source-ics3u/s2/index.md",
+                "S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                }
+              ],
+              "choose": ".",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "ICS3U",
+                  "route": "modern"
+                }
+              ],
+              "expectTicked": [
+                "ICS3U"
+              ]
+            },
+            {
+              "name": "#254's older layout wins",
+              "tree": [
+                "Class Website/ICS3U-S1-2023-24/.obsidian/app.json",
+                "Class Website/ICS3U-S1-2023-24/Thread 1/Day 1.md",
+                "Class Website/S1/quartz/quartz.config.ts",
+                "Class Website/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "Class Website/S1/quartz/content/source-ics3u/s1/index.md",
+                "Class Website/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Class Website/S1/quartz/content/source-ics3u/s2/index.md",
+                "Class Website/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                {
+                  "link": "Class Website/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "Class Website/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "Class Website/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                }
+              ],
+              "choose": "Class Website",
+              "expect": "accepted",
+              "expectCourses": [
+                {
+                  "row": "ICS3U-S1-2023-24",
+                  "route": "olderLayout"
+                }
+              ],
+              "expectTicked": [
+                "ICS3U-S1-2023-24"
+              ],
+              "why": "The order is what makes it safe to add a third shape: neither earlier route can be claimed by this one."
+            }
+          ],
+          "yearCases": [
+            {
+              "name": "a folder named YYYY-YY two levels up",
+              "website": "2023-24/ICS3U/S1",
+              "pagesChanged": "2024-09-10",
+              "expectYear": 2023,
+              "why": "All 136 pages of the real 2023-24 website folder were touched in September 2024, when it was copied; the folder's name is right."
+            },
+            {
+              "name": "no year in the path: the pages say",
+              "website": "Websites/ICS3U/S1",
+              "pagesChanged": "2024-10-01",
+              "expectYear": 2024
+            },
+            {
+              "name": "a name carrying -YYYY-YY",
+              "website": "ICS3U-2024-25/S1",
+              "pagesChanged": "2025-10-01",
+              "expectYear": 2024
+            }
+          ]
+        },
+        "placement": {
+          "rule": "Read ONLY from the website folder pointed at (or the one its shortcut leads to): its own source-<code>/s1 and source-<code>/shared, BY NAME, walked with lstat and never followed. s1/* goes to section1/ unchanged (index.md is already the front page, so nothing is renamed; All Classes lands at section1/All Classes, the modern layout's own place); shared/* goes to the course root, Media included; content/.obsidian comes WITHOUT plugins/ and community-plugins.json. A real entry at the top of content/ other than .obsidian, source-* and vault-* (0 measured) comes to the root as shared. The links at the top of content/ are a MANIFEST: each link's TEXT, worked out against content/ as a path, must be source-<code>/shared/<its own name> or source-<code>/s1/<its own name>, and that entry must be there - then it is 'replaced by what it showed', machinery; otherwise it is a LOSS. Also a loss, and named: a link anywhere inside the pages or inside .obsidian (outside plugins/), a shared entry with the same name as one of the section's own (nameTheSectionUses - the build would put both at content/<name>), a shared entry named index.md, section1 or course_config.json (nameTheCourseUses), and no s1/index.md (noFrontPage). Settings: course_code, course_name '<CODE> S1', one section, shared_folders (top folders except Media and dot-folders), shared_files (top regular files except dot-files), per_section_folders and per_section_files (s1's top folders, and its files except index.md), expandable, hidden [Media], include_curriculum_coverage false, show_section_marker section1 false - #254's - and unit_word when unitWord finds one. An empty Media is made when shared/ has none. Every page is byte-identical.",
+          "whyTheCopyInThisFolder": "S1's and S2's copies of source-ics3u DIFFER (335 entries, measured by SHA-1). S2's publish script (synclink) rsyncs S1's content into S2 before each S2 publish and re-points the section links, so each copy is exactly what that website folder's site was last built from; S1's is where both sections were edited and carries 2025-26 changes. Russell, 2026-09-23: the folder pointed at, its own copy.",
+          "whyNoLinkComesAcross": "As olderLayout.placement.whyNoLinkComesAcross, and here the links would even resolve: that is exactly why the copier still never copies one. The pages are selected by name; a link is a manifest entry and nothing more.",
+          "whyUnitWord": "The build's post-pass (_sync_non_class_pages_created) restamps the created date of every page it does not recognise as a class page by class_page_pattern(unit_word). With the key absent the word is Unit, no page of these is a class page, and every lesson in the preview gets the same date. So the import writes unit_word when the class folder's pages agree on one word.",
+          "leftBehind": {
+            "rule": "Machinery, counted by kind and named on the trail, NEVER a loss: it never makes an import 'imported with something missing' and never appears in the summary's list. A Windows implementation must keep leftBehind and lost as two lists (#254's first cut lumped them).",
+            "kinds": [
+              {
+                "kind": "theBuildersOwnFiles",
+                "what": "every file and link inside quartz/ other than content/, walked with the skip list; a folder the skip list names (node_modules, .git) counts as ONE entry and is not looked inside; .DS_Store is not counted. Nothing beside quartz/ in the website folder is walked."
+              },
+              {
+                "kind": "shortcutsReplaced",
+                "what": "each link at the top of content/ whose text names the page or folder of its own name, which came across by name"
+              },
+              {
+                "kind": "editingFolders",
+                "what": "every file and link in content/vault-*: Obsidian folders made of links, for editing"
+              },
+              {
+                "kind": "anotherSectionsPages",
+                "what": "every file and link in source-<code>/s<M>, M not 1"
+              },
+              {
+                "kind": "notOnTheWebsite",
+                "what": "anything else in source-<code> (or a second source-*) that no link showed"
+              },
+              {
+                "kind": "addOns",
+                "what": ".obsidian/plugins and .obsidian/community-plugins.json, one each (0 in Russell's folders: core plugins only)"
+              }
+            ]
+          },
+          "lost": {
+            "rule": "A loss is something the site SHOWED that does not come across. Counted and NAMED in the summary (wording.olderLayoutLeftOut, reused) and on the trail; the import is reported as not complete. A linkShowedSomethingElse loss is named with where the link pointed - wording.checkoutLayoutWhatALinkShowed, {place} the link's own TEXT with './' taken off and a path in the home folder written from '~' (pointedAt in the cases) - because its name alone ('All Classes') reads as the folder of that name, which DID come across from the section's own pages (review of #256, L3).",
+            "reasons": [
+              "linkShowedSomethingElse",
+              "linkNameWithNoPage",
+              "link",
+              "nameTheSectionUses",
+              "nameTheCourseUses",
+              "noFrontPage"
+            ]
+          },
+          "unitWord": {
+            "rule": "Over the pages directly in the section's class folder (the section folder whose name contains 'class' - All Classes), skipping index.md, Key Links.md and Curriculum Coverage.md: a page named '<word> <digits>, Day <letters>' is a PLACEHOLDER and is set aside (Thread 2, Day x - the build never calls it a class page either), and a page with no '<word> <digits>, Day <m>' shape at all (Notes.md) is set aside too; at least one page must be '<word> <digits>, Day <digits>' and every such page must use ONE word (any case); then that word, else none. Setting a shapeless page aside is the review of #256's L2: the build restamps every page it does not call a class page, so without the key Notes.md AND every lesson are restamped, and with it only Notes.md - writing nothing is never better than writing the word the class pages use. Two words is the one real ambiguity, and still writes none.",
+            "why": "Measured with the build's own pattern: ICS3U S1 has 55 pages in All Classes, 54 lessons and 'Thread 2, Day x'; ICS3U S2 59 (4 placeholders), ICS4U S1 57 (2), ICS4U S2 58 (3), 2023-24 ICS3U S1 56 (0). 'Every page' without setting placeholders aside would write the key for NONE of the four 2024-25 courses.",
+            "cases": [
+              {
+                "pages": [
+                  "Thread 1, Day 1.md",
+                  "Thread 1, Day 2.md",
+                  "Thread 2, Day x.md",
+                  "index.md"
+                ],
+                "word": "Thread",
+                "placeholders": 1,
+                "why": "ICS3U S1 as it really is: 54 lesson pages and one 'Thread 2, Day x' placeholder (measured with the build's own pattern)."
+              },
+              {
+                "pages": [
+                  "Thread 1, Day 1.md",
+                  "Thread 3, Day x.md",
+                  "Thread 3, Day y.md"
+                ],
+                "word": "Thread",
+                "placeholders": 2
+              },
+              {
+                "pages": [
+                  "Thread 1, Day 1.md",
+                  "Unit 1, Day 2.md"
+                ],
+                "word": null,
+                "placeholders": 0,
+                "why": "Two words: one would leave the other's pages not class pages."
+              },
+              {
+                "pages": [
+                  "Thread 1, Day 1.md",
+                  "Notes.md"
+                ],
+                "word": "Thread",
+                "placeholders": 0,
+                "why": "A page with no class-page shape at all is set aside, as a placeholder is (review of #256, L2). Was null until 2026-09-23: that made the build restamp the lesson's date as well as Notes.md's."
+              },
+              {
+                "pages": [
+                  "Notes.md",
+                  "Scratch Page.md",
+                  "index.md"
+                ],
+                "word": null,
+                "placeholders": 0,
+                "why": "No page has the class-page shape, so there is no word to write."
+              },
+              {
+                "pages": [
+                  "Thread 2, Day x.md",
+                  "index.md"
+                ],
+                "word": null,
+                "placeholders": 1,
+                "why": "Placeholders alone name no word."
+              },
+              {
+                "pages": [
+                  "Key Links.md",
+                  "thread 4, day 15.md"
+                ],
+                "word": "thread",
+                "placeholders": 0
+              }
+            ]
+          },
+          "cases": [
+            {
+              "name": "a website folder as it really is: builder files, add-ons, an editing folder, section 2, links, a placeholder page",
+              "tree": [
+                "W/S1/quartz/quartz.config.ts",
+                "W/S1/quartz/package.json",
+                "W/S1/quartz/public/index.html",
+                "W/S1/quartz/quartz/build.ts",
+                "W/S1/quartz/.DS_Store",
+                "W/S1/quartz/node_modules/x/index.js",
+                "W/S1/quartz/content/.obsidian/app.json",
+                "W/S1/quartz/content/.obsidian/community-plugins.json",
+                "W/S1/quartz/content/.obsidian/plugins/x/main.js",
+                "W/S1/quartz/content/.DS_Store",
+                "W/S1/quartz/content/source-ics3u/shared/Media/p.png",
+                "W/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
+                "W/S1/quartz/content/source-ics3u/shared/Learning Goals.md",
+                "W/S1/quartz/content/source-ics3u/shared/.DS_Store",
+                "W/S1/quartz/content/source-ics3u/s1/index.md",
+                "W/S1/quartz/content/source-ics3u/s1/Key Links.md",
+                "W/S1/quartz/content/source-ics3u/s1/Private Notes.md",
+                "W/S1/quartz/content/source-ics3u/s1/All Classes/index.md",
+                "W/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "W/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 2.md",
+                "W/S1/quartz/content/source-ics3u/s1/All Classes/Thread 2, Day x.md",
+                "W/S1/quartz/content/source-ics3u/s2/index.md",
+                "W/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                "W/S1/quartz/content/vault-ics3u-s1/.obsidian/app.json",
+                {
+                  "link": "W/S1/quartz/content/vault-ics3u-s1/Concepts",
+                  "text": "../source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "W/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "W/S1/quartz/content/Key Links.md",
+                  "text": "./source-ics3u/s1/Key Links.md"
+                },
+                {
+                  "link": "W/S1/quartz/content/Private Notes.md",
+                  "text": "./source-ics3u/s1/Private Notes.md"
+                },
+                {
+                  "link": "W/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s1/All Classes"
+                },
+                {
+                  "link": "W/S1/quartz/content/Media",
+                  "text": "./source-ics3u/shared/Media"
+                },
+                {
+                  "link": "W/S1/quartz/content/Concepts",
+                  "text": "./source-ics3u/shared/Concepts"
+                },
+                {
+                  "link": "W/S1/quartz/content/Learning Goals.md",
+                  "text": "source-ics3u/shared/Learning Goals.md"
+                }
+              ],
+              "website": "W/S1",
+              "expectPlaced": {
+                ".obsidian/app.json": ".obsidian/app.json",
+                "Media/p.png": "source-ics3u/shared/Media/p.png",
+                "Concepts/Lists.md": "source-ics3u/shared/Concepts/Lists.md",
+                "Learning Goals.md": "source-ics3u/shared/Learning Goals.md",
+                "section1/index.md": "source-ics3u/s1/index.md",
+                "section1/Key Links.md": "source-ics3u/s1/Key Links.md",
+                "section1/Private Notes.md": "source-ics3u/s1/Private Notes.md",
+                "section1/All Classes/index.md": "source-ics3u/s1/All Classes/index.md",
+                "section1/All Classes/Thread 1, Day 1.md": "source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "section1/All Classes/Thread 1, Day 2.md": "source-ics3u/s1/All Classes/Thread 1, Day 2.md",
+                "section1/All Classes/Thread 2, Day x.md": "source-ics3u/s1/All Classes/Thread 2, Day x.md"
+              },
+              "expectLeftBehind": {
+                "theBuildersOwnFiles": 5,
+                "shortcutsReplaced": 7,
+                "editingFolders": 2,
+                "anotherSectionsPages": 2,
+                "notOnTheWebsite": 0,
+                "addOns": 2
+              },
+              "expectLost": [],
+              "expectEmptyMedia": false,
+              "expectSettings": {
+                "course_code": "ICS3U",
+                "course_name": "ICS3U S1",
+                "shared_folders": [
+                  "Concepts"
+                ],
+                "shared_files": [
+                  "Learning Goals.md"
+                ],
+                "per_section_folders": [
+                  "All Classes"
+                ],
+                "per_section_files": [
+                  "Key Links.md",
+                  "Private Notes.md"
+                ],
+                "unit_word": "Thread",
+                "include_curriculum_coverage": false,
+                "num_sections": 1,
+                "section_numbers": [
+                  1
+                ]
+              },
+              "why": "theBuildersOwnFiles is every file inside quartz/ other than content/ (package.json, quartz.config.ts, public/index.html, quartz/build.ts) plus node_modules counted as ONE entry without being looked inside; .DS_Store is not counted. The two add-on entries are plugins/ and community-plugins.json. The editing folder is its two entries (a settings file and a link). None of it is a loss, so the import is complete."
+            },
+            {
+              "name": "links that showed something else, or something that is not there, are losses and are named",
+              "tree": [
+                "W/S1/quartz/quartz.config.ts",
+                "W/S1/quartz/content/source-ics3u/s1/index.md",
+                "W/S1/quartz/content/source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "W/S1/quartz/content/source-ics3u/s2/All Classes/Thread 1, Day 1.md",
+                "W/S1/quartz/content/source-ics3u/shared/Media/p.png",
+                {
+                  "link": "W/S1/quartz/content/index.md",
+                  "text": "./source-ics3u/s1/index.md"
+                },
+                {
+                  "link": "W/S1/quartz/content/All Classes",
+                  "text": "./source-ics3u/s2/All Classes"
+                },
+                {
+                  "link": "W/S1/quartz/content/Curriculum",
+                  "text": "./source-ics3u/shared/Curriculum"
+                },
+                {
+                  "link": "W/S1/quartz/content/Media",
+                  "to": null
+                }
+              ],
+              "website": "W/S1",
+              "expectPlaced": {
+                "section1/index.md": "source-ics3u/s1/index.md",
+                "section1/All Classes/Thread 1, Day 1.md": "source-ics3u/s1/All Classes/Thread 1, Day 1.md",
+                "Media/p.png": "source-ics3u/shared/Media/p.png"
+              },
+              "expectLeftBehind": {
+                "theBuildersOwnFiles": 1,
+                "shortcutsReplaced": 1,
+                "editingFolders": 0,
+                "anotherSectionsPages": 1,
+                "notOnTheWebsite": 0,
+                "addOns": 0
+              },
+              "expectLost": [
+                {
+                  "path": "All Classes",
+                  "reason": "linkShowedSomethingElse",
+                  "pointedAt": "source-ics3u/s2/All Classes"
+                },
+                {
+                  "path": "Curriculum",
+                  "reason": "linkNameWithNoPage"
+                },
+                {
+                  "path": "Media",
+                  "reason": "linkShowedSomethingElse"
+                }
+              ],
+              "expectEmptyMedia": false,
+              "why": "Each top link's TEXT is worked out against content/ as a path, never followed, and must be the page or folder of its OWN name in source-<code>/shared or /s1. 'All Classes' here showed section 2's pages (a half-run publish script): section 1's still come, by name, and the loss says what the site showed is not what came."
+            },
+            {
+              "name": "a name both places use, a name the course uses, a link inside the pages, no front page, no Media",
+              "tree": [
+                "W/S1/quartz/quartz.config.ts",
+                "W/S1/quartz/content/source-ics3u/s1/Key Links.md",
+                "W/S1/quartz/content/source-ics3u/shared/Key Links.md",
+                "W/S1/quartz/content/source-ics3u/shared/index.md",
+                "W/S1/quartz/content/source-ics3u/shared/Tasks/Task 1.md",
+                {
+                  "link": "W/S1/quartz/content/source-ics3u/shared/Tasks/Elsewhere.md",
+                  "to": null
+                }
+              ],
+              "website": "W/S1",
+              "expectPlaced": {
+                "section1/Key Links.md": "source-ics3u/s1/Key Links.md",
+                "Tasks/Task 1.md": "source-ics3u/shared/Tasks/Task 1.md"
+              },
+              "expectLeftBehind": {
+                "theBuildersOwnFiles": 1,
+                "shortcutsReplaced": 0,
+                "editingFolders": 0,
+                "anotherSectionsPages": 0,
+                "notOnTheWebsite": 0,
+                "addOns": 0
+              },
+              "expectLost": [
+                {
+                  "path": "source-ics3u/s1/index.md",
+                  "reason": "noFrontPage"
+                },
+                {
+                  "path": "source-ics3u/shared/index.md",
+                  "reason": "nameTheCourseUses"
+                },
+                {
+                  "path": "source-ics3u/shared/Key Links.md",
+                  "reason": "nameTheSectionUses"
+                },
+                {
+                  "path": "source-ics3u/shared/Tasks/Elsewhere.md",
+                  "reason": "link"
+                }
+              ],
+              "expectEmptyMedia": true,
+              "expectSettings": {
+                "shared_folders": [
+                  "Tasks"
+                ],
+                "shared_files": [],
+                "per_section_folders": [],
+                "per_section_files": [
+                  "Key Links.md"
+                ]
+              }
+            }
+          ]
+        },
+        "whatThePreviewShows": "Pages byte-identical, so today's build reads publishForSection1, publish, draftSection1 and draft (file-formats.json -> pageVisibility). For a SECTION 1 import that is exactly what section 1's own site read (its patched Quartz hid draft:): measured, 280 of 324 ICS3U pages and 213 of 220 ICS4U pages visible, 0 disagreements with S1's site. draftSectionTwo and createdForSectionTwo ride along inert in the reference course: nothing reads them, and only section 1 comes across. Copy a Page takes both off a copied page (copyingAPageBetweenCourses.hidden.theOldSectionTwoKeys; Russell, 2026-09-23). Each lesson keeps its own date because unit_word is written.",
+        "rejected": [
+          {
+            "what": "Resolving every entry isAliasFileKey calls an alias",
+            "why": "Measured: it is true for the website folder's own symlinks, and resolving follows them."
+          },
+          {
+            "what": "Telling the teacher to choose the real folder in Documents instead of reading through a shortcut",
+            "why": "The folder chooser already resolves a shortcut the teacher clicks; refusing the folder of shortcuts would refuse the exact folder Russell named. Read through, and say where from."
+          },
+          {
+            "what": "Merging S1's and S2's copies, or taking the newest of each file",
+            "why": "A course that never existed."
+          },
+          {
+            "what": "Always reading S1's copy (where both sections were edited)",
+            "why": "Makes the answer depend on a sibling folder the teacher did not choose; Russell chose the folder pointed at."
+          },
+          {
+            "what": "Following the content links to find the pages",
+            "why": "#254's decision 2, and unnecessary: the link names equal the course pages' entries exactly (21 of 21, in all five real website folders)."
+          },
+          {
+            "what": "Importing section 2 (and rewriting draftSectionTwo into draft, or teaching the build to read it)",
+            "why": "Russell, 2026-09-23: only the first section. Measured before he decided: an S2 import would preview 225 pages where S2's site showed 283 (ICS3U; 19 shown that S2 hid, 77 hidden that it showed) and 157 against 213 (ICS4U)."
+          },
+          {
+            "what": "Resolving a folder chosen inside a website folder upward",
+            "why": "s2/ or vault-ics3u-s2 would import section 1 - the opposite of what was pointed at."
+          },
+          {
+            "what": "Reading the title or section from quartz.config.ts",
+            "why": "It is a program; parsing it is guessing."
+          },
+          {
+            "what": "Showing Math Club as a row that cannot be ticked",
+            "why": "Russell, 2026-09-23: leave it out of the list entirely. It is not a course."
+          },
+          {
+            "what": "Counting the website folder's other contents (a .git of 2,276 files, node_modules) file by file, or walking the folder above quartz/",
+            "why": "Unbounded: an ordinary program folder anywhere would be walked in full. Counted inside quartz/ only, a skipped folder as one entry."
+          },
+          {
+            "what": "Leaving unit_word absent as #254 does",
+            "why": "Every lesson's date would be restamped to one day in the preview."
+          }
+        ]
+      },
       "wording": {
         "menuItem": "Import Courses for Reference…",
         "title": "Import courses for reference",
@@ -5009,6 +6559,21 @@
         "olderLayoutLeftOut": "{count} of its files and folders were not brought across: {names}.",
         "olderLayoutChooseOneCourseAtATime": "{folder} holds courses rather than classes. Choose the Class Website folder inside one of them, or one class folder.",
         "olderLayoutAddOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across from older class folders, so nothing in them can publish these pages.",
+        "checkoutLayoutReadFrom": "Pages and pictures from {place}.",
+        "checkoutLayoutReadThroughShortcut": "{shortcut} is a shortcut. Its pages and pictures are read from {place}.",
+        "checkoutLayoutOnlyPagesComeAcross": "From a class website folder, only the pages and pictures of its first section come across. The files that built the website, the extra folders kept for editing, and the other sections' pages stay where they are.",
+        "checkoutLayoutChooseTheWholeFolder": "{folder} is part of the class website kept in {website}. Choose {website} itself.",
+        "checkoutLayoutOnlyTheFirstSection": "{folder} holds section {section}'s pages. Only the first section of a course kept this way can be brought across.",
+        "checkoutLayoutChooseOneCourseAtATime": "{folder} holds several courses. Choose one course's folder inside it, or one class's folder.",
+        "checkoutLayoutChooseACourseFolderInside": "{folder} holds courses rather than classes. Choose one course's folder inside it, or one class's folder.",
+        "checkoutLayoutWhatALinkShowed": "what {name} showed ({place})",
+        "checkoutLayoutMoreThanOneCourse": "It holds the pages of more than one course, so it can’t be brought across as one.",
+        "checkoutLayoutWhichSection": "Which section it was could not be told, so it can’t be brought across.",
+        "checkoutLayoutShortcutGone": "{shortcut} is a shortcut to a folder that is no longer there, so it can’t be brought across.",
+        "checkoutLayoutShortcutCouldNotBeOpened": "{shortcut} is a shortcut to a folder Plantoir was not allowed to open. Allow it in System Settings › Privacy & Security › Files and Folders, then choose the folder again.",
+        "checkoutLayoutShortcutOnADiskNotConnected": "{shortcut} is a shortcut to a folder on {disk}, which isn’t connected. Connect it, then choose the folder again.",
+        "checkoutLayoutShortcutToAFile": "{shortcut} is a shortcut to a file, not a folder.",
+        "checkoutLayoutRule": "The checkoutLayout* sentences are said only about a class kept in the 2024-25 layout, a whole website folder per class (quartzCheckoutLayout above). {place} is where the pages are read from: ~/... inside the home folder, the whole path otherwise. {shortcut} is a Finder shortcut's own name - 'shortcut' is the one word allowed about how the folders were joined, because the teacher made them in Finder; none says alias, link, vault, checkout or Quartz. checkoutLayoutOnlyTheFirstSection is both a row's reason and the refusal when a later section is chosen on its own, {section} its number. A row reached through a shortcut says checkoutLayoutReadThroughShortcut, any other checkoutLayoutReadFrom. checkoutLayoutOnlyPagesComeAcross is said once under the list and in the summary whenever such a row is there. A loss reuses olderLayoutLeftOut; a link that showed something else is one of its {names} as checkoutLayoutWhatALinkShowed, {name} the link's own name and {place} its own text with './' taken off and a home-folder path written from '~' (never the account name). checkoutLayoutChooseACourseFolderInside is the refusal for a school year's folder whose courses' shortcuts are two levels down (recognition.rule step 5).",
         "olderLayoutRule": "The olderLayout* sentences are said only about a class kept in the older folder-per-class layout (olderLayout above). {names} is the missing names in a stable order joined as 'A, B and C' (in olderLayoutLeftOut, the paths left out, and with {count} 1 the sentence reads '1 of its files or folders was not brought across'); {count} is how many shared folders and pages the class used (in olderLayoutLeftOut, how many were left out); alsoTickedForThatYear is said beside a ticked row whose code and year clash ONLY with a row ticked above it in the same sheet - nothing is kept yet, so codeAlreadyInThatYear ('You already have...') would be false - unless both are older-layout classes named as sections of the course, which get olderLayoutAnotherSectionOfTheSameCourse; {folder} is the row above, {course} the code; olderLayoutLeftOut is added to a summary line after olderLayoutImportedWithSharedMissing, or after 'imported' and a full stop; {code} is the code a chosen folder's name carries. None of them says how the shared folder was reached from the class - a teacher kept folders, and folders are what they are told about - and none says vault, link or add-on settings' contents.",
         "rule": "{course} is the code a TEACHER reads - ICS4U, never the folder name; {folder} is the folder they chose, by its own name, because 'that folder' means nothing once the chooser has closed. The calm note about the pages being locked (referenceCourses.wording.pagesAreLocked) is shown in this sheet too, where the teacher is deciding rather than after the fact.",
         "machineryCheck": "No sentence here names a symlink, a build output, a script, a container or a flag. Nothing says 'cannot' where 'is not' will do. The size a teacher reads is the size that will be COPIED, with last year's built website already taken out of it."
@@ -5056,6 +6621,7 @@
       "theOrderIsLoadBearing": "Per-section keys FIRST, then the plain key. Measured: writing publish: false first makes the per-section writer a complete no-op - its 'already says it' gate reads the plain key and returns the text unchanged, so NO publishForSection key is written at all.",
       "whyThePlainKeyAtAll": "It is what keeps the copy hidden in a section the destination gains LATER, by any route. Measured: all 156 of one real course's shared pages, composed with the per-section keys alone, come out VISIBLE in a section 4 they were never told about, because Quartz publishes a page that says nothing.",
       "whatComesOffFirst": "The source's own publishForSection<N>, draftSection<N> and createdSection<N>, and the plain publish: and draft:. The plain pair is stripped with the READER's key matcher and its continuation rule, never a prefix test: a naive strip of a draft: whose value sits on the line BELOW it orphans that line, YAML folds it into the last key written as the plain scalar 'false true', and the build does not hide a string that is not 'false' - so the page is PUBLISHED. Measured. The house format drops the plain keys anyway: setup_course.py's per_section_frontmatter removes plain created/publish/draft when it splits a page into per-section pairs.",
+      "theOldSectionTwoKeys": "draftSectionTwo and createdForSectionTwo - the 2024-25 website-folder layout's keys for a class's second section, and the only per-section keys a census of all four of that layout's real copies found (800 and 655 lines over 1,338 pages) - come off with the plain pair, with the same matcher and continuation rule. Russell's decision, 2026-09-23 (#256). No build since reads them, and a page still carrying draftSectionTwo would be refused by the builder-agreement guard, whose language was left unchanged: they are stripped before it is asked.",
       "whatIsKept": "Everything else the teacher wrote, created: included. A page copied from last year shows last year's date until they change it; they see the page in Obsidian before publishing, and silently rewriting a date in their own frontmatter is the larger sin.",
       "sectionsAreReReadBeforeWriting": "The destination's section numbers are read from course_config.json again immediately before the text is composed, rather than taken from the plan. A section added in another window between the two would otherwise leave the copy with nothing said about it.",
       "readBackAndDelete": {
@@ -5609,6 +7175,33 @@
           1,
           2
         ]
+      },
+      {
+        "name": "a page from the 2024-25 website-folder layout, carrying its old section-2 keys",
+        "why": "Russell's decision, 2026-09-23 (#256): draftSectionTwo and createdForSectionTwo come off the way draft: does. They were that layout's answers about its SECOND section; no build since reads either. Left on, the builder-agreement guard refused every page carrying draftSectionTwo (its top-level line begins draftSection) - measured over the real shared pages, 154 of 259 in ICS3U and 66 of 153 in ICS4U, every refusal one of those pages; stripped, 0 of 412 refused and 0 not hidden. They are stripped BEFORE the guard is asked, so the guard's language did not change. The source text is a real page's settings block. The plain created: is kept, as always.",
+        "source": "---\ndraft: true\ndraftSectionTwo: true\nenableToc: true\nexcludeBacklinks: false\ncreated: 2024-10-21T07:00:00.000-0400\ncreatedForSectionTwo: 2024-11-04T07:34:55.000-0400\ntags:\n---\nBody\n",
+        "sections": [
+          1,
+          2
+        ],
+        "mustContain": [
+          "publishForSection1: false",
+          "publishForSection2: false",
+          "publish: false",
+          "created: 2024-10-21T07:00:00.000-0400",
+          "enableToc: true"
+        ],
+        "mustNotContain": [
+          "draftSectionTwo",
+          "createdForSectionTwo",
+          "draft: true"
+        ],
+        "hiddenInSections": [
+          1,
+          2,
+          3
+        ],
+        "theBuilderAgrees": true
       }
     ],
     "cases": [

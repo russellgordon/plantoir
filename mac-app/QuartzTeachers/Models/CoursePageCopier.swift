@@ -25,6 +25,13 @@ nonisolated enum CopiedPageText {
     ///    drops these anyway: `scripts/setup_course.py` →
     ///    `per_section_frontmatter` removes the plain `created`/`publish`/
     ///    `draft` lines when it splits a page into per-section pairs.
+    ///    **The 2024–25 layout's section-2 keys come off with them**
+    ///    (`oldSectionTwoKeys`) — Russell's decision, 2026-09-23 (#256).
+    ///    They were that layout's own answers about its SECOND section, the
+    ///    build today reads neither, and leaving them on meant the guard
+    ///    below refused every page that carried one: 154 of 259 real ICS3U
+    ///    shared pages and 66 of 153 ICS4U, measured. Stripped HERE, before
+    ///    the guard, so the guard's language did not have to change.
     /// 3. **`publishForSection<N>: false` for every section the destination
     ///    has**, written DESCENDING so the file reads 1, 2, 3 — each call
     ///    inserts at the top of the block.
@@ -45,6 +52,7 @@ nonisolated enum CopiedPageText {
     static func hidden(from sourceText: String, forSections sectionNumbers: [Int]) -> String {
         var text: String = AssistPageVisibility.withoutPerSectionKeys(in: sourceText)
         text = CopiedPageText.withoutPlainVisibilityKeys(in: text)
+        text = CopiedPageText.withoutTheOldSectionTwoKeys(in: text)
 
         var descending: [Int] = sectionNumbers
         descending.sort()
@@ -76,12 +84,39 @@ nonisolated enum CopiedPageText {
     /// line that was part of a key's VALUE goes with it, which is what
     /// `PageVisibilityReader.continuationLineIndices` exists for.
     static func withoutPlainVisibilityKeys(in pageText: String) -> String {
+        return CopiedPageText.without(keys: ["publish", "draft"], in: pageText)
+    }
+
+    /// The keys the 2024–25 website-folder layout wrote for a class's SECOND
+    /// section, which no build since reads.
+    ///
+    /// Taken from a census of every page in that layout's four real copies
+    /// (ICS3U and ICS4U, S1 and S2: 1,338 pages): `draftSectionTwo` on 800
+    /// lines and `createdForSectionTwo` on 655, and no other key naming a
+    /// section in any spelling. The 2023–24 layout carries neither.
+    static let oldSectionTwoKeys: [String] = ["draftSectionTwo", "createdForSectionTwo"]
+
+    /// The text with the 2024–25 layout's section-2 keys taken out, the same
+    /// way and with the same matcher as the plain `draft:`.
+    ///
+    /// `draftSectionTwo` is why this exists: the builder-agreement guard
+    /// refuses any top-level line beginning `draftSection`, so a page carrying
+    /// it could never be copied. `createdForSectionTwo` goes with it because
+    /// it is the same layout's date for the same section — a date for a
+    /// section that is not the destination's, and nothing reads it.
+    static func withoutTheOldSectionTwoKeys(in pageText: String) -> String {
+        return CopiedPageText.without(keys: CopiedPageText.oldSectionTwoKeys, in: pageText)
+    }
+
+    /// The text with every top-level line naming one of these keys taken
+    /// out, and every line that was part of that key's value with it.
+    static func without(keys: [String], in pageText: String) -> String {
         guard let block = PageFrontmatter.block(in: pageText) else {
             return pageText
         }
         var lines: [String] = pageText.components(separatedBy: "\n")
         var removals: Set<Int> = []
-        for key in ["publish", "draft"] {
+        for key in keys {
             for index in AssistPageVisibility.topLevelLineIndices(ofKey: key, in: pageText) {
                 removals.insert(index)
                 for taken in PageVisibilityReader.continuationLineIndices(

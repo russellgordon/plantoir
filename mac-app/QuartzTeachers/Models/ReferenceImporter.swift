@@ -184,7 +184,38 @@ enum ReferenceImporter {
 
             do {
                 let made: ReferenceCopier.Made
-                if request.course.olderLayout != nil {
+                if let facts = request.course.checkoutLayout {
+                    let result: (made: ReferenceCopier.Made, plan: QuartzCheckoutLayout.Plan) =
+                        try await ReferenceImporter.importOneWebsite(
+                            request,
+                            facts: facts,
+                            named: folderName,
+                            stagedAt: stagingURL,
+                            into: destinationURL,
+                            leavingBehind: namesToLeaveBehind,
+                            courseNumber: courseNumber,
+                            courseCount: requests.count,
+                            progress: progress
+                        )
+                    made = result.made
+                    // Named after the WEBSITE folder the pages were read
+                    // from, not the folder of shortcuts it was reached from.
+                    ActivityTrail.note(
+                        .courseImportedForReference,
+                        ReferenceImporter.trailLine(for: made, broughtInFrom: request.course.directoryURL)
+                    )
+                    ActivityTrail.note(
+                        .courseImportedFromAClassWebsiteFolder,
+                        ReferenceImporter.checkoutLayoutTrailLine(facts: facts, made: made, plan: result.plan)
+                    )
+                    if result.plan.lost.isEmpty {
+                        outcomes.append(.imported(made))
+                    } else {
+                        outcomes.append(.importedWithSomethingMissing(
+                            made, sharedPagesMissing: false, leftOut: result.plan.lostPaths
+                        ))
+                    }
+                } else if request.course.olderLayout != nil {
                     let result: (made: ReferenceCopier.Made, plan: OlderCourseLayout.Plan) =
                         try await ReferenceImporter.importOneOlderClass(
                             request,
@@ -334,6 +365,81 @@ enum ReferenceImporter {
             line += "; left out \(lost.count): " + lost.joined(separator: ", ")
         }
         line += "; \(addOns) Obsidian add-on entries left behind"
+        if plan.createsEmptyMedia {
+            line += "; an empty Media folder was made"
+        }
+        return line
+    }
+
+    /// The second trail line for a class kept in the 2024–25 layout: where
+    /// its pages were read from (and through which shortcut), which section
+    /// and HOW that was told, which course pages folder, and then — as two
+    /// separate clauses — what was LEFT BEHIND, by kind with counts, and what
+    /// was LOST, by name. "Which copy, and what did not come" is the question
+    /// a report about one of these asks, and only this line answers it.
+    /// Folder and file NAMES only, never what is written on a page; the
+    /// trail redacts on the way in.
+    static func checkoutLayoutTrailLine(
+        facts: QuartzCheckoutLayout.Facts,
+        made: ReferenceCopier.Made,
+        plan: QuartzCheckoutLayout.Plan
+    ) -> String {
+        var line: String = "imported \(plan.courseCode) section \(facts.section ?? 0) from \(facts.place)"
+        if let shortcut = facts.shortcutName {
+            line += " (through the shortcut \(shortcut))"
+        }
+        line += " as \(made.folderName) — section told by "
+        switch facts.sectionFrom {
+        case .frontPage:
+            line += "its front page"
+        case .folderName:
+            line += "its folder's name"
+        case .onlyOne:
+            line += "being the only one"
+        case .none:
+            line += "nothing"
+        }
+        if let named = facts.sectionTheNameSays, named != facts.section {
+            line += " (its folder's name says section \(named))"
+        }
+        line += "; \(plan.fileCount) files from \(facts.coursePagesFolderName ?? "?")"
+        if let word = plan.unitWord {
+            line += "; class pages called \(word)"
+            if plan.placeholderPages > 0 {
+                let noun: String = plan.placeholderPages == 1 ? "page" : "pages"
+                line += " (\(plan.placeholderPages) placeholder \(noun) set aside)"
+            }
+        } else {
+            line += "; no single word for its class pages"
+        }
+        var behind: [String] = []
+        behind.append("the website's own program files (\(plan.leftBehind[.theBuildersOwnFiles] ?? 0))")
+        if !plan.notLookedInside.isEmpty {
+            behind.append("not looked inside: " + plan.notLookedInside.joined(separator: ", "))
+        }
+        behind.append("\(plan.leftBehind[.shortcutsReplaced] ?? 0) links replaced by what they showed")
+        if !plan.editingFolderNames.isEmpty {
+            behind.append(
+                "editing folders " + plan.editingFolderNames.joined(separator: ", ")
+                + " (\(plan.leftBehind[.editingFolders] ?? 0))"
+            )
+        }
+        if !plan.otherSectionNames.isEmpty {
+            behind.append(
+                "other sections " + plan.otherSectionNames.joined(separator: ", ")
+                + " (\(plan.leftBehind[.anotherSectionsPages] ?? 0))"
+            )
+        }
+        if (plan.leftBehind[.notOnTheWebsite] ?? 0) > 0 {
+            behind.append("not on the website (\(plan.leftBehind[.notOnTheWebsite] ?? 0))")
+        }
+        behind.append("Obsidian add-on entries (\(plan.leftBehind[.addOns] ?? 0))")
+        line += "; left behind, not lost: " + behind.joined(separator: ", ")
+        if plan.lost.isEmpty {
+            line += "; nothing lost"
+        } else {
+            line += "; lost \(plan.lost.count): " + plan.lostPaths.joined(separator: ", ")
+        }
         if plan.createsEmptyMedia {
             line += "; an empty Media folder was made"
         }
@@ -491,10 +597,37 @@ enum ReferenceImporter {
             }
         }
 
+        let made: ReferenceCopier.Made = try ReferenceImporter.finishPlacedImport(
+            stagedAt: stagingURL,
+            into: destinationURL,
+            named: folderName,
+            settingsValues: plan.settingsValues(),
+            createsEmptyMedia: plan.createsEmptyMedia,
+            schoolYear: request.schoolYear
+        )
+        return (made: made, plan: plan)
+    }
+
+    /// Everything after the copy, for both routes that PLACE files rather
+    /// than copy a course whole (#254's older layout, #256's website
+    /// folders) — one sequence, not two: an empty `Media` when nothing
+    /// supplied one, the settings through the one writer, the lock a frozen
+    /// source handed over cleared, marked, filed, neutralised and LOCKED by
+    /// `ReferenceCopier`, and renamed into place as the last act.
+    private static func finishPlacedImport(
+        stagedAt stagingURL: URL,
+        into destinationURL: URL,
+        named folderName: String,
+        settingsValues: [String: Any],
+        createsEmptyMedia: Bool,
+        schoolYear: Int?
+    ) throws -> ReferenceCopier.Made {
+        let fileManager: FileManager = FileManager.default
+
         // Nothing supplied `Media`: an empty one, so the build does not
         // announce on every preview what the sheet already said, and the
         // built site's Media is not a link to nothing.
-        if plan.createsEmptyMedia {
+        if createsEmptyMedia {
             try fileManager.createDirectory(
                 at: stagingURL.appendingPathComponent("Media"), withIntermediateDirectories: false
             )
@@ -502,7 +635,7 @@ enum ReferenceImporter {
 
         // Settings, through the one writer every other config goes through.
         let settings: CourseConfiguration = CourseConfiguration(
-            values: plan.settingsValues(), lastSavedData: Data()
+            values: settingsValues, lastSavedData: Data()
         )
         try settings.write(to: stagingURL.appendingPathComponent(ReferenceImportSource.configFileName))
 
@@ -511,17 +644,86 @@ enum ReferenceImporter {
         ReferenceLock.clearLock(at: stagingURL)
 
         let staged: ReferenceCopier.Made = try ReferenceCopier.makeIntoAReferenceCourse(
-            at: stagingURL, schoolYear: request.schoolYear
+            at: stagingURL, schoolYear: schoolYear
         )
         try fileManager.moveItem(at: stagingURL, to: destinationURL)
 
-        let made: ReferenceCopier.Made = ReferenceCopier.Made(
+        return ReferenceCopier.Made(
             folderName: folderName,
             displayCode: staged.displayCode,
             schoolYear: staged.schoolYear,
             sectionCount: staged.sectionCount
         )
+    }
+
+    /// One class kept in the 2024–25 layout: its first section planned again
+    /// (the sheet's numbers were read when it opened), copied piece by piece
+    /// into the hidden folder, and finished exactly as #254's route is.
+    private static func importOneWebsite(
+        _ request: Request,
+        facts: QuartzCheckoutLayout.Facts,
+        named folderName: String,
+        stagedAt stagingURL: URL,
+        into destinationURL: URL,
+        leavingBehind leftBehindNames: Set<String>,
+        courseNumber: Int,
+        courseCount: Int,
+        progress: @escaping @Sendable @MainActor (Progress) -> Void
+    ) async throws -> (made: ReferenceCopier.Made, plan: QuartzCheckoutLayout.Plan) {
+        let fileManager: FileManager = FileManager.default
+        let displayCode: String = request.course.courseCode
+
+        let plan: QuartzCheckoutLayout.Plan = await ReferenceImporter.planWebsiteOffTheMainActor(
+            facts: facts, leavingBehind: leftBehindNames
+        )
+        if let unreadable = plan.unreadableFolders.first {
+            throw ReferenceTreeCopier.Trouble.couldNotRead(name: unreadable)
+        }
+
+        progress(Progress(
+            courseCode: displayCode,
+            courseNumber: courseNumber,
+            courseCount: courseCount,
+            copiedBytes: 0,
+            totalBytes: plan.byteCount
+        ))
+
+        try fileManager.createDirectory(at: stagingURL, withIntermediateDirectories: false)
+
+        let totalBytes: Int64 = plan.byteCount
+        try await ReferenceTreeCopier.copy(
+            placements: plan.placements, into: stagingURL
+        ) { copiedBytes in
+            Task { @MainActor in
+                progress(Progress(
+                    courseCode: displayCode,
+                    courseNumber: courseNumber,
+                    courseCount: courseCount,
+                    copiedBytes: copiedBytes,
+                    totalBytes: totalBytes
+                ))
+            }
+        }
+
+        let made: ReferenceCopier.Made = try ReferenceImporter.finishPlacedImport(
+            stagedAt: stagingURL,
+            into: destinationURL,
+            named: folderName,
+            settingsValues: plan.settingsValues(),
+            createsEmptyMedia: plan.createsEmptyMedia,
+            schoolYear: request.schoolYear
+        )
         return (made: made, plan: plan)
+    }
+
+    /// The website plan, off the main actor. `@concurrent` for the reason
+    /// `surveyOffTheMainActor` gives.
+    @concurrent
+    private nonisolated static func planWebsiteOffTheMainActor(
+        facts: QuartzCheckoutLayout.Facts,
+        leavingBehind leftBehindNames: Set<String>
+    ) async -> QuartzCheckoutLayout.Plan {
+        return QuartzCheckoutLayout.plan(facts: facts, leavingBehind: leftBehindNames)
     }
 
     /// The older-layout plan, off the main actor. `@concurrent` for the
