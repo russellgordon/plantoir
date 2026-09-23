@@ -68,6 +68,12 @@ nonisolated struct ReferenceImportSource: Sendable {
         /// says what was found of its shared pages beside the row.
         var olderLayout: OlderCourseLayout.Facts? = nil
 
+        /// Set for a class kept in the 2024–25 layout (a whole website
+        /// folder per class, #256), nil otherwise. The importer takes its own
+        /// road for one — `QuartzCheckoutLayout.plan` — and the sheet says
+        /// where its pages are read from beside the row.
+        var checkoutLayout: QuartzCheckoutLayout.Facts? = nil
+
         // MARK: - Computed properties
 
         var id: String {
@@ -91,6 +97,19 @@ nonisolated struct ReferenceImportSource: Sendable {
         /// A folder of whole older-layout courses (the school year's folder).
         case aFolderOfOlderCourses(folderName: String)
 
+        /// A folder inside a class's website folder (#256).
+        case partOfAClassWebsite(folderName: String, websiteName: String)
+
+        /// A later section of a course kept a website folder per class: only
+        /// the first comes across (Russell, 2026-09-23).
+        case onlyTheFirstSection(folderName: String, section: Int)
+
+        /// A folder holding several courses' folders of class websites.
+        case severalClassWebsiteCourses(folderName: String)
+
+        /// A Finder shortcut, chosen on its own, that cannot be read through.
+        case shortcutTrouble(shortcut: String, trouble: QuartzCheckoutLayout.ShortcutTrouble, disk: String?)
+
         // MARK: - Computed properties
 
         var sentence: String {
@@ -107,6 +126,16 @@ nonisolated struct ReferenceImportSource: Sendable {
                 return ReferenceImportWording.olderLayoutThatIsTheSharedFolder(folder: folderName)
             case .aFolderOfOlderCourses(let folderName):
                 return ReferenceImportWording.olderLayoutChooseOneCourseAtATime(folder: folderName)
+            case .partOfAClassWebsite(let folderName, let websiteName):
+                return ReferenceImportWording.checkoutLayoutChooseTheWholeFolder(
+                    folder: folderName, checkout: websiteName
+                )
+            case .onlyTheFirstSection(let folderName, let section):
+                return ReferenceImportWording.checkoutLayoutOnlyTheFirstSection(folder: folderName, section: section)
+            case .severalClassWebsiteCourses(let folderName):
+                return ReferenceImportWording.checkoutLayoutChooseOneCourseAtATime(folder: folderName)
+            case .shortcutTrouble(let shortcut, let trouble, let disk):
+                return QuartzCheckoutLayout.sentence(about: trouble, shortcut: shortcut, disk: disk)
             }
         }
     }
@@ -209,7 +238,9 @@ nonisolated struct ReferenceImportSource: Sendable {
     /// **When none of the three is there, the OLDER folder-per-class layout
     /// is tried** (`olderLayoutOutcome`, #254) — asked second, so a folder
     /// holding a `courses` folder or a course's settings is always read the
-    /// modern way whatever else is in it.
+    /// modern way whatever else is in it — **and then the 2024–25
+    /// website-folder-per-class layout** (`checkoutLayoutOutcome`, #256),
+    /// asked third, so neither earlier shape can be claimed by it.
     ///
     /// `leavingBehind` is the whole skip list, passed in rather than read
     /// here so the measuring and the copying cannot disagree about it.
@@ -307,6 +338,8 @@ nonisolated struct ReferenceImportSource: Sendable {
         guard let coursesURL else {
             return ReferenceImportSource.olderLayoutOutcome(
                 chosen: chosenURL, leavingBehind: leftBehindNames, on: day
+            ) ?? ReferenceImportSource.checkoutLayoutOutcome(
+                chosen: chosenURL, workingFolderURL: workingFolderURL, leavingBehind: leftBehindNames, on: day
             ) ?? .refused(.noCoursesThere(folderName: chosenName))
         }
 
@@ -328,6 +361,8 @@ nonisolated struct ReferenceImportSource: Sendable {
         if courses.isEmpty {
             return ReferenceImportSource.olderLayoutOutcome(
                 chosen: chosenURL, leavingBehind: leftBehindNames, on: day
+            ) ?? ReferenceImportSource.checkoutLayoutOutcome(
+                chosen: chosenURL, workingFolderURL: workingFolderURL, leavingBehind: leftBehindNames, on: day
             ) ?? .refused(.noCoursesThere(folderName: chosenName))
         }
 
@@ -541,6 +576,183 @@ nonisolated struct ReferenceImportSource: Sendable {
                 shared: plan.shared,
                 chosenWarning: chosenWarning
             )
+        )
+    }
+
+    // MARK: - Functions (the 2024–25 layout, #256)
+
+    /// What the 2024–25 website-folder-per-class layout makes of a chosen
+    /// folder, or nil when it is not that shape either.
+    ///
+    /// The three refusals about the open working folder already ran on the
+    /// CHOSEN folder; they run again here on every folder a shortcut leads
+    /// to, because a shortcut can lead into the folder this window has open.
+    static func checkoutLayoutOutcome(
+        chosen chosenURL: URL,
+        workingFolderURL: URL?,
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay
+    ) -> Outcome? {
+        switch QuartzCheckoutLayout.recognise(chosenURL) {
+        case .nothing:
+            return nil
+        case .partOfAWebsite(let websiteName):
+            return .refused(.partOfAClassWebsite(folderName: chosenURL.lastPathComponent, websiteName: websiteName))
+        case .aLaterSection(let section):
+            return .refused(.onlyTheFirstSection(folderName: chosenURL.lastPathComponent, section: section))
+        case .severalCourses:
+            return .refused(.severalClassWebsiteCourses(folderName: chosenURL.lastPathComponent))
+        case .shortcutTrouble(let candidate):
+            return .refused(.shortcutTrouble(
+                shortcut: candidate.rowName,
+                trouble: candidate.trouble ?? .gone,
+                disk: candidate.disk
+            ))
+        case .website(let candidate):
+            let course: FoundCourse = ReferenceImportSource.measureWebsite(
+                candidate, workingFolderURL: workingFolderURL, leavingBehind: leftBehindNames, on: day
+            )
+            // A later section chosen on its own is refused outright rather
+            // than shown as a single row that cannot be ticked.
+            if let facts = course.checkoutLayout, let section = facts.section,
+               section != QuartzCheckoutLayout.importableSection {
+                return .refused(.onlyTheFirstSection(folderName: candidate.rowName, section: section))
+            }
+            let parent: URL = chosenURL.deletingLastPathComponent()
+            return .found(ReferenceImportSource(
+                rootURL: parent,
+                coursesURL: parent,
+                courses: [course],
+                chosenCourseFolderName: course.id
+            ))
+        case .folderOfWebsites(let folderURL, let candidates):
+            var courses: [FoundCourse] = []
+            for candidate in candidates {
+                courses.append(ReferenceImportSource.measureWebsite(
+                    candidate, workingFolderURL: workingFolderURL, leavingBehind: leftBehindNames, on: day
+                ))
+            }
+            courses.sort { first, second in
+                if first.courseCode == second.courseCode {
+                    return first.folderName.localizedStandardCompare(second.folderName) == .orderedAscending
+                }
+                return first.courseCode < second.courseCode
+            }
+            var source: ReferenceImportSource = ReferenceImportSource(
+                rootURL: folderURL,
+                coursesURL: folderURL,
+                courses: courses,
+                chosenCourseFolderName: nil
+            )
+            source.olderLayoutTicked = ReferenceImportSource.checkoutLayoutTicked(courses)
+            return .found(source)
+        }
+    }
+
+    /// Which rows are ticked when a folder of class websites is chosen:
+    /// every row that can come across, and of several with the same code
+    /// and year only the first — the shelf holds one course per code per
+    /// year, and a sheet opened with its second row already in trouble
+    /// reads as broken (#254's lesson).
+    static func checkoutLayoutTicked(_ courses: [FoundCourse]) -> Set<String> {
+        var ticked: Set<String> = []
+        var taken: Set<String> = []
+        for course in courses where course.problem == nil {
+            var yearText: String = "none"
+            if let year = course.suggestedSchoolYear {
+                yearText = "\(year)"
+            }
+            let key: String = course.courseCode.uppercased() + " " + yearText
+            if taken.contains(key) {
+                continue
+            }
+            taken.insert(key)
+            ticked.insert(course.id)
+        }
+        return ticked
+    }
+
+    /// One class website folder, measured for the sheet: its code, its
+    /// section, where it is read from, the year its path (or its pages)
+    /// say, and the size of what will be COPIED — its first section and the
+    /// shared pages, not the whole website folder.
+    ///
+    /// A row with a problem is not planned at all: its numbers would be of
+    /// a copy that will never be made.
+    static func measureWebsite(
+        _ candidate: QuartzCheckoutLayout.Candidate,
+        workingFolderURL: URL?,
+        leavingBehind leftBehindNames: Set<String>,
+        on day: CalendarDay
+    ) -> FoundCourse {
+        let facts: QuartzCheckoutLayout.Facts = QuartzCheckoutLayout.facts(of: candidate)
+
+        var problem: String?
+        if let trouble = candidate.trouble {
+            problem = QuartzCheckoutLayout.sentence(
+                about: trouble, shortcut: candidate.shortcutName ?? candidate.rowName, disk: candidate.disk
+            )
+        } else if facts.code == nil {
+            problem = ReferenceImportWording.checkoutLayoutMoreThanOneCourse
+        } else if facts.section == nil {
+            problem = ReferenceImportWording.checkoutLayoutWhichSection
+        } else if let section = facts.section, section != QuartzCheckoutLayout.importableSection {
+            problem = ReferenceImportWording.checkoutLayoutOnlyTheFirstSection(
+                folder: candidate.rowName, section: section
+            )
+        } else if let websiteURL = facts.websiteURL, let workingFolderURL {
+            let openURL: URL = workingFolderURL.standardizedFileURL
+            if ReferenceImportSource.isTheSameFolder(websiteURL, openURL)
+                || ReferenceImportSource.folder(websiteURL, isInside: openURL) {
+                problem = ReferenceImportWording.insideTheFolderYouHaveOpen(folder: candidate.rowName)
+            } else if ReferenceImportSource.folder(openURL, isInside: websiteURL) {
+                problem = ReferenceImportWording.holdsTheFolderYouHaveOpen(folder: candidate.rowName)
+            }
+        }
+
+        var pageCount: Int = 0
+        var fileCount: Int = 0
+        var byteCount: Int64 = 0
+        var pageYears: [Int] = []
+        if problem == nil {
+            let plan: QuartzCheckoutLayout.Plan = QuartzCheckoutLayout.plan(
+                facts: facts, leavingBehind: leftBehindNames
+            )
+            pageCount = plan.pageCount
+            fileCount = plan.fileCount
+            byteCount = plan.byteCount
+            pageYears = plan.pageYears
+            if let unreadable = plan.unreadableFolders.first {
+                problem = ReferenceImportWording.couldNotReadFolder(folder: unreadable)
+            }
+        }
+
+        var year: Int?
+        if let websiteURL = facts.websiteURL {
+            year = SchoolYear.offeredYear(
+                storedYear: QuartzCheckoutLayout.schoolYear(fromThePathOf: websiteURL), on: day
+            )
+        }
+        if year == nil && problem == nil {
+            year = ReferenceImportSource.suggestedSchoolYear(fromPagesChangedIn: pageYears, on: day)
+        }
+
+        var courseName: String = ""
+        if let code = facts.code, let section = facts.section {
+            courseName = "\(code) S\(section)"
+        }
+        return FoundCourse(
+            folderName: candidate.rowName,
+            courseCode: facts.code ?? candidate.rowName,
+            courseName: courseName,
+            sectionNumbers: [1],
+            pageCount: pageCount,
+            fileCount: fileCount,
+            byteCount: byteCount,
+            problem: problem,
+            suggestedSchoolYear: year,
+            directoryURL: facts.websiteURL ?? URL(fileURLWithPath: "/").appendingPathComponent(candidate.rowName),
+            checkoutLayout: facts
         )
     }
 
