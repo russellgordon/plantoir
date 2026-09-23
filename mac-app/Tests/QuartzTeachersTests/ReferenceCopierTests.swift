@@ -99,6 +99,50 @@ final class ReferenceCopierTests: XCTestCase {
 
     // MARK: - What the copy is
 
+    /// Obsidian opens a reference course's pages for reading: the copy's
+    /// `.obsidian/app.json` carries `defaultViewMode: preview`, with every
+    /// other key the teacher's own settings had kept. Without the change the
+    /// copy has whatever the original had — this test fails with the
+    /// `ReferenceReadingView` call taken out of the copier.
+    func testTheCopyOpensInObsidianForReading() throws {
+        try prepare()
+        let live: Course = try makeLiveCourse()
+        let obsidianURL: URL = live.directoryURL.appendingPathComponent(".obsidian", isDirectory: true)
+        try FileManager.default.createDirectory(at: obsidianURL, withIntermediateDirectories: true)
+        let teachersOwn: String = "{\"livePreview\": false, \"attachmentFolderPath\": \"Media\"}"
+        try teachersOwn.write(
+            to: obsidianURL.appendingPathComponent("app.json"), atomically: true, encoding: .utf8
+        )
+
+        _ = try ReferenceCopier.keepACopy(
+            of: live, named: "ICS3U-2025", schoolYear: 2025,
+            coursesDirectoryURL: coursesDirectoryURL
+        )
+
+        let copyURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U-2025")
+        XCTAssertTrue(ReferenceReadingView.isReadingViewTheDefault(for: copyURL))
+        let data: Data = try Data(contentsOf: copyURL.appendingPathComponent(".obsidian/app.json"))
+        let settings: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        XCTAssertEqual(settings["attachmentFolderPath"] as? String, "Media", "The teacher's own settings are kept.")
+        XCTAssertEqual(settings["livePreview"] as? Bool, false)
+        XCTAssertFalse(ReferenceReadingView.isReadingViewTheDefault(for: live.directoryURL), "The original is not touched.")
+    }
+
+    /// A copy with no `.obsidian` at all gets the folder and the one key.
+    func testACopyWithNoObsidianSettingsStillOpensForReading() throws {
+        try prepare()
+        let live: Course = try makeLiveCourse()
+        _ = try ReferenceCopier.keepACopy(
+            of: live, named: "ICS3U-2024", schoolYear: 2024,
+            coursesDirectoryURL: coursesDirectoryURL
+        )
+        let copyURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U-2024")
+        XCTAssertTrue(ReferenceReadingView.isReadingViewTheDefault(for: copyURL))
+    }
+
+
     func testTheCopyIsAReferenceCourseShowingTheRealCode() throws {
         try prepare()
         let live: Course = try makeLiveCourse()

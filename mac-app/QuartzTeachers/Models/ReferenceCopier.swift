@@ -269,6 +269,11 @@ enum ReferenceCopier {
             )
         }
 
+        // Obsidian opens the pages rendered rather than ready to edit —
+        // AFTER the lock, because `.obsidian` is never locked and this is the
+        // one thing written there. See `ReferenceReadingView` for why.
+        ReferenceReadingView.makeReadingViewTheDefault(for: copy.directoryURL)
+
         return Made(
             folderName: folderName,
             displayCode: copy.displayCode,

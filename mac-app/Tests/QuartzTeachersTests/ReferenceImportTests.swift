@@ -937,9 +937,13 @@ final class ReferenceImportTests: XCTestCase {
             coursesDirectoryURL: coursesDirectoryURL
         )
 
-        let copiedNames: Set<[UInt8]> = ReferenceImportTests.entryBytes(
+        var copiedNames: Set<[UInt8]> = ReferenceImportTests.entryBytes(
             inFolder: coursesDirectoryURL.appendingPathComponent("ICS3U-2025").path
         )
+        // The copy ADDS one entry on purpose — `.obsidian`, holding the
+        // reading-view default (`ReferenceReadingView`). It is not a source
+        // name re-spelled, so it is taken out before the comparison.
+        copiedNames.remove(Array(".obsidian".utf8))
         XCTAssertEqual(
             copiedNames, sourceNames,
             "A top-level name came across re-spelled by the copy a teacher makes from a course "
