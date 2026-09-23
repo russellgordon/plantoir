@@ -1609,14 +1609,32 @@ The lock refuses nothing there; the guard does. Found by review, 2026-09-20,
 with the same shape in Course Settings' folder rename, the unit-word rename,
 Add Section, Rename Course and "Restore Section N…".
 
-**The calm note appears BEFORE Obsidian, once per course.** Not after, and
-that placement is forced by what could not be measured: whether Obsidian tells
-a teacher that a save failed, or swallows what they typed, is unknown — so a
-note that arrived afterwards would be the worst of both. It claims only that
-Plantoir keeps the pages locked and that they stay as they were. It may not
-say they cannot be changed (the lock is per-Mac, and a cloud folder strips it
-while files upload) and it may not promise the teacher will be told when an
-edit fails. `LockedPagesNote` remembers which courses have had it.
+**The calm note appears BEFORE Obsidian, once per course.** It claims only
+that Plantoir keeps the pages locked and that they stay as they were — it may
+not say they cannot be changed (the lock is per-Mac, and a cloud folder strips
+it while files upload). `LockedPagesNote` remembers which courses have had it.
+
+**What Obsidian does was measured by Russell on 2026-09-23**, the one thing
+the run could not drive (synthetic input never reached Obsidian's editor):
+typing into a locked page makes Obsidian show a notice — *"Failed to save file
+… EPERM: operation not permitted … Make a backup of the contents of this file
+now to avoid losing data"* — and the page stays exactly as it was. Loud, not
+silent; the backup advice is Obsidian's generic wording and nothing is lost.
+Obsidian titles the vault by its FOLDER name (`ICS4U-2025`), which is the one
+place that name is useful: it says which ICS4U is open. The note's second
+sentence, `obsidianOpensThemForReading`, now says exactly this.
+
+**And a reference course opens in Obsidian's reading view.** Russell asked for
+a read-only mode; Obsidian has none for a vault. What it has is a per-vault
+preference, `defaultViewMode` in `.obsidian/app.json`, whose value `"preview"`
+is the reading view — the key and its values were read out of Obsidian's own
+bundle (`obsidian.asar`) rather than guessed. `ReferenceReadingView` sets it
+when a reference course is made, keeping every other key the teacher's settings
+carried, AFTER the lock — possible only because `.obsidian` is in the
+never-locked set. Pages then open rendered rather than ready to edit, and a
+teacher who switches one to editing meets the refusal above. Best effort by
+design: a settings file Obsidian could not read is left alone, and the lock,
+not the view mode, is what keeps the pages.
 
 It used to carry a second sentence — *"A file you copy out of it stays locked
 until you untick Locked in Get Info."* — written on the evening #207 was out
