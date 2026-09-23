@@ -2295,17 +2295,37 @@ one word, or nothing is written.
 `publishForSection1`, `publish`, `draftSection1`, `draft`, which for section 1
 is what S1's own site read. Measured: **280 of 324** ICS3U pages built — the
 same 280 S1's site showed; for ICS4U, reading the frontmatter (not a build), 213 of 220.
-`draftSectionTwo` and `createdForSectionTwo` ride along inert.
+`draftSectionTwo` and `createdForSectionTwo` ride along inert in the reference
+course itself; Copy a Page takes them off a copy (below).
 
-**What Copy a Page makes of these pages — measured, not changed here.** #207's
-copier REFUSES, by name and safely, every page whose frontmatter carries a line
-it cannot be sure the build reads the same way, and `draftSectionTwo:` is one.
-From the real ICS3U-2024 import it offered 250 pages, copied **97** (every copy
-hidden) and refused **153** — exactly the 153 offered pages carrying
-`draftSectionTwo:`; ICS4U-2024: 151 offered, 85 copied, 66 refused (66 carry
-the key). Nothing is lost or published; the teacher is told each page was not
-copied. Whether Copy a Page should strip the old section-2 keys the way it
-strips `draft:` is a decision left open, not taken in this piece.
+**What Copy a Page makes of these pages — Russell's decision, 2026-09-23:
+the old section-2 keys come off, the way `draft:` does.** Before it, #207's
+copier REFUSED, by name and safely, every page carrying `draftSectionTwo:`,
+because its builder-agreement guard refuses any top-level line beginning
+`draftSection` (`namesAVisibilityKey`) and `withoutPerSectionKeys` strips only
+`draftSection<digits>`. From the real ICS3U-2024 import it offered 250 pages,
+copied 97 and refused **153** — exactly the offered pages carrying the key;
+ICS4U-2024 refused 66 of 151. The main use of a reference course failed for
+60% of one course's pages, so Russell chose to strip rather than leave them
+refused. `CopiedPageText.withoutTheOldSectionTwoKeys` now takes
+`draftSectionTwo` and `createdForSectionTwo` off in step 2, with the reader's
+matcher and continuation rule, BEFORE the guard is asked — so the guard's
+language (the fuzzed whitelist) did not change and needed no re-fuzz. The pair
+is the whole list: a census of all four real copies of the layout (ICS3U and
+ICS4U, S1 and S2; 1,338 pages) found `draftSectionTwo` on 800 lines,
+`createdForSectionTwo` on 655, and no other key naming a section; the 2023–24
+layout (#254) carries neither. `createdForSectionTwo` goes too because it is a
+date for a section of a course that is not the destination, and nothing reads
+it; the plain `created:` is kept as always. **Measured, the composed text of
+every top-level page of the real shared folders:** before, ICS3U S1 154 of 259
+refused and ICS4U S1 66 of 153 (every refusal a page carrying the keys); after,
+**0 of 412 refused, 0 not hidden** in sections 1, 2 and 3, and none still
+carrying either key (S2's copies: 0 of 411). Every copy still lands hidden in
+every section of the destination. Contract:
+`copyingAPageBetweenCourses.hidden.theOldSectionTwoKeys` and the ninth
+`frontmatterCases` entry; test
+`testAPageCarryingTheOldSectionTwoKeysIsCopiedHidden` (must-fail: on the old
+copier the page is skipped as `thePageIsWrittenInAWayPlantoirCannotBeSureOf`).
 
 **Rehearsed on the real folders, 2026-09-23**, into a scratch working folder
 under `$HOME` through the real importer (a temporary harness calling
@@ -2355,7 +2375,9 @@ them:
 1. the source's own `publishForSection<N>`, `draftSection<N>` and
    `createdSection<N>` come off (`AssistPageVisibility.withoutPerSectionKeys`);
 2. the plain `publish:` and `draft:` come off, with the READER's key matcher
-   and its continuation rule;
+   and its continuation rule — and with them the 2024–25 layout's
+   `draftSectionTwo` and `createdForSectionTwo` (#256, Russell's decision
+   2026-09-23; see "The 2024–25 layout" above for the census and numbers);
 3. `publishForSection<N>: false` for every section the destination has,
    written DESCENDING so the file reads 1, 2, 3;
 4. a plain `publish: false`, as the LAST line of the block.
