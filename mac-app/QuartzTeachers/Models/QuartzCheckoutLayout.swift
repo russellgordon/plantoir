@@ -172,6 +172,22 @@ nonisolated enum QuartzCheckoutLayout {
         /// Its path inside `content/` (a link) or `source-<code>/`.
         let path: String
         let reason: LostReason
+        /// Where a link that showed something else pointed, as its text
+        /// said it (`./` taken off, the home folder as `~`), or nil. Without
+        /// it the loss list would say "All Classes" beside an `All Classes`
+        /// folder that DID come across, by name, from the section's own
+        /// pages (review of #256, L3).
+        var pointedAt: String? = nil
+
+        // MARK: - Computed properties
+
+        /// How the loss is named to the teacher and on the trail.
+        var described: String {
+            guard let pointedAt else {
+                return path
+            }
+            return ReferenceImportWording.checkoutLayoutWhatALinkShowed(name: path, place: pointedAt)
+        }
     }
 
     /// The whole mapping of one website folder's first section into a
@@ -222,7 +238,7 @@ nonisolated enum QuartzCheckoutLayout {
         var lostPaths: [String] {
             var paths: [String] = []
             for entry in lost {
-                paths.append(entry.path)
+                paths.append(entry.described)
             }
             return paths
         }
@@ -281,6 +297,10 @@ nonisolated enum QuartzCheckoutLayout {
         case aLaterSection(section: Int)
         /// A folder holding several courses' folders of websites.
         case severalCourses
+        /// A folder whose courses' shortcut folders are one level further
+        /// down still: the school year's folder, `LCS/2024-25`, whose
+        /// `Old ICS3U/Class Websites` holds the shortcuts.
+        case coursesFurtherDown
         /// A shortcut chosen on its own that cannot be read through.
         case shortcutTrouble(Candidate)
         case nothing
@@ -607,7 +627,52 @@ nonisolated enum QuartzCheckoutLayout {
             let only: URL = unreadableGroups[0]
             return .folderOfWebsites(only, QuartzCheckoutLayout.candidates(in: only))
         }
+        // The school year's folder, chosen one level above the courses:
+        // "no courses there — choose the folder you kept that year's classes
+        // in" would point straight back at the folder just chosen.
+        if QuartzCheckoutLayout.holdsWebsiteShortcutsTwoLevelsDown(chosenURL) {
+            return .coursesFurtherDown
+        }
         return .nothing
+    }
+
+    /// True when a folder two levels below the chosen one holds a Finder
+    /// shortcut that leads to a course website — the school year's folder
+    /// in iCloud, `2024-25/Old ICS3U/Class Websites/S1`.
+    ///
+    /// Asked only when nothing nearer was found, and it stops at the first
+    /// one. It looks at SHORTCUTS only, never inside the folders it passes:
+    /// a website folder three levels down would mean asking about the
+    /// contents of every folder there, and a broad folder chosen by mistake
+    /// (the home folder, whose grandchildren include other apps' private
+    /// folders) must not become a reason for macOS to ask the teacher about
+    /// places they never chose. A website folder kept that deep is still
+    /// found by choosing the folder above it. It changes only WHICH refusal
+    /// is said, never what is imported.
+    static func holdsWebsiteShortcutsTwoLevelsDown(_ chosenURL: URL) -> Bool {
+        for childName in ReferenceTreeCopier.names(inFolderAt: chosenURL) {
+            guard OlderCourseLayout.kind(ofEntry: childName, inFolderAt: chosenURL) == S_IFDIR else {
+                continue
+            }
+            let childURL: URL = ReferenceTreeCopier.url(named: childName, inFolderAt: chosenURL)
+            for grandchildName in ReferenceTreeCopier.names(inFolderAt: childURL) {
+                guard OlderCourseLayout.kind(ofEntry: grandchildName, inFolderAt: childURL) == S_IFDIR else {
+                    continue
+                }
+                let grandchildURL: URL = ReferenceTreeCopier.url(named: grandchildName, inFolderAt: childURL)
+                for entryName in ReferenceTreeCopier.names(inFolderAt: grandchildURL) {
+                    guard OlderCourseLayout.kind(ofEntry: entryName, inFolderAt: grandchildURL) == S_IFREG else {
+                        continue
+                    }
+                    let entryURL: URL = ReferenceTreeCopier.url(named: entryName, inFolderAt: grandchildURL)
+                    if case .folder(let target) = QuartzCheckoutLayout.shortcutTarget(of: entryURL),
+                       QuartzCheckoutLayout.isCourseWebsite(target) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
     }
 
     /// A folder inside a course website's `quartz/`, found by walking the
@@ -771,10 +836,17 @@ nonisolated enum QuartzCheckoutLayout {
     /// The word class pages use, over the names of the pages directly in a
     /// class folder. Placeholders — `Thread 2, Day x`, a day that is a word
     /// rather than a number — are set aside, and so are the names the build
-    /// never calls a class page. What is left must be at least one page,
-    /// EVERY one `<word> <n>, Day <m>`, with one word (any case). Otherwise
-    /// nil: a word that fits some pages and not others would make the build
-    /// treat the rest as something else.
+    /// never calls a class page and pages with no `<word> <n>, Day <m>`
+    /// shape at all (`Notes.md`). At least one page must then be
+    /// `<word> <n>, Day <m>`, and every one of them must use the same word
+    /// (any case). Otherwise nil: two words means one would leave the
+    /// other's lessons not class pages.
+    ///
+    /// Why a shapeless page is ignored rather than refusing the word: the
+    /// build restamps the date of every page it does not call a class page.
+    /// With the word, only `Notes.md` is restamped; without it, `Notes.md`
+    /// AND every lesson are. Writing nothing is never better than writing
+    /// the word the class pages use (review of #256, L2).
     static func unitWord(amongPageNames names: [String]) -> (word: String?, placeholders: Int) {
         var word: String?
         var placeholders: Int = 0
@@ -788,7 +860,7 @@ nonisolated enum QuartzCheckoutLayout {
             }
             let stem: String = String(name.dropLast(3))
             guard let parsed = QuartzCheckoutLayout.classPageParts(stem) else {
-                return (word: nil, placeholders: placeholders)
+                continue
             }
             if !parsed.dayIsANumber {
                 placeholders += 1
@@ -980,7 +1052,11 @@ nonisolated enum QuartzCheckoutLayout {
                     withLinkNamed: text, at: entryURL, content: content, pagesName: pagesName,
                     sectionName: sectionName, sharedNames: sharedTopNames, sectionNames: sectionTopNames
                 ) {
-                    lost.append(Lost(path: text, reason: reason))
+                    var pointedAt: String? = nil
+                    if reason == .linkShowedSomethingElse {
+                        pointedAt = QuartzCheckoutLayout.wherePointed(byLinkAt: entryURL)
+                    }
+                    lost.append(Lost(path: text, reason: reason, pointedAt: pointedAt))
                 } else {
                     leftBehind[.shortcutsReplaced, default: 0] += 1
                 }
@@ -1229,6 +1305,27 @@ nonisolated enum QuartzCheckoutLayout {
             return sectionNames.contains(composedBytes) ? nil : .linkNameWithNoPage
         }
         return .linkShowedSomethingElse
+    }
+
+    /// A link's own text, read and never followed: `./` taken off the
+    /// front, and a path in the home folder written from `~`, so the
+    /// teacher's account name is never in a sentence or on the trail. Nil
+    /// when the text cannot be read.
+    static func wherePointed(byLinkAt linkURL: URL) -> String? {
+        guard var text = try? FileManager.default.destinationOfSymbolicLink(atPath: linkURL.path) else {
+            return nil
+        }
+        while text.hasPrefix("./") {
+            text = String(text.dropFirst(2))
+        }
+        let home: String = NSHomeDirectory()
+        if text == home {
+            return "~"
+        }
+        if text.hasPrefix(home + "/") {
+            return "~" + String(text.dropFirst(home.count))
+        }
+        return text
     }
 
     /// The real `s<N>` folder's own spelling, or nil.

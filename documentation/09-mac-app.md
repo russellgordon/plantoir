@@ -2217,8 +2217,46 @@ section's folder gets `checkoutLayoutOnlyTheFirstSection`, anything else
 children's are COUNTED — readable website folders in two places refuse with
 `checkoutLayoutChooseOneCourseAtATime` (`2024-25` holds `ICS3U/` and `ICS4U/`),
 in one child only read that child (`Old ICS3U` holds planning `Thread N`
-folders, a PDF shortcut and one `Class Websites`). No folder NAME is trusted,
-and nothing below the chosen folder's children is looked at. A website folder
+folders, a PDF shortcut and one `Class Websites`). No folder NAME is trusted.
+**What "the children's entries" means in practice** (corrected after the
+implementation review's L4, which found this paragraph said less than the code
+does): each child's entries are LISTED; a real folder among them is asked
+whether it is a website folder (`lstat` of its `quartz/quartz.config.ts` and
+`quartz/content`, and of `content/source-*/s<N>`), and every Finder shortcut
+among them is RESOLVED, with `.withoutUI` and `.withoutMounting`. Only when all
+of that finds nothing is one more level asked about, and only about SHORTCUTS
+there (`holdsWebsiteShortcutsTwoLevelsDown`): a folder two levels down holding a
+shortcut that leads to a website folder makes the chosen folder the school
+year's, refused with `checkoutLayoutChooseACourseFolderInside`, which points
+one level down and is true whether one course or several is there (so not
+`checkoutLayoutChooseOneCourseAtATime`). That is the implementation review's
+L1: iCloud's `LCS/2024-25` holds `Old ICS3U/Class Websites/S1`, and
+`noCoursesThere` pointed the teacher back at the very folder they had chosen.
+It is a refusal, never an import, because nothing should come across from a folder the teacher did not
+point at; it stops at the first such shortcut, and asks nothing about the
+folders beside the shortcuts, so a website folder three levels down is found by
+choosing the folder above it, not by a look inside every folder at that depth.
+Measured on the real folders (read-only): `LCS/2024-25` → that refusal in
+0.063 s; `LCS` itself, `~/Documents` and `~/Documents/Class Websites` → still
+`noCoursesThere` (the last is true advice: `2024-25` inside it is the folder to
+choose), in 0.002–0.033 s; `Old ICS3U`, `Old ICS4U`, `ICD2O` and `Class
+Websites` unchanged. A dead shortcut two levels down does not count (contract
+case), so `ICD2O` alone is still found by choosing it.
+
+*The plan review's F9 — "resolve shortcuts only in the chosen folder and in the
+single child" — was REJECTED*, and was not recorded as such until the
+implementation review asked. Its worry was real: resolving a shortcut asks
+about the place it leads, and a broad folder chosen by mistake could make macOS
+ask the teacher about places they never chose. It was rejected because finding
+the ONE child that holds the shortcuts (`Old ICS3U` holds `Class Websites`
+beside nine planning folders and a shortcut to a PDF) needs each child's
+shortcuts resolved: an unresolved shortcut cannot say whether it leads to a
+website folder, a file or nowhere, and a child that merely HOLDS shortcuts is
+not yet a course. What was taken from it instead: resolution never shows a dialog and
+never mounts a disk, a symbolic link is never resolved, and the one level
+added below (L1's) asks about shortcuts ONLY and ends at the first — never
+about the folders beside them, which is where another app's private folders
+would be met if the home folder were chosen. A website folder
 is `quartz/quartz.config.ts` + `quartz/content`; it is a COURSE only with one
 `content/source-<code>` holding an `s<digits>` folder. **Math Club** (no
 `source-*`, no code anywhere) is left out of every list entirely — Russell,
@@ -2273,7 +2311,11 @@ cannot turn into a walk of someone's home), the links replaced by what they
 showed, the editing folders, the other sections' pages, anything else in
 `source-<code>` no link showed, the add-ons. A LOSS — counted, named in the
 summary with `olderLayoutLeftOut` and on the trail, and the import not called
-complete: a link that showed something else or names what is not there, a
+complete: a link that showed something else (named WITH where it pointed —
+`checkoutLayoutWhatALinkShowed`, the link's own text with `./` taken off and a
+home-folder path written from `~` — because by its name alone `All Classes`
+reads as the `All Classes` folder that DID come across from the section's own
+pages; the implementation review's L3) or names what is not there, a
 link inside the pages, a shared entry sharing a name with one of the section's
 own (the build would put both at `content/<name>`), a shared `index.md`,
 `section1` or `course_config.json`, and no `s1/index.md`.
@@ -2288,8 +2330,14 @@ pages with PLACEHOLDERS set aside — `Thread 2, Day x`, a day that is a word
 (the build never calls those class pages either): ICS3U S1 has 55 pages in
 `All Classes`, 54 lessons and one placeholder; ICS3U S2 4 placeholders, ICS4U
 S1 2, S2 3. A rule of "every page" would have written the key for NONE of the
-four (plan review F1). Every other page must then be `<word> <n>, Day <m>` in
-one word, or nothing is written.
+four (plan review F1). Pages with no `<word> <n>, Day <m>` shape at all
+(`Notes.md`) are set aside too — the implementation review's L2, ruled by the
+director: without the key the build restamps `Notes.md` AND every lesson, with
+it only `Notes.md`, so writing nothing is never better than writing the word
+the class pages use. At least one page must have the shape, and every one that
+does must use one word; two words (`Thread 1, Day 1` beside `Unit 1, Day 2`)
+is the one real ambiguity and still writes nothing. All four real class
+folders have no shapeless page, so no real import changes.
 
 **What the preview shows.** Pages byte-identical; today's build reads
 `publishForSection1`, `publish`, `draftSection1`, `draft`, which for section 1

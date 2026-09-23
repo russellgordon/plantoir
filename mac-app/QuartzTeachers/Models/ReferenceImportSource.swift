@@ -107,6 +107,10 @@ nonisolated struct ReferenceImportSource: Sendable {
         /// A folder holding several courses' folders of class websites.
         case severalClassWebsiteCourses(folderName: String)
 
+        /// The school year's folder, one level above the courses whose
+        /// folders hold the shortcuts to their class websites.
+        case classWebsiteCoursesFurtherDown(folderName: String)
+
         /// A Finder shortcut, chosen on its own, that cannot be read through.
         case shortcutTrouble(shortcut: String, trouble: QuartzCheckoutLayout.ShortcutTrouble, disk: String?)
 
@@ -134,6 +138,8 @@ nonisolated struct ReferenceImportSource: Sendable {
                 return ReferenceImportWording.checkoutLayoutOnlyTheFirstSection(folder: folderName, section: section)
             case .severalClassWebsiteCourses(let folderName):
                 return ReferenceImportWording.checkoutLayoutChooseOneCourseAtATime(folder: folderName)
+            case .classWebsiteCoursesFurtherDown(let folderName):
+                return ReferenceImportWording.checkoutLayoutChooseACourseFolderInside(folder: folderName)
             case .shortcutTrouble(let shortcut, let trouble, let disk):
                 return QuartzCheckoutLayout.sentence(about: trouble, shortcut: shortcut, disk: disk)
             }
@@ -603,6 +609,8 @@ nonisolated struct ReferenceImportSource: Sendable {
             return .refused(.onlyTheFirstSection(folderName: chosenURL.lastPathComponent, section: section))
         case .severalCourses:
             return .refused(.severalClassWebsiteCourses(folderName: chosenURL.lastPathComponent))
+        case .coursesFurtherDown:
+            return .refused(.classWebsiteCoursesFurtherDown(folderName: chosenURL.lastPathComponent))
         case .shortcutTrouble(let candidate):
             return .refused(.shortcutTrouble(
                 shortcut: candidate.rowName,

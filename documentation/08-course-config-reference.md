@@ -176,8 +176,8 @@ lists, as contract cases, are `shared-rules.json` →
 **A class imported from the 2024–25 website-folder-per-class layout (#256)** is
 written the same way, with the same keys, and ONE more that this table already
 documents: **`unit_word`**, when the class folder's pages agree on one word
-(`Thread` in every real one, with placeholder pages like `Thread 2, Day x` set
-aside). Without it the build's date post-pass takes no lesson for a class page
+(`Thread` in every real one, with placeholder pages like `Thread 2, Day x`, and
+pages with no class-page shape at all like `Notes.md`, set aside). Without it the build's date post-pass takes no lesson for a class page
 and restamps them all — measured on the real ICS3U S1 import, 313 pages
 restamped without the key and 143 with it. `course_name` is `<CODE> S1`
 (`ICS3U S1`), and the per-section lists are that section's own folder's

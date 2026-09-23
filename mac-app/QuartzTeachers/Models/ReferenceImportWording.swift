@@ -299,6 +299,26 @@ nonisolated enum ReferenceImportWording {
         return "\(folder) holds several courses. Choose one course's folder inside it, or one class's folder."
     }
 
+    /// The school year's folder, chosen one level above the courses —
+    /// iCloud's `LCS/2024-25`, whose `Old ICS3U/Class Websites` holds the
+    /// shortcuts. `noCoursesThere` ("Choose the folder you kept that year's
+    /// classes in") would point back at the very folder chosen. True
+    /// whether one course or several is down there, which is why it is not
+    /// `checkoutLayoutChooseOneCourseAtATime`.
+    static func checkoutLayoutChooseACourseFolderInside(folder: String) -> String {
+        return "\(folder) holds courses rather than classes. Choose one course's folder inside it, "
+             + "or one class's folder."
+    }
+
+    /// One entry of the loss list (`olderLayoutLeftOut`'s `{names}`): a
+    /// link at the top of a class website's pages that showed something
+    /// other than the page or folder of its own name. Named with where it
+    /// pointed, so it is not mistaken for the folder of the same name that
+    /// DID come across.
+    static func checkoutLayoutWhatALinkShowed(name: String, place: String) -> String {
+        return "what \(name) showed (\(place))"
+    }
+
     /// A website folder holding the pages of more than one course.
     static let checkoutLayoutMoreThanOneCourse: String =
         "It holds the pages of more than one course, so it can’t be brought across as one."
