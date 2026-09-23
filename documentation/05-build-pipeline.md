@@ -286,6 +286,26 @@ brand-new course has an empty curriculum folder and an empty class folder on
 day one, and warning about both would nag every build of a course nobody has
 broken.
 
+**A skeleton course can now have expectations to map, and its map is all
+red.** Until
+[#251](https://github.com/russellgordon/plantoir/issues/251) (2026-09-22) a
+course made from a subject's skeleton had two pages in its Curriculum
+folder — a generic index and a placeholder called `A1.1` — so
+`_find_curriculum_folder` found a folder and `_collect_expectations`
+returned exactly one specific expectation. Switching the map on there would
+have drawn a single cell for an expectation that does not exist. A teacher
+who declines the ready-made pages for one of the 38 codes that have them
+now gets that code's real expectations installed into the skeleton, so the
+map is built from the same 47-and-12 (ICS4U) the payload course draws.
+
+**Day one it is entirely red, by design.** Coverage counts the site's own
+links from lessons to expectations and a skeleton course has none yet, so
+`_coverage_counts` returns `covered: 0, assessed: 0` for every cell. That
+is the intended reading rather than a defect to special-case — the page's
+caption already says "red in September, greener as the year goes on" — and
+`site_health` is quiet about it for the same reason the paragraph above
+gives.
+
 ### Where they run, and where they honestly do not
 
 They run in the toolchain rather than in the app because the GUI button is one of

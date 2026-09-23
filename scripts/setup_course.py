@@ -1602,6 +1602,147 @@ def starting_point_intro(course_code: str, label: str, has_payload: bool) -> str
     )
 
 
+# What a specific expectation's page is called: "A1.1", "D2.3". The same
+# pattern `build_site.py` reads the curriculum coverage map with, and the
+# same sort order — so "the first expectation" means the same thing in the
+# installer and on the map.
+SPECIFIC_EXPECTATION_STEM = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
+
+# A wiki link or embed, up to the target's own name: "[[A1.1]]",
+# "![[A1.1]]", "[[A1.1|the first one]]", "[[Curriculum/A1.1#Examples]]".
+WIKI_LINK_TARGET = re.compile(r"(!?\[\[)([^\]\[|#]+)")
+
+
+def specific_expectation_stems(curriculum_dir: Path) -> list:
+    """
+    Every specific expectation page in a curriculum folder, in the order
+    the coverage map reads them.
+    """
+    stems = []
+    if not curriculum_dir.is_dir():
+        return stems
+    for page in sorted(curriculum_dir.glob("*.md")):
+        if SPECIFIC_EXPECTATION_STEM.match(page.stem):
+            stems.append(page.stem)
+    return stems
+
+
+def expectation_renames_for_skeleton(skeleton_dir: Path, skeleton_manifest: dict,
+                                     payload_dir: Path, payload_manifest: dict) -> dict:
+    """
+    Which expectations the SKELETON's pages point at that the payload's
+    curriculum does not have — each mapped to the payload's first specific
+    expectation.
+
+    Every skeleton family's `_DUPLICATE ME.md` templates carry a
+    "Curriculum connection" block embedding `![[A1.1]]`, the placeholder
+    expectation the skeleton ships. When the payload's real expectations
+    are installed instead (GitHub issue #251) that embed usually starts
+    resolving to something better — ICS4U's own A1.1. But TWO payloads
+    have no A1.1 at all: MCMPR11's British Columbia codes begin at D1.1
+    and MTH1W's at B1.1. Their templates would embed a page that does not
+    exist, and a teacher who duplicates one — which is what the page tells
+    them to do — would publish a broken transclusion. Measured on the
+    prototype: six such pages in an MCMPR11 course.
+
+    The replacement is the FIRST specific expectation, by the coverage
+    map's own ordering, because the block is an illustration of how to
+    link rather than a claim about this page: any real expectation reads
+    correctly there, and the first is the one a teacher meets first.
+    """
+    skeleton_folder = skeleton_manifest.get("curriculum_folder")
+    payload_folder = payload_manifest.get("curriculum_folder")
+    if not skeleton_folder or not payload_folder:
+        return {}
+    payload_stems = specific_expectation_stems(payload_dir / "shared" / payload_folder)
+    if not payload_stems:
+        return {}
+    first_payload_stem = payload_stems[0]
+    renames = {}
+    for stem in specific_expectation_stems(skeleton_dir / "shared" / skeleton_folder):
+        if stem not in payload_stems:
+            renames[stem] = first_payload_stem
+    return renames
+
+
+def retargeted_expectation_references(text: str, renames: dict) -> str:
+    """
+    Point every link and embed at the expectation that will actually be
+    there. Only the TARGET changes; an alias or a heading after it is left
+    exactly as written.
+    """
+    if not renames:
+        return text
+
+    def replacement(match):
+        opening = match.group(1)
+        target = match.group(2)
+        stripped = target.strip()
+        name = stripped.split("/")[-1]
+        if name not in renames:
+            return match.group(0)
+        # Whatever folder the link named is kept; only the page changes.
+        replaced = stripped[:len(stripped) - len(name)] + renames[name]
+        return opening + target.replace(stripped, replaced, 1)
+
+    return WIKI_LINK_TARGET.sub(replacement, text)
+
+
+def jurisdiction_name(manifest: dict) -> str:
+    """
+    What to CALL the curriculum a payload carries — "Ontario", "British
+    Columbia", or whatever else a manifest declares.
+
+    The same rule the macOS wizard's own toggle already uses
+    (`ExampleContentCatalog.jurisdictionName`), which is why a mac teacher
+    reads "Include British Columbia curriculum pages" for MCMPR11 while
+    this console told them, in the very next breath, that they were being
+    offered "the official Ontario curriculum". Ontario is the fallback
+    because every payload written before the key existed is Ontario's.
+    """
+    explicit = manifest.get("jurisdiction_name")
+    if explicit:
+        return str(explicit)
+    declared = manifest.get("jurisdiction")
+    if declared:
+        if str(declared).upper() == "BC":
+            return "British Columbia"
+        if str(declared).upper() == "ON":
+            return "Ontario"
+        return str(declared)
+    return "Ontario"
+
+
+def starting_point_curriculum_intro(course_code: str, jurisdiction: str,
+                                    has_payload_curriculum: bool) -> str:
+    """
+    What is printed above the skeleton's "Include the … curriculum pages?"
+    question.
+
+    Two forms, because two different things are true. For the ~1,900 codes
+    with no ready-made course, the skeleton's Curriculum folder really is
+    a placeholder waiting for expectations the teacher will add. For one of
+    the 38 codes that HAS a payload, the expectations exist — the teacher
+    declined the pages, not the curriculum — so they can still come along,
+    and saying the folder is empty would be untrue twice over (GitHub issue
+    #251).
+
+    The jurisdiction is the payload's own, so a British Columbia teacher is
+    not told about Ontario's curriculum.
+    """
+    if has_payload_curriculum:
+        return (
+            f"\n🏛️  The {jurisdiction} curriculum for {course_code} can still come"
+            "\nalong — every expectation as its own page, so your lessons and tasks"
+            "\ncan link to exactly the expectations they address, and the curriculum"
+            "\ncoverage map has something to map."
+        )
+    return (
+        "\n🏛️  The skeleton includes an empty Curriculum folder, ready for"
+        f"\nthe expectations for {course_code} when you add them."
+    )
+
+
 def curriculum_page_names(payload_dir: Path, manifest: dict) -> set:
     """The page names (file stems) of every curriculum page in the payload."""
     folder_name = manifest.get("curriculum_folder")
@@ -1898,7 +2039,8 @@ def install_payload_file(source: Path, destination: Path, now_str: str,
                          course_name: str | None = None,
                          weekday_step: int = DEFAULT_CLASS_WEEKDAY_STEP,
                          start_school_day: int = 1,
-                         unit_word: str = class_pages.DEFAULT_UNIT_WORD) -> bool:
+                         unit_word: str = class_pages.DEFAULT_UNIT_WORD,
+                         expectation_renames: dict | None = None) -> bool:
     """
     One file from payload to course. Markdown is adjusted on the way
     through; everything else is copied as-is. Existing files are never
@@ -1934,6 +2076,7 @@ def install_payload_file(source: Path, destination: Path, now_str: str,
     if course_name:
         text = text.replace("__COURSE_NAME__", course_name)
     text = class_pages.rewritten(text, unit_word)
+    text = retargeted_expectation_references(text, expectation_renames or {})
     text = strip_curriculum_blocks(text, keep_content=include_curriculum)
     if not include_curriculum:
         text = unlink_curriculum_references(text, page_names)
@@ -1952,7 +2095,8 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
                             reference=None,
                             course_code: str | None = None,
                             course_name: str | None = None,
-                            unit_word: str = class_pages.DEFAULT_UNIT_WORD) -> int:
+                            unit_word: str = class_pages.DEFAULT_UNIT_WORD,
+                            expectation_renames: dict | None = None) -> int:
     """
     Pour the payload into the course. Only top-level items the teacher kept
     in the structure lists are installed; the curriculum folder also needs
@@ -2002,7 +2146,8 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
                                         shared_sections=section_numbers,
                                         course_code=course_code,
                                         course_name=course_name,
-                                        unit_word=unit_word):
+                                        unit_word=unit_word,
+                                        expectation_renames=expectation_renames):
                     written += 1
 
     per_section_root = payload_dir / "per_section"
@@ -2028,9 +2173,87 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
                                             course_name=course_name,
                                             weekday_step=weekday_step,
                                             start_school_day=start_school_day,
-                                            unit_word=unit_word):
+                                            unit_word=unit_word,
+                                            expectation_renames=expectation_renames):
                         written += 1
 
+    return written
+
+
+def install_curriculum_from_payload(course_path: Path, payload_dir: Path,
+                                    manifest: dict, section_numbers: list,
+                                    now_str: str, destination_folder: str,
+                                    reference=None,
+                                    course_code: str | None = None,
+                                    course_name: str | None = None,
+                                    unit_word: str = class_pages.DEFAULT_UNIT_WORD) -> int:
+    """
+    Pour ONLY the curriculum pages of a payload into a course that is
+    starting from its subject's skeleton instead. Returns the number of
+    files written.
+
+    A teacher who declines the ready-made pages for one of the 38 codes
+    that have them still gets the skeleton (GitHub issue #248) — and the
+    skeleton's Curriculum folder holds nothing but a generic index and a
+    placeholder expectation called A1.1. The curriculum coverage map is
+    built from those pages, so without this the map either cannot be built
+    at all or is drawn over one fake expectation, which is worse: a feature
+    reporting success while being entirely wrong (GitHub issue #251).
+
+    Deliberately a walk of its own rather than a restricted second call to
+    `install_example_content`. That installer's `top_level_allowed` lets
+    any `index.md` through unconditionally, so a narrowed call would also
+    pour the payload's own section landing page into a course that is
+    taking none of the payload's pages — every one of the 38 payloads has
+    one.
+
+    `destination_folder` is the SKELETON's curriculum folder name, because
+    that is the name the course's `course_config.json` records and the name
+    the build looks in. All 38 payloads and all 50 skeleton families call
+    it "Curriculum" today (measured 2026-09-21); naming it explicitly means
+    a future payload that disagreed lands where the build will look rather
+    than in an orphan folder.
+
+    Must run BEFORE the skeleton is installed: `install_payload_file`
+    refuses a destination that already exists, so the real expectations
+    have to claim their names ahead of the placeholders.
+    """
+    source_folder = manifest.get("curriculum_folder")
+    if not source_folder or not destination_folder:
+        return 0
+    curriculum_root = payload_dir / "shared" / source_folder
+    if not curriculum_root.is_dir():
+        return 0
+
+    page_names = curriculum_page_names(payload_dir, manifest)
+    weekday_step = int(manifest.get("class_weekday_step", DEFAULT_CLASS_WEEKDAY_STEP))
+    start_school_day = int(manifest.get("class_start_school_day", 1))
+    # The same dates the payload's own install would give these pages: an
+    # expectation first transcluded by Unit 3, Day 5 carries that day's
+    # date, so the folder lists in the order a course meets them.
+    class_use_dates = (first_use_dates(payload_dir, reference, weekday_step,
+                                       start_school_day)
+                       if reference is not None else {})
+    first_class_date = (semester_class_timestamp(1, reference, weekday_step,
+                                                 start_school_day)
+                        if reference is not None else None)
+
+    written = 0
+    for source in sorted(curriculum_root.rglob("*")):
+        if source.is_dir():
+            continue
+        destination = renamed_for_unit_word(
+            course_path / destination_folder / source.relative_to(curriculum_root),
+            unit_word
+        )
+        if install_payload_file(source, destination, now_str,
+                                True, page_names,
+                                first_use_date=class_use_dates.get(source.stem) or first_class_date,
+                                shared_sections=section_numbers,
+                                course_code=course_code,
+                                course_name=course_name,
+                                unit_word=unit_word):
+            written += 1
     return written
 
 
@@ -2283,11 +2506,12 @@ def setup_course(no_backup: bool = False):
             bool(saved_config.get("prepopulate_example_content", True))
         )
         if prepopulate_example and manifest.get("curriculum_folder"):
-            print(f"\n🏛️  The example content includes the official Ontario curriculum")
+            jurisdiction = jurisdiction_name(manifest)
+            print(f"\n🏛️  The example content includes the official {jurisdiction} curriculum")
             print(f"for {course_code} — every expectation as its own page, so your")
             print("lessons and tasks can link to exactly the expectations they address.")
             include_curriculum = prompt_yes_no_default(
-                "Include the Ontario curriculum pages?",
+                f"Include the {jurisdiction} curriculum pages?",
                 bool(saved_config.get("include_curriculum_pages", True))
             )
             include_curriculum_coverage = prompt_curriculum_coverage(
@@ -2323,10 +2547,24 @@ def setup_course(no_backup: bool = False):
             if use_skeleton:
                 skeleton_payload = candidate
                 if skeleton_manifest.get("curriculum_folder"):
-                    print("\n🏛️  The skeleton includes an empty Curriculum folder, ready for")
-                    print(f"the expectations for {course_code} when you add them.")
+                    # The expectations written for this code, which the
+                    # teacher declined the PAGES of one question ago, can
+                    # still come along — so the question says which
+                    # curriculum it is offering (GitHub issue #251).
+                    payload_curriculum_manifest = (
+                        load_example_content_manifest(example_payload)
+                        if example_payload else {}
+                    )
+                    payload_has_curriculum = bool(
+                        payload_curriculum_manifest.get("curriculum_folder")
+                    )
+                    jurisdiction = jurisdiction_name(payload_curriculum_manifest)
+                    print(starting_point_curriculum_intro(
+                        course_code, jurisdiction, payload_has_curriculum
+                    ))
                     include_curriculum = prompt_yes_no_default(
-                        "Include the Curriculum pages?",
+                        f"Include the {jurisdiction} curriculum pages?"
+                        if payload_has_curriculum else "Include the Curriculum pages?",
                         bool(saved_config.get("include_curriculum_pages", True))
                     )
                     include_curriculum_coverage = prompt_curriculum_coverage(
@@ -2638,22 +2876,70 @@ def setup_course(no_backup: bool = False):
         except Exception as e:
             print(f"⚠️ Could not install the example content: {e}")
 
+    # ---------- The declined payload's curriculum, into the skeleton --------
+    # Before the skeleton, never after: the installer refuses a name that
+    # already exists, so the real expectations have to land ahead of the
+    # skeleton's placeholder ones (GitHub issue #251).
+    curriculum_came_from_the_payload = False
+    if (skeleton_payload and skeleton_manifest and include_curriculum
+            and example_payload):
+        try:
+            payload_manifest = load_example_content_manifest(example_payload)
+            skeleton_curriculum = skeleton_manifest.get("curriculum_folder")
+            if skeleton_curriculum and skeleton_curriculum in shared_folders:
+                files_written = install_curriculum_from_payload(
+                    course_path, example_payload, payload_manifest,
+                    section_numbers, now_str, skeleton_curriculum,
+                    reference=now_dt,
+                    course_code=course_code,
+                    course_name=course_name,
+                    unit_word=chosen_unit_word
+                )
+                if files_written > 0:
+                    curriculum_came_from_the_payload = True
+                    print(f"\n🏛️  Curriculum pages for {course_code} added: {files_written}.")
+        except Exception as e:
+            print(f"⚠️ Could not add the curriculum pages: {e}")
+
     # ---------- Install the starting skeleton -------------------------------
     # Only the folders and files the teacher kept are poured in; the
     # curriculum folder comes only if they kept that too.
     if skeleton_payload and skeleton_manifest:
         try:
             skeleton_curriculum = skeleton_manifest.get("curriculum_folder")
+            # With the real expectations already in place, the skeleton's
+            # own Curriculum folder is skipped BY NAME — never by turning
+            # its `include_curriculum` argument off, which also decides
+            # whether every other skeleton page keeps its "Curriculum
+            # connection" block. Skipping by name matters for MCMPR11 and
+            # MTH1W, whose expectations do not include an A1.1: the
+            # skeleton's placeholder A1.1 would survive, and the coverage
+            # map would carry a cell for a standard that does not exist.
+            folders_for_the_skeleton = list(shared_folders)
+            expectation_renames = {}
+            if curriculum_came_from_the_payload and skeleton_curriculum in folders_for_the_skeleton:
+                folders_for_the_skeleton.remove(skeleton_curriculum)
+                # …and the template pages' "Curriculum connection" embed is
+                # pointed at an expectation that will actually be there.
+                # For most codes the skeleton's A1.1 is the payload's A1.1
+                # and nothing moves; for MCMPR11 and MTH1W, which have no
+                # A1.1 of their own, this is what stops seven template
+                # pages embedding a page that does not exist.
+                expectation_renames = expectation_renames_for_skeleton(
+                    skeleton_payload, skeleton_manifest,
+                    example_payload, load_example_content_manifest(example_payload)
+                )
             files_written = install_example_content(
                 course_path, skeleton_payload, skeleton_manifest,
                 section_numbers, now_str,
                 bool(skeleton_curriculum and skeleton_curriculum in shared_folders),
-                shared_folders, shared_files,
+                folders_for_the_skeleton, shared_files,
                 per_section_folders, per_section_files,
                 reference=now_dt,
                 course_code=course_code,
                 course_name=course_name,
-                unit_word=chosen_unit_word
+                unit_word=chosen_unit_word,
+                expectation_renames=expectation_renames
             )
             if files_written > 0:
                 print(f"\n🧱 Starting pages added: {files_written}.")
