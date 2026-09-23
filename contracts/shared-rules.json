@@ -4630,6 +4630,20 @@
               "expectTicked": ["ICS3U-S1-2023-24", "ICS3U-S2-2024-25"]
             },
             {
+              "name": "the school year's folder, holding whole courses",
+              "tree": [
+                "2023-24/ICS3U/Class Website/ICS3U-S1-2023-24/.obsidian/app.json",
+                "2023-24/ICS3U/Class Website/ICS3U-S1-2023-24/Thread 1/Day 1.md",
+                "2023-24/ICS4U/Class Website/ICS4U-2023-24/.obsidian/app.json",
+                "2023-24/ICS4U/Class Website/ICS4U-2023-24/Thread 1/Day 1.md",
+                "2023-24/Expenses/receipt.pdf"
+              ],
+              "choose": "2023-24",
+              "expect": "refused",
+              "refusal": "aFolderOfOlderCourses",
+              "why": "noCoursesThere says 'Choose the folder you kept that year's classes in', and for this layout that is the folder just chosen. Refused with a sentence pointing one level down instead; which course is meant is the teacher's to say."
+            },
+            {
               "name": "the modern shape wins",
               "tree": [
                 "courses/ICS3U/course_config.json",
@@ -4729,7 +4743,7 @@
           ]
         },
         "placement": {
-          "rule": "Where everything lands in the new course, source path -> destination. Thread N folders go under section1/ with their names unchanged and are the per_section_folders. Home.md becomes section1/index.md - the ONE rename, bytes unchanged (Russell, decision 6); with no Home.md a root index.md takes its place, and with both, index.md is left out. All Prior Classes.md goes to section1/ as the one per_section_files entry. .obsidian comes to the course root WITHOUT plugins/ and WITHOUT community-plugins.json. Every other real top-level entry of the class folder, and every shared entry the class's links named, goes to the course root under its own name. Every LINK, at any depth and in either folder, is left out. When nothing supplies Media an empty Media folder is made. Every page is byte-identical, dg-* keys and all (Russell, decision 3).",
+          "rule": "Where everything lands in the new course, source path -> destination. Thread N folders go under section1/ with their names unchanged and are the per_section_folders. Home.md becomes section1/index.md - the ONE rename, bytes unchanged (Russell, decision 6); with no Home.md a root index.md takes its place, and with both, index.md is left out. All Prior Classes.md goes to section1/ as the one per_section_files entry. .obsidian comes to the course root WITHOUT plugins/ and WITHOUT community-plugins.json. Every other real top-level entry of the class folder, and every shared entry the class's links named, goes to the course root under its own name. Every LINK, at any depth and in either folder, is left out. A top-level link of the class is a NAME and is either replaced by the shared folder's real entry or counted as missing; everything else left out - a link below the top, a link inside a shared entry, anything whose name the course uses for itself (section1, course_config.json, and a shared index.md) - is a LOSS, and is COUNTED and NAMED in the sheet's summary (wording.olderLayoutLeftOut) and on the trail, and the import is not reported as complete (expectLost). The add-ons are said once, for every older class, instead. When nothing supplies Media an empty Media folder is made. Every page is byte-identical, dg-* keys and all (Russell, decision 3).",
           "whyThreadFoldersSitAtSection1": "Home.md embeds ![[Thread 4/Day 15]] - a PATH link, which Quartz resolves from the content root. The build copies each per_section_folders entry to content/<name>, so section1/Thread 4/ becomes content/Thread 4/ and the link resolves as it did in the class folder. Measured, simulating Quartz v4.5.0's shortest resolution over the planned content root: ICS3U S1 + shared, 1,586 of 1,587 links and embeds resolve (the one is an absolute path to a folder that no longer exists); without the shared folder, 57 of 186. Nesting them under section1/All Classes/ was REJECTED: it breaks every one of those path embeds.",
           "whyTheFrontPageIsRenamed": "With no section1/index.md the build writes no index.html and the preview's watcher waits for it forever. 0 links in the real pages name Home, so nothing points at the old name.",
           "whyNoLinkComesAcross": "A reference course must hold no link: the lock cannot lock through one, the census does not count one (so a course holding a live link into iCloud reported 'everything that should be locked is'), and the preview cannot follow one out of courses/. MEASURED, before this change: the copier copied a symlink AS a link, dangling or not, and counted it as a file - pointed at an ICD2O class, today's route would have made a reference course whose shared content was live links into iCloud. The planner leaves every link out and the copier REFUSES one on this route as well, so a future planner bug fails loudly.",
@@ -4784,6 +4798,7 @@
                 {"path": "Concepts/Loops.md", "inTheSharedFolder": true, "reason": "link"}
               ],
               "expectMissing": ["Tutorials"],
+              "expectLost": ["Concepts/Loops.md"],
               "expectEmptyMedia": false,
               "expectSettings": {
                 "course_code": "ICS3U",
@@ -4796,7 +4811,7 @@
                 "per_section_files": ["All Prior Classes.md"],
                 "expandable": ["Concepts", "Thread 1", "Thread 2"],
                 "hidden": ["Media"],
-                "include_curriculum_coverage": {"sections": {"section1": false}},
+                "include_curriculum_coverage": false,
                 "show_section_marker": {"sections": {"section1": false}}
               },
               "afterImporting": {
@@ -4829,6 +4844,7 @@
                 {"path": "Tasks", "inTheSharedFolder": false, "reason": "link"}
               ],
               "expectMissing": ["Media", "Tasks"],
+              "expectLost": [],
               "expectEmptyMedia": true,
               "expectSettings": {
                 "shared_folders": [],
@@ -4869,6 +4885,7 @@
                 {"path": "section1", "inTheSharedFolder": false, "reason": "nameTheCourseUses"}
               ],
               "expectMissing": [],
+              "expectLost": ["Thread 1/Old.md", "index.md", "section1"],
               "expectEmptyMedia": false,
               "expectSettings": {
                 "shared_folders": ["Concepts"],
@@ -4895,7 +4912,46 @@
               },
               "expectLeftOut": [],
               "expectMissing": [],
+              "expectLost": [],
               "expectEmptyMedia": true
+            },
+            {
+              "name": "shared entries whose names the course uses for itself",
+              "root": ".",
+              "tree": [
+                "ICS3U-S1-2023-24/.obsidian/app.json",
+                "ICS3U-S1-2023-24/Thread 1/Day 1.md",
+                "ICS3U-S1-2023-24/Home.md",
+                {"link": "ICS3U-S1-2023-24/section1", "to": null},
+                {"link": "ICS3U-S1-2023-24/index.md", "to": null},
+                {"link": "ICS3U-S1-2023-24/Media", "to": null},
+                "ICS3U-2024-25 Shared/section1/stray.md",
+                "ICS3U-2024-25 Shared/index.md",
+                "ICS3U-2024-25 Shared/Media/p.png"
+              ],
+              "classFolder": "ICS3U-S1-2023-24",
+              "sharedFolder": "ICS3U-2024-25 Shared",
+              "expectPlaced": {
+                ".obsidian/app.json": "ICS3U-S1-2023-24/.obsidian/app.json",
+                "section1/Thread 1/Day 1.md": "ICS3U-S1-2023-24/Thread 1/Day 1.md",
+                "section1/index.md": "ICS3U-S1-2023-24/Home.md",
+                "Media/p.png": "ICS3U-2024-25 Shared/Media/p.png"
+              },
+              "expectLeftOut": [
+                {"path": "section1", "inTheSharedFolder": false, "reason": "link"},
+                {"path": "index.md", "inTheSharedFolder": false, "reason": "link"},
+                {"path": "Media", "inTheSharedFolder": false, "reason": "link"},
+                {"path": "section1", "inTheSharedFolder": true, "reason": "nameTheCourseUses"},
+                {"path": "index.md", "inTheSharedFolder": true, "reason": "nameTheCourseUses"}
+              ],
+              "expectMissing": [],
+              "expectLost": ["section1", "index.md"],
+              "expectEmptyMedia": false,
+              "expectSettings": {
+                "shared_folders": [],
+                "shared_files": []
+              },
+              "why": "The shared folder is held to the same names as the class folder: a shared section1 would collide with the section folder (measured: the copy failed with 'File exists'), and a shared index.md would sit in shared_files and fight the front page. 0 of either on the real data."
             }
           ]
         },
@@ -4949,8 +5005,10 @@
         "olderLayoutNoCourseCode": "Its name has no course code in it, so it can’t be brought across.",
         "olderLayoutAnotherSectionOfTheSameCourse": "Another section of this course, {folder}, is ticked for that school year. To keep this one as well, choose Other or a different school year for it.",
         "olderLayoutImportedWithSharedMissing": "{course} — {year}, 1 section, without some of its shared pages and pictures.",
+        "olderLayoutLeftOut": "{count} of its files and folders were not brought across: {names}.",
+        "olderLayoutChooseOneCourseAtATime": "{folder} holds courses rather than classes. Choose the Class Website folder inside one of them, or one class folder.",
         "olderLayoutAddOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across from older class folders, so nothing in them can publish these pages.",
-        "olderLayoutRule": "The olderLayout* sentences are said only about a class kept in the older folder-per-class layout (olderLayout above). {names} is the missing names in a stable order joined as 'A, B and C'; {count} is how many shared folders and pages the class used; {code} is the code a chosen folder's name carries. None of them says how the shared folder was reached from the class - a teacher kept folders, and folders are what they are told about - and none says vault, link or add-on settings' contents.",
+        "olderLayoutRule": "The olderLayout* sentences are said only about a class kept in the older folder-per-class layout (olderLayout above). {names} is the missing names in a stable order joined as 'A, B and C' (in olderLayoutLeftOut, the paths left out, and with {count} 1 the sentence reads '1 of its files or folders was not brought across'); {count} is how many shared folders and pages the class used (in olderLayoutLeftOut, how many were left out); olderLayoutLeftOut is added to a summary line after olderLayoutImportedWithSharedMissing, or after 'imported' and a full stop; {code} is the code a chosen folder's name carries. None of them says how the shared folder was reached from the class - a teacher kept folders, and folders are what they are told about - and none says vault, link or add-on settings' contents.",
         "rule": "{course} is the code a TEACHER reads - ICS4U, never the folder name; {folder} is the folder they chose, by its own name, because 'that folder' means nothing once the chooser has closed. The calm note about the pages being locked (referenceCourses.wording.pagesAreLocked) is shown in this sheet too, where the teacher is deciding rather than after the fact.",
         "machineryCheck": "No sentence here names a symlink, a build output, a script, a container or a flag. Nothing says 'cannot' where 'is not' will do. The size a teacher reads is the size that will be COPIED, with last year's built website already taken out of it."
       }

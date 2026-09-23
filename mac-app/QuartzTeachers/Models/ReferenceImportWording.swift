@@ -220,6 +220,25 @@ nonisolated enum ReferenceImportWording {
         return "\(course) — \(year), 1 section, without some of its shared pages and pictures."
     }
 
+    /// Added to a summary line when something of the class did not come
+    /// across — a file below the top of it, or inside its shared folders,
+    /// that only pointed somewhere else, or one whose name the course uses
+    /// for itself. COUNTED and NAMED, so nothing goes missing unnoticed
+    /// (#254 fixes, item 1). Why each was left out is in the docs, not here.
+    static func olderLayoutLeftOut(count: Int, names: [String]) -> String {
+        let noun: String = count == 1 ? "1 of its files or folders was" : "\(count) of its files and folders were"
+        return "\(noun) not brought across: " + ReferenceImportWording.list(names) + "."
+    }
+
+    /// A folder holding whole courses kept a folder per class — the school
+    /// year's folder, `2023-24`. `noCoursesThere` ("Choose the folder you
+    /// kept that year's classes in") would point back at the folder just
+    /// chosen, which is exactly the one it describes.
+    static func olderLayoutChooseOneCourseAtATime(folder: String) -> String {
+        return "\(folder) holds courses rather than classes. Choose the Class Website folder "
+             + "inside one of them, or one class folder."
+    }
+
     /// Said under the list and in the summary whenever an older class is
     /// involved. The real class folders carry a publishing add-on whose
     /// settings hold a live credential; none of it comes across.

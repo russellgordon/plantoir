@@ -88,6 +88,9 @@ nonisolated struct ReferenceImportSource: Sendable {
         /// The older layout's shared folder was chosen rather than a class.
         case theSharedFolder(folderName: String)
 
+        /// A folder of whole older-layout courses (the school year's folder).
+        case aFolderOfOlderCourses(folderName: String)
+
         // MARK: - Computed properties
 
         var sentence: String {
@@ -102,6 +105,8 @@ nonisolated struct ReferenceImportSource: Sendable {
                 return ReferenceImportWording.holdsTheFolderYouHaveOpen(folder: folderName)
             case .theSharedFolder(let folderName):
                 return ReferenceImportWording.olderLayoutThatIsTheSharedFolder(folder: folderName)
+            case .aFolderOfOlderCourses(let folderName):
+                return ReferenceImportWording.olderLayoutChooseOneCourseAtATime(folder: folderName)
             }
         }
     }
@@ -400,6 +405,8 @@ nonisolated struct ReferenceImportSource: Sendable {
             return nil
         case .theSharedFolder:
             return .refused(.theSharedFolder(folderName: chosenURL.lastPathComponent))
+        case .aFolderOfCourses:
+            return .refused(.aFolderOfOlderCourses(folderName: chosenURL.lastPathComponent))
         case .classFolder(let classURL):
             let course: FoundCourse = ReferenceImportSource.measureOlderClass(
                 at: classURL,

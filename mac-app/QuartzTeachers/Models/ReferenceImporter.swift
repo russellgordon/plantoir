@@ -48,11 +48,14 @@ enum ReferenceImporter {
     enum Outcome: Equatable {
         case imported(ReferenceCopier.Made)
 
-        /// An older-layout class that came across WITHOUT some or all of its
-        /// shared pages and pictures — none were found beside it and none
-        /// were chosen, or the folder held only some. Its own case so the
-        /// summary says so; never a refusal (Russell, decision 2).
-        case importedWithSharedPagesMissing(ReferenceCopier.Made)
+        /// An older-layout class that came across with something MISSING:
+        /// some or all of its shared pages and pictures (none were found
+        /// beside it and none were chosen, or the folder held only some),
+        /// and/or files that were left out because they only pointed
+        /// somewhere else or would have taken a name the course uses — each
+        /// NAMED. Its own case so the summary says so; never a refusal
+        /// (Russell, decision 2).
+        case importedWithSomethingMissing(ReferenceCopier.Made, sharedPagesMissing: Bool, leftOut: [String])
         case notImported(course: String, reason: String)
 
         /// The teacher stopped it. Always last, and everything before it in
@@ -207,10 +210,14 @@ enum ReferenceImporter {
                             classFolderName: request.course.folderName, made: made, plan: result.plan
                         )
                     )
-                    if result.plan.shared.missingNames.isEmpty {
+                    let sharedPagesMissing: Bool = !result.plan.shared.missingNames.isEmpty
+                    let leftOut: [String] = result.plan.leftOutAndLost
+                    if !sharedPagesMissing && leftOut.isEmpty {
                         outcomes.append(.imported(made))
                     } else {
-                        outcomes.append(.importedWithSharedPagesMissing(made))
+                        outcomes.append(.importedWithSomethingMissing(
+                            made, sharedPagesMissing: sharedPagesMissing, leftOut: leftOut
+                        ))
                     }
                 } else {
                     made = try await ReferenceImporter.importOneCourse(
@@ -319,7 +326,14 @@ enum ReferenceImporter {
         for entry in plan.leftOut where entry.reason == .addOns {
             addOns += 1
         }
-        line += "; left out \(plan.linksLeftOut) links and \(addOns) Obsidian add-on entries"
+        line += "; \(plan.linksReplaced) links replaced by the shared folder's own"
+        let lost: [String] = plan.leftOutAndLost
+        if lost.isEmpty {
+            line += "; nothing else left out"
+        } else {
+            line += "; left out \(lost.count): " + lost.joined(separator: ", ")
+        }
+        line += "; \(addOns) Obsidian add-on entries left behind"
         if plan.createsEmptyMedia {
             line += "; an empty Media folder was made"
         }
