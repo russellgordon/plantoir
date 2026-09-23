@@ -93,6 +93,16 @@ nonisolated enum ReferenceImportWording {
     static let builtWebsitesAreNotCopied: String =
         "Last year's built websites are not copied. Preview a course and Plantoir builds it again."
 
+    /// Beside a ticked row whose code and school year clash only with a row
+    /// ticked ABOVE it in this same sheet. Nothing is kept yet, so the
+    /// shelf's own sentence ("You already have…") would be false here. Two
+    /// sections of an older-layout course say
+    /// `olderLayoutAnotherSectionOfTheSameCourse` instead.
+    static func alsoTickedForThatYear(folder: String, course: String) -> String {
+        return "\(folder) is also ticked for that school year, and one \(course) is kept for each year. "
+             + "Choose Other or a different school year for one of them."
+    }
+
     /// The button.
     static let importButton: String = "Import"
 

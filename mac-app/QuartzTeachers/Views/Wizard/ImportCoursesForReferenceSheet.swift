@@ -158,9 +158,39 @@ struct ImportCoursesForReferenceSheet: View {
     /// contract's own `oneCourseFailingDoesNotStopTheRest`, and disabling the
     /// button for all of them put it out of a teacher's reach.
     var troubleByCourse: [String: String] {
+        var years: [String: Int?] = [:]
+        for course in courses {
+            // `.some` on purpose: assigning a bare nil to a dictionary whose
+            // values are optional REMOVES the key, and "no year" is a year.
+            years[course.id] = .some(schoolYear(for: course))
+        }
+        return ImportCoursesForReferenceSheet.troubleByCourse(
+            courses: courses,
+            ticked: ticked,
+            years: years,
+            onTheShelf: workspace.shelvedReferenceCourses(on: today)
+        )
+    }
+
+    /// The rule behind `troubleByCourse`, with everything it reads passed in,
+    /// so a test can pin which sentence a row gets.
+    ///
+    /// A clash with a course already ON THE SHELF says so
+    /// (`codeAlreadyInThatYear`). A clash only with a row ticked ABOVE this
+    /// one in the same sheet must not: nothing is kept yet, so "You already
+    /// have…" would be false. Two sections of an older-layout course say they
+    /// are sections; any other pair — `ICD2O-Exemplars`, which sorts above S1
+    /// and takes its year from its pages, is the measured one — says the row
+    /// above is also ticked for that year (`alsoTickedForThatYear`).
+    static func troubleByCourse(
+        courses: [ReferenceImportSource.FoundCourse],
+        ticked: Set<String>,
+        years: [String: Int?],
+        onTheShelf: [ReferenceCourseRule.Shelved]
+    ) -> [String: String] {
         var result: [String: String] = [:]
-        let onTheShelf: [ReferenceCourseRule.Shelved] = workspace.shelvedReferenceCourses(on: today)
         var shelved: [ReferenceCourseRule.Shelved] = onTheShelf
+        var tickedAbove: [ReferenceImportSource.FoundCourse] = []
         for course in courses {
             if let problem = course.problem {
                 result[course.id] = problem
@@ -169,24 +199,38 @@ struct ImportCoursesForReferenceSheet: View {
             guard ticked.contains(course.id) else {
                 continue
             }
-            let year: Int? = schoolYear(for: course)
+            let year: Int? = years[course.id] ?? nil
             if let trouble = ReferenceCourseRule.trouble(
                 placing: course.courseCode, inYear: year, among: shelved
             ) {
-                // Two sections of one OLDER-layout course, both ticked for the
-                // same year: nothing is kept yet, so "You already have…" would
-                // be false. Said as what it is (#254).
                 let clashesOnlyInThisSheet: Bool = ReferenceCourseRule.trouble(
                     placing: course.courseCode, inYear: year, among: onTheShelf
                 ) == nil
-                if clashesOnlyInThisSheet, course.olderLayout != nil,
-                   let sibling = tickedSibling(of: course, before: true) {
-                    result[course.id] = ReferenceImportWording.olderLayoutAnotherSectionOfTheSameCourse(
-                        folder: sibling.folderName
-                    )
+                var rowAbove: ReferenceImportSource.FoundCourse?
+                if clashesOnlyInThisSheet {
+                    let code: String = CourseCodeRule.normalized(course.courseCode)
+                    for other in tickedAbove {
+                        let otherYear: Int? = years[other.id] ?? nil
+                        if rowAbove == nil && CourseCodeRule.normalized(other.courseCode) == code && otherYear == year {
+                            rowAbove = other
+                        }
+                    }
+                }
+                guard let above = rowAbove else {
+                    result[course.id] = trouble.sentence
                     continue
                 }
-                result[course.id] = trouble.sentence
+                let bothAreSections: Bool = (course.olderLayout?.names.looksLikeAClass ?? false)
+                    && (above.olderLayout?.names.looksLikeAClass ?? false)
+                if bothAreSections {
+                    result[course.id] = ReferenceImportWording.olderLayoutAnotherSectionOfTheSameCourse(
+                        folder: above.folderName
+                    )
+                } else {
+                    result[course.id] = ReferenceImportWording.alsoTickedForThatYear(
+                        folder: above.folderName, course: CourseCodeRule.normalized(course.courseCode)
+                    )
+                }
                 continue
             }
             // Counted as taken for the rows below it, exactly as the importer
@@ -194,6 +238,7 @@ struct ImportCoursesForReferenceSheet: View {
             shelved.append(ReferenceCourseRule.Shelved(
                 displayCode: course.courseCode, schoolYear: year, folderName: course.folderName
             ))
+            tickedAbove.append(course)
         }
         return result
     }

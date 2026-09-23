@@ -449,6 +449,12 @@ final class OlderLayoutImportTests: XCTestCase {
             atPath: made.classURL.appendingPathComponent("Thread 1/diagram.png").path,
             withDestinationPath: made.sharedURL.appendingPathComponent("Media/App\u{00e9}tit.png").path
         )
+        // A link inside the add-ons, which are left behind BY DESIGN: not a
+        // loss, and not to be reported as one.
+        try FileManager.default.createSymbolicLink(
+            atPath: made.classURL.appendingPathComponent(".obsidian/plugins/devlinked").path,
+            withDestinationPath: made.sharedURL.path
+        )
         let imported: (outcome: ReferenceImporter.Outcome, courseURL: URL) = try await importTheClass(made.classURL)
         guard case .importedWithSomethingMissing(let madeCourse, false, let leftOut) = imported.outcome else {
             return XCTFail("A picture was dropped and the import called itself complete: \(imported.outcome)")
@@ -463,6 +469,50 @@ final class OlderLayoutImportTests: XCTestCase {
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
         XCTAssertTrue(trail.contains("left out 1: Thread 1/diagram.png"), "The trail does not name it: \(trail)")
         XCTAssertEqual(OlderLayoutImportTests.links(under: imported.courseURL), [])
+    }
+
+    /// Which sentence a ticked row gets when its code and year clash —
+    /// decided outside the view, so it can be pinned. A clash only with a
+    /// row ticked above it in the same sheet never says "You already have…".
+    func testAClashInsideOneSheetIsNotCalledAlreadyKept() throws {
+        let exemplars: ReferenceImportSource.FoundCourse = OlderLayoutImportTests.row("ICD2O-Exemplars")
+        let first: ReferenceImportSource.FoundCourse = OlderLayoutImportTests.row("ICD2O-S1-2023-24")
+        let second: ReferenceImportSource.FoundCourse = OlderLayoutImportTests.row("ICD2O-S2-2023-24")
+        var years: [String: Int?] = [:]
+        years[exemplars.id] = .some(2023)
+        years[first.id] = .some(2023)
+        years[second.id] = .some(2023)
+
+        // A non-section row above S1: the neutral in-sheet sentence.
+        let withExemplars: [String: String] = ImportCoursesForReferenceSheet.troubleByCourse(
+            courses: [exemplars, first], ticked: [exemplars.id, first.id], years: years, onTheShelf: []
+        )
+        XCTAssertNil(withExemplars[exemplars.id])
+        XCTAssertEqual(
+            withExemplars[first.id],
+            ReferenceImportWording.alsoTickedForThatYear(folder: "ICD2O-Exemplars", course: "ICD2O")
+        )
+
+        // Two sections: they say they are sections.
+        let twoSections: [String: String] = ImportCoursesForReferenceSheet.troubleByCourse(
+            courses: [first, second], ticked: [first.id, second.id], years: years, onTheShelf: []
+        )
+        XCTAssertEqual(
+            twoSections[second.id],
+            ReferenceImportWording.olderLayoutAnotherSectionOfTheSameCourse(folder: "ICD2O-S1-2023-24")
+        )
+
+        // Something really on the shelf: then "You already have…" is true.
+        let shelf: [ReferenceCourseRule.Shelved] = [
+            ReferenceCourseRule.Shelved(displayCode: "ICD2O", schoolYear: 2023, folderName: "ICD2O-2023"),
+        ]
+        let alreadyKept: [String: String] = ImportCoursesForReferenceSheet.troubleByCourse(
+            courses: [first], ticked: [first.id], years: years, onTheShelf: shelf
+        )
+        XCTAssertEqual(
+            alreadyKept[first.id],
+            ReferenceCourseRule.Trouble.codeAlreadyInThatYear(code: "ICD2O", schoolYear: 2023).sentence
+        )
     }
 
     /// The copier refuses a link handed to it, so a planner bug fails loudly.
@@ -754,6 +804,10 @@ final class OlderLayoutImportTests: XCTestCase {
             (wording["olderLayoutLeftOut"] as? String)?.replacingOccurrences(of: "{count}", with: "7")
         )
         XCTAssertEqual(
+            ReferenceImportWording.alsoTickedForThatYear(folder: "{folder}", course: "{course}"),
+            wording["alsoTickedForThatYear"] as? String
+        )
+        XCTAssertEqual(
             ReferenceImportWording.olderLayoutChooseOneCourseAtATime(folder: "{folder}"),
             wording["olderLayoutChooseOneCourseAtATime"] as? String
         )
@@ -833,6 +887,32 @@ final class OlderLayoutImportTests: XCTestCase {
         } else {
             XCTAssertNil(course.problem, "\(name): \(course.folderName) has a problem: \(course.problem ?? "")")
         }
+    }
+
+    /// A sheet row for an older-layout class, measured from nothing but its
+    /// name — enough for the rule that picks a row's sentence.
+    private static func row(_ folderName: String) -> ReferenceImportSource.FoundCourse {
+        let names: OlderCourseLayout.NameFacts = OlderCourseLayout.nameFacts(of: folderName)
+        return ReferenceImportSource.FoundCourse(
+            folderName: folderName,
+            courseCode: names.code ?? folderName,
+            courseName: folderName,
+            sectionNumbers: [1],
+            pageCount: 1,
+            fileCount: 1,
+            byteCount: 1,
+            problem: nil,
+            suggestedSchoolYear: 2023,
+            directoryURL: URL(fileURLWithPath: "/nowhere").appendingPathComponent(folderName),
+            olderLayout: OlderCourseLayout.Facts(
+                classFolderName: folderName,
+                names: names,
+                shared: OlderCourseLayout.SharedContent(
+                    howFound: .notNeeded, folderURL: nil, foundNames: [], missingNames: [], linkCount: 0
+                ),
+                chosenWarning: nil
+            )
+        )
     }
 
     private static func sentence(forKey key: String, folder: String) -> String? {
