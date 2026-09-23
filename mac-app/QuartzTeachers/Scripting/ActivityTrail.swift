@@ -520,7 +520,8 @@ nonisolated enum ActivityTrail {
         /// and then as two separate clauses what was LEFT BEHIND by kind with
         /// counts (the website's own program files, links replaced, editing
         /// folders and other sections by name, add-ons) and what was LOST, by
-        /// name. S1's and S2's copies of the pages differ, so "which copy did
+        /// name (a link that showed somewhere unexpected also says where it
+        /// pointed, from the home folder). S1's and S2's copies of the pages differ, so "which copy did
         /// this come from, and what did not come" is a real question, and
         /// only this line answers it. Names and counts only — never what is
         /// written on a page.
