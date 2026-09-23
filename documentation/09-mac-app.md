@@ -1989,7 +1989,14 @@ course, so `ICD2O-Exemplars` (whose pages' dates give it the same year) is not
 called "another section" of ICD2O — and a ticked one that clashes only with a row
 in the same sheet says the same instead of "You already have…"
 (`wording.olderLayoutAnotherSectionOfTheSameCourse`). Filing S2 under Other, or
-another year, keeps it.
+another year, keeps it. Any OTHER clash that exists only inside the sheet —
+the measured one is ticking `ICD2O-Exemplars`, which sorts above S1 and takes
+2023 from its pages' dates — says that the row above is also ticked for that
+year (`wording.alsoTickedForThatYear`), never "You already have…", because
+nothing is kept yet. The choice of sentence is a static function
+(`ImportCoursesForReferenceSheet.troubleByCourse(courses:ticked:years:onTheShelf:)`)
+so `testAClashInsideOneSheetIsNotCalledAlreadyKept` can pin it outside the
+view.
 
 **Where everything lands** (`OlderCourseLayout.plan`, one function the sheet's
 sizes and the importer both use):

@@ -673,11 +673,9 @@ nonisolated enum OlderCourseLayout {
             let parts: [[UInt8]] = OlderCourseLayout.components(of: item.relativePath)
             let first: String = String(decoding: parts[0], as: UTF8.self)
 
-            if item.isSymbolicLink {
-                leftOut.append(LeftOut(path: item.text, inTheSharedFolder: false, reason: .link))
-                continue
-            }
-
+            // The add-ons first, links and all: everything under
+            // `.obsidian/plugins/` is left behind by design, so a link in
+            // there is not a LOSS to be reported (#254 fix review, nit 3).
             if first == ".obsidian" && parts.count >= 2 {
                 let second: String = String(decoding: parts[1], as: UTF8.self)
                 if second == "plugins" || (parts.count == 2 && second == "community-plugins.json") {
@@ -686,6 +684,11 @@ nonisolated enum OlderCourseLayout {
                     }
                     continue
                 }
+            }
+
+            if item.isSymbolicLink {
+                leftOut.append(LeftOut(path: item.text, inTheSharedFolder: false, reason: .link))
+                continue
             }
 
             var destination: [UInt8] = item.relativePath
