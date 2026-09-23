@@ -201,6 +201,11 @@ nonisolated struct ReferenceImportSource: Sendable {
     /// holds a course, because the teacher went one level too deep, is the
     /// kind of refusal that reads as the app being broken.
     ///
+    /// **When none of the three is there, the OLDER folder-per-class layout
+    /// is tried** (`olderLayoutOutcome`, #254) — asked second, so a folder
+    /// holding a `courses` folder or a course's settings is always read the
+    /// modern way whatever else is in it.
+    ///
     /// `leavingBehind` is the whole skip list, passed in rather than read
     /// here so the measuring and the copying cannot disagree about it.
     /// The same, off the main actor.
