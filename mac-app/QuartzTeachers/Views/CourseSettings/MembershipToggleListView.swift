@@ -119,19 +119,18 @@ struct MembershipToggleListView: View {
 
     /// The protection of every row, worked out once per drawing of the list.
     ///
-    /// **Why not in the cell (issue #266).** A `Table` builds each row in a
-    /// part of the view graph of its own. The marks list's protection closure
-    /// reads the course's configuration and walks its folders; called from
-    /// the cell, that question was asked from inside the row. Leaving Course
-    /// Settings for nothing, or for another working folder, then aborted the
-    /// app with "precondition failure: no subgraph": the window's detail pane
-    /// rebuilt the rows of the page it was removing, and the table updated a
-    /// row whose part of the graph was already gone. Bisected on 2026-09-24 —
-    /// the same cell given the same answer as a value survived, and the
-    /// Shared folders table crashed the same way once its cells asked the
-    /// marks question — so the rule for every folder table is: ask in the
-    /// list's body, hand the cell the answer. `CourseSettingsTeardownTests`
-    /// is the must-fail.
+    /// **Why not in the cell (issue #266).** Called from inside a `Table`
+    /// cell, the protection closure made leaving Course Settings — for
+    /// nothing, or for another working folder — abort the app with
+    /// "precondition failure: no subgraph". Bisected on 2026-09-24: the same
+    /// cell handed the same answer as a value survived, and the Shared
+    /// folders table crashed the same way once its cells called the marks
+    /// question. WHY it crashes is not known — a cell reading the course
+    /// through its checkbox binding survived — so this records what was
+    /// measured, not a mechanism: ask in the list's body, hand the cell the
+    /// answer. `CourseSettingsTeardownTests` is the must-fail;
+    /// `documentation/09-mac-app.md` → "A cell never asks the course a
+    /// question" has the bisect.
     func protectionsAsDrawn() -> [String: ItemProtection] {
         var protections: [String: ItemProtection] = [:]
         for row in rows {

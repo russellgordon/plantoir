@@ -1386,7 +1386,11 @@ be emitted by Hide, Expandable and Marks at once); `table-<title>`,
   answers behind one gesture.
 - **Space toggles Hide; Expandable by click or the row's context menu.** A
   table is ONE focusable control, so Full Keyboard Access reaches the second
-  column through the menu ("Hide in the Sidebar", "Expandable in the Sidebar").
+  column through the menu (`SidebarVisibilityTableView.hideMenuTitle` and
+  `.expandableMenuTitle` — the two lists' former titles, so "sidebar" says
+  whose; Plantoir has one of its own). Like Space, Delete and double-click,
+  every row menu offers nothing while the table is disabled
+  (`ListTableMetrics.contextMenuTarget`).
   Type-select is on, so a Space typed inside a type-select run now toggles —
   accepted.
 - **Each checkbox column has its own VoiceOver label** ("Hide Tasks",
@@ -1441,18 +1445,26 @@ survived; a cell that CALLED the `protection` closure crashed — with the
 button and popover taken out, still crashed. Handing the Marks question
 (`gradedFolderProtection`) to the Shared folders table crashed that table too,
 so the four name tables had survived only because of which closure each was
-given. The closures read the course's configuration and walk its folders on
-disk; asked from inside a `Table` row, that work belonged to the row's own
-part of the view graph, and when the window's detail pane rebuilt the page's
-rows on its way out, the table then updated a row whose part was already gone.
-Choosing one of the course's sections did not crash; clearing the selection
+given.
+
+**The mechanism is NOT known.** What was measured is narrower than an
+explanation: calling the protection closure from inside a cell crashes, and
+the same answer handed in as a value does not. It is not simply "a cell read
+the model": the Marks checkbox's own binding getter reads
+`course.configuration.gradedFolders` and, when that is unset, walks the
+course's folders on disk — per cell, on every draw, then and now — and a cell
+doing that read survived the bisect. So do not tidy that getter on the
+strength of this section, and do not read the rule below as "no cell ever
+touches the course"; it is the rule that FIXED the crash, as measured.
+
+Where it showed: choosing one of the course's sections did not crash; clearing the selection
 and changing working folder did.
 
-**The rule.** Every per-row answer a cell needs is worked out in the LIST's
-body (`protectionsAsDrawn()` in `MembershipToggleListView` and
-`StringListEditorView`) and handed to the cell as a value. A cell builds only
-from its row and what it is given; a gesture (a click, Space, Delete) may
-still ask the model at the moment it happens. `CourseSettingsTeardownTests`
+**The rule that fixed it.** A cell never asks the course a question through
+the list's closures: every per-row answer such as a protection is worked out
+in the LIST's body (`protectionsAsDrawn()` in `MembershipToggleListView` and
+`StringListEditorView`) and handed to the cell as a value; a gesture (a
+click, Space, Delete) may still ask the model at the moment it happens. `CourseSettingsTeardownTests`
 is the must-fail (two of its three tests crash the host on the old cells);
 `TickTableTests.testAProtectionATickBringsAboutHoldsAtOnce` guards that the
 answer is not stale after a tick changes it.
