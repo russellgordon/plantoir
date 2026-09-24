@@ -133,6 +133,30 @@ class WorkspaceModel {
         return reloadedCount
     }
 
+    /// Whether ANY open window's copy of the course whose settings live at
+    /// `url` holds changes nobody saved — this window's included (issue #265,
+    /// the review's L1). A preview reads the saved file, and with two windows
+    /// on one folder the unsaved switches can be in the OTHER window's Course
+    /// Settings; asking only the previewing window's copy said nothing then.
+    static func anyCopyHasUnsavedChanges(
+        configFileURL url: URL,
+        in models: [WorkspaceModel] = windowModels
+    ) -> Bool {
+        let wantedPath: String = url.standardizedFileURL.resolvingSymlinksInPath().path
+        for model in models {
+            for course in model.courses {
+                let coursePath: String = course.configFileURL.standardizedFileURL.resolvingSymlinksInPath().path
+                if coursePath != wantedPath {
+                    continue
+                }
+                if course.configuration.hasUnsavedChanges {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     /// True once the app has begun quitting. Windows closing as part of
     /// the quit must not rewrite the remembered list — that is the list
     /// the next launch restores from.

@@ -1320,8 +1320,32 @@ class CourseConfiguration {
         }
     }
 
+    /// What Course Settings' Revert button does: the settings as the FILE
+    /// has them now, not as this copy last read them (issue #265).
+    ///
+    /// A copy with unsaved edits is deliberately left alone when another
+    /// window saves (`WorkspaceModel.followWrite`), so the bytes it last read
+    /// can be older than the file. Reverting to those put the other window's
+    /// Save back on screen as "nothing unsaved" — measured by the review: B
+    /// with an unsaved edit, A saves three hides, B reverts and shows the old
+    /// ten — and B's next Save wrote the old list back over A's, because it
+    /// now looked like a change B had made. Reading the file is what "put it
+    /// back the way it was saved" means when somebody else saved last.
+    ///
+    /// When the file cannot be read, falls back to the bytes this copy last
+    /// read, which is what Revert did before.
+    func revertToFile(at url: URL) throws {
+        if let data = try? Data(contentsOf: url),
+           let dictionary = CourseConfiguration.decodedDictionary(data) {
+            lastSavedData = data
+            values = dictionary
+            return
+        }
+        try discardChanges()
+    }
+
     /// Reverts all in-memory edits back to the last data read from or
-    /// written to disk (the Cancel button).
+    /// written to disk. Course Settings' Revert uses `revertToFile(at:)`.
     func discardChanges() throws {
         let decoded: Any = try JSONSerialization.jsonObject(with: lastSavedData)
         guard let dictionary = decoded as? [String: Any] else {

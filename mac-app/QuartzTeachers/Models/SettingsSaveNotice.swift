@@ -24,30 +24,79 @@ struct SettingsSaveNotice: Equatable {
     // MARK: - Functions
 
     /// What to say after a Save of `courseCode`'s settings, or nil when
-    /// nothing is running that the Save could miss.
+    /// there is nothing to say.
     ///
-    /// A publish running takes precedence, and then Preview Again is NOT
-    /// offered: rebuilding a preview while that course is publishing is
-    /// refused everywhere else in the app (`rebuildAfterRepair`), so a
-    /// button that could only be refused would be worse than none. Once the
-    /// publish finishes, the teacher previews from the section as usual.
+    /// First, when this Save replaced a change to the sidebar list that the
+    /// file had and this window had not read (`replacedChangesFromElsewhere`
+    /// names `hidden`): the last Save wins, but it is SAID — the review's M2,
+    /// ruled by the director for Russell on 2026-09-24. No merge of the two
+    /// lists. Only the sidebar list, because that is the one a teacher reads
+    /// back as "the switches do nothing"; a build no longer writes it, so
+    /// "somewhere else" is another window or a hand edit.
+    ///
+    /// Then what was running. A publish takes precedence, and then Preview
+    /// Again is NOT offered: rebuilding a preview while that course is
+    /// publishing is refused everywhere else in the app
+    /// (`rebuildAfterRepair`), so a button that could only be refused would
+    /// be worse than none. Once the publish finishes, the teacher previews
+    /// from the section as usual.
     static func afterSave(
         folderPath: String,
         courseCode: String,
         previewLeases: [PreviewLeases.Lease],
-        publishes: [CourseActivity.PublishRecord]
+        publishes: [CourseActivity.PublishRecord],
+        replacedChangesFromElsewhere: [String]
     ) -> SettingsSaveNotice? {
         let folder: String = standardised(folderPath)
 
+        var sentences: [String] = []
+        if replacedChangesFromElsewhere.contains("hidden") {
+            sentences.append(SpecialNames.settingsSaveReplacedSidebarChange)
+        }
+
         for publish in publishes {
             if standardised(publish.folderPath) == folder && publish.courseCode == courseCode {
-                return SettingsSaveNotice(
-                    sentences: [SpecialNames.settingsSavedWhilePublishing],
-                    sectionsToPreviewAgain: []
-                )
+                sentences.append(SpecialNames.settingsSavedWhilePublishing)
+                return SettingsSaveNotice(sentences: sentences, sectionsToPreviewAgain: [])
             }
         }
 
+        let previewedSections: [Int] = sectionsPreviewed(
+            folderPath: folderPath, courseCode: courseCode, previewLeases: previewLeases
+        )
+        if !previewedSections.isEmpty {
+            sentences.append(SpecialNames.settingsSavedWhilePreviewing)
+        }
+        if sentences.isEmpty {
+            return nil
+        }
+        return SettingsSaveNotice(sentences: sentences, sectionsToPreviewAgain: previewedSections)
+    }
+
+    /// This notice once Preview Again has been pressed: the preview sentence
+    /// is answered and goes, with the button; any sentence about the Save
+    /// itself stays. Nil when nothing is left to say.
+    func withoutPreviewAgain() -> SettingsSaveNotice? {
+        var remaining: [String] = []
+        for sentence in sentences {
+            if sentence != SpecialNames.settingsSavedWhilePreviewing {
+                remaining.append(sentence)
+            }
+        }
+        if remaining.isEmpty {
+            return nil
+        }
+        return SettingsSaveNotice(sentences: remaining, sectionsToPreviewAgain: [])
+    }
+
+    /// The sections of `courseCode` with a preview leased in this folder,
+    /// in order.
+    static func sectionsPreviewed(
+        folderPath: String,
+        courseCode: String,
+        previewLeases: [PreviewLeases.Lease]
+    ) -> [Int] {
+        let folder: String = standardised(folderPath)
         var previewedSections: [Int] = []
         for lease in previewLeases {
             if standardised(lease.folderPath) == folder && lease.courseCode == courseCode {
@@ -56,14 +105,39 @@ struct SettingsSaveNotice: Equatable {
                 }
             }
         }
-        if previewedSections.isEmpty {
-            return nil
-        }
         previewedSections.sort()
-        return SettingsSaveNotice(
-            sentences: [SpecialNames.settingsSavedWhilePreviewing],
-            sectionsToPreviewAgain: previewedSections
+        return previewedSections
+    }
+
+    /// Of the sections the notice offered to preview again, the ones Preview
+    /// Again can still reach NOW: a preview still leased in this folder, and
+    /// a section window on screen whose preview is running
+    /// (`previewIsRunning` answers nil when no window is registered for the
+    /// section). The notice is worked out at the Save and stays up, so its
+    /// preview can stop, or its window close, before the button is pressed —
+    /// and then the button did nothing and said nothing (the review's L2).
+    /// Empty means the button is disabled and
+    /// `settingsPreviewAgainNothingOpen` is shown instead.
+    static func sectionsStillPreviewed(
+        offered: [Int],
+        folderPath: String,
+        courseCode: String,
+        previewLeases: [PreviewLeases.Lease],
+        previewIsRunning: (Int) -> Bool?
+    ) -> [Int] {
+        let leased: [Int] = sectionsPreviewed(
+            folderPath: folderPath, courseCode: courseCode, previewLeases: previewLeases
         )
+        var reachable: [Int] = []
+        for section in offered {
+            if !leased.contains(section) {
+                continue
+            }
+            if previewIsRunning(section) == true {
+                reachable.append(section)
+            }
+        }
+        return reachable
     }
 
     /// What to say where a preview's progress appears, when it starts while
@@ -122,6 +196,9 @@ struct SettingsSaveNotice: Equatable {
         }
 
         if let notice {
+            if notice.sentences.contains(SpecialNames.settingsSaveReplacedSidebarChange) {
+                line += "; told the teacher this save replaced a sidebar change made elsewhere"
+            }
             if notice.sentences.contains(SpecialNames.settingsSavedWhilePublishing) {
                 line += "; a publish of the course was running, told it uses the earlier settings"
             } else if !notice.sectionsToPreviewAgain.isEmpty {

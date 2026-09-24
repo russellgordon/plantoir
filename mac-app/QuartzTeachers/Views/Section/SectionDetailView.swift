@@ -1103,8 +1103,12 @@ struct SectionDetailView: View {
         }
         previewLease = lease
         previewURL = nil
+        // Every window's copy of this course, not only this window's: the
+        // unsaved switches may be in another window's Course Settings.
+        let anyWindowHasUnsavedSettings: Bool = course.configuration.hasUnsavedChanges
+            || WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: course.configFileURL)
         unsavedSettingsNotice = SettingsSaveNotice.whenPreviewStarts(
-            settingsHaveUnsavedChanges: course.configuration.hasUnsavedChanges
+            settingsHaveUnsavedChanges: anyWindowHasUnsavedSettings
         )
         if unsavedSettingsNotice != nil {
             ActivityTrail.note(

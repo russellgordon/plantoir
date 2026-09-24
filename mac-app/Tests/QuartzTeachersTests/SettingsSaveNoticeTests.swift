@@ -21,7 +21,8 @@ final class SettingsSaveNoticeTests: XCTestCase {
             PreviewLeases.Lease(port: 8083, folderPath: "/Users/teacher/Other", courseCode: "ICS4U", sectionNumber: 1),
         ]
         let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
-            folderPath: folder + "/", courseCode: "ICS4U", previewLeases: leases, publishes: []
+            folderPath: folder + "/", courseCode: "ICS4U", previewLeases: leases, publishes: [],
+            replacedChangesFromElsewhere: []
         )
         XCTAssertEqual(notice?.sentences, [SpecialNames.settingsSavedWhilePreviewing])
         XCTAssertEqual(notice?.sectionsToPreviewAgain, [2])
@@ -30,7 +31,8 @@ final class SettingsSaveNoticeTests: XCTestCase {
     @MainActor
     func testASaveWithNothingRunningSaysNothing() {
         XCTAssertNil(SettingsSaveNotice.afterSave(
-            folderPath: folder, courseCode: "ICS4U", previewLeases: [], publishes: []
+            folderPath: folder, courseCode: "ICS4U", previewLeases: [], publishes: [],
+            replacedChangesFromElsewhere: []
         ))
     }
 
@@ -45,10 +47,155 @@ final class SettingsSaveNoticeTests: XCTestCase {
             CourseActivity.PublishRecord(folderPath: folder, courseCode: "ICS4U", sectionNumber: 2),
         ]
         let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
-            folderPath: folder, courseCode: "ICS4U", previewLeases: leases, publishes: publishes
+            folderPath: folder, courseCode: "ICS4U", previewLeases: leases, publishes: publishes,
+            replacedChangesFromElsewhere: []
         )
         XCTAssertEqual(notice?.sentences, [SpecialNames.settingsSavedWhilePublishing])
         XCTAssertEqual(notice?.sectionsToPreviewAgain, [])
+    }
+
+    // MARK: - Both windows changed the sidebar list (the review's M2)
+
+    /// The last Save wins, and it is SAID — with nothing running as well,
+    /// where the notice used to be nil.
+    @MainActor
+    func testASaveThatReplacedAnotherWindowsSidebarChangeSaysSo() {
+        let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
+            folderPath: folder, courseCode: "ICS4U", previewLeases: [], publishes: [],
+            replacedChangesFromElsewhere: ["hidden"]
+        )
+        XCTAssertEqual(notice?.sentences, [SpecialNames.settingsSaveReplacedSidebarChange])
+        XCTAssertEqual(notice?.sectionsToPreviewAgain, [])
+    }
+
+    /// Only the sidebar list: a setting both windows changed elsewhere is on
+    /// the trail, not on screen.
+    @MainActor
+    func testAnotherReplacedSettingIsNotSaidOnScreen() {
+        XCTAssertNil(SettingsSaveNotice.afterSave(
+            folderPath: folder, courseCode: "ICS4U", previewLeases: [], publishes: [],
+            replacedChangesFromElsewhere: ["show_reading_time"]
+        ))
+    }
+
+    /// With a preview open too, the Save's own sentence comes first and
+    /// Preview Again is still offered; pressing it answers only the preview.
+    @MainActor
+    func testTheReplacedSentenceComesFirstAndOutlivesPreviewAgain() {
+        let leases: [PreviewLeases.Lease] = [
+            PreviewLeases.Lease(port: 8081, folderPath: folder, courseCode: "ICS4U", sectionNumber: 1),
+        ]
+        let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
+            folderPath: folder, courseCode: "ICS4U", previewLeases: leases, publishes: [],
+            replacedChangesFromElsewhere: ["hidden"]
+        )
+        XCTAssertEqual(notice?.sentences, [
+            SpecialNames.settingsSaveReplacedSidebarChange, SpecialNames.settingsSavedWhilePreviewing,
+        ])
+        XCTAssertEqual(notice?.sectionsToPreviewAgain, [1])
+        XCTAssertEqual(notice?.withoutPreviewAgain()?.sentences, [SpecialNames.settingsSaveReplacedSidebarChange])
+        XCTAssertEqual(notice?.withoutPreviewAgain()?.sectionsToPreviewAgain, [])
+
+        let previewOnly: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
+            folderPath: folder, courseCode: "ICS4U", previewLeases: leases, publishes: [],
+            replacedChangesFromElsewhere: []
+        )
+        XCTAssertNil(previewOnly?.withoutPreviewAgain())
+    }
+
+    /// The whole path, end to end on real files: two windows, both change
+    /// the list, the second Save's result drives the notice and the trail.
+    @MainActor
+    func testTwoWindowsChangingTheListProduceTheSentenceAndTheTrailLine() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SettingsSaveNotice-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fileURL: URL = root.appendingPathComponent("course_config.json")
+        let seed: [String: Any] = ["course_code": "ICS4U", "hidden": ["Media", "Tasks"]]
+        try JSONSerialization.data(withJSONObject: seed, options: [.sortedKeys]).write(to: fileURL)
+
+        let windowA: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+        let windowB: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+        windowA.hiddenItems = ["Media"]
+        try windowA.write(to: fileURL)
+        windowB.hiddenItems = ["Media", "Tasks", "Style"]
+        let result: CourseConfiguration.WriteResult = try windowB.write(to: fileURL)
+
+        let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
+            folderPath: folder, courseCode: "ICS4U", previewLeases: [], publishes: [],
+            replacedChangesFromElsewhere: result.replacedChangesFromElsewhere
+        )
+        XCTAssertEqual(notice?.sentences, [SpecialNames.settingsSaveReplacedSidebarChange])
+        let line: String = SettingsSaveNotice.trailLine(
+            courseCode: "ICS4U", hiddenBefore: ["Media"], hiddenAfter: windowB.hiddenItems,
+            result: result, notice: notice
+        )
+        XCTAssertTrue(line.contains("replaced what another window or a build had changed (hidden)"))
+        XCTAssertTrue(line.contains("told the teacher this save replaced a sidebar change made elsewhere"))
+    }
+
+    // MARK: - Preview Again with nothing left to reach (the review's L2)
+
+    /// The notice is worked out at the Save and stays up. A preview that has
+    /// stopped since — lease released, or its window gone (no controller), or
+    /// the window there with its preview no longer running — is not offered.
+    @MainActor
+    func testPreviewAgainOffersOnlyPreviewsStillRunning() {
+        let leases: [PreviewLeases.Lease] = [
+            PreviewLeases.Lease(port: 8081, folderPath: folder, courseCode: "ICS4U", sectionNumber: 1),
+            PreviewLeases.Lease(port: 8082, folderPath: folder, courseCode: "ICS4U", sectionNumber: 2),
+            PreviewLeases.Lease(port: 8083, folderPath: folder, courseCode: "ICS4U", sectionNumber: 3),
+        ]
+        let answers: [Int: Bool] = [1: true, 3: false]
+        let reachable: [Int] = SettingsSaveNotice.sectionsStillPreviewed(
+            offered: [1, 2, 3, 4],
+            folderPath: folder,
+            courseCode: "ICS4U",
+            previewLeases: leases,
+            previewIsRunning: { section in
+                return answers[section]
+            }
+        )
+        XCTAssertEqual(reachable, [1], "2 has no window, 3 is not running, 4 has no lease")
+
+        let nothingLeft: [Int] = SettingsSaveNotice.sectionsStillPreviewed(
+            offered: [1], folderPath: folder, courseCode: "ICS4U", previewLeases: [],
+            previewIsRunning: { section in
+                return true
+            }
+        )
+        XCTAssertEqual(nothingLeft, [])
+    }
+
+    // MARK: - Unsaved settings in ANY window (the review's L1)
+
+    @MainActor
+    func testUnsavedSettingsInTheOtherWindowCount() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SettingsSaveNotice-" + UUID().uuidString)
+        let courseURL: URL = root.appendingPathComponent("courses/ICS4U")
+        try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fileURL: URL = courseURL.appendingPathComponent("course_config.json")
+        try JSONSerialization.data(withJSONObject: ["course_code": "ICS4U"], options: []).write(to: fileURL)
+
+        let suiteName: String = "SettingsSaveNoticeTests-" + UUID().uuidString
+        let defaults: UserDefaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let windowA: Course = Course(code: "ICS4U", directoryURL: courseURL, configuration: try CourseConfiguration(contentsOf: fileURL))
+        let windowB: Course = Course(code: "ICS4U", directoryURL: courseURL, configuration: try CourseConfiguration(contentsOf: fileURL))
+        let modelA: WorkspaceModel = WorkspaceModel(defaults: defaults)
+        let modelB: WorkspaceModel = WorkspaceModel(defaults: defaults)
+        modelA.courses = [windowA]
+        modelB.courses = [windowB]
+
+        XCTAssertFalse(WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: fileURL, in: [modelA, modelB]))
+        windowB.configuration.showReadingTime = true
+        XCTAssertFalse(windowA.configuration.hasUnsavedChanges, "the previewing window's own copy says nothing")
+        XCTAssertTrue(WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: fileURL, in: [modelA, modelB]))
     }
 
     @MainActor
@@ -114,6 +261,8 @@ final class SettingsSaveNoticeTests: XCTestCase {
             "settingsSavedWhilePreviewing": SpecialNames.settingsSavedWhilePreviewing,
             "settingsSavedWhilePublishing": SpecialNames.settingsSavedWhilePublishing,
             "previewUsesSavedSettings": SpecialNames.previewUsesSavedSettings,
+            "settingsSaveReplacedSidebarChange": SpecialNames.settingsSaveReplacedSidebarChange,
+            "settingsPreviewAgainNothingOpen": SpecialNames.settingsPreviewAgainNothingOpen,
         ]
         for (key, sentence) in expected {
             let entry: [String: Any] = try XCTUnwrap(section[key] as? [String: Any], "specialNames.\(key) is missing")
@@ -128,6 +277,8 @@ final class SettingsSaveNoticeTests: XCTestCase {
             SpecialNames.settingsSavedWhilePreviewing,
             SpecialNames.settingsSavedWhilePublishing,
             SpecialNames.previewUsesSavedSettings,
+            SpecialNames.settingsSaveReplacedSidebarChange,
+            SpecialNames.settingsPreviewAgainNothingOpen,
         ]
         let forbidden: [String] = ["toolchain", "script", "docker", "container", "symlink", "vault", "config", "json", "build"]
         for sentence in sentences {
@@ -164,6 +315,23 @@ final class SettingsSaveNoticeTests: XCTestCase {
         XCTAssertTrue(
             settingsSource.contains("reloadIfNothingUnsaved(url:"),
             "Course Settings no longer reads the file again when opened, so a folder the build discovered is not offered"
+        )
+        XCTAssertTrue(noticeSource.contains("SpecialNames.settingsSaveReplacedSidebarChange"))
+        XCTAssertTrue(
+            settingsSource.contains("replacedChangesFromElsewhere: result.replacedChangesFromElsewhere"),
+            "Course Settings no longer tells the notice what its Save replaced"
+        )
+        XCTAssertTrue(
+            settingsSource.contains("Text(SpecialNames.settingsPreviewAgainNothingOpen)"),
+            "Course Settings no longer says when Preview Again has nothing to reach"
+        )
+        XCTAssertTrue(
+            settingsSource.contains(".disabled(sectionsStillPreviewed(offered:"),
+            "Preview Again is no longer disabled when its preview has stopped"
+        )
+        XCTAssertTrue(
+            sectionSource.contains("WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL:"),
+            "Starting a preview no longer asks every window about unsaved settings"
         )
         XCTAssertTrue(sectionSource.contains("SettingsSaveNotice.whenPreviewStarts("), "Starting a preview no longer asks about unsaved settings")
         XCTAssertTrue(sectionSource.contains("Text(unsavedSettingsNotice)"), "The section no longer draws the unsaved-settings sentence")
