@@ -597,7 +597,12 @@ nonisolated enum AssistWording {
     // MARK: - When the answer did not finish
 
     /// The engine stopped the assistant part way through its answer, so
-    /// whatever it had begun to ask for was thrown away unread.
+    /// whatever it had begun to ask for was thrown away unread — or a finished
+    /// answer's arguments could not be read at all, which the teacher cannot
+    /// tell apart from the first and is mended the same way. NOT said when a
+    /// finished answer wrote nothing: that one has its own sentence,
+    /// `answerLeftOutWhatItWasFor` (issue #198), because the advice below is
+    /// about the teacher's request and an empty answer is not its fault.
     ///
     /// Three things it has to do, in this order. **Say the answer did not
     /// finish**, because the teacher has just waited for one. **Say that
@@ -629,6 +634,30 @@ nonisolated enum AssistWording {
     static let answerWasCutOff: String =
         "I didn't get to the end of that, so I haven't changed anything. Ask me again — "
         + "a shorter sentence, or fewer pages at a time."
+
+    /// A tool was asked for with no course at all — which reaches the runner
+    /// only from outside the app, over MCP, where nothing binds a window's own
+    /// course onto the call (issue #198).
+    ///
+    /// Replaces "There is no course called “” in this working folder", which
+    /// is false in its own terms (it names a course nobody named) and reads,
+    /// relayed to a teacher, as a complaint about what they typed.
+    static let noCourseNamed: String = "No course was named, so nothing was done."
+
+    /// A finished answer chose a tool that needs something this window cannot
+    /// supply — which pages, which day, which time — and wrote nothing for it,
+    /// so nothing was done (issue #198).
+    ///
+    /// Its own sentence rather than `answerWasCutOff`, whose advice ("a
+    /// shorter sentence, or fewer pages") is about the teacher's request. Here
+    /// the teacher had named what they meant and the assistant dropped it, so
+    /// the sentence owns that — it is the assistant that did not work it out —
+    /// and asks for nothing but the same request again. "Nothing was done" is
+    /// true for the same reasons as in `answerWasCutOff`: the gate that says
+    /// this sits above every tool.
+    static let answerLeftOutWhatItWasFor: String =
+        "I did not work out which pages, day or time you meant, so nothing was done. "
+      + "Please ask me again."
 
     // MARK: - When the answer was the question again
 
