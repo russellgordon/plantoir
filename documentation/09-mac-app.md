@@ -1516,6 +1516,29 @@ Course Settings also re-reads the file each time it is opened
 relaunch. The rule and its cases: `contracts/shared-rules.json` →
 `savingSettings`, run against `CourseConfiguration.merged`.
 
+**Revert reads the FILE** (`revertToFile(at:)`, the fix round's M1). A copy
+with unsaved edits is deliberately skipped by `followWrite`, so the bytes it
+last read can be older than the file. Reverting to those — what the button did
+first — measured badly in the review: window B with an unsaved edit, A saves
+three hides, B presses Revert and shows the OLD ten with "nothing unsaved", and
+B's next hide is then a change B "made" to a ten-item list, so its Save wrote
+eleven hides and took A's "All Classes" away. Reverting to the file is what
+"put it back the way it was saved" means when somebody else saved last. An
+unreadable file falls back to the old behaviour. Must-fail:
+`TwoWindowSettingsTests.testRevertShowsTheFileAndTheNextSaveDoesNotPutTheOldListBack`.
+
+**When both windows changed the sidebar list, the last Save wins — and says
+so** (the review's M2; ruled by the director for Russell, 2026-09-24). The
+merge is per key, so two windows that both changed `hidden` cannot both win;
+the later Save writes its whole list. That used to reach only the trail. Now,
+when the Save's `replacedChangesFromElsewhere` names `hidden`,
+`SpecialNames.settingsSaveReplacedSidebarChange` is the first after-Save
+sentence — with nothing running as well — and the trail line adds that the
+teacher was told. Only the sidebar list is said on screen: it is the one a
+teacher reads back as "the switches do nothing", and another setting replaced
+this way stays on the trail. Rejected again, for the reason below: merging the
+two lists.
+
 **Rejected**, and why:
 - *Merging inside lists* (union the two `hidden` lists, say): needs rules for
   order and for an item removed on one side and added on the other; nothing
@@ -1535,19 +1558,57 @@ served sidebar filter was unchanged. So:
   (Russell's choice). Leaving a section for its course's settings STOPS that
   section's preview (`SectionDetailView.onDisappear`), so an open preview is in
   ANOTHER window; the button restarts it through `SectionWindowControllers` —
-  the same stop-then-start the assistant uses — and a section whose preview has
-  since stopped is left alone.
+  the same stop-then-start the assistant uses. The notice is worked out at the
+  Save and stays up, so the preview it names can stop, or its window close,
+  before the button is pressed; the button then did nothing and said nothing
+  (the review's L2). Measured from the code: an in-app lease is taken only in
+  `SectionDetailView.startPreview` and released in the same synchronous
+  `onDisappear` that unregisters the window, so a lease with no window does not
+  persist — what persists is the notice. So Preview Again is live:
+  `SettingsSaveNotice.sectionsStillPreviewed` keeps a section only while its
+  lease is held AND its window is registered AND its preview is running, the
+  button is disabled when none is left, and
+  `SpecialNames.settingsPreviewAgainNothingOpen` is shown instead. Reading
+  `PreviewLeases.active` (observable) is what redraws it; a press that reaches
+  nothing in the instant between still leaves a trail line.
 - **A publish of the course is running** (the plan review's A3) →
   `settingsSavedWhilePublishing` instead, and NO button: a preview is refused
   while that course publishes (`rebuildAfterRepair`), so a button that could only
-  be refused would be worse than none. Worth knowing: because the Save changed
-  no page, the next Publish may call the site up to date and send the same build
-  again (`BuildFreshness` compares page times with `index.html`). Rejected for
-  now: teaching `needsRebuild` to compare the build's copy of the settings with
-  the file — a publish-path change for a case the sentence already names.
+  be refused would be worse than none. The sentence tells the teacher to
+  Publish again once this one finishes, and that advice is TRUE only because
+  of the freshness fix below (the review's H1): until it, the next Publish
+  called the site up to date and sent the same old build, reporting success.
+- **The next Publish rebuilds after a Save made during a build** (the fix
+  round's H1). `BuildFreshness.needsRebuild` compared the course's files with
+  the time `index.html` was WRITTEN — the END of the build — while the build
+  read the settings at its START, so a Save in between was older than the page
+  and looked published. `build_site.py` now makes
+  `.merged_output/section<N>/.build-started.pending` before it reads anything
+  and renames it to `.build-started` once the site is copied out, and
+  `needsRebuild` compares with the earlier of that file's time and the page's
+  (`referenceDate`; an early answer only costs a rebuild, a late one sends a
+  stale site; no file means the page's time, as before). The scheduled publish's
+  generated shell makes the same choice (`FRESH_SINCE` in
+  `ScheduledDeploy.oneShotCommand`). It covers a PAGE saved during a build as
+  well, which was the same hole. **Measured** before choosing it: a file made
+  from inside the Colima container on a bind mount is stamped by the MAC's
+  clock (5 of 5 creations stamped 55–67 ms before the container's own clock
+  read just ahead of them), so the marker and the teacher's Save are on one
+  clock and no time is written into the file. **Rejected:** the plan review's
+  A3 amendment, comparing the build's copy of `course_config.json` with the
+  course's — the build copies the settings some seconds AFTER it reads them, so
+  a Save in between matches the copy and is still missed, and it would not
+  catch a page; and writing `time.time()` into the marker, which compares two
+  clocks. Must-fails: `BuildFreshnessTests.testSettingsSavedWhileThePublishWasBuildingMeanRebuild`,
+  `ScheduledPublishOutcomeTests.testTheOvernightRunBuildsWhenSettingsWereSavedDuringTheLastBuild`
+  (runs the generated shell), `scripts/test_build_started_marker.py`. Contract:
+  `app-rules.json` → `buildFreshness` (the rule and `buildStartedMarker`).
 - The notice does not fade (unlike "Saved ✓"); it stays until the next Save,
-  Preview Again, or leaving the course.
-- **A preview STARTS while Course Settings holds unsaved changes** →
+  Preview Again (which takes away only the preview sentence and its button — a
+  sentence about the Save itself stays), or leaving the course.
+- **A preview STARTS while Course Settings holds unsaved changes** — in ANY
+  window on the folder (`WorkspaceModel.anyCopyHasUnsavedChanges`, the review's
+  L1; the unsaved switches can be in the other window) →
   `previewUsesSavedSettings` above the preview. Unsaved edits live in the
   course's shared configuration and survive leaving the form, so the switches
   and the page could disagree with nothing said. Rejected: saving automatically
@@ -1559,7 +1620,8 @@ served sidebar filter was unchanged. So:
 
 **The trail.** `settings saved` now says what the Save hid and showed (names
 only, compared with the file before the Save), which settings it kept or
-replaced from elsewhere, and whether a preview or a publish was running — the
+replaced from elsewhere (and, for the sidebar list, that the teacher was told),
+and whether a preview or a publish was running — the
 line that would have settled #265 in one read. New: `preview started with
 unsaved settings` and `preview again after settings saved`.
 
