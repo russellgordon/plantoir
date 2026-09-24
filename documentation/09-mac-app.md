@@ -766,17 +766,40 @@ putting a figure anywhere.
 
 ### What is still owed, and what was rejected
 
-**Owed, and NOT yet opened as an issue when this was written — open one:** the
-launchers print "🐳 Setting up this Mac — a
-one-time step that runs on its own…" and "▶️  Starting Colima…"
-(`setup.sh:563/573`, `preview.sh:788/798`, `deploy.sh:1255/1265`). Now that
-quitting really stops the machine, the first is untrue — it happens every
-morning — and the second names the machinery (rule 1). **Whatever replaces them
-must keep the substring "Setting up this Mac"**: the app matches the milestone
-on it (`contracts/app-rules.json` → `milestones`, `markerOrigins`), and a
-rewrite that drops those four words stops the progress bar moving with no other
-symptom. Not taken here because it is a launcher change, which drags in a
-foreground `verify.sh` and the whole toolchain travel chain.
+**Done since, as GitHub #228 (2026-09-23): the first-start lines.** The
+launchers used to print "🐳 Setting up this Mac — a one-time step that runs on
+its own…" and "▶️  Starting Colima…" (in `ensure_container_runtime`, identical
+in `setup.sh`, `preview.sh` and `deploy.sh`). Once quitting really stops the
+machine, the first is untrue — it happens again after every quit that stopped
+it, several times a day for a teacher who quits often — and the second names
+the machinery (rule 1). They now print "🐳 Setting up this Mac…" and
+"▶️  Starting the website builder…".
+
+- **The four words "Setting up this Mac" are kept verbatim**: the app matches
+  the milestone on them (`contracts/app-rules.json` → `milestones`,
+  `markerOrigins`), and a rewrite that drops them stops the progress bar moving
+  with no other symptom. The existing marker test passed if ANY one launcher
+  printed a marker, so `AppRulesContractTests.testEveryLauncherKeepsTheSetUpMarkerAndNamesNoMachinery`
+  now asks each of the three, and pins that no `echo` says "one-time step" or
+  "Starting Colima".
+- **A second reader of the old line**: `ScriptRunner.friendlyPhase` mapped the
+  marker "Starting Colima" to "Starting up (first time can take a few
+  minutes)…". It now matches "Starting the website builder" (pinned by
+  `ScriptRunnerStatusTests.testStartingTheWebsiteBuilderIsAPhase`); without
+  that move the phase would have fallen back to the previous one, silently. No
+  alias for the old marker: the app refreshes a folder's launchers from its
+  bundle before running them.
+- **No duration is claimed**, because the warm start is unmeasured (above).
+  REJECTED: the issue's own suggestion "this takes a moment the first time each
+  day" — after #220 the machine can stop and start several times a day.
+- **The word "Colima" has NOT left the console.** `colima start` writes its own
+  `INFO[…] starting colima` lines into the details a teacher can open, and the
+  same function still prints four more lines that name the machinery ("Waiting
+  for the container runtime to be ready…", "Docker isn't responding yet —
+  restarting Colima…", the "(Colima is shared …)" note, and "Colima did not
+  become ready…"). They were outside #228's two lines and are left for a
+  follow-up; "Waiting for the container runtime" is also a `friendlyPhase`
+  marker, so moving it means moving that too.
 
 **REJECTED — write the tools folder into `~/.zprofile` at install.** Plantoir
 editing a teacher's shell profile is exactly the machinery the product hides, it

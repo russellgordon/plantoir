@@ -1129,7 +1129,9 @@ class ScriptRunner {
             ("Parsing input files", "Building your site…"),
             ("Installing dependencies", "Preparing your site (first time can take a few minutes)…"),
             ("Pulling", "Downloading components (first time can take a few minutes)…"),
-            ("Starting Colima", "Starting up (first time can take a few minutes)…"),
+            // The launchers print "▶️  Starting the website builder…" here;
+            // it said "Starting Colima…" until 2026-09-23 (GitHub #228).
+            ("Starting the website builder", "Starting up (first time can take a few minutes)…"),
             ("Waiting for the container runtime", "Starting up…"),
             ("delta deploy", "Deploying your site…"),
             ("Uploaded", "Deploying your site…"),
