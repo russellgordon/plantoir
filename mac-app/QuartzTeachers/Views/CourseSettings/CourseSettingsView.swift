@@ -219,15 +219,10 @@ struct CourseSettingsView: View {
                 }
 
                 Section {
-                    MembershipToggleListView(
-                        title: "Hide from the site's sidebar",
+                    SidebarVisibilityTableView(
                         allItems: configuration.allSidebarItems,
-                        members: $configuration.hiddenItems
-                    )
-                    MembershipToggleListView(
-                        title: "Expandable in the site's sidebar",
-                        allItems: configuration.allSidebarItems,
-                        members: $configuration.expandableItems
+                        hidden: $configuration.hiddenItems,
+                        expandable: $configuration.expandableItems
                     )
                 } header: {
                     FormSectionHeader("Sidebar Visibility")
