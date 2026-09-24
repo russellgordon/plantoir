@@ -287,7 +287,10 @@ nonisolated enum ActivityTrail {
         /// Three things turn one off without being asked: removing the course,
         /// removing the section, and the day it was set for going by — and the
         /// line says WHICH, in the teacher's own terms, carrying the course and
-        /// the section. One event with three reasons rather than three events:
+        /// the section. A fourth since issue #195: a new deploy set in its place
+        /// that then could not be set — the old one is booted out first, so a
+        /// refusal leaves neither, and the line carries when the lost one was
+        /// set for. One event with three reasons rather than three events:
         /// somebody reading the trail wants to know their overnight deploy was
         /// turned off and by what, and the difference between two ways of
         /// removing something means nothing to them.

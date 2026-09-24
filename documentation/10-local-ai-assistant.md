@@ -475,9 +475,13 @@ remember that it is different.
   (`ScheduledDeploy` removes any previous job). When this family landed,
   neither the card nor the summary said so; since
   [#195](https://github.com/russellgordon/plantoir/issues/195) (2026-09-23)
-  the card, the schedule sheet and the plan name the moment being replaced
+  the card, the schedule sheet, the plan and the tool's own result (the only
+  thing an MCP caller sees) name the moment being replaced
   (`wording.scheduleReplaces`, read Mac-wide) and the trail records it
-  (`scheduled deploy replaced`). The reasoning is in
+  (`scheduled deploy replaced`). A job from another working folder set for
+  the same minute still says nothing, and one from another folder is named
+  with no clock or Cancel for it in this window — both left to
+  [#237](https://github.com/russellgordon/plantoir/issues/237). The reasoning is in
   [`07-deployment.md`](07-deployment.md) → "Scheduling a section that already
   has a deploy set".
 - **On the morning the clocks go forward, a wall time may not exist**, and the

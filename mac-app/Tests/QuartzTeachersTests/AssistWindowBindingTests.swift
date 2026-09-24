@@ -159,6 +159,18 @@ final class AssistWindowBindingTests: XCTestCase {
     func testTheSameCourseInAnotherCasingRunsInThisWindowsSpelling() async throws {
         let made: AssistFixture.Made = try AssistFixture.makeRunner(hasDeployedBefore: true)
         defer { try? FileManager.default.removeItem(at: made.root) }
+        // The scheduled card reads whether a deploy is already set for the
+        // section (issue #195); it must read a folder this test owns, never
+        // the real ~/Library/LaunchAgents of whoever runs the suite.
+        let launchAgents: URL = made.root.appendingPathComponent("LaunchAgents", isDirectory: true)
+        try FileManager.default.createDirectory(at: launchAgents, withIntermediateDirectories: true)
+        ScheduledDeploy.launchAgentsDirectoryOverride = launchAgents
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            launchAgents.deletingLastPathComponent().appendingPathComponent("scheduled")
+        defer {
+            ScheduledDeploy.launchAgentsDirectoryOverride = nil
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+        }
 
         let engine: StubEngine = try StubEngine()
         defer { engine.stop() }
