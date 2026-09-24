@@ -223,6 +223,15 @@ else
   cat /tmp/verify_preflight_exclusions_test.log
 fi
 
+# Issue #265: the build never changes `hidden`, the sidebar filter keeps the
+# stored names, and an older section's filter is repaired.
+if (cd scripts && python3 test_sidebar_hiding.py) >/tmp/verify_sidebar_hiding_test.log 2>&1; then
+  pass "build_site.py: the build keeps hidden as saved, and the sidebar filter and its repair (scripts/test_sidebar_hiding.py)"
+else
+  fail "build_site.py: the build keeps hidden as saved, and the sidebar filter and its repair (scripts/test_sidebar_hiding.py)"
+  cat /tmp/verify_sidebar_hiding_test.log
+fi
+
 if (cd scripts && python3 test_publishable_site.py) >/tmp/verify_publishable_site_test.log 2>&1; then
   pass "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
 else
