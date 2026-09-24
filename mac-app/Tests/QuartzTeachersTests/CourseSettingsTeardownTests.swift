@@ -9,18 +9,17 @@ import XCTest
 /// **The fault this pins.** With the settings page showing, simply choosing
 /// nothing in the sidebar — or another working folder, or one of the
 /// course's sections — aborted the whole app with SwiftUI's "precondition
-/// failure: no subgraph". The trigger was a table CELL that asked the course
-/// a question while it was being drawn: the marks table's tick cell called
-/// its `protection` closure, which reads the course's configuration and walks
-/// its folders. When the detail pane was replaced, SwiftUI rebuilt the rows
-/// of the page it was about to throw away, and the table then updated a row
-/// whose part of the view graph was already gone. Measured by bisecting on
-/// 2026-09-24: only the marks table crashed; a plain cell, a cell given the
-/// same answer worked out BEFORE the table, and the other tables all survived,
-/// while the Shared folders table crashed too the moment its cells were handed
-/// the marks table's question. The rule since then — every per-row answer is
-/// worked out in the list's own body and handed to the cell as a value — is
-/// written up in `documentation/09-mac-app.md`.
+/// failure: no subgraph". The measured trigger was a table CELL calling the
+/// list's `protection` closure while it was drawn: the marks table's tick
+/// cell called it (the closure reads the course's configuration and walks
+/// its folders). Measured by bisecting on 2026-09-24: only the marks table
+/// crashed; a plain cell, a cell given the same answer worked out BEFORE the
+/// table, a cell reading the list's binding, and the other tables all
+/// survived, while the Shared folders table crashed too the moment its cells
+/// called the marks table's question. WHY is not known. The rule that fixed
+/// it — every per-row protection is worked out in the list's own body and
+/// handed to the cell as a value — is written up in
+/// `documentation/09-mac-app.md`.
 ///
 /// **Why the real window and not `TableHost`.** Hosting `CourseSettingsView`
 /// on its own and removing it did NOT crash, in any of five variants tried
