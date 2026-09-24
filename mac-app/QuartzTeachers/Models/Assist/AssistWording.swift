@@ -81,7 +81,11 @@ nonisolated enum AssistWording {
     /// <time>" was matched in code (#168) and scheduling stopped being the rare
     /// path. It must never carry the word "now", and it must differ from
     /// `deployQuestion`; a test pins both rather than the words.
-    static let scheduleQuestion: String = "Shall I schedule it?"
+    ///
+    /// A FIRST DRAFT for Russell's wording pass. It names "the deploy" rather
+    /// than saying "it", because the card above ends on a sentence about this
+    /// Mac, and "it" would read as the Mac.
+    static let scheduleQuestion: String = "Shall I schedule the deploy?"
 
     /// The question under a plan card.
     static let planQuestion: String = "Shall I go ahead?"
