@@ -276,10 +276,17 @@ struct StringListEditorView: View {
     // MARK: - The table
 
     /// The names, one row each, in the order they are stored.
+    ///
+    /// Each row's protection is asked for HERE and handed to its cell as a
+    /// value — never asked from inside the cell. See
+    /// `MembershipToggleListView.protectionsAsDrawn()` for the crash that
+    /// rule prevents (issue #266); this table survived it only because of
+    /// which question it happened to be given.
     var nameTable: some View {
-        Table(rows, selection: $selectedRowID) {
+        let protections: [String: ItemProtection] = protectionsAsDrawn()
+        return Table(rows, selection: $selectedRowID) {
             TableColumn(title) { (row: ListTableRow) in
-                nameCell(for: row.name)
+                nameCell(for: row.name, protection: protections[row.name] ?? .ordinary)
             }
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
@@ -328,7 +335,7 @@ struct StringListEditorView: View {
     /// One row: the name, then — as before the table — the rename pencil
     /// and, for a name that cannot be removed, the button that says why.
     @ViewBuilder
-    func nameCell(for item: String) -> some View {
+    func nameCell(for item: String, protection itemProtection: ItemProtection) -> some View {
         let displayName: String = StringListEditorView.displayName(for: item, hidingMarkdownExtension: hidesMarkdownExtension)
         HStack {
             Text(displayName)
@@ -346,7 +353,7 @@ struct StringListEditorView: View {
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("rename-\(item)")
             }
-            if case .blocked(let reason) = protection?(item) ?? .ordinary {
+            if case .blocked(let reason) = itemProtection {
                 Button("Why \(displayName) can’t be removed", systemImage: "info.circle") {
                     activeExplanation = ActiveExplanation(item: item, reason: reason)
                     ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be removed from " + title + " — " + reason)
@@ -460,6 +467,18 @@ struct StringListEditorView: View {
     }
 
     // MARK: - Functions
+
+    /// The protection of every row, worked out once per drawing of the table
+    /// and handed to the cells — the rule `nameTable` explains.
+    func protectionsAsDrawn() -> [String: ItemProtection] {
+        var protections: [String: ItemProtection] = [:]
+        for row in rows {
+            if protections[row.name] == nil {
+                protections[row.name] = protection?(row.name) ?? .ordinary
+            }
+        }
+        return protections
+    }
 
     /// How one stored item appears in the list.
     static func displayName(for item: String, hidingMarkdownExtension: Bool) -> String {
