@@ -550,7 +550,7 @@ wrong section on one platform.
 
 ### Stopping a build: exit 130, and no traceback
 
-Pressing Stop while a preview is building or serving goes through the app's
+Pressing Cancel in the progress view while a preview is building goes through the app's
 cancel path (`ScriptRunner.cancelByUser`), which types a `^C` into the
 console. Through the launcher's `docker exec -it` that arrives inside the
 container as SIGINT, and Python raises `KeyboardInterrupt` wherever the build
@@ -587,9 +587,12 @@ reaches `main()`, so no node server is left behind. Pinned by
   `stop_preview.py` (SIGTERM by default) already end Python without a
   traceback, because SIGTERM does not raise `KeyboardInterrupt`.
 - **Not in this change:** `scripts/deploy.py` has no `KeyboardInterrupt`
-  handling either, so an interrupt during a publish's upload would still print
-  its own traceback. Whether the app offers Stop at that moment was not
-  measured.
+  handling either, so Cancel during a publish still prints its traceback —
+  measured by the review with a real `^C` through a pty: 20 lines during the
+  rebuild on this change, 53 before. Filed as #259.
+- **Which button.** Only the progress view's Cancel types a `^C`; the Stop
+  Preview and console Stop buttons end the process without one and never
+  showed the traceback (measured by the same review).
 
 ## A section with no `index.md` cannot be PUBLISHED
 
