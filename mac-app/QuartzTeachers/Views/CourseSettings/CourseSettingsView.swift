@@ -116,14 +116,10 @@ struct CourseSettingsView: View {
                         title: "Shared folders (all sections)",
                         items: $configuration.sharedFolders,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "shared")
-                            dropFromMarksPool(name)
-                            ActivityTrail.note(.itemExcluded, "excluded shared folder " + name + " in " + course.code)
+                            folderWasRemoved(name, scope: .shared)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "shared") {
-                                ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
-                            }
+                            folderWasAdded(name, scope: .shared)
                         },
                         protection: sharedFolderProtection,
                         renameProblem: { oldName, newName, finishing in
@@ -150,27 +146,20 @@ struct CourseSettingsView: View {
                         hidesMarkdownExtension: true,
                         items: $configuration.sharedFiles,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "shared")
-                            ActivityTrail.note(.itemExcluded, "excluded shared file " + name + " in " + course.code)
+                            fileWasRemoved(name, scope: .shared)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "shared") {
-                                ActivityTrail.note(.itemReincluded, "re-included shared file " + name + " in " + course.code)
-                            }
+                            fileWasAdded(name, scope: .shared)
                         }
                     )
                     StringListEditorView(
                         title: "Per-section folders",
                         items: $configuration.perSectionFolders,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "per_section")
-                            dropFromMarksPool(name)
-                            ActivityTrail.note(.itemExcluded, "excluded per-section folder " + name + " in " + course.code)
+                            folderWasRemoved(name, scope: .perSection)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "per_section") {
-                                ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
-                            }
+                            folderWasAdded(name, scope: .perSection)
                         },
                         protection: perSectionFolderProtection,
                         renameProblem: { oldName, newName, finishing in
@@ -197,13 +186,10 @@ struct CourseSettingsView: View {
                         hidesMarkdownExtension: true,
                         items: $configuration.perSectionFiles,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "per_section")
-                            ActivityTrail.note(.itemExcluded, "excluded per-section file " + name + " in " + course.code)
+                            fileWasRemoved(name, scope: .perSection)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "per_section") {
-                                ActivityTrail.note(.itemReincluded, "re-included per-section file " + name + " in " + course.code)
-                            }
+                            fileWasAdded(name, scope: .perSection)
                         },
                         protection: perSectionFileProtection
                     )
@@ -486,6 +472,51 @@ struct CourseSettingsView: View {
             }
         }
         course.configuration.gradedFolders = remaining
+    }
+
+    // MARK: - Adding and removing folders and files
+
+    /// What removing a name from one of the Content Structure lists does
+    /// beyond taking it out of the list: records it in `excluded_items`, so
+    /// the build stops publishing it, and takes it out of the marks pool.
+    ///
+    /// Named methods rather than closures written at the call site so that a
+    /// test can run exactly what the list runs — the goldens for issue #266
+    /// drive these, and a closure in `body` cannot be reached from a test.
+    func folderWasRemoved(_ name: String, scope: FolderScope) {
+        course.configuration.exclude(name, inScope: scope.exclusionKey)
+        dropFromMarksPool(name)
+        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " folder " + name + " in " + course.code)
+    }
+
+    /// A folder name added back to a list is taken out of `excluded_items`.
+    func folderWasAdded(_ name: String, scope: FolderScope) {
+        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
+            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " folder " + name + " in " + course.code)
+        }
+    }
+
+    /// The file twin of `folderWasRemoved`: a file is never in the marks pool.
+    func fileWasRemoved(_ name: String, scope: FolderScope) {
+        course.configuration.exclude(name, inScope: scope.exclusionKey)
+        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " file " + name + " in " + course.code)
+    }
+
+    /// The file twin of `folderWasAdded`.
+    func fileWasAdded(_ name: String, scope: FolderScope) {
+        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
+            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " file " + name + " in " + course.code)
+        }
+    }
+
+    /// How the trail names a scope: "shared" or "per-section".
+    func trailWord(for scope: FolderScope) -> String {
+        switch scope {
+        case .shared:
+            return "shared"
+        case .perSection:
+            return "per-section"
+        }
     }
 
     // MARK: - Renaming a folder
