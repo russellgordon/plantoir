@@ -1422,6 +1422,48 @@ the running app (this app has met a table eating a key before —
 `Views/Helpers/SidebarReturnKey.swift`). Both are in the by-hand list for the
 next time the Mac is free.
 
+### A cell never asks the course a question (the "no subgraph" crash)
+
+**The trap.** On the first cut of the tables, leaving Course Settings for
+nothing — or opening another working folder while it showed — aborted the
+whole app with SwiftUI's `precondition failure: no subgraph`
+(`AGGraphGetAttributeSubgraph`, under
+`AppKitOutlineTableCoordinator.update(to:with:diffRows:diffColumns:)`). The
+test host died six times on 2026-09-24 before it was pinned down, and the full
+suite still printed "0 failures", because XCTest restarts the host and totals
+only the half that ran after the restart. **Read a suite log for
+`Restarting after` as well as the totals line.**
+
+**The trigger, measured by bisecting in the real window** (each variant one
+run): only the Marks table crashed; a plain-text cell survived; a cell given a
+fixed "blocked" answer survived; a cell that read the list's `@Binding`
+survived; a cell that CALLED the `protection` closure crashed — with the
+button and popover taken out, still crashed. Handing the Marks question
+(`gradedFolderProtection`) to the Shared folders table crashed that table too,
+so the four name tables had survived only because of which closure each was
+given. The closures read the course's configuration and walk its folders on
+disk; asked from inside a `Table` row, that work belonged to the row's own
+part of the view graph, and when the window's detail pane rebuilt the page's
+rows on its way out, the table then updated a row whose part was already gone.
+Choosing one of the course's sections did not crash; clearing the selection
+and changing working folder did.
+
+**The rule.** Every per-row answer a cell needs is worked out in the LIST's
+body (`protectionsAsDrawn()` in `MembershipToggleListView` and
+`StringListEditorView`) and handed to the cell as a value. A cell builds only
+from its row and what it is given; a gesture (a click, Space, Delete) may
+still ask the model at the moment it happens. `CourseSettingsTeardownTests`
+is the must-fail (two of its three tests crash the host on the old cells);
+`TickTableTests.testAProtectionATickBringsAboutHoldsAtOnce` guards that the
+answer is not stale after a tick changes it.
+
+**Rejected.** A delay before tearing down (Russell's rule against waiting out
+a race; it would also only move the window). Taking the tables out of the
+grouped `Form` — the Form is not the cause: hosting `CourseSettingsView` on
+its own in `TableHost` and removing it did NOT crash in five variants (tall
+and short windows, animated or not, with a change to the course in the same
+moment), which is also why the must-fail drives the real window.
+
 ## Renaming a course folder
 
 Folder rows in Course Settings carry a pencil. It renames the folder **on
