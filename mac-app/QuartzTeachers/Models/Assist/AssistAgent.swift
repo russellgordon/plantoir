@@ -341,9 +341,21 @@ final class AssistAgent {
                 // running it against no course, which used to produce a
                 // refusal reading as though the teacher's sentence was the
                 // problem.
-                if !first.argumentsAreReadable {
+                //
+                // And arguments that say NOTHING, for a tool that needs
+                // something this window cannot supply (issue #198): a finished
+                // `publish_pages` with `""` is not an answer, however readable
+                // an empty string is — while a `rebuild_preview` with `""` is,
+                // because the window supplies its course and section. Read
+                // from the tool's own schema; an unknown name is judged
+                // tool-blind, so it still reaches "no tool by that name".
+                if !AssistAgent.argumentsAreReadable(
+                    of: first, for: tools.definition(named: first.function.name)
+                ) {
                     sayTheAnswerDidNotFinish(
-                        tool: first.function.name, stoppedByTheEngine: false
+                        tool: first.function.name,
+                        stoppedByTheEngine: false,
+                        wroteNothing: first.wroteNoArguments
                     )
                     return
                 }
@@ -436,16 +448,33 @@ final class AssistAgent {
     /// place that finding is asserted should not be quietly removed by a
     /// change about something else.
     ///
-    /// The TEACHER is told the same thing either way — from their side an
-    /// answer that ran out of room and one that came out garbled are the same
-    /// event, and both are mended by asking again. The TRAIL tells them apart,
-    /// because whoever reads a report cannot: an answer stopped at the cap is
-    /// a question about how much the model was asked to write, and a finished
-    /// answer whose arguments will not parse is a question about the model
-    /// itself. Same event, different sentence.
-    private func sayTheAnswerDidNotFinish(tool: String?, stoppedByTheEngine: Bool) {
+    /// The TEACHER is told the same thing for the first two causes — from
+    /// their side an answer that ran out of room and one that came out garbled
+    /// are the same event, and both are mended by asking again. The TRAIL tells
+    /// them apart, because whoever reads a report cannot: an answer stopped at
+    /// the cap is a question about how much the model was asked to write, and
+    /// a finished answer whose arguments will not parse is a question about
+    /// the model itself. Same event, different sentence.
+    ///
+    /// The third cause (issue #198) — a finished answer that wrote NOTHING
+    /// for a tool that needs more than the window supplies — gets its own
+    /// sentence as well, `answerLeftOutWhatItWasFor`, because
+    /// `answerWasCutOff`'s advice is about the teacher's request and an empty
+    /// answer is not its fault.
+    private func sayTheAnswerDidNotFinish(
+        tool: String?,
+        stoppedByTheEngine: Bool,
+        wroteNothing: Bool = false
+    ) {
         windTheTurnBack()
-        entries.append(Entry(speaker: .assistant, text: AssistWording.answerWasCutOff))
+        // Its own sentence when the model wrote NOTHING (issue #198):
+        // `answerWasCutOff` asks for a shorter sentence or fewer pages, which
+        // is advice about the teacher's request, and an empty answer is not
+        // the request's fault.
+        let told: String = wroteNothing
+            ? AssistWording.answerLeftOutWhatItWasFor
+            : AssistWording.answerWasCutOff
+        entries.append(Entry(speaker: .assistant, text: told))
         // The tool it had BEGUN to name, in the words a teacher would
         // recognise rather than the function's own: "it ran away trying to
         // publish" and "it ran away trying to deploy" are different reports.
@@ -458,6 +487,13 @@ final class AssistAgent {
             } else {
                 said += " before it named a tool"
             }
+        } else if wroteNothing {
+            // A third phrasing (issue #198): it did not write something
+            // unreadable, it wrote nothing at all for a tool that needs
+            // something — a different question about the model, and one the
+            // reader of a report cannot otherwise tell apart.
+            said = "the assistant finished answering but wrote nothing for "
+                + AssistAgent.inWords(tool ?? "that")
         } else {
             said = "the assistant finished answering but what it wrote for "
                 + AssistAgent.inWords(tool ?? "that") + " could not be read"
@@ -728,6 +764,24 @@ final class AssistAgent {
     /// arguments it filled in, how long it took and how many tokens it
     /// wrote. The argument values are the teacher's page titles and are not
     /// part of the routing question.
+    /// The readability gate for a finished answer in a section window: the
+    /// tool-aware rule when the tool is known, the tool-blind one otherwise.
+    /// One function, so the gate and the trail's account of it cannot differ.
+    static func argumentsAreReadable(of call: AssistToolCall, for definition: AssistToolDefinition?) -> Bool {
+        guard let definition else {
+            return call.argumentsAreReadable
+        }
+        var declared: [String] = []
+        for name in definition.parameters.keys {
+            declared.append(name)
+        }
+        return call.argumentsAreReadable(
+            forToolRequiring: definition.required,
+            declaring: declared,
+            readOnly: definition.readOnly
+        )
+    }
+
     private func recordTurn(reply: AssistReply, askedAt: Date) {
         var toolName: String?
         var argumentNames: [String] = []
@@ -735,7 +789,14 @@ final class AssistAgent {
         if let call = reply.message.toolCalls?.first {
             toolName = call.function.name
             argumentNames = AssistTurnRecord.argumentNames(inJSON: call.function.arguments)
-            stoppedAtGate = tools.definition(named: call.function.name)?.needsApproval ?? false
+            // "Waited for the button" only when a button went up: a reply the
+            // engine cut off, or one the readability gate refused, never
+            // reaches the card, and the trail used to say it had.
+            let definition: AssistToolDefinition? = tools.definition(named: call.function.name)
+            let needsApproval: Bool = definition?.needsApproval ?? false
+            stoppedAtGate = needsApproval
+                && !reply.wasCutOff
+                && AssistAgent.argumentsAreReadable(of: call, for: definition)
         }
         let record: AssistTurnRecord = AssistTurnRecord(
             at: askedAt,

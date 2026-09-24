@@ -157,6 +157,8 @@ enum AssistContract {
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
             "answerWasCutOff": AssistWording.answerWasCutOff,
+            "answerLeftOutWhatItWasFor": AssistWording.answerLeftOutWhatItWasFor,
+            "noCourseNamed": AssistWording.noCourseNamed,
             "didNotFollowThat": AssistWording.didNotFollowThat,
             // A call naming a course that is not this window's. Two keys for
             // two different facts, not two phrasings of one: the first can

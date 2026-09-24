@@ -3017,6 +3017,9 @@ final class AssistToolRunner {
             found = candidate
         }
         guard let course = found else {
+            if asked.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return AssistToolOutcome.couldNotRead(AssistWording.noCourseNamed)
+            }
             return AssistToolOutcome.couldNotRead(
                 "There is no course called “\(asked)” in this working folder."
             )
