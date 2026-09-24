@@ -73,6 +73,37 @@ nonisolated enum AssistWording {
     /// the sentence above does not name it.
     static let deployQuestion: String = "Shall I deploy?"
 
+    /// The question under a SCHEDULED deploy's card (issue #184).
+    ///
+    /// Its own sentence because `deployQuestion` reads as "now", and the card
+    /// above it has just named a moment that is not now — so the question
+    /// contradicted the card it sat under. It mattered more once "deploy at
+    /// <time>" was matched in code (#168) and scheduling stopped being the rare
+    /// path. It must never carry the word "now", and it must differ from
+    /// `deployQuestion`; a test pins both rather than the words.
+    ///
+    /// A FIRST DRAFT for Russell's wording pass. It names "the deploy" rather
+    /// than saying "it", because the card above ends on a sentence about this
+    /// Mac, and "it" would read as the Mac.
+    static let scheduleQuestion: String = "Shall I schedule the deploy?"
+
+    /// Said under a scheduled deploy's card, and in the schedule sheet, when
+    /// setting it will REPLACE a deploy already set for that section
+    /// (issue #195). `moment` is when the old one was set for, written the
+    /// way the card writes its own moment.
+    ///
+    /// The card is the only moment before anything is written, so it is the
+    /// only place a teacher can still act on it: scheduling a section again
+    /// removes the one already set, on purpose, and until this sentence the
+    /// teacher was told nothing about it. The fact and nothing else, in the
+    /// house style of `deployWasCancelled`. A FIRST DRAFT for Russell's
+    /// wording pass. It may name a deploy set from ANOTHER working folder —
+    /// one this window's sidebar shows no clock for — because that is the
+    /// one being replaced: a section's scheduled deploy is one per Mac.
+    static func scheduleReplaces(moment: String) -> String {
+        return "This replaces the deploy already set for \(moment)."
+    }
+
     /// The question under a plan card.
     static let planQuestion: String = "Shall I go ahead?"
 
@@ -597,7 +628,12 @@ nonisolated enum AssistWording {
     // MARK: - When the answer did not finish
 
     /// The engine stopped the assistant part way through its answer, so
-    /// whatever it had begun to ask for was thrown away unread.
+    /// whatever it had begun to ask for was thrown away unread — or a finished
+    /// answer's arguments could not be read at all, which the teacher cannot
+    /// tell apart from the first and is mended the same way. NOT said when a
+    /// finished answer wrote nothing: that one has its own sentence,
+    /// `answerLeftOutWhatItWasFor` (issue #198), because the advice below is
+    /// about the teacher's request and an empty answer is not its fault.
     ///
     /// Three things it has to do, in this order. **Say the answer did not
     /// finish**, because the teacher has just waited for one. **Say that
@@ -629,6 +665,30 @@ nonisolated enum AssistWording {
     static let answerWasCutOff: String =
         "I didn't get to the end of that, so I haven't changed anything. Ask me again — "
         + "a shorter sentence, or fewer pages at a time."
+
+    /// A tool was asked for with no course at all — which reaches the runner
+    /// only from outside the app, over MCP, where nothing binds a window's own
+    /// course onto the call (issue #198).
+    ///
+    /// Replaces "There is no course called “” in this working folder", which
+    /// is false in its own terms (it names a course nobody named) and reads,
+    /// relayed to a teacher, as a complaint about what they typed.
+    static let noCourseNamed: String = "No course was named, so nothing was done."
+
+    /// A finished answer chose a tool that needs something this window cannot
+    /// supply — which pages, which day, which time — and wrote nothing for it,
+    /// so nothing was done (issue #198).
+    ///
+    /// Its own sentence rather than `answerWasCutOff`, whose advice ("a
+    /// shorter sentence, or fewer pages") is about the teacher's request. Here
+    /// the teacher had named what they meant and the assistant dropped it, so
+    /// the sentence owns that — it is the assistant that did not work it out —
+    /// and asks for nothing but the same request again. "Nothing was done" is
+    /// true for the same reasons as in `answerWasCutOff`: the gate that says
+    /// this sits above every tool.
+    static let answerLeftOutWhatItWasFor: String =
+        "I did not work out which pages, day or time you meant, so nothing was done. "
+      + "Please ask me again."
 
     // MARK: - When the answer was the question again
 

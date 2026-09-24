@@ -1135,6 +1135,12 @@ enum AssistToolRefusal: LocalizedError, Equatable {
         case .noWorkingFolder:
             return "No working folder is open, so there is nothing to look at."
         case .noSuchCourse(let code):
+            // An EMPTY code is no course named at all (issue #198): only an
+            // MCP caller can send one, and naming "“”" as a course that is
+            // not here is false and reads as blaming the teacher.
+            if code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return AssistWording.noCourseNamed
+            }
             return "There is no course called “\(code)” in this working folder."
         case .noSuchSection(let code, let number):
             return "\(code) has no Section \(number)."

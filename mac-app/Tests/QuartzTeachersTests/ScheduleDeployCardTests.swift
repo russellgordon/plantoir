@@ -252,6 +252,18 @@ final class ScheduleDeployCardTests: XCTestCase {
     /// sentence is: `AssistAgent.matchedInCodeLine` is the one copy of it.
     func testTheTrailLineNamesTheMomentItSettledOn() async throws {
         let made = try AssistFixture.makeRunner(hasDeployedBefore: true)
+        // The scheduled card reads whether a deploy is already set for the
+        // section (issue #195); it must read a folder this test owns, never
+        // the real ~/Library/LaunchAgents of whoever runs the suite.
+        let launchAgents: URL = made.root.appendingPathComponent("LaunchAgents", isDirectory: true)
+        try FileManager.default.createDirectory(at: launchAgents, withIntermediateDirectories: true)
+        ScheduledDeploy.launchAgentsDirectoryOverride = launchAgents
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            launchAgents.deletingLastPathComponent().appendingPathComponent("scheduled")
+        defer {
+            ScheduledDeploy.launchAgentsDirectoryOverride = nil
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+        }
         let scratch: URL = made.root.appendingPathComponent("trail", isDirectory: true)
         let previousStore: ProblemReportStore = ActivityTrail.store
         ActivityTrail.store = ProblemReportStore(folderURL: scratch)

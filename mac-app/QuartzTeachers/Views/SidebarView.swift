@@ -626,7 +626,7 @@ struct SidebarView: View {
         generation: Int
     ) -> ScheduledPublishOutcome.Stopped? {
         let outcome: ScheduledPublishOutcome.Stopped? = ScheduledPublishOutcome.stopped(
-            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
             course: courseCode,
             section: sectionNumber
         )

@@ -16,9 +16,9 @@
         "why": "The assistant runs natively on one architecture and not the other, and the whole toolchain emulates on the wrong one. Memory decides which model tier a teacher gets. OS build number and kernel release isolate virtualization, Metal, and WinUI/WSL2 platform issues."
       },
       {
-        "carries": "bundled assistant engine and toolchain helper software versions",
+        "carries": "the bundled assistant engine's build, and the helper programs as FOUND on this machine: on macOS each one's version measured by asking it (Colima, Lima, Docker CLI, Buildx) and where it came from (Plantoir's own copy, Homebrew, or the folder it was found in), or 'not found' with the version that would be installed; on Windows the runtime kind, read from disk",
         "event": "helpers described",
-        "why": "The assistant flags and chat template handling depend on the engine build. Static tool versions (Colima, Lima, Docker CLI, Buildx on macOS; WSL2 and container tools on Windows) isolate whether a machine is running on expected helper versions."
+        "why": "The assistant flags and chat template handling depend on the engine build. The helper versions isolate whether a machine is running what Plantoir expects - but only if they are MEASURED: the launchers use whatever copy is already installed and download only what is missing, so a line naming the pinned versions described a machine that did not exist, and on a Mac with Homebrew's tools it once sent a diagnosis the wrong way (issue #222). On macOS the line is written a moment after the other two launch lines, once the programs have answered."
       },
       {
         "carries": "the folder path, redacted",
@@ -96,9 +96,9 @@
         "why": "The failure that leaves nothing else behind: no tool, no turn, no output. Without this line 'I asked it something and nothing happened' is unfalsifiable."
       },
       {
-        "carries": "course, section, which tool the model had BEGUN to name when there was one, and WHICH of the two things happened - an answer the engine stopped part way, or a finished answer whose arguments could not be read. Never what it had begun to write.",
+        "carries": "course, section, which tool the model had BEGUN to name when there was one, and WHICH of the three things happened - an answer the engine stopped part way, a finished answer whose arguments could not be read, or (since issue #198) a finished answer that wrote nothing for a tool that needs more than the section window supplies. Never what it had begun to write.",
         "event": "assistant answer was cut off",
-        "why": "A model can write until it is stopped, and what it has half-written is not an instruction: the app throws it away, runs nothing and says so. Without this line the teacher's side of that - a long wait and then the assistant declining - is indistinguishable from a misroute, so a report of 'it thought for ages and then said no' has nothing to look at. Separate from 'assistant could not answer', which is for an engine that FAILED; here the engine answered perfectly and the app refused the answer. The tool it had begun to name is carried because 'it ran away trying to publish' and 'it ran away trying to deploy' are different reports; what it had begun to WRITE is not carried, because that is the teacher's page titles. The two causes share one event and one sentence to the teacher - from their side both are mended by asking again - but the LINE distinguishes them, because whoever reads the report cannot: an answer stopped at the cap is a question about how much the model was asked to write, and a finished answer whose arguments will not parse is a question about the model itself."
+        "why": "A model can write until it is stopped, and what it has half-written is not an instruction: the app throws it away, runs nothing and says so. Without this line the teacher's side of that - a long wait and then the assistant declining - is indistinguishable from a misroute, so a report of 'it thought for ages and then said no' has nothing to look at. Separate from 'assistant could not answer', which is for an engine that FAILED; here the engine answered perfectly and the app refused the answer. The tool it had begun to name is carried because 'it ran away trying to publish' and 'it ran away trying to deploy' are different reports; what it had begun to WRITE is not carried, because that is the teacher's page titles. The two causes share one event and one sentence to the teacher - from their side both are mended by asking again - but the LINE distinguishes them, because whoever reads the report cannot: an answer stopped at the cap is a question about how much the model was asked to write, and a finished answer whose arguments will not parse is a question about the model itself. Since issue #198 (2026-09-23) there is a third: a finished answer that wrote NOTHING for a tool that needs more than the section window supplies, which the line says in those words (\"wrote nothing for\") - it is neither a cap nor garbled JSON, and a report reader could not otherwise tell it from either."
       },
       {
         "carries": "this window's course and section, that nothing was run, and that the turn was taken back out of the conversation. Never the sentence - 'assistant asked' already carries it, on its own marked line - and never any page content.",
@@ -297,18 +297,28 @@
         "appliesOnWhy": "Permanent for the same reason as the two above: there is no stop to fail where there is nothing to stop."
       },
       {
-        "carries": "what was under way, in the words the teacher was shown, and which of the two buttons they pressed",
+        "carries": "what was under way - a publish, or since issue #232 a preview being built - in the words the teacher was shown, and which of the two buttons they pressed",
         "event": "quit asked about work under way",
-        "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out.",
+        "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. Since issue #232 the line also names a preview being BUILT when that is what was under way (a publish, when there is one, is still what is named), so 'it would not quit while my preview was loading' has the same answer on the trail. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out.",
         "appliesOn": [
           "mac"
         ],
         "appliesOnWhy": "NOT permanent, and this one is an acknowledged exception rather than the ordinary use - read contracts/README.md's \"Four ways out\" passage, which rejects exactly this move, and its Named gaps section, which records why it was taken here anyway. Windows could ask the same question: it has publishes and it has a quit. The honest alternative reddens their ContractTests with a failure only they can mend (a NamedGapLedger entry is theirs to write), on a release where nobody is on that side. The cost is real and is stated rather than hidden: appliesOn has NO mend-check, so the day Windows implements this, nothing anywhere goes red to say the contract is now lying. What points at it instead is this sentence, the README's Named-gaps entry, and the windows issue that carries the work. Adopt the rule (quittingWhileWorkIsUnderWay, below) and this line together, or neither - a line saying a teacher was asked, in an app that asks nothing, would be worse than no line - and delete both appliesOn keys when you do."
       },
       {
-        "carries": "the course, the section, and WHY - which of the things that turn one off without being asked did it",
+        "carries": "the course, the section, and WHY - which of the things that turn one off without being asked did it; for a replacement that failed (since issue #195), when the deploy that was lost had been set for",
         "event": "scheduled deploy turned off",
-        "why": "A deploy the teacher set to happen on its own was turned off by something other than them asking for it: the course was removed, the section was removed, or the day it was set for had gone by. Without this line a teacher whose site stopped updating has nothing anywhere explaining it - the alarm simply is not there any more, which reads exactly like one that was never set, and that is the same silence 'scheduled publish needed an answer' exists to break, one step further back. ONE event with several reasons rather than one event each (three when it was written; a fourth since a course could be kept for reference): somebody reading the trail wants to know their overnight deploy was turned off and by what, and the difference between two ways of removing something means nothing to them. It says DEPLOY where its three neighbours say publish, because a site is deployed and a page is published (Russell, 2026-09-20); the shipped names are left alone rather than renamed here, since a NEW name carrying the old vocabulary is the expensive mistake - this list pins it on both platforms. NOT written by the teacher's own Cancel item, nor by the assistant's cancel_scheduled_deploy: those are the teacher asking, and the trail already carries what they asked for. No appliesOn, deliberately - Windows cancels on removing a SECTION and not on removing a COURSE (Plantoir.Core/Models/CourseArchiver.cs), so two of the three reasons are theirs whatever they decide about the third."
+        "why": "A deploy the teacher set to happen on its own was turned off by something other than them asking for it: the course was removed, the section was removed, the day it was set for had gone by, or - since issue #195 - a new deploy for the same section was set in its place and macOS then refused it (the old one is booted out and its plist overwritten before macOS is asked, so that refusal leaves neither, and the refusal the teacher reads speaks only of the new one). A failed WRITE is NOT one of these: the old plist is still on disk, it is handed back to macOS, and 'scheduled deploy could not be set' says it still stands. Without this line a teacher whose site stopped updating has nothing anywhere explaining it - the alarm simply is not there any more, which reads exactly like one that was never set, and that is the same silence 'scheduled publish needed an answer' exists to break, one step further back. ONE event with several reasons rather than one event each (three when it was written; a fourth since a course could be kept for reference; a fifth since issue #195, a replacement macOS refused): somebody reading the trail wants to know their overnight deploy was turned off and by what, and the difference between two ways of removing something means nothing to them. It says DEPLOY where its three neighbours say publish, because a site is deployed and a page is published (Russell, 2026-09-20); the shipped names are left alone rather than renamed here, since a NEW name carrying the old vocabulary is the expensive mistake - this list pins it on both platforms. NOT written by the teacher's own Cancel item, nor by the assistant's cancel_scheduled_deploy: those are the teacher asking, and the trail already carries what they asked for. No appliesOn, deliberately - Windows cancels on removing a SECTION and not on removing a COURSE (Plantoir.Core/Models/CourseArchiver.cs), so two of the three reasons are theirs whatever they decide about the third."
+      },
+      {
+        "carries": "the course code, the section number, when the deploy that was replaced had been set for, and when the new one is set for",
+        "event": "scheduled deploy replaced",
+        "why": "Scheduling a section that already has a scheduled deploy removes the old one - deliberately, since a section has one per Mac - and until issue #195 (2026-09-23) nothing said so, before or after. The old job leaves nothing behind once it is replaced, so a teacher who set Friday and then Saturday and asks why it went on Saturday has no answer anywhere unless this line exists. The approval card and the schedule sheet now say it BEFORE anything is written (wording.scheduleReplaces); this is the record AFTERWARDS. Written where the replacement happens, in the one function every way of scheduling reaches, so it cannot be missing from one of them. Not written when the old deploy was set for the same minute, or had already gone by: neither is a promise being broken. The old deploy may belong to ANOTHER working folder, because a section's scheduled deploy is one per Mac, and that is the case this line matters most for."
+      },
+      {
+        "carries": "the course code, the section number, the moment asked for, and - when the section already had a scheduled deploy - whether that one still stands",
+        "event": "scheduled deploy could not be set",
+        "why": "Added 2026-09-24 with issue #195's fix review. 'I set it for Friday and it never went' is otherwise answered only by the refusal that was on screen at the time, which nobody quotes a week later. The two ways it fails leave DIFFERENT things behind, and the line has to say which: when the new deploy's files could not be WRITTEN, the old deploy's plist is still on disk (the failed write is atomic and everything before it writes elsewhere), so it is handed back to macOS and the line says it still stands - saying 'turned off' there would be false, because the old job would still fire; when macOS REFUSED the new one after its plist was written, the old one's plist has been overwritten, so it is gone, and 'scheduled deploy turned off' says so beside this line - including when the old one was set for the same minute, which the card rightly leaves unsaid but whose loss is still a loss."
       },
       {
         "carries": "the folder it was given, the code and school year it shows, how many sections came across, and which course it was copied from",
@@ -3453,17 +3463,17 @@
     ]
   },
   "quittingWhileWorkIsUnderWay": {
-    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing, and never asks when the Mac itself is logging out, restarting or shutting down.",
+    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing or of building a preview, and never asks when the Mac itself is logging out, restarting or shutting down.",
     "why": "Quitting used to be free, because it could not reach anything: the path that stops a working folder's website builder looked for programs it had never told itself where to find, so on an ordinary teacher's Mac it did nothing at all and there was nothing to interrupt (issue #220, 2026-09-19). Making it work means a quit can now genuinely land on work in flight, and the one case where that hurts is the one the teacher cannot see happening.",
-    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does.",
-    "whatDoesNotCount": "A preview. A preview is known by the port it holds, and that is held for as long as the preview is OPEN - it cannot tell a section still building from one that finished twenty minutes ago and is being read. Asking on every open preview would mean asking almost every quit, which teaches a teacher to dismiss the question unread, and the question exists for the publish. Previews are not abandoned either: quitting stops this app's own previews deliberately, the way the Stop button does, before anything else is asked to rest.",
+    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does. And, since issue #232 (2026-09-23), a preview being BUILT - from the moment it is asked for until its page first answers, or the run ends - whether a section window started it or the app's own assistant rebuilt it with no window open. Counted from a second record of the same kind, of preview builds. A publish's own build is NOT counted as a preview build: it is part of the publish, which is already counted. When both are under way the question names the publish, whose loss reaches the class website.",
+    "whatDoesNotCount": "A preview that is merely OPEN. A preview is known by the port it holds, and that is held for as long as the preview is OPEN - it cannot tell a section still building from one that finished twenty minutes ago and is being read. Asking on every open preview would mean asking almost every quit, which teaches a teacher to dismiss the question unread, and the question exists for work that can still be lost. Previews are not abandoned either: quitting stops this app's own previews deliberately, the way the Stop button does, before anything else is asked to rest. The record of a preview BUILD is a different fact from the port, and it is the one that counts: it ends when the page first answers, so a preview being read is never asked about. It is NOT the preview's address either - the launcher prints the address before it starts building, so the address is known for almost the whole build.",
     "whatIsNeverAskedAbout": "Work belonging to another process - a publish set to happen on its own, an assistant driving the app over a connection, or a teacher's own command line. None of them is visible from here, so none of them is asked about; they are protected instead by the quit path refusing to stop anything while a launcher for that folder is running on the machine.",
     "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
     "buttons": {
       "default": "keepWorking",
       "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
       "keepWorking": "the app stays open and nothing is stopped or released",
-      "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped."
+      "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
     },
     "cases": [
       {
@@ -3471,6 +3481,7 @@
         "given": {
           "publishesUnderWay": 0,
           "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": false,
@@ -3481,6 +3492,7 @@
         "given": {
           "publishesUnderWay": 1,
           "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
@@ -3491,6 +3503,7 @@
         "given": {
           "publishesUnderWay": 3,
           "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true
@@ -3500,20 +3513,55 @@
         "given": {
           "publishesUnderWay": 0,
           "previewsOpen": 2,
+          "previewsBeingBuilt": 0,
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": false,
-        "why": "The decision this case exists to pin. A preview that is merely open is not work under way, and an app that cannot tell a building preview from a finished one must not guess."
+        "why": "The decision this case exists to pin. A preview that is merely open is not work under way, and an app that cannot tell a building preview from a finished one must not guess. Still true after issue #232: what counts is a preview being BUILT, which is its own record, and an open preview whose build has finished is not one."
       },
       {
         "name": "the Mac is logging out while a section is publishing",
         "given": {
           "publishesUnderWay": 1,
           "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
           "quitReason": "theMacIsLoggingOutOrShuttingDown"
         },
         "expectAsk": false,
         "why": "The rule that must never bend. A modal here holds up the log out, and a teacher whose Mac will not log out has a worse problem than a publish that did not finish."
+      },
+      {
+        "name": "a preview is being built and nothing is publishing",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "why": "The case issue #232 exists for. Russell's ruling on 2026-09-20 named a publish OR a preview; a first build can spend minutes fetching what it needs, and a teacher who quits through it deserves to be told."
+      },
+      {
+        "name": "a preview is open and another is being built",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 1,
+          "previewsBeingBuilt": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "why": "The open preview adds nothing and takes nothing away: the build is what is asked about."
+      },
+      {
+        "name": "a preview is being built while the Mac logs out",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 1,
+          "quitReason": "theMacIsLoggingOutOrShuttingDown"
+        },
+        "expectAsk": false,
+        "why": "The rule that must never bend bends for a preview no more than for a publish."
       }
     ],
     "appliesOn": [

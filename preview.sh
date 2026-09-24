@@ -304,7 +304,8 @@ if [[ ! -d "courses/$COURSE/section$SECTION" ]]; then
   echo "⚠️  courses/$COURSE/section$SECTION does not exist."
   echo "   If this is one of your timetable sections, run './setup.sh' again and include section $SECTION."
   echo "   Otherwise, choose one of YOUR assigned sections when running this command."
-  # don't exit here yet; we'll validate against section_numbers below
+  # don't exit here: build_site.py checks the section against the course's
+  # section_numbers and says so.
 fi
 
 # -------------------- Mount-aware container handling --------------------
@@ -801,7 +802,11 @@ ensure_container_runtime() {
     return 0
   fi
 
-  echo "🐳 Setting up this Mac — a one-time step that runs on its own…"
+  # "Setting up this Mac" is a progress marker the app matches word for word
+  # (contracts/app-rules.json → milestones); keep those four words. It is not
+  # "a one-time step": quitting Plantoir stops this machinery when nothing else
+  # is using it, so it happens again after such a quit (GitHub #228).
+  echo "🐳 Setting up this Mac…"
   ensure_local_tools
 
   if [[ ! -d "$HOME/.colima/default" ]]; then
@@ -811,7 +816,8 @@ ensure_container_runtime() {
     # the qemu default.
     colima start --cpu "$(_colima_cpus)" --memory "$(_colima_memory_gb)" --vm-type vz
   else
-    echo "▶️  Starting Colima…"
+    # The app's friendlyPhase matches "Starting the website builder" (#228).
+    echo "▶️  Starting the website builder…"
     # shellcheck disable=SC2046  # deliberate word splitting: these are flags
     colima start $(_colima_growth_flags)
   fi
@@ -1085,44 +1091,12 @@ if ! docker exec -i "$CONTAINER_NAME" bash -lc 'test -f /opt/quartz/quartz.layou
   echo "   (Continuing anyway; the build will attempt a safe fallback.)"
 fi
 
-# Validate that SECTION is one of the allowed timetable sections for this course
-echo "📋 Checking allowed timetable sections for $COURSE..."
-ALLOWED_SECTIONS="$(docker exec -e COURSE="$COURSE" "$CONTAINER_NAME" python3 - <<'PY'
-import os, json, sys
-course = os.environ.get("COURSE")
-p = f"/teaching/courses/{course}/course_config.json"
-try:
-    with open(p, "r", encoding="utf-8") as f:
-        cfg = json.load(f)
-    secs = cfg.get("section_numbers")
-    if isinstance(secs, list) and secs:
-        print(",".join(str(int(x)) for x in secs))
-    else:
-        n = int(cfg.get("num_sections", 1))
-        print(",".join(str(i) for i in range(1, n+1)))
-except Exception as e:
-    print("")
-PY
-)"
-
-if [[ -n "$ALLOWED_SECTIONS" ]]; then
-  echo "   Allowed sections: $ALLOWED_SECTIONS"
-  IFS=',' read -ra ARR <<< "$ALLOWED_SECTIONS"
-  FOUND=0
-  for s in "${ARR[@]}"; do
-    if [[ "$s" == "$SECTION" ]]; then
-      FOUND=1
-      break
-    fi
-  done
-  if [[ "$FOUND" -ne 1 ]]; then
-    echo "❌ Section $SECTION is not one of YOUR timetable sections for $COURSE."
-    echo "   Choose one of: $ALLOWED_SECTIONS"
-    exit 1
-  fi
-else
-  echo "ℹ️ Could not read allowed sections from course_config.json (continuing)."
-fi
+# The requested section is checked against the course's section_numbers by
+# build_site.py (validate_requested_section), inside the build, which says so
+# and builds nothing. This launcher used to carry its own copy of that check,
+# but it fed a heredoc to `docker exec` without -i, so the program never
+# arrived, the check never ran (2025-08-11 to 2026-09-23) and every preview
+# printed a line that was never true. Removed rather than repaired, GitHub #224.
 
 echo "🔧 Building site for $COURSE, section $SECTION..."
 echo "📂 Output will be written to: $OUTPUT_PATH"

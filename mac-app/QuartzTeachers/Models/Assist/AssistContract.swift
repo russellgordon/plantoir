@@ -59,6 +59,10 @@ enum AssistContract {
     /// The page a teacher named, in the duplicate sentences.
     static let pagePlaceholder: String = "{page}"
 
+    /// The moment an existing scheduled deploy was set for, in the sentence
+    /// saying scheduling again replaces it.
+    static let momentPlaceholder: String = "{moment}"
+
     /// What the copy of that page is called.
     static let copyPlaceholder: String = "{copy}"
 
@@ -90,6 +94,7 @@ enum AssistContract {
         let table: [String: String] = [
             "deployApproval": AssistWording.deployApproval,
             "deployQuestion": AssistWording.deployQuestion,
+            "scheduleQuestion": AssistWording.scheduleQuestion,
             "planQuestion": AssistWording.planQuestion,
             "deployAccepted": AssistWording.deployAccepted,
             "planAccepted": AssistWording.planAccepted,
@@ -152,6 +157,8 @@ enum AssistContract {
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
             "answerWasCutOff": AssistWording.answerWasCutOff,
+            "answerLeftOutWhatItWasFor": AssistWording.answerLeftOutWhatItWasFor,
+            "noCourseNamed": AssistWording.noCourseNamed,
             "didNotFollowThat": AssistWording.didNotFollowThat,
             // A call naming a course that is not this window's. Two keys for
             // two different facts, not two phrasings of one: the first can
@@ -176,6 +183,7 @@ enum AssistContract {
             // own past-tense clause — "unpublished Unit 4, Day 23" — which is
             // what makes these sentences rather than slots: the undo used to
             // read "Undid unpublished 2 pages in ADA1O Section 1."
+            "scheduleReplaces": AssistWording.scheduleReplaces(moment: momentPlaceholder),
             "undid": AssistWording.undid(changePlaceholder),
             "undidPartly": AssistWording.undidPartly(changePlaceholder, leftAlone: 2),
             "couldNotUndo": AssistWording.couldNotUndo(changePlaceholder, leftAlone: 2),
@@ -237,6 +245,10 @@ enum AssistContract {
                         + "\"unpublished Unit 4, Day 23\". Never a bare count — the "
                         + "teacher asked about a class, not about a number of files.",
                 "leftAlone": "how many pages an undo could not put back, here 2",
+                "moment": "when a deploy already scheduled for the section was set for, "
+                        + "written the way the scheduled card writes its own moment "
+                        + "(day, date and time in this Mac's own style), e.g. "
+                        + "Friday 25 September, 6:30 AM",
                 "page": "the page being copied, e.g. Unit 3, Day 2",
                 "copy": "what the copy is called, e.g. Unit 3, Day 3",
                 "moving": "how many later classes move, counted once each even when a page is "

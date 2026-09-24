@@ -1374,7 +1374,11 @@ ensure_container_runtime() {
     return 0
   fi
 
-  echo "🐳 Setting up this Mac — a one-time step that runs on its own…"
+  # "Setting up this Mac" is a progress marker the app matches word for word
+  # (contracts/app-rules.json → milestones); keep those four words. It is not
+  # "a one-time step": quitting Plantoir stops this machinery when nothing else
+  # is using it, so it happens again after such a quit (GitHub #228).
+  echo "🐳 Setting up this Mac…"
   ensure_local_tools
 
   if [[ ! -d "$HOME/.colima/default" ]]; then
@@ -1384,7 +1388,8 @@ ensure_container_runtime() {
     # the qemu default.
     colima start --cpu "$(_colima_cpus)" --memory "$(_colima_memory_gb)" --vm-type vz
   else
-    echo "▶️  Starting Colima…"
+    # The app's friendlyPhase matches "Starting the website builder" (#228).
+    echo "▶️  Starting the website builder…"
     # shellcheck disable=SC2046  # deliberate word splitting: these are flags
     colima start $(_colima_growth_flags)
   fi

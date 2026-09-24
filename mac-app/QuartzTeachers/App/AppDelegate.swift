@@ -16,6 +16,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task.detached(priority: .utility) {
                 BuildOutputLocation.discardBuildsForMissingWorkingFolders()
             }
+            // Ask the helper programs which versions they are, off the main
+            // thread, and only THEN write the trail's helpers line — about a
+            // third of a second after the two lines above. Behind this guard
+            // so the suite never probes the machine it runs on. The line is
+            // written back on the main actor, where every other trail line
+            // is written, so two writers never interleave one file.
+            Task { @MainActor in
+                let measurement: HelperMeasurement = await ProblemReportEnvironment.refreshHelpers().value
+                ActivityTrail.noteHelpers(measurement.description)
+            }
             // Watch for what a scheduled run leaves behind, so its notice
             // reaches a teacher who is already looking at that section. One
             // watcher for the app: the folder hangs off the home folder, not

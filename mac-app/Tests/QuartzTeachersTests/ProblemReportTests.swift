@@ -523,10 +523,21 @@ final class ProblemReportTests: XCTestCase {
         XCTAssertTrue(system.contains("cores"), system)
         XCTAssertTrue(system.contains("GB"), system)
 
+        // The suite never measures (every refresh is behind a test guard),
+        // so what a record carries here is the unmeasured line — and that
+        // line must say so of every helper rather than state a version.
         let helpers: String = ProblemReportEnvironment.helperDescription
-        XCTAssertTrue(helpers.contains("llama.cpp"), helpers)
-        XCTAssertTrue(helpers.contains("Colima"), helpers)
-        XCTAssertTrue(helpers.contains("Docker CLI"), helpers)
+        XCTAssertTrue(helpers.hasPrefix("llama.cpp b10435 (Metal) · "), helpers)
+        for helper in ProblemReportEnvironment.pinnedHelpers {
+            XCTAssertTrue(
+                helpers.contains(helper.displayName + " not checked yet (pinned " + helper.pinnedVersion + ")"),
+                helpers
+            )
+            XCTAssertFalse(
+                helpers.contains(helper.displayName + " " + helper.pinnedVersion),
+                "The Helpers line names a pinned version as though it were installed: \(helpers)"
+            )
+        }
     }
 
     func testNoteLaunchEmitsMachineAndHelpersOnTheTrail() {
@@ -536,9 +547,10 @@ final class ProblemReportTests: XCTestCase {
         defer { ActivityTrail.store = previousStore }
 
         ActivityTrail.noteLaunch()
+        ActivityTrail.noteHelpers("llama.cpp b10435 (Metal) · Colima 0.10.3 (Homebrew)")
         let trail: String = store.activityText(includingPrompts: true)
         XCTAssertTrue(trail.contains("Plantoir opened — Plantoir"), trail)
         XCTAssertTrue(trail.contains("running on macOS"), trail)
-        XCTAssertTrue(trail.contains("using llama.cpp"), trail)
+        XCTAssertTrue(trail.contains("using llama.cpp b10435 (Metal) · Colima 0.10.3 (Homebrew)"), trail)
     }
 }
