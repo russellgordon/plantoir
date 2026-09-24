@@ -299,7 +299,7 @@
       {
         "carries": "what was under way, in the words the teacher was shown, and which of the two buttons they pressed",
         "event": "quit asked about work under way",
-        "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out.",
+        "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. Since issue #232 the line also names a preview being BUILT when that is what was under way (a publish, when there is one, is still what is named), so 'it would not quit while my preview was loading' has the same answer on the trail. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out.",
         "appliesOn": [
           "mac"
         ],
@@ -3453,17 +3453,17 @@
     ]
   },
   "quittingWhileWorkIsUnderWay": {
-    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing, and never asks when the Mac itself is logging out, restarting or shutting down.",
+    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing or of building a preview, and never asks when the Mac itself is logging out, restarting or shutting down.",
     "why": "Quitting used to be free, because it could not reach anything: the path that stops a working folder's website builder looked for programs it had never told itself where to find, so on an ordinary teacher's Mac it did nothing at all and there was nothing to interrupt (issue #220, 2026-09-19). Making it work means a quit can now genuinely land on work in flight, and the one case where that hurts is the one the teacher cannot see happening.",
-    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does.",
-    "whatDoesNotCount": "A preview. A preview is known by the port it holds, and that is held for as long as the preview is OPEN - it cannot tell a section still building from one that finished twenty minutes ago and is being read. Asking on every open preview would mean asking almost every quit, which teaches a teacher to dismiss the question unread, and the question exists for the publish. Previews are not abandoned either: quitting stops this app's own previews deliberately, the way the Stop button does, before anything else is asked to rest.",
+    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does. And, since issue #232 (2026-09-23), a preview being BUILT - from the moment it is asked for until its page first answers, or the run ends - whether a section window started it or the app's own assistant rebuilt it with no window open. Counted from a second record of the same kind, of preview builds. A publish's own build is NOT counted as a preview build: it is part of the publish, which is already counted. When both are under way the question names the publish, whose loss reaches the class website.",
+    "whatDoesNotCount": "A preview that is merely OPEN. A preview is known by the port it holds, and that is held for as long as the preview is OPEN - it cannot tell a section still building from one that finished twenty minutes ago and is being read. Asking on every open preview would mean asking almost every quit, which teaches a teacher to dismiss the question unread, and the question exists for work that can still be lost. Previews are not abandoned either: quitting stops this app's own previews deliberately, the way the Stop button does, before anything else is asked to rest. The record of a preview BUILD is a different fact from the port, and it is the one that counts: it ends when the page first answers, so a preview being read is never asked about. It is NOT the preview's address either - the launcher prints the address before it starts building, so the address is known for almost the whole build.",
     "whatIsNeverAskedAbout": "Work belonging to another process - a publish set to happen on its own, an assistant driving the app over a connection, or a teacher's own command line. None of them is visible from here, so none of them is asked about; they are protected instead by the quit path refusing to stop anything while a launcher for that folder is running on the machine.",
     "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
     "buttons": {
       "default": "keepWorking",
       "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
       "keepWorking": "the app stays open and nothing is stopped or released",
-      "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped."
+      "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
     },
     "cases": [
       {
@@ -3471,6 +3471,7 @@
         "given": {
           "publishesUnderWay": 0,
           "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": false,
@@ -3481,6 +3482,7 @@
         "given": {
           "publishesUnderWay": 1,
           "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
@@ -3491,6 +3493,7 @@
         "given": {
           "publishesUnderWay": 3,
           "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true
@@ -3500,20 +3503,55 @@
         "given": {
           "publishesUnderWay": 0,
           "previewsOpen": 2,
+          "previewsBeingBuilt": 0,
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": false,
-        "why": "The decision this case exists to pin. A preview that is merely open is not work under way, and an app that cannot tell a building preview from a finished one must not guess."
+        "why": "The decision this case exists to pin. A preview that is merely open is not work under way, and an app that cannot tell a building preview from a finished one must not guess. Still true after issue #232: what counts is a preview being BUILT, which is its own record, and an open preview whose build has finished is not one."
       },
       {
         "name": "the Mac is logging out while a section is publishing",
         "given": {
           "publishesUnderWay": 1,
           "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
           "quitReason": "theMacIsLoggingOutOrShuttingDown"
         },
         "expectAsk": false,
         "why": "The rule that must never bend. A modal here holds up the log out, and a teacher whose Mac will not log out has a worse problem than a publish that did not finish."
+      },
+      {
+        "name": "a preview is being built and nothing is publishing",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "why": "The case issue #232 exists for. Russell's ruling on 2026-09-20 named a publish OR a preview; a first build can spend minutes fetching what it needs, and a teacher who quits through it deserves to be told."
+      },
+      {
+        "name": "a preview is open and another is being built",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 1,
+          "previewsBeingBuilt": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "why": "The open preview adds nothing and takes nothing away: the build is what is asked about."
+      },
+      {
+        "name": "a preview is being built while the Mac logs out",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 1,
+          "quitReason": "theMacIsLoggingOutOrShuttingDown"
+        },
+        "expectAsk": false,
+        "why": "The rule that must never bend bends for a preview no more than for a publish."
       }
     ],
     "appliesOn": [

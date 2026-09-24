@@ -33,6 +33,17 @@ struct SectionDetailView: View {
     @State var previewURL: URL?
     @State var isWaitingForServer: Bool = false
 
+    /// The preview build this window recorded in `CourseActivity`, while it
+    /// has one — so ⌘Q, which cannot see this view's state, knows a preview is
+    /// still being built (issue #232).
+    ///
+    /// Kept rather than rebuilt from `folderThisSectionWorksIn` at the end,
+    /// because that note is also written by a deploy: by the time the end is
+    /// delivered it could name another folder, and ending the wrong record
+    /// leaves the right one behind for ever. Written only by
+    /// `notePreviewBuildBegan()`, cleared only by `notePreviewBuildEnded()`.
+    @State var previewBuildRecorded: CourseActivity.PreviewBuildRecord?
+
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
 
@@ -462,7 +473,29 @@ struct SectionDetailView: View {
                 healthDialog = .findings
             }
         }
+        // ⌘Q asks about a preview still being built (issue #232). The build
+        // is recorded where it begins — `startPreview()`, the one place a
+        // preview starts — and ended HERE, once, rather than beside each of
+        // the seven places that clear `isWaitingForServer`: mirroring those by
+        // hand is how a record gets left behind, and a record left behind
+        // makes every later quit ask about a build that is not happening.
+        // `isWaitingForServer` is true from the press until the page first
+        // answers or the run ends.
+        //
+        // NOT `previewRunner.previewAddress`: `preview.sh` prints the address
+        // BEFORE it starts the build, so it is set for nearly all of it.
+        .onChange(of: isWaitingForServer) { _, isWaiting in
+            if !isWaiting {
+                notePreviewBuildEnded()
+            }
+        }
         .onDisappear {
+            // FIRST, and unconditionally: SwiftUI does not reliably deliver
+            // the change above to a view being torn down (closing the window,
+            // or switching section, which gives this view a new identity), and
+            // `stopPreview()` below clears `isWaitingForServer` itself — so
+            // waiting for that change would leave the record behind.
+            notePreviewBuildEnded()
             // The key this section registered under, never the folder its
             // work belongs to and never the window's current one.
             if let folder = folderThisSectionRegisteredIn {
@@ -1069,6 +1102,7 @@ struct SectionDetailView: View {
         previewLease = lease
         previewURL = nil
         isWaitingForServer = true
+        notePreviewBuildBegan()
         previewRunner.milestones = TaskMilestones.preview
 
         Task { @MainActor in
@@ -1194,10 +1228,50 @@ struct SectionDetailView: View {
 
     /// Hands the port back, whatever ended the preview.
     func releasePreviewLease() {
+        // A belt beside the change handler: every ending that hands the port
+        // back is also the end of any build, and ending twice is harmless.
+        notePreviewBuildEnded()
         if let lease = previewLease {
             PreviewLeases.release(lease)
             previewLease = nil
         }
+    }
+
+    /// Records, across every window, that this section's preview is being
+    /// built — for ⌘Q's question and nothing else. Called from
+    /// `startPreview()` alone, beside the one `isWaitingForServer = true`.
+    func notePreviewBuildBegan() {
+        guard let folder = folderThisSectionWorksIn else {
+            return
+        }
+        // A build already recorded is ended first, so a second press can never
+        // leave the first record behind.
+        notePreviewBuildEnded()
+        let record: CourseActivity.PreviewBuildRecord = CourseActivity.PreviewBuildRecord(
+            folderPath: folder.path,
+            courseCode: course.code,
+            sectionNumber: sectionNumber
+        )
+        CourseActivity.beginPreviewBuild(
+            folderPath: record.folderPath,
+            courseCode: record.courseCode,
+            sectionNumber: record.sectionNumber
+        )
+        previewBuildRecorded = record
+    }
+
+    /// Ends the record `notePreviewBuildBegan()` made, if there is one. Safe
+    /// to call from every ending, and called from three.
+    func notePreviewBuildEnded() {
+        guard let record = previewBuildRecorded else {
+            return
+        }
+        CourseActivity.endPreviewBuild(
+            folderPath: record.folderPath,
+            courseCode: record.courseCode,
+            sectionNumber: record.sectionNumber
+        )
+        previewBuildRecorded = nil
     }
 
     /// Why this course is never deployed, or nil when it is an ordinary one.

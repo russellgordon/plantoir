@@ -3,6 +3,8 @@ import Observation
 
 /// Which courses are doing something right now, across every window:
 /// previewing (known via `PreviewLeases`) or publishing (recorded here).
+/// Previews still being BUILT are recorded here too, for the one question
+/// that has to tell a build from a preview that is merely open — ⌘Q.
 ///
 /// Re-running the course setup rewrites a course's folders and files, so
 /// actions like "Add Section…" must decline while one of the course's
@@ -19,12 +21,25 @@ enum CourseActivity {
         let sectionNumber: Int
     }
 
+    /// A preview of one section that is still being BUILT — from the press
+    /// until its page first answers, or the run ends.
+    ///
+    /// Its own type rather than a second use of `PublishRecord`, whose shape
+    /// is identical: a preview build filed under a name that says "publish"
+    /// would be read as one by the next person to count them.
+    struct PreviewBuildRecord: Equatable {
+        let folderPath: String
+        let courseCode: String
+        let sectionNumber: Int
+    }
+
     /// The backing store is observable for the same reason as
     /// `PreviewLeases.Store`: views reading `courseIsBusy` must
     /// re-render the moment a publish begins or ends.
     @Observable
     final class Store {
         var activePublishes: [PublishRecord] = []
+        var activePreviewBuilds: [PreviewBuildRecord] = []
     }
 
     // MARK: - Stored properties
@@ -36,6 +51,17 @@ enum CourseActivity {
     /// The publishes currently running, across all windows.
     static var activePublishes: [PublishRecord] {
         return store.activePublishes
+    }
+
+    /// The previews still being built, across all windows and the
+    /// assistant's own rebuilds (issue #232).
+    ///
+    /// Read by nothing but the quit question. `busyDescription`,
+    /// `courseIsBusy` and `coursePublishIsRunning` deliberately do not look
+    /// here: a preview already counts for those through its lease, and a
+    /// menu item greyed out "until preview completed" is about the lease.
+    static var activePreviewBuilds: [PreviewBuildRecord] {
+        return store.activePreviewBuilds
     }
 
     // MARK: - Functions
@@ -67,6 +93,52 @@ enum CourseActivity {
             remaining.append(existing)
         }
         store.activePublishes = remaining
+    }
+
+    /// Records that a preview of one section has started building.
+    ///
+    /// Recording the same section twice keeps ONE record. A section has at
+    /// most one preview per folder (its lease sees to that), and the one
+    /// other thing that builds it — the assistant's rebuild with no window —
+    /// is the same fact to a teacher who asks to quit: that section's preview
+    /// is being built.
+    static func beginPreviewBuild(folderPath: String, courseCode: String, sectionNumber: Int) {
+        let record: PreviewBuildRecord = PreviewBuildRecord(
+            folderPath: folderPath,
+            courseCode: courseCode,
+            sectionNumber: sectionNumber
+        )
+        for existing in activePreviewBuilds {
+            if existing == record {
+                return
+            }
+        }
+        store.activePreviewBuilds.append(record)
+    }
+
+    /// Records that a section's preview is no longer being built, however it
+    /// ended — and is safe to call when nothing was recorded, or twice.
+    ///
+    /// **Idempotent on purpose, unlike `endPublish`.** It is called from more
+    /// than one ending of the same build (the view's own change of state, its
+    /// disappearance, and the lease being handed back), because SwiftUI does
+    /// not reliably deliver a change to a view that is being torn down — and a
+    /// record that outlives its build makes EVERY later ⌘Q ask about a
+    /// preview that is not being built. Removing every match is what makes a
+    /// second call harmless.
+    static func endPreviewBuild(folderPath: String, courseCode: String, sectionNumber: Int) {
+        let finished: PreviewBuildRecord = PreviewBuildRecord(
+            folderPath: folderPath,
+            courseCode: courseCode,
+            sectionNumber: sectionNumber
+        )
+        var remaining: [PreviewBuildRecord] = []
+        for existing in activePreviewBuilds {
+            if existing != finished {
+                remaining.append(existing)
+            }
+        }
+        store.activePreviewBuilds = remaining
     }
 
     /// True while any section of the course is PUBLISHING — previews do not
@@ -119,5 +191,6 @@ enum CourseActivity {
     /// Starts from nothing — for tests.
     static func reset() {
         store.activePublishes = []
+        store.activePreviewBuilds = []
     }
 }

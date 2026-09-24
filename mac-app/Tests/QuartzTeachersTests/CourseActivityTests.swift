@@ -73,7 +73,60 @@ final class CourseActivityTests: XCTestCase {
         XCTAssertTrue(CourseActivity.courseIsBusy(folderPath: "/folder", courseCode: "ICS3U"))
         XCTAssertFalse(CourseActivity.courseIsBusy(folderPath: "/folder", courseCode: "MPM2D"))
     }
+
+    // MARK: - Preview builds (issue #232)
+
+    /// A build's record is ended by whichever ending reaches it first, and
+    /// the others must find nothing to do: a record that outlives its build
+    /// makes every later ⌘Q ask about a preview nobody is building.
+    @MainActor
+    func testEndingAPreviewBuildTwiceIsHarmless() {
+        CourseActivity.reset()
+        defer { CourseActivity.reset() }
+
+        CourseActivity.beginPreviewBuild(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
+        CourseActivity.beginPreviewBuild(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
+        XCTAssertEqual(
+            CourseActivity.activePreviewBuilds.count, 1,
+            "One section being built is one fact, however many times it is said"
+        )
+        CourseActivity.beginPreviewBuild(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 2)
+        XCTAssertEqual(CourseActivity.activePreviewBuilds.count, 2)
+
+        CourseActivity.endPreviewBuild(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
+        CourseActivity.endPreviewBuild(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
+        XCTAssertEqual(
+            CourseActivity.activePreviewBuilds,
+            [CourseActivity.PreviewBuildRecord(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 2)],
+            "Ending one section's build must leave another section's alone"
+        )
+
+        CourseActivity.endPreviewBuild(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 7)
+        XCTAssertEqual(CourseActivity.activePreviewBuilds.count, 1, "Ending a build that never began changes nothing")
+    }
+
+    /// A preview build is a fact for ⌘Q alone: it must not make a course
+    /// "busy" (the lease already does that) or count as a publish.
+    @MainActor
+    func testAPreviewBuildIsNeitherBusyNorAPublish() {
+        CourseActivity.reset()
+        PreviewLeases.reset()
+        defer { CourseActivity.reset() }
+
+        CourseActivity.beginPreviewBuild(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
+        XCTAssertNil(CourseActivity.busyDescription(folderPath: "/f", courseCode: "ICS3U"))
+        XCTAssertFalse(CourseActivity.coursePublishIsRunning(folderPath: "/f", courseCode: "ICS3U"))
+        XCTAssertTrue(CourseActivity.activePublishes.isEmpty)
+    }
+
+    @MainActor
+    func testResetClearsPreviewBuilds() {
+        CourseActivity.beginPreviewBuild(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
+        CourseActivity.reset()
+        XCTAssertTrue(CourseActivity.activePreviewBuilds.isEmpty)
+    }
 }
+
 
 /// Which question the repair dialog asks before starting a preview.
 ///
@@ -131,4 +184,5 @@ final class CourseActivityPublishOnlyTests: XCTestCase {
             CourseActivity.coursePublishIsRunning(folderPath: "/tmp/f", courseCode: "ICS3U")
         )
     }
+
 }
