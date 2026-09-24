@@ -372,11 +372,23 @@ who asked for half six tomorrow read a card that was perfectly true and said
 nothing to contradict them. `AssistWording.deployApproval` now leads with the
 fact that it happens now; the two sentences after it, which have been argued
 over twice, are untouched. **`deployQuestion` was deliberately NOT changed**:
-"Shall I deploy?" is said under EVERY approval card including the scheduled
-one (`AssistAgent.run(settledCall:)` is unconditional, and Windows' `AskFirst`
-likewise), so "Shall I deploy now?" would make the scheduled card read worse
-than the thing being fixed. Splitting the question per tool is its own piece —
-[issue #184](https://github.com/russellgordon/plantoir/issues/184). The rule is
+at the time it was said under EVERY approval card including the scheduled one
+(`AssistAgent.run(settledCall:)` was unconditional, and Windows' `AskFirst`
+likewise), so "Shall I deploy now?" would have made the scheduled card read
+worse than the thing being fixed. Splitting the question per tool was its own
+piece — [issue #184](https://github.com/russellgordon/plantoir/issues/184),
+done 2026-09-23: the scheduled card now carries `AssistWording.scheduleQuestion`,
+chosen by `AssistAgent.approvalQuestion(forToolNamed:)`. The choice is keyed on
+the tool NAME, not on `needsApproval`, so a third approval tool added later
+falls to `deployQuestion` — the reading ("now") that is safe for anything that
+deploys. `SharedRulesContractTests.testTheScheduledCardAsksItsOwnQuestion`
+pins the mirror of the rule below: the scheduled question must NOT carry the
+immediate card's word, read from the same contract rule; and the authored
+scenario "an immediate deploy's card still asks the immediate question" pins
+the other half on BOTH platforms. The Go bubble
+(`deployAccepted`) and the cancel line (`deployWasCancelled`) were left as they
+are — both are true of a scheduled deploy too; whether they should say
+"schedule" is a question for the wording pass, not a fault. The rule is
 pinned as a PROPERTY rather than a sentence:
 `contracts/shared-rules.json` → `assistantConfirmation.`
 `theImmediateDeployCardSaysItIsImmediate` carries the word the sentence must
@@ -471,10 +483,19 @@ remember that it is different.
   "Settled once" is a property of the MOMENT, not of the refusal. **No minimum
   lead time was invented** — there is none anywhere in the product, and adding
   one here would be a rule nobody could find later.
-- **Scheduling silently replaces an existing schedule** for that section
-  (`ScheduledDeploy` removes any previous job), and neither the card nor the
-  summary says so. Pre-existing, and untouched here; this family turns that
-  path from rare into the easy one, so it is worth knowing.
+- **Scheduling replaces an existing schedule** for that section
+  (`ScheduledDeploy` removes any previous job). When this family landed,
+  neither the card nor the summary said so; since
+  [#195](https://github.com/russellgordon/plantoir/issues/195) (2026-09-23)
+  the card, the schedule sheet, the plan and the tool's own result (the only
+  thing an MCP caller sees) name the moment being replaced
+  (`wording.scheduleReplaces`, read Mac-wide) and the trail records it
+  (`scheduled deploy replaced`). A job from another working folder set for
+  the same minute still says nothing, and one from another folder is named
+  with no clock or Cancel for it in this window — both left to
+  [#237](https://github.com/russellgordon/plantoir/issues/237). The reasoning is in
+  [`07-deployment.md`](07-deployment.md) → "Scheduling a section that already
+  has a deploy set".
 - **On the morning the clocks go forward, a wall time may not exist**, and the
   settled text is therefore built from the INSTANT rather than by joining a day
   to a time. Measured, America/Toronto, DST starting 02:00 on 8 March 2026:
@@ -933,12 +954,101 @@ apart**, because whoever reads a problem report cannot: *"the assistant's
 answer was cut off part way through publish pages"* is a question about how
 much the model was asked to write, and *"the assistant finished answering but
 what it wrote for publish pages could not be read"* is a question about the
-model itself. One event (`assistant answer was cut off`), two sentences.
+model itself. One event (`assistant answer was cut off`), two trail sentences
+— three since #198, below, which also gives the teacher a sentence of its own.
 (Until #166 neither was true: `finish_reason` was
 never read, the unparseable arguments were silently replaced with `{}`, and
 the tool RAN — against no course, producing "There is no course called "" in
 this working folder", which reads to a teacher as a complaint about what they
 typed.)
+
+**A third cause, since [#198](https://github.com/russellgordon/plantoir/issues/198)
+(2026-09-23): a finished answer that wrote NOTHING for a tool that needs more
+than the window supplies.** An empty string (and `{}`) is readable on purpose —
+`undo_last_change` takes no arguments and llama.cpp sends `""` for it, so a gate
+refusing every empty call would refuse "Undo that", the tool a card reaches
+most. But the same yes let a finished `publish_pages` with `""` through. The
+issue predicted the stale #166 refusal; that is **no longer reachable** from
+the local path, because the window binds `course` and `section` onto every
+call whose schema declares them (since 2026-08-15). What happened instead,
+traced by reading (the must-fail run confirms only that the old gate let the
+call through to a reply other than the refusal): bound to this section, with
+plan mode on, it reached `plan_publish_pages` → `.nothingNamed` → a sentence
+saying no pages and no dates were given — the #166 fault in different words,
+since the teacher HAD named pages and the model dropped them.
+
+**The rule: an empty call runs only when the window supplies everything the
+tool needs.** The window supplies `course` and `section`
+(`AssistToolCall.argumentsTheWindowSupplies`). A tool needs more than that when
+its schema REQUIRES any other argument (a date, a page, a time), or when it
+changes pages (`readOnly` false) and declares any other argument at all (which
+pages, which dates, which unit) — a write told only its section has nothing to
+act on. Everything else runs on an empty call: undo, rebuilding the preview,
+the deploy (still behind its own button), checking the section, adding the
+next class, and `list_pages`, whose other argument only narrows it. The gate
+is `AssistAgent.argumentsAreReadable(of:for:)` over
+`AssistToolCall.argumentsAreReadable(forToolRequiring:declaring:readOnly:)`,
+reading `required`, the declared properties and `readOnly` from the tool's own
+definition — the schema is only READ, so no description, schema or prompt byte
+moved (hashes unchanged). `undo_last_change`'s schema has NO `required` key,
+which reads as requiring nothing; a Windows port must treat a missing key the
+same way. An unknown tool name is judged tool-blind and still reaches "There
+is no tool by that name."
+
+Re-taken after the change on 2026-09-23 by running the real gate over every
+definition on the surface (the local thirteen; the MCP-only nineteen never pass
+this gate — `AssistMCPServer` calls the runner directly — and are listed,
+with what each does on an empty call, in #198's closing comment):
+
+| Local tool | Requires beyond course/section | Declares beyond course/section | Not `readOnly` | First cut | Now |
+|---|---|---|---|---|---|
+| `list_pages` | — | `matching` | no | refused | **runs** |
+| `read_page` | `page` | `page` | no | refused | refused |
+| `check_section` | — | — | no | refused | **runs** |
+| `publish_class_on` | `date` | `date` | yes | refused | refused |
+| `publish_pages` | — | `pages`, `before`, `onOrAfter` | yes | refused | refused |
+| `unpublish_pages` | — | `pages`, `before`, `onOrAfter` | yes | refused | refused |
+| `rebuild_preview` | — | — | yes | refused | **runs** |
+| `undo_last_change` | (no `required` key) | — | yes | runs | runs |
+| `deploy_section` | — | — | yes | refused | **runs** (its button still asks) |
+| `schedule_deploy` | `when` | `when` | yes | refused | refused |
+| `cancel_scheduled_deploy` | — | — | yes | refused | **runs** |
+| `read_remembered_timetable` | — | — | no | refused | **runs** |
+| `add_next_class` | — | — | yes | refused | **runs** |
+
+**What the teacher is told: its own sentence.** A refused empty call answers
+`wording.answerLeftOutWhatItWasFor` — the assistant did not work out which
+pages, day or time was meant, so nothing was done — and NOT
+`wording.answerWasCutOff`, whose advice ("a shorter sentence, or fewer pages")
+is about the teacher's request; an empty answer is not its fault. The trail's
+third phrasing is "wrote nothing for <tool>", and the "assistant chose a tool"
+line no longer says "waited for the button" for a call the gate refused (or
+one the engine cut off) — no button went up. Contract:
+`app-rules.json → modelTiers.requirements`, "A finished reply that wrote
+nothing runs a tool only when the window supplies everything that tool
+needs", with fourteen pure cases; each case's `required`, properties and
+`readOnly` are checked against the real definition, and the agent's gate is
+run on each.
+
+**Over MCP, where nothing binds a course,** an empty `course` used to come back
+as "There is no course called “” in this working folder" — false in its own
+terms, and a complaint about the teacher when relayed. It is now
+`wording.noCourseNamed` (the runner's `noSuchCourse` refusal and
+`back_up_course`). Result text only; no schema moved.
+
+**Measured cost:** across the 990 tool-call rows in `research/ai-assist/*.txt`,
+175 were empty-argument calls — every one to a tool that requires nothing —
+and none left out `course`/`section`, so the rule changes no measured routing
+outcome and closes a path no recorded run has taken.
+
+**REJECTED:** (i) refusing every empty call — breaks undo; (ii) refusing every
+tool with a `required` list — THE FIRST CUT of this piece, caught on review: it
+refused "rebuild the preview", the deploy, checking the section and adding the
+next class on an empty call although the window supplies everything they take
+(nine of the thirteen local tools require exactly course and section);
+(iii) "readable when every REQUIRED argument is one the window supplies" alone
+— keeps the empty `publish_pages` running, because its real content is
+optional in its schema, which is why a write's declared arguments count too.
 
 **The gate is the finish reason, not a parse check, and that is measured.**
 Sweeping `max_tokens` across every cut point of two ordinary requests on the
@@ -2485,8 +2595,9 @@ most for how the window reads:
   Cancel destroyed the description of what had just been agreed to — and with
   it the context for everything after. A conversation you cannot scroll back
   through is not a conversation.
-- **The question.** "Shall I go ahead?" / "Shall I deploy?" is its own
-  message, which is what lets the card below be nothing but buttons.
+- **The question.** `planQuestion` / `deployQuestion` / `scheduleQuestion`
+  (the last under a scheduled deploy's card, #184) is its own message, which
+  is what lets the card below be nothing but buttons.
 - **The teacher's ANSWER.** Pressing Go records "Go" as a teacher message, in
   their bubble on their side. Reading back a conversation where the assistant
   asked, nothing answered, and yet something plainly happened is worse than

@@ -523,6 +523,97 @@ tools folder — and gave one to the quit path, which had none at all. The
 scheduled publish worked only because the launcher re-exports that folder from
 inside itself.
 
+### The Helpers line says what is installed, measured (issue #222)
+
+A problem report's header carries a "Helpers" line, and the trail opens every
+launch with the same text (`helpers described`). Through v1.3.0 it was five
+literals — the versions `setup.sh` downloads — printed as though they were
+installed. They are not what runs: the launchers use whatever copy is already
+on the `PATH` above and download only what is missing, so on a Mac with
+Homebrew's tools the line described a machine that did not exist. Measured on
+Russell's Mac on 2026-09-23: the report said "Docker CLI 29.7.2", Homebrew's
+29.7.1 was the one running, and nothing said the programs were Homebrew's at
+all. On the Mac that filed the 2026-09-19 report the pins happened to match,
+which read as evidence that Plantoir had installed its own tools and cost real
+time to rule out.
+
+Now `ProblemReportEnvironment.measureHelpers` ASKS them — one `/bin/sh -c` with
+`HelperPrograms.environment()`, so the same search order the launchers use:
+`colima --version`, `limactl --version`, `docker --version`,
+`docker buildx version`. All four took 0.32 s on that Mac (0.46 s the first
+time), with none installed 0.08 s — the real source compiled standalone and run
+against the real `PATH`. Each is reported with where it was found:
+
+- **"Plantoir's copy"** when found in `…/Plantoir/tools/bin` — by the folder it
+  was FOUND in, with no path printed.
+- **"Homebrew"** when the link LEADS into `/opt/homebrew`, `/usr/local/Cellar` or
+  `/usr/local/Homebrew`. Not merely "found in `/usr/local/bin`": Docker Desktop
+  links its own `docker` there too, and calling that Homebrew would be the same
+  kind of wrong answer the line exists to stop giving.
+- **"found in <folder>"** otherwise. A folder under the home folder is redacted
+  on the way to disk like every other path.
+- **Buildx** gets a source only when its own text names one (Homebrew's build
+  says "Homebrew"). It is a Docker CLI plug-in found in `~/.docker/cli-plugins`,
+  which is the SAME folder Plantoir's download (`setup.sh`) and Homebrew's link
+  both use — where `docker` lives says nothing about where buildx came from.
+- A program that is absent reads **"not found (would install <pin>)"**; before
+  anything has been measured, **"not checked yet (pinned <pin>)"**. When the
+  check is ended by its time limit, the program it was waiting on **"did not
+  answer within 5 s"** — a hung `docker --version` is itself the diagnosis, so
+  it is not folded in with the rest — and any after it, never reached, read
+  **"not checked (pinned <pin>)"**. The
+  pins live in one list, `ProblemReportEnvironment.pinnedHelpers`, which
+  `HelperVersionsTests` holds against `setup.sh`'s four `*_VERSION` lines.
+
+The engine (`llama.cpp b10435 (Metal)`) stays a stated constant: it is bundled,
+so its build genuinely is known.
+
+**Every answer says when it was taken** — the remembered line ends
+"· checked 2026-09-24 00:41:07" — because a record can carry an answer from the
+launch or from the end of the last task, and without it a report could not
+tell a Mac with no Colima from one that had none an hour ago.
+
+**When it is measured.** Once at launch, in a detached task, and the trail's
+helpers line is written only after it answers — so `ActivityTrail.noteLaunch()`
+writes two lines and `noteHelpers(_:)` the third, about a third of a second
+later, hopping back to the main actor to write so two writers never interleave
+the one trail file. Again after every launcher task finishes, because a first
+setup downloads the programs it did not find (that task's OWN record keeps the
+earlier answer, which was true when it was taken — a record saying "not found"
+on the setup that then installed it is not a failed download). **The TRAIL's
+helpers line is written once per launch and never again**, deliberately left
+that way: a report made in the same session that installed the tools shows,
+on the trail, the launch's "not found (would install …)" — with the time it
+was checked — while the records written after the setup finished carry the
+new answer; the next launch writes a fresh line. And at the
+start of a task when nothing has been measured yet: the `--mcp-stdio` process
+never runs the app's launch, and without this its records would all say "not
+checked yet". Every one of the three is skipped under XCTest, so the suite
+neither probes the Mac it runs on nor has a background answer change a record
+mid-test; `measureHelpers` itself stores nothing (only `refreshHelpers` does),
+so a test that points it at stub programs cannot leak a stub's version into a
+later test.
+
+**Two traps in the check itself.** `colima --version`, never `colima version`:
+the undashed form talks to the running virtual machine — 0.256 s against
+0.045 s, and it prints a second, server-side line — so a stopped machine makes
+the check slow and a wedged one makes it hang. No test with stub programs can
+tell the two apart; read the script. And a 5 s watchdog ends the shell in case
+a program never answers. That only works because each program's output is
+captured by the shell's own `$( … )`: the programs never hold the pipe the app
+reads, so ending the shell ends the read
+(`testAHelperThatNeverAnswersDoesNotHoldTheCheckUp`, a 1 s limit against a
+program that sleeps 8 s). The review measured the hung program itself too: a
+stub that wrote its pid and then `exec sleep 40` was gone once the check had
+returned, so nothing is left running.
+
+**Rejected.** Measuring when each record is written, on the main actor: a 0.3 s
+stall per record, and records are rewritten every ten seconds while a task
+runs. Keeping the literals and labelling them "expected": still unmeasured, and
+the difference between measured and expected is exactly what a reader of the
+report cannot see. Windows owes nothing here: its header never claimed tool
+versions — it says "WSL2" or "native toolchain", from what is on disk.
+
 ### What the quit path now refuses to do
 
 The generated script is `/bin/sh`, never `/bin/zsh -l`, with all three handles
@@ -671,36 +762,105 @@ redacting — the working folder's LAST COMPONENT, never its path.
 ### ⌘Q while something is under way
 
 `applicationShouldTerminate` used to return `.terminateNow` unconditionally.
-It now asks first when this app is publishing, and the rule is
-`contracts/shared-rules.json` → `quittingWhileWorkIsUnderWay`, with five cases
-both suites can run.
+It now asks first when this app is publishing or building a preview, and the
+rule is `contracts/shared-rules.json` → `quittingWhileWorkIsUnderWay`, with
+eight cases (five from #220, three from #232 on 2026-09-23).
 
-**What counts as under way: a publish, and not a preview.** `CourseActivity.
-activePublishes` is process-wide and lasts exactly as long as the publish does,
-so it means what it says. A preview is known through `PreviewLeases`, and a
-lease is held for as long as the preview is OPEN — it cannot tell a section
-still building from one that finished twenty minutes ago and is being read.
-Asking on every lease would mean asking almost every quit, which teaches a
-teacher to dismiss the question unread. `CourseActivity.courseIsBusy` folds the
-two together; that is right for greying out a menu item and wrong here, and
-asking the wrong one of those two questions has already produced a bug in this
-app (the repair dialog's "Preview Again" refused whenever a preview was
-running, which is every time it is offered).
+**What counts as under way: a publish, and a preview being BUILT — not a
+preview that is merely open.** `CourseActivity.activePublishes` is
+process-wide and lasts exactly as long as the publish does, so it means what
+it says. `CourseActivity.activePreviewBuilds` is the same kind of record for a
+preview build (#232): kept from the press until the preview's page first
+answers, or the run ends. A preview's LEASE (`PreviewLeases`) is held for as
+long as the preview is OPEN — it cannot tell a section still building from one
+that finished twenty minutes ago and is being read — so the lease is still NOT
+asked about. Asking on every lease would mean asking almost every quit, which
+teaches a teacher to dismiss the question unread. `CourseActivity.courseIsBusy`
+folds leases and publishes together; that is right for greying out a menu item
+and wrong here, and asking the wrong one of those two questions has already
+produced a bug in this app (the repair dialog's "Preview Again" refused
+whenever a preview was running, which is every time it is offered).
+`busyDescription`, `courseIsBusy` and `coursePublishIsRunning` do not read the
+build record at all — a preview already counts for them through its lease.
 
-**REJECTED: adding a process-wide record of a preview BUILD.** The honest
-signal — `previewRunner.previewAddress` becoming non-nil when the server
-announces itself — lives in `SectionDetailView`'s `@State` and is not visible
-from the delegate. Making it visible means new cross-window state during a fix
-meant to be small and shippable; and a preview that is lost costs a rebuild,
-while a publish that is lost costs a half-updated class website. Previews are
-not abandoned either — they are stopped cleanly on the way out.
+**A publish wins.** With both under way the question names the publish and
+carries the publish's sentence (`QuitConfirmation.explanation(publishing:)`);
+the build is named only when nothing is publishing. The publish is the one
+whose loss reaches the class website, and one question about two different
+things would have to be vaguer about both. The preview's sentence says
+quitting COULD leave it unfinished and that nothing on the class website
+changes — "could" for the same two-sided reason as the publish's (below): a
+section window's preview is a live preview and the quit path ends it, but the
+assistant's no-window rebuild is passed over like a publish and `preview.sh`
+has no `set -e`, so it may run to its end on the dead terminal. It promises
+nothing about next time — a plan draft said "it is built again the next time
+you open it", and the review caught that nothing starts a preview when a
+window opens.
 
-The same reasoning covers the assistant's own rebuild of a preview
-(`AssistSiteWork.rebuildPreview`, a `--build-only` run): it is work under way
-that the question does not ask about, and what is lost by quitting through it
-is a rebuild, never a page a student can see. Russell's ruling named "a
-publish or preview"; asking about a preview BUILD as well is tracked as its
-own issue rather than widened into this fix.
+**Where a build is recorded, and why there.** Each choice is a defence against
+the one failure that reports success from here — a record that outlives its
+build, which would make EVERY later ⌘Q ask about a preview nobody is building:
+
+- **A section window: the wait and the record are ONE object.**
+  `PreviewBuildWait` (held in `@State`) owns the flag the window used to keep
+  as `isWaitingForServer` — now a read-only view of `previewBuildWait.isWaiting`
+  — and the record. `begin(…)` in `startPreview()` records the build;
+  `end()` is the ONLY way back to "not waiting", and every ending calls it: the
+  page answering, the run ending, Stop, Cancel, the silence check, the outer
+  ten-minute bound, and `.onDisappear` (first, unconditionally). One of those
+  was found by the fix review: a run that ends BY ITSELF while the silence
+  check is asking the builder whether the page is up. Every other early
+  return there has already ended the wait (Stop, a closed window, a new run),
+  so that one is ended by the silence check itself, guarded by
+  `PreviewReachability.theSameRunEndedByItself` — never unconditionally, since
+  after a new run has started the wait belongs to it. `end()` is
+  idempotent, and the object ends only the record it began (the window's
+  `folderThisSectionWorksIn` is also written by a deploy, so rebuilding the
+  record from it at the end could name the wrong folder).
+- **The assistant's no-window rebuild** (`AssistToolchainWork.rebuildPreview`,
+  `--build-only`) records around its run, ended by a `defer` on every return.
+  NOT in `ScriptRunner`: a publish's own `--build-only` wears the same
+  launcher's name and is already counted as the publish.
+
+**REJECTED, after it was built: ending the record from `.onChange(of:
+isWaitingForServer)`.** The first cut kept the flag as plain `@State` and ended
+the record from one `.onChange` handler, with belts in `.onDisappear` and
+`releasePreviewLease()`. The implementation review found the gap by measurement
+(a standalone `NSHostingView` probe): `startPreview()` can run on a view that
+has ALREADY gone, through a closure captured before an `await` — the
+assistant's `await window.stopPreview(); window.startPreview()`, and the repair
+dialog's `await stopPreviewAndWait(); startPreview()`. The closure's `@State`
+writes persist on the gone view, but `.onChange` is never delivered to it, so
+when that orphan build's page answered (or hit the ten-minute bound, the two
+endings that release no lease) the flag went false and the record stayed until
+the app quit. Putting the record inside the only function that clears the flag
+makes that state impossible rather than unlikely. `CourseActivityTests.
+testAWaitCannotEndWithoutItsRecord` drives the sequence; with `end()` made to
+clear the flag alone — which is what those two endings did — it fails five
+assertions.
+
+**Why this was REJECTED in #220 and done in #232 — the recorded reason was
+wrong.** The v1.2.1 write-up rejected a process-wide record of a preview build
+partly because "the honest signal — `previewRunner.previewAddress` becoming
+non-nil when the server announces itself — lives in `@State`". The address is
+NOT that signal: `preview.sh` prints "Preview will be available at …" BEFORE it
+starts `build_site.py` (in the real 2026-09-19 report it is line 24, the
+build's first line is 25, and "Launching Quartz preview" is line 159), so the
+address is known for nearly the whole build. The honest per-view signal is
+the window's wait for its page (`isWaitingForServer`, now held by
+`PreviewBuildWait`). The other half of the old reason (new cross-window state
+during a small fix) was a judgement about THAT fix's size, and Russell's ruling
+of 2026-09-20 named "a publish or preview".
+
+**Known, and in the safe direction:** the outer ten-minute bound in
+`waitForPreviewServer` ends the wait while a very slow first-ever
+build may still be running, which ends the record early — a quit then goes
+unasked, which is what happened for every preview before #232. A window's
+build and an assistant rebuild of the SAME section at once share one record,
+and whichever ends first clears it; same direction.
+
+**Still REJECTED: asking about a preview that is merely open**, for the lease
+reason above.
 
 **What is never asked about**, because it cannot be seen from here: a scheduled
 publish (launchd runs a SECOND Plantoir process with its own statics), an
@@ -766,17 +926,46 @@ putting a figure anywhere.
 
 ### What is still owed, and what was rejected
 
-**Owed, and NOT yet opened as an issue when this was written — open one:** the
-launchers print "🐳 Setting up this Mac — a
-one-time step that runs on its own…" and "▶️  Starting Colima…"
-(`setup.sh:563/573`, `preview.sh:788/798`, `deploy.sh:1255/1265`). Now that
-quitting really stops the machine, the first is untrue — it happens every
-morning — and the second names the machinery (rule 1). **Whatever replaces them
-must keep the substring "Setting up this Mac"**: the app matches the milestone
-on it (`contracts/app-rules.json` → `milestones`, `markerOrigins`), and a
-rewrite that drops those four words stops the progress bar moving with no other
-symptom. Not taken here because it is a launcher change, which drags in a
-foreground `verify.sh` and the whole toolchain travel chain.
+**Done since, as GitHub #228 (2026-09-23): the first-start lines.** The
+launchers used to print "🐳 Setting up this Mac — a one-time step that runs on
+its own…" and "▶️  Starting Colima…" (in `ensure_container_runtime`, identical
+in `setup.sh`, `preview.sh` and `deploy.sh`). Once quitting really stops the
+machine, the first is untrue — it happens again after every quit that stopped
+it, several times a day for a teacher who quits often — and the second names
+the machinery (rule 1). They now print "🐳 Setting up this Mac…" and
+"▶️  Starting the website builder…".
+
+- **The four words "Setting up this Mac" are kept verbatim**: the app matches
+  the milestone on them (`contracts/app-rules.json` → `milestones`,
+  `markerOrigins`), and a rewrite that drops them stops the progress bar moving
+  with no other symptom. The existing marker test passed if ANY one launcher
+  printed a marker, so `AppRulesContractTests.testEveryLauncherKeepsTheSetUpMarkerAndNamesNoMachinery`
+  now asks each of the three, and pins that no `echo` says "one-time step" or
+  "Starting Colima".
+- **A second reader of the old line**: `ScriptRunner.friendlyPhase` mapped the
+  marker "Starting Colima" to "Starting up (first time can take a few
+  minutes)…". It now matches "Starting the website builder" (pinned by
+  `ScriptRunnerStatusTests.testStartingTheWebsiteBuilderIsAPhase`); without
+  that move the phase would have fallen back to the previous one, silently. No
+  alias for the old marker: the app refreshes a folder's launchers from its
+  bundle before running them.
+- **No duration is claimed**, because the warm start is unmeasured (above).
+  REJECTED: the issue's own suggestion "this takes a moment the first time each
+  day" — after #220 the machine can stop and start several times a day.
+- **The word "Colima" has NOT left the console, nor has the rest of the
+  machinery.** `colima start` writes its own `INFO[…] starting colima` lines
+  into the details a teacher can open, and `ensure_container_runtime` still
+  prints "Waiting for the container runtime to be ready…", "Docker isn't
+  responding yet — restarting Colima…", the "(Colima is shared …)" note, and
+  "Colima did not become ready." with its "Try running 'colima stop --force &&
+  colima start' by hand, then re-run this script."; `ensure_local_tools`,
+  which it calls, prints "Getting the container runtime…", "the container
+  tools" and "the image builder" on a first run. All outside #228's two lines;
+  the director files them as ONE follow-up issue (this paragraph should then
+  carry its number). "Waiting for the container runtime" is also a
+  `friendlyPhase` marker, so moving it means moving that too. The test above
+  checks a marker only on `echo` lines: a first version checked the whole
+  file and was satisfied by the comment that names the marker beside the echo.
 
 **REJECTED — write the tools folder into `~/.zprofile` at install.** Plantoir
 editing a teacher's shell profile is exactly the machinery the product hides, it
@@ -1356,6 +1545,110 @@ because the obvious home is wrong twice over:
   `scheduledScriptsDirectoryURL()` traps in a Debug build when the agents
   override is set and this one is not — a test that moves one and forgets the
   other fails on the spot rather than reaching a teacher's file.
+- **And the rest of that folder, the agents folder and the assistant's launch
+  files: issue #240, 2026-09-24.** Three more paths were still reached by the
+  suite, all for fixture code `ICS3U` — "a course a teacher plausibly has":
+  - `scheduled/<label>.succeeded` — `SectionPublishStateTests` created,
+    wrote and deleted it; a real overnight run's unconsumed result sitting
+    there would have been destroyed, and the section silently not marked
+    published.
+  - `scheduled/<label>.findings` — `findingsSentinelURL` had no home parameter
+    at all, so `ScheduledDeployFolderProblemTests` threw away any pending "your
+    media folder is missing" note, and wrote (then restored) the real
+    `~/Library/Logs/Plantoir/<label>.log`.
+  - `…/Plantoir/assist/` — **not in the issue; found by walking every resolver
+    of the home folder.** `ClaudeCodeLauncher.supportDirectory()` had no seam of
+    any kind, and the launcher tests write `mcp-<CODE>.json` and
+    `launch-<CODE>.command` through both doors into the teacher's real folder.
+    One outlived its test: `launch-ICS3U_ROUNDTRIP_TEST.command` (826 bytes,
+    2026-09-19) was found there on 2026-09-23, beside Russell's own launch
+    files. It is harmless and it is his to delete; the fix does not touch it.
+  - and `~/Library/LaunchAgents`, READ (listed) 347 times in one run
+    of the suite — `WorkspaceModel.sweepScheduledDeploysThatAreTooLate` for every
+    test that opens a folder, the sidebar's clock, the scheduling card.
+
+  **The fix is a redirect, not the trap the issue proposed.** The issue asked
+  for a Debug trap "when `launchAgentsDirectoryOverride` is set and the home has
+  not been moved" — but neither test that reached the sentinels sets that
+  override, so the trap would have fired for neither path it was written for.
+  The condition that identifies them is "under the suite, and nobody named a
+  home". So `ScheduledDeploy.homeForScheduledNotes` answers one throwaway home
+  per test run (keyed on `BuildOutputLocation.isRunningTests`, the device
+  `buildsRoot` already uses, so the two cannot disagree about whether a test is
+  driving), and the sentinels, the agent's log, the wrapper-scripts folder and
+  `launchAgentsDirectoryURL()` all resolve against it when no home or override
+  is named. `ClaudeCodeLauncher.supportDirectory()` gets an override and the
+  same redirect. The resolvers' defaults became `URL? = nil` rather than
+  `= homeDirectoryForCurrentUser`, because a default argument is evaluated at
+  the CALL site and could not be redirected from inside; a home passed
+  explicitly — `oneShotCommand` writing the real path into the script launchd
+  will run — is used exactly, test or not. The launchd run itself is not under
+  XCTest, so it keeps the real home; no test can prove that, so read it.
+
+  **The redirect needed a second change to be safe rather than dangerous.**
+  `LaunchControl.run` used to refuse only while the agents override was set. With
+  the agents folder silently redirected, a test that forgot the override would
+  write its plist into the throwaway folder and then hand that plist to the REAL
+  launchd — so it now refuses under the suite whether or not the override is
+  set. `SuiteStaysOutOfRealFoldersTests` pins every redirect and that refusal;
+  a probe that logs a stack whenever any of these resolvers answers a path in
+  the real `~/Library` under XCTest counted, over the full suite, **482 stacks on `origin/dev`**
+  (8bcb01f1; LaunchAgents 347 — 317 of them the too-late sweep — the agent's
+  log 77, `.succeeded` 24, `assist/` 23, `.findings` 11; 92 of those only
+  built a path into generated text) and **38 with the fix — every one
+  `oneShotCommand` writing script TEXT with its real-home default, which
+  touches no file.** The probe returned a scratch path wherever it logged, so
+  neither run read or wrote the real folders.
+
+  **The stopped-run records, found by the review and closed in the same
+  piece.** `…/Plantoir/scheduled/stopped/` is read by the sidebar's badge
+  (`SidebarView.stoppedPublishBadge`) and the section's notice
+  (`SectionDetailView.loadStoppedScheduledPublish`) whenever a window is built,
+  and `dismissScheduledPublishNotice` DELETES a record — all three, and
+  `ScheduledPublishWatcher.shared`, passed the real home EXPLICITLY, so the
+  redirect never applied: 29 reads per suite run (14 from
+  `CourseRenameInterfaceTests` alone), and the first test to press Dismiss
+  would have deleted a real record. The plan had said no test builds the
+  sidebar; the review measured that wrong. All four now pass
+  `ScheduledDeploy.homeForScheduledNotes`.
+
+  **What "zero" covers, exactly.** The final probe (branch tip, full suite,
+  1,727 tests) watched the five `ScheduledDeploy` resolvers (sentinels, log,
+  scripts folder, LaunchAgents), `ClaudeCodeLauncher.supportDirectory()`,
+  `ScheduledPublishOutcome.directory` (every stopped-record path derives from
+  it) and `AssistModelStore.directoryURL`. It logged **101 stacks and no reach
+  of a real file in any watched folder**: 95 are the 19 `oneShotCommand` calls
+  building script TEXT (log, `.succeeded`, and three stopped-record paths
+  each), and **6 are stat-only reads of the real models folder** —
+  `SharedRulesContractTests.testWhatThePanelSaysFollowsTheContract` (4, through
+  `AssistModelLibrary.whatHappensNext`),
+  `AssistWarmUpTests.testATurnCannotStartBeforeTheWarmUpHasComeBack` (1) and
+  `SectionRestoredTrailTests.testARefusedRestoreWritesNothing` (1): whether a
+  model file exists and how big it is, nothing written, but a panel sentence
+  that depends on what this Mac has downloaded. Left for now, and named.
+
+  **Reached and deliberately left:** `~/Library/Application Support/obsidian/
+  obsidian.json` is READ by the rename paths only when Obsidian is running with
+  a window; `~/plantoir-mirror-test-<UUID>` is created under `$HOME` on purpose
+  by `ToolchainMirrorTests` (the VM mounts only `$HOME`) and removed; the UI
+  tests' read of the real models folder is opt-in and outside the gate. And
+  `ScheduledDeploy.bootOutAgent(label:)` runs `/bin/launchctl` directly,
+  bypassing the refusal — safe only because its callers end the process and no
+  test reaches them; its comment says so. The review's broader probe (every
+  product home lookup) also counted 146 lookups of home dot-folders by
+  `findCommandLineTool` (`~/.local/bin`, `~/.nvm` …) — outside this issue's
+  folders.
+
+  **The limit of the guard, so nobody oversells it.** The redirects are per
+  SUBSYSTEM — `homeForScheduledNotes` for everything a scheduled deploy leaves,
+  `supportDirectory`'s own for the launch files, `buildsRoot`'s for builds — and
+  `SuiteStaysOutOfRealFoldersTests` asks the resolvers it names. A NEW product
+  path that resolves the real home by itself would not be caught today; the
+  stopped-record reads were exactly such a path, found by a probe rather than
+  a test. A source-scan tripwire (the `ActivityTrailWiringTests` device) is a
+  follow-up, not part of this piece. Windows owes nothing as an
+  obligation, but the shape is worth a look there: a resolver with no home
+  parameter, fed a fixture course a teacher plausibly has.
 - **Not inside `SidebarView.performRemoval` either**, which is where it started.
   Nothing in the suite constructs that view — every reference to it is to a
   static member — so a cancel living there could be proved only by proving the

@@ -3921,6 +3921,33 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertNil(made.runner.conversationBackupURL)
     }
 
+    /// Over MCP nothing binds a window's course onto a call, so a client can
+    /// send none. The answer says no course was named — not that a course
+    /// called "“”" is missing, which names something nobody named and reads,
+    /// relayed to a teacher, as a complaint about what they typed (#198).
+    @MainActor
+    func testACallThatNamesNoCourseIsToldSo() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        for tool in ["publish_pages", "deploy_section", "back_up_course"] {
+            for arguments in [[String: Any](), ["course": "  ", "section": 1]] {
+                let outcome: AssistToolOutcome = await made.runner.run(call: call(tool, arguments: arguments))
+                XCTAssertTrue(
+                    outcome.summary.contains(AssistWording.noCourseNamed)
+                        || outcome.detail.contains(AssistWording.noCourseNamed),
+                    "\(tool) \(arguments): \(outcome.summary) / \(outcome.detail)"
+                )
+            }
+        }
+        // A course that IS named and is not here still says which.
+        let named: AssistToolOutcome = await made.runner.run(call: call(
+            "publish_pages", arguments: ["course": "ZZZ9Z", "section": 1, "pages": "Unit 1, Day 1"]
+        ))
+        XCTAssertFalse(named.detail.contains(AssistWording.noCourseNamed), named.detail)
+        XCTAssertTrue(named.detail.contains("ZZZ9Z") || named.summary.contains("ZZZ9Z"), named.detail)
+    }
+
     /// The gate is the tool's own answer, not a list kept beside it, and the
     /// explanation is the sentence the teacher reads before pressing anything.
     @MainActor
@@ -3995,6 +4022,110 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertTrue(cancelled.summary.contains("Cancelled"))
         XCTAssertNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1))
+    }
+
+    /// The scheduled card says when it would REPLACE a deploy already set for
+    /// the section — including one set from ANOTHER working folder, which is
+    /// the case a folder-scoped reading would stay silent about (issue #195).
+    @MainActor
+    func testTheScheduledCardSaysWhatItReplaces() throws {
+        let made = try makeRunner(hasDeployedBefore: true)
+        let agents: URL = made.root.appendingPathComponent("LaunchAgents")
+        try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+        ScheduledDeploy.launchAgentsDirectoryOverride = agents
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            agents.deletingLastPathComponent().appendingPathComponent("scheduled")
+        defer {
+            ScheduledDeploy.launchAgentsDirectoryOverride = nil
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let scheduling = call(
+            "schedule_deploy",
+            arguments: ["course": "ICS3U", "section": 1, "when": "2030-09-09 06:30"]
+        )
+
+        // Nothing set: the card is what it always was.
+        let plain: String = made.runner.explain(call: scheduling)
+
+        // A deploy already set for the section, from a DIFFERENT working
+        // folder, at a moment still ahead.
+        let alreadySet: Date = Date().addingTimeInterval(3 * 24 * 60 * 60)
+        let old: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
+            workspaceURL: made.root.appendingPathComponent("last-years-folder"),
+            deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
+
+        let replacing: String = made.runner.explain(call: scheduling)
+        let expected: String = AssistWording.scheduleReplaces(
+            moment: ScheduledDeploy.dayAndTimeText(alreadySet)
+        )
+        XCTAssertTrue(
+            replacing.hasSuffix(expected),
+            "The card did not say it replaces the deploy already set: \(replacing)"
+        )
+        XCTAssertTrue(replacing.hasPrefix(plain), "The rest of the card is unchanged")
+        XCTAssertFalse(plain.contains(expected), plain)
+
+        // One already gone by is not a promise being broken.
+        let gone: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: "ICS3U", sectionNumber: 1, when: Date().addingTimeInterval(-60 * 60),
+            workspaceURL: made.root, deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: gone, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
+        XCTAssertEqual(made.runner.explain(call: scheduling), plain)
+    }
+
+    /// Over MCP there is no card: the RESULT of `schedule_deploy` is the only
+    /// thing an outside assistant — and through it the teacher — is told, so it
+    /// says what it replaced, in the same named sentence (issue #195 review).
+    @MainActor
+    func testSchedulingOverAnyPathSaysWhatItReplacedInItsResult() async throws {
+        let made = try makeRunner(hasDeployedBefore: true)
+        let agents: URL = made.root.appendingPathComponent("LaunchAgents")
+        try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+        ScheduledDeploy.launchAgentsDirectoryOverride = agents
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            agents.deletingLastPathComponent().appendingPathComponent("scheduled")
+        defer {
+            ScheduledDeploy.launchAgentsDirectoryOverride = nil
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+            try? FileManager.default.removeItem(at: made.root)
+        }
+
+        let alreadySet: Date = Date().addingTimeInterval(3 * 24 * 60 * 60)
+        let old: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
+            workspaceURL: made.root.appendingPathComponent("last-years-folder"),
+            deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
+
+        let set: AssistToolOutcome = await made.runner.run(call: call(
+            "schedule_deploy",
+            arguments: ["course": "ICS3U", "section": 1, "when": "2030-09-09 06:30"]
+        ))
+        let expected: String = AssistWording.scheduleReplaces(
+            moment: ScheduledDeploy.dayAndTimeText(alreadySet)
+        )
+        XCTAssertTrue(set.detail.contains(expected), "The result says nothing of what it replaced: \(set.detail)")
+
+        // Scheduling the same moment again replaces nothing, and says so by
+        // saying nothing.
+        let again: AssistToolOutcome = await made.runner.run(call: call(
+            "schedule_deploy",
+            arguments: ["course": "ICS3U", "section": 1, "when": "2030-09-09 06:30"]
+        ))
+        XCTAssertFalse(again.detail.contains(expected), again.detail)
+        let sameMoment: String = AssistWording.scheduleReplaces(
+            moment: ScheduledDeploy.dayAndTimeText(try XCTUnwrap(AssistToolRunner.moment(named: "2030-09-09 06:30")))
+        )
+        XCTAssertFalse(again.detail.contains(sameMoment), again.detail)
     }
 
     /// Everything a scheduled deploy would ASK at half six is asked now

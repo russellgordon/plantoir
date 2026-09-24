@@ -142,6 +142,13 @@ command line. The bash launchers:
    laptop gets exactly the old 2 CPU / 4 GB default and a 48 GB desktop gets
    6 CPUs and 12 GB. Deliberately not the whole machine: the teacher is using
    it while a site builds.
+   What it prints differs by path: a VM being created for the first time
+   prints "🚀 First start: building the virtual machine…", an existing one
+   "▶️  Starting the website builder…" (before 2026-09-23, "Starting Colima…";
+   GitHub #228). The app's `ScriptRunner.friendlyPhase` labels only the SECOND
+   "Starting up (first time can take a few minutes)…", so that label shows on
+   exactly the start that is not the first. Known and left alone: it is shown
+   only when a runner has no milestones, which no launcher run lacks.
 4. Poll `docker info` for up to a minute. If the VM claims to be running but
    the daemon never answers (a known Colima state after the Mac sleeps or
    shuts down uncleanly, where a plain `colima start` no-ops), force a clean
@@ -608,10 +615,41 @@ nobody can ever close. The one thing that side does owe is the new
   full), and `--stop`. The last three are handled entirely by the launcher and
   never reach `build_site.py`.
 - Checks host-side that the course is set up (`course_config.json` exists)
-  and that the section folder is there. The `section_numbers` check itself
-  runs in the container once it is up (`docker exec … python3 -`), so a typo
-  like section `2` in a course with sections `1,3,4` still fails before any
-  build starts, with a helpful message.
+  and whether the section folder is there (it only warns if it is not). The
+  requested section is checked against `section_numbers` by `build_site.py`,
+  not by the launcher: `build_section_site` first looks for the
+  `section<N>` folder and then calls `validate_requested_section`, and either
+  way it prints what is wrong and builds nothing. It does NOT refuse in the
+  sense of an exit code — `main()` returns normally, so the launcher exits 0.
+  In practice a typo like section `2` in a course with sections `1,3,4` meets
+  the folder check first ("Section folder 'section2' not found"). This is a
+  command-line path only: the app offers only sections that exist.
+
+  **`preview.sh` used to carry its own copy of that check, and it never
+  ran.** It fed a heredoc to `docker exec … python3 -` WITHOUT `-i`, so
+  docker discarded stdin, the program never arrived, and the command exited
+  0 with no output (measured against a live container: without `-i`, rc 0
+  and empty output; with `-i`, the expected list — and the same inside a
+  pty, which is how the app runs launchers). The "allowed" list was
+  therefore always empty and every preview on every Mac printed "Could not
+  read allowed sections from course_config.json (continuing)", from
+  2025-08-11 until it was removed on 2026-09-23 (GitHub #224). Removed
+  rather than repaired: adding `-i` would have turned on a second copy of a
+  check the build already makes, plus a new refusal sentence and contract
+  case, for a path only a developer uses. `verify.sh` now fails if any
+  launcher feeds a program to `docker exec` without `-i`, and if a real
+  preview prints the old line.
+
+  **`preview.ps1` still has its check, deliberately.** It is not the same
+  shape: it reads `course_config.json` on the HOST, so it works — it prints
+  the allowed list and, for a section the course does not list, warns and
+  asks "Continue anyway? [y/N]" (refused under `--non-interactive`, the
+  Windows-only entry in `contracts/app-rules.json` →
+  `launcherFlags.nonInteractive.refusals`). Its "Could not determine allowed
+  sections" line prints only when the config is missing or unreadable. The
+  decision on #224 said to delete it in both launchers, on the premise that
+  the twin had the same fault; measured by reading, it does not, so it was
+  left as it is rather than removing a working question from Windows.
 - Runs `build_site.py`, which (by default) ends by serving the site on
   the requested container port (8081–8084), with Quartz's live-reload
   websocket on port + 1000 (`--wsPort`) — the reason the container

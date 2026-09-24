@@ -167,6 +167,52 @@ final class PreviewReachabilityTests: XCTestCase {
         ), "A DIFFERENT preview is running now — it is running, and nobody stopped it.")
     }
 
+    /// Of the endings above, only one is nobody's doing — the run finished by
+    /// itself while the builder was being asked — and that one alone has to
+    /// be ended by the question's caller, or the window's wait and ⌘Q's
+    /// record of a preview being built outlive the run (issue #232).
+    func testOnlyARunThatEndedByItselfIsEndedHere() {
+        let ranFrom: Date = start
+        XCTAssertTrue(PreviewReachability.theSameRunEndedByItself(
+            startedAt: ranFrom, theRunNowStartedAt: ranFrom,
+            theTeacherStoppedIt: false, theRunIsStillGoing: false
+        ), "The run ended by itself while the builder was being asked.")
+        XCTAssertFalse(PreviewReachability.theSameRunEndedByItself(
+            startedAt: ranFrom, theRunNowStartedAt: ranFrom,
+            theTeacherStoppedIt: true, theRunIsStillGoing: false
+        ), "Stop already ended the wait.")
+        XCTAssertFalse(PreviewReachability.theSameRunEndedByItself(
+            startedAt: ranFrom, theRunNowStartedAt: start.addingTimeInterval(5),
+            theTeacherStoppedIt: false, theRunIsStillGoing: false
+        ), "A different run: the wait is not this question's to end.")
+        XCTAssertFalse(PreviewReachability.theSameRunEndedByItself(
+            startedAt: ranFrom, theRunNowStartedAt: start.addingTimeInterval(5),
+            theTeacherStoppedIt: false, theRunIsStillGoing: true
+        ), "A new run is going, and the wait belongs to it.")
+        XCTAssertFalse(PreviewReachability.theSameRunEndedByItself(
+            startedAt: ranFrom, theRunNowStartedAt: ranFrom,
+            theTeacherStoppedIt: false, theRunIsStillGoing: true
+        ), "Still the same wait — the caller goes on to say so, it does not end it here.")
+    }
+
+    /// And the view ends the wait on that path, before it returns. A source
+    /// read, for the reason the test below gives.
+    func testTheViewEndsTheWaitOfARunThatEndedByItself() throws {
+        let function: String = try PreviewReachabilityTests.givingUpFunction()
+        let checking: Int = try XCTUnwrap(
+            function.range(of: "PreviewReachability.theSameRunEndedByItself("),
+            "A run that ends by itself during the question leaves the wait, and ⌘Q's record, behind."
+        ).lowerBound.utf16Offset(in: function)
+        let ending: Int = try XCTUnwrap(
+            function.range(of: "previewBuildWait.end()")
+        ).lowerBound.utf16Offset(in: function)
+        let recording: Int = try XCTUnwrap(
+            function.range(of: "ActivityTrail.note(")
+        ).lowerBound.utf16Offset(in: function)
+        XCTAssertLessThan(checking, ending)
+        XCTAssertLessThan(ending, recording, "The wait is ended on the early return, before anything is said")
+    }
+
     /// And the view really consults that before it says or records anything.
     /// A source read, because the order inside one function is the thing
     /// being pinned and nothing else can see it.

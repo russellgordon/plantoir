@@ -260,6 +260,13 @@ else
   cat /tmp/verify_stop_preview_test.log
 fi
 
+if (cd scripts && python3 test_stop_quietly.py) >/tmp/verify_stop_quietly_test.log 2>&1; then
+  pass "pressing Stop ends a build quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
+else
+  fail "pressing Stop ends a build quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
+  cat /tmp/verify_stop_quietly_test.log
+fi
+
 if (cd scripts && python3 test_config_write_race.py) >/tmp/verify_config_race_test.log 2>&1; then
   pass "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
 else
@@ -332,6 +339,21 @@ if [ "$_dot_guard_ok" = true ]; then
   pass "a course code beginning with a dot is refused (all four launchers)"
 else
   fail "a course code beginning with a dot is refused (all four launchers)"
+fi
+
+# No launcher may hand a program to `docker exec` on stdin without -i. Without
+# it, docker discards stdin: the program never arrives, the command exits 0
+# with no output, and whatever it was meant to check silently never runs.
+# preview.sh's timetable-section check had exactly that shape from 2025-08-11
+# until 2026-09-23, and every preview printed "Could not read allowed
+# sections" because of it (GitHub #224). A second hit here is another dead
+# check, not a reason to narrow this.
+_dead_heredocs="$(grep -nE 'docker exec [^|]*python3 - <<' setup.sh preview.sh deploy.sh | grep -v 'exec -i' || true)"
+if [ -z "$_dead_heredocs" ]; then
+  pass "no launcher feeds a program to docker exec without -i (it would never run)"
+else
+  fail "a launcher feeds a program to docker exec without -i, so it never runs"
+  echo "$_dead_heredocs"
 fi
 
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
@@ -830,6 +852,9 @@ fi
 echo ""
 echo "🚦 Putting back a container made WITHOUT the builds mount, the way every"
 echo "   existing teacher's is, and building again…"
+# Cleared first, so the check after this section can never read a log left by
+# an earlier run.
+rm -f /tmp/verify_old_container.log
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 # No published ports: this stand-in only has to EXIST without the builds
 # mount, and the launcher replaces it before anything serves. Publishing
@@ -873,6 +898,18 @@ if docker run -dit --name "$CONTAINER_NAME" \
   fi
 else
   fail "could not put back a container without the builds mount"
+fi
+
+# A real preview through the launcher must not print the line that went with
+# the removed timetable-section check (GitHub #224). It was printed on every
+# preview for over a year and was never true. Outside the block above so it
+# cannot be skipped: no log is a failure, not a pass.
+if [[ ! -f /tmp/verify_old_container.log ]]; then
+  fail "no preview output to read for the removed 'allowed sections' line"
+elif grep -q "Could not read allowed sections" /tmp/verify_old_container.log; then
+  fail "a preview still prints 'Could not read allowed sections', which was never true"
+else
+  pass "a preview no longer prints 'Could not read allowed sections'"
 fi
 
 # -------------------- 6d. --stop stops this section, and only this one ------

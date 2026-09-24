@@ -205,6 +205,51 @@ final class AppRulesContractTests: XCTestCase {
         }
     }
 
+    /// The test above passes if ANY ONE launcher prints a marker — so a
+    /// rewrite of the first-start line that kept "Setting up this Mac" in
+    /// setup.sh and dropped it from preview.sh would stay green while the
+    /// preview's progress bar sat still. This asks EACH launcher that starts
+    /// the website builder whether an `echo` line — what a teacher reads, not
+    /// a comment — still prints the marker. On those same lines it pins the
+    /// two claims #228 removed: "a one-time step" (untrue since quitting
+    /// stops the builder) and "Starting Colima" (names the machinery, rule 1).
+    func testEveryLauncherKeepsTheSetUpMarkerAndNamesNoMachinery() throws {
+        let repository: URL = AppRulesContractTests.repositoryRoot()
+        for launcher in ["setup.sh", "preview.sh", "deploy.sh"] {
+            let url: URL = repository.appendingPathComponent(launcher)
+            let text: String = try String(contentsOf: url, encoding: .utf8)
+            // Only what is PRINTED counts. The file also carries a comment
+            // naming the marker, and a check over the whole file was
+            // satisfied by that comment with the echo itself reworded.
+            var echoLines: [String] = []
+            for line in text.components(separatedBy: "\n") {
+                if line.trimmingCharacters(in: .whitespaces).hasPrefix("echo ") {
+                    echoLines.append(line)
+                }
+            }
+            var printsTheMarker: Bool = false
+            for line in echoLines {
+                if line.contains("Setting up this Mac") {
+                    printsTheMarker = true
+                }
+            }
+            XCTAssertTrue(
+                printsTheMarker,
+                "\(launcher) no longer prints \"Setting up this Mac\", so the progress bar stops moving there."
+            )
+            for line in echoLines {
+                XCTAssertFalse(
+                    line.contains("one-time step"),
+                    "\(launcher) still tells a teacher this is a one-time step: \(line)"
+                )
+                XCTAssertFalse(
+                    line.contains("Starting Colima"),
+                    "\(launcher) still names the machinery to a teacher: \(line)"
+                )
+            }
+        }
+    }
+
     // MARK: - What a teacher is told when something fails
 
     /// Both apps read the SAME output from the same shared scripts, so both
@@ -425,6 +470,54 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertFalse(halfWritten.argumentsAreReadable, "A call that stopped mid-JSON reads as readable, so the gate would run it.")
         XCTAssertFalse(AssistWording.answerWasCutOff.isEmpty)
         answer("A reply the engine stopped part way runs no tool and says so")
+
+        // A finished reply that wrote NOTHING (issue #198): it runs only when
+        // the window supplies everything the tool needs. The contract's own
+        // cases, run through the gate `AssistAgent.think` uses; the whole
+        // behaviour — nothing changed, the teacher told
+        // `answerLeftOutWhatItWasFor`, the trail saying "wrote nothing" — is
+        // executed in `AssistCutOffAnswerTests`.
+        let emptyRule: String = "A finished reply that wrote nothing runs a tool only when the window supplies everything that tool needs"
+        var emptyCases: [[String: Any]] = []
+        for requirement in requirements where (requirement["rule"] as? String) == emptyRule {
+            emptyCases = try XCTUnwrap(requirement["cases"] as? [[String: Any]])
+        }
+        XCTAssertGreaterThan(emptyCases.count, 10, "The empty-arguments rule has lost its cases")
+        for emptyCase in emptyCases {
+            let name: String = try XCTUnwrap(emptyCase["name"] as? String)
+            let tool: String = try XCTUnwrap(emptyCase["tool"] as? String)
+            let written: String = try XCTUnwrap(emptyCase["arguments"] as? String)
+            let required: [String] = try XCTUnwrap(emptyCase["required"] as? [String])
+            let properties: [String] = try XCTUnwrap(emptyCase["properties"] as? [String])
+            let readOnly: Bool = try XCTUnwrap(emptyCase["readOnly"] as? Bool)
+            let readable: Bool = try XCTUnwrap(emptyCase["readable"] as? Bool)
+            let call: AssistToolCall = AssistToolCall(
+                id: "1", type: "function",
+                function: AssistToolCall.Function(name: tool, arguments: written)
+            )
+            XCTAssertEqual(
+                call.argumentsAreReadable(forToolRequiring: required, declaring: properties, readOnly: readOnly),
+                readable, name
+            )
+
+            // And each case's schema facts are the tool's own, so the cases
+            // cannot drift from the surface they model — and the agent's
+            // gate, fed the real definition, agrees with the case.
+            var definitionOnTheSurface: AssistToolDefinition?
+            for definition in AssistToolRunner.mcpTools where definition.name == tool {
+                definitionOnTheSurface = definition
+            }
+            let definition: AssistToolDefinition = try XCTUnwrap(definitionOnTheSurface, "\(name): no tool \(tool)")
+            XCTAssertEqual(definition.required, required, "\(name): the case's required list is not the schema's")
+            var declared: [String] = []
+            for key in definition.parameters.keys {
+                declared.append(key)
+            }
+            XCTAssertEqual(declared.sorted(), properties.sorted(), "\(name): the case's properties are not the schema's")
+            XCTAssertEqual(definition.readOnly, readOnly, "\(name): the case's readOnly is not the tool's")
+            XCTAssertEqual(AssistAgent.argumentsAreReadable(of: call, for: definition), readable, name)
+        }
+        answer(emptyRule)
 
         // The one that genuinely cannot be executed, named rather than
         // dropped. A polarity veto is a rule about how a MODEL is chosen: it
