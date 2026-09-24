@@ -21,6 +21,17 @@ final class ScriptRunnerStatusTests: XCTestCase {
         XCTAssertEqual(runner.friendlyPhase, "Starting the preview…")
     }
 
+    /// The launchers' "Starting Colima…" became "Starting the website
+    /// builder…" (#228). If the marker here had not moved with it, the phase
+    /// would fall back to whatever came before — silently.
+    @MainActor
+    func testStartingTheWebsiteBuilderIsAPhase() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput( "🐳 Setting up this Mac…\n")
+        runner.receiveOutput( "▶️  Starting the website builder…\n")
+        XCTAssertEqual(runner.friendlyPhase, "Starting up (first time can take a few minutes)…")
+    }
+
     @MainActor
     func testDefaultPhaseIsWorking() {
         let runner: ScriptRunner = ScriptRunner()
