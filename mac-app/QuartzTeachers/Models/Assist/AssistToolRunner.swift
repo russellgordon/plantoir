@@ -842,7 +842,9 @@ final class AssistToolRunner {
             return nil
         }
         let unitWord: String = located.course.configuration.unitWord
-        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+        guard let unit = AssistPublishPlanner.unitNamed(
+            titles[0], naming: located.course.configuration.classPageNaming
+        ) else {
             return nil
         }
 
@@ -887,7 +889,7 @@ final class AssistToolRunner {
         let becoming: String = publishing ? "visible" : "hidden"
         var lines: [String] = []
         lines.append("\(located.course.code) Section \(located.sectionNumber): "
-                     + "\(publishing ? "publishing" : "unpublishing") Unit \(unit).")
+                     + "\(publishing ? "publishing" : "unpublishing") \(unitWord) \(unit).")
         lines.append("")
         lines.append("\(moving.count) \(word) would become \(becoming), "
                      + "\(publishing ? "starting at" : "starting from") "
@@ -899,7 +901,7 @@ final class AssistToolRunner {
         }
 
         return AssistToolOutcome.planned(
-            "Worked out what \(publishing ? "publishing" : "unpublishing") Unit \(unit) would do.",
+            "Worked out what \(publishing ? "publishing" : "unpublishing") \(unitWord) \(unit) would do.",
             plan: lines.joined(separator: "\n")
         )
     }
@@ -946,7 +948,9 @@ final class AssistToolRunner {
             return nil
         }
         let unitWord: String = located.course.configuration.unitWord
-        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+        guard let unit = AssistPublishPlanner.unitNamed(
+            titles[0], naming: located.course.configuration.classPageNaming
+        ) else {
             return nil
         }
 
@@ -3142,7 +3146,7 @@ final class AssistToolRunner {
             return AssistToolOutcome.wrote(
                 "Made room for \(asked.count) "
                 + (asked.count == 1 ? "class" : "classes")
-                + " at \(asked.located.course.configuration.unitWord) \(asked.unit), Day \(asked.atDay).",
+                + " at \(asked.plan.positionTitle).",
                 detail: detail
             )
         }
@@ -3168,13 +3172,37 @@ final class AssistToolRunner {
         guard case .success(let located) = found else {
             return .couldNot(refusal(from: found).message)
         }
-        guard let unit = number("unit", in: arguments) else {
-            return .couldNot(
-                "Which \(located.course.configuration.unitWord.lowercased()) should I make room in?"
-            )
-        }
-        guard let atDay = number("atDay", in: arguments) else {
-            return .couldNot("Which day should the new class take?")
+        let naming: ClassPageNaming = located.course.configuration.classPageNaming
+        var unit: Int = 0
+        var atDay: Int = 0
+        if naming.isNumbered {
+            // A numbered course (#267) has one number and no units, but the
+            // tool's schema — frozen, because routing was measured against
+            // it — still asks for `unit` and `atDay`. Which one a small model
+            // fills for "make room at Week 5" is a routing question, so the
+            // reading accepts either and refuses the one shape it cannot
+            // read: two different numbers.
+            guard let position = ClassInsertionPlanner.numberedPosition(
+                unit: number("unit", in: arguments), atDay: number("atDay", in: arguments)
+            ) else {
+                return .couldNot(
+                    "Which \(naming.word.lowercased()) should I make room at? Name one, like "
+                    + "“\(naming.title(unit: 1, day: 3))”."
+                )
+            }
+            unit = 1
+            atDay = position
+        } else {
+            guard let askedUnit = number("unit", in: arguments) else {
+                return .couldNot(
+                    "Which \(located.course.configuration.unitWord.lowercased()) should I make room in?"
+                )
+            }
+            guard let askedDay = number("atDay", in: arguments) else {
+                return .couldNot("Which day should the new class take?")
+            }
+            unit = askedUnit
+            atDay = askedDay
         }
         // One unless asked for more, matching what the teacher means by "make
         // room for a class".

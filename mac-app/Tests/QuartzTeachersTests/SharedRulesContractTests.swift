@@ -1752,6 +1752,17 @@ final class SharedRulesContractTests: XCTestCase {
             UnitWordRenameWording.rowCaption(word: "Module"),
             (rename["rowCaption"] as? String)?.replacingOccurrences(of: "{word}", with: "Module")
         )
+        // A numbered course (#267): its own caption, and the sentence beside
+        // its disabled Rename… button.
+        XCTAssertEqual(
+            UnitWordRenameWording.rowCaption(naming: ClassPageNaming(word: "Week", scheme: .numbered)),
+            (rename["rowCaptionNumbered"] as? String)?.replacingOccurrences(of: "{word}", with: "Week")
+        )
+        XCTAssertEqual(
+            UnitWordRenameWording.rowCaption(naming: ClassPageNaming(word: "Module", scheme: .unitDay)),
+            (rename["rowCaption"] as? String)?.replacingOccurrences(of: "{word}", with: "Module")
+        )
+        XCTAssertEqual(UnitWordRenameWording.renameLockedNumbered, rename["renameLockedNumbered"] as? String)
         XCTAssertEqual(UnitWordRenameWording.explanation, rename["explanation"] as? String)
         XCTAssertEqual(UnitWordRenameWording.proseIsLeftAlone, rename["proseIsLeftAlone"] as? String)
 
