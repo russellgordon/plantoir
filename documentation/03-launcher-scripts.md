@@ -142,6 +142,13 @@ command line. The bash launchers:
    laptop gets exactly the old 2 CPU / 4 GB default and a 48 GB desktop gets
    6 CPUs and 12 GB. Deliberately not the whole machine: the teacher is using
    it while a site builds.
+   What it prints differs by path: a VM being created for the first time
+   prints "🚀 First start: building the virtual machine…", an existing one
+   "▶️  Starting the website builder…" (before 2026-09-23, "Starting Colima…";
+   GitHub #228). The app's `ScriptRunner.friendlyPhase` labels only the SECOND
+   "Starting up (first time can take a few minutes)…", so that label shows on
+   exactly the start that is not the first. Known and left alone: it is shown
+   only when a runner has no milestones, which no launcher run lacks.
 4. Poll `docker info` for up to a minute. If the VM claims to be running but
    the daemon never answers (a known Colima state after the Mac sleeps or
    shuts down uncleanly, where a plain `colima start` no-ops), force a clean

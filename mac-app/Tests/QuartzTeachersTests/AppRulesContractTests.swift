@@ -205,6 +205,51 @@ final class AppRulesContractTests: XCTestCase {
         }
     }
 
+    /// The test above passes if ANY ONE launcher prints a marker — so a
+    /// rewrite of the first-start line that kept "Setting up this Mac" in
+    /// setup.sh and dropped it from preview.sh would stay green while the
+    /// preview's progress bar sat still. This asks EACH launcher that starts
+    /// the website builder whether an `echo` line — what a teacher reads, not
+    /// a comment — still prints the marker. On those same lines it pins the
+    /// two claims #228 removed: "a one-time step" (untrue since quitting
+    /// stops the builder) and "Starting Colima" (names the machinery, rule 1).
+    func testEveryLauncherKeepsTheSetUpMarkerAndNamesNoMachinery() throws {
+        let repository: URL = AppRulesContractTests.repositoryRoot()
+        for launcher in ["setup.sh", "preview.sh", "deploy.sh"] {
+            let url: URL = repository.appendingPathComponent(launcher)
+            let text: String = try String(contentsOf: url, encoding: .utf8)
+            // Only what is PRINTED counts. The file also carries a comment
+            // naming the marker, and a check over the whole file was
+            // satisfied by that comment with the echo itself reworded.
+            var echoLines: [String] = []
+            for line in text.components(separatedBy: "\n") {
+                if line.trimmingCharacters(in: .whitespaces).hasPrefix("echo ") {
+                    echoLines.append(line)
+                }
+            }
+            var printsTheMarker: Bool = false
+            for line in echoLines {
+                if line.contains("Setting up this Mac") {
+                    printsTheMarker = true
+                }
+            }
+            XCTAssertTrue(
+                printsTheMarker,
+                "\(launcher) no longer prints \"Setting up this Mac\", so the progress bar stops moving there."
+            )
+            for line in echoLines {
+                XCTAssertFalse(
+                    line.contains("one-time step"),
+                    "\(launcher) still tells a teacher this is a one-time step: \(line)"
+                )
+                XCTAssertFalse(
+                    line.contains("Starting Colima"),
+                    "\(launcher) still names the machinery to a teacher: \(line)"
+                )
+            }
+        }
+    }
+
     // MARK: - What a teacher is told when something fails
 
     /// Both apps read the SAME output from the same shared scripts, so both
