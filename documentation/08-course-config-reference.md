@@ -54,7 +54,7 @@ A representative example:
 | `locale` | string | setup | build → `quartz.config.ts` | One of Quartz's 27 locale codes; drives UI strings ([teacher-customized](06-quartz-customizations.md#d-locale-files-replaced-at-build-time)) and date formats. |
 | `emojis.sections.section<N>` | string | setup | build (page title) | Single emoji per section, e.g. `"📚"`. Legacy `emojis.default` is honoured as a fallback. |
 | `num_sections` | int | setup | setup (prompt default) + build and launchers (fallback when `section_numbers` is absent) | Count of sections; normalized to `len(section_numbers)`. |
-| `section_numbers` | int[] | setup | launchers + build (validation) | The teacher's actual timetable section numbers, e.g. `[1,3,4]`. Only these sections can be built or deployed. |
+| `section_numbers` | int[] | setup | build (validation); `preview.ps1` also checks it host-side and asks | The teacher's actual timetable section numbers, e.g. `[1,3,4]`. Only these sections can be built or deployed. |
 | `shared_folders` | string[] | setup + build discovery | build | Course-root folders copied into every section's site. `Media` never appears here (symlinked instead). |
 | `shared_files` | string[] | setup + build discovery | build | Course-root loose `.md` files copied into every section's site. |
 | `per_section_folders` | string[] | setup + build discovery | build | Folder names expected inside each `section<N>/`, copied only into that section's site. |
