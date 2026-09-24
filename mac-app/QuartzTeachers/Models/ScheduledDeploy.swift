@@ -371,6 +371,9 @@ enum ScheduledDeploy {
                 cloudflareAccountID: cloudflareAccountID,
                 locale: locale
             ),
+            replacing: momentBeingReplaced(
+                courseCode: course.code, sectionNumber: sectionNumber, by: when, now: now
+            ),
             locale: locale
         )
     }
@@ -934,6 +937,15 @@ enum ScheduledDeploy {
         )
         let destinationURL: URL = plistURL(courseCode: course.code, sectionNumber: sectionNumber)
 
+        // What is about to be replaced, read BEFORE it goes (issue #195): once
+        // the old agent is booted out and its plist overwritten, nothing
+        // anywhere remembers it was ever set. Read here, in the one function
+        // the sheet, the assistant and an outside assistant all reach, so the
+        // trail line cannot be missing from one of them.
+        let replacing: Date? = momentBeingReplaced(
+            courseCode: course.code, sectionNumber: sectionNumber, by: when
+        )
+
         // Anything already scheduled for this section goes first, so the
         // replacement is never briefly a second agent.
         runner.bootOut(label: agentLabel(courseCode: course.code, sectionNumber: sectionNumber))
@@ -979,6 +991,17 @@ enum ScheduledDeploy {
         if let failure = runner.bootstrap(plistURL: destinationURL) {
             try? FileManager.default.removeItem(at: destinationURL)
             return "macOS would not accept the scheduled deploy: \(failure)"
+        }
+        if let replacing {
+            // "It went on Saturday; I set it for Friday" is otherwise a report
+            // nothing can answer: the old job leaves no file behind.
+            ActivityTrail.note(
+                .scheduledDeployReplaced,
+                "replaced the deploy set for \(dayAndTimeText(replacing)) "
+                    + "with one set for \(dayAndTimeText(when))",
+                course: course.code,
+                section: sectionNumber
+            )
         }
         return nil
     }
@@ -1459,6 +1482,40 @@ enum ScheduledDeploy {
         return moment
     }
 
+    /// When the deploy that scheduling this section for `when` would REPLACE
+    /// is set for — or nil when there is none, or when it is set for that
+    /// same minute and so replaces nothing a teacher would notice (issue #195).
+    ///
+    /// **Deliberately NOT scoped to a working folder**, unlike every other
+    /// reader of `nextRun` that has a folder in hand. `scheduleDeploy` writes
+    /// to `plistURL`, which is one file per course code and section for the
+    /// whole Mac, so the job it overwrites may have been set from ANOTHER
+    /// working folder — last year's, holding the same code. Asking with this
+    /// folder would answer nil in exactly that case, and stay silent about
+    /// the replacement nobody could see coming. A moment already past is nil
+    /// here as it is in `nextRun`: a job that has fired, or was left by a Mac
+    /// that was off, is not a promise being broken.
+    static func momentBeingReplaced(
+        courseCode: String,
+        sectionNumber: Int,
+        by when: Date,
+        now: Date = Date(),
+        calendar: Calendar = Calendar.current
+    ) -> Date? {
+        guard let existing = nextRun(
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            now: now,
+            inWorkingFolder: nil
+        ) else {
+            return nil
+        }
+        if calendar.isDate(existing, equalTo: when, toGranularity: .minute) {
+            return nil
+        }
+        return existing
+    }
+
     // MARK: - Which agents belong to this working folder
 
     /// One scheduled deploy as it stands on disk, read back from its own
@@ -1685,6 +1742,11 @@ struct ScheduledDeployPlan {
     /// Why this cannot be scheduled, or nil when it can be.
     let problem: String?
 
+    /// When the deploy this would replace is set for, or nil when it replaces
+    /// nothing (issue #195). Read Mac-wide — see
+    /// `ScheduledDeploy.momentBeingReplaced`.
+    let replacing: Date?
+
     let locale: Locale
 
     // MARK: - Computed properties
@@ -1702,6 +1764,11 @@ struct ScheduledDeployPlan {
 
         var lines: [String] = []
         lines.append("Deploy \(courseCode) Section \(sectionNumber) to \(destination) at \(ScheduledDeploy.dayAndTimeText(when, locale: locale)).")
+        if let replacing {
+            lines.append(AssistWording.scheduleReplaces(
+                moment: ScheduledDeploy.dayAndTimeText(replacing, locale: locale)
+            ))
+        }
         lines.append("")
         lines.append("For this to happen, at that moment this Mac must be:")
         lines.append("  • switched on, and awake — not asleep or shut down")
@@ -1748,6 +1815,7 @@ struct ScheduledDeployPlan {
         destination: String,
         unpublishedClasses: [String],
         problem: String?,
+        replacing: Date? = nil,
         locale: Locale = Locale.current
     ) {
         self.courseCode = courseCode
@@ -1756,6 +1824,7 @@ struct ScheduledDeployPlan {
         self.destination = destination
         self.unpublishedClasses = unpublishedClasses
         self.problem = problem
+        self.replacing = replacing
         self.locale = locale
     }
 }
