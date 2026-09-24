@@ -9,20 +9,22 @@ import Foundation
 /// that hurts is the one a teacher cannot see happening, so they are asked.
 ///
 /// **What counts as "under way", and what deliberately does not.** A publish
-/// recorded in `CourseActivity` does; a preview does not. The reason is what
-/// each fact can actually tell us. `CourseActivity.activePublishes` is
-/// process-wide and lasts exactly as long as the publish, so it means what it
-/// says. A preview is known through `PreviewLeases`, and a lease is held for
-/// the whole time a preview is OPEN — it cannot tell a section still building
-/// from one that finished twenty minutes ago and is sitting there being
-/// looked at. Asking on every lease would mean asking almost every quit,
-/// which trains a teacher to dismiss the question before reading it, and the
-/// one it exists for is the publish. (`CourseActivity.courseIsBusy` folds the
-/// two together, which is right for greying out a menu item and wrong here;
-/// asking it the wrong one of those questions has produced a bug in this app
-/// before.) Previews are not left to their fate either: the quit path stops
-/// the app's own previews cleanly on the way out rather than asking about
-/// them.
+/// recorded in `CourseActivity` does, and so — since issue #232 — does a
+/// preview still being BUILT; a preview that is merely OPEN does not. The
+/// reason is what each fact can actually tell us.
+/// `CourseActivity.activePublishes` is process-wide and lasts exactly as long
+/// as the publish, so it means what it says; `activePreviewBuilds` is the same
+/// kind of record, kept from the press until the preview's page first answers
+/// (or the run ends). A preview's LEASE is held for the whole time a preview
+/// is open — it cannot tell a section still building from one that finished
+/// twenty minutes ago and is sitting there being looked at. Asking on every
+/// lease would mean asking almost every quit, which trains a teacher to
+/// dismiss the question before reading it. (`CourseActivity.courseIsBusy`
+/// folds leases and publishes together, which is right for greying out a menu
+/// item and wrong here; asking it the wrong one of those questions has
+/// produced a bug in this app before.) Open previews are not left to their
+/// fate either: the quit path stops the app's own previews cleanly on the way
+/// out rather than asking about them.
 ///
 /// **What is out of reach, and is therefore never asked about.** A scheduled
 /// publish, an assistant driving Plantoir over MCP, and a teacher's own
@@ -108,31 +110,48 @@ enum QuitConfirmation {
     /// `courseIsBusy` at the call site left the whole suite green. Now the
     /// choice of source is inside the function the contract cases run.
     static func workUnderWay() -> String? {
-        return workUnderWay(publishes: CourseActivity.activePublishes, previews: PreviewLeases.active)
+        return workUnderWay(
+            publishes: CourseActivity.activePublishes,
+            previews: PreviewLeases.active,
+            previewBuilds: CourseActivity.activePreviewBuilds
+        )
     }
 
-    /// The same decision with both facts handed in, for a test that wants to
+    /// The same decision with every fact handed in, for a test that wants to
     /// build them rather than install them.
     ///
     /// `previews` is taken and deliberately NOT used — a parameter that
     /// exists to say so out loud. A lease is held for as long as a preview is
     /// OPEN, so it cannot tell a section still building from one that
     /// finished twenty minutes ago; asking on every lease would mean asking
-    /// almost every quit, and the question exists for the publish. Quitting
-    /// deals with previews by stopping them, not by asking about them.
+    /// almost every quit. A preview still being BUILT is its own fact,
+    /// `previewBuilds`, and that one counts.
+    ///
+    /// **A publish wins.** When both are under way the teacher is asked about
+    /// the publish, in the publish's words: it is the one whose loss reaches
+    /// the class website, and one question naming two different things would
+    /// have to be vaguer about both.
     static func workUnderWay(
         publishes: [CourseActivity.PublishRecord],
-        previews: [PreviewLeases.Lease]
+        previews: [PreviewLeases.Lease],
+        previewBuilds: [CourseActivity.PreviewBuildRecord] = []
     ) -> String? {
         _ = previews
-        if publishes.isEmpty {
-            return nil
-        }
         if publishes.count == 1 {
             let only: CourseActivity.PublishRecord = publishes[0]
             return "publishing Section \(only.sectionNumber) of \(only.courseCode)"
         }
-        return "publishing \(publishes.count) sections"
+        if publishes.count > 1 {
+            return "publishing \(publishes.count) sections"
+        }
+        if previewBuilds.count == 1 {
+            let only: CourseActivity.PreviewBuildRecord = previewBuilds[0]
+            return "building the preview of Section \(only.sectionNumber) of \(only.courseCode)"
+        }
+        if previewBuilds.count > 1 {
+            return "building \(previewBuilds.count) previews"
+        }
+        return nil
     }
 
     /// Whether to put the question up at all.
@@ -162,15 +181,25 @@ enum QuitConfirmation {
         return "Plantoir is still \(workUnderWay)."
     }
 
-    /// The sentence under it.
+    /// The sentence under it, for whatever is under way right now.
+    ///
+    /// Reads its own facts for the same reason `workUnderWay()` does: the
+    /// delegate asks one question and gets the sentence that belongs to it,
+    /// so the question and its explanation are chosen from the same record
+    /// at the same moment. A publish wins here exactly as it does there.
+    static func explanation() -> String {
+        return explanation(publishing: !CourseActivity.activePublishes.isEmpty)
+    }
+
+    /// The sentence under the question.
     ///
     /// "Could", not "would", and the difference is measured rather than
     /// cautious — in both directions, which is why this comment is long.
     ///
-    /// Plantoir does not END the publish: it is a separate program, and
-    /// `ScriptRunner.stopEveryLivePreview` deliberately passes it over. But it
-    /// is a program writing to a pseudo-terminal the APP owned, and
-    /// `deploy.sh` runs under `set -euo pipefail` (line 3), so when the app
+    /// **A publish.** Plantoir does not END the publish: it is a separate
+    /// program, and `ScriptRunner.stopEveryLivePreview` deliberately passes it
+    /// over. But it is a program writing to a pseudo-terminal the APP owned,
+    /// and `deploy.sh` runs under `set -euo pipefail` (line 3), so when the app
     /// goes its next line of output fails and the publish stops there.
     /// Measured 2026-09-19, twice independently: two children of identical
     /// shape orphaned on a dead pty — the plain one ran to the end, the
@@ -180,9 +209,23 @@ enum QuitConfirmation {
     /// "would be stopped" nor "carries on" is. What a teacher loses either way
     /// is the watching: the console is gone and a question the publish asks is
     /// asked of nobody.
-    static func explanation() -> String {
-        return "Quitting now could leave it unfinished, with the class website "
-            + "part way updated."
+    ///
+    /// **A preview being built (issue #232).** "Could" again, for the same
+    /// two-sided reason: a section window's preview is a live preview and the
+    /// quit path ends it, but the assistant's own rebuild (`--build-only`) is
+    /// passed over like a publish and `preview.sh` has no `set -e`, so it may
+    /// well run to its end on the dead terminal — the plain child in the
+    /// measurement above. What is true either way is that nothing a student
+    /// can see is touched. It deliberately promises nothing about the next
+    /// time: nothing starts a preview when a window opens, so "it is built
+    /// again next time" would be a promise the app does not keep.
+    static func explanation(publishing: Bool) -> String {
+        if publishing {
+            return "Quitting now could leave it unfinished, with the class website "
+                + "part way updated."
+        }
+        return "Quitting now could leave it unfinished. Nothing on the class "
+            + "website changes."
     }
 
     /// What the button at a given position means — read from the same list

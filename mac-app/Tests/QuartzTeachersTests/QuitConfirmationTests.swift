@@ -25,6 +25,11 @@ final class QuitConfirmationTests: XCTestCase {
 
             let publishCount: Int = try XCTUnwrap(given["publishesUnderWay"] as? Int)
             let previewCount: Int = try XCTUnwrap(given["previewsOpen"] as? Int)
+            // Unwrapped rather than defaulted, so a case written without it
+            // fails here instead of quietly meaning "none being built".
+            let buildCount: Int = try XCTUnwrap(
+                given["previewsBeingBuilt"] as? Int, "\(name): no previewsBeingBuilt"
+            )
             let reasonName: String = try XCTUnwrap(given["quitReason"] as? String)
             let reason: QuitConfirmation.Reason = reasonName == "theMacIsLoggingOutOrShuttingDown"
                 ? .theMacIsLoggingOutOrShuttingDown
@@ -44,6 +49,11 @@ final class QuitConfirmationTests: XCTestCase {
             for index in 0..<previewCount {
                 _ = try PreviewLeases.lease(
                     folderPath: "/pretend", courseCode: "ICS3U", sectionNumber: index + 1
+                )
+            }
+            for index in 0..<buildCount {
+                CourseActivity.beginPreviewBuild(
+                    folderPath: "/pretend", courseCode: "ENG2D", sectionNumber: index + 1
                 )
             }
 
@@ -79,8 +89,49 @@ final class QuitConfirmationTests: XCTestCase {
 
         XCTAssertNil(QuitConfirmation.workUnderWay(publishes: [], previews: []))
 
+        // A preview being built (issue #232), one and several.
+        let building: String = try XCTUnwrap(QuitConfirmation.workUnderWay(
+            publishes: [],
+            previews: [],
+            previewBuilds: [
+                CourseActivity.PreviewBuildRecord(folderPath: "/p", courseCode: "ICS3U", sectionNumber: 2)
+            ]
+        ))
+        XCTAssertEqual(building, "building the preview of Section 2 of ICS3U")
+        let buildingSeveral: String = try XCTUnwrap(QuitConfirmation.workUnderWay(
+            publishes: [],
+            previews: [],
+            previewBuilds: [
+                CourseActivity.PreviewBuildRecord(folderPath: "/p", courseCode: "ICS3U", sectionNumber: 1),
+                CourseActivity.PreviewBuildRecord(folderPath: "/p", courseCode: "ICS3U", sectionNumber: 2)
+            ]
+        ))
+        XCTAssertEqual(buildingSeveral, "building 2 previews")
+
+        // A publish wins: it is the one whose loss reaches the class website.
+        let both: String = try XCTUnwrap(QuitConfirmation.workUnderWay(
+            publishes: [
+                CourseActivity.PublishRecord(folderPath: "/p", courseCode: "ADA1O", sectionNumber: 2)
+            ],
+            previews: [],
+            previewBuilds: [
+                CourseActivity.PreviewBuildRecord(folderPath: "/p", courseCode: "ICS3U", sectionNumber: 1)
+            ]
+        ))
+        XCTAssertEqual(both, one)
+
+        // A preview build never touches the class website, so it cannot
+        // borrow the publish's sentence, which says the website is part way
+        // updated.
+        XCTAssertNotEqual(
+            QuitConfirmation.explanation(publishing: true),
+            QuitConfirmation.explanation(publishing: false)
+        )
+
         let shown: String = QuitConfirmation.question(about: one)
-            + " " + QuitConfirmation.explanation()
+            + " " + QuitConfirmation.question(about: building)
+            + " " + QuitConfirmation.explanation(publishing: true)
+            + " " + QuitConfirmation.explanation(publishing: false)
             + " " + QuitConfirmation.keepWorkingButton
             + " " + QuitConfirmation.quitAnywayButton
         for word in ["container", "docker", "colima", "script", "toolchain", "process"] {
@@ -89,6 +140,20 @@ final class QuitConfirmationTests: XCTestCase {
                 "\"\(word)\" is machinery and a teacher reads this: \(shown)"
             )
         }
+    }
+
+    /// The no-argument explanation reads the same record the question does,
+    /// so a question about a preview build never arrives with the publish's
+    /// sentence under it.
+    func testTheExplanationBelongsToTheQuestionItSitsUnder() {
+        CourseActivity.reset()
+        defer { CourseActivity.reset() }
+
+        CourseActivity.beginPreviewBuild(folderPath: "/pretend", courseCode: "ICS3U", sectionNumber: 1)
+        XCTAssertEqual(QuitConfirmation.explanation(), QuitConfirmation.explanation(publishing: false))
+
+        CourseActivity.beginPublish(folderPath: "/pretend", courseCode: "ADA1O", sectionNumber: 1)
+        XCTAssertEqual(QuitConfirmation.explanation(), QuitConfirmation.explanation(publishing: true))
     }
 
     /// Both answers reach the trail, and the line says which was chosen.

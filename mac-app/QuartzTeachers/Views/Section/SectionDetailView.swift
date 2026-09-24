@@ -31,7 +31,10 @@ struct SectionDetailView: View {
 
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
-    @State var isWaitingForServer: Bool = false
+    /// The wait for this window's preview, and the record ⌘Q reads while it
+    /// lasts (issue #232). Cleared only through `previewBuildWait.end()`, so
+    /// the record cannot outlive the wait — see `PreviewBuildWait`.
+    @State var previewBuildWait: PreviewBuildWait = PreviewBuildWait()
 
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
@@ -178,6 +181,13 @@ struct SectionDetailView: View {
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
+
+    /// True from the press until the preview's page first answers or the run
+    /// ends — read through `previewBuildWait`, which is the only thing that
+    /// can change it (issue #232).
+    var isWaitingForServer: Bool {
+        return previewBuildWait.isWaiting
+    }
 
     /// What this section is CALLED — used wherever a sentence names it
     /// ("Deploying ICS3U-S1"). Deliberately without the " — Edited"
@@ -463,6 +473,11 @@ struct SectionDetailView: View {
             }
         }
         .onDisappear {
+            // FIRST, and unconditionally: the wait, and with it ⌘Q's record
+            // of a preview being built (issue #232). `stopPreview()` below
+            // ends it too; saying so here keeps a window that is going away
+            // from depending on what that function happens to do today.
+            previewBuildWait.end()
             // The key this section registered under, never the folder its
             // work belongs to and never the window's current one.
             if let folder = folderThisSectionRegisteredIn {
@@ -1068,7 +1083,11 @@ struct SectionDetailView: View {
         }
         previewLease = lease
         previewURL = nil
-        isWaitingForServer = true
+        previewBuildWait.begin(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            sectionNumber: sectionNumber
+        )
         previewRunner.milestones = TaskMilestones.preview
 
         Task { @MainActor in
@@ -1155,7 +1174,7 @@ struct SectionDetailView: View {
         }
         previewRunner.stopByUser()
         previewURL = nil
-        isWaitingForServer = false
+        previewBuildWait.end()
         // The next preview reuses this section's port, so its address will be
         // identical to the one already loaded. Without this the web view sees
         // a URL it has seen before and shows the pages it already had —
@@ -1175,7 +1194,7 @@ struct SectionDetailView: View {
         }
         previewRunner.cancelByUser()
         previewURL = nil
-        isWaitingForServer = false
+        previewBuildWait.end()
         previewController.forgetLoadedPage()
         releasePreviewLease()
     }
@@ -1530,7 +1549,7 @@ struct SectionDetailView: View {
         while waitedSeconds < 600 {
             if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
                 // The script exited before the server came up: show output.
-                isWaitingForServer = false
+                previewBuildWait.end()
                 releasePreviewLease()
                 return
             }
@@ -1577,7 +1596,7 @@ struct SectionDetailView: View {
         var waitedForBuild: Int = 0
         while waitedSeconds < 600 && waitedForBuild < 120 {
             if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
-                isWaitingForServer = false
+                previewBuildWait.end()
                 releasePreviewLease()
                 return
             }
@@ -1610,7 +1629,7 @@ struct SectionDetailView: View {
         // pointed at an address that is not ready.
         while waitedSeconds < 600 {
             if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
-                isWaitingForServer = false
+                previewBuildWait.end()
                 releasePreviewLease()
                 return
             }
@@ -1626,7 +1645,7 @@ struct SectionDetailView: View {
                 let (_, response) = try await URLSession.shared.data(for: request)
                 if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200 {
-                        isWaitingForServer = false
+                        previewBuildWait.end()
                         previewURL = serverURL
                         // Load the fresh site EXPLICITLY, rather than trusting
                         // the mounting web view's `loadIfNeeded` to do it.
@@ -1680,7 +1699,7 @@ struct SectionDetailView: View {
             try? await Task.sleep(for: .seconds(1))
             waitedSeconds += 1
         }
-        isWaitingForServer = false
+        previewBuildWait.end()
     }
 
     /// Ends a preview that announced its website and never showed it, and
@@ -1725,6 +1744,23 @@ struct SectionDetailView: View {
             theTeacherStoppedIt: previewRunner.wasStoppedByUser,
             theRunIsStillGoing: previewRunner.isRunning
         ) {
+            // One of those endings is nobody's doing: the SAME run ended on
+            // its own while the question was out. Stop, Cancel, a closed
+            // window and a new run have each ended the wait already; this one
+            // has not, and `waitForPreviewServer` returns straight after us —
+            // so it is ended here, the way the other "the run ended" returns
+            // do, or ⌘Q would go on asking about it (issue #232). Guarded,
+            // not unconditional: when a NEW run has started, the wait belongs
+            // to it.
+            if PreviewReachability.theSameRunEndedByItself(
+                startedAt: theRunThisIsAbout,
+                theRunNowStartedAt: previewRunner.startedAt,
+                theTeacherStoppedIt: previewRunner.wasStoppedByUser,
+                theRunIsStillGoing: previewRunner.isRunning
+            ) {
+                previewBuildWait.end()
+                releasePreviewLease()
+            }
             return
         }
         let verdict: PreviewReachability.Verdict = PreviewReachability.verdict(for: answer)
