@@ -1196,6 +1196,73 @@ invitation — *"Choose the folder this course deploys into."* — so a determin
 teacher can undo it. That is the honest cost of a defence written in a file
 format an old version can read.
 
+## Scheduling a section that already has a deploy set
+
+Added 2026-09-23, [issue #195](https://github.com/russellgordon/plantoir/issues/195).
+
+**The behaviour is unchanged: scheduling a section again REPLACES the deploy
+already set for it.** A job's label is the course code and section number and
+nothing else, so there is one per section per Mac, and
+`ScheduledDeploy.scheduleDeploy` boots the old one out and overwrites its plist
+before writing the new one. What changed is that the teacher is TOLD, before
+and after:
+
+- **Before — the approval card, the schedule sheet and the assistant's plan.**
+  Each appends `AssistWording.scheduleReplaces`, naming the moment the old one
+  was set for (`wording.scheduleReplaces`, placeholder `{moment}`, written with
+  `dayAndTimeText` like the card's own moment). The card is built by
+  `AssistToolRunner.explain(call:)`; the sheet and the plan twin both read
+  `ScheduledDeployPlan.description`, which carries `replacing` from
+  `ScheduledDeploy.plan`. One sentence, three places, one function
+  (`ScheduledDeploy.momentBeingReplaced`). The card is the only moment before
+  anything is written, which is why it is the place to say it — #168 made
+  "deploy at <time>" a parsed family, so a teacher changing their mind twice in
+  one conversation is ordinary rather than rare.
+- **After — the trail.** `scheduled deploy replaced` (both
+  `ActivityTrail.Event` and `shared-rules.json → activityTrail.mustRecord`)
+  carries the section, the old moment and the new one. It is written inside
+  `scheduleDeploy` itself — the one function the sheet, the in-app assistant
+  and an outside assistant over MCP all reach — from a reading taken BEFORE
+  the old job is booted out, and only once the new one has been accepted.
+  Without it, "it went on Saturday, I set it for Friday" has no answer: the old
+  job leaves nothing behind.
+
+**Read Mac-wide, on purpose — unlike every other reader of `nextRun` that has a
+folder in hand.** The job being overwritten may belong to ANOTHER working
+folder holding the same code (last year's), because `plistURL` names one file
+per code and section for the whole Mac. `nextRun(…, inWorkingFolder:)` answers
+nil for that job, so a folder-scoped reading — the natural copy of the cancel
+path — stays silent in exactly the case that matters most. The sentence may
+therefore name a deploy this window's sidebar shows no clock for; that is the
+truth about what is being replaced.
+
+**Said nothing, deliberately:** when the old job is set for the SAME minute
+(scheduling the same moment again replaces nothing a teacher would notice), and
+when its moment has already gone by (a job that fired, or was left by a Mac
+that was off, is not a promise being broken — `nextRun` already treats it as
+nothing).
+
+**REJECTED:**
+- *Writing the trail line from the two callers* (the assistant's
+  `scheduleDeploy` tool and `ScheduleDeploySheet`), which the first plan
+  proposed. Two writers is one to forget, and the MCP path would have been a
+  third; the function they all call already had the old plist in hand.
+- *A contract scenario for the card.* It would need a new `given` key on both
+  runners (an existing job, in another folder) — bigger than the fix; the
+  wording key and the unit tests carry it
+  (`AssistToolRunnerTests.testTheScheduledCardSaysWhatItReplaces`, whose old
+  job is in a different folder so a folder-scoped version fails it, and
+  `ScheduledDeployTests.testSchedulingAgainSaysWhatItReplacesAndRecordsIt`).
+- *Stopping the replacement, or asking a second question.* The issue asks to
+  SAY it; replacing is still what a teacher who changes their mind wants.
+
+**The suite no longer reads the real LaunchAgents through the scenarios.** The
+scenario "a deploy asked for at a time…" puts a scheduled card up, and since
+this change the card reads the Mac-wide agent — so `AssistScenarioTests` now
+points both `launchAgentsDirectoryOverride` and
+`scheduledScriptsDirectoryOverride` at a temporary folder for every scenario,
+and `testTheScenariosNeverReadThisMacsScheduledDeploys` fails if it stops.
+
 ## A scheduled deploy that outlived its course
 
 Added 2026-09-20, [issue #236](https://github.com/russellgordon/plantoir/issues/236).
