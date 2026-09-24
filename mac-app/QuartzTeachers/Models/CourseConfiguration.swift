@@ -1223,6 +1223,24 @@ class CourseConfiguration {
         return output
     }
 
+    /// Reads the file again when this copy has nothing unsaved — what Course
+    /// Settings does each time it is opened (issue #265), so a folder the
+    /// build discovered, or a Save made in another window, is on screen
+    /// without relaunching. Unsaved edits are never replaced. Returns whether
+    /// the file was read.
+    @discardableResult
+    func reloadIfNothingUnsaved(url: URL) -> Bool {
+        if hasUnsavedChanges {
+            return false
+        }
+        do {
+            try reloadFromDisk(url: url)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Replaces this copy with what is in the file now — for a copy with
     /// nothing unsaved, after something else wrote the file. Callers check
     /// `hasUnsavedChanges` first: this discards unsaved edits.
