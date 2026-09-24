@@ -92,6 +92,34 @@ enum SpecialNames {
     nonisolated static let contentStructureTip: String =
         "Tip: you can also simply create new folders and files in Obsidian — they’re added to your site automatically the next time you preview. The exception is anything you remove here: it stays off your site, even if you make it again in Obsidian, until you add it back here."
 
+    /// Beside "Saved ✓" in Course Settings when a preview of this course is
+    /// open (issue #265). A preview bakes every setting in when its build
+    /// starts, so a Save changes nothing it shows until it is built again —
+    /// measured: 20 s after a save, the served sidebar filter was unchanged.
+    /// The Preview Again button beside it rebuilds the open preview. About
+    /// EVERY setting, not only the sidebar: footer, colours and reading time
+    /// are baked in the same way. `contracts/shared-rules.json` →
+    /// `specialNames.settingsSavedWhilePreviewing`.
+    nonisolated static let settingsSavedWhilePreviewing: String =
+        "A preview of this course is still showing the settings it started with. Press Preview Again to see what you just saved."
+
+    /// Beside "Saved ✓" when a publish of this course is running. The publish
+    /// read the settings when its build began, so it sends the earlier ones —
+    /// and the next Publish may call the site up to date, because nothing in
+    /// the course's pages changed. Said rather than blocked: the Save itself
+    /// is right. `specialNames.settingsSavedWhilePublishing`.
+    nonisolated static let settingsSavedWhilePublishing: String =
+        "This course is being published right now, and that publish uses the settings from before this save. Publish again once it has finished to send what you just saved."
+
+    /// Where a preview's progress appears, when it starts while Course
+    /// Settings holds changes nobody saved. A preview reads the saved file,
+    /// so the switches on screen and the preview can disagree with nothing
+    /// said. Not auto-saved (a half-typed setting would be written) and not
+    /// blocked (previewing the saved settings may be the point).
+    /// `specialNames.previewUsesSavedSettings`.
+    nonisolated static let previewUsesSavedSettings: String =
+        "Course Settings has changes you have not saved, so this preview uses the settings as they were last saved."
+
     // MARK: - Functions
 
     nonisolated static func curriculumFolderBlockedByCurriculumPages(jurisdiction: String) -> String {

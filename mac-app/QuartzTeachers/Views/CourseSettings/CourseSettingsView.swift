@@ -18,6 +18,12 @@ struct CourseSettingsView: View {
     @State var saveProblem: String?
     @State var didJustSave: Bool = false
 
+    /// What the last Save could not reach — a preview or a publish of this
+    /// course already running (issue #265). Unlike "Saved ✓" it does not
+    /// fade after three seconds: it has to stay long enough to be read, so it
+    /// stays until the next Save, Preview Again, or leaving this course.
+    @State var saveNotice: SettingsSaveNotice? = nil
+
     // MARK: - Body
 
     var body: some View {
@@ -239,6 +245,30 @@ struct CourseSettingsView: View {
 
             Divider()
 
+            if let saveNotice {
+                HStack(alignment: .firstTextBaseline) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(saveNotice.sentences, id: \.self) { sentence in
+                            Text(sentence)
+                                .font(.callout)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Spacer()
+                    if !saveNotice.sectionsToPreviewAgain.isEmpty {
+                        Button("Preview Again") {
+                            previewAgain(sections: saveNotice.sectionsToPreviewAgain)
+                        }
+                        .accessibilityIdentifier("settingsPreviewAgainButton")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .accessibilityIdentifier("settingsSaveNotice")
+            }
+
             HStack {
                 // "Revert", not "Cancel": this is a settings form, not a
                 // dialog — the button puts the values back the way the last
@@ -387,8 +417,28 @@ struct CourseSettingsView: View {
             return
         }
         do {
-            try course.configuration.write(to: course.configFileURL)
-            ActivityTrail.note(.settingsSaved, "saved the settings for " + course.code)
+            // What the file hid BEFORE this Save, for the trail — read from
+            // the file, not this copy, because the file is what the site was
+            // built from.
+            var hiddenBefore: [String] = []
+            if let onDisk = try? CourseConfiguration(contentsOf: course.configFileURL) {
+                hiddenBefore = onDisk.hiddenItems
+            }
+            let result: CourseConfiguration.WriteResult = try course.configuration.write(to: course.configFileURL)
+            let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
+                folderPath: workingFolderPath,
+                courseCode: course.code,
+                previewLeases: PreviewLeases.active,
+                publishes: CourseActivity.activePublishes
+            )
+            saveNotice = notice
+            ActivityTrail.note(.settingsSaved, SettingsSaveNotice.trailLine(
+                courseCode: course.code,
+                hiddenBefore: hiddenBefore,
+                hiddenAfter: course.configuration.hiddenItems,
+                result: result,
+                notice: notice
+            ))
             didJustSave = true
             Task {
                 try? await Task.sleep(for: .seconds(3))
@@ -397,6 +447,50 @@ struct CourseSettingsView: View {
         } catch {
             saveProblem = "Could not save: \(error.localizedDescription)"
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
+        }
+    }
+
+    /// The working folder this course lives in — the folder a preview's
+    /// lease and a publish's record name.
+    var workingFolderPath: String {
+        return course.directoryURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .path
+    }
+
+    /// Builds each open preview of this course again, so it shows what was
+    /// just saved. The preview belongs to the section's own view — in another
+    /// window, since leaving a section for its course's settings stops that
+    /// section's preview — so this goes through the same registered controls
+    /// the assistant uses, which stop and start it the way its own button
+    /// does. A section whose preview has since stopped is left alone.
+    func previewAgain(sections: [Int]) {
+        saveNotice = nil
+        let folderPath: String = workingFolderPath
+        let courseCode: String = course.code
+        Task { @MainActor in
+            var rebuilt: [String] = []
+            for section in sections {
+                guard let controller = SectionWindowControllers.shared.controller(
+                    folderPath: folderPath, courseCode: courseCode, sectionNumber: section
+                ) else {
+                    continue
+                }
+                if controller.previewState() == .notRunning {
+                    continue
+                }
+                await controller.stopPreview()
+                controller.startPreview()
+                rebuilt.append(String(section))
+            }
+            if !rebuilt.isEmpty {
+                ActivityTrail.note(
+                    .previewAgainAfterSettingsSaved,
+                    "previewed " + courseCode + " again after saving its settings (section "
+                        + rebuilt.joined(separator: ", ") + ")"
+                )
+            }
         }
     }
 
