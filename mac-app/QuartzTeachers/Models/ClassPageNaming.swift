@@ -92,7 +92,32 @@ nonisolated struct ClassPageNaming: Equatable, Hashable {
         self.scheme = scheme
     }
 
+    /// The shape a class page's name takes, as a teacher would write it
+    /// down: "Unit N, Day N", or "Week N". For sentences that say which
+    /// pages were passed over, so a Module course and a club each hear their
+    /// own shape rather than "Unit N, Day N" (#267, #268).
+    var shapeDescription: String {
+        switch scheme {
+        case .unitDay:
+            return "\(word) N, Day N"
+        case .numbered:
+            return "\(word) N"
+        }
+    }
+
     // MARK: - Functions
+
+    /// A unit, named — "Unit 4", "Module 4" — or nil in a numbered course,
+    /// which has no units to name. A sentence that would say "in Unit 1"
+    /// about a club says nothing about a unit instead.
+    func unitName(_ unit: Int) -> String? {
+        switch scheme {
+        case .unitDay:
+            return "\(word) \(unit)"
+        case .numbered:
+            return nil
+        }
+    }
 
     /// The name a position makes: "Unit 2, Day 3", or "Week 3".
     ///

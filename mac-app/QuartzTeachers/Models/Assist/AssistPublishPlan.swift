@@ -816,7 +816,19 @@ enum AssistPublishPlanner {
     /// silently. "unit" is still accepted alongside it because a teacher types
     /// what they are used to and the model echoes what it was shown; the unit
     /// NUMBER is the answer either way, so accepting both cannot be ambiguous.
-    static func unitNamed(_ raw: String, term: String = ClassPageTerm.standard) -> Int? {
+    ///
+    /// **Nil, always, in a numbered course (#267).** A club's pages are
+    /// "Week 1", "Week 2", held inside this app as unit 1 — so reading
+    /// "Week 1" as a unit would make "publish Week 1", the most ordinary
+    /// request a club has, publish EVERY meeting at once, and "Week 3" would
+    /// find no unit and be refused instead of publishing the page. A numbered
+    /// course has no units; its titles go to the page path, which acts on the
+    /// one page named. No default naming, so a caller cannot forget this.
+    static func unitNamed(_ raw: String, naming: ClassPageNaming) -> Int? {
+        if naming.isNumbered {
+            return nil
+        }
+        let term: String = naming.word
         let tidied: String = raw
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
@@ -849,6 +861,11 @@ enum AssistPublishPlanner {
     static func classPages(inUnit unit: Int, from classPages: [ClassPageSummary]) -> [ClassPageSummary] {
         var found: [ClassPageSummary] = []
         for summary in classPages {
+            // A numbered course has no units (see `unitNamed`): its pages
+            // are never a unit's pages, whatever this app holds them as.
+            if summary.naming.isNumbered {
+                continue
+            }
             guard let numbers = summary.unitAndDay, numbers.unit == unit else {
                 continue
             }

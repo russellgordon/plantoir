@@ -315,8 +315,16 @@ enum ClassPages {
     /// The teacher's own template, down to the frontmatter keys — with one
     /// deliberate difference. It starts `publish: false`: a page nobody has
     /// written yet has no business appearing on the site.
-    static func skeleton(title: String, unit: Int, date: CalendarDay, howMany: Int, tail: String) -> String {
+    static func skeleton(
+        title: String, unit: Int, naming: ClassPageNaming, folderName: String,
+        date: CalendarDay, howMany: Int, tail: String
+    ) -> String {
         let plural: String = howMany == 1 ? "This page was" : "\(howMany) of these were"
+        if naming.isNumbered {
+            return numberedSkeleton(
+                title: title, folderName: folderName, date: date, plural: plural, tail: tail
+            )
+        }
         return """
         ---
         title: \(title)
@@ -348,6 +356,47 @@ enum ClassPages {
         1.
 
         ## Things to do before our next class
+
+        - [ ]
+
+        """
+    }
+
+    /// A new page in a numbered course (#267) — a club's "Week 4".
+    ///
+    /// No `unit-N` tag: a numbered course is held as unit 1 inside this app,
+    /// so every page would carry `unit-1` and Quartz would make a tag page
+    /// listing every meeting there has ever been. The comment names the
+    /// course's OWN class folder rather than "All Classes", and says
+    /// "the group" rather than "this class". Same shape otherwise, so the
+    /// assistant's other planners read it exactly as they read a Unit page.
+    private static func numberedSkeleton(
+        title: String, folderName: String, date: CalendarDay, plural: String, tail: String
+    ) -> String {
+        return """
+        ---
+        title: \(title)
+        publish: false
+        created: \(date.text)\(tail)
+        transcludeTitleSize: h2
+        enableToc: false
+        excludeBacklinks: true
+        ---
+
+        %%
+        \(plural) created for you, dated to the days the group actually meets.
+        The `created:` date is what puts them in order under \(folderName), so a
+        new page needs one of its own.
+
+        This page is unpublished. Write it, then publish it when it is ready.
+        Delete this comment when you do — comments never reach the site either.
+        %%
+
+        ## Agenda
+
+        1.
+
+        ## Things to do before we next meet
 
         - [ ]
 

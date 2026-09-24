@@ -47,11 +47,23 @@ enum NextClassPlanner {
     enum Problem: LocalizedError {
         case noTimetable(String, Int)
 
+        /// A numbered course (#267) — a club's "Week 1", "Week 2" — has one
+        /// run of pages and no units, so "start a new unit" and "add five
+        /// more days to Unit 4" have nothing to act on. Refused BEFORE the
+        /// timetable is read, so nobody is asked for their dates on the way
+        /// to being told no. Says "page", not "meeting": this sentence also
+        /// goes back to the model, whose words are not changed by #267.
+        case noUnitsInANumberedCourse(String, String)
+
         var errorDescription: String? {
             switch self {
             case .noTimetable(let code, let number):
                 return "I don’t know when \(code) Section \(number) meets, so I can’t date a new class. "
                      + AssistWording.mayIAskForYourDates
+            case .noUnitsInANumberedCourse(let code, let word):
+                return "\(code) numbers its pages one after another — “\(word) 1”, “\(word) 2” — and has "
+                     + "no units, so there is no unit to start or add days to. Ask for the next page "
+                     + "instead and it takes the next number."
             }
         }
     }
@@ -83,14 +95,18 @@ enum NextClassPlanner {
         in course: Course,
         startingANewUnit: Bool = false
     ) throws -> PlaceholderClassPlan {
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if startingANewUnit && naming.isNumbered {
+            throw Problem.noUnitsInANumberedCourse(course.code, naming.word)
+        }
         guard let remembered = try SectionTimetableStore.read(forSection: sectionNumber, in: course) else {
             throw Problem.noTimetable(course.code, sectionNumber)
         }
 
         let existing: [ClassPageSummary] = ClassPages.list(forSection: sectionNumber, in: course)
         let next: UnitDay = startingANewUnit
-            ? firstDayOfANewUnit(after: existing, naming: course.configuration.classPageNaming)
-            : nextUnitAndDay(after: existing, naming: course.configuration.classPageNaming)
+            ? firstDayOfANewUnit(after: existing, naming: naming)
+            : nextUnitAndDay(after: existing, naming: naming)
 
         // Position, not numbering: the class after this section's 15th class
         // takes the 16th date, whatever the 15 pages happen to be called.
@@ -119,6 +135,7 @@ enum NextClassPlanner {
             courseCode: course.code,
             sectionNumber: sectionNumber,
             unit: next.unit,
+            naming: course.configuration.classPageNaming,
             classes: classes,
             alreadyThere: alreadyThere,
             problems: [],
@@ -179,6 +196,10 @@ enum NextClassPlanner {
         forSection sectionNumber: Int,
         in course: Course
     ) throws -> PlaceholderClassPlan {
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if naming.isNumbered {
+            throw Problem.noUnitsInANumberedCourse(course.code, naming.word)
+        }
         guard let remembered = try SectionTimetableStore.read(forSection: sectionNumber, in: course) else {
             throw Problem.noTimetable(course.code, sectionNumber)
         }
@@ -225,6 +246,7 @@ enum NextClassPlanner {
             courseCode: course.code,
             sectionNumber: sectionNumber,
             unit: unit,
+            naming: course.configuration.classPageNaming,
             classes: classes,
             alreadyThere: alreadyThere,
             problems: [],

@@ -74,12 +74,22 @@ struct CourseSettingsView: View {
                                 unitWordNotice = nil
                                 isRenamingUnitWord = true
                             }
+                            // A numbered course's word is part of the
+                            // vocabulary chosen in the wizard (#267).
+                            .disabled(configuration.classPageNaming.isNumbered)
                             .accessibilityIdentifier("renameUnitWordButton")
                         }
                     }
-                    Text(UnitWordRenameWording.rowCaption(word: configuration.unitWord))
+                    Text(UnitWordRenameWording.rowCaption(naming: configuration.classPageNaming))
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                    if configuration.classPageNaming.isNumbered {
+                        Text(UnitWordRenameWording.renameLockedNumbered)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("unitWordLockedNotice")
+                    }
                     if let unitWordNotice {
                         Text(unitWordNotice)
                             .font(.callout)
