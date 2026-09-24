@@ -945,6 +945,12 @@ enum ScheduledDeploy {
         let replacing: Date? = momentBeingReplaced(
             courseCode: course.code, sectionNumber: sectionNumber, by: when
         )
+        // What is on this Mac for the section AT ALL, same minute included —
+        // for the record of a replacement that fails, which must say what was
+        // lost even when the card rightly said nothing.
+        let alreadySet: Date? = momentAlreadySet(
+            courseCode: course.code, sectionNumber: sectionNumber
+        )
 
         // Anything already scheduled for this section goes first, so the
         // replacement is never briefly a second agent.
@@ -985,13 +991,26 @@ enum ScheduledDeploy {
             )
             try data.write(to: destinationURL, options: [.atomic])
         } catch {
-            noteTheReplacedDeployWasLost(replacing, course: course, sectionNumber: sectionNumber)
+            // Every step that can throw comes before, or IS, the atomic plist
+            // write — so the OLD plist is still on disk, only booted out. Put
+            // it back in front of macOS, so that "it still stands" is true now
+            // rather than from the next login, and say so.
+            noteTheOldDeployAfterAFailedWrite(
+                alreadySet, at: destinationURL, runner: runner,
+                when: when, course: course, sectionNumber: sectionNumber
+            )
             return "The scheduled deploy could not be written: \(error.localizedDescription)"
         }
 
         if let failure = runner.bootstrap(plistURL: destinationURL) {
             try? FileManager.default.removeItem(at: destinationURL)
-            noteTheReplacedDeployWasLost(replacing, course: course, sectionNumber: sectionNumber)
+            ActivityTrail.note(
+                .scheduledDeployCouldNotBeSet,
+                "could not set a scheduled deploy for \(dayAndTimeText(when)): macOS would not accept it",
+                course: course.code,
+                section: sectionNumber
+            )
+            noteTheReplacedDeployWasLost(alreadySet, course: course, sectionNumber: sectionNumber)
             return "macOS would not accept the scheduled deploy: \(failure)"
         }
         if let replacing {
@@ -1008,12 +1027,54 @@ enum ScheduledDeploy {
         return nil
     }
 
+    /// The new deploy's files could not be written. The old one's plist is
+    /// untouched on disk (the write that failed is atomic, and everything
+    /// before it writes elsewhere), but it was booted out a moment ago — so it
+    /// is handed back to macOS, and the trail says what is TRUE: the deploy
+    /// already set still stands, or, if macOS would not take it back, that it
+    /// was turned off. Silent when nothing was set.
+    ///
+    /// Known and left as it was: the one-shot script is written BEFORE the
+    /// plist, at the same path for the section, so an old plist restored here
+    /// runs whatever script the failed attempt managed to write.
+    private static func noteTheOldDeployAfterAFailedWrite(
+        _ alreadySet: Date?,
+        at plistURL: URL,
+        runner: LaunchControlRunning,
+        when: Date,
+        course: Course,
+        sectionNumber: Int
+    ) {
+        let notSet: String = "could not set a scheduled deploy for \(dayAndTimeText(when))"
+        guard let alreadySet else {
+            ActivityTrail.note(
+                .scheduledDeployCouldNotBeSet, notSet, course: course.code, section: sectionNumber
+            )
+            return
+        }
+        if FileManager.default.fileExists(atPath: plistURL.path)
+            && runner.bootstrap(plistURL: plistURL) == nil {
+            ActivityTrail.note(
+                .scheduledDeployCouldNotBeSet,
+                notSet + "; the one set for \(dayAndTimeText(alreadySet)) still stands",
+                course: course.code,
+                section: sectionNumber
+            )
+            return
+        }
+        ActivityTrail.note(
+            .scheduledDeployCouldNotBeSet, notSet, course: course.code, section: sectionNumber
+        )
+        noteTheReplacedDeployWasLost(alreadySet, course: course, sectionNumber: sectionNumber)
+    }
+
     /// The old deploy was booted out to make way for a new one, and the new
     /// one then failed — so the teacher has NEITHER, and the refusal they are
     /// shown speaks only of the new one (issue #195's review). Filed under
     /// `scheduled deploy turned off`, whose job is exactly this: a deploy
     /// turned off by something other than the teacher asking. Silent when
-    /// nothing was being replaced.
+    /// nothing was set — and NOT silent for the same minute, which the card
+    /// rightly leaves unsaid but whose loss is still a loss.
     private static func noteTheReplacedDeployWasLost(
         _ replacing: Date?,
         course: Course,
@@ -1507,6 +1568,36 @@ enum ScheduledDeploy {
         return moment
     }
 
+    /// When the one deploy this section has on this Mac is set for — from
+    /// ANY working folder — or nil when there is none or its moment has gone
+    /// by. The reading behind both `momentBeingReplaced` (which then leaves
+    /// out the same minute, for what a teacher is TOLD) and the record of a
+    /// replacement that failed (which must not: a same-minute job lost is
+    /// still lost).
+    ///
+    /// Under the test suite this reads ONLY a folder a test chose. The card
+    /// reads this whenever a scheduled deploy is proposed, and tests that put
+    /// one up without moving the agents folder would otherwise read the real
+    /// `~/Library/LaunchAgents` of whoever runs the suite — passing whatever
+    /// that Mac has scheduled, which is the #240 fault arriving through a new
+    /// door. A test that wants one sets `launchAgentsDirectoryOverride`, as
+    /// every scheduling test already does.
+    static func momentAlreadySet(
+        courseCode: String,
+        sectionNumber: Int,
+        now: Date = Date()
+    ) -> Date? {
+        if WorkspaceModel.isRunningTests && launchAgentsDirectoryOverride == nil {
+            return nil
+        }
+        return nextRun(
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            now: now,
+            inWorkingFolder: nil
+        )
+    }
+
     /// When the deploy that scheduling this section for `when` would REPLACE
     /// is set for — or nil when there is none, or when it is set for that
     /// same minute and so replaces nothing a teacher would notice (issue #195).
@@ -1527,22 +1618,8 @@ enum ScheduledDeploy {
         now: Date = Date(),
         calendar: Calendar = Calendar.current
     ) -> Date? {
-        // Under the test suite this reads ONLY a folder a test chose. The
-        // card reads this whenever a scheduled deploy is proposed, and tests
-        // that put one up without moving the agents folder would otherwise
-        // read the real `~/Library/LaunchAgents` of whoever runs the suite —
-        // passing whatever that Mac has scheduled, which is the #240 fault
-        // arriving through a new door. A test that wants a replacement sets
-        // `launchAgentsDirectoryOverride`, as every scheduling test already
-        // does.
-        if WorkspaceModel.isRunningTests && launchAgentsDirectoryOverride == nil {
-            return nil
-        }
-        guard let existing = nextRun(
-            courseCode: courseCode,
-            sectionNumber: sectionNumber,
-            now: now,
-            inWorkingFolder: nil
+        guard let existing = momentAlreadySet(
+            courseCode: courseCode, sectionNumber: sectionNumber, now: now
         ) else {
             return nil
         }

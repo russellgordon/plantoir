@@ -1263,14 +1263,37 @@ before the old job goes. Added on the implementation review, which found the
 outside-assistant path silent; the tool's description and schema did not move
 (surface hashes unchanged).
 
-**A replacement that FAILS still lost the old deploy, and the trail says so.**
-`scheduleDeploy` boots the old job out and overwrites its plist before asking
-macOS to take the new one, so a refusal leaves neither — and the sentence the
-teacher is shown speaks only of the new one. That case is written under the
-existing `scheduled deploy turned off` event, with when the lost one had been
-set for — its fourth reason, since that event exists for a deploy turned off by
-something other than the teacher asking. Pre-existing destruction; the line is
-what makes it findable.
+**A replacement that FAILS: two shapes, and the trail tells them apart.**
+`scheduleDeploy` boots the old job out, writes the one-shot script, then
+writes the plist (atomically) and only then asks macOS to take it.
+
+- **macOS refuses the new one** (the bootstrap fails): the old plist has
+  already been overwritten, so the teacher has NEITHER — and the sentence they
+  are shown speaks only of the new one. The trail gets `scheduled deploy could
+  not be set` for the new moment AND `scheduled deploy turned off` for the lost
+  one, with when it had been set for — that event's FIFTH reason (course
+  removed, section removed, the day gone by, kept for reference, and this),
+  since it exists for a deploy turned off by something other than the teacher
+  asking. Recorded for the SAME minute too: the card rightly says nothing when
+  the moment is unchanged, but a same-minute deploy lost is still lost, so the
+  record reads `momentAlreadySet` (Mac-wide, same minute included) rather than
+  `momentBeingReplaced`.
+- **The new one's files cannot be WRITTEN** (anything that throws before or
+  in the plist write): the old plist is still on disk, only booted out — so it
+  is handed back to macOS at once (otherwise it would sit unloaded until the
+  next login and miss its moment), and the trail gets `scheduled deploy could
+  not be set` saying the old one still stands. NOT "turned off", which would
+  be false: the old job would still fire. If macOS will not take it back, it
+  IS turned off, and says so. Known and left as it was: the one-shot script is
+  written before the plist at the same path, so a restored old plist runs
+  whatever script the failed attempt managed to write.
+
+Found by the fix review (Opus) of the first version, which recorded "turned
+off" on both shapes and nothing for the same minute. Tests:
+`ScheduledDeployTests.testAReplacementThatFailsRecordsTheDeployItTurnedOff`,
+`…testARefusedReScheduleForTheSameMinuteRecordsWhatWasLost`,
+`…testAFailedWriteLeavesTheOldDeployStandingAndSaysSo` (the write is made to
+fail by putting the scripts folder under a file).
 
 **Left for [#237](https://github.com/russellgordon/plantoir/issues/237), and
 known:** a job set from ANOTHER working folder for the SAME minute says
