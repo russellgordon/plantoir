@@ -33,6 +33,23 @@ support files ──────┘                        │                  
    components (`BuildFreshness`, `SectionDetailView`, `ScheduledDeploy`, and `deploy.py`)
    read from this path directly on the host filesystem.
 
+   **Beside `public/`, the build notes when it STARTED** (issue #265, fix
+   round): `build_site.py` makes `section<N>/.build-started.pending` before it
+   reads the settings or any page, and renames it to `.build-started` once the
+   site has been copied out — so `.build-started` always describes the site
+   that is there, and a build that fails, is stopped or is a preview leaves it
+   alone. The file's modification time IS the start; nothing reads its
+   contents. It exists because freshness used to be judged against
+   `index.html`'s time, the END of the build, and a Save made while a publish
+   was building is older than that page: the next Publish called the site up
+   to date and sent the same old build. Measured: a file created from inside
+   the Colima container on a bind mount is stamped by the host's clock, the
+   same clock as the teacher's Save. Readers: `BuildFreshness.needsRebuild`
+   and the scheduled publish's shell (both compare with the EARLIER of the two
+   times); Windows' `BuildFreshness` owes the same. The reasoning and what was
+   rejected: [09 → "Two windows, one course"](09-mac-app.md#two-windows-one-course);
+   the rule: `contracts/app-rules.json` → `buildFreshness.buildStartedMarker`.
+
    **That path is a link, and the built site is not inside the working
    folder.** Since 2026-09-05 `courses/<CODE>/.merged_output` is a symlink to
    `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>` on
