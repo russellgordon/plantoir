@@ -3997,6 +3997,62 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertNil(ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1))
     }
 
+    /// The scheduled card says when it would REPLACE a deploy already set for
+    /// the section — including one set from ANOTHER working folder, which is
+    /// the case a folder-scoped reading would stay silent about (issue #195).
+    @MainActor
+    func testTheScheduledCardSaysWhatItReplaces() throws {
+        let made = try makeRunner(hasDeployedBefore: true)
+        let agents: URL = made.root.appendingPathComponent("LaunchAgents")
+        try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+        ScheduledDeploy.launchAgentsDirectoryOverride = agents
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            agents.deletingLastPathComponent().appendingPathComponent("scheduled")
+        defer {
+            ScheduledDeploy.launchAgentsDirectoryOverride = nil
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let scheduling = call(
+            "schedule_deploy",
+            arguments: ["course": "ICS3U", "section": 1, "when": "2030-09-09 06:30"]
+        )
+
+        // Nothing set: the card is what it always was.
+        let plain: String = made.runner.explain(call: scheduling)
+
+        // A deploy already set for the section, from a DIFFERENT working
+        // folder, at a moment still ahead.
+        let alreadySet: Date = Date().addingTimeInterval(3 * 24 * 60 * 60)
+        let old: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: "ICS3U", sectionNumber: 1, when: alreadySet,
+            workspaceURL: made.root.appendingPathComponent("last-years-folder"),
+            deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
+
+        let replacing: String = made.runner.explain(call: scheduling)
+        let expected: String = AssistWording.scheduleReplaces(
+            moment: ScheduledDeploy.dayAndTimeText(alreadySet)
+        )
+        XCTAssertTrue(
+            replacing.hasSuffix(expected),
+            "The card did not say it replaces the deploy already set: \(replacing)"
+        )
+        XCTAssertTrue(replacing.hasPrefix(plain), "The rest of the card is unchanged")
+        XCTAssertFalse(plain.contains(expected), plain)
+
+        // One already gone by is not a promise being broken.
+        let gone: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: "ICS3U", sectionNumber: 1, when: Date().addingTimeInterval(-60 * 60),
+            workspaceURL: made.root, deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: gone, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1))
+        XCTAssertEqual(made.runner.explain(call: scheduling), plain)
+    }
+
     /// Everything a scheduled deploy would ASK at half six is asked now
     /// instead. A section nobody has deployed yet would sit at a prompt with
     /// nobody there, so it is refused before anything is written.

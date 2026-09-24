@@ -264,6 +264,88 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertNil(ScheduledDeploy.requestedScript(from: ["/x", ScheduledDeploy.runFlag]))
     }
 
+    /// Scheduling a section that already has a deploy set says so in the
+    /// plan — the schedule sheet's own text — and leaves a line on the trail
+    /// once it has replaced it (issue #195). The old one is read Mac-wide:
+    /// it was set from another working folder here, which is the case a
+    /// reading scoped to this folder would miss.
+    @MainActor
+    func testSchedulingAgainSaysWhatItReplacesAndRecordsIt() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let scratch: URL = agentsDirectory.deletingLastPathComponent().appendingPathComponent("trail")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
+        let newMoment: Date = sixThirtyTomorrow()
+        let alreadySet: Date = newMoment.addingTimeInterval(36 * 60 * 60)
+        let old: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: course.code, sectionNumber: 1, when: alreadySet,
+            workspaceURL: agentsDirectory.deletingLastPathComponent().appendingPathComponent("last-year"),
+            deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1))
+
+        XCTAssertEqual(
+            ScheduledDeploy.momentBeingReplaced(courseCode: course.code, sectionNumber: 1, by: newMoment),
+            alreadySet
+        )
+        XCTAssertNil(
+            ScheduledDeploy.momentBeingReplaced(courseCode: course.code, sectionNumber: 1, by: alreadySet),
+            "Setting it again for the same moment replaces nothing a teacher would notice"
+        )
+
+        let sentence: String = AssistWording.scheduleReplaces(
+            moment: ScheduledDeploy.dayAndTimeText(alreadySet)
+        )
+        let plan: ScheduledDeployPlan = ScheduledDeploy.plan(
+            course: course, sectionNumber: 1, when: newMoment, now: Date(), cloudflareAccountID: ""
+        )
+        XCTAssertTrue(plan.description.contains(sentence), plan.description)
+
+        let runner: FakeLaunchControl = FakeLaunchControl()
+        XCTAssertNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: newMoment,
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("\(course.code)/1"), trail)
+        XCTAssertTrue(trail.contains(ScheduledDeploy.dayAndTimeText(alreadySet)), trail)
+        XCTAssertTrue(trail.contains(ScheduledDeploy.dayAndTimeText(newMoment)), trail)
+
+        // Now that it is set, the sheet says it would replace THIS one — and
+        // scheduling the same moment again says nothing and records nothing.
+        let again: ScheduledDeployPlan = ScheduledDeploy.plan(
+            course: course, sectionNumber: 1, when: newMoment, now: Date(), cloudflareAccountID: ""
+        )
+        XCTAssertFalse(again.description.contains(sentence), again.description)
+        let linesBefore: Int = trail.components(separatedBy: "\n").count
+        XCTAssertNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: newMoment,
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+        XCTAssertEqual(
+            ActivityTrail.store.activityText(includingPrompts: true).components(separatedBy: "\n").count,
+            linesBefore
+        )
+    }
+
+    /// With nothing set, the plan says nothing about replacing anything.
+    @MainActor
+    func testSchedulingAFreeSectionMentionsNoReplacement() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let plan: ScheduledDeployPlan = ScheduledDeploy.plan(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(), now: Date(), cloudflareAccountID: ""
+        )
+        XCTAssertNil(plan.replacing)
+        XCTAssertNil(ScheduledDeploy.momentBeingReplaced(
+            courseCode: course.code, sectionNumber: 1, by: sixThirtyTomorrow()
+        ))
+    }
+
     /// Scheduling writes the script the agent runs, and cancelling takes it
     /// away — a cancelled deploy must not leave a runnable copy of itself.
     @MainActor
