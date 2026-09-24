@@ -161,4 +161,31 @@ final class TwoWindowSettingsTests: XCTestCase {
         XCTAssertTrue(windowB.configuration.showReadingTime)
         XCTAssertTrue(windowB.configuration.hasUnsavedChanges)
     }
+
+    /// Opening Course Settings reads the file again, so a folder a build
+    /// discovered is offered without relaunching — but never over unsaved
+    /// edits.
+    @MainActor
+    func testOpeningSettingsReadsTheFileAgainUnlessSomethingIsUnsaved() throws {
+        let fileURL: URL = try writeSeedFile()
+        let window: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+
+        let build: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+        var folders: [String] = build.sharedFolders
+        folders.append("Projects")
+        build.sharedFolders = folders
+        let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys]
+        try JSONSerialization.data(withJSONObject: build.values, options: options).write(to: fileURL)
+
+        XCTAssertTrue(window.reloadIfNothingUnsaved(url: fileURL))
+        XCTAssertTrue(window.sharedFolders.contains("Projects"))
+
+        folders.append("Labs")
+        build.sharedFolders = folders
+        try JSONSerialization.data(withJSONObject: build.values, options: options).write(to: fileURL)
+        window.showReadingTime = true
+        XCTAssertFalse(window.reloadIfNothingUnsaved(url: fileURL))
+        XCTAssertTrue(window.showReadingTime)
+        XCTAssertFalse(window.sharedFolders.contains("Labs"))
+    }
 }

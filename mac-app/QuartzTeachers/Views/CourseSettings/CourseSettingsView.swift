@@ -323,6 +323,12 @@ struct CourseSettingsView: View {
             }
         }
         .navigationSubtitle(course.configuration.courseName)
+        .onAppear {
+            // The file may have moved on since this window read it: a build
+            // adds folders it discovers, and another window on the same
+            // folder may have saved. Never over unsaved edits (issue #265).
+            course.configuration.reloadIfNothingUnsaved(url: course.configFileURL)
+        }
     }
 
     // MARK: - Computed properties

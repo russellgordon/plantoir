@@ -161,6 +161,10 @@ final class SettingsSaveNoticeTests: XCTestCase {
         XCTAssertTrue(settingsSource.contains("SettingsSaveNotice.afterSave("), "Course Settings no longer asks what to say after a Save")
         XCTAssertTrue(settingsSource.contains("Text(sentence)"), "Course Settings no longer draws the after-Save sentences")
         XCTAssertTrue(settingsSource.contains("Button(\"Preview Again\")"), "Course Settings lost its Preview Again button")
+        XCTAssertTrue(
+            settingsSource.contains("reloadIfNothingUnsaved(url:"),
+            "Course Settings no longer reads the file again when opened, so a folder the build discovered is not offered"
+        )
         XCTAssertTrue(sectionSource.contains("SettingsSaveNotice.whenPreviewStarts("), "Starting a preview no longer asks about unsaved settings")
         XCTAssertTrue(sectionSource.contains("Text(unsavedSettingsNotice)"), "The section no longer draws the unsaved-settings sentence")
     }

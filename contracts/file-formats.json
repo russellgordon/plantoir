@@ -101,7 +101,7 @@
       {
         "key": "hidden",
         "type": "array of strings",
-        "why": "Folders and files kept out of the built site."
+        "why": "Folders and files kept out of the built site's sidebar (they are still built, linkable and searchable). Written by the setup wizard and the apps ONLY: since issue #265 (2026-09-24) the build never changes it, where it used to take a folder it thought new back out and write the list back. See sidebarHiding."
       },
       {
         "key": "include_coverage_notes",
@@ -807,5 +807,55 @@
     "note": "`courses/<CODE>/.internal/timetable/section<N>.json` — the dates a section actually meets, written down once by whichever app the teacher used and read by both. It lives INSIDE the course folder so it travels with a backup, an archive and a restore; a teacher who restores a course gets its timetable back with it.",
     "path": "courses/<CODE>/.internal/timetable/section<N>.json",
     "verified": "Both apps use this exact path — mac `SectionTimetable`, Windows `TimetableMemory.cs`."
+  },
+  "sidebarHiding": {
+    "note": "What the entries of course_config.json's `hidden` list MEAN, and who may change them. Issue #265: the switches under 'Hide from the site's sidebar' in Course Settings did not always match the built sidebar.",
+    "buildKeepsHidden": {
+      "rule": "A build's preflight never changes `hidden`. A folder it discovers (on disk, not yet in its scope's list) is still added to shared_folders or per_section_folders and to expandable, but if its name is already in `hidden` it STAYS hidden.",
+      "why": "The build used to un-hide such a folder and write the list back ('Un-hid newly discovered folder'). A folder ticked hidden and then moved to the other level, made again at the other level, or listed in the wrong scope was un-hidden on EVERY build, the tick erased from the file while Course Settings still showed it, and the next Save put it back - measured on all five shapes below with the real preflight. Keeping it hidden errs the safe way: hiding from the sidebar never unpublishes a page. Rejected: limiting the un-hide to names the teacher could not have ticked - the Settings form offers only names already listed, so every name in `hidden` was ticked by somebody, or is a legacy entry nobody should lose silently.",
+      "consumers": "scripts/test_sidebar_hiding.py (run by verify.sh and by Windows' PythonToolchainTests). Neither app runs these: nothing in either app changes `hidden` behind the teacher.",
+      "cases": [
+        {
+          "name": "S3: a hidden per-section folder moved to the course root",
+          "sharedOnDisk": ["Concepts", "Tasks", "Curriculum", "Handouts"],
+          "perSectionOnDisk": ["All Classes"],
+          "config": { "shared_folders": ["Concepts", "Tasks", "Curriculum"], "per_section_folders": ["All Classes", "Handouts"], "hidden": ["Handouts"] },
+          "expectHidden": ["Handouts"],
+          "expectAdded": { "shared_folders": ["Handouts"] }
+        },
+        {
+          "name": "S4: the same name made at both levels, the shared one hidden",
+          "sharedOnDisk": ["Concepts", "Tasks", "Curriculum"],
+          "perSectionOnDisk": ["All Classes", "Tasks"],
+          "config": { "shared_folders": ["Concepts", "Tasks", "Curriculum"], "per_section_folders": ["All Classes"], "hidden": ["Tasks"] },
+          "expectHidden": ["Tasks"],
+          "expectAdded": { "per_section_folders": ["Tasks"] }
+        },
+        {
+          "name": "E2: listed per-section, also made at the top level",
+          "sharedOnDisk": ["Concepts", "Curriculum", "Tasks"],
+          "perSectionOnDisk": ["All Classes", "Tasks"],
+          "config": { "shared_folders": ["Concepts", "Curriculum"], "per_section_folders": ["All Classes", "Tasks"], "hidden": ["Tasks"] },
+          "expectHidden": ["Tasks"],
+          "expectAdded": { "shared_folders": ["Tasks"] }
+        },
+        {
+          "name": "A: a shared folder on disk, ticked hidden, not yet in shared_folders",
+          "sharedOnDisk": ["Concepts", "Tasks", "Curriculum", "Projects"],
+          "perSectionOnDisk": ["All Classes"],
+          "config": { "shared_folders": ["Concepts", "Tasks", "Curriculum"], "per_section_folders": ["All Classes"], "hidden": ["Projects"] },
+          "expectHidden": ["Projects"],
+          "expectAdded": { "shared_folders": ["Projects"] }
+        },
+        {
+          "name": "D: a per-section folder on disk, ticked hidden, not yet in per_section_folders",
+          "sharedOnDisk": ["Concepts", "Tasks", "Curriculum"],
+          "perSectionOnDisk": ["All Classes", "Handouts"],
+          "config": { "shared_folders": ["Concepts", "Tasks", "Curriculum"], "per_section_folders": ["All Classes"], "hidden": ["Handouts"] },
+          "expectHidden": ["Handouts"],
+          "expectAdded": { "per_section_folders": ["Handouts"] }
+        }
+      ]
+    }
   }
 }

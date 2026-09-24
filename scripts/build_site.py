@@ -3681,7 +3681,17 @@ def _dropping_excluded_items(cfg: dict) -> dict:
 def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path,
                                    _attempt: int = 0) -> dict:
     """Discover new items and append them to course_config.json. Return updated config dict.
-    Also: any newly discovered folders are marked not hidden and added to the expandable list.
+    Also: any newly discovered folders are added to the expandable list.
+
+    It NEVER changes `hidden` (issue #265, 2026-09-24). It used to take a
+    newly discovered folder OUT of `hidden` and write the list back — so a
+    folder the teacher had ticked hidden and then moved (or made again at
+    the other level, or listed in the wrong scope) was un-hidden on every
+    build, the tick erased from the file while the app went on showing it,
+    and the next Save put it back for the next build to take out again.
+    Measured on five folder shapes, all five looping. `hidden` is the
+    apps' alone now: a "new" folder already named there stays hidden, which
+    errs the safe way — hiding from the sidebar never unpublishes a page.
     Excludes any items listed in excluded_items (skips discovery, does not un-hide, and manages index.md note).
 
     NOT add-only, and this docstring said it was until 2026-09-07. Since
@@ -3720,7 +3730,6 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     shared_files = list(cfg.get("shared_files", []))
     per_section_folders = list(cfg.get("per_section_folders", []))
     per_section_files = list(cfg.get("per_section_files", []))
-    hidden_list = list(cfg.get("hidden", []))
     expandable_list = list(cfg.get("expandable", []))
     excluded_items = cfg.get("excluded_items") or {}
     excluded_shared = set(excluded_items.get("shared") or [])
@@ -3789,14 +3798,11 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     added_psf = _safe_unique_append(per_section_folders, allowed_disc_sec_folders)
     added_psfi = _safe_unique_append(per_section_files, allowed_disc_sec_files)
 
-    # For newly discovered folders: ensure NOT hidden + ensure in expandable
-    hidden_changed = False
+    # For newly discovered folders: ensure in expandable. NOT un-hidden:
+    # `hidden` is what the teacher ticked, and only the apps write it — see
+    # this function's docstring (issue #265).
     expandable_changed = False
     for name in new_shared_folders + new_sec_folders:
-        if name in hidden_list:
-            hidden_list = [h for h in hidden_list if h != name]
-            hidden_changed = True
-            print(f"👁️‍🗨️ Un-hid newly discovered folder: {name}")
         if name not in expandable_list:
             expandable_list.append(name)
             expandable_changed = True
@@ -3833,13 +3839,11 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     print(f"📌 Auto-discovered per-section folders: {allowed_disc_sec_folders or '—'}")
     print(f"📌 Auto-discovered per-section files: {allowed_disc_sec_files or '—'}")
 
-    if any([added_sf, added_sfi, added_psf, added_psfi, hidden_changed, expandable_changed, reconciled_changed]):
+    if any([added_sf, added_sfi, added_psf, added_psfi, expandable_changed, reconciled_changed]):
         cfg["shared_folders"] = shared_folders
         cfg["shared_files"] = shared_files
         cfg["per_section_folders"] = per_section_folders
         cfg["per_section_files"] = per_section_files
-        if hidden_changed:
-            cfg["hidden"] = hidden_list
         if expandable_changed:
             cfg["expandable"] = expandable_list
         # Compare-and-swap: only write if nothing else has written since the
