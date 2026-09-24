@@ -323,6 +323,47 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
+    /// The mirror of the rule above, for the QUESTION under a scheduled card
+    /// (issue #184): it must not say the word the immediate card must say.
+    ///
+    /// "Shall I deploy?" was put under every approval card, including the one
+    /// that had just named a moment tomorrow morning, and it reads as now.
+    /// The word is read from the same contract rule rather than typed here,
+    /// so the two cannot drift apart.
+    @MainActor
+    func testTheScheduledCardAsksItsOwnQuestion() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("assistantConfirmation")
+        let rule: [String: Any] = try XCTUnwrap(
+            section["theImmediateDeployCardSaysItIsImmediate"] as? [String: Any]
+        )
+        let immediateWord: String = try XCTUnwrap(rule["mustContain"] as? String).lowercased()
+
+        XCTAssertEqual(
+            AssistAgent.approvalQuestion(forToolNamed: "schedule_deploy"),
+            AssistWording.scheduleQuestion
+        )
+        XCTAssertEqual(
+            AssistAgent.approvalQuestion(forToolNamed: "deploy_section"),
+            AssistWording.deployQuestion
+        )
+        XCTAssertEqual(
+            AssistAgent.approvalQuestion(forToolNamed: "a_tool_nobody_has_written_yet"),
+            AssistWording.deployQuestion,
+            "Anything else that waits for approval gets the question that is safe for a deploy: now"
+        )
+        XCTAssertNotEqual(AssistWording.scheduleQuestion, AssistWording.deployQuestion)
+
+        var spoken: [String] = []
+        for piece in AssistWording.scheduleQuestion.lowercased()
+            .split(whereSeparator: { character in return !character.isLetter }) {
+            spoken.append(String(piece))
+        }
+        XCTAssertFalse(
+            spoken.contains(immediateWord),
+            "the scheduled card's question says it happens now: " + AssistWording.scheduleQuestion
+        )
+    }
+
     // MARK: - What a page is called
 
     /// Every case the contract lists, run against the real rule.
