@@ -8,11 +8,11 @@ import XCTest
 /// (`SidebarVisibilityTableView`) — clicked, spaced and read as a teacher
 /// would, through the real `NSTableView` a SwiftUI `Table` becomes.
 ///
-/// The fault these exist for is the one that reports success: a box that
-/// DRAWS ticked and WRITES the opposite, or writes a different row's item, or
-/// the Hide box writing the Expandable list. Each was put in on purpose
-/// (copy the source aside, break it, run, put it back) and turned the named
-/// test red — recorded in `documentation/09-mac-app.md` → "Course Settings
+/// The fault these exist for is the one that reports success: a box whose
+/// binding READS ticked and WRITES the opposite, or writes a different row's
+/// item, or the Hide box writing the Expandable list. Each was put in on
+/// purpose (copy the source aside, break it, run, put it back) and turned
+/// the named test red — recorded in `documentation/09-mac-app.md` → "Course Settings
 /// lists are tables, and why".
 @MainActor
 final class TickTableTests: XCTestCase {
@@ -65,6 +65,24 @@ final class TickTableTests: XCTestCase {
         XCTAssertEqual(ListTableMetrics.name(ofRowWithID: rows[2].id, in: rows), "Tasks")
         XCTAssertNil(ListTableMetrics.name(ofRowWithID: "nothing", in: rows))
         XCTAssertNil(ListTableMetrics.name(ofRowWithID: nil, in: rows))
+    }
+
+    /// A row's menu — Remove in the name tables, Hide and Expandable in the
+    /// Sidebar Visibility table — offers nothing while the table is disabled,
+    /// as Space, Delete and double-click already refuse. The wizard's
+    /// Structure section is disabled until a course is chosen, and a disabled
+    /// `Table` still answers gestures. Red if the menu ignores `isEnabled`.
+    func testARowMenuOffersNothingWhileTheTableIsDisabled() {
+        let rows: [ListTableRow] = ListTableMetrics.positionedRows(from: ["Concepts", "Tasks"])
+        let tasksRow: Set<String> = [rows[1].id]
+        XCTAssertEqual(ListTableMetrics.contextMenuTarget(forRowIDs: tasksRow, in: rows, isEnabled: true), "Tasks")
+        XCTAssertNil(ListTableMetrics.contextMenuTarget(forRowIDs: tasksRow, in: rows, isEnabled: false))
+        XCTAssertNil(ListTableMetrics.contextMenuTarget(forRowIDs: [], in: rows, isEnabled: true), "no row, no menu")
+        let bothRows: Set<String> = [rows[1].id, rows[0].id]
+        XCTAssertEqual(
+            ListTableMetrics.contextMenuTarget(forRowIDs: bothRows, in: rows, isEnabled: true), "Concepts",
+            "with several rows under the menu, it acts on the first in the table's order, not the set's"
+        )
     }
 
     func testTheHeightShowsEveryRowUpToTheCap() {
@@ -127,8 +145,10 @@ final class TickTableTests: XCTestCase {
     }
 
     /// Clicking a box adds exactly that row's item, and clicking it again
-    /// takes exactly that item out. Red if the box draws the opposite of what
-    /// it writes, or if a row's box acts on another row's item.
+    /// takes exactly that item out. Red if a click writes the opposite of
+    /// what the box's binding reads (the getter inverted), or if a row's box
+    /// acts on another row's item. It reads the MODEL after each click, not
+    /// the drawn checkbox: no test here reads `NSButton.state`.
     func testClickingABoxTicksExactlyThatRowsItem() throws {
         let members: ListBox = ListBox(["Tasks"])
         let host: TableHost = makeMarksTable(members: members)
