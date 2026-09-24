@@ -255,12 +255,24 @@ struct CourseSettingsView: View {
                                 .font(.callout)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
+                        // The preview this was about has stopped, or its
+                        // window closed: say so rather than leave a button
+                        // that does nothing (the review's L2).
+                        if !saveNotice.sectionsToPreviewAgain.isEmpty
+                            && sectionsStillPreviewed(offered: saveNotice.sectionsToPreviewAgain).isEmpty {
+                            Text(SpecialNames.settingsPreviewAgainNothingOpen)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("settingsPreviewAgainNothingOpen")
+                        }
                     }
                     Spacer()
                     if !saveNotice.sectionsToPreviewAgain.isEmpty {
                         Button("Preview Again") {
-                            previewAgain(sections: saveNotice.sectionsToPreviewAgain)
+                            previewAgain(sections: sectionsStillPreviewed(offered: saveNotice.sectionsToPreviewAgain))
                         }
+                        .disabled(sectionsStillPreviewed(offered: saveNotice.sectionsToPreviewAgain).isEmpty)
                         .accessibilityIdentifier("settingsPreviewAgainButton")
                     }
                 }
@@ -272,9 +284,10 @@ struct CourseSettingsView: View {
             HStack {
                 // "Revert", not "Cancel": this is a settings form, not a
                 // dialog — the button puts the values back the way the last
-                // save left them.
+                // save left them. The FILE's values, not this copy's memory
+                // of them: another window may have saved since (issue #265).
                 Button("Revert") {
-                    try? course.configuration.discardChanges()
+                    try? course.configuration.revertToFile(at: course.configFileURL)
                 }
                 .disabled(!course.configuration.hasUnsavedChanges)
                 .accessibilityIdentifier("revertButton")
@@ -435,7 +448,8 @@ struct CourseSettingsView: View {
                 folderPath: workingFolderPath,
                 courseCode: course.code,
                 previewLeases: PreviewLeases.active,
-                publishes: CourseActivity.activePublishes
+                publishes: CourseActivity.activePublishes,
+                replacedChangesFromElsewhere: result.replacedChangesFromElsewhere
             )
             saveNotice = notice
             ActivityTrail.note(.settingsSaved, SettingsSaveNotice.trailLine(
@@ -465,6 +479,28 @@ struct CourseSettingsView: View {
             .path
     }
 
+    /// Of `offered`, the sections whose preview Preview Again can still reach.
+    /// Reads `PreviewLeases.active`, which is observable, so this view is
+    /// drawn again when a preview stops or its window closes.
+    func sectionsStillPreviewed(offered: [Int]) -> [Int] {
+        let folderPath: String = workingFolderPath
+        let courseCode: String = course.code
+        return SettingsSaveNotice.sectionsStillPreviewed(
+            offered: offered,
+            folderPath: folderPath,
+            courseCode: courseCode,
+            previewLeases: PreviewLeases.active,
+            previewIsRunning: { section in
+                guard let controller = SectionWindowControllers.shared.controller(
+                    folderPath: folderPath, courseCode: courseCode, sectionNumber: section
+                ) else {
+                    return nil
+                }
+                return controller.isPreviewRunning()
+            }
+        )
+    }
+
     /// Builds each open preview of this course again, so it shows what was
     /// just saved. The preview belongs to the section's own view — in another
     /// window, since leaving a section for its course's settings stops that
@@ -472,7 +508,9 @@ struct CourseSettingsView: View {
     /// the assistant uses, which stop and start it the way its own button
     /// does. A section whose preview has since stopped is left alone.
     func previewAgain(sections: [Int]) {
-        saveNotice = nil
+        // The preview sentence is answered; a sentence about the Save itself
+        // (another window's sidebar change replaced) stays to be read.
+        saveNotice = saveNotice?.withoutPreviewAgain()
         let folderPath: String = workingFolderPath
         let courseCode: String = course.code
         Task { @MainActor in
@@ -495,6 +533,14 @@ struct CourseSettingsView: View {
                     .previewAgainAfterSettingsSaved,
                     "previewed " + courseCode + " again after saving its settings (section "
                         + rebuilt.joined(separator: ", ") + ")"
+                )
+            } else {
+                // The button is disabled when nothing is reachable, so this
+                // is the instant between drawing it and pressing it — rare,
+                // and still worth a line rather than silence.
+                ActivityTrail.note(
+                    .previewAgainAfterSettingsSaved,
+                    "pressed Preview Again for " + courseCode + ", but no preview of it was open any more"
                 )
             }
         }

@@ -188,4 +188,57 @@ final class TwoWindowSettingsTests: XCTestCase {
         XCTAssertTrue(window.showReadingTime)
         XCTAssertFalse(window.sharedFolders.contains("Labs"))
     }
+    // MARK: - Revert (the review's M1)
+
+    /// The review's sequence: window B has an unsaved edit, so A's Save
+    /// leaves B's copy alone; B presses Revert. B must then show the FILE —
+    /// A's three hides — and B's next sidebar change must build on those,
+    /// not write B's old ten back. On the old Revert (the bytes B last read)
+    /// B showed ten hides with "nothing unsaved", and its next Save put
+    /// eleven on disk and took A's "All Classes" away.
+    @MainActor
+    func testRevertShowsTheFileAndTheNextSaveDoesNotPutTheOldListBack() throws {
+        let fileURL: URL = try writeSeedFile()
+        let windowA: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+        let windowB: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+
+        windowB.showReadingTime = true
+        windowA.hiddenItems = ["Media", "All Classes", "College Board Curriculum"]
+        try windowA.write(to: fileURL)
+
+        try windowB.revertToFile(at: fileURL)
+        XCTAssertEqual(windowB.hiddenItems, ["Media", "All Classes", "College Board Curriculum"])
+        XCTAssertFalse(windowB.showReadingTime, "Revert throws the unsaved edit away")
+        XCTAssertFalse(windowB.hasUnsavedChanges)
+
+        windowB.hiddenItems = ["Media", "All Classes", "College Board Curriculum", "Tasks"]
+        let result: CourseConfiguration.WriteResult = try windowB.write(to: fileURL)
+        XCTAssertEqual(try hiddenOnDisk(at: fileURL), ["Media", "All Classes", "College Board Curriculum", "Tasks"])
+        XCTAssertEqual(result.replacedChangesFromElsewhere, [], "Nothing of A's was replaced")
+    }
+
+    /// With the file unreadable, Revert still puts back what this copy last
+    /// read, as it always did.
+    @MainActor
+    func testRevertWithNoFileFallsBackToWhatWasLastRead() throws {
+        let fileURL: URL = try writeSeedFile()
+        let window: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+        window.showReadingTime = true
+        try FileManager.default.removeItem(at: fileURL)
+        try window.revertToFile(at: fileURL)
+        XCTAssertFalse(window.showReadingTime)
+        XCTAssertFalse(window.hasUnsavedChanges)
+    }
+
+    /// The button is what matters: Course Settings' Revert reads the file.
+    func testTheRevertButtonReadsTheFile() throws {
+        let viewURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift")
+        let source: String = try String(contentsOf: viewURL, encoding: .utf8)
+        XCTAssertTrue(source.contains("course.configuration.revertToFile(at: course.configFileURL)"))
+        XCTAssertFalse(source.contains("discardChanges()"), "Revert must not put back this window's older copy")
+    }
 }
