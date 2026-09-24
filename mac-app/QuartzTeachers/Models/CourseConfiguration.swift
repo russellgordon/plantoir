@@ -15,8 +15,9 @@ class CourseConfiguration {
     /// The decoded contents of `course_config.json`.
     var values: [String: Any]
 
-    /// The bytes most recently read from or written to disk, used by
-    /// `discardChanges()` to implement the Cancel button.
+    /// The bytes most recently read from or written to disk: what a Save
+    /// merges against, and what `revertToFile(at:)` falls back to when the
+    /// file cannot be read.
     private var lastSavedData: Data
 
     // MARK: - Computed properties
