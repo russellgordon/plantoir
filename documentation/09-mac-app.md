@@ -523,6 +523,97 @@ tools folder — and gave one to the quit path, which had none at all. The
 scheduled publish worked only because the launcher re-exports that folder from
 inside itself.
 
+### The Helpers line says what is installed, measured (issue #222)
+
+A problem report's header carries a "Helpers" line, and the trail opens every
+launch with the same text (`helpers described`). Through v1.3.0 it was five
+literals — the versions `setup.sh` downloads — printed as though they were
+installed. They are not what runs: the launchers use whatever copy is already
+on the `PATH` above and download only what is missing, so on a Mac with
+Homebrew's tools the line described a machine that did not exist. Measured on
+Russell's Mac on 2026-09-23: the report said "Docker CLI 29.7.2", Homebrew's
+29.7.1 was the one running, and nothing said the programs were Homebrew's at
+all. On the Mac that filed the 2026-09-19 report the pins happened to match,
+which read as evidence that Plantoir had installed its own tools and cost real
+time to rule out.
+
+Now `ProblemReportEnvironment.measureHelpers` ASKS them — one `/bin/sh -c` with
+`HelperPrograms.environment()`, so the same search order the launchers use:
+`colima --version`, `limactl --version`, `docker --version`,
+`docker buildx version`. All four took 0.32 s on that Mac (0.46 s the first
+time), with none installed 0.08 s — the real source compiled standalone and run
+against the real `PATH`. Each is reported with where it was found:
+
+- **"Plantoir's copy"** when found in `…/Plantoir/tools/bin` — by the folder it
+  was FOUND in, with no path printed.
+- **"Homebrew"** when the link LEADS into `/opt/homebrew`, `/usr/local/Cellar` or
+  `/usr/local/Homebrew`. Not merely "found in `/usr/local/bin`": Docker Desktop
+  links its own `docker` there too, and calling that Homebrew would be the same
+  kind of wrong answer the line exists to stop giving.
+- **"found in <folder>"** otherwise. A folder under the home folder is redacted
+  on the way to disk like every other path.
+- **Buildx** gets a source only when its own text names one (Homebrew's build
+  says "Homebrew"). It is a Docker CLI plug-in found in `~/.docker/cli-plugins`,
+  which is the SAME folder Plantoir's download (`setup.sh`) and Homebrew's link
+  both use — where `docker` lives says nothing about where buildx came from.
+- A program that is absent reads **"not found (would install <pin>)"**; before
+  anything has been measured, **"not checked yet (pinned <pin>)"**. When the
+  check is ended by its time limit, the program it was waiting on **"did not
+  answer within 5 s"** — a hung `docker --version` is itself the diagnosis, so
+  it is not folded in with the rest — and any after it, never reached, read
+  **"not checked (pinned <pin>)"**. The
+  pins live in one list, `ProblemReportEnvironment.pinnedHelpers`, which
+  `HelperVersionsTests` holds against `setup.sh`'s four `*_VERSION` lines.
+
+The engine (`llama.cpp b10435 (Metal)`) stays a stated constant: it is bundled,
+so its build genuinely is known.
+
+**Every answer says when it was taken** — the remembered line ends
+"· checked 2026-09-24 00:41:07" — because a record can carry an answer from the
+launch or from the end of the last task, and without it a report could not
+tell a Mac with no Colima from one that had none an hour ago.
+
+**When it is measured.** Once at launch, in a detached task, and the trail's
+helpers line is written only after it answers — so `ActivityTrail.noteLaunch()`
+writes two lines and `noteHelpers(_:)` the third, about a third of a second
+later, hopping back to the main actor to write so two writers never interleave
+the one trail file. Again after every launcher task finishes, because a first
+setup downloads the programs it did not find (that task's OWN record keeps the
+earlier answer, which was true when it was taken — a record saying "not found"
+on the setup that then installed it is not a failed download). **The TRAIL's
+helpers line is written once per launch and never again**, deliberately left
+that way: a report made in the same session that installed the tools shows,
+on the trail, the launch's "not found (would install …)" — with the time it
+was checked — while the records written after the setup finished carry the
+new answer; the next launch writes a fresh line. And at the
+start of a task when nothing has been measured yet: the `--mcp-stdio` process
+never runs the app's launch, and without this its records would all say "not
+checked yet". Every one of the three is skipped under XCTest, so the suite
+neither probes the Mac it runs on nor has a background answer change a record
+mid-test; `measureHelpers` itself stores nothing (only `refreshHelpers` does),
+so a test that points it at stub programs cannot leak a stub's version into a
+later test.
+
+**Two traps in the check itself.** `colima --version`, never `colima version`:
+the undashed form talks to the running virtual machine — 0.256 s against
+0.045 s, and it prints a second, server-side line — so a stopped machine makes
+the check slow and a wedged one makes it hang. No test with stub programs can
+tell the two apart; read the script. And a 5 s watchdog ends the shell in case
+a program never answers. That only works because each program's output is
+captured by the shell's own `$( … )`: the programs never hold the pipe the app
+reads, so ending the shell ends the read
+(`testAHelperThatNeverAnswersDoesNotHoldTheCheckUp`, a 1 s limit against a
+program that sleeps 8 s). The review measured the hung program itself too: a
+stub that wrote its pid and then `exec sleep 40` was gone once the check had
+returned, so nothing is left running.
+
+**Rejected.** Measuring when each record is written, on the main actor: a 0.3 s
+stall per record, and records are rewritten every ten seconds while a task
+runs. Keeping the literals and labelling them "expected": still unmeasured, and
+the difference between measured and expected is exactly what a reader of the
+report cannot see. Windows owes nothing here: its header never claimed tool
+versions — it says "WSL2" or "native toolchain", from what is on disk.
+
 ### What the quit path now refuses to do
 
 The generated script is `/bin/sh`, never `/bin/zsh -l`, with all three handles

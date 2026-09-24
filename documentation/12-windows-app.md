@@ -1395,7 +1395,8 @@ should mirror it:
   fails loudly instead of passing vacuously.
 - **Its honest limit, so nobody oversells it**: the scan proves a call site
   EXISTS, not that it is reached. The mac additionally runs `noteLaunch()`
-  against a scratch store and counts its three lines. Full runtime coverage
+  and `noteHelpers(_:)` (split since #222, because the helpers line waits for
+  the programs to be asked) against a scratch store and counts the three lines. Full runtime coverage
   of every event would mean driving every feature in unit tests; REJECTED as
   disproportionate — the failure Windows actually shipped was
   zero-references, which the scan catches outright.

@@ -320,6 +320,14 @@ class ScriptRunner {
         // reports ("the preview is stuck") was the one thing that left no
         // trace at all.
         recordWrittenAt = nil
+        // A process that never passed through the app's launch — the one
+        // Claude Code starts with `--mcp-stdio` — has not asked the helper
+        // programs anything yet. Ask now, in the background, so the record
+        // this task writes when it finishes carries a measurement rather
+        // than "not checked yet".
+        if ProblemReportEnvironment.measuredHelperDescription == nil {
+            ScriptRunner.refreshHelperVersions()
+        }
         writeRecordOfRun(exitCode: nil)
         ActivityTrail.note(.taskStarted, "started " + LogRedactor.redacting(([scriptName] + arguments).joined(separator: " ")))
     }
@@ -1202,6 +1210,11 @@ class ScriptRunner {
         process = nil
         terminal = nil
         writeRecordOfRun(exitCode: exitCode)
+        // A task can change the answer: a first setup downloads the programs
+        // it did not find. Ask again, so every LATER record says what is
+        // there now. (This task's own record keeps the earlier answer, which
+        // was true when it was taken.)
+        ScriptRunner.refreshHelperVersions()
         ActivityTrail.note(
             .taskFinished,
             runScriptName + " — "
@@ -1332,6 +1345,19 @@ class ScriptRunner {
         )
         reportStore.write(record)
         recordWrittenAt = Date()
+    }
+
+    /// Asks the helper programs their versions again, in the background.
+    ///
+    /// Never under the test suite: the suite runs real launchers through
+    /// this class, and a background check finishing in the middle of a test
+    /// would both probe the machine the suite runs on and change what a
+    /// later test's record says.
+    static func refreshHelperVersions() {
+        if WorkspaceModel.isRunningTests {
+            return
+        }
+        ProblemReportEnvironment.refreshHelpers()
     }
 
     /// How a finished task is described in its record.
