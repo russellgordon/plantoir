@@ -1144,13 +1144,15 @@ def update_quartz_layout(quartz_layout_path: Path, hidden_components: list):
         print(f"⚠️ quartz.layout.ts not found at {quartz_layout_path}")
         return
 
-    normalized_hidden = [
-        item[:-3] if item.endswith(".md") else item
-        for item in hidden_components
-    ]
-
+    # The STORED names, `.md` kept (issue #265). Version 1 of the filter
+    # matched a file on its page title, so this used to strip `.md` to let the
+    # file name stand in for the title — which failed for every page whose
+    # title was not its file name. Version 2 (`setup_course.EXPLORER_BLOCK`)
+    # matches the file's own path, `.md` included. Each name is written as a
+    # JSON string, which is also a valid TypeScript string: a name holding a
+    # quote or a backslash used to break the layout file.
     content = Path(quartz_layout_path).read_text(encoding="utf-8")
-    formatted = ", ".join(f'"{n}"' for n in normalized_hidden)
+    formatted = ", ".join(json.dumps(str(n), ensure_ascii=False) for n in hidden_components)
     replacement_line = f"const omit = new Set([{formatted}])"
 
     # Match both:
@@ -3137,6 +3139,88 @@ def ensure_quartz_layout_anchor(quartz_layout_path: Path) -> bool:
 
     quartz_layout_path.write_text(repaired, encoding="utf-8")
     print("✅ Restored the Explorer's hide filter.")
+    return True
+
+
+def _same_stored_name(first: str, second: str) -> bool:
+    """Whether two `hidden` entries name the same item, the way the sidebar's
+    filter compares them: ignoring case and Unicode normalisation."""
+    import unicodedata
+    return (unicodedata.normalize("NFC", str(first)).lower()
+            == unicodedata.normalize("NFC", str(second)).lower())
+
+
+def names_the_sidebar_hides(hidden_list: list) -> list:
+    """The teacher's `hidden` list plus what the build always hides from the
+    sidebar, as STORED names (issue #265). Nothing here is written back to
+    course_config.json."""
+    names = list(hidden_list)
+    # 'Media' is always hidden — checked in any spelling, or a config that
+    # already says "media" would gain a SECOND entry for the same directory
+    # every build.
+    if not any(_is_media_name(name) for name in names):
+        names.append("Media")
+    # The Curriculum Coverage page is reached from Key Links, deliberately.
+    # It is a teacher's instrument rather than a place students navigate to,
+    # and it sits at the content root, so without this it would appear in
+    # the sidebar above the folders — the most prominent position on the
+    # site, for the page that needs it least. By its FILE name: the filter
+    # matches a top-level file on its path, `.md` included, and the page's
+    # file is named after its title.
+    coverage_file_name = COVERAGE_PAGE_TITLE + ".md"
+    if not any(_same_stored_name(name, coverage_file_name) for name in names):
+        names.append(coverage_file_name)
+    return names
+
+
+def ensure_sidebar_hide_rule_current(quartz_layout_path: Path) -> bool:
+    """
+    Bring a section's quartz.layout.ts up to the current sidebar hide rule
+    (issue #265), or say it cannot. Idempotent: a file that already carries
+    `setup_course.HIDE_RULE_MARKER` is left byte for byte as it is.
+
+    Each section's layout is a COPY made once, when the section is first
+    built, so a change to `EXPLORER_BLOCK` reaches new sections only. On the
+    mac the copy usually dies with the container (a changed toolchain gets a
+    new container and a fresh copy from the image, which already has the new
+    rule); on Windows the build folder persists, and this is where the
+    change actually lands.
+
+    Every `Component.Explorer({...})` block is replaced with the current one
+    — the Set's contents and `folderClickBehavior` are rewritten on every
+    build anyway, after this. The result must carry the marker in every
+    block and a wired anchor, or the build refuses rather than guessing at a
+    hand-edited file.
+    """
+    if not quartz_layout_path.exists():
+        print(f"❌ quartz.layout.ts not found at {quartz_layout_path}")
+        return False
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from setup_course import EXPLORER_BLOCK, HIDE_RULE_MARKER
+    except Exception as exc:
+        print(f"❌ Could not load the sidebar's hide rule: {exc}")
+        return False
+
+    txt = quartz_layout_path.read_text(encoding="utf-8")
+    explorer_count = txt.count("Component.Explorer(")
+    if explorer_count > 0 and txt.count(HIDE_RULE_MARKER) == explorer_count:
+        return True
+
+    block_pattern = re.compile(r'Component\.Explorer\(\s*\{[\s\S]*?\}\s*\)')
+
+    def _current_block(_match: re.Match) -> str:
+        return EXPLORER_BLOCK
+
+    repaired, replaced = block_pattern.subn(_current_block, txt)
+    wired = _anchor_is_structurally_wired(repaired)
+    marked = repaired.count(HIDE_RULE_MARKER)
+    if replaced == 0 or not wired or marked != repaired.count("Component.Explorer("):
+        print("❌ Could not bring the sidebar's hide rule up to date in quartz.layout.ts.")
+        return False
+
+    quartz_layout_path.write_text(repaired, encoding="utf-8")
+    print("✅ Brought the sidebar's hide rule up to date (hidden items are now matched by file name, top level only).")
     return True
 # -----------------------------------------------------------------------------
 
@@ -5168,22 +5252,17 @@ def build_section_site(
         print("   established, so anything you have hidden would appear on")
         print("   your site. Run setup.sh for this course to restore it.")
         sys.exit(1)
+    # And it must be the CURRENT rule. This file is a copy made when the
+    # section was first built, so a changed rule reaches an existing section
+    # only through this repair (ALWAYS section, idempotent).
+    if not ensure_sidebar_hide_rule_current(quartz_layout_ts):
+        print()
+        print("❌ Refusing to build: the sidebar's hide rule could not be")
+        print("   brought up to date, so what you have hidden might show.")
+        print("   Run setup.sh for this course to restore it.")
+        sys.exit(1)
 
-    # ensure 'Media' is always hidden in Explorer omit set — checked in any
-    # spelling, or a config that already says "media" would gain a SECOND entry
-    # for the same directory every build.
-    if not any(_is_media_name(name) for name in hidden_list):
-        hidden_list.append("Media")
-
-    # The Curriculum Coverage page is reached from Key Links, deliberately.
-    # It is a teacher's instrument rather than a place students navigate to,
-    # and it sits at the content root, so without this it would appear in
-    # the sidebar above the folders — the most prominent position on the
-    # site, for the page that needs it least.
-    if COVERAGE_PAGE_TITLE not in hidden_list:
-        hidden_list.append(COVERAGE_PAGE_TITLE)
-
-    update_quartz_layout(quartz_layout_ts, hidden_list)  # ensure omit is present and updated
+    update_quartz_layout(quartz_layout_ts, names_the_sidebar_hides(hidden_list))  # ensure omit is present and updated
     
     # honor expandOnFolderClick from course_config.json
     expand_on_name = bool(config.get("expandOnFolderClick", False))

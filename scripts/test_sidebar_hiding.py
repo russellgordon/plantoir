@@ -9,6 +9,7 @@ PythonToolchainTests. Pure Python, temporary folders, no Docker.
 """
 import io
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -22,6 +23,7 @@ if str(scripts_dir) not in sys.path:
 import contracts
 import toolchain_paths
 import build_site
+import setup_course
 
 
 class TheBuildNeverChangesHidden(unittest.TestCase):
@@ -79,6 +81,131 @@ class TheBuildNeverChangesHidden(unittest.TestCase):
                                   f"{name} was not added to {list_key}")
                     self.assertIn(name, on_disk.get("expandable", []),
                                   f"{name} was not added to expandable")
+
+
+# The v1.3.1 filter, exactly as sections built before issue #265 carry it.
+VERSION_1_BLOCK = """Component.Explorer({
+    folderClickBehavior: "collapse",
+    filterFn: (node) => {
+      // CQ4T-OMIT-ANCHOR: do not remove this line; build script overwrites this Set
+      const omit = new Set(["Media", "Key Links", "Curriculum Coverage"])
+      if (node.isFolder) {
+        return !omit.has(node.fileSegmentHint);
+      } else {
+        return !omit.has(node.data.title);
+      }
+    },
+  })"""
+
+
+def quartz_shaped_layout(block: str) -> str:
+    """Two Explorers, the way Quartz 4.5's layout has them."""
+    return (
+        'import { PageLayout, SharedLayout } from "./quartz/cfg"\n'
+        'import * as Component from "./quartz/components"\n\n'
+        "export const defaultContentPageLayout: PageLayout = {\n"
+        "  left: [\n    Component.PageTitle(),\n    " + block + ",\n  ],\n}\n\n"
+        "export const defaultListPageLayout: PageLayout = {\n"
+        "  left: [\n    Component.PageTitle(),\n    " + block + ",\n  ],\n  right: [],\n}\n"
+    )
+
+
+class TheSidebarMatchesStoredTopLevelNames(unittest.TestCase):
+    """`sidebarHiding.matchRule`. What the rule DOES is checked against the
+    real Quartz by `check_sidebar_hiding_against_the_site.py` (verify.sh);
+    this checks, without Node, what the build writes and repairs."""
+
+    @classmethod
+    def setUpClass(cls):
+        repo_contracts = Path(__file__).resolve().parent.parent / "contracts"
+        if repo_contracts.is_dir():
+            toolchain_paths.CONTRACTS_DIR = repo_contracts
+        contracts.reset_cache()
+        cls.cases = contracts.section("file-formats", "sidebarHiding", "matchRule", "cases")
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.layout = Path(self.temp_dir.name) / "quartz.layout.ts"
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def _quietly(self, function, *arguments):
+        with patch("sys.stdout", io.StringIO()) as output:
+            result = function(*arguments)
+        return result, output.getvalue()
+
+    def test_the_cases_are_well_formed(self):
+        self.assertGreaterEqual(len(self.cases), 10)
+        for case in self.cases:
+            with self.subTest(case["name"]):
+                items = []
+                for path in case["paths"]:
+                    parts = path.split("/")
+                    for depth in range(1, len(parts)):
+                        items.append("/".join(parts[:depth]) + "/")
+                    items.append(path)
+                for item in case["expectHidden"]:
+                    self.assertIn(item, items)
+
+    def test_the_omit_set_keeps_the_stored_names(self):
+        self.layout.write_text(quartz_shaped_layout(setup_course.EXPLORER_BLOCK), encoding="utf-8")
+        self._quietly(build_site.update_quartz_layout, self.layout,
+                      ["Key Links.md", "Tasks", 'Bob\'s "Stuff"'])
+        text = self.layout.read_text(encoding="utf-8")
+        self.assertIn('const omit = new Set(["Key Links.md", "Tasks", "Bob\'s \\"Stuff\\""])', text)
+        self.assertEqual(text.count("const omit = new Set(["), 2)
+
+    def test_the_build_hides_media_and_the_coverage_page_by_file_name(self):
+        names = build_site.names_the_sidebar_hides(["Tasks"])
+        self.assertIn("Media", names)
+        self.assertIn(build_site.COVERAGE_PAGE_TITLE + ".md", names)
+        again = build_site.names_the_sidebar_hides(["media", "curriculum coverage.md"])
+        self.assertEqual(again, ["media", "curriculum coverage.md"])
+
+    def test_the_filter_has_the_shape_the_patchers_and_the_browser_need(self):
+        block = setup_course.EXPLORER_BLOCK
+        self.assertIn(setup_course.HIDE_RULE_MARKER, block)
+        self.assertTrue(build_site._anchor_is_structurally_wired(block))
+        match = re.search(r"Component\.Explorer\(\s*\{[\s\S]*?\}\s*\)", block)
+        self.assertEqual(match.group(0), block, "a `}` then `)` inside the block cuts it short")
+        self.assertNotIn("\\", block, "the patchers use this text as a regex replacement")
+        # Quartz bundles with keepNames, which breaks a named inner function
+        # once the filter is rebuilt from its text in the browser.
+        self.assertIsNone(re.search(r"const\s+\w+\s*=\s*(\(|function)", block))
+        self.assertNotIn("function ", block)
+
+    def test_the_repair_brings_an_old_layout_to_the_current_rule(self):
+        self.layout.write_text(quartz_shaped_layout(VERSION_1_BLOCK), encoding="utf-8")
+        repaired, output = self._quietly(build_site.ensure_sidebar_hide_rule_current, self.layout)
+        self.assertTrue(repaired)
+        self.assertIn("Brought the sidebar's hide rule up to date", output)
+        text = self.layout.read_text(encoding="utf-8")
+        self.assertEqual(text.count(setup_course.HIDE_RULE_MARKER), 2)
+        self.assertEqual(text.count("Component.Explorer("), 2)
+        self.assertNotIn("node.data.title", text)
+        self.assertTrue(build_site._anchor_is_structurally_wired(text))
+
+        again, output_again = self._quietly(build_site.ensure_sidebar_hide_rule_current, self.layout)
+        self.assertTrue(again)
+        self.assertEqual(output_again, "")
+        self.assertEqual(self.layout.read_text(encoding="utf-8"), text)
+
+        # The per-build patches that follow still find their fields.
+        self._quietly(build_site.update_quartz_layout, self.layout, ["Tasks"])
+        self._quietly(build_site.patch_folder_click_behavior, self.layout, True)
+        final = self.layout.read_text(encoding="utf-8")
+        self.assertEqual(final.count('folderClickBehavior: "collapse"'), 2)
+        self.assertEqual(final.count('const omit = new Set(["Tasks"])'), 2)
+        self.assertEqual(final.count(setup_course.HIDE_RULE_MARKER), 2)
+
+    def test_a_hand_edited_explorer_is_refused_not_guessed(self):
+        self.layout.write_text(
+            quartz_shaped_layout("Component.Explorer(myOwnOptions)"), encoding="utf-8"
+        )
+        repaired, output = self._quietly(build_site.ensure_sidebar_hide_rule_current, self.layout)
+        self.assertFalse(repaired)
+        self.assertIn("Could not bring the sidebar's hide rule up to date", output)
 
 
 if __name__ == "__main__":

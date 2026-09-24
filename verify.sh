@@ -483,6 +483,24 @@ else
   cat /tmp/verify_visibility_site.log
 fi
 
+# ---- The sidebar's hide rule, against the REAL Quartz file tree ----
+# Issue #265. Every `file-formats.json` -> `sidebarHiding.matchRule` case is
+# run through Quartz 4.5's own FileTrieNode with the filter text the build
+# writes, rebuilt from that text the way the page does in the browser. Needs
+# Node and Quartz's sources, which only the image has — so it is here and
+# not a `test_` file (Windows' Python suite has neither).
+echo ""
+echo "🔎 Checking the sidebar's hide rule against the real Quartz file tree…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_sidebar_hiding_against_the_site.py" /opt/scripts/check_sidebar_hiding_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_sidebar_hiding_against_the_site.py \
+  >/tmp/verify_sidebar_hiding.log 2>&1; then
+  pass "every sidebarHiding.matchRule case agrees with the real Quartz file tree (scripts/check_sidebar_hiding_against_the_site.py)"
+else
+  fail "every sidebarHiding.matchRule case agrees with the real Quartz file tree (scripts/check_sidebar_hiding_against_the_site.py)"
+  cat /tmp/verify_sidebar_hiding.log
+fi
+
 # ---- build_site.py: custom-domain resolution follows the primary destination ----
 # Needs the real image, not a host run — build_site.py imports `frontmatter`,
 # which lives only inside the container (see Dockerfile's `pip install`), so
