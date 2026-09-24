@@ -635,8 +635,9 @@ gained `checkoutLayoutChooseACourseFolderInside` and
 
 **Re-taken 2026-09-23 with [#195](https://github.com/russellgordon/plantoir/issues/195)**
 (saying what a scheduled deploy replaces): still **163**. `activityTrail.mustRecord`
-grew from 66 to 67 (`scheduled deploy replaced`, which Windows will have to
-record or ledger), and the wording block gained `scheduleReplaces` with a new
+grew from 66 to 68 (`scheduled deploy replaced`, and `scheduled deploy could
+not be set` from the fix review — both of which Windows will have to record or
+ledger), and the wording block gained `scheduleReplaces` with a new
 `{moment}` placeholder; neither is a new list.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat

@@ -287,11 +287,13 @@ nonisolated enum ActivityTrail {
         /// Three things turn one off without being asked: removing the course,
         /// removing the section, and the day it was set for going by — and the
         /// line says WHICH, in the teacher's own terms, carrying the course and
-        /// the section. A fourth since issue #195: a new deploy set in its place
-        /// that then could not be set — the old one is booted out first, so a
-        /// refusal leaves neither, and the line carries when the lost one was
-        /// set for. One event with three reasons rather than three events:
-        /// somebody reading the trail wants to know their overnight deploy was
+        /// the section. A fourth since a course could be kept for reference,
+        /// and a fifth since issue #195: a new deploy set in its place that
+        /// macOS then refused — the old one is booted out and its plist
+        /// overwritten first, so the refusal leaves neither, and the line
+        /// carries when the lost one was set for. One event with several
+        /// reasons rather than one event each: somebody reading the trail
+        /// wants to know their overnight deploy was
         /// turned off and by what, and the difference between two ways of
         /// removing something means nothing to them.
         ///
@@ -322,6 +324,21 @@ nonisolated enum ActivityTrail {
         /// old job was set for the same minute (nothing a teacher would notice
         /// changed) or had already gone by (it was not a promise any more).
         case scheduledDeployReplaced = "scheduled deploy replaced"
+        /// A scheduled deploy was asked for and could not be set: its files
+        /// could not be written, or macOS would not accept it. Carries the
+        /// section, the moment asked for, and — when the section already had
+        /// one — whether that one still stands (issue #195's fix review).
+        ///
+        /// "I set it for Friday and it never went" is otherwise answered only
+        /// by the refusal on screen at the time, which nobody quotes a week
+        /// later. And the two failures leave DIFFERENT things behind: a failed
+        /// write leaves the old deploy's plist on disk, so it is handed back to
+        /// macOS and the line says it still stands; a refusal from macOS after
+        /// the new plist was written has overwritten it, so the old one is
+        /// gone and `scheduled deploy turned off` says so beside this line.
+        /// Saying "turned off" for the first would be false — the old job
+        /// would still fire — which is why they are told apart.
+        case scheduledDeployCouldNotBeSet = "scheduled deploy could not be set"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
         case itemExcluded = "item excluded"
