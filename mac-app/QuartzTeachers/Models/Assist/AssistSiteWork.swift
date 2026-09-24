@@ -92,6 +92,20 @@ final class AssistToolchainWork: AssistSiteWork {
             )
         }
 
+        // Recorded for ⌘Q (issue #232): the delegate cannot see this runner,
+        // and a quit in the middle of it is a quit through a preview build.
+        // Recorded HERE and not inside `ScriptRunner`, because a publish's own
+        // `--build-only` wears the same launcher's name and is already counted
+        // as the publish it belongs to. The `defer` covers every return below.
+        CourseActivity.beginPreviewBuild(
+            folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+        )
+        defer {
+            CourseActivity.endPreviewBuild(
+                folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+            )
+        }
+
         runner = ScriptRunner()
         runner.milestones = TaskMilestones.preview
         runner.run(
