@@ -1298,6 +1298,130 @@ test, and choosing it over a hosted-view geometry check was the same call
 `Form` renders lazily on macOS, so walking the view tree means fighting the
 layout for an answer the source already gives.
 
+## Course Settings lists are tables, and why
+
+Issue #266, 2026-09-24. Every list of folders or files in Course Settings and
+the New Course wizard is a standard macOS table: the checkbox sits in the row
+beside the name it belongs to, and the four Content Structure lists have + and
+− at the lower left. Before, each tick was a `Toggle` inside a grouped `Form`,
+which macOS draws as a SWITCH at the far trailing edge — about 500 points from
+its label on a normal window — and each name list had a ⊖ per row and an
+always-visible text field.
+
+**Russell's three answers (they decided the shape):** +/− only on the four
+Content Structure lists (the lists a teacher types into); Hide and Expandable as
+ONE table with two checkbox columns (Hide | Expandable | Folder or file); the
+wizard keeps its layout — the four name tables stay collapsed under "Folders and
+files", the Marks table below them.
+
+**Three components, not one generic one.**
+
+- `StringListEditorView` — the name table (Content Structure, both surfaces).
+  Its initialiser did not change, so no call site was re-plumbed.
+- `MembershipToggleListView` — the Marks tick table (both surfaces). A single
+  column whose checkbox carries its name as a VISIBLE label, the way Xcode's
+  target-membership list draws it, so clicking the name ticks the box as the
+  old toggle's label did.
+- `SidebarVisibilityTableView` — the combined Hide/Expandable table (Course
+  Settings only; the wizard has none). It takes TWO bindings, which is why it
+  is a new view rather than a mode of the tick table.
+
+Shared pieces live in `ListTable.swift`: `ListTableRow`, `ListTableMetrics`
+(sizes, row building) and `ListAddRemoveFooter` (the +/− bar, drawn with the
+sidebar's own glyph and target sizes so the app has one +/− look).
+
+**What keeps the saved file identical.** One pure function,
+`MembershipToggleListView.updatedMembers(_:item:isMember:)`, turns a tick into
+a list, and every checkbox in all three tables goes through it. Every removal —
+the − button, the Delete key, the row menu's Remove — goes through
+`StringListEditorView.requestRemoval(of:)`, which asks the list's protection
+first: ordinary removes; consequential asks (the existing confirmation);
+blocked removes nothing, shows the SAME named reason from the − button and
+notes `removalBlocked` with the SAME trail line the row's info button writes.
+Nothing new is recorded on the trail — what is written did not change, only
+which control triggers it. A fixed gesture script (`ListGestureScript.swift`)
+was run through the OLD code before the redraw and captured into
+`Tests/Goldens/266-course-settings-gestures.json` and `266-wizard-gestures.json`;
+`ListTableGoldenTests` runs it through the new entry points and demands the
+same bytes.
+
+**Measured, with the table hosted off-screen in a grouped `Form` (planner's and
+reviewer's probes, `NSTableView` read directly):**
+
+| Question | Answer |
+|---|---|
+| Row height | **24.0** points, at every Dynamic Type and control size tried (`xxxLarge`, `accessibility3`, `.large`, `.small`). So the frame uses a CONSTANT 24, not `@ScaledMetric` — a scaled frame over fixed rows leaves an empty band. `TickTableTests.testTheRowAndHeaderHeightsAreTheOnesTheFrameAssumes` pins it, and a header of **28.0**. |
+| Height | rows × 24 + (header ? 28 : 0) + 2 shows every row with no inner scroll; capped at 20 rows (the longest real list is 18 — TEJ4M, MDM4U, MCMPR11). |
+| Page scroll | the outer Form still scrolls with the pointer over a table that fits its rows. |
+| Keyboard | Space (`.onKeyPress`) and Delete (`.onDeleteCommand`) reach the table once it is first responder. |
+| **A disabled table** | `.disabled(true)` does NOT stop the keys: the `NSTableView` stays enabled, arrows select, and Space and Delete FIRE. The wizard's Structure section is disabled until a course is chosen, so every key handler (and the double-click action) asks `@Environment(\.isEnabled)` first. |
+| VoiceOver / XCUITest | each checkbox is an `AXCheckBox` carrying its identifier, `AXDescription` = its label, `AXValue` 0/1; AX-press writes the model; rows below the fold are still exposed. |
+| Two popovers on one state | two presenters read from one state opened TWO popover windows, one silently unseen — so the − button's refusal has its own state (`removalExplanation`) apart from the row info button's. |
+
+**Identifiers.** `hideToggle-<item>` and `expandToggle-<item>` in the
+Sidebar Visibility table; `toggle-<item>` on the Marks table ONLY (it used to
+be emitted by Hide, Expandable and Marks at once); `table-<title>`,
+`addTo-<title>` (+), `removeFrom-<title>` (−), `addField-<title>` and
+`addConfirm-<title>` in the add popover; `sidebarVisibilityTable`. Gone:
+`remove-<item>` (the per-row ⊖; nothing read it).
+
+**Decisions, and what was REJECTED:**
+
+- **`Table`, not `List(.bordered)`.** Both are an `NSTableView` underneath with
+  24-point rows, but only `Table` carries a column header and more than one
+  checkbox column, and `List` left an empty band under its rows.
+- **+ opens a popover, not an editable new row.** A focus landing in a SwiftUI
+  table cell could not be confirmed without activating a window in front of
+  Russell, and table-cell fields are known to need a click to begin editing; a
+  popover is its own window and its field takes the keyboard at once, and a
+  half-typed name never becomes a row that Space, Delete or a selection could
+  act on. The always-visible add field was rejected as not the +/− convention.
+- **Add stays disabled while the name would not be added** (empty, `media` in
+  any case, or already listed) rather than closing — a popover that closed on
+  `media` would read as success. No new sentence was added for it.
+- **− is disabled only when nothing is selected**, never for a blocked row: a
+  disabled button explains nothing, and the issue says a refused removal says
+  why.
+- **Single selection.** Multi-select removal would put several protection
+  answers behind one gesture.
+- **Space toggles Hide; Expandable by click or the row's context menu.** A
+  table is ONE focusable control, so Full Keyboard Access reaches the second
+  column through the menu ("Hide in the Sidebar", "Expandable in the Sidebar").
+  Type-select is on, so a Space typed inside a type-select run now toggles —
+  accepted.
+- **Each checkbox column has its own VoiceOver label** ("Hide Tasks",
+  "Expandable: Tasks"); with the bare name, both boxes on a row read "Tasks,
+  checkbox".
+- **Rows are one per NAME** in the tick tables (a shared and a per-section
+  folder may share a name; both rows could only ever tick together). Swift's
+  `==` treats NFC and NFD as equal, so two byte-different spellings show as
+  one row whose tick writes the first — left to #265, which owns what the
+  build matches.
+- **The Expandable box on a FILE row is a visible no-op** (the site's explorer
+  expands folders only). Kept, so a file ticked today stays ticked and the
+  saved file is unchanged.
+- **No +/− on Hide, Expandable or Marks** — their rows come from the Content
+  Structure lists and from the disk, and the Marks caption promises only
+  "tick". Renaming the components to `…Table` was rejected as churn.
+- No Cmd+Z for removal (there was none before; out of scope).
+
+**How the tests reach a real table.** `Tests/TableHost.swift` puts the
+COMPONENT (not the settings page — a grouped `Form` realises rows lazily) in an
+off-screen window that is never activated, and clicks
+`frameOfCell(atColumn:row:)` with `NSWindow.sendEvent`. `TickTableTests` and
+`NameTableTests` drive clicks, Space and Delete through it. Each must-fail was
+proved by copying the source aside, breaking it, running, and copying it back:
+the getter inverted, the setter ignoring a blocked untick, Space computing
+protection as ordinary, the Hide and Expandable columns swapped, Space and
+Delete not asking `isEnabled`, and `requestRemoval` skipping the protection all
+turn a named test red.
+
+**Not verified by driving the real app yet:** that the row's info popover
+survives the table reloading underneath it, and the in-process key routing in
+the running app (this app has met a table eating a key before —
+`Views/Helpers/SidebarReturnKey.swift`). Both are in the by-hand list for the
+next time the Mac is free.
+
 ## Renaming a course folder
 
 Folder rows in Course Settings carry a pencil. It renames the folder **on
