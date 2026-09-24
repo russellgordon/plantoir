@@ -738,7 +738,8 @@ was argued the other way first and the contract's `why` carries the full
 argument:
 
 - **It says "tick", never "add" or "remove"** — a correction rather than a
-  preference. The control is a tick list with no Add button, so the mac's
+  preference. The control is a table of checkboxes with no Add button (a tick list until
+  issue #266 made it a table; the rule is unchanged), so the mac's
   previous caption named two actions it does not offer, and "remove what you
   don't" invited the one thing the product refuses outright: unticking the last
   graded folder while the coverage map is on.
