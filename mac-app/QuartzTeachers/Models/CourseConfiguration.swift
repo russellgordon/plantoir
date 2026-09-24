@@ -470,6 +470,37 @@ class CourseConfiguration {
         set { values["unit_word"] = ClassPageTerm.cleaned(newValue) }
     }
 
+    /// The shape of this course's class-page names (#267). Absent and unknown
+    /// read as "Unit 2, Day 3"; see `ClassPageScheme`.
+    var classPageScheme: ClassPageScheme {
+        get { return ClassPageScheme.reading(stringValue(forKey: "class_page_scheme")) }
+        set { values["class_page_scheme"] = newValue.rawValue }
+    }
+
+    /// The heading a new numbered course's front pages are created with.
+    /// Absent means "Most Recent Class". Read at creation only (#267).
+    var frontPageHeading: String {
+        get {
+            let stored: String = stringValue(forKey: "front_page_heading").trimmingCharacters(in: .whitespaces)
+            if stored.isEmpty {
+                return "Most Recent Class"
+            }
+            return stored
+        }
+        set { values["front_page_heading"] = newValue }
+    }
+
+    /// What the assistant calls one class page to the teacher (#267).
+    var classNoun: ClassNoun {
+        get { return ClassNoun.reading(stringValue(forKey: "class_noun")) }
+        set { values["class_noun"] = newValue.rawValue }
+    }
+
+    /// The word and the scheme together — what every planner names pages by.
+    var classPageNaming: ClassPageNaming {
+        return ClassPageNaming(word: unitWord, scheme: classPageScheme)
+    }
+
     var sharedFolders: [String] {
         get { return stringListValue(forKey: "shared_folders") }
         set { values["shared_folders"] = newValue }
