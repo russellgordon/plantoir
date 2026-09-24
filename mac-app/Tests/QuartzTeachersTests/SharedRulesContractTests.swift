@@ -2489,7 +2489,7 @@ final class SharedRulesContractTests: XCTestCase {
     ) {
         guard let adoptable = SkeletonCatalog.structureToAdopt(
             forCode: code,
-            takingExampleContent: takingExampleContent,
+            takingExampleContent: takingExampleContent, numbered: false,
             currentSharedFolders: lists.sharedFolders
         ) else {
             return

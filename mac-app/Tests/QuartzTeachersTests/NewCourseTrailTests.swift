@@ -45,6 +45,39 @@ final class NewCourseTrailTests: XCTestCase {
         )
     }
 
+    /// A club (#267) says so, in its own words — and every other course's
+    /// line is exactly what it was, because the words are read from a
+    /// configuration whose pages are numbered and from nothing else.
+    @MainActor
+    func testAClubSaysItIsAClubInItsOwnWords() {
+        let clubConfiguration: [String: Any] = [
+            "class_page_scheme": "numbered", "unit_word": "Week", "class_folder": "All Meetings",
+            "prepopulate_example_content": false, "use_skeleton": false,
+        ]
+        let club: (pageWord: String, classFolder: String)? = NewCourseCreator.clubWords(in: clubConfiguration)
+        XCTAssertEqual(club?.pageWord, "Week")
+        XCTAssertEqual(club?.classFolder, "All Meetings")
+        XCTAssertEqual(
+            NewCourseCreator.startingContentLine(
+                courseCode: "CODING", takesExampleContent: false,
+                usesSkeleton: false, skeletonSubject: nil, asAClub: club
+            ),
+            "created CODING as a club, with pages named “Week 1” in “All Meetings”"
+        )
+
+        let ordinary: [String: Any] = ["class_page_scheme": "unit_day", "unit_word": "Unit"]
+        XCTAssertNil(NewCourseCreator.clubWords(in: ordinary))
+        XCTAssertNil(NewCourseCreator.clubWords(in: [:]), "an absent scheme is not a club")
+        XCTAssertEqual(
+            NewCourseCreator.startingContentLine(
+                courseCode: "ICS4U", takesExampleContent: false,
+                usesSkeleton: false, skeletonSubject: nil,
+                asAClub: NewCourseCreator.clubWords(in: ordinary)
+            ),
+            "created ICS4U with empty folders"
+        )
+    }
+
     /// A skeleton course now comes out two ways, and they differ by
     /// fifty-nine pages and by whether the curriculum coverage map works
     /// at all (GitHub issue #251) — so the line says which of the two
