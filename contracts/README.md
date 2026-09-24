@@ -633,6 +633,12 @@ to 33, `placement.unitWord.cases` to 7 and
 gained `checkoutLayoutChooseACourseFolderInside` and
 `checkoutLayoutWhatALinkShowed`.)
 
+**Re-taken 2026-09-23 with [#195](https://github.com/russellgordon/plantoir/issues/195)**
+(saying what a scheduled deploy replaces): still **163**. `activityTrail.mustRecord`
+grew from 66 to 67 (`scheduled deploy replaced`, which Windows will have to
+record or ledger), and the wording block gained `scheduleReplaces` with a new
+`{moment}` placeholder; neither is a new list.
+
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
 objects only*: an array inside a case is a FIELD of that case (each

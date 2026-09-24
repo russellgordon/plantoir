@@ -471,10 +471,15 @@ remember that it is different.
   "Settled once" is a property of the MOMENT, not of the refusal. **No minimum
   lead time was invented** — there is none anywhere in the product, and adding
   one here would be a rule nobody could find later.
-- **Scheduling silently replaces an existing schedule** for that section
-  (`ScheduledDeploy` removes any previous job), and neither the card nor the
-  summary says so. Pre-existing, and untouched here; this family turns that
-  path from rare into the easy one, so it is worth knowing.
+- **Scheduling replaces an existing schedule** for that section
+  (`ScheduledDeploy` removes any previous job). When this family landed,
+  neither the card nor the summary said so; since
+  [#195](https://github.com/russellgordon/plantoir/issues/195) (2026-09-23)
+  the card, the schedule sheet and the plan name the moment being replaced
+  (`wording.scheduleReplaces`, read Mac-wide) and the trail records it
+  (`scheduled deploy replaced`). The reasoning is in
+  [`07-deployment.md`](07-deployment.md) → "Scheduling a section that already
+  has a deploy set".
 - **On the morning the clocks go forward, a wall time may not exist**, and the
   settled text is therefore built from the INSTANT rather than by joining a day
   to a time. Measured, America/Toronto, DST starting 02:00 on 8 March 2026:
