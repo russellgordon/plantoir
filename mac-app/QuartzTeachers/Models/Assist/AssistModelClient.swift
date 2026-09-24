@@ -97,6 +97,53 @@ struct AssistToolCall: Codable, Equatable, Sendable, Identifiable {
         let parsed: Any? = try? JSONSerialization.jsonObject(with: data)
         return (parsed as? [String: Any]) != nil
     }
+
+    /// Whether the model wrote NO arguments at all: nothing, whitespace, or an
+    /// object with no keys in it. Not the same as unreadable — half-written
+    /// JSON is a fragment, and this is an answer that says nothing.
+    var wroteNoArguments: Bool {
+        let written: String = function.arguments.trimmingCharacters(in: .whitespacesAndNewlines)
+        if written.isEmpty {
+            return true
+        }
+        if !argumentsAreReadable {
+            return false
+        }
+        return argumentValues.isEmpty
+    }
+
+    // MARK: - Functions
+
+    /// Whether the arguments are readable FOR THIS TOOL — the gate a finished
+    /// answer must pass before anything runs (issue #198).
+    ///
+    /// `argumentsAreReadable` answers yes for an empty string and for `{}`,
+    /// deliberately, because `undo_last_change` takes nothing and llama.cpp
+    /// sends `""` for it. But the same yes let a finished reply that named
+    /// `publish_pages` and wrote nothing reach the tool, where — bound to the
+    /// window's section, with no pages and no dates — it answered with a
+    /// sentence reading as a complaint about the teacher's request, when the
+    /// teacher had named pages and the model had dropped them. So "wrote
+    /// nothing" is readable only for a tool that REQUIRES nothing; the tool's
+    /// own `required` list, read from the surface the model was shown, says
+    /// which. Refusing every empty call instead was REJECTED: it would
+    /// refuse "Undo that", the tool a card reaches most.
+    ///
+    /// `required` rather than "the arguments the window binds": every local
+    /// tool but undo requires `course` and `section`, which the window fills
+    /// in anyway, so that version would keep the empty `publish_pages`
+    /// running — its real content (pages, dates, a unit) is optional in its
+    /// schema, and a model shown a schema requiring arguments that wrote none
+    /// has not answered.
+    func argumentsAreReadable(forToolRequiring required: [String]) -> Bool {
+        if !argumentsAreReadable {
+            return false
+        }
+        if wroteNoArguments {
+            return required.isEmpty
+        }
+        return true
+    }
 }
 
 /// Talks to the local `llama-server`.

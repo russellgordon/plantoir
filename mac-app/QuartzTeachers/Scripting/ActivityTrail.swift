@@ -78,6 +78,11 @@ nonisolated enum ActivityTrail {
         /// that FAILED: here the engine answered perfectly and the app
         /// refused the answer, and a line saying it could not answer would
         /// send whoever reads it looking for a crash that did not happen.
+        ///
+        /// Three causes, and the line names which: stopped part way by the
+        /// engine, finished with arguments that could not be read, or — since
+        /// issue #198 — finished having written NOTHING for a tool whose
+        /// schema requires something ("wrote nothing for …").
         case assistantAnswerWasCutOff = "assistant answer was cut off"
         /// The assistant's whole reply was the teacher's own sentence handed
         /// back, so the turn was refused and taken out of the conversation.

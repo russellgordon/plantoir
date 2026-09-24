@@ -1084,6 +1084,100 @@
         "detail" : "Whether or not its half-written arguments happen to parse, and whether or not it had got as far as naming a tool. Nothing runs, and the teacher is answered with wording.answerWasCutOff - and the whole TURN is wound back out of the conversation sent to the model, the half-written reply and the teacher's sentence together, so the retry that wording asks for is not sent with the request that ran away still in front of it. Two boundaries: what the teacher SEES is not wound back (their sentence stays in the transcript), and neither is a turn that failed because the engine could not be reached or timed out - that one reports an engine failure rather than asking for a rephrase.",
         "rule" : "A reply the engine stopped part way runs no tool and says so",
         "why" : "A separate rule from the cap, and needed BECAUSE of it: a cap turns a rare context overrun into a routine stopping point, so what the app does with a stopped reply matters more after capping than before. Parsing cannot be the check. Measured on an M4 Pro (llama.cpp b10435, Qwen2.5-1.5B Q4_K_M) by sweeping the cap across every cut point of two ordinary requests: llama.cpp closes the arguments object before the tool-call wrapper, so at max_tokens 28 a stopped deploy_section call parsed cleanly as {course, section}, and at 42 a stopped publish_pages call parsed as a page list one title long where the teacher had named more. Cut earlier still, at 8, the tool name had not been written yet and a raw tool-call fragment arrived in the message CONTENT, which an app that shows content verbatim would print in front of a teacher. And a tool that takes no arguments at all, like undo_last_change, is readable however early it was cut, so a parse check would simply run it. The reason the turn ended is the only signal that tells a finished answer from a fragment."
+      },
+      {
+        "cases" : [
+          {
+            "arguments" : "",
+            "name" : "an empty string, for a tool that needs a course and section",
+            "readable" : false,
+            "required" : [
+              "course",
+              "section"
+            ],
+            "tool" : "publish_pages"
+          },
+          {
+            "arguments" : "   ",
+            "name" : "only whitespace, for a tool that needs a course and section",
+            "readable" : false,
+            "required" : [
+              "course",
+              "section"
+            ],
+            "tool" : "publish_pages"
+          },
+          {
+            "arguments" : "{}",
+            "name" : "an object with nothing in it, for a tool that needs a course and section",
+            "readable" : false,
+            "required" : [
+              "course",
+              "section"
+            ],
+            "tool" : "publish_pages"
+          },
+          {
+            "arguments" : "",
+            "name" : "an empty string, for the deploy",
+            "readable" : false,
+            "required" : [
+              "course",
+              "section"
+            ],
+            "tool" : "deploy_section"
+          },
+          {
+            "arguments" : "",
+            "name" : "an empty string, for a tool whose schema requires nothing",
+            "readable" : true,
+            "required" : [
+
+            ],
+            "tool" : "undo_last_change"
+          },
+          {
+            "arguments" : "{}",
+            "name" : "an object with nothing in it, for a tool whose schema requires nothing",
+            "readable" : true,
+            "required" : [
+
+            ],
+            "tool" : "undo_last_change"
+          },
+          {
+            "arguments" : "{\"course\": \"ICS3U\"}",
+            "name" : "something written, even without everything the schema requires",
+            "readable" : true,
+            "required" : [
+              "course",
+              "section"
+            ],
+            "tool" : "publish_pages"
+          },
+          {
+            "arguments" : "{\"course\": \"ICS3U\", \"pages\": \"Unit 1, Day",
+            "name" : "half-written, which is unreadable for any tool",
+            "readable" : false,
+            "required" : [
+              "course",
+              "section"
+            ],
+            "tool" : "publish_pages"
+          },
+          {
+            "arguments" : "{\"course\": \"ICS3U\", \"pages\": \"Unit 1, Day",
+            "name" : "half-written, even for a tool that requires nothing",
+            "readable" : false,
+            "required" : [
+
+            ],
+            "tool" : "undo_last_change"
+          }
+        ],
+        "detail" : "A reply that finished normally and named a tool, but wrote NO arguments for it - nothing, only whitespace, or an object with no keys - is readable only when that tool's schema requires nothing. Otherwise nothing runs and the teacher is answered with wording.answerWasCutOff, exactly as for arguments that cannot be read, and the trail says the assistant wrote nothing for that tool. Which arguments a tool requires is read from its schema as the model was shown it: a schema with NO required key (undo_last_change's has none) requires nothing, the same as an empty list. 'Wrote something' is readable however little it wrote - binding the window's course and section, and the tool's own refusals, decide what happens next.",
+        "rule" : "A finished reply that wrote nothing for a tool that needs something runs no tool and says so",
+        "why" : "Issue #198, 2026-09-23. An empty string is readable on purpose, because undo_last_change takes nothing and llama.cpp sends an empty string for it, so a gate that refused every empty call would refuse 'Undo that', the tool a card reaches most. But the same yes let a finished reply naming publish_pages with nothing written reach the tool, where, bound to the window's section with no pages and no dates, it answered that nothing had been named to change - a sentence reading as a complaint about the teacher's request when the teacher had named pages and the model had dropped them. Measured against the recorded routing runs (990 tool-call rows in research/ai-assist): 175 empty-argument calls, every one to a tool that requires nothing, and none to a tool that needs a course or section - so this costs nothing measured, and closes a path no measured run has taken yet. REJECTED: refusing every empty call (breaks undo); treating a call as readable when every required argument is one the window fills in (course and section) - that keeps the empty publish_pages running, because its real content is optional in its schema."
       }
     ]
   },

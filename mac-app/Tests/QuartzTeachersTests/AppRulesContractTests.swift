@@ -471,6 +471,38 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertFalse(AssistWording.answerWasCutOff.isEmpty)
         answer("A reply the engine stopped part way runs no tool and says so")
 
+        // A finished reply that wrote NOTHING for a tool that needs something
+        // (issue #198). The contract's own cases, run through the gate
+        // `AssistAgent.think` uses; the whole behaviour — no page changed,
+        // the teacher told `answerWasCutOff`, the trail saying "wrote nothing"
+        // — is executed in `AssistCutOffAnswerTests`.
+        let emptyRule: String = "A finished reply that wrote nothing for a tool that needs something runs no tool and says so"
+        var emptyCases: [[String: Any]] = []
+        for requirement in requirements where (requirement["rule"] as? String) == emptyRule {
+            emptyCases = try XCTUnwrap(requirement["cases"] as? [[String: Any]])
+        }
+        XCTAssertGreaterThan(emptyCases.count, 5, "The empty-arguments rule has lost its cases")
+        for emptyCase in emptyCases {
+            let name: String = try XCTUnwrap(emptyCase["name"] as? String)
+            let tool: String = try XCTUnwrap(emptyCase["tool"] as? String)
+            let written: String = try XCTUnwrap(emptyCase["arguments"] as? String)
+            let required: [String] = try XCTUnwrap(emptyCase["required"] as? [String])
+            let readable: Bool = try XCTUnwrap(emptyCase["readable"] as? Bool)
+            let call: AssistToolCall = AssistToolCall(
+                id: "1", type: "function",
+                function: AssistToolCall.Function(name: tool, arguments: written)
+            )
+            XCTAssertEqual(call.argumentsAreReadable(forToolRequiring: required), readable, name)
+            // And each case's `required` is what the tool's schema really
+            // says, so the cases cannot drift from the surface they model.
+            var requiredOnTheSurface: [String]?
+            for definition in AssistToolRunner.mcpTools where definition.name == tool {
+                requiredOnTheSurface = definition.required
+            }
+            XCTAssertEqual(requiredOnTheSurface, required, "\(name): the case says the tool requires something its schema does not")
+        }
+        answer(emptyRule)
+
         // The one that genuinely cannot be executed, named rather than
         // dropped. A polarity veto is a rule about how a MODEL is chosen: it
         // governs the routing suite in research/ai-assist/, measured by hand,

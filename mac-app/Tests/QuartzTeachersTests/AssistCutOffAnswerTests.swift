@@ -371,6 +371,81 @@ final class AssistCutOffAnswerTests: XCTestCase {
         XCTAssertEqual(toolResults(in: agent), [])
     }
 
+    /// A FINISHED answer that names a tool needing arguments and writes none
+    /// runs nothing either (issue #198). Before, an empty string was readable
+    /// for every tool, so this reached `publish_pages` bound to the window's
+    /// section with no pages and no dates, and the teacher — who had named a
+    /// page — was answered as though they had named nothing. Plans are left
+    /// ON, because that is the path a teacher meets by default.
+    func testAFinishedAnswerThatWroteNothingForAToolThatNeedsSomethingRunsNothing() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "false", body: "A class.", in: made.course)
+
+        let folderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wrote-nothing-trail-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: folderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: folderURL)
+        }
+
+        for written in ["", "   ", "{}"] {
+            let engine: StubEngine = try StubEngine()
+            defer { engine.stop() }
+            engine.serve(Canned.finished(tool: "publish_pages", arguments: written))
+
+            let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner, engineAt: engine.baseURL)
+            await agent.say("Publish tomorrow's class and everything it links to")
+            XCTAssertGreaterThan(engine.requestCount, 0, "The sentence was answered in code; the model was never asked")
+
+            let onDisk: String = try String(
+                contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 1", in: made.course), encoding: .utf8
+            )
+            XCTAssertTrue(onDisk.contains("publish: false"), "\"\(written)\" changed a page")
+            XCTAssertTrue(
+                transcript(of: agent).contains(AssistWording.answerWasCutOff),
+                "\"\(written)\": the teacher was not told the answer did not come through: \(transcript(of: agent))"
+            )
+            XCTAssertEqual(toolResults(in: agent), [], "\"\(written)\" reached a tool")
+            XCTAssertNil(agent.pendingApproval, "\"\(written)\" put a card up")
+        }
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("finished answering but wrote nothing for publish pages"),
+            "The trail does not say the assistant wrote nothing:\n\(trail)"
+        )
+    }
+
+    /// And the tool that genuinely takes nothing still runs on nothing:
+    /// llama.cpp sends an empty string for `undo_last_change`, and "Undo that"
+    /// is the tool a card reaches most. Refusing every empty call was the
+    /// cheap fix, and this is why it was rejected.
+    func testAFinishedAnswerThatWroteNothingForAToolThatNeedsNothingStillRuns() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        for written in ["", "{}"] {
+            let engine: StubEngine = try StubEngine()
+            defer { engine.stop() }
+            engine.serve(Canned.finished(tool: "undo_last_change", arguments: written))
+
+            let agent: AssistAgent = AssistFixture.makeAgent(
+                tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
+            )
+            await agent.say("Please put back whatever you changed a moment ago")
+            XCTAssertGreaterThan(engine.requestCount, 0, "The sentence was answered in code; the model was never asked")
+
+            XCTAssertFalse(
+                transcript(of: agent).contains(AssistWording.answerWasCutOff),
+                "\"\(written)\" for undo was refused as though it were not an answer"
+            )
+        }
+    }
+
     /// The teacher hears the same sentence for both causes — from their side
     /// an answer that ran out of room and one that came out garbled are the
     /// same event. The TRAIL has to tell them apart, because whoever reads a
