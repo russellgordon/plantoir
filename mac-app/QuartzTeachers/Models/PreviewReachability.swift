@@ -348,6 +348,28 @@ nonisolated enum PreviewReachability {
         return startedAt == theRunNowStartedAt
     }
 
+    /// Whether the run the question was about ENDED ON ITS OWN while the
+    /// question was out — the one reason `isStillTheSameWait` says no that
+    /// nobody else has dealt with (issue #232).
+    ///
+    /// Stop, Cancel and a closed window each end the window's wait as they
+    /// happen, and a new run begins its own; but a run that simply finished
+    /// leaves the wait, and with it ⌘Q's record of a preview being built,
+    /// for whoever returns next — and the caller returns next. So the caller
+    /// ends the wait when this says yes, and ONLY then: when a new run has
+    /// started, the wait belongs to it.
+    static func theSameRunEndedByItself(
+        startedAt: Date?,
+        theRunNowStartedAt: Date?,
+        theTeacherStoppedIt: Bool,
+        theRunIsStillGoing: Bool
+    ) -> Bool {
+        if theTeacherStoppedIt || theRunIsStillGoing {
+            return false
+        }
+        return startedAt == theRunNowStartedAt
+    }
+
     /// What the teacher is told.
     ///
     /// Plain words, and none of the machinery (rule 1): no port, no
