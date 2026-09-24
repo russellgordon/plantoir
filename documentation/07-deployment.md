@@ -1319,8 +1319,11 @@ was read): full suite, **0 stacks through `momentBeingReplaced`** with the fix
 with both removed, exactly those 2. The same probe counts **~344 OTHER reaches**
 that predate this piece — 313 from `WorkspaceModel.sweepScheduledDeploysThatAreTooLate`,
 26 from the sidebar's `scheduledDeployTime`, a handful from agent listing —
-which are the suite-wide `~/Library` reaches #240 exists to close, and are left
-to it.
+which were the suite-wide `~/Library` reaches #240 existed to close. #240 closed
+them at the source: under the suite `launchAgentsDirectoryURL()` now answers an
+empty throwaway folder unless a test names one, and `LaunchControl.run` refuses
+there whether or not the override is set (`documentation/09-mac-app.md`, the
+#240 passage). `momentBeingReplaced`'s own guard stays, as the second of two.
 
 ## A scheduled deploy that outlived its course
 
