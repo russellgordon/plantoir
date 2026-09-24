@@ -159,6 +159,39 @@ final class TickTableTests: XCTestCase {
         XCTAssertTrue(trailText().contains("was told Tasks cannot be unticked under " + GradedFolderWording.listTitle))
     }
 
+    /// A protection that a tick BRINGS ABOUT holds at once. Since issue #266's
+    /// crash fix the list works each row's protection out in its own body and
+    /// hands the cell the answer, so this is the guard that the answer is not
+    /// stale: unticking Concepts leaves Tasks the only member, and the rule —
+    /// like the real "last graded folder" rule — then blocks Tasks. A cell
+    /// still holding the protection it was first drawn with would let the
+    /// second click empty the list.
+    func testAProtectionATickBringsAboutHoldsAtOnce() throws {
+        let members: ListBox = ListBox(["Tasks", "Concepts"])
+        let host: TableHost = TableHost(
+            MembershipToggleListView(
+                title: GradedFolderWording.listTitle,
+                allItems: ["Concepts", "Tasks"],
+                members: members.binding,
+                protection: { folder in
+                    if members.names == [folder] {
+                        return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+                    }
+                    return .ordinary
+                }
+            )
+        )
+        defer { host.close() }
+        let table: NSTableView = try XCTUnwrap(host.tables().first)
+
+        host.clickCell(of: table, column: 0, row: 0)
+        XCTAssertEqual(members.names, ["Tasks"], "Concepts was ordinary and comes out")
+        host.pump()
+        host.clickCell(of: table, column: 0, row: 1)
+        XCTAssertEqual(members.names, ["Tasks"], "Tasks is now the last member, and the click is refused")
+        XCTAssertTrue(trailText().contains("was told Tasks cannot be unticked under " + GradedFolderWording.listTitle))
+    }
+
     /// Every box draws exactly what the list holds.
     func testEveryBoxDrawsWhatTheListHolds() {
         let members: ListBox = ListBox(["Tasks", "Legacy"])

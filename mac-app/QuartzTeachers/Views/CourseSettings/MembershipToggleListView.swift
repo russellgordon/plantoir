@@ -43,6 +43,11 @@ struct MembershipToggleListView: View {
     // MARK: - Body
 
     var body: some View {
+        // Worked out HERE, in the list's own body, and handed to each cell as
+        // a value: a cell must never ask the course a question while it is
+        // being drawn. See `protectionsAsDrawn()` for why.
+        let protections: [String: ItemProtection] = protectionsAsDrawn()
+
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.headline)
@@ -53,7 +58,7 @@ struct MembershipToggleListView: View {
             } else {
                 Table(rows, selection: $selectedRowID) {
                     TableColumn(title) { (row: ListTableRow) in
-                        tickCell(for: row.name)
+                        tickCell(for: row.name, protection: protections[row.name] ?? .ordinary)
                     }
                 }
                 .tableStyle(.bordered(alternatesRowBackgrounds: true))
@@ -80,12 +85,14 @@ struct MembershipToggleListView: View {
     /// The checkbox WITH its name as its visible label, the way Xcode's
     /// target-membership list draws it: clicking the name ticks the box, as
     /// clicking the old toggle's label did.
+    ///
+    /// Built only from what it is given — the row's name and the protection
+    /// the list worked out for it — never by calling back into the course.
     @ViewBuilder
-    func tickCell(for item: String) -> some View {
+    func tickCell(for item: String, protection itemProtection: ItemProtection) -> some View {
         // File entries hide their ".md" storage extension, matching the list
         // editors.
         let displayName: String = StringListEditorView.displayName(for: item, hidingMarkdownExtension: true)
-        let itemProtection: ItemProtection = protectionAsDrawn(for: item)
         HStack {
             Toggle(displayName, isOn: membershipBinding(for: item, protection: itemProtection))
                 .toggleStyle(.checkbox)
@@ -109,6 +116,29 @@ struct MembershipToggleListView: View {
     }
 
     // MARK: - Functions
+
+    /// The protection of every row, worked out once per drawing of the list.
+    ///
+    /// **Why not in the cell (issue #266).** A `Table` builds each row in a
+    /// part of the view graph of its own. The marks list's protection closure
+    /// reads the course's configuration and walks its folders; called from
+    /// the cell, that question was asked from inside the row. Leaving Course
+    /// Settings for nothing, or for another working folder, then aborted the
+    /// app with "precondition failure: no subgraph": the window's detail pane
+    /// rebuilt the rows of the page it was removing, and the table updated a
+    /// row whose part of the graph was already gone. Bisected on 2026-09-24 —
+    /// the same cell given the same answer as a value survived, and the
+    /// Shared folders table crashed the same way once its cells asked the
+    /// marks question — so the rule for every folder table is: ask in the
+    /// list's body, hand the cell the answer. `CourseSettingsTeardownTests`
+    /// is the must-fail.
+    func protectionsAsDrawn() -> [String: ItemProtection] {
+        var protections: [String: ItemProtection] = [:]
+        for row in rows {
+            protections[row.name] = protectionAsDrawn(for: row.name)
+        }
+        return protections
+    }
 
     /// The protection a row is drawn and ticked with: only a MEMBER can be
     /// protected, because only unticking can be refused.
