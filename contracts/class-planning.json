@@ -292,6 +292,31 @@
           "expect": null
         }
       ]
+    },
+    "positionInSentences": {
+      "note": "Where the room is made, as the two make-room sentences say it — the plan card's “Make room for … at {position} in {code} Section {n}.” and the result's “Made room for … at {position}.” — is the position named the way the COURSE names a page, never “Unit {unit}, Day {day}” typed by hand. Typed by hand is how a Module course was told “at Unit 3, Day 4” and how a club would have been told “at Unit 1, Day 5” (#268, fixed with #267). Each case gives the course's `term` (default “Unit”) and `scheme` (default the ordinary one) and the position, and expects `position`. Mac: ClassInsertionPlan.positionTitle; NumberedCourseTests asserts both sentences.",
+      "cases": [
+        {
+          "unit": 3,
+          "atDay": 4,
+          "position": "Unit 3, Day 4"
+        },
+        {
+          "term": "Module",
+          "unit": 3,
+          "atDay": 4,
+          "position": "Module 3, Day 4",
+          "why": "The course's own word — the #268 fault."
+        },
+        {
+          "scheme": "numbered",
+          "term": "Week",
+          "unit": 1,
+          "atDay": 5,
+          "position": "Week 5",
+          "why": "One number, and no Day."
+        }
+      ]
     }
   },
   "duplication": {

@@ -227,6 +227,26 @@ final class ClassPlanningContractTests: XCTestCase {
         }
     }
 
+    /// The position the two make-room sentences name, in the course's own
+    /// words (#268).
+    func testTheMakeRoomSentencesNameThePositionAsTheCourseDoes() throws {
+        let insertion: [String: Any] = try ClassPlanningContractTests.section("insertion")
+        let block: [String: Any] = try XCTUnwrap(insertion["positionInSentences"] as? [String: Any])
+        for testCase in try XCTUnwrap(block["cases"] as? [[String: Any]]) {
+            let naming: ClassPageNaming = ClassPageNaming(
+                word: ClassPageTerm.cleaned(testCase["term"] as? String),
+                scheme: ClassPageScheme.reading(testCase["scheme"] as? String)
+            )
+            let plan: ClassInsertionPlan = ClassInsertionPlan(
+                courseCode: "ICS3U", sectionNumber: 1,
+                unit: try XCTUnwrap(testCase["unit"] as? Int),
+                atDay: try XCTUnwrap(testCase["atDay"] as? Int),
+                naming: naming, added: [], renames: [], moves: [], linksToRewrite: 0, problems: []
+            )
+            XCTAssertEqual(plan.positionTitle, testCase["position"] as? String, naming.word)
+        }
+    }
+
     /// Where "make room" lands in a numbered course, read from the tool's
     /// two arguments (#267).
     func testTheNumberedMakeRoomPositionIsReadAsTheContractSays() throws {
