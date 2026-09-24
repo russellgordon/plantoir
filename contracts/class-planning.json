@@ -160,9 +160,139 @@
           "2026-09-16"
         ],
         "why": "The trip keeps its date and its name, and the plan SAYS so before the teacher agrees — an unnumbered page silently keeping a date that everything around it moved off is the kind of thing noticed weeks later."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "name": "a numbered course renames highest first, one number",
+        "count": 1,
+        "existingClasses": [
+          {
+            "date": "2026-09-08",
+            "title": "Week 1"
+          },
+          {
+            "date": "2026-09-10",
+            "title": "Week 2"
+          },
+          {
+            "date": "2026-09-14",
+            "title": "Week 3"
+          }
+        ],
+        "insertAtNumber": 2,
+        "expectRenamesInOrder": [
+          "Week 3 → Week 4",
+          "Week 2 → Week 3"
+        ],
+        "expectDateMoves": [
+          "Week 3",
+          "Week 4"
+        ],
+        "timetable": [
+          "2026-09-08",
+          "2026-09-10",
+          "2026-09-14",
+          "2026-09-16"
+        ],
+        "why": "The same order rule as the first case, under the one-number scheme (#267): “make room at Week 2” names ONE number, and no page may be renamed onto a name still in use. A runner builds the position from `insertAtNumber` however its planner holds it."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "name": "a numbered course keeps its gaps: a later page never moves earlier",
+        "count": 1,
+        "existingClasses": [
+          {
+            "date": "2025-09-18",
+            "title": "Week 1"
+          },
+          {
+            "date": "2025-09-25",
+            "title": "Week 2"
+          },
+          {
+            "date": "2025-11-20",
+            "title": "Week 8"
+          },
+          {
+            "date": "2025-11-27",
+            "title": "Week 9"
+          }
+        ],
+        "insertAtNumber": 2,
+        "expectRenamesInOrder": [
+          "Week 9 → Week 10",
+          "Week 8 → Week 9",
+          "Week 2 → Week 3"
+        ],
+        "expectMovedTo": {
+          "Week 3": "2025-10-02"
+        },
+        "expectNotMoved": [
+          "Week 9",
+          "Week 10"
+        ],
+        "timetable": [
+          "2025-09-18",
+          "2025-09-25",
+          "2025-10-02",
+          "2025-10-09",
+          "2025-10-16",
+          "2025-10-23",
+          "2025-10-30",
+          "2025-11-06",
+          "2025-11-13",
+          "2025-11-20",
+          "2025-11-27",
+          "2025-12-04"
+        ],
+        "why": "CODING's own dates: a weekly club whose pages for weeks 3–7 were never written. Packing the later pages onto the next free days — the ordinary scheme's rule, which suits a course whose pages sit on consecutive class days — would move old Week 8 to 2025-10-09, SIX WEEKS EARLIER, while the plan said “moved onto later class days”. In a numbered course a page moves only as far as it must: a page already dated after the page before it stays where it is, and otherwise it takes the first class day after that page. For a section with no gaps the two rules give the same dates (the case above). Found by the #267 plan review; measured against the real planner."
       }
     ],
-    "note": "Making room for a class in the middle of a unit. The RENAME ORDER is the part to get right and the part that looks like an implementation detail: it is the difference between a course that survives and one that loses a lesson."
+    "note": "Making room for a class in the middle of a unit. The RENAME ORDER is the part to get right and the part that looks like an implementation detail: it is the difference between a course that survives and one that loses a lesson.",
+    "numberedPosition": {
+      "note": "Where “make room” lands in a numbered course (#267), read from the tool's two arguments. The schema still says `unit` and `atDay` and is not changed — routing was measured against it — so “make room at Week 5” may arrive in either, or as a Unit/Day habit's `unit: 5, atDay: 1`. Every reading that names one number is taken; two DIFFERENT numbers, neither of them 1, are refused (null) so the teacher is asked rather than having pages renamed at a guess. Mac: ClassInsertionPlanner.numberedPosition.",
+      "cases": [
+        {
+          "unit": null,
+          "atDay": 5,
+          "expect": 5
+        },
+        {
+          "unit": 5,
+          "atDay": null,
+          "expect": 5
+        },
+        {
+          "unit": 1,
+          "atDay": 5,
+          "expect": 5
+        },
+        {
+          "unit": 5,
+          "atDay": 1,
+          "expect": 5,
+          "why": "What a model used to Unit/Day writes for “Week 5”. Reading it as position 1 would make room at the very first meeting and report success."
+        },
+        {
+          "unit": 5,
+          "atDay": 5,
+          "expect": 5
+        },
+        {
+          "unit": 3,
+          "atDay": 5,
+          "expect": null,
+          "why": "Two numbers, neither of them 1: no reading is safe, and a wrong one renames pages the teacher's links point at."
+        },
+        {
+          "unit": null,
+          "atDay": null,
+          "expect": null
+        }
+      ]
+    }
   },
   "duplication": {
     "cases": [
@@ -214,6 +344,36 @@
         "expectOtherClassesMoving": 0,
         "expectUndoOffered": true,
         "why": "Nothing else moves, so taking the copy back is whole rather than partial — and this is the common case, since a teacher duplicating a lesson is usually working at the end of what they have written."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "name": "a numbered course duplicates as the next number",
+        "duplicate": "Week 1",
+        "existingClasses": [
+          {
+            "title": "Week 1",
+            "date": "2026-09-08"
+          },
+          {
+            "title": "Week 2",
+            "date": "2026-09-10"
+          }
+        ],
+        "timetable": [
+          "2026-09-08",
+          "2026-09-10",
+          "2026-09-14",
+          "2026-09-16"
+        ],
+        "expectNewTitle": "Week 2",
+        "expectDate": "2026-09-10",
+        "expectRenamesInOrder": [
+          "Week 2 → Week 3"
+        ],
+        "expectOtherClassesMoving": 1,
+        "expectUndoOffered": false,
+        "why": "The first case's rule under the one-number scheme (#267): the copy is the source's own next number, and what was there moves up one and onto the next class day."
       }
     ],
     "forcedUnpublished": {
@@ -266,6 +426,45 @@
         ],
         "expectDay": 4,
         "expectUnit": 1
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "existing": [],
+        "expectNumber": 1,
+        "why": "A numbered course (#267) with no page yet starts at “Week 1”. A runner asserts the NUMBER and builds the title from the course's word; there is no unit."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "existing": [
+          "Week 1",
+          "Week 2",
+          "Week 8",
+          "Week 9"
+        ],
+        "expectNumber": 10,
+        "why": "Russell's CODING club, as it is on disk: weeks 3–7 were never written. The next page is one past the HIGHEST number — never a gap filled — because the number counts meetings and a gap is meetings that had no page."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "existing": [
+          "Week 2",
+          "Field Trip"
+        ],
+        "expectNumber": 3,
+        "why": "A page named some other way is passed over, as it is under the ordinary scheme."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "existing": [
+          "Week 1",
+          "Unit 1, Day 4"
+        ],
+        "expectNumber": 2,
+        "why": "A two-number page in a numbered course is not a class page (pageNaming), so it cannot push the count along."
       }
     ],
     "note": "What 'add the next class' would be called: the highest unit these pages name, and one past the highest day inside it."
@@ -284,7 +483,23 @@
       "Unit 1, Day 2"
     ],
     "note": "Numbered pages sort by unit, then by day — not by date and not by filename.",
-    "why": "Day 10 after Day 2, so this cannot be a string sort. And 'Field Trip' is dropped from the list rather than sorted to one end."
+    "why": "Day 10 after Day 2, so this cannot be a string sort. And 'Field Trip' is dropped from the list rather than sorted to one end.",
+    "numberedScheme": {
+      "scheme": "numbered",
+      "word": "Week",
+      "input": [
+        "Week 10",
+        "Week 2",
+        "Field Trip",
+        "Week 1"
+      ],
+      "expectOrder": [
+        "Week 1",
+        "Week 2",
+        "Week 10"
+      ],
+      "why": "The same rule under the one-number scheme (#267): by number, never as strings (Week 10 after Week 2), with the unnumbered page dropped."
+    }
   },
   "pageNaming": {
     "cases": [
@@ -399,9 +614,84 @@
         "expectProblem": "countOutOfRange",
         "insertAtDay": 1,
         "insertAtUnit": 1
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "count": 1,
+        "insertAtNumber": 0,
+        "expectProblem": "dayOutOfRange",
+        "why": "Numbers start at 1 under the one-number scheme too."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "startANewUnit": true,
+        "expectProblem": "noUnitsInANumberedCourse",
+        "why": "A numbered course (#267) has one run of pages and no units, so “start a new unit” has nothing to act on. Refused BEFORE the class dates are asked for, so nobody is asked for their dates on the way to being told no."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "addDaysToUnit": 1,
+        "count": 3,
+        "expectProblem": "noUnitsInANumberedCourse",
+        "why": "“Add three more days to Unit 1” is the same request in another shape, and gets the same answer."
       }
     ],
     "note": "Named by case, not by message: which refusal it is must match on both platforms, while the sentence a teacher reads is the product's wording."
+  },
+  "wholeUnit": {
+    "note": "Which request names a WHOLE unit — “publish Unit 4”, “hide Module 4” — rather than one page. A whole unit is published or hidden one class page at a time; a title that is not a unit goes to the ordinary page path, which acts on the one page named. Each case reads `title` in a course whose word is `term` (default “Unit”) under `scheme` (default the ordinary one) and expects the unit NUMBER, or null for “not a whole unit”. Mac: AssistPublishPlanner.unitNamed.",
+    "cases": [
+      {
+        "title": "Unit 4",
+        "expectUnit": 4
+      },
+      {
+        "title": "unit 4.",
+        "expectUnit": 4,
+        "why": "Case and a trailing full stop are forgiven: the model echoes what a teacher typed."
+      },
+      {
+        "term": "Module",
+        "title": "Module 4",
+        "expectUnit": 4,
+        "why": "The course's own word names a unit — reading only “unit” meant a Module course found nothing and was told no page is called that."
+      },
+      {
+        "term": "Module",
+        "title": "Unit 4",
+        "expectUnit": 4,
+        "why": "“unit” is accepted beside the course's word: the NUMBER is the answer either way, so accepting both cannot be ambiguous."
+      },
+      {
+        "title": "Unit 4, Day 3",
+        "expectUnit": null,
+        "why": "A day was named, so this is one page."
+      },
+      {
+        "scheme": "numbered",
+        "term": "Week",
+        "title": "Week 1",
+        "expectUnit": null,
+        "why": "The CRITICAL case of #267. A numbered course's pages are “Week 1”, “Week 2”, and an app that holds them as one unit (the mac holds them as unit 1) would read “publish Week 1” — the most ordinary request a club has — as the whole of unit 1 and publish EVERY meeting at once, with a card that did not say so. A numbered course has no units: every title goes to the page path. Measured on the mac before the fix: the real parser read “Week 1” as unit 1, and publishing it in a four-page numbered section published four pages."
+      },
+      {
+        "scheme": "numbered",
+        "term": "Week",
+        "title": "Week 3",
+        "expectUnit": null,
+        "why": "The other half of the same fault: read as “unit 3” it found no unit and was REFUSED, instead of publishing the page."
+      },
+      {
+        "scheme": "numbered",
+        "term": "Week",
+        "title": "Unit 1",
+        "expectUnit": null,
+        "why": "“unit” is not a numbered course's word either, so “publish unit 1” typed in a club reaches the page path and is told no page is called that — never the whole course."
+      }
+    ]
   },
   "classFolder": {
     "note": "Which folder holds a section's class pages, and whether a given page is one of them. ONE rule, because there were several and they disagreed — a teacher whose folder was not called 'All Classes' got a different answer from the mac app, the Windows app and the build, and the build's answer silently changed the Curriculum Coverage map from 'pages the course teaches' to 'every published page'. A wrong map that reports success is the failure this rule exists to close.",
