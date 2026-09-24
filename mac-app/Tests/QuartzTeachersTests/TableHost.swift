@@ -135,13 +135,6 @@ final class ListBox {
     var names: [String]
     var secondNames: [String]
 
-    // MARK: - Initializer
-
-    init(_ names: [String], second secondNames: [String] = []) {
-        self.names = names
-        self.secondNames = secondNames
-    }
-
     // MARK: - Computed properties
 
     var binding: Binding<[String]> {
@@ -156,5 +149,12 @@ final class ListBox {
             get: { return self.secondNames },
             set: { newValue in self.secondNames = newValue }
         )
+    }
+
+    // MARK: - Initializer
+
+    init(_ names: [String], second secondNames: [String] = []) {
+        self.names = names
+        self.secondNames = secondNames
     }
 }
