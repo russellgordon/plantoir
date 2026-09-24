@@ -441,8 +441,9 @@ nonisolated enum ActivityTrail {
         /// deliberate choice was made, and a choice nobody was able to make is
         /// a different fact.
         case websiteBuilderCouldNotBeStopped = "website builder could not be stopped"
-        /// ⌘Q landed while this app was publishing, the teacher was asked
-        /// whether to quit anyway, and this is what they chose.
+        /// ⌘Q landed while this app was publishing or building a preview
+        /// (the latter since issue #232), the teacher was asked whether to
+        /// quit anyway, and this is what they chose.
         ///
         /// BOTH answers are recorded, and the "keep working" one matters most:
         /// a teacher who says "I pressed Quit and it would not quit" is

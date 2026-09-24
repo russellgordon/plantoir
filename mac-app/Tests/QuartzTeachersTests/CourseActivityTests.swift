@@ -119,6 +119,54 @@ final class CourseActivityTests: XCTestCase {
         XCTAssertTrue(CourseActivity.activePublishes.isEmpty)
     }
 
+    /// The sequence the review measured (issue #232): a window's preview is
+    /// started, the window goes away, and a captured closure — the
+    /// assistant's stop-then-start, or the repair dialog's — starts it AGAIN
+    /// on the view that has gone. A torn-down view is never sent `.onChange`,
+    /// so a record ended there was left behind when that orphan build's page
+    /// answered, and the next ⌘Q asked about a build nobody was running.
+    ///
+    /// The wait is now one object with the record, and every ending — the
+    /// page answering and the outer time limit included — is `end()`. Driven
+    /// here through that object, because it is what the window holds.
+    @MainActor
+    func testAWaitCannotEndWithoutItsRecord() {
+        CourseActivity.reset()
+        defer { CourseActivity.reset() }
+        let wait: PreviewBuildWait = PreviewBuildWait()
+
+        wait.begin(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
+        XCTAssertTrue(wait.isWaiting)
+        XCTAssertEqual(CourseActivity.activePreviewBuilds.count, 1)
+
+        // The window goes away.
+        wait.end()
+        XCTAssertTrue(CourseActivity.activePreviewBuilds.isEmpty)
+
+        // The captured closure starts the preview again on the view that has
+        // gone, and that orphan build's page then answers.
+        wait.begin(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
+        XCTAssertEqual(CourseActivity.activePreviewBuilds.count, 1)
+        wait.end()
+        XCTAssertFalse(wait.isWaiting)
+        XCTAssertTrue(
+            CourseActivity.activePreviewBuilds.isEmpty,
+            "The wait ended and its record did not: every later quit would ask about a preview nobody is building"
+        )
+        XCTAssertNil(QuitConfirmation.workUnderWay())
+
+        // Ending again, or pressing twice, leaves nothing behind either.
+        wait.end()
+        wait.begin(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
+        wait.begin(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 2)
+        XCTAssertEqual(
+            CourseActivity.activePreviewBuilds,
+            [CourseActivity.PreviewBuildRecord(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 2)]
+        )
+        wait.end()
+        XCTAssertTrue(CourseActivity.activePreviewBuilds.isEmpty)
+    }
+
     @MainActor
     func testResetClearsPreviewBuilds() {
         CourseActivity.beginPreviewBuild(folderPath: "/f", courseCode: "ICS3U", sectionNumber: 1)
@@ -126,7 +174,6 @@ final class CourseActivityTests: XCTestCase {
         XCTAssertTrue(CourseActivity.activePreviewBuilds.isEmpty)
     }
 }
-
 
 /// Which question the repair dialog asks before starting a preview.
 ///
@@ -184,5 +231,4 @@ final class CourseActivityPublishOnlyTests: XCTestCase {
             CourseActivity.coursePublishIsRunning(folderPath: "/tmp/f", courseCode: "ICS3U")
         )
     }
-
 }

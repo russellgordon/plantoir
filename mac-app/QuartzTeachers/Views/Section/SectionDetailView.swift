@@ -31,18 +31,16 @@ struct SectionDetailView: View {
 
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
-    @State var isWaitingForServer: Bool = false
+    /// The wait for this window's preview, and the record ⌘Q reads while it
+    /// lasts (issue #232). Cleared only through `previewBuildWait.end()`, so
+    /// the record cannot outlive the wait — see `PreviewBuildWait`.
+    @State var previewBuildWait: PreviewBuildWait = PreviewBuildWait()
 
-    /// The preview build this window recorded in `CourseActivity`, while it
-    /// has one — so ⌘Q, which cannot see this view's state, knows a preview is
-    /// still being built (issue #232).
-    ///
-    /// Kept rather than rebuilt from `folderThisSectionWorksIn` at the end,
-    /// because that note is also written by a deploy: by the time the end is
-    /// delivered it could name another folder, and ending the wrong record
-    /// leaves the right one behind for ever. Written only by
-    /// `notePreviewBuildBegan()`, cleared only by `notePreviewBuildEnded()`.
-    @State var previewBuildRecorded: CourseActivity.PreviewBuildRecord?
+    /// True from the press until the preview's page first answers or the run
+    /// ends.
+    var isWaitingForServer: Bool {
+        return previewBuildWait.isWaiting
+    }
 
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
@@ -473,29 +471,12 @@ struct SectionDetailView: View {
                 healthDialog = .findings
             }
         }
-        // ⌘Q asks about a preview still being built (issue #232). The build
-        // is recorded where it begins — `startPreview()`, the one place a
-        // preview starts — and ended HERE, once, rather than beside each of
-        // the seven places that clear `isWaitingForServer`: mirroring those by
-        // hand is how a record gets left behind, and a record left behind
-        // makes every later quit ask about a build that is not happening.
-        // `isWaitingForServer` is true from the press until the page first
-        // answers or the run ends.
-        //
-        // NOT `previewRunner.previewAddress`: `preview.sh` prints the address
-        // BEFORE it starts the build, so it is set for nearly all of it.
-        .onChange(of: isWaitingForServer) { _, isWaiting in
-            if !isWaiting {
-                notePreviewBuildEnded()
-            }
-        }
         .onDisappear {
-            // FIRST, and unconditionally: SwiftUI does not reliably deliver
-            // the change above to a view being torn down (closing the window,
-            // or switching section, which gives this view a new identity), and
-            // `stopPreview()` below clears `isWaitingForServer` itself — so
-            // waiting for that change would leave the record behind.
-            notePreviewBuildEnded()
+            // FIRST, and unconditionally: the wait, and with it ⌘Q's record
+            // of a preview being built (issue #232). `stopPreview()` below
+            // ends it too; saying so here keeps a window that is going away
+            // from depending on what that function happens to do today.
+            previewBuildWait.end()
             // The key this section registered under, never the folder its
             // work belongs to and never the window's current one.
             if let folder = folderThisSectionRegisteredIn {
@@ -1101,8 +1082,11 @@ struct SectionDetailView: View {
         }
         previewLease = lease
         previewURL = nil
-        isWaitingForServer = true
-        notePreviewBuildBegan()
+        previewBuildWait.begin(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            sectionNumber: sectionNumber
+        )
         previewRunner.milestones = TaskMilestones.preview
 
         Task { @MainActor in
@@ -1189,7 +1173,7 @@ struct SectionDetailView: View {
         }
         previewRunner.stopByUser()
         previewURL = nil
-        isWaitingForServer = false
+        previewBuildWait.end()
         // The next preview reuses this section's port, so its address will be
         // identical to the one already loaded. Without this the web view sees
         // a URL it has seen before and shows the pages it already had —
@@ -1209,7 +1193,7 @@ struct SectionDetailView: View {
         }
         previewRunner.cancelByUser()
         previewURL = nil
-        isWaitingForServer = false
+        previewBuildWait.end()
         previewController.forgetLoadedPage()
         releasePreviewLease()
     }
@@ -1228,50 +1212,10 @@ struct SectionDetailView: View {
 
     /// Hands the port back, whatever ended the preview.
     func releasePreviewLease() {
-        // A belt beside the change handler: every ending that hands the port
-        // back is also the end of any build, and ending twice is harmless.
-        notePreviewBuildEnded()
         if let lease = previewLease {
             PreviewLeases.release(lease)
             previewLease = nil
         }
-    }
-
-    /// Records, across every window, that this section's preview is being
-    /// built — for ⌘Q's question and nothing else. Called from
-    /// `startPreview()` alone, beside the one `isWaitingForServer = true`.
-    func notePreviewBuildBegan() {
-        guard let folder = folderThisSectionWorksIn else {
-            return
-        }
-        // A build already recorded is ended first, so a second press can never
-        // leave the first record behind.
-        notePreviewBuildEnded()
-        let record: CourseActivity.PreviewBuildRecord = CourseActivity.PreviewBuildRecord(
-            folderPath: folder.path,
-            courseCode: course.code,
-            sectionNumber: sectionNumber
-        )
-        CourseActivity.beginPreviewBuild(
-            folderPath: record.folderPath,
-            courseCode: record.courseCode,
-            sectionNumber: record.sectionNumber
-        )
-        previewBuildRecorded = record
-    }
-
-    /// Ends the record `notePreviewBuildBegan()` made, if there is one. Safe
-    /// to call from every ending, and called from three.
-    func notePreviewBuildEnded() {
-        guard let record = previewBuildRecorded else {
-            return
-        }
-        CourseActivity.endPreviewBuild(
-            folderPath: record.folderPath,
-            courseCode: record.courseCode,
-            sectionNumber: record.sectionNumber
-        )
-        previewBuildRecorded = nil
     }
 
     /// Why this course is never deployed, or nil when it is an ordinary one.
@@ -1604,7 +1548,7 @@ struct SectionDetailView: View {
         while waitedSeconds < 600 {
             if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
                 // The script exited before the server came up: show output.
-                isWaitingForServer = false
+                previewBuildWait.end()
                 releasePreviewLease()
                 return
             }
@@ -1651,7 +1595,7 @@ struct SectionDetailView: View {
         var waitedForBuild: Int = 0
         while waitedSeconds < 600 && waitedForBuild < 120 {
             if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
-                isWaitingForServer = false
+                previewBuildWait.end()
                 releasePreviewLease()
                 return
             }
@@ -1684,7 +1628,7 @@ struct SectionDetailView: View {
         // pointed at an address that is not ready.
         while waitedSeconds < 600 {
             if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
-                isWaitingForServer = false
+                previewBuildWait.end()
                 releasePreviewLease()
                 return
             }
@@ -1700,7 +1644,7 @@ struct SectionDetailView: View {
                 let (_, response) = try await URLSession.shared.data(for: request)
                 if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200 {
-                        isWaitingForServer = false
+                        previewBuildWait.end()
                         previewURL = serverURL
                         // Load the fresh site EXPLICITLY, rather than trusting
                         // the mounting web view's `loadIfNeeded` to do it.
@@ -1754,7 +1698,7 @@ struct SectionDetailView: View {
             try? await Task.sleep(for: .seconds(1))
             waitedSeconds += 1
         }
-        isWaitingForServer = false
+        previewBuildWait.end()
     }
 
     /// Ends a preview that announced its website and never showed it, and

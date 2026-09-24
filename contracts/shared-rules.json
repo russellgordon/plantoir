@@ -297,7 +297,7 @@
         "appliesOnWhy": "Permanent for the same reason as the two above: there is no stop to fail where there is nothing to stop."
       },
       {
-        "carries": "what was under way, in the words the teacher was shown, and which of the two buttons they pressed",
+        "carries": "what was under way - a publish, or since issue #232 a preview being built - in the words the teacher was shown, and which of the two buttons they pressed",
         "event": "quit asked about work under way",
         "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. Since issue #232 the line also names a preview being BUILT when that is what was under way (a publish, when there is one, is still what is named), so 'it would not quit while my preview was loading' has the same answer on the trail. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out.",
         "appliesOn": [
