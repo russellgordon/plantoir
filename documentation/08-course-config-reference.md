@@ -9,7 +9,7 @@ by the macOS app from scratch: a class imported from the older
 folder-per-class layout has no settings file at all, so the importer writes
 one (see "Reference courses" below) — **read and auto-extended** by the
 build ([`build_site.py`](05-build-pipeline.md) appends newly discovered
-folders/files), and **statically imported** by the patched Explorer
+folders/files, and never touches `hidden`), and **statically imported** by the patched Explorer
 components at Quartz build time
 ([customizations C2-1](06-quartz-customizations.md#c2-applied-on-every-build)).
 
@@ -59,7 +59,7 @@ A representative example:
 | `shared_files` | string[] | setup + build discovery | build | Course-root loose `.md` files copied into every section's site. |
 | `per_section_folders` | string[] | setup + build discovery | build | Folder names expected inside each `section<N>/`, copied only into that section's site. |
 | `per_section_files` | string[] | setup + build discovery | build | Loose `.md` files inside each `section<N>/`. |
-| `hidden` | string[] | setup + build (auto-adds `Media`) | build → Explorer omit set | Items filtered out of the sidebar. Still built, linkable, and searchable. |
+| `hidden` | string[] | setup + the apps ONLY — the build never changes it (#265); it adds `Media` and `Curriculum Coverage.md` to the sidebar's list in memory, never to this file | build → Explorer omit set | Items filtered out of the sidebar. Still built, linkable, and searchable. Each entry is the STORED name of a TOP-LEVEL item — a file with `.md` (`"Key Links.md"`), a folder by name (`"Tasks"`) — matched ignoring case and Unicode normalisation; a name without `.md` also hides `<name>.md`; nothing nested is hidden by a name. Contract: `file-formats.json` → `sidebarHiding`. |
 | `expandable` | string[] | setup + build discovery | patched Explorer (statically imported) | Folders rendered as collapsible trees; all other folders render as plain links to their index page. |
 | `expandOnFolderClick` | bool | setup | build → `folderClickBehavior` + `data-expand-on-navigate` | `true`: clicking a folder name expands it. `false` (default): name navigates; only the chevron expands. |
 | `footer_html` | string | setup | build → `Footer.tsx` | Raw HTML injected into every page's footer. |
@@ -158,8 +158,9 @@ and in `setup_course.py`), and `show_section_marker` false for `section1`
 (every import is section 1, so "S1" would be wrong for an S2).
 
 `hidden` is the set of names the site's sidebar leaves out — the Explorer's
-`omit` set, written by `update_quartz_layout`; the pages are still built and
-still reachable by link. The import writes only `Media`, because pictures are
+`omit` set, written by `update_quartz_layout` with each name as stored
+(`.md` kept, since #265); the pages are still built and still reachable by
+link. The import writes only `Media`, because pictures are
 not pages, and the build adds `Media` itself anyway. It deliberately does NOT
 copy the wizard's own list (`WizardDefaults.hiddenItems`: Private Notes,
 Scratch Page, Key Links, Learning Goals and so on), which would hide seven of

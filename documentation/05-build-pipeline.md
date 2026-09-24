@@ -74,14 +74,37 @@ exist, and that the requested section is one of the course's
 
 It scans the course root and section folder for top-level folders/files that
 are *not yet listed* in `course_config.json` and appends them. A newly
-discovered folder is also taken OUT of `hidden` if it is listed there
-and added to `expandable`, so it appears with a chevron like any other. The updated config is written atomically
+discovered folder is also added to `expandable`, so it appears with a chevron like any other. The updated config is written atomically
 with a `course_config.backup.json` safety copy.
+
+**Preflight never changes `hidden`** (issue #265, 2026-09-24). It used to take
+a newly discovered folder OUT of `hidden` and write the list back ("Un-hid newly
+discovered folder"). Measured with the real preflight on five folder shapes — a
+hidden per-section folder moved to the course root, the same name made at both
+levels, a name listed in one scope and made in the other, and a folder ticked
+hidden before it was listed, shared or per-section — every one looped: the build
+un-hid it and erased the tick from the file, the app went on showing the tick,
+the next Save put it back, and the next build took it out again. `hidden` is now
+written by the setup wizard and the apps only; a "new" folder already named in it
+stays hidden, which errs the safe way (hiding from the sidebar never unpublishes
+a page). Nothing depended on the rewrite: the build copies the FILE into the
+output, and adds `Media` and the coverage page to the sidebar's list in memory
+(`names_the_sidebar_hides`) without writing them back. Rejected: limiting the
+un-hide to names the teacher "could not have ticked" — Course Settings offers
+only listed names, so every entry was ticked by somebody or is a legacy entry
+nobody should lose silently. Cases: `contracts/file-formats.json` →
+`sidebarHiding.buildKeepsHidden`, run by `scripts/test_sidebar_hiding.py`.
+
+**The app does not save over what preflight added, either.** Course Settings
+used to write its whole in-memory copy, so a Save from a window that had read the
+file before a build dropped the folders that build had appended (the next build
+rediscovered them). Since #265 a Save writes only the settings that window
+changed — see [09 → "Two windows, one course"](09-mac-app.md#two-windows-one-course).
 
 **The one thing discovery does not do is re-add what the teacher took away.**
 Names the teacher removed in Course Settings are recorded in `excluded_items`
 (keyed `shared` / `per_section`), and preflight skips them: not discovered, not
-un-hidden, not expanded, and — since 2026-08-24 — actively **dropped** from
+not expanded, and — since 2026-08-24 — actively **dropped** from
 `shared_folders`, `shared_files`, `per_section_folders` and `per_section_files`
 if it finds one back in a copy list, with the config written back. So the four
 copy lists are *not* add-only: `excluded_items` is authoritative. The exclusion
@@ -433,6 +456,26 @@ page title (emoji + course code or custom label + optional `S<N>` marker),
 locale, per-section colour scheme, and the social-media-preview emitter
 toggle. Each is detailed in
 [customizations §C2](06-quartz-customizations.md#c2-applied-on-every-build).
+
+**Before the omit set is written, the section's copy of the sidebar filter is
+brought up to date** (`ensure_sidebar_hide_rule_current`, issue #265). Each
+section's `quartz.layout.ts` is a copy made once, when the section is first
+built, so a change to the filter (`setup_course.EXPLORER_BLOCK`) reaches only new
+sections unless something repairs the old ones. It runs right after the anchor
+check, in the ALWAYS part of the build, and is idempotent: a file whose every
+`Component.Explorer(` block carries `CQ4T-HIDE-RULE: v2` is left byte for byte;
+otherwise every block is replaced with the current one (the omit set and
+`folderClickBehavior` are rewritten just after, as on every build) and the result
+must carry the marker in every block and a wired anchor — or the build refuses,
+the way the anchor check does, rather than guess at a hand-edited file. **On the
+mac this seldom runs**: a changed toolchain gets a new container, whose
+`/tmp/quartz-builds` is empty, so the section is recopied from the image, which
+already has v2. On Windows the build folder (`%TEMP%\quartz-builds`) persists, and
+this is where the change actually lands. It was proved the Windows way on the
+mac: a v1.3.1 build into a persisted `PLANTOIR_WORK_DIR`, then a rebuild with the
+new scripts and no `--full-rebuild` — the console said "Reusing existing" and
+"Brought the sidebar's hide rule up to date", and the built sidebar hid exactly
+the stored names. What the rule itself is: [06 → B1](06-quartz-customizations.md).
 
 Two more things happen here, fresh on every build:
 
