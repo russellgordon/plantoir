@@ -3508,6 +3508,66 @@ def _ensure_media_symlink(content_root: Path, course_dir: Path):
     except Exception as e:
         print(f"❌ Failed to create Media symlink at {link_path}: {e}")
 
+# When the build that made the site on the host STARTED (issue #265).
+#
+# The apps and the scheduled publish decide whether a Publish must build first
+# by comparing the course's files with the built site. They used to compare with
+# the time the built `index.html` was WRITTEN — the END of the build — so a Save
+# made while a publish was building (the settings are read at the start, the
+# page is written minutes later) was older than the page and looked already
+# built: the next Publish sent the same old site and said it had succeeded.
+# Anything changed after the build STARTED is what that build could not have
+# seen, so that is the time to compare with.
+#
+# Two files, because the start of a build is not yet the start of the site on
+# the host. `.build-started.pending` is made the moment a build begins; it
+# becomes `.build-started` only once that build's site has been copied out.
+# Until then `.build-started` still describes the site that IS there — a
+# build that fails, is stopped, or is a preview (whose pages are never
+# published as they are) leaves it alone.
+#
+# The time comes from the file itself, never from `time.time()`: measured on
+# Colima 2026-09-24, a file made from inside the container is stamped by the
+# MAC's clock (5 of 5 creations stamped 55-67 ms before the container's own
+# clock read just ahead of them), which is the clock the teacher's Save is
+# stamped with. Writing a time into the file would have compared two clocks.
+# Hidden names on purpose: the freshness checks skip hidden entries, and
+# nothing outside `public/` is published. `contracts/app-rules.json` ->
+# `buildFreshness.buildStartedMarker` names both files.
+BUILD_STARTED_MARKER = ".build-started"
+BUILD_STARTED_PENDING = ".build-started.pending"
+
+
+def _mark_build_starting(host_output_dir: Path) -> None:
+    """Make `.build-started.pending` afresh — removed first, so its time is the
+    moment it is created rather than the time an old one was last touched."""
+    pending = host_output_dir / BUILD_STARTED_PENDING
+    try:
+        host_output_dir.mkdir(parents=True, exist_ok=True)
+        if pending.exists() or pending.is_symlink():
+            pending.unlink()
+        with open(pending, "w", encoding="utf-8") as marker:
+            marker.write("This build started when this file was made.\n")
+    except OSError as error:
+        # Not fatal: with no marker the apps compare with the built page's own
+        # time, which is what they did before this existed.
+        print(f"⚠️  Could not note when this build started: {error}")
+
+
+def _mark_build_finished(host_output_dir: Path) -> None:
+    """The site on the host is now this build's: its start time becomes the
+    site's. A rename keeps the pending file's time."""
+    pending = host_output_dir / BUILD_STARTED_PENDING
+    if not pending.exists():
+        return
+    try:
+        os.replace(pending, host_output_dir / BUILD_STARTED_MARKER)
+    except OSError as error:
+        # Leaving the old marker is safe: an older start time only ever makes
+        # the next Publish rebuild when it need not have.
+        print(f"⚠️  Could not note when this build started: {error}")
+
+
 def _sync_public_to_host(output_dir: Path, host_output_dir: Path) -> bool:
     """
     Sync built static assets (public/) and course_config.json from internal
@@ -4890,6 +4950,11 @@ def build_section_site(
     host_output_dir = hidden_output_root / section_name
     host_output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Before anything is read — the settings and every page are read after
+    # this line, so a change made from here on is one this build cannot have
+    # seen. See BUILD_STARTED_MARKER.
+    _mark_build_starting(host_output_dir)
+
     # Use fast container-local ext4 storage (/tmp/quartz-builds/<COURSE>/section<N>)
     # for the build workspace so that node_modules, AST walks, and esbuild run at native
     # speed without crossing the slow 9P/virtiofs host bind mount.
@@ -5443,6 +5508,7 @@ def build_section_site(
         # now says so and FAILS, so a publish stops at the build with the
         # reason in front of it instead of at the step that cannot know why.
         if _sync_public_to_host(output_dir, host_output_dir):
+            _mark_build_finished(host_output_dir)
             print("✅ Static build complete.")
         else:
             print(f"❌ Nothing to publish for {course_code} Section {section_number}: "
