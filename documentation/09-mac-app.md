@@ -792,14 +792,20 @@ the machinery (rule 1). They now print "🐳 Setting up this Mac…" and
 - **No duration is claimed**, because the warm start is unmeasured (above).
   REJECTED: the issue's own suggestion "this takes a moment the first time each
   day" — after #220 the machine can stop and start several times a day.
-- **The word "Colima" has NOT left the console.** `colima start` writes its own
-  `INFO[…] starting colima` lines into the details a teacher can open, and the
-  same function still prints four more lines that name the machinery ("Waiting
-  for the container runtime to be ready…", "Docker isn't responding yet —
-  restarting Colima…", the "(Colima is shared …)" note, and "Colima did not
-  become ready…"). They were outside #228's two lines and are left for a
-  follow-up; "Waiting for the container runtime" is also a `friendlyPhase`
-  marker, so moving it means moving that too.
+- **The word "Colima" has NOT left the console, nor has the rest of the
+  machinery.** `colima start` writes its own `INFO[…] starting colima` lines
+  into the details a teacher can open, and `ensure_container_runtime` still
+  prints "Waiting for the container runtime to be ready…", "Docker isn't
+  responding yet — restarting Colima…", the "(Colima is shared …)" note, and
+  "Colima did not become ready." with its "Try running 'colima stop --force &&
+  colima start' by hand, then re-run this script."; `ensure_local_tools`,
+  which it calls, prints "Getting the container runtime…", "the container
+  tools" and "the image builder" on a first run. All outside #228's two lines;
+  the director files them as ONE follow-up issue (this paragraph should then
+  carry its number). "Waiting for the container runtime" is also a
+  `friendlyPhase` marker, so moving it means moving that too. The test above
+  checks a marker only on `echo` lines: a first version checked the whole
+  file and was satisfied by the comment that names the marker beside the echo.
 
 **REJECTED — write the tools folder into `~/.zprofile` at install.** Plantoir
 editing a teacher's shell profile is exactly the machinery the product hides, it
