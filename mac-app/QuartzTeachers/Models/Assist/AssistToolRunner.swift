@@ -2547,7 +2547,7 @@ final class AssistToolRunner {
             )
         }
         guard let numbers = UnitDay(
-            pageTitle: source.title, term: located.course.configuration.unitWord
+            pageTitle: source.title, naming: located.course.configuration.classPageNaming
         ) else {
             return .failure(AssistWording.notANumberedClassPage(page: source.displayTitle))
         }
