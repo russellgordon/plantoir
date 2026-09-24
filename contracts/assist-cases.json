@@ -1271,7 +1271,7 @@
         "expectTranscriptContains" : [
           "teacher: Deploy at 6:30 AM",
           "assistant: Section 1",
-          "assistant: wording.deployQuestion",
+          "assistant: wording.scheduleQuestion",
           "teacher: wording.cancelled"
         ],
         "given" : {
@@ -1282,7 +1282,7 @@
         },
         "name" : "a deploy asked for at a time is answered in code and asks about the MOMENT",
         "when" : "decline",
-        "why" : "Measured on 2026-09-18: the smaller assistant sent this sentence to deploy_section 10 trials out of 10, so a teacher who asked for half six tomorrow got a deploy to students on the spot, behind an approval card that mentioned no time at all. Answered in code it cannot reach the model, and the card it does reach names the section, the destination and the whole moment. 'Section 1' is what is asserted because it is LOCALE-FREE and appears in the scheduled card on both platforms while appearing in the immediate one on neither: a formatted time is written '6:30 AM' here, '6:30 a.m.' on another Mac and with a different separator again in a 24-hour locale, so asserting one would pin the machine rather than the behaviour. The MOMENT is pinned instead by deployAtATime.resolving, which is pure and portable. Declined rather than approved because approving would write a real scheduled job."
+        "why" : "Measured on 2026-09-18: the smaller assistant sent this sentence to deploy_section 10 trials out of 10, so a teacher who asked for half six tomorrow got a deploy to students on the spot, behind an approval card that mentioned no time at all. Answered in code it cannot reach the model, and the card it does reach names the section, the destination and the whole moment. 'Section 1' is what is asserted because it is LOCALE-FREE and appears in the scheduled card on both platforms while appearing in the immediate one on neither: a formatted time is written '6:30 AM' here, '6:30 a.m.' on another Mac and with a different separator again in a 24-hour locale, so asserting one would pin the machine rather than the behaviour. The MOMENT is pinned instead by deployAtATime.resolving, which is pure and portable. Declined rather than approved because approving would write a real scheduled job. The question under the card is wording.scheduleQuestion, not wording.deployQuestion (issue #184, 2026-09-23): the immediate question reads as 'now' under a card that has just named a later moment."
       },
       {
         "expectTranscriptContains" : [

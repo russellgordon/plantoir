@@ -930,6 +930,22 @@ final class AssistAgent {
         await run(settledCall: settled(rawCall))
     }
 
+    /// The question put under an approval card, chosen by the tool the card
+    /// is for (issue #184).
+    ///
+    /// A scheduled deploy gets its own question, because the immediate one
+    /// reads as "now" under a card that has just named a later moment. Every
+    /// OTHER tool that waits for approval gets `deployQuestion` — chosen by
+    /// name rather than by `needsApproval`, so a third approval tool added
+    /// later lands on the reading that is safe for anything that deploys:
+    /// that it happens now.
+    static func approvalQuestion(forToolNamed name: String) -> String {
+        if name == "schedule_deploy" {
+            return AssistWording.scheduleQuestion
+        }
+        return AssistWording.deployQuestion
+    }
+
     private func run(settledCall call: AssistToolCall) async {
         guard let definition = tools.definition(named: call.function.name) else {
             messages.append(AssistMessage.toolResult(
@@ -945,7 +961,10 @@ final class AssistAgent {
         if definition.needsApproval {
             let explanation: String = tools.explain(call: call)
             entries.append(Entry(speaker: .assistant, text: explanation))
-            entries.append(Entry(speaker: .assistant, text: AssistWording.deployQuestion))
+            entries.append(Entry(
+                speaker: .assistant,
+                text: AssistAgent.approvalQuestion(forToolNamed: call.function.name)
+            ))
             pendingApproval = PendingApproval(call: call, explanation: explanation)
             activity = .waitingForApproval
             return

@@ -90,6 +90,7 @@ enum AssistContract {
         let table: [String: String] = [
             "deployApproval": AssistWording.deployApproval,
             "deployQuestion": AssistWording.deployQuestion,
+            "scheduleQuestion": AssistWording.scheduleQuestion,
             "planQuestion": AssistWording.planQuestion,
             "deployAccepted": AssistWording.deployAccepted,
             "planAccepted": AssistWording.planAccepted,

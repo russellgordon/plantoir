@@ -73,6 +73,16 @@ nonisolated enum AssistWording {
     /// the sentence above does not name it.
     static let deployQuestion: String = "Shall I deploy?"
 
+    /// The question under a SCHEDULED deploy's card (issue #184).
+    ///
+    /// Its own sentence because `deployQuestion` reads as "now", and the card
+    /// above it has just named a moment that is not now — so the question
+    /// contradicted the card it sat under. It mattered more once "deploy at
+    /// <time>" was matched in code (#168) and scheduling stopped being the rare
+    /// path. It must never carry the word "now", and it must differ from
+    /// `deployQuestion`; a test pins both rather than the words.
+    static let scheduleQuestion: String = "Shall I schedule it?"
+
     /// The question under a plan card.
     static let planQuestion: String = "Shall I go ahead?"
 
