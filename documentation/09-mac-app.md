@@ -1476,6 +1476,97 @@ its own in `TableHost` and removing it did NOT crash in five variants (tall
 and short windows, animated or not, with a change to the course in the same
 moment), which is also why the must-fail drives the real window.
 
+<a name="two-windows-one-course"></a>
+
+## Two windows, one course: what a Save writes, and what it tells you (issue #265)
+
+**What was reported.** Russell, 2026-09-24: the switches under "Hide from the
+site's sidebar" "do not work" — in the preview and on the published site, with
+no correlation between the switches and the sidebar. Two walks at the Mac matched
+perfectly, which is what pointed away from the build. The plan review found the
+cause and Russell confirmed it: **two windows were open on the same working
+folder.**
+
+**Why two windows disagree.** Each window has its own `WorkspaceModel`
+(`WindowRootView`'s `@State`), and `reloadCourses()` gives each its own
+`CourseConfiguration` per course. Nothing re-read the file on focus, and
+"the same folder in a second window" is a supported case (`folderForNewWindow`
+opens the key window's folder by default). `CourseConfiguration.write` was a blind
+whole-file write. Measured with the real `CourseConfiguration.swift` compiled
+standalone and a copy of his ICS4U file: window A saved three hides; window B,
+still holding the old ten, saved an unrelated setting (reading time); the file
+went back to the ten, and BOTH windows reported nothing unsaved while showing
+different switches. Every preview, publish and scheduled publish reads the file,
+so the site followed whichever window saved LAST, for any reason.
+
+**What a Save writes now.** `write(to:)` re-reads the file first. If it has not
+changed since this copy last read or wrote it (`lastSavedData`), the write is the
+old one, byte for byte. Otherwise, per TOP-LEVEL key: a key this copy did not
+change keeps the file's value (another window's Save, or a folder a build
+appended); a key this copy did change is written, and if the file had changed it
+too, the result says so (`WriteResult.replacedChangesFromElsewhere`). The same
+read-check-write loop as `recordOnDisk` guards the instant between. Afterwards the
+in-memory copy IS the file, so an open form shows what was really saved. All six
+writers use it — Course Settings, Add Section, archive, restore, course rename,
+school year — which is why the rule is in `write` and not in the Settings view.
+Then `WorkspaceModel.followWrite` reloads every OTHER window's copy of that
+course, unless it has unsaved changes (never discarded; its own Save merges).
+Course Settings also re-reads the file each time it is opened
+(`reloadIfNothingUnsaved`), so a folder a build discovered is offered without a
+relaunch. The rule and its cases: `contracts/shared-rules.json` →
+`savingSettings`, run against `CourseConfiguration.merged`.
+
+**Rejected**, and why:
+- *Merging inside lists* (union the two `hidden` lists, say): needs rules for
+  order and for an item removed on one side and added on the other; nothing
+  reported needs them. Per key is enough for "a stale window saved something
+  else", which is the case that happened.
+- *Refusing a Save that met another window's change and reloading instead*:
+  throws away what the teacher just did. The Save wins; the trail records that it
+  replaced a change made elsewhere.
+- *A file watcher per window*: a new moving part, for what reload-after-Save and
+  reload-on-open already cover.
+
+**What a Save tells you** (`SettingsSaveNotice`). A preview and a publish read
+the settings once, when their build begins — measured: 20 s after a Save the
+served sidebar filter was unchanged. So:
+- **A preview of the course is open** → beside the Save row,
+  `SpecialNames.settingsSavedWhilePreviewing`, with a **Preview Again** button
+  (Russell's choice). Leaving a section for its course's settings STOPS that
+  section's preview (`SectionDetailView.onDisappear`), so an open preview is in
+  ANOTHER window; the button restarts it through `SectionWindowControllers` —
+  the same stop-then-start the assistant uses — and a section whose preview has
+  since stopped is left alone.
+- **A publish of the course is running** (the plan review's A3) →
+  `settingsSavedWhilePublishing` instead, and NO button: a preview is refused
+  while that course publishes (`rebuildAfterRepair`), so a button that could only
+  be refused would be worse than none. Worth knowing: because the Save changed
+  no page, the next Publish may call the site up to date and send the same build
+  again (`BuildFreshness` compares page times with `index.html`). Rejected for
+  now: teaching `needsRebuild` to compare the build's copy of the settings with
+  the file — a publish-path change for a case the sentence already names.
+- The notice does not fade (unlike "Saved ✓"); it stays until the next Save,
+  Preview Again, or leaving the course.
+- **A preview STARTS while Course Settings holds unsaved changes** →
+  `previewUsesSavedSettings` above the preview. Unsaved edits live in the
+  course's shared configuration and survive leaving the form, so the switches
+  and the page could disagree with nothing said. Rejected: saving automatically
+  (a half-typed setting would be written) and refusing (previewing the saved
+  settings may be the point).
+- *Rejected: rebuilding the preview automatically on every Save* — it kills a
+  page the teacher may be reading, for a Save that may have changed only the
+  footer, and the preview belongs to another window's runner.
+
+**The trail.** `settings saved` now says what the Save hid and showed (names
+only, compared with the file before the Save), which settings it kept or
+replaced from elsewhere, and whether a preview or a publish was running — the
+line that would have settled #265 in one read. New: `preview started with
+unsaved settings` and `preview again after settings saved`.
+
+**What the view must not do.** The notice is decided once, in `save()`, from
+`PreviewLeases.active` and `CourseActivity.activePublishes`; no cell of the
+sidebar table asks the course anything while drawn (the #266 rule above).
+
 ## Renaming a course folder
 
 Folder rows in Course Settings carry a pencil. It renames the folder **on

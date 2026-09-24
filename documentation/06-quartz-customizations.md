@@ -160,7 +160,8 @@ copies), so they exist before any site is built. Both are idempotent.
 ### B1. Explorer "omit anchor" in `quartz.layout.ts`
 
 Stock `quartz.layout.ts` calls `Component.Explorer()`. Setup replaces it with
-a configured call whose `filterFn` consults a marked set:
+a configured call whose `filterFn` consults a marked set. This is version 2 of
+that filter (issue #265, 2026-09-24), copied from `setup_course.EXPLORER_BLOCK`:
 
 ```ts
 Component.Explorer({
@@ -168,11 +169,27 @@ Component.Explorer({
     filterFn: (node) => {
       // CQ4T-OMIT-ANCHOR: do not remove this line; build script overwrites this Set
       const omit = new Set<string>([""]);
-      if (node.isFolder) {
-        return !omit.has(node.fileSegmentHint);
-      } else {
-        return !omit.has(node.data.title);
+      // CQ4T-HIDE-RULE: v2 - stored names, top level only
+      const hiddenNames = new Set<string>();
+      for (const name of omit) {
+        hiddenNames.add(String(name || "").normalize("NFC").toLowerCase());
       }
+      const depth = node.slug.split("/").length;
+      if (node.isFolder) {
+        if (depth !== 2) {
+          return true;
+        }
+        return !hiddenNames.has(String(node.fileSegmentHint || "").normalize("NFC").toLowerCase());
+      }
+      if (depth !== 1) {
+        return true;
+      }
+      const filePath = node.data ? String(node.data.filePath || "").normalize("NFC").toLowerCase() : "";
+      if (hiddenNames.has(filePath)) {
+        return false;
+      }
+      const stem = filePath.endsWith(".md") ? filePath.slice(0, -3) : filePath;
+      return !hiddenNames.has(stem);
     },
   })
 ```
@@ -182,6 +199,43 @@ the course's actual hidden items. The `CQ4T-OMIT-ANCHOR` comment
 ("Containerized Quartz 4 Teachers") gives the rewrite a stable landmark, and
 `build_site.py` contains a preflight that re-injects a default set if the
 anchor has gone missing (e.g. someone hand-edited the file).
+
+**The rule** (`contracts/file-formats.json` → `sidebarHiding.matchRule`): a
+`hidden` entry is the STORED name of a TOP-LEVEL item — a file by its name with
+`.md`, a folder by its name, which is exactly what Course Settings offers and
+writes — matched ignoring case and Unicode normalisation; nothing below the top
+level is hidden by a name; a name without `.md` still hides `<name>.md`, so no
+older entry is un-hidden. **Version 1** matched a folder on
+`fileSegmentHint` at ANY depth and a file on `node.data.title` — its page TITLE —
+with the build stripping `.md` so a file name could stand in for the title. So a
+page titled differently from its file name was never hidden, and a nested
+`Portfolios/Tasks` was hidden because the top-level `Tasks` was ticked. Titles
+were never the input (the list was file names from the first commit, where this
+filter was Quartz's own documentation example); the title match worked only
+because every shipped page has title == file name. Measured: old vs new over 8 real
+courses, 38 payloads and 50 skeletons (13,457 items), 0 differences. The only
+direction toward SHOWING is a nested item sharing a ticked name, which the switch
+list never offered, and which is still published either way.
+
+Three constraints the text must keep, each tested in `scripts/test_sidebar_hiding.py`:
+
+- **No `}` followed by `)` before the block's end.** The patchers find a block with
+  the non-greedy `Component\.Explorer\(\s*\{[\s\S]*?\}\s*\)`, which would stop early
+  and leave a truncated filter. Hence `if` statements, not callbacks.
+- **No named inner function or arrow.** `filterFn` is serialised with `.toString()`
+  and rebuilt in the browser, and Quartz bundles with esbuild's `keepNames`, which
+  wraps `const f = (x) => ...` in a `__name(...)` helper that does not exist once
+  the text is rebuilt — the filter throws and the sidebar fails to draw. The first
+  draft of v2 had exactly this; `scripts/check_sidebar_hiding_against_the_site.py`
+  (verify.sh) caught it, because it rebuilds the function from its text the same
+  way, through Quartz's own `FileTrieNode`.
+- **No backslash.** The patchers pass the block to `re.subn` as a replacement,
+  where a backslash is an escape.
+
+`fileSegmentHint` is TypeScript-private but read at runtime, as v1 did; `slug`
+is public (a folder's is `<path>/index`, so two segments means top level).
+Existing sections are brought to v2 on their next build
+([05 → Stage 4](05-build-pipeline.md#stage-4-configuration-patching)).
 
 **Purpose:** implements the "hide from sidebar" feature — hidden pages still
 build and remain reachable by link and search; they are only filtered out of
@@ -244,7 +298,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-2 | **Reading time toggle** | `quartz/components/ContentMeta.tsx` | Sets `showReadingTime` (and its trailing comma display) in `defaultOptions` to match `show_reading_time`. |
 | C2-3 | **Expand-on-navigate wiring** | `Explorer.tsx`, `explorer.inline.ts` | Injects `expandOnFolderClick` from course config as a `data-expand-on-navigate` attribute and gates the client script's "auto-open folders on the current page's path" logic behind it. Without the gate, navigating to a page inside a folder always sprang that folder open even when the teacher chose chevron-only expansion. |
 | C2-4 | **Patched Backlinks component** | `quartz/components/Backlinks.tsx` | Whole-file replacement from `support/Backlinks.tsx` — see D below. |
-| C2-5 | **Sidebar omit set** | `quartz.layout.ts` | Rewrites the B1 anchor's `const omit = new Set([...])` with the course's `hidden` list (with `Media` always appended). This is the moment "hide from sidebar" choices become real. |
+| C2-5 | **Sidebar omit set** | `quartz.layout.ts` | First brings the section's copy of the B1 filter up to the current version (`ensure_sidebar_hide_rule_current`), then rewrites the anchor's `const omit = new Set([...])` with the course's `hidden` list AS STORED — `.md` kept, each name a JSON string — plus `Media` and `Curriculum Coverage.md` (`names_the_sidebar_hides`, never written back). This is the moment "hide from sidebar" choices become real. |
 | C2-6 | **Folder click behaviour** | `quartz.layout.ts` | Sets `folderClickBehavior` on every `Component.Explorer({...})` to `"collapse"` (name click expands) or `"link"` (name click navigates), per `expandOnFolderClick`. |
 | C2-7 | **Custom footer** | `quartz.layout.ts`, `quartz/components/Footer.tsx` | Normalizes the layout to `Component.Footer()` and replaces the footer JSX with the teacher's raw HTML (via `dangerouslySetInnerHTML`, backtick-escaped). Typically a licence notice. |
 | C2-8 | **Page title** | `quartz.config.ts` | Sets `pageTitle` to `"<emoji> <label> S<N>"` — per-section emoji, the uppercased course code (or the club's custom short label when the code has no grade digit), and the optional section marker. |
