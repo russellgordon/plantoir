@@ -112,7 +112,9 @@ enum ScheduledDeploy {
     }
 
     /// The home folder a scheduled deploy's notes — the success and findings
-    /// sentinels, the wrapper scripts, the agent's log — are resolved against
+    /// sentinels, the wrapper scripts, the agent's log, and the stopped-run
+    /// records the sidebar badge, the section's notice (and its Dismiss, which
+    /// DELETES one) and `ScheduledPublishWatcher` read — are resolved against
     /// when a caller names none: the real one in the app and in a run launchd
     /// fired, and ONE throwaway folder per test run under the suite.
     ///

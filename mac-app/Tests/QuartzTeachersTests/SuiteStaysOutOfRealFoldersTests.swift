@@ -55,6 +55,13 @@ final class SuiteStaysOutOfRealFoldersTests: XCTestCase {
         XCTAssertFalse(findings.path.hasPrefix(realLibraryPath), findings.path)
         XCTAssertFalse(log.path.hasPrefix(realLibraryPath), log.path)
         XCTAssertFalse(scripts.path.hasPrefix(realLibraryPath), scripts.path)
+
+        // The stopped-run records: the sidebar's badge and the section's
+        // notice read them whenever a window is built, and Dismiss deletes
+        // one. They name their home explicitly, so this asks the home they
+        // name rather than a resolver's default.
+        let stopped: URL = ScheduledPublishOutcome.directory(inHomeFolder: ScheduledDeploy.homeForScheduledNotes)
+        XCTAssertFalse(stopped.path.hasPrefix(realLibraryPath), stopped.path)
     }
 
     func testTheSuiteNeverReadsTheRealLaunchAgents() {

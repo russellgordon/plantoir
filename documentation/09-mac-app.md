@@ -1506,8 +1506,35 @@ because the obvious home is wrong twice over:
   log 77, `.succeeded` 24, `assist/` 23, `.findings` 11; 92 of those only
   built a path into generated text) and **38 with the fix — every one
   `oneShotCommand` writing script TEXT with its real-home default, which
-  touches no file.** Zero reaches of a real file. The probe returned a scratch
-  path wherever it logged, so neither run read or wrote the real folders.
+  touches no file.** The probe returned a scratch path wherever it logged, so
+  neither run read or wrote the real folders.
+
+  **The stopped-run records, found by the review and closed in the same
+  piece.** `…/Plantoir/scheduled/stopped/` is read by the sidebar's badge
+  (`SidebarView.stoppedPublishBadge`) and the section's notice
+  (`SectionDetailView.loadStoppedScheduledPublish`) whenever a window is built,
+  and `dismissScheduledPublishNotice` DELETES a record — all three, and
+  `ScheduledPublishWatcher.shared`, passed the real home EXPLICITLY, so the
+  redirect never applied: 29 reads per suite run (14 from
+  `CourseRenameInterfaceTests` alone), and the first test to press Dismiss
+  would have deleted a real record. The plan had said no test builds the
+  sidebar; the review measured that wrong. All four now pass
+  `ScheduledDeploy.homeForScheduledNotes`.
+
+  **What "zero" covers, exactly.** The final probe (branch tip, full suite,
+  1,727 tests) watched the five `ScheduledDeploy` resolvers (sentinels, log,
+  scripts folder, LaunchAgents), `ClaudeCodeLauncher.supportDirectory()`,
+  `ScheduledPublishOutcome.directory` (every stopped-record path derives from
+  it) and `AssistModelStore.directoryURL`. It logged **101 stacks and no reach
+  of a real file in any watched folder**: 95 are the 19 `oneShotCommand` calls
+  building script TEXT (log, `.succeeded`, and three stopped-record paths
+  each), and **6 are stat-only reads of the real models folder** —
+  `SharedRulesContractTests.testWhatThePanelSaysFollowsTheContract` (4, through
+  `AssistModelLibrary.whatHappensNext`),
+  `AssistWarmUpTests.testATurnCannotStartBeforeTheWarmUpHasComeBack` (1) and
+  `SectionRestoredTrailTests.testARefusedRestoreWritesNothing` (1): whether a
+  model file exists and how big it is, nothing written, but a panel sentence
+  that depends on what this Mac has downloaded. Left for now, and named.
 
   **Reached and deliberately left:** `~/Library/Application Support/obsidian/
   obsidian.json` is READ by the rename paths only when Obsidian is running with
@@ -1516,7 +1543,19 @@ because the obvious home is wrong twice over:
   tests' read of the real models folder is opt-in and outside the gate. And
   `ScheduledDeploy.bootOutAgent(label:)` runs `/bin/launchctl` directly,
   bypassing the refusal — safe only because its callers end the process and no
-  test reaches them; its comment says so. Windows owes nothing as an
+  test reaches them; its comment says so. The review's broader probe (every
+  product home lookup) also counted 146 lookups of home dot-folders by
+  `findCommandLineTool` (`~/.local/bin`, `~/.nvm` …) — outside this issue's
+  folders.
+
+  **The limit of the guard, so nobody oversells it.** The redirects are per
+  SUBSYSTEM — `homeForScheduledNotes` for everything a scheduled deploy leaves,
+  `supportDirectory`'s own for the launch files, `buildsRoot`'s for builds — and
+  `SuiteStaysOutOfRealFoldersTests` asks the resolvers it names. A NEW product
+  path that resolves the real home by itself would not be caught today; the
+  stopped-record reads were exactly such a path, found by a probe rather than
+  a test. A source-scan tripwire (the `ActivityTrailWiringTests` device) is a
+  follow-up, not part of this piece. Windows owes nothing as an
   obligation, but the shape is worth a look there: a resolver with no home
   parameter, fed a fixture course a teacher plausibly has.
 - **Not inside `SidebarView.performRemoval` either**, which is where it started.

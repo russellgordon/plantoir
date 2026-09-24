@@ -937,7 +937,7 @@ struct SectionDetailView: View {
     /// this view's own state and the workspace.
     func dismissScheduledPublishNotice() {
         ScheduledPublishOutcome.clear(
-            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
             course: course.code,
             section: sectionNumber
         )
@@ -961,7 +961,7 @@ struct SectionDetailView: View {
     /// it instead of the half six the run stopped at.
     func loadStoppedScheduledPublish() {
         stoppedScheduledPublish = ScheduledPublishOutcome.stopped(
-            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
             course: course.code,
             section: sectionNumber
         )
