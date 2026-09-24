@@ -264,6 +264,206 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertNil(ScheduledDeploy.requestedScript(from: ["/x", ScheduledDeploy.runFlag]))
     }
 
+    /// Scheduling a section that already has a deploy set says so in the
+    /// plan — the schedule sheet's own text — and leaves a line on the trail
+    /// once it has replaced it (issue #195). The old one is read Mac-wide:
+    /// it was set from another working folder here, which is the case a
+    /// reading scoped to this folder would miss.
+    @MainActor
+    func testSchedulingAgainSaysWhatItReplacesAndRecordsIt() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let scratch: URL = agentsDirectory.deletingLastPathComponent().appendingPathComponent("trail")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
+        let newMoment: Date = sixThirtyTomorrow()
+        let alreadySet: Date = newMoment.addingTimeInterval(36 * 60 * 60)
+        let old: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: course.code, sectionNumber: 1, when: alreadySet,
+            workspaceURL: agentsDirectory.deletingLastPathComponent().appendingPathComponent("last-year"),
+            deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1))
+
+        XCTAssertEqual(
+            ScheduledDeploy.momentBeingReplaced(courseCode: course.code, sectionNumber: 1, by: newMoment),
+            alreadySet
+        )
+        XCTAssertNil(
+            ScheduledDeploy.momentBeingReplaced(courseCode: course.code, sectionNumber: 1, by: alreadySet),
+            "Setting it again for the same moment replaces nothing a teacher would notice"
+        )
+
+        let sentence: String = AssistWording.scheduleReplaces(
+            moment: ScheduledDeploy.dayAndTimeText(alreadySet)
+        )
+        let plan: ScheduledDeployPlan = ScheduledDeploy.plan(
+            course: course, sectionNumber: 1, when: newMoment, now: Date(), cloudflareAccountID: ""
+        )
+        XCTAssertTrue(plan.description.contains(sentence), plan.description)
+
+        let runner: FakeLaunchControl = FakeLaunchControl()
+        XCTAssertNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: newMoment,
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("\(course.code)/1"), trail)
+        XCTAssertTrue(trail.contains(ScheduledDeploy.dayAndTimeText(alreadySet)), trail)
+        XCTAssertTrue(trail.contains(ScheduledDeploy.dayAndTimeText(newMoment)), trail)
+
+        // Now that it is set, the sheet says it would replace THIS one — and
+        // scheduling the same moment again says nothing and records nothing.
+        let again: ScheduledDeployPlan = ScheduledDeploy.plan(
+            course: course, sectionNumber: 1, when: newMoment, now: Date(), cloudflareAccountID: ""
+        )
+        XCTAssertFalse(again.description.contains(sentence), again.description)
+        let linesBefore: Int = trail.components(separatedBy: "\n").count
+        XCTAssertNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: newMoment,
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+        XCTAssertEqual(
+            ActivityTrail.store.activityText(includingPrompts: true).components(separatedBy: "\n").count,
+            linesBefore
+        )
+    }
+
+    /// A replacement that FAILS has still removed the old deploy — booted out
+    /// and overwritten before macOS refused the new one — so the teacher has
+    /// neither, and the refusal speaks only of the new one. The trail says the
+    /// old one was turned off, and when it had been set for.
+    @MainActor
+    func testAReplacementThatFailsRecordsTheDeployItTurnedOff() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let scratch: URL = agentsDirectory.deletingLastPathComponent().appendingPathComponent("trail")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
+        let newMoment: Date = sixThirtyTomorrow()
+        let alreadySet: Date = newMoment.addingTimeInterval(36 * 60 * 60)
+        let old: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: course.code, sectionNumber: 1, when: alreadySet,
+            workspaceURL: workspaceURL, deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1))
+
+        let runner: FakeLaunchControl = FakeLaunchControl()
+        runner.bootstrapFailure = "Bootstrap failed: 5: Input/output error"
+        XCTAssertNotNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: newMoment,
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+        XCTAssertEqual(runner.bootedOutLabels.count, 1, "The old deploy was booted out before the new one was refused")
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains(ScheduledDeploy.dayAndTimeText(alreadySet)), trail)
+        XCTAssertTrue(trail.contains("turned off"), trail)
+        XCTAssertTrue(
+            trail.contains("could not set a scheduled deploy for \(ScheduledDeploy.dayAndTimeText(newMoment))"),
+            "The trail must say the new one was not set: \(trail)"
+        )
+    }
+
+    /// The SAME minute, refused by macOS: the card rightly said nothing about
+    /// replacing it, but the old one's plist was overwritten before macOS was
+    /// asked, so it is gone — and that loss is recorded (#195 fix review).
+    @MainActor
+    func testARefusedReScheduleForTheSameMinuteRecordsWhatWasLost() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let scratch: URL = agentsDirectory.deletingLastPathComponent().appendingPathComponent("trail")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
+        let moment: Date = sixThirtyTomorrow()
+        let old: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: course.code, sectionNumber: 1, when: moment,
+            workspaceURL: workspaceURL, deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1))
+        XCTAssertNil(
+            ScheduledDeploy.momentBeingReplaced(courseCode: course.code, sectionNumber: 1, by: moment),
+            "The card says nothing for the same minute"
+        )
+
+        let runner: FakeLaunchControl = FakeLaunchControl()
+        runner.bootstrapFailure = "Bootstrap failed: 5: Input/output error"
+        XCTAssertNotNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: moment,
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("turned off the scheduled deploy set for \(ScheduledDeploy.dayAndTimeText(moment))"),
+            "A same-minute deploy was lost and nothing says so: \(trail)"
+        )
+    }
+
+    /// A failed WRITE is not a loss: the old plist is still on disk, so it is
+    /// handed back to macOS and the trail says it still stands — never "turned
+    /// off", which would be false, since it would still fire (#195 fix review).
+    @MainActor
+    func testAFailedWriteLeavesTheOldDeployStandingAndSaysSo() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let scratch: URL = agentsDirectory.deletingLastPathComponent().appendingPathComponent("trail")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
+        let newMoment: Date = sixThirtyTomorrow()
+        let alreadySet: Date = newMoment.addingTimeInterval(36 * 60 * 60)
+        let old: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: course.code, sectionNumber: 1, when: alreadySet,
+            workspaceURL: workspaceURL, deployArguments: []
+        )
+        let plist: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1)
+        let oldBytes: Data = try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
+        try oldBytes.write(to: plist)
+
+        // The scripts folder sits under a FILE, so creating it throws — the
+        // first write in the attempt fails before the plist is touched.
+        let blocker: URL = agentsDirectory.deletingLastPathComponent().appendingPathComponent("not-a-folder")
+        try Data("x".utf8).write(to: blocker)
+        ScheduledDeploy.scheduledScriptsDirectoryOverride = blocker.appendingPathComponent("scheduled")
+
+        let runner: FakeLaunchControl = FakeLaunchControl()
+        XCTAssertNotNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: newMoment,
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+        XCTAssertEqual(try Data(contentsOf: plist), oldBytes, "The old plist must be untouched by a failed write")
+        XCTAssertEqual(runner.bootstrappedURLs, [plist], "The old deploy was not handed back to macOS")
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("still stands"), trail)
+        XCTAssertTrue(trail.contains(ScheduledDeploy.dayAndTimeText(alreadySet)), trail)
+        XCTAssertFalse(trail.contains("turned off"), "The old deploy still stands, so nothing was turned off: \(trail)")
+    }
+
+    /// With nothing set, the plan says nothing about replacing anything.
+    @MainActor
+    func testSchedulingAFreeSectionMentionsNoReplacement() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let plan: ScheduledDeployPlan = ScheduledDeploy.plan(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(), now: Date(), cloudflareAccountID: ""
+        )
+        XCTAssertNil(plan.replacing)
+        XCTAssertNil(ScheduledDeploy.momentBeingReplaced(
+            courseCode: course.code, sectionNumber: 1, by: sixThirtyTomorrow()
+        ))
+    }
+
     /// Scheduling writes the script the agent runs, and cancelling takes it
     /// away — a cancelled deploy must not leave a runnable copy of itself.
     @MainActor

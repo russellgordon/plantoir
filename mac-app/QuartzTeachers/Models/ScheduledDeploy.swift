@@ -371,6 +371,9 @@ enum ScheduledDeploy {
                 cloudflareAccountID: cloudflareAccountID,
                 locale: locale
             ),
+            replacing: momentBeingReplaced(
+                courseCode: course.code, sectionNumber: sectionNumber, by: when, now: now
+            ),
             locale: locale
         )
     }
@@ -934,6 +937,21 @@ enum ScheduledDeploy {
         )
         let destinationURL: URL = plistURL(courseCode: course.code, sectionNumber: sectionNumber)
 
+        // What is about to be replaced, read BEFORE it goes (issue #195): once
+        // the old agent is booted out and its plist overwritten, nothing
+        // anywhere remembers it was ever set. Read here, in the one function
+        // the sheet, the assistant and an outside assistant all reach, so the
+        // trail line cannot be missing from one of them.
+        let replacing: Date? = momentBeingReplaced(
+            courseCode: course.code, sectionNumber: sectionNumber, by: when
+        )
+        // What is on this Mac for the section AT ALL, same minute included —
+        // for the record of a replacement that fails, which must say what was
+        // lost even when the card rightly said nothing.
+        let alreadySet: Date? = momentAlreadySet(
+            courseCode: course.code, sectionNumber: sectionNumber
+        )
+
         // Anything already scheduled for this section goes first, so the
         // replacement is never briefly a second agent.
         runner.bootOut(label: agentLabel(courseCode: course.code, sectionNumber: sectionNumber))
@@ -973,14 +991,105 @@ enum ScheduledDeploy {
             )
             try data.write(to: destinationURL, options: [.atomic])
         } catch {
+            // Every step that can throw comes before, or IS, the atomic plist
+            // write — so the OLD plist is still on disk, only booted out. Put
+            // it back in front of macOS, so that "it still stands" is true now
+            // rather than from the next login, and say so.
+            noteTheOldDeployAfterAFailedWrite(
+                alreadySet, at: destinationURL, runner: runner,
+                when: when, course: course, sectionNumber: sectionNumber
+            )
             return "The scheduled deploy could not be written: \(error.localizedDescription)"
         }
 
         if let failure = runner.bootstrap(plistURL: destinationURL) {
             try? FileManager.default.removeItem(at: destinationURL)
+            ActivityTrail.note(
+                .scheduledDeployCouldNotBeSet,
+                "could not set a scheduled deploy for \(dayAndTimeText(when)): macOS would not accept it",
+                course: course.code,
+                section: sectionNumber
+            )
+            noteTheReplacedDeployWasLost(alreadySet, course: course, sectionNumber: sectionNumber)
             return "macOS would not accept the scheduled deploy: \(failure)"
         }
+        if let replacing {
+            // "It went on Saturday; I set it for Friday" is otherwise a report
+            // nothing can answer: the old job leaves no file behind.
+            ActivityTrail.note(
+                .scheduledDeployReplaced,
+                "replaced the deploy set for \(dayAndTimeText(replacing)) "
+                    + "with one set for \(dayAndTimeText(when))",
+                course: course.code,
+                section: sectionNumber
+            )
+        }
         return nil
+    }
+
+    /// The new deploy's files could not be written. The old one's plist is
+    /// untouched on disk (the write that failed is atomic, and everything
+    /// before it writes elsewhere), but it was booted out a moment ago — so it
+    /// is handed back to macOS, and the trail says what is TRUE: the deploy
+    /// already set still stands, or, if macOS would not take it back, that it
+    /// was turned off. Silent when nothing was set.
+    ///
+    /// Known and left as it was: the one-shot script is written BEFORE the
+    /// plist, at the same path for the section, so an old plist restored here
+    /// runs whatever script the failed attempt managed to write.
+    private static func noteTheOldDeployAfterAFailedWrite(
+        _ alreadySet: Date?,
+        at plistURL: URL,
+        runner: LaunchControlRunning,
+        when: Date,
+        course: Course,
+        sectionNumber: Int
+    ) {
+        let notSet: String = "could not set a scheduled deploy for \(dayAndTimeText(when))"
+        guard let alreadySet else {
+            ActivityTrail.note(
+                .scheduledDeployCouldNotBeSet, notSet, course: course.code, section: sectionNumber
+            )
+            return
+        }
+        if FileManager.default.fileExists(atPath: plistURL.path)
+            && runner.bootstrap(plistURL: plistURL) == nil {
+            ActivityTrail.note(
+                .scheduledDeployCouldNotBeSet,
+                notSet + "; the one set for \(dayAndTimeText(alreadySet)) still stands",
+                course: course.code,
+                section: sectionNumber
+            )
+            return
+        }
+        ActivityTrail.note(
+            .scheduledDeployCouldNotBeSet, notSet, course: course.code, section: sectionNumber
+        )
+        noteTheReplacedDeployWasLost(alreadySet, course: course, sectionNumber: sectionNumber)
+    }
+
+    /// The old deploy was booted out to make way for a new one, and the new
+    /// one then failed — so the teacher has NEITHER, and the refusal they are
+    /// shown speaks only of the new one (issue #195's review). Filed under
+    /// `scheduled deploy turned off`, whose job is exactly this: a deploy
+    /// turned off by something other than the teacher asking. Silent when
+    /// nothing was set — and NOT silent for the same minute, which the card
+    /// rightly leaves unsaid but whose loss is still a loss.
+    private static func noteTheReplacedDeployWasLost(
+        _ replacing: Date?,
+        course: Course,
+        sectionNumber: Int
+    ) {
+        guard let replacing else {
+            return
+        }
+        ActivityTrail.note(
+            .scheduledDeployTurnedOff,
+            "turned off the scheduled deploy set for \(dayAndTimeText(replacing)) "
+                + "to make way for a new one that could not be set",
+            course: course.code,
+            section: sectionNumber
+        )
     }
 
     /// Run the one-shot script and leave, without ever becoming an app.
@@ -1459,6 +1568,67 @@ enum ScheduledDeploy {
         return moment
     }
 
+    /// When the one deploy this section has on this Mac is set for — from
+    /// ANY working folder — or nil when there is none or its moment has gone
+    /// by. The reading behind both `momentBeingReplaced` (which then leaves
+    /// out the same minute, for what a teacher is TOLD) and the record of a
+    /// replacement that failed (which must not: a same-minute job lost is
+    /// still lost).
+    ///
+    /// Under the test suite this reads ONLY a folder a test chose. The card
+    /// reads this whenever a scheduled deploy is proposed, and tests that put
+    /// one up without moving the agents folder would otherwise read the real
+    /// `~/Library/LaunchAgents` of whoever runs the suite — passing whatever
+    /// that Mac has scheduled, which is the #240 fault arriving through a new
+    /// door. A test that wants one sets `launchAgentsDirectoryOverride`, as
+    /// every scheduling test already does.
+    static func momentAlreadySet(
+        courseCode: String,
+        sectionNumber: Int,
+        now: Date = Date()
+    ) -> Date? {
+        if WorkspaceModel.isRunningTests && launchAgentsDirectoryOverride == nil {
+            return nil
+        }
+        return nextRun(
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            now: now,
+            inWorkingFolder: nil
+        )
+    }
+
+    /// When the deploy that scheduling this section for `when` would REPLACE
+    /// is set for — or nil when there is none, or when it is set for that
+    /// same minute and so replaces nothing a teacher would notice (issue #195).
+    ///
+    /// **Deliberately NOT scoped to a working folder**, unlike every other
+    /// reader of `nextRun` that has a folder in hand. `scheduleDeploy` writes
+    /// to `plistURL`, which is one file per course code and section for the
+    /// whole Mac, so the job it overwrites may have been set from ANOTHER
+    /// working folder — last year's, holding the same code. Asking with this
+    /// folder would answer nil in exactly that case, and stay silent about
+    /// the replacement nobody could see coming. A moment already past is nil
+    /// here as it is in `nextRun`: a job that has fired, or was left by a Mac
+    /// that was off, is not a promise being broken.
+    static func momentBeingReplaced(
+        courseCode: String,
+        sectionNumber: Int,
+        by when: Date,
+        now: Date = Date(),
+        calendar: Calendar = Calendar.current
+    ) -> Date? {
+        guard let existing = momentAlreadySet(
+            courseCode: courseCode, sectionNumber: sectionNumber, now: now
+        ) else {
+            return nil
+        }
+        if calendar.isDate(existing, equalTo: when, toGranularity: .minute) {
+            return nil
+        }
+        return existing
+    }
+
     // MARK: - Which agents belong to this working folder
 
     /// One scheduled deploy as it stands on disk, read back from its own
@@ -1685,6 +1855,11 @@ struct ScheduledDeployPlan {
     /// Why this cannot be scheduled, or nil when it can be.
     let problem: String?
 
+    /// When the deploy this would replace is set for, or nil when it replaces
+    /// nothing (issue #195). Read Mac-wide — see
+    /// `ScheduledDeploy.momentBeingReplaced`.
+    let replacing: Date?
+
     let locale: Locale
 
     // MARK: - Computed properties
@@ -1702,6 +1877,11 @@ struct ScheduledDeployPlan {
 
         var lines: [String] = []
         lines.append("Deploy \(courseCode) Section \(sectionNumber) to \(destination) at \(ScheduledDeploy.dayAndTimeText(when, locale: locale)).")
+        if let replacing {
+            lines.append(AssistWording.scheduleReplaces(
+                moment: ScheduledDeploy.dayAndTimeText(replacing, locale: locale)
+            ))
+        }
         lines.append("")
         lines.append("For this to happen, at that moment this Mac must be:")
         lines.append("  • switched on, and awake — not asleep or shut down")
@@ -1748,6 +1928,7 @@ struct ScheduledDeployPlan {
         destination: String,
         unpublishedClasses: [String],
         problem: String?,
+        replacing: Date? = nil,
         locale: Locale = Locale.current
     ) {
         self.courseCode = courseCode
@@ -1756,6 +1937,7 @@ struct ScheduledDeployPlan {
         self.destination = destination
         self.unpublishedClasses = unpublishedClasses
         self.problem = problem
+        self.replacing = replacing
         self.locale = locale
     }
 }

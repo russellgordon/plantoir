@@ -87,6 +87,23 @@ nonisolated enum AssistWording {
     /// Mac, and "it" would read as the Mac.
     static let scheduleQuestion: String = "Shall I schedule the deploy?"
 
+    /// Said under a scheduled deploy's card, and in the schedule sheet, when
+    /// setting it will REPLACE a deploy already set for that section
+    /// (issue #195). `moment` is when the old one was set for, written the
+    /// way the card writes its own moment.
+    ///
+    /// The card is the only moment before anything is written, so it is the
+    /// only place a teacher can still act on it: scheduling a section again
+    /// removes the one already set, on purpose, and until this sentence the
+    /// teacher was told nothing about it. The fact and nothing else, in the
+    /// house style of `deployWasCancelled`. A FIRST DRAFT for Russell's
+    /// wording pass. It may name a deploy set from ANOTHER working folder —
+    /// one this window's sidebar shows no clock for — because that is the
+    /// one being replaced: a section's scheduled deploy is one per Mac.
+    static func scheduleReplaces(moment: String) -> String {
+        return "This replaces the deploy already set for \(moment)."
+    }
+
     /// The question under a plan card.
     static let planQuestion: String = "Shall I go ahead?"
 
