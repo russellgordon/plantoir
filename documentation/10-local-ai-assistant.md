@@ -997,8 +997,8 @@ is no tool by that name."
 
 Re-taken after the change on 2026-09-23 by running the real gate over every
 definition on the surface (the local thirteen; the MCP-only nineteen never pass
-this gate — `AssistMCPServer` calls the runner directly — and are in the
-review notes):
+this gate — `AssistMCPServer` calls the runner directly — and are listed,
+with what each does on an empty call, in #198's closing comment):
 
 | Local tool | Requires beyond course/section | Declares beyond course/section | Not `readOnly` | First cut | Now |
 |---|---|---|---|---|---|
