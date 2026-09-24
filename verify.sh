@@ -232,6 +232,15 @@ else
   cat /tmp/verify_sidebar_hiding_test.log
 fi
 
+# Issue #265: the build notes when it STARTED, so a Save made during a
+# publish's build makes the next Publish build again.
+if (cd scripts && python3 test_build_started_marker.py) >/tmp/verify_build_started_marker_test.log 2>&1; then
+  pass "build_site.py: the build notes when it started, for the freshness check (scripts/test_build_started_marker.py)"
+else
+  fail "build_site.py: the build notes when it started, for the freshness check (scripts/test_build_started_marker.py)"
+  cat /tmp/verify_build_started_marker_test.log
+fi
+
 if (cd scripts && python3 test_publishable_site.py) >/tmp/verify_publishable_site_test.log 2>&1; then
   pass "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
 else
