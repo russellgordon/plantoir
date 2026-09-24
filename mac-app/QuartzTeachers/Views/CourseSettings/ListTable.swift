@@ -94,6 +94,25 @@ enum ListTableMetrics {
         return rows
     }
 
+    /// The name a row's context menu acts on, or nil when the menu should
+    /// offer nothing: no row under the pointer, or the table is disabled. A
+    /// disabled SwiftUI `Table` still takes keys (see `isEnabled` in each
+    /// table), so every gesture that changes a list asks — Space, Delete,
+    /// double-click, and this menu.
+    static func contextMenuTarget(forRowIDs rowIDs: Set<String>, in rows: [ListTableRow], isEnabled: Bool) -> String? {
+        guard isEnabled else {
+            return nil
+        }
+        var firstRowID: String? = nil
+        for row in rows {
+            if rowIDs.contains(row.id) {
+                firstRowID = row.id
+                break
+            }
+        }
+        return name(ofRowWithID: firstRowID, in: rows)
+    }
+
     /// The name of the row with this id, or nil when no row has it — looked
     /// up, never parsed out of the id.
     static func name(ofRowWithID rowID: String?, in rows: [ListTableRow]) -> String? {

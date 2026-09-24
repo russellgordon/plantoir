@@ -7,7 +7,8 @@ import SwiftUI
 /// One table shows at a glance which folder is hidden and which expands, and
 /// is half the height of the two lists it replaced. The two list titles
 /// ("Hide from the site's sidebar", "Expandable in the site's sidebar") are
-/// now short column headers under the section's own "Sidebar Visibility".
+/// now short column headers under the section's own "Sidebar Visibility",
+/// and live on in full as the row menu's two items.
 ///
 /// Each column writes its own list and nothing else. Both go through
 /// `MembershipToggleListView.updatedMembers`, the one place a tick becomes a
@@ -24,6 +25,12 @@ struct SidebarVisibilityTableView: View {
     static let hideHeader: String = "Hide"
     static let expandableHeader: String = "Expandable"
     static let nameHeader: String = "Folder or file"
+
+    /// The row menu's two items: the titles the two lists carried before
+    /// the table, so "sidebar" keeps saying WHOSE sidebar — Plantoir has one
+    /// of its own.
+    static let hideMenuTitle: String = "Hide from the site's sidebar"
+    static let expandableMenuTitle: String = "Expandable in the site's sidebar"
 
     /// Wide enough for each header to be read in full.
     static let hideColumnWidth: CGFloat = 44
@@ -82,9 +89,9 @@ struct SidebarVisibilityTableView: View {
                 // focusable control, so Space can serve only one column, and
                 // with Full Keyboard Access this menu is how the other is
                 // reached.
-                if let item = ListTableMetrics.name(ofRowWithID: rowIDs.first, in: rows) {
-                    Toggle("Hide in the Sidebar", isOn: hideBinding(for: item))
-                    Toggle("Expandable in the Sidebar", isOn: expandableBinding(for: item))
+                if let item = ListTableMetrics.contextMenuTarget(forRowIDs: rowIDs, in: rows, isEnabled: isEnabled) {
+                    Toggle(SidebarVisibilityTableView.hideMenuTitle, isOn: hideBinding(for: item))
+                    Toggle(SidebarVisibilityTableView.expandableMenuTitle, isOn: expandableBinding(for: item))
                 }
             }
             .onKeyPress(.space) {
