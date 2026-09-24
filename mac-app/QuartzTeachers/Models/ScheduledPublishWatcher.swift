@@ -61,7 +61,7 @@ final class ScheduledPublishWatcher {
     /// the suite's own guard.
     static let shared: ScheduledPublishWatcher = ScheduledPublishWatcher(
         folder: ScheduledPublishOutcome.directory(
-            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser
+            inHomeFolder: ScheduledDeploy.homeForScheduledNotes
         )
     )
 
