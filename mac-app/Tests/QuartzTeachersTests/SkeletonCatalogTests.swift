@@ -44,8 +44,8 @@ final class SkeletonCatalogTests: XCTestCase {
     /// a code with real pages is offered no placeholder ones while they are.
     @MainActor
     func testACodeWithExampleContentIsNotOfferedASkeletonWhileItIsBeingTaken() {
-        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: "ADA1O", takingExampleContent: true))
-        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA2O", takingExampleContent: true),
+        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: "ADA1O", takingExampleContent: true, numbered: false))
+        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA2O", takingExampleContent: true, numbered: false),
                       "ADA2O has no ready-made pages, so the flag cannot matter for it")
     }
 
@@ -55,18 +55,18 @@ final class SkeletonCatalogTests: XCTestCase {
     /// — an ICS4U with 18 pages where the skeleton has 47.
     @MainActor
     func testASkeletonIsOfferedOnceTheExampleIsDeclined() {
-        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA1O", takingExampleContent: false))
-        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ICS4U", takingExampleContent: false))
-        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA2O", takingExampleContent: false),
+        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA1O", takingExampleContent: false, numbered: false))
+        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ICS4U", takingExampleContent: false, numbered: false))
+        XCTAssertTrue(SkeletonCatalog.hasSkeleton(forCode: "ADA2O", takingExampleContent: false, numbered: false),
                       "A code with no payload is unaffected in either direction")
-        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: "", takingExampleContent: false),
+        XCTAssertFalse(SkeletonCatalog.hasSkeleton(forCode: "", takingExampleContent: false, numbered: false),
                        "No code typed resolves no family, so there is nothing to offer")
     }
 
     @MainActor
     func testTheSubjectsFoldersAreOfferedForACodeWithoutExampleContent() throws {
         let adopted: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.structureToAdopt(
-            forCode: "AMU3M", takingExampleContent: true,
+            forCode: "AMU3M", takingExampleContent: true, numbered: false,
             currentSharedFolders: WizardDefaults.sharedFolders))
         XCTAssertTrue(adopted.sharedFolders.contains("Repertoire"))
         XCTAssertTrue(adopted.perSectionFiles.contains("Key Links.md"))
@@ -77,7 +77,7 @@ final class SkeletonCatalogTests: XCTestCase {
     @MainActor
     func testTheSubjectsFoldersAreOfferedOnceTheExampleIsDeclined() throws {
         let adopted: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.structureToAdopt(
-            forCode: "ADA1O", takingExampleContent: false,
+            forCode: "ADA1O", takingExampleContent: false, numbered: false,
             currentSharedFolders: WizardDefaults.sharedFolders))
         XCTAssertEqual(adopted.name, "drama")
         XCTAssertTrue(adopted.sharedFolders.contains("Conventions"))
@@ -88,9 +88,9 @@ final class SkeletonCatalogTests: XCTestCase {
     @MainActor
     func testAnEditedFolderListIsNeverOverwritten() {
         XCTAssertNil(SkeletonCatalog.structureToAdopt(
-            forCode: "AMU3M", takingExampleContent: true, currentSharedFolders: ["Only", "Mine"]))
+            forCode: "AMU3M", takingExampleContent: true, numbered: false, currentSharedFolders: ["Only", "Mine"]))
         XCTAssertNil(SkeletonCatalog.structureToAdopt(
-            forCode: "ADA1O", takingExampleContent: false, currentSharedFolders: ["Only", "Mine"]),
+            forCode: "ADA1O", takingExampleContent: false, numbered: false, currentSharedFolders: ["Only", "Mine"]),
             "Declining the example content is not a licence to overwrite an edited list")
     }
 
@@ -100,7 +100,7 @@ final class SkeletonCatalogTests: XCTestCase {
     func testTheSameFamilyTwiceChangesNothing() throws {
         let music: SkeletonCatalog.Family = try XCTUnwrap(SkeletonCatalog.family(forCode: "AMU3M"))
         XCTAssertNil(SkeletonCatalog.structureToAdopt(
-            forCode: "AMU2O", takingExampleContent: true, currentSharedFolders: music.sharedFolders))
+            forCode: "AMU2O", takingExampleContent: true, numbered: false, currentSharedFolders: music.sharedFolders))
     }
 
     /// The folders a skeleton hides and expands are its own, not the app's
@@ -169,7 +169,7 @@ final class SkeletonCatalogTests: XCTestCase {
     @MainActor
     func testACodeWithExampleContentKeepsItsOwnStructureWhileItIsBeingTaken() {
         XCTAssertNil(SkeletonCatalog.structureToAdopt(
-            forCode: "ADA1O", takingExampleContent: true,
+            forCode: "ADA1O", takingExampleContent: true, numbered: false,
             currentSharedFolders: WizardDefaults.sharedFolders),
             "The example content chooses the folders for a teacher who is taking it")
         let wizard: NewCourseWizardView = NewCourseWizardView()

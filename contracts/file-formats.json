@@ -19,7 +19,7 @@
       {
         "key": "class_page_scheme",
         "type": "string (\"unit_day\" or \"numbered\")",
-        "why": "The SHAPE of this course's class-page names (#267). \"unit_day\" is \u201c<unit_word> 2, Day 3\u201d; \"numbered\" is \u201c<unit_word> 3\u201d, one number counting meetings \u2014 what a club writes. ABSENT means \"unit_day\", and so does any value a reader does not know: a scheme a newer app wrote, opened by an older one, reads as today's shape (it then sees no class pages \u2014 degraded, never corrupting) and nothing is rewritten. Written by the new-course wizard for every course, chosen there and NOT switchable afterwards: Course Settings shows it locked. A course made before the key existed (Russell's CODING, whose pages are already \u201cWeek N\u201d) can never become numbered by opening it."
+        "why": "The SHAPE of this course's class-page names (#267). \"unit_day\" is \u201c<unit_word> 2, Day 3\u201d; \"numbered\" is \u201c<unit_word> 3\u201d, one number counting meetings \u2014 what a club writes. ABSENT means \"unit_day\", and so does any value a reader does not know: a scheme a newer app wrote, opened by an older one, reads as today's shape (it then sees no class pages \u2014 degraded, never corrupting) and nothing is rewritten. Written by the new-course wizard for a CLUB only (with front_page_heading and class_noun) \u2014 every other course's file stays byte-for-byte what it was, which absence already describes \u2014 chosen there and NOT switchable afterwards: Course Settings shows it locked. A course made before the key existed (Russell's CODING, whose pages are already \u201cWeek N\u201d) can never become numbered by opening it."
       },
       {
         "key": "front_page_heading",

@@ -101,6 +101,31 @@ struct CourseSettingsView: View {
                     FormSectionHeader("Settings — Overall")
                 }
 
+                // The words the course was made with (#267): shown, and
+                // LOCKED — a club's are chosen in the wizard and are not
+                // switchable afterwards, and an existing course (CODING
+                // included) can never become one from here.
+                Section {
+                    LabeledContent(WizardWording.settingsPageNamingLabel) {
+                        Text(WizardWording.settingsPageNamingValue(configuration.classPageNaming))
+                            .accessibilityIdentifier("pageNamingValue")
+                    }
+                    LabeledContent(WizardWording.settingsFrontPageHeadingLabel) {
+                        Text(configuration.frontPageHeading)
+                            .accessibilityIdentifier("frontPageHeadingValue")
+                    }
+                    LabeledContent(WizardWording.settingsNounLabel) {
+                        Text(configuration.classNoun.rawValue)
+                            .accessibilityIdentifier("classNounValue")
+                    }
+                    Text(WizardWording.settingsLockedCaption)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } header: {
+                    FormSectionHeader("Class Pages")
+                }
+
                 Section {
                     PublishingChoiceView(
                         deployTarget: $configuration.deployTarget,
