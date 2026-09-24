@@ -301,7 +301,7 @@ struct StringListEditorView: View {
             }
         }
         .contextMenu(forSelectionType: String.self) { rowIDs in
-            if let item = ListTableMetrics.name(ofRowWithID: rowIDs.first, in: rows) {
+            if let item = ListTableMetrics.contextMenuTarget(forRowIDs: rowIDs, in: rows, isEnabled: isEnabled) {
                 if onRename != nil {
                     Button("Rename…") {
                         beginRename(of: item)
