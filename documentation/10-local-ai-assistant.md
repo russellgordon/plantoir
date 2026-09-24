@@ -372,11 +372,23 @@ who asked for half six tomorrow read a card that was perfectly true and said
 nothing to contradict them. `AssistWording.deployApproval` now leads with the
 fact that it happens now; the two sentences after it, which have been argued
 over twice, are untouched. **`deployQuestion` was deliberately NOT changed**:
-"Shall I deploy?" is said under EVERY approval card including the scheduled
-one (`AssistAgent.run(settledCall:)` is unconditional, and Windows' `AskFirst`
-likewise), so "Shall I deploy now?" would make the scheduled card read worse
-than the thing being fixed. Splitting the question per tool is its own piece —
-[issue #184](https://github.com/russellgordon/plantoir/issues/184). The rule is
+at the time it was said under EVERY approval card including the scheduled one
+(`AssistAgent.run(settledCall:)` was unconditional, and Windows' `AskFirst`
+likewise), so "Shall I deploy now?" would have made the scheduled card read
+worse than the thing being fixed. Splitting the question per tool was its own
+piece — [issue #184](https://github.com/russellgordon/plantoir/issues/184),
+done 2026-09-23: the scheduled card now carries `AssistWording.scheduleQuestion`,
+chosen by `AssistAgent.approvalQuestion(forToolNamed:)`. The choice is keyed on
+the tool NAME, not on `needsApproval`, so a third approval tool added later
+falls to `deployQuestion` — the reading ("now") that is safe for anything that
+deploys. `SharedRulesContractTests.testTheScheduledCardAsksItsOwnQuestion`
+pins the mirror of the rule below: the scheduled question must NOT carry the
+immediate card's word, read from the same contract rule; and the authored
+scenario "an immediate deploy's card still asks the immediate question" pins
+the other half on BOTH platforms. The Go bubble
+(`deployAccepted`) and the cancel line (`deployWasCancelled`) were left as they
+are — both are true of a scheduled deploy too; whether they should say
+"schedule" is a question for the wording pass, not a fault. The rule is
 pinned as a PROPERTY rather than a sentence:
 `contracts/shared-rules.json` → `assistantConfirmation.`
 `theImmediateDeployCardSaysItIsImmediate` carries the word the sentence must
@@ -2485,8 +2497,9 @@ most for how the window reads:
   Cancel destroyed the description of what had just been agreed to — and with
   it the context for everything after. A conversation you cannot scroll back
   through is not a conversation.
-- **The question.** "Shall I go ahead?" / "Shall I deploy?" is its own
-  message, which is what lets the card below be nothing but buttons.
+- **The question.** `planQuestion` / `deployQuestion` / `scheduleQuestion`
+  (the last under a scheduled deploy's card, #184) is its own message, which
+  is what lets the card below be nothing but buttons.
 - **The teacher's ANSWER.** Pressing Go records "Go" as a teacher message, in
   their bubble on their side. Reading back a conversation where the assistant
   asked, nothing answered, and yet something plainly happened is worse than
