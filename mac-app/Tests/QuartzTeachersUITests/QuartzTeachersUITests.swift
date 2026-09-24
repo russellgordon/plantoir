@@ -968,6 +968,16 @@ final class QuartzTeachersUITests: XCTestCase {
         )
         XCTAssertFalse(factoryFolder.exists, "…and take the factory-only ones out")
 
+        // The Marks list is a table since issue #266: its box must still be a
+        // checkbox a click ticks, drawing what it wrote. Read its value
+        // before and after two clicks, so a box that draws one thing and
+        // writes another shows up here and not in a teacher's saved file.
+        let valueBefore: String = "\(subjectFolder.value ?? "")"
+        subjectFolder.click()
+        XCTAssertNotEqual("\(subjectFolder.value ?? "")", valueBefore, "A click did not change the Marks checkbox")
+        subjectFolder.click()
+        XCTAssertEqual("\(subjectFolder.value ?? "")", valueBefore, "A second click did not put the Marks checkbox back")
+
         let skeletonToggle: XCUIElement = application.descendants(matching: .any)
             .matching(identifier: "skeletonToggle").firstMatch
         XCTAssertTrue(skeletonToggle.waitForExistence(timeout: 5))
