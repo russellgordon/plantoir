@@ -5420,15 +5420,29 @@ def main():
     args = parser.parse_args()
     _HOST_OS = getattr(args, 'host_os', 'unknown')
 
-    build_section_site(
-        course_code=args.course,
-        section_number=args.section,
-        include_social_media_previews=args.include_social_media_previews,
-        force_npm_install=args.force_npm_install,
-        full_rebuild=args.full_rebuild,
-        build_only=args.build_only,
-        port=args.port,
-    )
+    try:
+        build_section_site(
+            course_code=args.course,
+            section_number=args.section,
+            include_social_media_previews=args.include_social_media_previews,
+            force_npm_install=args.force_npm_install,
+            full_rebuild=args.full_rebuild,
+            build_only=args.build_only,
+            port=args.port,
+        )
+    except KeyboardInterrupt:
+        # Stop in the app (the ^C it types into the console) and Ctrl-C at a
+        # terminal arrive here. Stopping is an ordinary thing to do, not a
+        # crash, so leave WITHOUT a traceback — it used to print twenty-odd
+        # lines of Python internals into the console and the problem report
+        # (GitHub #223). Exit 130, the status a shell gives a program
+        # interrupted this way, so every reader of the exit status sees what it
+        # saw before. NOT 0: deploy.py runs this build with check=True, and a
+        # Stop during a publish's rebuild must not read as a finished build
+        # that is then uploaded. Print nothing: the app already says the task
+        # was stopped. subprocess.run has already killed its child (node) by
+        # the time the interrupt reaches here.
+        sys.exit(130)
 
 if __name__ == "__main__":
     main()

@@ -548,6 +548,49 @@ wrong section on one platform.
 > or crash silently inside a resource-constrained Docker container. A serial
 > build is modestly slower but reliable.
 
+### Stopping a build: exit 130, and no traceback
+
+Pressing Stop while a preview is building or serving goes through the app's
+cancel path (`ScriptRunner.cancelByUser`), which types a `^C` into the
+console. Through the launcher's `docker exec -it` that arrives inside the
+container as SIGINT, and Python raises `KeyboardInterrupt` wherever the build
+happens to be — usually inside a `subprocess.run` waiting on node. Until
+2026-09-23 nothing caught it, so the last thing in the console, and in any
+problem report, was a Python traceback: measured in a real report of
+2026-09-19 as 21 lines and 1,230 characters of container paths and
+`subprocess` internals, sitting inside the 8,000-character tail the app reads
+for failure explanations and the preview address (GitHub #223).
+
+`main()` now catches `KeyboardInterrupt` around `build_section_site` and calls
+`sys.exit(130)`, printing nothing. Measured with the real `main()` and the
+build replaced by a long `subprocess.run`: before, exit −2 (killed by SIGINT)
+and 33 lines of traceback on stderr; after, exit 130 and nothing.
+`subprocess.run` has already killed its child by the time the interrupt
+reaches `main()`, so no node server is left behind. Pinned by
+`scripts/test_stop_quietly.py`, which Windows' `PythonToolchainTests` runs too
+(its real-SIGINT case skips there).
+
+- **Why 130 and not 0.** 130 is what a shell reports for a program killed by
+  SIGINT, and what `docker exec` passed on before, so every reader of the exit
+  status sees exactly what it saw. 0 was REJECTED: `deploy.py` runs this build
+  with `check=True`, and a Stop during a publish's rebuild would read as a
+  finished build and go on to upload a half-built site.
+- **Why nothing is printed.** A line here would be a new sentence a teacher
+  reads, owed to the wording pass and the contract, for a moment the app
+  already describes itself (the task's "stopped" outcome).
+- **One handler, not one per `subprocess.run`.** The issue offered both;
+  `build_site.py` has no bare `except:` and no `except BaseException`, so
+  nothing inside the build can swallow the interrupt and carry on, and the one
+  handler covers the npm install, the build-only run and the serve run alike.
+- **This is the `^C` path only — do not "extend" it to SIGTERM.** The app's
+  other stop (`stopByUser`, which terminates the host shell) and
+  `stop_preview.py` (SIGTERM by default) already end Python without a
+  traceback, because SIGTERM does not raise `KeyboardInterrupt`.
+- **Not in this change:** `scripts/deploy.py` has no `KeyboardInterrupt`
+  handling either, so an interrupt during a publish's upload would still print
+  its own traceback. Whether the app offers Stop at that moment was not
+  measured.
+
 ## A section with no `index.md` cannot be PUBLISHED
 
 Found while testing the deploy path on the mac; it broke identically on Windows
