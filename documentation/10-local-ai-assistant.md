@@ -383,7 +383,9 @@ the tool NAME, not on `needsApproval`, so a third approval tool added later
 falls to `deployQuestion` — the reading ("now") that is safe for anything that
 deploys. `SharedRulesContractTests.testTheScheduledCardAsksItsOwnQuestion`
 pins the mirror of the rule below: the scheduled question must NOT carry the
-immediate card's word, read from the same contract rule. The Go bubble
+immediate card's word, read from the same contract rule; and the authored
+scenario "an immediate deploy's card still asks the immediate question" pins
+the other half on BOTH platforms. The Go bubble
 (`deployAccepted`) and the cancel line (`deployWasCancelled`) were left as they
 are — both are true of a scheduled deploy too; whether they should say
 "schedule" is a question for the wording pass, not a fault. The rule is

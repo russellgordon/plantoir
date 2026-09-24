@@ -956,8 +956,9 @@ final class AssistAgent {
             return
         }
 
-        // Deploying ALWAYS waits for a button: it puts something in front of
-        // students immediately and Plantoir cannot take it back for them.
+        // Deploying ALWAYS waits for a button, whether it happens now or at a
+        // moment the teacher set: either way it puts something in front of
+        // students that Plantoir cannot take back for them.
         if definition.needsApproval {
             let explanation: String = tools.explain(call: call)
             entries.append(Entry(speaker: .assistant, text: explanation))
