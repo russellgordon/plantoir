@@ -260,6 +260,13 @@ else
   cat /tmp/verify_stop_preview_test.log
 fi
 
+if (cd scripts && python3 test_stop_quietly.py) >/tmp/verify_stop_quietly_test.log 2>&1; then
+  pass "pressing Stop ends a build quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
+else
+  fail "pressing Stop ends a build quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
+  cat /tmp/verify_stop_quietly_test.log
+fi
+
 if (cd scripts && python3 test_config_write_race.py) >/tmp/verify_config_race_test.log 2>&1; then
   pass "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
 else
