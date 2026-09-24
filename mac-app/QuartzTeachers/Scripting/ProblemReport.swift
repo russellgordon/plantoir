@@ -195,6 +195,47 @@ nonisolated struct RunRecord {
 /// records is the fastest way that has ever been available to see it.
 nonisolated enum ProblemReportEnvironment {
 
+    // MARK: - Stored properties
+
+    /// The assistant's engine is bundled inside the app, so its build IS
+    /// known without asking anything.
+    static let bundledEngineDescription: String = "llama.cpp b10435 (Metal)"
+
+    /// The versions the launchers download when a program is missing
+    /// (`setup.sh`, `COLIMA_VERSION` and its three neighbours — a test holds
+    /// the two lists together). Shown only as what WOULD be installed, never
+    /// as what is.
+    static let pinnedHelpers: [PinnedHelper] = [
+        PinnedHelper(displayName: "Colima", probeName: "colima", pinnedVersion: "v0.10.3", setupVariable: "COLIMA_VERSION"),
+        PinnedHelper(displayName: "Lima", probeName: "limactl", pinnedVersion: "2.2.0", setupVariable: "LIMA_VERSION"),
+        PinnedHelper(displayName: "Docker CLI", probeName: "docker", pinnedVersion: "29.7.2", setupVariable: "DOCKER_CLI_VERSION"),
+        PinnedHelper(displayName: "Buildx", probeName: "buildx", pinnedVersion: "v0.36.1", setupVariable: "BUILDX_VERSION")
+    ]
+
+    /// One `sh` run asks all four, printing one tab-separated row each:
+    /// the program, the first line of its version, and where it was found.
+    /// Buildx has no path of its own to report (see `helperDescription`).
+    static let helperProbeScript: String = """
+    for tool in colima limactl docker; do
+      where=$(command -v "$tool" 2>/dev/null)
+      line=""
+      if [ -n "$where" ]; then
+        line=$("$tool" --version 2>/dev/null </dev/null | head -n 1 | tr -d '\t\r')
+      fi
+      printf '%s\t%s\t%s\n' "$tool" "$line" "$where"
+    done
+    line=""
+    if command -v docker >/dev/null 2>&1; then
+      line=$(docker buildx version 2>/dev/null </dev/null | head -n 1 | tr -d '\t\r')
+    fi
+    printf 'buildx\t%s\t\n' "$line"
+    """
+
+    /// Guards `storedHelperDescription`, which the background check writes
+    /// and every record reads, from any thread.
+    private static let measuredHelperLock: NSLock = NSLock()
+    nonisolated(unsafe) private static var storedHelperDescription: String?
+
     // MARK: - Computed properties
 
     /// "Plantoir 1.0 (12) · pid 4711 · /Applications/Plantoir.app"
@@ -223,15 +264,229 @@ nonisolated enum ProblemReportEnvironment {
         return text
     }
 
-    /// "llama.cpp b10435 (Metal) · Colima v0.10.3 · Lima 2.2.0 · Docker CLI 29.7.2 · Buildx v0.36.1"
+    /// "llama.cpp b10435 (Metal) · Colima 0.10.3 (Homebrew) · Lima 2.2.0 (Homebrew) · …"
+    ///
+    /// What was MEASURED the last time this app asked the programs
+    /// themselves, or — before it has asked — every helper marked "not
+    /// checked yet" beside the version the launchers would download. Never a
+    /// bare version it did not check: this line used to print the pinned
+    /// versions as though they were installed, and on a Mac with Homebrew's
+    /// Docker CLI 29.7.1 it said 29.7.2, which is how a report nearly sent a
+    /// diagnosis the wrong way (issue #222).
     static var helperDescription: String {
-        var parts: [String] = []
-        parts.append("llama.cpp b10435 (Metal)")
-        parts.append("Colima v0.10.3")
-        parts.append("Lima 2.2.0")
-        parts.append("Docker CLI 29.7.2")
-        parts.append("Buildx v0.36.1")
+        if let measured = measuredHelperDescription {
+            return measured
+        }
+        var parts: [String] = [bundledEngineDescription]
+        for helper in pinnedHelpers {
+            parts.append(helper.displayName + " not checked yet (pinned " + helper.pinnedVersion + ")")
+        }
         return parts.joined(separator: " · ")
+    }
+
+    /// The last measured description, shared by every record and trail line
+    /// this process writes. Only `refreshHelpers` stores into it; a test that
+    /// measures stub programs through `measureHelpers` leaves it alone, so a
+    /// stub's made-up version cannot leak into a later test's record.
+    static var measuredHelperDescription: String? {
+        get {
+            return measuredHelperLock.withLock {
+                return storedHelperDescription
+            }
+        }
+        set {
+            measuredHelperLock.withLock {
+                storedHelperDescription = newValue
+            }
+        }
+    }
+
+    // MARK: - Helper versions, measured
+
+    /// Asks the helper programs which versions they are, and says where each
+    /// was found.
+    ///
+    /// Synchronous and slow (about 0.3 s measured on a Mac with all four from
+    /// Homebrew, 0.08 s with none), so it is only ever called off the main
+    /// thread — see `refreshHelpers`. PURE apart from running the programs:
+    /// it stores nothing, which is what lets a test point it at stub
+    /// programs without the stubs' versions reaching any other test.
+    ///
+    /// `colima --version`, never `colima version`: the undashed form talks to
+    /// the running virtual machine (0.256 s against 0.045 s measured, and it
+    /// prints a second, server-side line), so a stopped machine would make
+    /// the check slow and a wedged one would make it hang.
+    ///
+    /// The time limit is a backstop for a program that never answers. Every
+    /// program's output is captured by the shell's own `$( … )`, so only the
+    /// shell itself writes to the pipe read here; ending the shell ends the
+    /// read, even if a helper it started is still stuck.
+    static func measureHelpers(
+        environment: [String: String] = HelperPrograms.environment(),
+        toolsFolder: String = HelperPrograms.binDirectory(),
+        timeLimit: Duration = .seconds(5)
+    ) -> String {
+        let process: Process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", helperProbeScript]
+        process.environment = environment
+        process.standardInput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        let outputPipe: Pipe = Pipe()
+        process.standardOutput = outputPipe
+        do {
+            try process.run()
+        } catch {
+            return helperDescription(fromProbeOutput: "", toolsFolder: toolsFolder)
+        }
+        let watchdog: Task<Void, Never> = Task.detached(priority: .utility) {
+            try? await Task.sleep(for: timeLimit)
+            if Task.isCancelled {
+                return
+            }
+            if process.isRunning {
+                process.terminate()
+            }
+        }
+        let outputData: Data = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        watchdog.cancel()
+        let output: String = String(decoding: outputData, as: UTF8.self)
+        return helperDescription(
+            fromProbeOutput: output,
+            toolsFolder: toolsFolder,
+            resolvingLinks: { path in
+                return URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+            }
+        )
+    }
+
+    /// Measures in the background and remembers the answer for every record
+    /// written after it.
+    ///
+    /// A DETACHED task, not a plain `nonisolated async` function: this
+    /// project builds with approachable concurrency, under which a plain one
+    /// runs on its caller's actor — here, the main one — and the 0.3 s
+    /// check would stall the window it was meant to stay out of the way of.
+    /// The result says which thread the check ran on so a test can hold the
+    /// code to that, rather than to a belief about it.
+    @discardableResult
+    static func refreshHelpers(
+        environment: [String: String] = HelperPrograms.environment(),
+        toolsFolder: String = HelperPrograms.binDirectory()
+    ) -> Task<HelperMeasurement, Never> {
+        return Task.detached(priority: .utility) {
+            let ranOnTheMainThread: Bool = pthread_main_np() != 0
+            let description: String = ProblemReportEnvironment.measureHelpers(
+                environment: environment,
+                toolsFolder: toolsFolder
+            )
+            ProblemReportEnvironment.measuredHelperDescription = description
+            return HelperMeasurement(description: description, ranOnTheMainThread: ranOnTheMainThread)
+        }
+    }
+
+    /// Turns the check's output into the Helpers line. PURE — the part the
+    /// rules live in, and the part a test feeds real machine output to.
+    ///
+    /// The output is one `name<TAB>first line of its version<TAB>where it was
+    /// found` row per program. A program with no row (the check ran out of
+    /// time before reaching it) is "not checked"; a row with no path, or
+    /// with nothing that reads as a version, is "not found".
+    static func helperDescription(
+        fromProbeOutput output: String,
+        toolsFolder: String,
+        resolvingLinks resolve: (String) -> String = { path in return path }
+    ) -> String {
+        var rowsByName: [String: [String]] = [:]
+        for line in output.components(separatedBy: "\n") {
+            let fields: [String] = line.components(separatedBy: "\t")
+            if fields.count < 2 || fields[0].isEmpty {
+                continue
+            }
+            rowsByName[fields[0]] = fields
+        }
+
+        var parts: [String] = [bundledEngineDescription]
+        for helper in pinnedHelpers {
+            guard let fields = rowsByName[helper.probeName] else {
+                parts.append(helper.displayName + " not checked (pinned " + helper.pinnedVersion + ")")
+                continue
+            }
+            let versionLine: String = fields[1]
+            let path: String = fields.count > 2 ? fields[2] : ""
+            let isBuildx: Bool = helper.probeName == "buildx"
+            if versionLine.isEmpty || (!isBuildx && path.isEmpty) {
+                parts.append(helper.displayName + " not found (would install " + helper.pinnedVersion + ")")
+                continue
+            }
+            guard let version = versionNumber(in: versionLine) else {
+                if isBuildx {
+                    parts.append(helper.displayName + " not found (would install " + helper.pinnedVersion + ")")
+                } else {
+                    parts.append(helper.displayName + " found, version unreadable" + sourceLabel(
+                        path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder
+                    ))
+                }
+                continue
+            }
+            var text: String = helper.displayName + " " + version
+            if isBuildx {
+                // Buildx is a plug-in of the Docker CLI, found in
+                // `~/.docker/cli-plugins` — the SAME folder Plantoir's own
+                // download and Homebrew's link both use — so where `docker`
+                // lives says nothing about where buildx came from. Only its
+                // own words are trusted: Homebrew's build says "Homebrew".
+                if versionLine.contains("Homebrew") {
+                    text += " (Homebrew)"
+                }
+            } else {
+                text += sourceLabel(path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder)
+            }
+            parts.append(text)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// " (Plantoir's copy)", " (Homebrew)", or " (found in <folder>)".
+    ///
+    /// Plantoir's copy is recognised by the folder it was FOUND in, before
+    /// any link is followed. Homebrew by where the link LEADS, because
+    /// `/usr/local/bin` is also where Docker Desktop puts its own link, and
+    /// calling that Homebrew would be the same kind of wrong answer this
+    /// line exists to stop giving.
+    static func sourceLabel(path: String, resolvedPath: String, toolsFolder: String) -> String {
+        if path.hasPrefix(toolsFolder + "/") {
+            return " (Plantoir's copy)"
+        }
+        if resolvedPath.hasPrefix("/opt/homebrew/")
+            || resolvedPath.hasPrefix("/usr/local/Cellar/")
+            || resolvedPath.hasPrefix("/usr/local/Homebrew/") {
+            return " (Homebrew)"
+        }
+        let folder: String = URL(fileURLWithPath: path).deletingLastPathComponent().path
+        return " (found in " + folder + ")"
+    }
+
+    /// The first word that reads as a version: after an optional leading
+    /// "v", it starts with a digit and has a dot in it. "Docker version
+    /// 29.7.1, build e9452d6e78" gives "29.7.1"; "github.com/docker/buildx
+    /// v0.36.1 Homebrew" gives "0.36.1".
+    static func versionNumber(in line: String) -> String? {
+        let separators: CharacterSet = CharacterSet.whitespaces.union(CharacterSet(charactersIn: ","))
+        for word in line.components(separatedBy: separators) {
+            var candidate: String = word
+            if candidate.hasPrefix("v") {
+                candidate = String(candidate.dropFirst())
+            }
+            guard let first = candidate.first else {
+                continue
+            }
+            if first.isASCII && first.isNumber && candidate.contains(".") {
+                return candidate
+            }
+        }
+        return nil
     }
 
     /// Exact OS build number (e.g. "24G84"), via sysctl kern.osversion.
@@ -275,6 +530,35 @@ nonisolated enum ProblemReportEnvironment {
         }
         return String(cString: bytes)
     }
+}
+
+/// One helper program the launchers can download, and the version they
+/// would download.
+nonisolated struct PinnedHelper: Sendable {
+
+    // MARK: - Stored properties
+
+    /// What a report calls it: "Docker CLI".
+    let displayName: String
+
+    /// Its row in the check's output: "docker".
+    let probeName: String
+
+    /// The version `setup.sh` downloads when it is missing: "29.7.2".
+    let pinnedVersion: String
+
+    /// The `setup.sh` variable that pins it, for the test that keeps the two
+    /// in step.
+    let setupVariable: String
+}
+
+/// What one background check found, and whether it kept off the main thread.
+nonisolated struct HelperMeasurement: Sendable {
+
+    // MARK: - Stored properties
+
+    let description: String
+    let ranOnTheMainThread: Bool
 }
 
 /// Where records are kept, and how many.
