@@ -940,6 +940,55 @@ the tool RAN — against no course, producing "There is no course called "" in
 this working folder", which reads to a teacher as a complaint about what they
 typed.)
 
+**A third cause, since [#198](https://github.com/russellgordon/plantoir/issues/198)
+(2026-09-23): a finished answer that wrote NOTHING for a tool that needs
+something.** An empty string (and `{}`) is readable on purpose —
+`undo_last_change` takes no arguments and llama.cpp sends `""` for it, so a gate
+refusing every empty call would refuse "Undo that", the tool a card reaches
+most. But the same yes let a finished `publish_pages` with `""` through. The
+issue predicted the stale #166 refusal; that is **no longer reachable** from
+the local path, because the window binds `course` and `section` onto every
+call whose schema declares them (since 2026-08-15). What happened instead,
+traced by reading (the must-fail run confirms only that the old gate let the
+call through to a reply other than `answerWasCutOff`): bound to this section, with plan
+mode on, it reached `plan_publish_pages` → `.nothingNamed` → a sentence saying
+no pages and no dates were given — the #166 fault in different words, since
+the teacher HAD named pages and the model dropped them. `""` for
+`deploy_section` would, by the same reading, have put the deploy card up
+although the model wrote nothing.
+
+The gate is now `AssistToolCall.argumentsAreReadable(forToolRequiring:)`:
+arguments that say nothing (empty, whitespace, or an object with no keys) are
+readable only when the tool's schema `required` list is empty — read from the
+surface the model was shown (`tools.definition(named:)`; the local and MCP
+schemas agree on `required` for every local tool, checked), so no schema byte
+moved. `undo_last_change`'s schema has NO `required` key at all, which reads
+as empty; a Windows port must treat a missing key the same way. An unknown
+tool name counts as requiring nothing and still reaches "There is no tool by
+that name." The teacher gets `wording.answerWasCutOff`, and the trail line's
+third phrasing is "wrote nothing for <tool>". Contract:
+`app-rules.json → modelTiers.requirements`, "A finished reply that wrote
+nothing for a tool that needs something runs no tool and says so", with nine
+pure cases (each case's `required` is checked against the real schema).
+
+Measured cost: across the 990 tool-call rows in `research/ai-assist/*.txt`,
+175 were empty-argument calls — every one to a tool that requires nothing —
+and none left out `course`/`section`, so the rule changes no measured routing
+outcome and closes a path no recorded run has taken. (Whether a model ever
+sends `{}` for `rebuild_preview` in a section window, which used to rebuild
+this section and is now refused, is unmeasured; nothing recorded has done it.)
+
+REJECTED: (i) refusing every empty call — breaks undo; (ii) "readable when
+every required argument is one the window binds" (`course`, `section`) — that
+keeps the empty `publish_pages` RUNNING, because its real content (pages,
+dates, a unit) is optional in its schema, and a model shown a schema requiring
+arguments that wrote none has not answered; (iii) rewording "There is no course
+called “”" — unreachable from the local path now; still reachable from MCP,
+where a client can send `course: ""` (`backUpCourse`, the publish plan), and
+left for the wording pass. Known and NOT changed here: `answerWasCutOff` advises
+a shorter sentence or fewer pages, which is the wrong advice when the model
+wrote nothing — a wording-pass question, recorded rather than fixed.
+
 **The gate is the finish reason, not a parse check, and that is measured.**
 Sweeping `max_tokens` across every cut point of two ordinary requests on the
 smaller assistant (llama.cpp b10435), llama.cpp closes the arguments object
