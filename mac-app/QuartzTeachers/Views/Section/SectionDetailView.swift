@@ -36,12 +36,6 @@ struct SectionDetailView: View {
     /// the record cannot outlive the wait — see `PreviewBuildWait`.
     @State var previewBuildWait: PreviewBuildWait = PreviewBuildWait()
 
-    /// True from the press until the preview's page first answers or the run
-    /// ends.
-    var isWaitingForServer: Bool {
-        return previewBuildWait.isWaiting
-    }
-
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
 
@@ -187,6 +181,13 @@ struct SectionDetailView: View {
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
+
+    /// True from the press until the preview's page first answers or the run
+    /// ends — read through `previewBuildWait`, which is the only thing that
+    /// can change it (issue #232).
+    var isWaitingForServer: Bool {
+        return previewBuildWait.isWaiting
+    }
 
     /// What this section is CALLED — used wherever a sentence names it
     /// ("Deploying ICS3U-S1"). Deliberately without the " — Edited"
@@ -1743,6 +1744,23 @@ struct SectionDetailView: View {
             theTeacherStoppedIt: previewRunner.wasStoppedByUser,
             theRunIsStillGoing: previewRunner.isRunning
         ) {
+            // One of those endings is nobody's doing: the SAME run ended on
+            // its own while the question was out. Stop, Cancel, a closed
+            // window and a new run have each ended the wait already; this one
+            // has not, and `waitForPreviewServer` returns straight after us —
+            // so it is ended here, the way the other "the run ended" returns
+            // do, or ⌘Q would go on asking about it (issue #232). Guarded,
+            // not unconditional: when a NEW run has started, the wait belongs
+            // to it.
+            if PreviewReachability.theSameRunEndedByItself(
+                startedAt: theRunThisIsAbout,
+                theRunNowStartedAt: previewRunner.startedAt,
+                theTeacherStoppedIt: previewRunner.wasStoppedByUser,
+                theRunIsStillGoing: previewRunner.isRunning
+            ) {
+                previewBuildWait.end()
+                releasePreviewLease()
+            }
             return
         }
         let verdict: PreviewReachability.Verdict = PreviewReachability.verdict(for: answer)

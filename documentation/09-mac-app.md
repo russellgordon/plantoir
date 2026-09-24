@@ -716,7 +716,13 @@ build, which would make EVERY later ⌘Q ask about a preview nobody is building:
   — and the record. `begin(…)` in `startPreview()` records the build;
   `end()` is the ONLY way back to "not waiting", and every ending calls it: the
   page answering, the run ending, Stop, Cancel, the silence check, the outer
-  ten-minute bound, and `.onDisappear` (first, unconditionally). `end()` is
+  ten-minute bound, and `.onDisappear` (first, unconditionally). One of those
+  was found by the fix review: a run that ends BY ITSELF while the silence
+  check is asking the builder whether the page is up. Every other early
+  return there has already ended the wait (Stop, a closed window, a new run),
+  so that one is ended by the silence check itself, guarded by
+  `PreviewReachability.theSameRunEndedByItself` — never unconditionally, since
+  after a new run has started the wait belongs to it. `end()` is
   idempotent, and the object ends only the record it began (the window's
   `folderThisSectionWorksIn` is also written by a deploy, so rebuilding the
   record from it at the end could name the wrong folder).
