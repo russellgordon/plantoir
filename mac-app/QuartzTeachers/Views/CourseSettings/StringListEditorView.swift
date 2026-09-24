@@ -69,8 +69,11 @@ struct ActiveExplanation: Identifiable {
     var id: String { return item }
 }
 
-/// Edits a list of names (folders or files): shows the current entries with
-/// remove buttons, and a field for adding a new entry.
+/// Edits a list of names (folders or files): a standard macOS table of the
+/// entries with + and − at its lower left (issue #266). + opens a small
+/// popover to type a new name into; − removes the selected entry, and so do
+/// the Delete key and the row's menu — all three through `requestRemoval(of:)`,
+/// the one place a removal asks the list's protection first.
 ///
 /// For FILE lists, the ".md" extension is a storage detail the scripts
 /// need but teachers should not have to think about: it is hidden in the
@@ -123,6 +126,20 @@ struct StringListEditorView: View {
     @State var renameFailure: String? = nil
     @State var isRenaming: Bool = false
     @State var notice: String? = nil
+    @State var selectedRowID: String? = nil
+    @State var isAddingItem: Bool = false
+
+    /// Why the selected entry cannot be removed, shown from the − button.
+    /// Its OWN state, apart from `activeExplanation` (the row's info
+    /// button): two popovers presented from one state were measured to
+    /// open two popover windows, one of them silently unseen.
+    @State var removalExplanation: ActiveExplanation? = nil
+
+    @FocusState var addFieldIsFocused: Bool
+
+    /// Read so the keyboard obeys a disabled section — see
+    /// `MembershipToggleListView.isEnabled`.
+    @Environment(\.isEnabled) var isEnabled: Bool
 
     // MARK: - Computed properties
 
@@ -142,6 +159,45 @@ struct StringListEditorView: View {
         return "Add new folder…"
     }
 
+    /// The label for the − control, keyed to the list's kind.
+    var removeLabel: String {
+        if hidesMarkdownExtension {
+            return "Remove Selected File"
+        }
+        return "Remove Selected Folder"
+    }
+
+    /// One row per entry, in the order stored.
+    var rows: [ListTableRow] {
+        return ListTableMetrics.positionedRows(from: items)
+    }
+
+    /// The stored name of the selected row, or nil when none is selected.
+    var selectedItem: String? {
+        return ListTableMetrics.name(ofRowWithID: selectedRowID, in: rows)
+    }
+
+    /// True when what is typed in the add popover would be added: not
+    /// empty, not the reserved name, not already in the list.
+    var canAdd: Bool {
+        return StringListEditorView.addableName(
+            newItemName, to: items, appendingMarkdownExtension: hidesMarkdownExtension
+        ) != nil
+    }
+
+    var pendingRemovalIsPresented: Binding<Bool> {
+        return Binding(
+            get: {
+                return pendingRemoval != nil
+            },
+            set: { isPresented in
+                if !isPresented {
+                    pendingRemoval = nil
+                }
+            }
+        )
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -149,107 +205,30 @@ struct StringListEditorView: View {
             Text(title)
                 .font(.headline)
 
-            if items.isEmpty {
-                Text("None")
-                    .foregroundStyle(.secondary)
-            }
-
-            ForEach(items, id: \.self) { item in
-                HStack {
-                    Text(StringListEditorView.displayName(for: item, hidingMarkdownExtension: hidesMarkdownExtension))
-                    Spacer()
-                    // Offered even on a row whose REMOVAL is blocked: "All
-                    // Classes" can never be removed and can perfectly well be
-                    // called something else, and conflating the two would make
-                    // the one folder every course has the only one a teacher
-                    // cannot rename.
-                    if onRename != nil {
-                        Button("Rename \(item)", systemImage: "pencil") {
-                            proposedName = item
-                            renameFailure = nil
-                            let interrupted: String? = interruptedRenameTarget?(item)
-                            // Filled in with the rename that was interrupted,
-                            // so finishing it is one keypress rather than a
-                            // remembered name.
-                            proposedName = interrupted ?? item
-                            pendingRename = PendingRename(
-                                item: item, interruptedRenameTarget: interrupted
-                            )
+            // The table and its +/− footer are one bordered unit, the way a
+            // macOS list with add and remove buttons is drawn everywhere
+            // else on the system.
+            VStack(alignment: .leading, spacing: 0) {
+                nameTable
+                ListAddRemoveFooter(
+                    addLabel: addLabel,
+                    removeLabel: removeLabel,
+                    title: title,
+                    canRemove: selectedItem != nil,
+                    onAdd: {
+                        newItemName = ""
+                        isAddingItem = true
+                    },
+                    onRemove: {
+                        if let selectedItem {
+                            requestRemoval(of: selectedItem)
                         }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.borderless)
-                        .accessibilityIdentifier("rename-\(item)")
-                    }
-                    let state: ItemProtection = protection?(item) ?? .ordinary
-                    switch state {
-                    case .blocked(let reason):
-                        Button {
-                            activeExplanation = ActiveExplanation(item: item, reason: reason)
-                            ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be removed from " + title + " — " + reason)
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.borderless)
-                        .accessibilityIdentifier("whyBlocked-\(item)")
-                        .help(reason)
-                        .popover(item: Binding(
-                            get: {
-                                if activeExplanation?.item == item {
-                                    return activeExplanation
-                                }
-                                return nil
-                            },
-                            set: { newValue in
-                                if newValue == nil && activeExplanation?.item == item {
-                                    activeExplanation = nil
-                                }
-                            }
-                        ), arrowEdge: .trailing) { explanation in
-                            // A fixed width plus fixedSize: a popover
-                            // sizes itself to its content, and a Text
-                            // with only a maxWidth was measured as one
-                            // line and shown truncated ("…") when the
-                            // real app was driven.
-                            Text(explanation.reason)
-                                .font(.callout)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(width: 280, alignment: .leading)
-                                .padding(12)
-                        }
-
-                    case .consequential(let alertTitle, let message):
-                        Button("Remove \(item)", systemImage: "minus.circle") {
-                            pendingRemoval = PendingRemoval(item: item, title: alertTitle, message: message)
-                        }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.borderless)
-                        .accessibilityIdentifier("remove-\(item)")
-
-                    case .ordinary:
-                        Button("Remove \(item)", systemImage: "minus.circle") {
-                            removeItem(named: item)
-                        }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.borderless)
-                        .accessibilityIdentifier("remove-\(item)")
-                    }
+                    },
+                    isAdding: $isAddingItem,
+                    removalExplanation: $removalExplanation
+                ) {
+                    addPopover
                 }
-            }
-
-            HStack {
-                TextField(addLabel, text: $newItemName, prompt: Text(promptText))
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit {
-                        addNewItem()
-                    }
-                    .accessibilityIdentifier("addField-\(title)")
-                Button(addLabel, systemImage: "plus.circle") {
-                    addNewItem()
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .accessibilityIdentifier("addTo-\(title)")
             }
 
             // **Said in place, deliberately NOT in an alert.** This used to be
@@ -275,18 +254,162 @@ struct StringListEditorView: View {
             }
         }
         .padding(.vertical, 4)
-        .alert(item: $pendingRemoval) { removal in
-            Alert(
-                title: Text(removal.title),
-                message: Text(removal.message),
-                primaryButton: .destructive(Text("Remove")) {
-                    removeItem(named: removal.item)
-                },
-                secondaryButton: .cancel()
-            )
+        .alert(
+            pendingRemoval?.title ?? "",
+            isPresented: pendingRemovalIsPresented,
+            presenting: pendingRemoval
+        ) { removal in
+            Button("Remove", role: .destructive) {
+                removeItem(named: removal.item)
+            }
+            Button("Cancel", role: .cancel) {
+                pendingRemoval = nil
+            }
+        } message: { removal in
+            Text(removal.message)
         }
         .sheet(item: $pendingRename) { rename in
             renameSheet(for: rename.item, interruptedTarget: rename.interruptedRenameTarget)
+        }
+    }
+
+    // MARK: - The table
+
+    /// The names, one row each, in the order they are stored.
+    ///
+    /// Each row's protection is asked for HERE and handed to its cell as a
+    /// value — never asked from inside the cell. See
+    /// `MembershipToggleListView.protectionsAsDrawn()` for the crash that
+    /// rule prevents (issue #266); this table survived it only because of
+    /// which question it happened to be given.
+    var nameTable: some View {
+        let protections: [String: ItemProtection] = protectionsAsDrawn()
+        return Table(rows, selection: $selectedRowID) {
+            TableColumn(title) { (row: ListTableRow) in
+                nameCell(for: row.name, protection: protections[row.name] ?? .ordinary)
+            }
+        }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .tableColumnHeaders(.hidden)
+        .frame(height: ListTableMetrics.height(forRowCount: rows.count, showsHeader: false))
+        .overlay(alignment: .leading) {
+            if items.isEmpty {
+                Text("None")
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 8)
+                    .allowsHitTesting(false)
+            }
+        }
+        .contextMenu(forSelectionType: String.self) { rowIDs in
+            if let item = ListTableMetrics.contextMenuTarget(forRowIDs: rowIDs, in: rows, isEnabled: isEnabled) {
+                if onRename != nil {
+                    Button("Rename…") {
+                        beginRename(of: item)
+                    }
+                }
+                Button("Remove") {
+                    requestRemoval(of: item)
+                }
+            }
+        } primaryAction: { rowIDs in
+            // A double-click renames, where renaming is offered.
+            guard isEnabled, onRename != nil else {
+                return
+            }
+            if let item = ListTableMetrics.name(ofRowWithID: rowIDs.first, in: rows) {
+                beginRename(of: item)
+            }
+        }
+        .onDeleteCommand {
+            // See `isEnabled`: a disabled table still takes keys.
+            guard isEnabled else {
+                return
+            }
+            if let selectedItem {
+                requestRemoval(of: selectedItem)
+            }
+        }
+        .accessibilityIdentifier("table-\(title)")
+    }
+
+    /// One row: the name, then — as before the table — the rename pencil
+    /// and, for a name that cannot be removed, the button that says why.
+    @ViewBuilder
+    func nameCell(for item: String, protection itemProtection: ItemProtection) -> some View {
+        let displayName: String = StringListEditorView.displayName(for: item, hidingMarkdownExtension: hidesMarkdownExtension)
+        HStack {
+            Text(displayName)
+            Spacer()
+            // Offered even on a row whose REMOVAL is blocked: "All
+            // Classes" can never be removed and can perfectly well be
+            // called something else, and conflating the two would make
+            // the one folder every course has the only one a teacher
+            // cannot rename.
+            if onRename != nil {
+                Button("Rename \(item)", systemImage: "pencil") {
+                    beginRename(of: item)
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("rename-\(item)")
+            }
+            if case .blocked(let reason) = itemProtection {
+                Button("Why \(displayName) can’t be removed", systemImage: "info.circle") {
+                    activeExplanation = ActiveExplanation(item: item, reason: reason)
+                    ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be removed from " + title + " — " + reason)
+                }
+                .labelStyle(.iconOnly)
+                .foregroundStyle(.secondary)
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("whyBlocked-\(item)")
+                .help(reason)
+                .popover(item: rowExplanationBinding(for: item), arrowEdge: .trailing) { explanation in
+                    ExplanationPopoverText(reason: explanation.reason)
+                }
+            }
+        }
+    }
+
+    // MARK: - The add popover
+
+    /// What + opens: a field, Cancel and Add. A popover rather than an
+    /// editable new row, because a popover is its own window and its field
+    /// takes the keyboard at once, and a half-typed name never becomes a row
+    /// that Space, Delete or a selection could act on.
+    var addPopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TextField(addLabel, text: $newItemName, prompt: Text(promptText))
+                .textFieldStyle(.roundedBorder)
+                .focused($addFieldIsFocused)
+                .onSubmit {
+                    if canAdd {
+                        addNewItem()
+                        isAddingItem = false
+                    }
+                }
+                .accessibilityIdentifier("addField-\(title)")
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    isAddingItem = false
+                }
+                .keyboardShortcut(.cancelAction)
+                // Disabled rather than closing on a name that would not be
+                // added: a popover that closed on "media" would read as if
+                // the folder had been added.
+                Button("Add") {
+                    addNewItem()
+                    isAddingItem = false
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canAdd)
+                .accessibilityIdentifier("addConfirm-\(title)")
+            }
+        }
+        .padding(14)
+        .frame(width: 280)
+        .onAppear {
+            addFieldIsFocused = true
         }
     }
 
@@ -345,6 +468,18 @@ struct StringListEditorView: View {
 
     // MARK: - Functions
 
+    /// The protection of every row, worked out once per drawing of the table
+    /// and handed to the cells — the rule `nameTable` explains.
+    func protectionsAsDrawn() -> [String: ItemProtection] {
+        var protections: [String: ItemProtection] = [:]
+        for row in rows {
+            if protections[row.name] == nil {
+                protections[row.name] = protection?(row.name) ?? .ordinary
+            }
+        }
+        return protections
+    }
+
     /// How one stored item appears in the list.
     static func displayName(for item: String, hidingMarkdownExtension: Bool) -> String {
         if hidingMarkdownExtension && item.hasSuffix(".md") {
@@ -377,9 +512,29 @@ struct StringListEditorView: View {
         return trimmed
     }
 
+    /// The stored form of a typed name when it would be ADDED to `items`,
+    /// or nil when it would not: empty, the reserved name, or already there.
+    /// What keeps the add popover's Add button disabled.
+    static func addableName(_ rawName: String, to items: [String], appendingMarkdownExtension: Bool) -> String? {
+        guard let normalized = StringListEditorView.normalizedItemName(rawName, appendingMarkdownExtension: appendingMarkdownExtension) else {
+            return nil
+        }
+        if items.contains(normalized) {
+            return nil
+        }
+        return normalized
+    }
+
+    /// Adds what is typed in the add popover, then clears the field.
     func addNewItem() {
-        guard let normalized = StringListEditorView.normalizedItemName(newItemName, appendingMarkdownExtension: hidesMarkdownExtension) else {
-            newItemName = ""
+        add(typedName: newItemName)
+        newItemName = ""
+    }
+
+    /// Adds one typed name — the whole of what adding does, apart from the
+    /// field it was typed into, so a test can run it with a name of its own.
+    func add(typedName: String) {
+        guard let normalized = StringListEditorView.normalizedItemName(typedName, appendingMarkdownExtension: hidesMarkdownExtension) else {
             return
         }
         if !items.contains(normalized) {
@@ -387,7 +542,60 @@ struct StringListEditorView: View {
             onAdd?(normalized)
             notice = noticeAfterChange?(normalized, .added)
         }
-        newItemName = ""
+    }
+
+    /// Asks to remove one entry — what −, the Delete key and the row's
+    /// Remove all do, and the ONLY way any of them removes anything, so no
+    /// path can skip the list's protection.
+    ///
+    /// Ordinary: removed at once. Consequential: the question is asked, and
+    /// returned so a caller outside a window can answer it. Blocked: nothing
+    /// is removed, the reason is shown from the − button, and the trail
+    /// records that the teacher was told — the same sentence and the same
+    /// line as the row's info button.
+    @discardableResult
+    func requestRemoval(of item: String) -> PendingRemoval? {
+        let state: ItemProtection = protection?(item) ?? .ordinary
+        switch state {
+        case .blocked(let reason):
+            removalExplanation = ActiveExplanation(item: item, reason: reason)
+            ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be removed from " + title + " — " + reason)
+            return nil
+        case .consequential(let alertTitle, let message):
+            let removal: PendingRemoval = PendingRemoval(item: item, title: alertTitle, message: message)
+            pendingRemoval = removal
+            return removal
+        case .ordinary:
+            removeItem(named: item)
+            return nil
+        }
+    }
+
+    /// Opens the rename sheet for one entry.
+    func beginRename(of item: String) {
+        renameFailure = nil
+        let interrupted: String? = interruptedRenameTarget?(item)
+        // Filled in with the rename that was interrupted, so finishing it is
+        // one keypress rather than a remembered name.
+        proposedName = interrupted ?? item
+        pendingRename = PendingRename(item: item, interruptedRenameTarget: interrupted)
+    }
+
+    /// Presents one row's explanation, and only that row's.
+    func rowExplanationBinding(for item: String) -> Binding<ActiveExplanation?> {
+        return Binding(
+            get: {
+                if activeExplanation?.item == item {
+                    return activeExplanation
+                }
+                return nil
+            },
+            set: { newValue in
+                if newValue == nil && activeExplanation?.item == item {
+                    activeExplanation = nil
+                }
+            }
+        )
     }
 
     func removeItem(named name: String) {
@@ -398,6 +606,7 @@ struct StringListEditorView: View {
             }
         }
         items = result
+        selectedRowID = nil
         onRemove?(name)
         notice = noticeAfterChange?(name, .removed)
     }
