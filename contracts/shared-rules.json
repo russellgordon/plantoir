@@ -16,9 +16,9 @@
         "why": "The assistant runs natively on one architecture and not the other, and the whole toolchain emulates on the wrong one. Memory decides which model tier a teacher gets. OS build number and kernel release isolate virtualization, Metal, and WinUI/WSL2 platform issues."
       },
       {
-        "carries": "bundled assistant engine and toolchain helper software versions",
+        "carries": "the bundled assistant engine's build, and the helper programs as FOUND on this machine: on macOS each one's version measured by asking it (Colima, Lima, Docker CLI, Buildx) and where it came from (Plantoir's own copy, Homebrew, or the folder it was found in), or 'not found' with the version that would be installed; on Windows the runtime kind, read from disk",
         "event": "helpers described",
-        "why": "The assistant flags and chat template handling depend on the engine build. Static tool versions (Colima, Lima, Docker CLI, Buildx on macOS; WSL2 and container tools on Windows) isolate whether a machine is running on expected helper versions."
+        "why": "The assistant flags and chat template handling depend on the engine build. The helper versions isolate whether a machine is running what Plantoir expects - but only if they are MEASURED: the launchers use whatever copy is already installed and download only what is missing, so a line naming the pinned versions described a machine that did not exist, and on a Mac with Homebrew's tools it once sent a diagnosis the wrong way (issue #222). On macOS the line is written a moment after the other two launch lines, once the programs have answered."
       },
       {
         "carries": "the folder path, redacted",

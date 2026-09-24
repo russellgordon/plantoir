@@ -655,12 +655,21 @@ nonisolated enum ActivityTrail {
         return formatter
     }
 
-    /// The line that opens a session, so a trail spanning several launches
+    /// The lines that open a session, so a trail spanning several launches
     /// says where each one began — and says which BUILD it was, which is the
     /// first thing to check when a report and the code disagree.
+    ///
+    /// The third launch line, the helpers, is `noteHelpers` — written a
+    /// moment later, once the helper programs have been ASKED which versions
+    /// they are (issue #222). Writing it here would mean writing the pinned
+    /// versions as though they were measured, which is what it used to do.
     static func noteLaunch() {
         ActivityTrail.note(.appOpened, "Plantoir opened — " + ProblemReportEnvironment.appDescription)
         ActivityTrail.note(.machine, "running on " + ProblemReportEnvironment.systemDescription)
-        ActivityTrail.note(.helpers, "using " + ProblemReportEnvironment.helperDescription)
+    }
+
+    /// The helper programs this launch found, as measured.
+    static func noteHelpers(_ description: String) {
+        ActivityTrail.note(.helpers, "using " + description)
     }
 }
