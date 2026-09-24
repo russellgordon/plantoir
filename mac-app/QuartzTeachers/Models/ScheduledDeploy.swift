@@ -985,11 +985,13 @@ enum ScheduledDeploy {
             )
             try data.write(to: destinationURL, options: [.atomic])
         } catch {
+            noteTheReplacedDeployWasLost(replacing, course: course, sectionNumber: sectionNumber)
             return "The scheduled deploy could not be written: \(error.localizedDescription)"
         }
 
         if let failure = runner.bootstrap(plistURL: destinationURL) {
             try? FileManager.default.removeItem(at: destinationURL)
+            noteTheReplacedDeployWasLost(replacing, course: course, sectionNumber: sectionNumber)
             return "macOS would not accept the scheduled deploy: \(failure)"
         }
         if let replacing {
@@ -1004,6 +1006,29 @@ enum ScheduledDeploy {
             )
         }
         return nil
+    }
+
+    /// The old deploy was booted out to make way for a new one, and the new
+    /// one then failed — so the teacher has NEITHER, and the refusal they are
+    /// shown speaks only of the new one (issue #195's review). Filed under
+    /// `scheduled deploy turned off`, whose job is exactly this: a deploy
+    /// turned off by something other than the teacher asking. Silent when
+    /// nothing was being replaced.
+    private static func noteTheReplacedDeployWasLost(
+        _ replacing: Date?,
+        course: Course,
+        sectionNumber: Int
+    ) {
+        guard let replacing else {
+            return
+        }
+        ActivityTrail.note(
+            .scheduledDeployTurnedOff,
+            "turned off the scheduled deploy set for \(dayAndTimeText(replacing)) "
+                + "to make way for a new one that could not be set",
+            course: course.code,
+            section: sectionNumber
+        )
     }
 
     /// Run the one-shot script and leave, without ever becoming an app.
@@ -1502,6 +1527,17 @@ enum ScheduledDeploy {
         now: Date = Date(),
         calendar: Calendar = Calendar.current
     ) -> Date? {
+        // Under the test suite this reads ONLY a folder a test chose. The
+        // card reads this whenever a scheduled deploy is proposed, and tests
+        // that put one up without moving the agents folder would otherwise
+        // read the real `~/Library/LaunchAgents` of whoever runs the suite —
+        // passing whatever that Mac has scheduled, which is the #240 fault
+        // arriving through a new door. A test that wants a replacement sets
+        // `launchAgentsDirectoryOverride`, as every scheduling test already
+        // does.
+        if WorkspaceModel.isRunningTests && launchAgentsDirectoryOverride == nil {
+            return nil
+        }
         guard let existing = nextRun(
             courseCode: courseCode,
             sectionNumber: sectionNumber,

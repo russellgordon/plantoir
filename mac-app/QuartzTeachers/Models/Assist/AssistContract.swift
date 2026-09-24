@@ -245,7 +245,7 @@ enum AssistContract {
                 "moment": "when a deploy already scheduled for the section was set for, "
                         + "written the way the scheduled card writes its own moment "
                         + "(day, date and time in this Mac's own style), e.g. "
-                        + "Friday 26 September, 6:30 AM",
+                        + "Friday 25 September, 6:30 AM",
                 "page": "the page being copied, e.g. Unit 3, Day 2",
                 "copy": "what the copy is called, e.g. Unit 3, Day 3",
                 "moving": "how many later classes move, counted once each even when a page is "

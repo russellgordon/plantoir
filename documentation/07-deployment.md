@@ -1256,12 +1256,48 @@ nothing).
 - *Stopping the replacement, or asking a second question.* The issue asks to
   SAY it; replacing is still what a teacher who changes their mind wants.
 
-**The suite no longer reads the real LaunchAgents through the scenarios.** The
-scenario "a deploy asked for at a time…" puts a scheduled card up, and since
-this change the card reads the Mac-wide agent — so `AssistScenarioTests` now
-points both `launchAgentsDirectoryOverride` and
-`scheduledScriptsDirectoryOverride` at a temporary folder for every scenario,
-and `testTheScenariosNeverReadThisMacsScheduledDeploys` fails if it stops.
+**The result says it too, for a caller with no card.** `schedule_deploy` over
+`--mcp-stdio` puts no card in front of anybody, so its RESULT (the "Scheduled:
+…" summary the tool returns) appends the same `wording.scheduleReplaces`, read
+before the old job goes. Added on the implementation review, which found the
+outside-assistant path silent; the tool's description and schema did not move
+(surface hashes unchanged).
+
+**A replacement that FAILS still lost the old deploy, and the trail says so.**
+`scheduleDeploy` boots the old job out and overwrites its plist before asking
+macOS to take the new one, so a refusal leaves neither — and the sentence the
+teacher is shown speaks only of the new one. That case is written under the
+existing `scheduled deploy turned off` event, with when the lost one had been
+set for — its fourth reason, since that event exists for a deploy turned off by
+something other than the teacher asking. Pre-existing destruction; the line is
+what makes it findable.
+
+**Left for [#237](https://github.com/russellgordon/plantoir/issues/237), and
+known:** a job set from ANOTHER working folder for the SAME minute says
+nothing (the suppression compares moments, not folders), though it deploys
+different content; and a job from another folder is NAMED on this window's card
+while this window's sidebar shows no clock for it and its Cancel refuses it.
+Both are the one-deploy-per-Mac fault #237 owns, not something this sentence
+can mend.
+
+**The suite never reads the real LaunchAgents through this reading.**
+`momentBeingReplaced` answers nil under the test suite unless
+`launchAgentsDirectoryOverride` is set — fixed at the SOURCE after the
+implementation review found two tests outside the scenarios
+(`ScheduleDeployCardTests.testTheTrailLineNamesTheMomentItSettledOn`,
+`AssistWindowBindingTests.testTheSameCourseInAnotherCasingRunsInThisWindowsSpelling`)
+reading Russell's real `ICS3U` section-1 plist through the card. Those two now
+set the override too, and `AssistScenarioTests` sets it for every scenario
+(`testTheScenariosNeverReadThisMacsScheduledDeploys`). Measured with a probe
+that logs a stack whenever `launchAgentsDirectoryURL()` is reached under the
+suite with no override (and returns an empty scratch folder, so nothing real
+was read): full suite, **0 stacks through `momentBeingReplaced`** with the fix
+(1,714 tests); with only the source guard and neither test's override, still 0;
+with both removed, exactly those 2. The same probe counts **~344 OTHER reaches**
+that predate this piece — 313 from `WorkspaceModel.sweepScheduledDeploysThatAreTooLate`,
+26 from the sidebar's `scheduledDeployTime`, a handful from agent listing —
+which are the suite-wide `~/Library` reaches #240 exists to close, and are left
+to it.
 
 ## A scheduled deploy that outlived its course
 

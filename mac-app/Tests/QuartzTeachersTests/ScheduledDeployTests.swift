@@ -332,6 +332,45 @@ final class ScheduledDeployTests: XCTestCase {
         )
     }
 
+    /// A replacement that FAILS has still removed the old deploy — booted out
+    /// and overwritten before macOS refused the new one — so the teacher has
+    /// neither, and the refusal speaks only of the new one. The trail says the
+    /// old one was turned off, and when it had been set for.
+    @MainActor
+    func testAReplacementThatFailsRecordsTheDeployItTurnedOff() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let scratch: URL = agentsDirectory.deletingLastPathComponent().appendingPathComponent("trail")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
+        let newMoment: Date = sixThirtyTomorrow()
+        let alreadySet: Date = newMoment.addingTimeInterval(36 * 60 * 60)
+        let old: [String: Any] = ScheduledDeploy.propertyList(
+            courseCode: course.code, sectionNumber: 1, when: alreadySet,
+            workspaceURL: workspaceURL, deployArguments: []
+        )
+        try PropertyListSerialization.data(fromPropertyList: old, format: .xml, options: 0)
+            .write(to: ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1))
+
+        let runner: FakeLaunchControl = FakeLaunchControl()
+        runner.bootstrapFailure = "Bootstrap failed: 5: Input/output error"
+        XCTAssertNotNil(ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: newMoment,
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: runner
+        ))
+        XCTAssertEqual(runner.bootedOutLabels.count, 1, "The old deploy was booted out before the new one was refused")
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains(ScheduledDeploy.dayAndTimeText(alreadySet)), trail)
+        XCTAssertTrue(trail.contains("turned off"), trail)
+        XCTAssertFalse(
+            trail.contains(ScheduledDeploy.dayAndTimeText(newMoment)),
+            "Nothing was set for the new moment, so the trail must not say it was: \(trail)"
+        )
+    }
+
     /// With nothing set, the plan says nothing about replacing anything.
     @MainActor
     func testSchedulingAFreeSectionMentionsNoReplacement() throws {

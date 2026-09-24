@@ -1765,6 +1765,16 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused("Nothing was scheduled. \(problem)")
         }
 
+        // What this is about to replace, read BEFORE it goes (issue #195).
+        // An outside assistant over MCP sees no card, so the result is the
+        // only place it — and through it the teacher — learns that a deploy
+        // already set is gone. The same named sentence the card uses.
+        let replacing: Date? = ScheduledDeploy.momentBeingReplaced(
+            courseCode: asked.located.course.code,
+            sectionNumber: asked.located.sectionNumber,
+            by: asked.when
+        )
+
         if let problem = ScheduledDeploy.scheduleDeploy(
             course: asked.located.course,
             sectionNumber: asked.located.sectionNumber,
@@ -1777,8 +1787,13 @@ final class AssistToolRunner {
         }
 
         let moment: String = ScheduledDeploy.dayAndTimeText(asked.when)
-        let summary: String = "Scheduled: \(asked.located.course.code) Section "
+        var summary: String = "Scheduled: \(asked.located.course.code) Section "
             + "\(asked.located.sectionNumber) deploys to \(asked.plan.destination) at \(moment)."
+        if let replacing {
+            summary += " " + AssistWording.scheduleReplaces(
+                moment: ScheduledDeploy.dayAndTimeText(replacing)
+            )
+        }
         return AssistToolOutcome.wrote(
             summary,
             detail: summary + "\n\nThis Mac has to be on and awake then — plugged in if it is a laptop, "
