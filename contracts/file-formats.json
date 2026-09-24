@@ -810,6 +810,75 @@
   },
   "sidebarHiding": {
     "note": "What the entries of course_config.json's `hidden` list MEAN, and who may change them. Issue #265: the switches under 'Hide from the site's sidebar' in Course Settings did not always match the built sidebar.",
+    "matchRule": {
+      "rule": "`hidden` holds the STORED names of TOP-LEVEL items of the built site: a file by its file name with `.md` (\"Key Links.md\"), a folder by its folder name (\"Tasks\"). An entry hides the top-level item of that name and everything inside it, matched ignoring case and Unicode normalisation. Nothing below the top level is hidden by a name. A name without `.md` also hides the top-level file `<name>.md`.",
+      "why": "Version 1 of the site's filter matched a file on its page TITLE and a folder on its name at ANY depth, and the build stripped `.md` so a file name could stand in for a title. Course Settings offers and writes FILE names of TOP-LEVEL items, so a page whose title was not its file name was never hidden (measured: 'Learning Goals.md' titled 'Goals for Learning' stayed in the sidebar), and a nested folder or page sharing a ticked name was hidden by accident. Case and normalisation are ignored because the Mac's disk ignores them: 'tasks' typed for the folder 'Tasks', or a name stored composed while the disk has it decomposed, is the same folder, and this errs toward hiding. The name-without-.md alias keeps every older entry hiding what it hid. Measured to change nothing on Russell's 7 real courses, all 38 example payloads and all 50 skeletons. The one direction toward SHOWING is a nested item sharing a ticked name, which the switch list never offered.",
+      "consumers": "scripts/check_sidebar_hiding_against_the_site.py runs every case through the REAL Quartz file tree and the filter text the build writes (verify.sh, in the image). scripts/test_sidebar_hiding.py checks the cases are well formed. Each built section's copy of the filter is brought up to date by build_site.ensure_sidebar_hide_rule_current.",
+      "cases": [
+        {
+          "name": "a folder and a file, by their stored names",
+          "hidden": ["Tasks", "Key Links.md"],
+          "paths": ["Tasks/index.md", "Tasks/Week 1.md", "Concepts/Loops.md", "Key Links.md", "Learning Goals.md"],
+          "expectHidden": ["Tasks/", "Tasks/Week 1.md", "Key Links.md"]
+        },
+        {
+          "name": "a page whose title is not its file name",
+          "hidden": ["Learning Goals.md"],
+          "paths": ["Learning Goals.md", "Key Links.md"],
+          "titles": { "Learning Goals.md": "Goals for Learning" },
+          "expectHidden": ["Learning Goals.md"]
+        },
+        {
+          "name": "a name typed in a different case",
+          "hidden": ["tasks"],
+          "paths": ["Tasks/Week 1.md", "Concepts/Loops.md"],
+          "expectHidden": ["Tasks/", "Tasks/Week 1.md"]
+        },
+        {
+          "name": "a name stored composed, on disk decomposed",
+          "hidden": ["\u00c9valuations"],
+          "paths": ["E\u0301valuations/Test 1.md", "Concepts/Loops.md"],
+          "expectHidden": ["E\u0301valuations/", "E\u0301valuations/Test 1.md"]
+        },
+        {
+          "name": "a nested folder sharing a ticked folder's name",
+          "hidden": ["Tasks"],
+          "paths": ["Tasks/Week 1.md", "Portfolios/Tasks/Reflection.md", "Portfolios/Overview.md"],
+          "expectHidden": ["Tasks/", "Tasks/Week 1.md"]
+        },
+        {
+          "name": "a nested page sharing a ticked page's name",
+          "hidden": ["Key Links.md"],
+          "paths": ["Key Links.md", "Setup/Key Links.md"],
+          "expectHidden": ["Key Links.md"]
+        },
+        {
+          "name": "an older entry without .md",
+          "hidden": ["Key Links"],
+          "paths": ["Key Links.md", "Concepts/Loops.md"],
+          "expectHidden": ["Key Links.md"]
+        },
+        {
+          "name": "Media and the curriculum coverage page, as the build adds them",
+          "hidden": ["Media", "Curriculum Coverage.md"],
+          "paths": ["Media/Diagram.md", "Curriculum Coverage.md", "Concepts/Loops.md"],
+          "expectHidden": ["Media/", "Media/Diagram.md", "Curriculum Coverage.md"]
+        },
+        {
+          "name": "a folder with no index page",
+          "hidden": ["Handouts"],
+          "paths": ["Handouts/Sheet 1.md", "Concepts/index.md", "Concepts/Loops.md"],
+          "expectHidden": ["Handouts/", "Handouts/Sheet 1.md"]
+        },
+        {
+          "name": "a name holding quotes",
+          "hidden": ["Bob's \"Stuff\""],
+          "paths": ["Bob's \"Stuff\"/Notes.md", "Concepts/Loops.md"],
+          "expectHidden": ["Bob's \"Stuff\"/", "Bob's \"Stuff\"/Notes.md"]
+        }
+      ],
+      "casesWhy": "paths are files relative to the site's content folder; every file (other than a folder's index.md) and every folder ('Name/') they imply is an item. expectHidden lists the items NOT in the sidebar; every other item must be. titles, when given, sets a page's title to something other than its file name, to prove the title plays no part."
+    },
     "buildKeepsHidden": {
       "rule": "A build's preflight never changes `hidden`. A folder it discovers (on disk, not yet in its scope's list) is still added to shared_folders or per_section_folders and to expandable, but if its name is already in `hidden` it STAYS hidden.",
       "why": "The build used to un-hide such a folder and write the list back ('Un-hid newly discovered folder'). A folder ticked hidden and then moved to the other level, made again at the other level, or listed in the wrong scope was un-hidden on EVERY build, the tick erased from the file while Course Settings still showed it, and the next Save put it back - measured on all five shapes below with the real preflight. Keeping it hidden errs the safe way: hiding from the sidebar never unpublishes a page. Rejected: limiting the un-hide to names the teacher could not have ticked - the Settings form offers only names already listed, so every name in `hidden` was ticked by somebody, or is a legacy entry nobody should lose silently.",
