@@ -1545,6 +1545,110 @@ because the obvious home is wrong twice over:
   `scheduledScriptsDirectoryURL()` traps in a Debug build when the agents
   override is set and this one is not — a test that moves one and forgets the
   other fails on the spot rather than reaching a teacher's file.
+- **And the rest of that folder, the agents folder and the assistant's launch
+  files: issue #240, 2026-09-24.** Three more paths were still reached by the
+  suite, all for fixture code `ICS3U` — "a course a teacher plausibly has":
+  - `scheduled/<label>.succeeded` — `SectionPublishStateTests` created,
+    wrote and deleted it; a real overnight run's unconsumed result sitting
+    there would have been destroyed, and the section silently not marked
+    published.
+  - `scheduled/<label>.findings` — `findingsSentinelURL` had no home parameter
+    at all, so `ScheduledDeployFolderProblemTests` threw away any pending "your
+    media folder is missing" note, and wrote (then restored) the real
+    `~/Library/Logs/Plantoir/<label>.log`.
+  - `…/Plantoir/assist/` — **not in the issue; found by walking every resolver
+    of the home folder.** `ClaudeCodeLauncher.supportDirectory()` had no seam of
+    any kind, and the launcher tests write `mcp-<CODE>.json` and
+    `launch-<CODE>.command` through both doors into the teacher's real folder.
+    One outlived its test: `launch-ICS3U_ROUNDTRIP_TEST.command` (826 bytes,
+    2026-09-19) was found there on 2026-09-23, beside Russell's own launch
+    files. It is harmless and it is his to delete; the fix does not touch it.
+  - and `~/Library/LaunchAgents`, READ (listed) 347 times in one run
+    of the suite — `WorkspaceModel.sweepScheduledDeploysThatAreTooLate` for every
+    test that opens a folder, the sidebar's clock, the scheduling card.
+
+  **The fix is a redirect, not the trap the issue proposed.** The issue asked
+  for a Debug trap "when `launchAgentsDirectoryOverride` is set and the home has
+  not been moved" — but neither test that reached the sentinels sets that
+  override, so the trap would have fired for neither path it was written for.
+  The condition that identifies them is "under the suite, and nobody named a
+  home". So `ScheduledDeploy.homeForScheduledNotes` answers one throwaway home
+  per test run (keyed on `BuildOutputLocation.isRunningTests`, the device
+  `buildsRoot` already uses, so the two cannot disagree about whether a test is
+  driving), and the sentinels, the agent's log, the wrapper-scripts folder and
+  `launchAgentsDirectoryURL()` all resolve against it when no home or override
+  is named. `ClaudeCodeLauncher.supportDirectory()` gets an override and the
+  same redirect. The resolvers' defaults became `URL? = nil` rather than
+  `= homeDirectoryForCurrentUser`, because a default argument is evaluated at
+  the CALL site and could not be redirected from inside; a home passed
+  explicitly — `oneShotCommand` writing the real path into the script launchd
+  will run — is used exactly, test or not. The launchd run itself is not under
+  XCTest, so it keeps the real home; no test can prove that, so read it.
+
+  **The redirect needed a second change to be safe rather than dangerous.**
+  `LaunchControl.run` used to refuse only while the agents override was set. With
+  the agents folder silently redirected, a test that forgot the override would
+  write its plist into the throwaway folder and then hand that plist to the REAL
+  launchd — so it now refuses under the suite whether or not the override is
+  set. `SuiteStaysOutOfRealFoldersTests` pins every redirect and that refusal;
+  a probe that logs a stack whenever any of these resolvers answers a path in
+  the real `~/Library` under XCTest counted, over the full suite, **482 stacks on `origin/dev`**
+  (8bcb01f1; LaunchAgents 347 — 317 of them the too-late sweep — the agent's
+  log 77, `.succeeded` 24, `assist/` 23, `.findings` 11; 92 of those only
+  built a path into generated text) and **38 with the fix — every one
+  `oneShotCommand` writing script TEXT with its real-home default, which
+  touches no file.** The probe returned a scratch path wherever it logged, so
+  neither run read or wrote the real folders.
+
+  **The stopped-run records, found by the review and closed in the same
+  piece.** `…/Plantoir/scheduled/stopped/` is read by the sidebar's badge
+  (`SidebarView.stoppedPublishBadge`) and the section's notice
+  (`SectionDetailView.loadStoppedScheduledPublish`) whenever a window is built,
+  and `dismissScheduledPublishNotice` DELETES a record — all three, and
+  `ScheduledPublishWatcher.shared`, passed the real home EXPLICITLY, so the
+  redirect never applied: 29 reads per suite run (14 from
+  `CourseRenameInterfaceTests` alone), and the first test to press Dismiss
+  would have deleted a real record. The plan had said no test builds the
+  sidebar; the review measured that wrong. All four now pass
+  `ScheduledDeploy.homeForScheduledNotes`.
+
+  **What "zero" covers, exactly.** The final probe (branch tip, full suite,
+  1,727 tests) watched the five `ScheduledDeploy` resolvers (sentinels, log,
+  scripts folder, LaunchAgents), `ClaudeCodeLauncher.supportDirectory()`,
+  `ScheduledPublishOutcome.directory` (every stopped-record path derives from
+  it) and `AssistModelStore.directoryURL`. It logged **101 stacks and no reach
+  of a real file in any watched folder**: 95 are the 19 `oneShotCommand` calls
+  building script TEXT (log, `.succeeded`, and three stopped-record paths
+  each), and **6 are stat-only reads of the real models folder** —
+  `SharedRulesContractTests.testWhatThePanelSaysFollowsTheContract` (4, through
+  `AssistModelLibrary.whatHappensNext`),
+  `AssistWarmUpTests.testATurnCannotStartBeforeTheWarmUpHasComeBack` (1) and
+  `SectionRestoredTrailTests.testARefusedRestoreWritesNothing` (1): whether a
+  model file exists and how big it is, nothing written, but a panel sentence
+  that depends on what this Mac has downloaded. Left for now, and named.
+
+  **Reached and deliberately left:** `~/Library/Application Support/obsidian/
+  obsidian.json` is READ by the rename paths only when Obsidian is running with
+  a window; `~/plantoir-mirror-test-<UUID>` is created under `$HOME` on purpose
+  by `ToolchainMirrorTests` (the VM mounts only `$HOME`) and removed; the UI
+  tests' read of the real models folder is opt-in and outside the gate. And
+  `ScheduledDeploy.bootOutAgent(label:)` runs `/bin/launchctl` directly,
+  bypassing the refusal — safe only because its callers end the process and no
+  test reaches them; its comment says so. The review's broader probe (every
+  product home lookup) also counted 146 lookups of home dot-folders by
+  `findCommandLineTool` (`~/.local/bin`, `~/.nvm` …) — outside this issue's
+  folders.
+
+  **The limit of the guard, so nobody oversells it.** The redirects are per
+  SUBSYSTEM — `homeForScheduledNotes` for everything a scheduled deploy leaves,
+  `supportDirectory`'s own for the launch files, `buildsRoot`'s for builds — and
+  `SuiteStaysOutOfRealFoldersTests` asks the resolvers it names. A NEW product
+  path that resolves the real home by itself would not be caught today; the
+  stopped-record reads were exactly such a path, found by a probe rather than
+  a test. A source-scan tripwire (the `ActivityTrailWiringTests` device) is a
+  follow-up, not part of this piece. Windows owes nothing as an
+  obligation, but the shape is worth a look there: a resolver with no home
+  parameter, fed a fixture course a teacher plausibly has.
 - **Not inside `SidebarView.performRemoval` either**, which is where it started.
   Nothing in the suite constructs that view — every reference to it is to a
   static member — so a cancel living there could be proved only by proving the

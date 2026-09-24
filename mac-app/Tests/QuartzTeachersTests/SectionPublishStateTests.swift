@@ -443,22 +443,31 @@ final class SectionPublishRecordingTests: XCTestCase {
 
     /// A scheduled deploy never goes through the deploy runner — launchd
     /// runs a shell script — so it needs its own path to the same record.
+    ///
+    /// In a throwaway home: `ICS3U` section 1 is a course a teacher plausibly
+    /// has, and before issue #240 this test created, wrote and deleted the
+    /// sentinel in the real `~/Library/Application Support/Plantoir/scheduled`
+    /// — destroying a real overnight run's result if one was waiting there.
     func testAScheduledDeployRecordsWhatWentOut() throws {
-        let sentinel: URL = ScheduledDeploy.successSentinelURL(courseCode: "ICS3U", sectionNumber: 1)
+        let homeFolderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scheduled-publish-home-" + UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: homeFolderURL) }
+        let sentinel: URL = ScheduledDeploy.successSentinelURL(
+            courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL
+        )
         try FileManager.default.createDirectory(
             at: sentinel.deletingLastPathComponent(), withIntermediateDirectories: true
         )
-        defer { try? FileManager.default.removeItem(at: sentinel) }
 
         let section: (courseDirectory: URL, courseCode: String, sectionNumber: Int) =
             (course.directoryURL, "ICS3U", 1)
 
         // No sentinel: the script did not say every destination worked.
-        ScheduledDeploy.recordScheduledPublish(section: section, fingerprint: "abc")
+        ScheduledDeploy.recordScheduledPublish(section: section, fingerprint: "abc", inHomeFolder: homeFolderURL)
         XCTAssertNil(SectionPublishState.stamp(courseDirectory: course.directoryURL, sectionNumber: 1))
 
         try "netlify cloudflare_pages\n".write(to: sentinel, atomically: true, encoding: .utf8)
-        ScheduledDeploy.recordScheduledPublish(section: section, fingerprint: "abc")
+        ScheduledDeploy.recordScheduledPublish(section: section, fingerprint: "abc", inHomeFolder: homeFolderURL)
         let stamp = SectionPublishState.stamp(courseDirectory: course.directoryURL, sectionNumber: 1)
         XCTAssertEqual(stamp?.fingerprint, "abc")
         XCTAssertEqual(stamp?.destinations, ["netlify", "cloudflare_pages"])
@@ -485,12 +494,18 @@ final class SectionPublishRecordingTests: XCTestCase {
         )
         XCTAssertNil(ScheduledDeploy.requestedSection(from: ["Plantoir"]))
 
+        // ONE home for both sides of the comparison. The script is given it
+        // explicitly (as the app gives it the real one), and the sentinel is
+        // asked for with the same one — asking with no home would answer the
+        // suite's throwaway home, which the script never names.
+        let homeFolderURL: URL = URL(fileURLWithPath: "/Users/teacher", isDirectory: true)
         let script: String = ScheduledDeploy.oneShotCommand(
             courseCode: "ICS3U",
             sectionNumber: 1,
             workspaceURL: workspace,
             deployArgumentsList: [["ICS3U", "1"], ["ICS3U", "1", "--target", "cloudflare"]],
-            destinationTypes: ["netlify", "cloudflare_pages"]
+            destinationTypes: ["netlify", "cloudflare_pages"],
+            homeFolder: homeFolderURL
         )
         XCTAssertTrue(
             script.contains("ALL_OK=0"),
@@ -498,7 +513,9 @@ final class SectionPublishRecordingTests: XCTestCase {
         )
         XCTAssertTrue(script.contains("netlify cloudflare_pages"))
         XCTAssertTrue(
-            script.contains(ScheduledDeploy.successSentinelURL(courseCode: "ICS3U", sectionNumber: 1).path)
+            script.contains(ScheduledDeploy.successSentinelURL(
+                courseCode: "ICS3U", sectionNumber: 1, inHomeFolder: homeFolderURL
+            ).path)
         )
     }
 

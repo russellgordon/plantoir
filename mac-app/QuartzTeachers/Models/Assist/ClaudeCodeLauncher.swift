@@ -32,6 +32,15 @@ nonisolated enum ClaudeCodeLauncher {
 
     // MARK: - Stored properties
 
+    /// A folder a test can name for `supportDirectory` explicitly. Nil in the
+    /// app, where the real folder is always the answer.
+    nonisolated(unsafe) static var supportDirectoryOverride: URL?
+
+    /// The one throwaway folder for a whole test run, so a test that writes
+    /// through one door and reads back through the other still finds it.
+    static let supportDirectoryWhileTesting: URL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("plantoir-assist-under-test-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+
     /// The three sentences this door shows a teacher, in one place, because
     /// `contracts/app-rules.json` → `outsideAgents` carries them and a test
     /// compares the two. A sentence typed into the view and again into the
@@ -304,9 +313,25 @@ nonisolated enum ClaudeCodeLauncher {
     /// The app's own data directory for these sessions, created if needed.
     /// Deliberately not the teacher's working folder: nothing either door
     /// writes should appear in the vault Obsidian is watching.
+    ///
+    /// **Under the test suite, a throwaway folder instead** (issue #240). The
+    /// launcher tests write real `mcp-<CODE>.json` and `launch-<CODE>.command`
+    /// files through both doors and delete them afterwards — into the
+    /// teacher's own `…/Plantoir/assist`, beside the ones Plantoir wrote for
+    /// their real courses, until this. One such file outlived its test:
+    /// `launch-ICS3U_ROUNDTRIP_TEST.command` (826 bytes, 2026-09-19) was found
+    /// there on 2026-09-23, left by an earlier shape of the round-trip test
+    /// that nothing cleans up. It is Russell's to delete, not the suite's.
     static func supportDirectory() throws -> URL {
-        let appSupportDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Plantoir/assist")
+        let appSupportDirectory: URL
+        if let supportDirectoryOverride {
+            appSupportDirectory = supportDirectoryOverride
+        } else if BuildOutputLocation.isRunningTests {
+            appSupportDirectory = supportDirectoryWhileTesting
+        } else {
+            appSupportDirectory = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/Plantoir/assist")
+        }
         try FileManager.default.createDirectory(at: appSupportDirectory, withIntermediateDirectories: true)
         return appSupportDirectory
     }

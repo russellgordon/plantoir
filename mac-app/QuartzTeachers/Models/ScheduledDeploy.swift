@@ -101,12 +101,51 @@ enum ScheduledDeploy {
             )
             return quarantinedScriptsDirectoryURL
         }
-        return FileManager.default.homeDirectoryForCurrentUser
+        // Under the suite with neither override set: never the real folder
+        // either (issue #240). The per-run home is the same one every other
+        // scheduled note under test resolves against.
+        return homeForScheduledNotes
             .appendingPathComponent("Library")
             .appendingPathComponent("Application Support")
             .appendingPathComponent("Plantoir")
             .appendingPathComponent("scheduled")
     }
+
+    /// The home folder a scheduled deploy's notes — the success and findings
+    /// sentinels, the wrapper scripts, the agent's log, and the stopped-run
+    /// records the sidebar badge, the section's notice (and its Dismiss, which
+    /// DELETES one) and `ScheduledPublishWatcher` read — are resolved against
+    /// when a caller names none: the real one in the app and in a run launchd
+    /// fired, and ONE throwaway folder per test run under the suite.
+    ///
+    /// **Why a redirect and not the trap issue #240 proposed.** The issue
+    /// asked for a Debug trap "when `launchAgentsDirectoryOverride` is set and
+    /// the home has not been moved" — but neither test that reached the real
+    /// sentinels sets that override, so the trap would have fired for neither
+    /// of the paths it was written for. The condition that identifies them is
+    /// "under the suite, and nobody passed a home", and that is what this
+    /// answers. It is the device `BuildOutputLocation.buildsRoot` already
+    /// uses, keyed on the same `isRunningTests`, so the two cannot disagree
+    /// about whether a test is driving.
+    ///
+    /// Every resolver that uses it takes `URL? = nil` rather than a default
+    /// of the real home, on purpose: a default argument is evaluated at the
+    /// CALL site, so `= homeDirectoryForCurrentUser` could not be redirected
+    /// from inside the function. A caller that passes a home explicitly —
+    /// `oneShotCommand`, writing the real path into the script launchd will
+    /// run — gets exactly that home, test or not.
+    nonisolated static var homeForScheduledNotes: URL {
+        if BuildOutputLocation.isRunningTests {
+            return homeWhileTesting
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+    }
+
+    /// The one throwaway home for a whole test run, so a test that writes a
+    /// sentinel and then reads it back through another function still finds
+    /// it.
+    nonisolated static let homeWhileTesting: URL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("plantoir-home-under-test-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
 
     /// Where the guard above sends a test that forgot, so that even with
     /// assertions off nothing real is touched. One folder per process, so a
@@ -142,10 +181,10 @@ enum ScheduledDeploy {
     nonisolated static func successSentinelURL(
         courseCode: String,
         sectionNumber: Int,
-        inHomeFolder home: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder home: URL? = nil
     ) -> URL {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
-        return home
+        return (home ?? homeForScheduledNotes)
             .appendingPathComponent("Library")
             .appendingPathComponent("Application Support")
             .appendingPathComponent("Plantoir")
@@ -190,6 +229,12 @@ enum ScheduledDeploy {
     /// number — three `ProgramArguments`, no `--scheduled-section` — so the
     /// stand-down path has only the label, taken from the wrapper script's own
     /// name. Every plist any release ever wrote is named after its label.
+    ///
+    /// It runs `/bin/launchctl` directly rather than through `LaunchControl`,
+    /// so the refusal that guards every other launchctl call does not guard
+    /// this one. That is safe only because its callers (`runScheduled`,
+    /// `standDown`) end the process and no test can reach them — route it
+    /// through `LaunchControl.run` before calling it from anywhere else.
     nonisolated static func bootOutAgent(label: String) {
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
@@ -234,11 +279,26 @@ enum ScheduledDeploy {
     /// replaceable on the same terms and for the same reason.
     nonisolated(unsafe) static var launchAgentsDirectoryOverride: URL?
 
+    /// Where the agents are.
+    ///
+    /// **Under the suite with no override, an empty throwaway folder** — never
+    /// the teacher's real `~/Library/LaunchAgents` (issue #240). Every test
+    /// that points a `WorkspaceModel` at a folder runs the sweep for deploys
+    /// that are too late, every sidebar row asks for its clock, and every
+    /// scheduling card asks what it would replace; on 2026-09-23 a probe
+    /// counted about 344 reaches of the real folder in one run of the suite,
+    /// each passing whatever that Mac happened to have scheduled. Reads only,
+    /// but a transcript that depends on the machine running it is not a test.
+    ///
+    /// The half that makes this safe rather than dangerous is in
+    /// `LaunchControl.run`: it refuses under the suite whether or not the
+    /// override is set, so a plist a test writes here can never be handed to
+    /// the real `launchd`.
     nonisolated static func launchAgentsDirectoryURL() -> URL {
         if let launchAgentsDirectoryOverride {
             return launchAgentsDirectoryOverride
         }
-        return FileManager.default.homeDirectoryForCurrentUser
+        return homeForScheduledNotes
             .appendingPathComponent("Library")
             .appendingPathComponent("LaunchAgents")
     }
@@ -249,10 +309,10 @@ enum ScheduledDeploy {
     nonisolated static func logURL(
         courseCode: String,
         sectionNumber: Int,
-        inHomeFolder home: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder home: URL? = nil
     ) -> URL {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
-        return home
+        return (home ?? homeForScheduledNotes)
             .appendingPathComponent("Library")
             .appendingPathComponent("Logs")
             .appendingPathComponent("Plantoir")
@@ -1331,9 +1391,13 @@ enum ScheduledDeploy {
     /// Beside the success sentinel and consumed the same way, because the
     /// shape is already proven here: a one-shot run writes a small file, the
     /// app reads it and deletes it.
-    nonisolated static func findingsSentinelURL(courseCode: String, sectionNumber: Int) -> URL {
+    nonisolated static func findingsSentinelURL(
+        courseCode: String,
+        sectionNumber: Int,
+        inHomeFolder home: URL? = nil
+    ) -> URL {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
-        return FileManager.default.homeDirectoryForCurrentUser
+        return (home ?? homeForScheduledNotes)
             .appendingPathComponent("Library")
             .appendingPathComponent("Application Support")
             .appendingPathComponent("Plantoir")
@@ -1357,13 +1421,14 @@ enum ScheduledDeploy {
     /// assistant's server, so this reads the file launchd already wrote.
     nonisolated static func recordFolderProblems(
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
-        fromByteOffset offset: UInt64
+        fromByteOffset offset: UInt64,
+        inHomeFolder home: URL? = nil
     ) {
         guard let section else {
             return
         }
         let log: URL = logURL(
-            courseCode: section.courseCode, sectionNumber: section.sectionNumber
+            courseCode: section.courseCode, sectionNumber: section.sectionNumber, inHomeFolder: home
         )
         guard let text = textOfLog(at: log, fromByteOffset: offset) else {
             return
@@ -1376,7 +1441,7 @@ enum ScheduledDeploy {
             }
         }
         let sentinel: URL = findingsSentinelURL(
-            courseCode: section.courseCode, sectionNumber: section.sectionNumber
+            courseCode: section.courseCode, sectionNumber: section.sectionNumber, inHomeFolder: home
         )
         if markerLines.isEmpty {
             // Nothing wrong this time: clear anything an earlier run left, so
@@ -1400,8 +1465,12 @@ enum ScheduledDeploy {
     /// became unreachable the moment a single problem had ever been logged. A
     /// teacher who fixed the folder would have gone on being told about it
     /// forever.
-    nonisolated static func logSize(courseCode: String, sectionNumber: Int) -> UInt64 {
-        let log: URL = logURL(courseCode: courseCode, sectionNumber: sectionNumber)
+    nonisolated static func logSize(
+        courseCode: String,
+        sectionNumber: Int,
+        inHomeFolder home: URL? = nil
+    ) -> UInt64 {
+        let log: URL = logURL(courseCode: courseCode, sectionNumber: sectionNumber, inHomeFolder: home)
         let attributes = try? FileManager.default.attributesOfItem(atPath: log.path)
         return (attributes?[.size] as? UInt64) ?? 0
     }
@@ -1422,10 +1491,12 @@ enum ScheduledDeploy {
     /// What the last scheduled run found, if anything, consuming the record so
     /// it is reported once rather than every time the app opens.
     nonisolated static func takeFolderProblems(
-        courseCode: String, sectionNumber: Int
+        courseCode: String,
+        sectionNumber: Int,
+        inHomeFolder home: URL? = nil
     ) -> [SiteHealthFinding] {
         let sentinel: URL = findingsSentinelURL(
-            courseCode: courseCode, sectionNumber: sectionNumber
+            courseCode: courseCode, sectionNumber: sectionNumber, inHomeFolder: home
         )
         guard let text = try? String(contentsOf: sentinel, encoding: .utf8) else {
             return []
@@ -1439,13 +1510,14 @@ enum ScheduledDeploy {
     /// that failed cannot be read as a success by the next one.
     nonisolated static func recordScheduledPublish(
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
-        fingerprint: String?
+        fingerprint: String?,
+        inHomeFolder home: URL? = nil
     ) {
         guard let section, let fingerprint else {
             return
         }
         let sentinel: URL = successSentinelURL(
-            courseCode: section.courseCode, sectionNumber: section.sectionNumber
+            courseCode: section.courseCode, sectionNumber: section.sectionNumber, inHomeFolder: home
         )
         guard let written = try? String(contentsOf: sentinel, encoding: .utf8) else {
             return
@@ -1581,7 +1653,11 @@ enum ScheduledDeploy {
     /// `~/Library/LaunchAgents` of whoever runs the suite — passing whatever
     /// that Mac has scheduled, which is the #240 fault arriving through a new
     /// door. A test that wants one sets `launchAgentsDirectoryOverride`, as
-    /// every scheduling test already does.
+    /// every scheduling test already does. (Since #240
+    /// `launchAgentsDirectoryURL()` itself answers an empty throwaway folder
+    /// under the suite, so this is now the second of two guards; it stays
+    /// because it also keeps a plist some other test left in that shared
+    /// throwaway folder from being read as a deploy to replace.)
     static func momentAlreadySet(
         courseCode: String,
         sectionNumber: Int,
@@ -2006,8 +2082,15 @@ struct LaunchControl: LaunchControlRunning {
     /// means the forgotten default would boot out and delete Russell's own
     /// ICS3U schedule on the machine running it. So the guard is structural
     /// rather than written down.
+    ///
+    /// **And it refuses under the suite even with NO override**, since issue
+    /// #240: `ScheduledDeploy.launchAgentsDirectoryURL()` now answers a
+    /// throwaway folder there, so a test that forgot the override would
+    /// otherwise write its plist somewhere harmless and then hand that plist
+    /// to the REAL launchd — the redirect would have un-guarded the one call
+    /// it most needed to keep guarded.
     static func run(arguments: [String]) -> (exitCode: Int32, output: String) {
-        if ScheduledDeploy.launchAgentsDirectoryOverride != nil {
+        if ScheduledDeploy.launchAgentsDirectoryOverride != nil || BuildOutputLocation.isRunningTests {
             return (exitCode: -1, output: refusedUnderATestRun)
         }
         let process: Process = Process()
