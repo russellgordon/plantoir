@@ -98,7 +98,30 @@ final class HelperVersionsTests: XCTestCase {
 
         let elapsed: TimeInterval = Date().timeIntervalSince(startedAt)
         XCTAssertLessThan(elapsed, 4, "The check waited \(elapsed)s for a program that never answered.")
-        XCTAssertTrue(helpers.contains("Colima not checked (pinned v0.10.3)"), helpers)
+        // The one that hung is named as hanging — that is the diagnosis —
+        // and the ones after it as never reached.
+        XCTAssertTrue(helpers.contains("Colima did not answer within 1 s (pinned v0.10.3)"), helpers)
+        XCTAssertTrue(helpers.contains("Lima not checked (pinned 2.2.0)"), helpers)
+    }
+
+    /// A helper further down the list hanging: the ones before it keep
+    /// their answers, and only it is named as hanging.
+    func testTheHelperThatHungIsTheOneNamed() {
+        let output: String = [
+            "colima\tcolima version 0.10.3\t/opt/homebrew/bin/colima",
+            "limactl\t\t"
+        ].joined(separator: "\n")
+
+        let helpers: String = ProblemReportEnvironment.helperDescription(
+            fromProbeOutput: output,
+            toolsFolder: "/nonexistent",
+            secondsWaitedForAHungHelper: 5
+        )
+
+        XCTAssertEqual(
+            helpers,
+            "llama.cpp b10435 (Metal) · Colima 0.10.3 (Homebrew) · Lima not found (would install 2.2.0) · Docker CLI did not answer within 5 s (pinned 29.7.2) · Buildx not checked (pinned v0.36.1)"
+        )
     }
 
     /// The check runs off the main thread, and only it stores the answer.
@@ -114,6 +137,7 @@ final class HelperVersionsTests: XCTestCase {
 
         XCTAssertFalse(measurement.ranOnTheMainThread)
         XCTAssertTrue(measurement.description.contains("Colima 9.9.1"), measurement.description)
+        XCTAssertTrue(measurement.description.contains(" · checked "), "The remembered answer must say when it was taken: \(measurement.description)")
         XCTAssertEqual(ProblemReportEnvironment.helperDescription, measurement.description)
     }
 
@@ -220,6 +244,14 @@ final class HelperVersionsTests: XCTestCase {
                 helpers
             )
         }
+    }
+
+    func testTheCheckSaysWhenItWasTaken() {
+        let utc: TimeZone = TimeZone(identifier: "UTC") ?? TimeZone.current
+        XCTAssertEqual(
+            ProblemReportEnvironment.whenChecked(Date(timeIntervalSince1970: 1_790_000_000), timeZone: utc),
+            "checked 2026-09-21 14:13:20"
+        )
     }
 
     func testVersionNumbersAreReadFromEachShapeOfLine() {
