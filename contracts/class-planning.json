@@ -334,9 +334,51 @@
         "term": "Thread",
         "title": "thread 1, day 1",
         "why": "Case-insensitive, exactly as the default word already is."
+      },
+      {
+        "expectNumber": 3,
+        "scheme": "numbered",
+        "term": "Week",
+        "title": "Week 3",
+        "why": "A club (#267): class_page_scheme \"numbered\" names a page with ONE number. It is read as unit 1, day 3 \u2014 every planner then counts one number with no rewrite \u2014 but a runner must assert the NUMBER, never a unit."
+      },
+      {
+        "expectNumber": 12,
+        "scheme": "numbered",
+        "term": "Week",
+        "title": "week 12",
+        "why": "Case-insensitive, as the other scheme is."
+      },
+      {
+        "expectNumber": null,
+        "scheme": "numbered",
+        "term": "Week",
+        "title": "Week 3, Day 1",
+        "why": "Nothing may follow the number. A two-number page in a numbered course is not a class page \u2014 reading it as one would put two schemes in one section."
+      },
+      {
+        "expectNumber": null,
+        "scheme": "numbered",
+        "term": "Week",
+        "title": "Unit 1, Day 1",
+        "why": "The skeleton's first page is not a club's class page; this is why a numbered course is poured no skeleton."
+      },
+      {
+        "expectNumber": null,
+        "scheme": "numbered",
+        "term": "Week",
+        "title": "Weekly Notes",
+        "why": "The word must be followed by whitespace and a number."
+      },
+      {
+        "expectDay": null,
+        "expectUnit": null,
+        "term": "Week",
+        "title": "Week 3",
+        "why": "The same title under the ORDINARY scheme is not a class page. This is the state of a course whose pages are \u201cWeek N\u201d but whose configuration says nothing about a scheme (Russell's CODING club): it stays exactly as it was, and nothing converts it."
       }
     ],
-    "note": "Which class-page titles carry numbers. A page named some other way — 'Field Trip', 'Exam Review' — is NOT guessed at: it is passed over everywhere classes are renumbered, and keeps its own date. The plan says how many were skipped so nobody is surprised. A case with no `term` uses the default word, \u201cUnit\u201d \u2014 which is what a course says when `unit_word` is absent from its configuration, and what every course made before 2026-09-01 says."
+    "note": "Which class-page titles carry numbers. A page named some other way — 'Field Trip', 'Exam Review' — is NOT guessed at: it is passed over everywhere classes are renumbered, and keeps its own date. The plan says how many were skipped so nobody is surprised. A case with no `term` uses the default word, \u201cUnit\u201d \u2014 which is what a course says when `unit_word` is absent from its configuration, and what every course made before 2026-09-01 says. A case with `\"scheme\": \"numbered\"` is read under that course's ONE-number scheme (file-formats.json, `class_page_scheme`; #267) and carries `expectNumber` instead of a unit and a day; a case with no `scheme` is the ordinary one, which is what an absent key means."
   },
   "refusals": {
     "cases": [
@@ -452,6 +494,16 @@
           ],
           "expect": "All Days",
           "why": "Matched case-insensitively, but the LIST's spelling is returned: everything downstream builds file paths out of this answer, and on a case-sensitive volume the key's spelling would not be there."
+        },
+        {
+          "name": "a club's folder, recorded, below another folder",
+          "classFolder": "All Meetings",
+          "perSectionFolders": [
+            "Resources",
+            "All Meetings"
+          ],
+          "expect": "All Meetings",
+          "why": "A club's class pages live in \u201cAll Meetings\u201d, which does not say 'class'. The guess alone answers \u201cResources\u201d here (measured, #267), so the recorded name is the only thing that finds the meetings \u2014 and the course setup must pass it in rather than re-guess, or the next re-run writes the wrong folder back."
         }
       ]
     },

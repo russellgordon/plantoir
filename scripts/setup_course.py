@@ -1995,6 +1995,11 @@ def prompt_unit_word(saved_config: dict, has_been_set_up_before: bool) -> str:
     """
     current = class_pages.word_from_config(saved_config)
     if has_been_set_up_before:
+        # A numbered course (a club, #267) chose its word with its scheme when
+        # it was made, and neither can be changed afterwards — so there is no
+        # Rename… to point at, and the sentence after the header says the rest.
+        if class_pages.scheme_from_config(saved_config) == class_pages.NUMBERED_SCHEME:
+            return current
         if current != class_pages.DEFAULT_UNIT_WORD:
             print(f"\n📘 This course calls its units “{current}”. To change that, use "
                   f"Rename… beside the word in Plantoir's Course Settings, which renames "
@@ -2351,6 +2356,21 @@ def copy_obsidian_defaults(course_dir: Path) -> None:
         print(f"ℹ️  Obsidian defaults already present at {dest} (no changes).")
 
 # ---------- Main setup flow (baseline preserved + backups + defaults) -------
+
+def class_folder_to_record(per_section_folders: list, saved_config: dict) -> str:
+    """
+    The `class_folder` a (re-)run writes: the one already recorded when it is
+    still in the list, else the old guess. The recorded answer is passed in
+    because the guess alone reads ["Resources", "All Meetings"] as
+    "Resources" — measured for #267 — and the dict this goes into wins over
+    the saved configuration, so a club the app had set up correctly would
+    have been rewritten to look for its meetings in the wrong folder.
+    """
+    return class_pages.folder_name({
+        "per_section_folders": per_section_folders,
+        "class_folder": saved_config.get("class_folder"),
+    })
+
 
 class ClubStart:
     """
@@ -2871,10 +2891,7 @@ def setup_course(no_backup: bool = False):
         # been given anyway — with the answer the app already RECORDED passed
         # in, because the guess alone reads ["Resources", "All Meetings"] as
         # "Resources" (measured, #267) and this dict wins over the saved one.
-        "class_folder": class_pages.folder_name({
-            "per_section_folders": per_section_folders,
-            "class_folder": saved_config.get("class_folder"),
-        }),
+        "class_folder": class_folder_to_record(per_section_folders, saved_config),
         # NEW: example-content choices, remembered for future re-runs
         "prepopulate_example_content": prepopulate_example,
         "use_skeleton": use_skeleton,
