@@ -706,29 +706,41 @@ nothing about next time — a plan draft said "it is built again the next time
 you open it", and the review caught that nothing starts a preview when a
 window opens.
 
-**Where a build is recorded, and why there.** Three places begin or end the
-record, and each choice is a defence against the one failure that reports
-success from here — a record that outlives its build, which would make EVERY
-later ⌘Q ask about a preview nobody is building:
+**Where a build is recorded, and why there.** Each choice is a defence against
+the one failure that reports success from here — a record that outlives its
+build, which would make EVERY later ⌘Q ask about a preview nobody is building:
 
-- **Begun** in `SectionDetailView.startPreview()` beside its
-  `isWaitingForServer = true` — the one place a preview starts (the button,
-  the repair dialog and the assistant's window-bound preview all press it) —
-  and in `AssistToolchainWork.rebuildPreview` (the assistant's `--build-only`
-  with no window), ended there by a `defer` on every return. NOT in
-  `ScriptRunner`: a publish's own `--build-only` wears the same launcher's
-  name and is already counted as the publish.
-- **Ended** by `.onChange(of: isWaitingForServer)` going false — one handler
-  rather than a copy beside each of the seven places that clear it — AND,
-  first and unconditionally, in `.onDisappear`, AND in
-  `releasePreviewLease()`. The `onDisappear` call is the one that matters:
-  closing a window or switching section tears the view down (the detail view
-  is `.id`'d by course and section), `stopPreview()` clears
-  `isWaitingForServer` itself, and SwiftUI does not reliably deliver a change
-  to a view being torn down. `CourseActivity.endPreviewBuild` removes every
-  matching record, and the view ends only the record it began (kept in
-  `previewBuildRecorded`, since `folderThisSectionWorksIn` is also written by a
-  deploy), so ending twice is harmless.
+- **A section window: the wait and the record are ONE object.**
+  `PreviewBuildWait` (held in `@State`) owns the flag the window used to keep
+  as `isWaitingForServer` — now a read-only view of `previewBuildWait.isWaiting`
+  — and the record. `begin(…)` in `startPreview()` records the build;
+  `end()` is the ONLY way back to "not waiting", and every ending calls it: the
+  page answering, the run ending, Stop, Cancel, the silence check, the outer
+  ten-minute bound, and `.onDisappear` (first, unconditionally). `end()` is
+  idempotent, and the object ends only the record it began (the window's
+  `folderThisSectionWorksIn` is also written by a deploy, so rebuilding the
+  record from it at the end could name the wrong folder).
+- **The assistant's no-window rebuild** (`AssistToolchainWork.rebuildPreview`,
+  `--build-only`) records around its run, ended by a `defer` on every return.
+  NOT in `ScriptRunner`: a publish's own `--build-only` wears the same
+  launcher's name and is already counted as the publish.
+
+**REJECTED, after it was built: ending the record from `.onChange(of:
+isWaitingForServer)`.** The first cut kept the flag as plain `@State` and ended
+the record from one `.onChange` handler, with belts in `.onDisappear` and
+`releasePreviewLease()`. The implementation review found the gap by measurement
+(a standalone `NSHostingView` probe): `startPreview()` can run on a view that
+has ALREADY gone, through a closure captured before an `await` — the
+assistant's `await window.stopPreview(); window.startPreview()`, and the repair
+dialog's `await stopPreviewAndWait(); startPreview()`. The closure's `@State`
+writes persist on the gone view, but `.onChange` is never delivered to it, so
+when that orphan build's page answered (or hit the ten-minute bound, the two
+endings that release no lease) the flag went false and the record stayed until
+the app quit. Putting the record inside the only function that clears the flag
+makes that state impossible rather than unlikely. `CourseActivityTests.
+testAWaitCannotEndWithoutItsRecord` drives the sequence; with `end()` made to
+clear the flag alone — which is what those two endings did — it fails five
+assertions.
 
 **Why this was REJECTED in #220 and done in #232 — the recorded reason was
 wrong.** The v1.2.1 write-up rejected a process-wide record of a preview build
@@ -738,12 +750,13 @@ NOT that signal: `preview.sh` prints "Preview will be available at …" BEFORE i
 starts `build_site.py` (in the real 2026-09-19 report it is line 24, the
 build's first line is 25, and "Launching Quartz preview" is line 159), so the
 address is known for nearly the whole build. The honest per-view signal is
-`isWaitingForServer`. The other half of the old reason (new cross-window state
+the window's wait for its page (`isWaitingForServer`, now held by
+`PreviewBuildWait`). The other half of the old reason (new cross-window state
 during a small fix) was a judgement about THAT fix's size, and Russell's ruling
 of 2026-09-20 named "a publish or preview".
 
 **Known, and in the safe direction:** the outer ten-minute bound in
-`waitForPreviewServer` clears `isWaitingForServer` while a very slow first-ever
+`waitForPreviewServer` ends the wait while a very slow first-ever
 build may still be running, which ends the record early — a quit then goes
 unasked, which is what happened for every preview before #232. A window's
 build and an assistant rebuild of the SAME section at once share one record,
