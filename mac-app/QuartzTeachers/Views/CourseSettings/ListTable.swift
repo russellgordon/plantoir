@@ -108,3 +108,90 @@ enum ListTableMetrics {
         return nil
     }
 }
+
+/// The + and − under a folder or file table — the standard macOS list
+/// footer, drawn exactly as the app's own sidebar draws its footer
+/// (`SidebarView.bottomBar`), so the app has one +/− look.
+///
+/// SwiftUI has no gradient "small square" button style, and AppKit's has
+/// looked like this borderless pair since Big Sur; bridging an
+/// `NSSegmentedControl` for the old look was rejected.
+struct ListAddRemoveFooter<AddContent: View>: View {
+
+    // MARK: - Stored properties
+
+    /// What VoiceOver reads for each button: "Add new folder…",
+    /// "Remove Selected Folder", and so on.
+    let addLabel: String
+    let removeLabel: String
+
+    /// The list's title, for the identifiers.
+    let title: String
+
+    /// False while nothing is selected. NOT false for a selection that
+    /// cannot be removed: − on such a row says why, and a disabled button
+    /// explains nothing.
+    let canRemove: Bool
+
+    let onAdd: () -> Void
+    let onRemove: () -> Void
+
+    /// The add popover, anchored to +, and why a removal was refused,
+    /// anchored to − — each on its own button and its own state, so exactly
+    /// one presenter answers to each.
+    @Binding var isAdding: Bool
+    @Binding var removalExplanation: ActiveExplanation?
+    @ViewBuilder let addContent: () -> AddContent
+
+    @ScaledMetric(relativeTo: .body) var glyphSize: CGFloat = SidebarView.footerGlyphSize
+    @ScaledMetric(relativeTo: .body) var buttonWidth: CGFloat = SidebarView.footerButtonSize.width
+    @ScaledMetric(relativeTo: .body) var buttonHeight: CGFloat = SidebarView.footerButtonSize.height
+
+    // MARK: - Body
+
+    var body: some View {
+        HStack(spacing: 0) {
+            footerButton(addLabel, systemImage: "plus", action: onAdd)
+                .accessibilityIdentifier("addTo-\(title)")
+                .popover(isPresented: $isAdding, arrowEdge: .bottom) {
+                    addContent()
+                }
+            Divider()
+                .frame(height: buttonHeight - 8)
+            footerButton(removeLabel, systemImage: "minus", action: onRemove)
+                .disabled(!canRemove)
+                .accessibilityIdentifier("removeFrom-\(title)")
+                .popover(item: $removalExplanation, arrowEdge: .bottom) { explanation in
+                    ExplanationPopoverText(reason: explanation.reason)
+                }
+            Divider()
+                .frame(height: buttonHeight - 8)
+            Spacer(minLength: 0)
+        }
+        .frame(height: buttonHeight)
+        .background(.background.secondary)
+        .overlay {
+            Rectangle()
+                .strokeBorder(.separator, lineWidth: 1)
+        }
+        // Shares the table's bottom border line rather than drawing a
+        // second one beside it.
+        .padding(.top, -1)
+    }
+
+    // MARK: - Functions
+
+    /// A glyph with a real target: the frame and content shape are INSIDE
+    /// the label, as `SidebarView.bottomBar` found they must be.
+    func footerButton(_ label: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        return Button(action: action) {
+            Label(label, systemImage: systemImage)
+                .labelStyle(.iconOnly)
+                .font(.system(size: glyphSize))
+                .frame(width: buttonWidth, height: buttonHeight)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .help(label)
+    }
+}
