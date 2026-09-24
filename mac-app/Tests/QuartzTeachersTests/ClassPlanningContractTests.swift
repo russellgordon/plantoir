@@ -59,20 +59,53 @@ final class ClassPlanningContractTests: XCTestCase {
         XCTAssertEqual(titles, try XCTUnwrap(section["expectOrder"] as? [String]))
     }
 
+    /// The same order under the one-number scheme (#267).
+    func testNumberedSchemeClassesSortByNumber() throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("numberedClassOrder")
+        let numbered: [String: Any] = try XCTUnwrap(section["numberedScheme"] as? [String: Any])
+        let (root, _, course) = try makeWorkspace(
+            word: numbered["word"] as? String, scheme: numbered["scheme"] as? String
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        for title in try XCTUnwrap(numbered["input"] as? [String]) {
+            try writeClass(title, on: "2026-09-08", in: course)
+        }
+        let sorted: [ClassPageSummary] = ClassInsertionPlanner.numberedClasses(
+            among: ClassPages.list(forSection: 1, in: course)
+        )
+        var titles: [String] = []
+        for page in sorted {
+            titles.append(page.title)
+        }
+        XCTAssertEqual(titles, try XCTUnwrap(numbered["expectOrder"] as? [String]))
+    }
+
     // MARK: - What the next class would be called
 
     func testTheNextClassIsNamedAsTheContractSays() throws {
         for testCase in try ClassPlanningContractTests.cases(in: "nextClass") {
-            let (root, _, course) = try makeWorkspace()
+            let (root, _, course) = try makeWorkspace(
+                word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
+            )
             defer { try? FileManager.default.removeItem(at: root) }
 
             for title in try XCTUnwrap(testCase["existing"] as? [String]) {
                 try writeClass(title, on: "2026-09-08", in: course)
             }
+            let naming: ClassPageNaming = course.configuration.classPageNaming
             let next: UnitDay = NextClassPlanner.nextUnitAndDay(
-                after: ClassPages.list(forSection: 1, in: course)
+                after: ClassPages.list(forSection: 1, in: course), naming: naming
             )
             let what: String = (try XCTUnwrap(testCase["existing"] as? [String])).joined(separator: " / ")
+            if naming.isNumbered {
+                // One number (#267): assert it, and the title the course's
+                // word makes of it — never a unit, and never a Day.
+                let number: Int = try XCTUnwrap(testCase["expectNumber"] as? Int, "after [\(what)]")
+                XCTAssertEqual(next.day, number, "after [\(what)]")
+                XCTAssertEqual(next.title, "\(naming.word) \(number)", "after [\(what)]")
+                continue
+            }
             XCTAssertEqual(next.unit, testCase["expectUnit"] as? Int, "after [\(what)]")
             XCTAssertEqual(next.day, testCase["expectDay"] as? Int, "after [\(what)]")
         }
@@ -84,7 +117,8 @@ final class ClassPlanningContractTests: XCTestCase {
         for testCase in try ClassPlanningContractTests.cases(in: "insertion") {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let (root, _, course) = try makeWorkspace(
-                meetingDates: try XCTUnwrap(testCase["timetable"] as? [String])
+                meetingDates: try XCTUnwrap(testCase["timetable"] as? [String]),
+                word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
             )
             defer { try? FileManager.default.removeItem(at: root) }
 
@@ -94,9 +128,10 @@ final class ClassPlanningContractTests: XCTestCase {
                 )
             }
 
+            let position: (unit: Int, day: Int) = try ClassPlanningContractTests.position(of: testCase)
             let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
-                unit: try XCTUnwrap(testCase["insertAtUnit"] as? Int),
-                atDay: try XCTUnwrap(testCase["insertAtDay"] as? Int),
+                unit: position.unit,
+                atDay: position.day,
                 count: try XCTUnwrap(testCase["count"] as? Int),
                 forSection: 1,
                 in: course
@@ -123,6 +158,27 @@ final class ClassPlanningContractTests: XCTestCase {
                 }
             }
 
+            // Where a move lands, and what does not move at all (#267: a
+            // numbered course keeps its date gaps).
+            if let movedTo = testCase["expectMovedTo"] as? [String: String] {
+                for (title, date) in movedTo {
+                    var landed: String? = nil
+                    for move in plan.moves where move.title == title {
+                        landed = move.to.text
+                    }
+                    XCTAssertEqual(landed, date, "\(name): where \(title) moves to")
+                }
+            }
+            if let notMoved = testCase["expectNotMoved"] as? [String] {
+                for move in plan.moves {
+                    XCTAssertFalse(
+                        notMoved.contains(move.title),
+                        "\(name): \(move.title) must keep its date, and was moved from "
+                        + "\(move.from?.text ?? "none") to \(move.to.text)"
+                    )
+                }
+            }
+
             if let mentions = testCase["expectProblemMentions"] as? String {
                 let said: String = plan.problems.joined(separator: " ")
                 XCTAssertTrue(
@@ -134,24 +190,56 @@ final class ClassPlanningContractTests: XCTestCase {
     }
 
     func testTheRefusalsAreTheOnesTheContractNames() throws {
-        let (root, _, course) = try makeWorkspace()
-        defer { try? FileManager.default.removeItem(at: root) }
-        try writeClass("Unit 1, Day 1", on: "2026-09-08", in: course)
-
         for testCase in try ClassPlanningContractTests.cases(in: "refusals") {
+            let (root, _, course) = try makeWorkspace(
+                word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
+            )
+            defer { try? FileManager.default.removeItem(at: root) }
+            try writeClass(
+                course.configuration.classPageNaming.title(unit: 1, day: 1), on: "2026-09-08", in: course
+            )
+
             let expected: String = try XCTUnwrap(testCase["expectProblem"] as? String)
             do {
-                _ = try ClassInsertionPlanner.plan(
-                    unit: try XCTUnwrap(testCase["insertAtUnit"] as? Int),
-                    atDay: try XCTUnwrap(testCase["insertAtDay"] as? Int),
-                    count: try XCTUnwrap(testCase["count"] as? Int),
-                    forSection: 1,
-                    in: course
-                )
+                if testCase["startANewUnit"] as? Bool == true {
+                    _ = try NextClassPlanner.plan(forSection: 1, in: course, startingANewUnit: true)
+                } else if let unit = testCase["addDaysToUnit"] as? Int {
+                    _ = try NextClassPlanner.plan(
+                        addingDays: try XCTUnwrap(testCase["count"] as? Int), toUnit: unit,
+                        forSection: 1, in: course
+                    )
+                } else {
+                    let position: (unit: Int, day: Int) = try ClassPlanningContractTests.position(of: testCase)
+                    _ = try ClassInsertionPlanner.plan(
+                        unit: position.unit,
+                        atDay: position.day,
+                        count: try XCTUnwrap(testCase["count"] as? Int),
+                        forSection: 1,
+                        in: course
+                    )
+                }
                 XCTFail("Should have been refused as \(expected)")
             } catch let problem as ClassInsertionPlanner.Problem {
                 XCTAssertEqual(ClassPlanningContractTests.name(of: problem), expected)
+            } catch let problem as NextClassPlanner.Problem {
+                XCTAssertEqual(ClassPlanningContractTests.name(of: problem), expected)
             }
+        }
+    }
+
+    /// Where "make room" lands in a numbered course, read from the tool's
+    /// two arguments (#267).
+    func testTheNumberedMakeRoomPositionIsReadAsTheContractSays() throws {
+        let insertion: [String: Any] = try ClassPlanningContractTests.section("insertion")
+        let reading: [String: Any] = try XCTUnwrap(insertion["numberedPosition"] as? [String: Any])
+        for testCase in try XCTUnwrap(reading["cases"] as? [[String: Any]]) {
+            let unit: Int? = testCase["unit"] as? Int
+            let atDay: Int? = testCase["atDay"] as? Int
+            XCTAssertEqual(
+                ClassInsertionPlanner.numberedPosition(unit: unit, atDay: atDay),
+                testCase["expect"] as? Int,
+                "unit \(String(describing: unit)), atDay \(String(describing: atDay))"
+            )
         }
     }
 
@@ -179,6 +267,9 @@ final class ClassPlanningContractTests: XCTestCase {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let made = try AssistFixture.makeRunner()
             defer { try? FileManager.default.removeItem(at: made.root) }
+            try ClassPlanningContractTests.name(
+                made.course, word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
+            )
             try rememberTimetable(
                 try XCTUnwrap(testCase["timetable"] as? [String]), in: made.course
             )
@@ -665,6 +756,43 @@ final class ClassPlanningContractTests: XCTestCase {
         )
     }
 
+    private static func name(of problem: NextClassPlanner.Problem) -> String {
+        switch problem {
+        case .noTimetable:
+            return "noTimetable"
+        case .noUnitsInANumberedCourse:
+            return "noUnitsInANumberedCourse"
+        }
+    }
+
+    /// Where a case makes room: `insertAtNumber` for a numbered course
+    /// (#267), which this app holds as unit 1 — the contract names only the
+    /// number — or `insertAtUnit` and `insertAtDay`.
+    private static func position(of testCase: [String: Any]) throws -> (unit: Int, day: Int) {
+        if let number = testCase["insertAtNumber"] as? Int {
+            return (1, number)
+        }
+        return (
+            try XCTUnwrap(testCase["insertAtUnit"] as? Int),
+            try XCTUnwrap(testCase["insertAtDay"] as? Int)
+        )
+    }
+
+    /// Give a fixture course a case's word and scheme, on disk and in memory.
+    @MainActor
+    private static func name(_ course: Course, word: String?, scheme: String?) throws {
+        if word == nil && scheme == nil {
+            return
+        }
+        if let word {
+            course.configuration.unitWord = word
+        }
+        if let scheme {
+            course.configuration.classPageScheme = ClassPageScheme.reading(scheme)
+        }
+        try course.configuration.write(to: course.directoryURL.appendingPathComponent("course_config.json"))
+    }
+
     private static func name(of problem: ClassInsertionPlanner.Problem) -> String {
         switch problem {
         case .unitOutOfRange:
@@ -686,6 +814,7 @@ final class ClassPlanningContractTests: XCTestCase {
         meetingDates: [String] = ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16",
                                   "2026-09-18", "2026-09-22"],
         word: String? = nil,
+        scheme: String? = nil,
         sectionNumbers: [Int] = [1]
     ) throws -> (root: URL, coursesURL: URL, course: Course) {
         let root: URL = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -708,6 +837,9 @@ final class ClassPlanningContractTests: XCTestCase {
         ]
         if let word {
             configuration["unit_word"] = word
+        }
+        if let scheme {
+            configuration["class_page_scheme"] = scheme
         }
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
             .write(to: courseURL.appendingPathComponent("course_config.json"))
