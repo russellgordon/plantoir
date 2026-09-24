@@ -341,9 +341,19 @@ final class AssistAgent {
                 // running it against no course, which used to produce a
                 // refusal reading as though the teacher's sentence was the
                 // problem.
-                if !first.argumentsAreReadable {
+                //
+                // And arguments that say NOTHING, for a tool that needs some
+                // (issue #198): a finished `publish_pages` with `""` is not an
+                // answer, however readable an empty string is. Which tools
+                // need something is read from the tool's own `required` list —
+                // an unknown name counts as needing nothing, so it still
+                // reaches the "no tool by that name" answer below.
+                let required: [String] = tools.definition(named: first.function.name)?.required ?? []
+                if !first.argumentsAreReadable(forToolRequiring: required) {
                     sayTheAnswerDidNotFinish(
-                        tool: first.function.name, stoppedByTheEngine: false
+                        tool: first.function.name,
+                        stoppedByTheEngine: false,
+                        wroteNothing: first.wroteNoArguments
                     )
                     return
                 }
@@ -443,7 +453,11 @@ final class AssistAgent {
     /// a question about how much the model was asked to write, and a finished
     /// answer whose arguments will not parse is a question about the model
     /// itself. Same event, different sentence.
-    private func sayTheAnswerDidNotFinish(tool: String?, stoppedByTheEngine: Bool) {
+    private func sayTheAnswerDidNotFinish(
+        tool: String?,
+        stoppedByTheEngine: Bool,
+        wroteNothing: Bool = false
+    ) {
         windTheTurnBack()
         entries.append(Entry(speaker: .assistant, text: AssistWording.answerWasCutOff))
         // The tool it had BEGUN to name, in the words a teacher would
@@ -458,6 +472,13 @@ final class AssistAgent {
             } else {
                 said += " before it named a tool"
             }
+        } else if wroteNothing {
+            // A third phrasing (issue #198): it did not write something
+            // unreadable, it wrote nothing at all for a tool that needs
+            // something — a different question about the model, and one the
+            // reader of a report cannot otherwise tell apart.
+            said = "the assistant finished answering but wrote nothing for "
+                + AssistAgent.inWords(tool ?? "that")
         } else {
             said = "the assistant finished answering but what it wrote for "
                 + AssistAgent.inWords(tool ?? "that") + " could not be read"
