@@ -671,36 +671,86 @@ redacting — the working folder's LAST COMPONENT, never its path.
 ### ⌘Q while something is under way
 
 `applicationShouldTerminate` used to return `.terminateNow` unconditionally.
-It now asks first when this app is publishing, and the rule is
-`contracts/shared-rules.json` → `quittingWhileWorkIsUnderWay`, with five cases
-both suites can run.
+It now asks first when this app is publishing or building a preview, and the
+rule is `contracts/shared-rules.json` → `quittingWhileWorkIsUnderWay`, with
+eight cases (five from #220, three from #232 on 2026-09-23).
 
-**What counts as under way: a publish, and not a preview.** `CourseActivity.
-activePublishes` is process-wide and lasts exactly as long as the publish does,
-so it means what it says. A preview is known through `PreviewLeases`, and a
-lease is held for as long as the preview is OPEN — it cannot tell a section
-still building from one that finished twenty minutes ago and is being read.
-Asking on every lease would mean asking almost every quit, which teaches a
-teacher to dismiss the question unread. `CourseActivity.courseIsBusy` folds the
-two together; that is right for greying out a menu item and wrong here, and
-asking the wrong one of those two questions has already produced a bug in this
-app (the repair dialog's "Preview Again" refused whenever a preview was
-running, which is every time it is offered).
+**What counts as under way: a publish, and a preview being BUILT — not a
+preview that is merely open.** `CourseActivity.activePublishes` is
+process-wide and lasts exactly as long as the publish does, so it means what
+it says. `CourseActivity.activePreviewBuilds` is the same kind of record for a
+preview build (#232): kept from the press until the preview's page first
+answers, or the run ends. A preview's LEASE (`PreviewLeases`) is held for as
+long as the preview is OPEN — it cannot tell a section still building from one
+that finished twenty minutes ago and is being read — so the lease is still NOT
+asked about. Asking on every lease would mean asking almost every quit, which
+teaches a teacher to dismiss the question unread. `CourseActivity.courseIsBusy`
+folds leases and publishes together; that is right for greying out a menu item
+and wrong here, and asking the wrong one of those two questions has already
+produced a bug in this app (the repair dialog's "Preview Again" refused
+whenever a preview was running, which is every time it is offered).
+`busyDescription`, `courseIsBusy` and `coursePublishIsRunning` do not read the
+build record at all — a preview already counts for them through its lease.
 
-**REJECTED: adding a process-wide record of a preview BUILD.** The honest
-signal — `previewRunner.previewAddress` becoming non-nil when the server
-announces itself — lives in `SectionDetailView`'s `@State` and is not visible
-from the delegate. Making it visible means new cross-window state during a fix
-meant to be small and shippable; and a preview that is lost costs a rebuild,
-while a publish that is lost costs a half-updated class website. Previews are
-not abandoned either — they are stopped cleanly on the way out.
+**A publish wins.** With both under way the question names the publish and
+carries the publish's sentence (`QuitConfirmation.explanation(publishing:)`);
+the build is named only when nothing is publishing. The publish is the one
+whose loss reaches the class website, and one question about two different
+things would have to be vaguer about both. The preview's sentence says
+quitting COULD leave it unfinished and that nothing on the class website
+changes — "could" for the same two-sided reason as the publish's (below): a
+section window's preview is a live preview and the quit path ends it, but the
+assistant's no-window rebuild is passed over like a publish and `preview.sh`
+has no `set -e`, so it may run to its end on the dead terminal. It promises
+nothing about next time — a plan draft said "it is built again the next time
+you open it", and the review caught that nothing starts a preview when a
+window opens.
 
-The same reasoning covers the assistant's own rebuild of a preview
-(`AssistSiteWork.rebuildPreview`, a `--build-only` run): it is work under way
-that the question does not ask about, and what is lost by quitting through it
-is a rebuild, never a page a student can see. Russell's ruling named "a
-publish or preview"; asking about a preview BUILD as well is tracked as its
-own issue rather than widened into this fix.
+**Where a build is recorded, and why there.** Three places begin or end the
+record, and each choice is a defence against the one failure that reports
+success from here — a record that outlives its build, which would make EVERY
+later ⌘Q ask about a preview nobody is building:
+
+- **Begun** in `SectionDetailView.startPreview()` beside its
+  `isWaitingForServer = true` — the one place a preview starts (the button,
+  the repair dialog and the assistant's window-bound preview all press it) —
+  and in `AssistToolchainWork.rebuildPreview` (the assistant's `--build-only`
+  with no window), ended there by a `defer` on every return. NOT in
+  `ScriptRunner`: a publish's own `--build-only` wears the same launcher's
+  name and is already counted as the publish.
+- **Ended** by `.onChange(of: isWaitingForServer)` going false — one handler
+  rather than a copy beside each of the seven places that clear it — AND,
+  first and unconditionally, in `.onDisappear`, AND in
+  `releasePreviewLease()`. The `onDisappear` call is the one that matters:
+  closing a window or switching section tears the view down (the detail view
+  is `.id`'d by course and section), `stopPreview()` clears
+  `isWaitingForServer` itself, and SwiftUI does not reliably deliver a change
+  to a view being torn down. `CourseActivity.endPreviewBuild` removes every
+  matching record, and the view ends only the record it began (kept in
+  `previewBuildRecorded`, since `folderThisSectionWorksIn` is also written by a
+  deploy), so ending twice is harmless.
+
+**Why this was REJECTED in #220 and done in #232 — the recorded reason was
+wrong.** The v1.2.1 write-up rejected a process-wide record of a preview build
+partly because "the honest signal — `previewRunner.previewAddress` becoming
+non-nil when the server announces itself — lives in `@State`". The address is
+NOT that signal: `preview.sh` prints "Preview will be available at …" BEFORE it
+starts `build_site.py` (in the real 2026-09-19 report it is line 24, the
+build's first line is 25, and "Launching Quartz preview" is line 159), so the
+address is known for nearly the whole build. The honest per-view signal is
+`isWaitingForServer`. The other half of the old reason (new cross-window state
+during a small fix) was a judgement about THAT fix's size, and Russell's ruling
+of 2026-09-20 named "a publish or preview".
+
+**Known, and in the safe direction:** the outer ten-minute bound in
+`waitForPreviewServer` clears `isWaitingForServer` while a very slow first-ever
+build may still be running, which ends the record early — a quit then goes
+unasked, which is what happened for every preview before #232. A window's
+build and an assistant rebuild of the SAME section at once share one record,
+and whichever ends first clears it; same direction.
+
+**Still REJECTED: asking about a preview that is merely open**, for the lease
+reason above.
 
 **What is never asked about**, because it cannot be seen from here: a scheduled
 publish (launchd runs a SECOND Plantoir process with its own statics), an
