@@ -21,9 +21,23 @@ final class ClassPlanningContractTests: XCTestCase {
             // A case with no `term` uses the default word, which is what a
             // course says when `unit_word` is absent from its configuration.
             let term: String = ClassPageTerm.cleaned(testCase["term"] as? String)
-            let numbers: UnitDay? = UnitDay(pageTitle: title, term: term)
-            XCTAssertEqual(numbers?.unit, testCase["expectUnit"] as? Int, "\(term): \(title)")
-            XCTAssertEqual(numbers?.day, testCase["expectDay"] as? Int, "\(term): \(title)")
+            // A case with no `scheme` is the ordinary one — what a course
+            // says when `class_page_scheme` is absent (#267).
+            let scheme: ClassPageScheme = ClassPageScheme.reading(testCase["scheme"] as? String)
+            let naming: ClassPageNaming = ClassPageNaming(word: term, scheme: scheme)
+            let numbers: UnitDay? = UnitDay(pageTitle: title, naming: naming)
+            if scheme == .numbered {
+                // One number, and a runner asserts the NUMBER: that it is
+                // held as unit 1 is this app's seam, not the contract's.
+                XCTAssertTrue(testCase.keys.contains("expectNumber"), "\(term): \(title) names no expectNumber")
+                XCTAssertEqual(numbers?.day, testCase["expectNumber"] as? Int, "\(term) (numbered): \(title)")
+                if let numbers = numbers {
+                    XCTAssertEqual(numbers.title.lowercased(), title.lowercased(), "\(term) (numbered): \(title)")
+                }
+            } else {
+                XCTAssertEqual(numbers?.unit, testCase["expectUnit"] as? Int, "\(term): \(title)")
+                XCTAssertEqual(numbers?.day, testCase["expectDay"] as? Int, "\(term): \(title)")
+            }
         }
     }
 
@@ -185,7 +199,7 @@ final class ClassPlanningContractTests: XCTestCase {
             // field and the number on the card is read from the same object.
             let source: String = try XCTUnwrap(testCase["duplicate"] as? String)
             let numbers: UnitDay = try XCTUnwrap(
-                UnitDay(pageTitle: source, term: made.course.configuration.unitWord), name
+                UnitDay(pageTitle: source, naming: made.course.configuration.classPageNaming), name
             )
             let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
                 unit: numbers.unit, atDay: numbers.day + 1, count: 1,

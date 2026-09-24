@@ -163,7 +163,7 @@ enum ClassInsertionPlanner {
         for offset in 0..<count {
             let day: Int = atDay + offset
             let title: String = UnitDay(
-                unit: unit, day: day, term: course.configuration.unitWord
+                unit: unit, day: day, naming: course.configuration.classPageNaming
             ).title
             added.append(PlannedClass(
                 title: title,
@@ -190,7 +190,7 @@ enum ClassInsertionPlanner {
                 continue
             }
             let newTitle: String = UnitDay(
-                unit: unit, day: numbers.day + count, term: course.configuration.unitWord
+                unit: unit, day: numbers.day + count, naming: course.configuration.classPageNaming
             ).title
             renames.append(ClassRename(
                 from: page.title,
@@ -212,7 +212,7 @@ enum ClassInsertionPlanner {
             var name: String = moving.title
             if let numbers = moving.unitAndDay, numbers.unit == unit {
                 name = UnitDay(
-                    unit: unit, day: numbers.day + count, term: course.configuration.unitWord
+                    unit: unit, day: numbers.day + count, naming: course.configuration.classPageNaming
                 ).title
             }
             moves.append(ClassDateMove(
