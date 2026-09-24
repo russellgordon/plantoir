@@ -24,6 +24,59 @@ import XCTest
 @MainActor
 final class AssistScenarioTests: XCTestCase {
 
+    // MARK: - Stored properties
+
+    /// Where this suite's scheduled deploys are read from and written to,
+    /// instead of the Mac's own `~/Library/LaunchAgents`.
+    ///
+    /// **Set for every scenario, because one of them reaches it without
+    /// scheduling anything.** "A deploy asked for at a time…" puts a
+    /// scheduled card up, and since issue #195 the card reads whether a
+    /// deploy is already set for the section — Mac-wide, by design — so with
+    /// no override it read the REAL `ICS3U` section-1 agent of whoever was
+    /// running the suite, and its transcript depended on their Mac. Both
+    /// folders together: moving one without the other is trapped in Debug.
+    nonisolated(unsafe) private static var scheduleFolder: URL?
+
+    // MARK: - Setting up
+
+    nonisolated override func setUpWithError() throws {
+        try super.setUpWithError()
+        let folder: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scenario-schedules-\(UUID().uuidString)", isDirectory: true)
+        let agents: URL = folder.appendingPathComponent("LaunchAgents", isDirectory: true)
+        try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+        ScheduledDeploy.launchAgentsDirectoryOverride = agents
+        ScheduledDeploy.scheduledScriptsDirectoryOverride = folder.appendingPathComponent("scheduled")
+        AssistScenarioTests.scheduleFolder = folder
+    }
+
+    nonisolated override func tearDownWithError() throws {
+        ScheduledDeploy.launchAgentsDirectoryOverride = nil
+        ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+        if let folder = AssistScenarioTests.scheduleFolder {
+            try? FileManager.default.removeItem(at: folder)
+        }
+        AssistScenarioTests.scheduleFolder = nil
+        try super.tearDownWithError()
+    }
+
+    // MARK: - The Mac's own scheduled deploys stay out of it
+
+    /// Every scenario runs against a stand-in for `~/Library/LaunchAgents`.
+    /// Without it the scheduled card reads the real agent of whoever runs the
+    /// suite (issue #195), which is the #240 fault in a new place.
+    func testTheScenariosNeverReadThisMacsScheduledDeploys() {
+        let real: URL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("LaunchAgents")
+        XCTAssertNotEqual(
+            ScheduledDeploy.launchAgentsDirectoryURL().standardizedFileURL.path,
+            real.standardizedFileURL.path
+        )
+        XCTAssertNotNil(ScheduledDeploy.scheduledScriptsDirectoryOverride)
+    }
+
     // MARK: - Types
 
     /// One case, as the contract writes it.
