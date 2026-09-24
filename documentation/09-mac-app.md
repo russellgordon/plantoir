@@ -526,7 +526,7 @@ inside itself.
 ### The Helpers line says what is installed, measured (issue #222)
 
 A problem report's header carries a "Helpers" line, and the trail opens every
-launch with the same text (`helpers described`). Until v1.3.1 it was five
+launch with the same text (`helpers described`). Through v1.3.0 it was five
 literals — the versions `setup.sh` downloads — printed as though they were
 installed. They are not what runs: the launchers use whatever copy is already
 on the `PATH` above and download only what is missing, so on a Mac with
@@ -557,13 +557,21 @@ against the real `PATH`. Each is reported with where it was found:
   which is the SAME folder Plantoir's download (`setup.sh`) and Homebrew's link
   both use — where `docker` lives says nothing about where buildx came from.
 - A program that is absent reads **"not found (would install <pin>)"**; before
-  anything has been measured, **"not checked yet (pinned <pin>)"**; a program the
-  check ran out of time before reaching, **"not checked (pinned <pin>)"**. The
+  anything has been measured, **"not checked yet (pinned <pin>)"**. When the
+  check is ended by its time limit, the program it was waiting on **"did not
+  answer within 5 s"** — a hung `docker --version` is itself the diagnosis, so
+  it is not folded in with the rest — and any after it, never reached, read
+  **"not checked (pinned <pin>)"**. The
   pins live in one list, `ProblemReportEnvironment.pinnedHelpers`, which
   `HelperVersionsTests` holds against `setup.sh`'s four `*_VERSION` lines.
 
 The engine (`llama.cpp b10435 (Metal)`) stays a stated constant: it is bundled,
 so its build genuinely is known.
+
+**Every answer says when it was taken** — the remembered line ends
+"· checked 2026-09-24 00:41:07" — because a record can carry an answer from the
+launch or from the end of the last task, and without it a report could not
+tell a Mac with no Colima from one that had none an hour ago.
 
 **When it is measured.** Once at launch, in a detached task, and the trail's
 helpers line is written only after it answers — so `ActivityTrail.noteLaunch()`
@@ -572,7 +580,12 @@ later, hopping back to the main actor to write so two writers never interleave
 the one trail file. Again after every launcher task finishes, because a first
 setup downloads the programs it did not find (that task's OWN record keeps the
 earlier answer, which was true when it was taken — a record saying "not found"
-on the setup that then installed it is not a failed download). And at the
+on the setup that then installed it is not a failed download). **The TRAIL's
+helpers line is written once per launch and never again**, deliberately left
+that way: a report made in the same session that installed the tools shows,
+on the trail, the launch's "not found (would install …)" — with the time it
+was checked — while the records written after the setup finished carry the
+new answer; the next launch writes a fresh line. And at the
 start of a task when nothing has been measured yet: the `--mcp-stdio` process
 never runs the app's launch, and without this its records would all say "not
 checked yet". Every one of the three is skipped under XCTest, so the suite
@@ -588,9 +601,11 @@ the check slow and a wedged one makes it hang. No test with stub programs can
 tell the two apart; read the script. And a 5 s watchdog ends the shell in case
 a program never answers. That only works because each program's output is
 captured by the shell's own `$( … )`: the programs never hold the pipe the app
-reads, so ending the shell ends the read even if a stuck helper outlives it
+reads, so ending the shell ends the read
 (`testAHelperThatNeverAnswersDoesNotHoldTheCheckUp`, a 1 s limit against a
-program that sleeps 8 s).
+program that sleeps 8 s). The review measured the hung program itself too: a
+stub that wrote its pid and then `exec sleep 40` was gone once the check had
+returned, so nothing is left running.
 
 **Rejected.** Measuring when each record is written, on the main actor: a 0.3 s
 stall per record, and records are rewritten every ten seconds while a task

@@ -352,9 +352,16 @@ nonisolated enum ProblemReportEnvironment {
         process.waitUntilExit()
         watchdog.cancel()
         let output: String = String(decoding: outputData, as: UTF8.self)
+        // Ended by the watchdog rather than finishing: the first program with
+        // no row is the one that HUNG, which is itself the diagnosis.
+        var secondsWaitedForAHungHelper: Int64?
+        if process.terminationReason == .uncaughtSignal {
+            secondsWaitedForAHungHelper = timeLimit.components.seconds
+        }
         return helperDescription(
             fromProbeOutput: output,
             toolsFolder: toolsFolder,
+            secondsWaitedForAHungHelper: secondsWaitedForAHungHelper,
             resolvingLinks: { path in
                 return URL(fileURLWithPath: path).resolvingSymlinksInPath().path
             }
@@ -377,25 +384,43 @@ nonisolated enum ProblemReportEnvironment {
     ) -> Task<HelperMeasurement, Never> {
         return Task.detached(priority: .utility) {
             let ranOnTheMainThread: Bool = pthread_main_np() != 0
-            let description: String = ProblemReportEnvironment.measureHelpers(
+            let answer: String = ProblemReportEnvironment.measureHelpers(
                 environment: environment,
                 toolsFolder: toolsFolder
             )
+            let description: String = answer + " · " + ProblemReportEnvironment.whenChecked(Date())
             ProblemReportEnvironment.measuredHelperDescription = description
             return HelperMeasurement(description: description, ranOnTheMainThread: ranOnTheMainThread)
         }
+    }
+
+    /// "checked 2026-09-24 00:41:07" — when the remembered answer was taken.
+    ///
+    /// A record can carry an answer from the launch or from the end of the
+    /// last task, and the trail's helpers line is written once per launch; a
+    /// report read without this could not tell a Mac that has no Colima from
+    /// one that had none an hour ago, before a first setup installed it.
+    static func whenChecked(_ moment: Date, timeZone: TimeZone = TimeZone.current) -> String {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return "checked " + formatter.string(from: moment)
     }
 
     /// Turns the check's output into the Helpers line. PURE — the part the
     /// rules live in, and the part a test feeds real machine output to.
     ///
     /// The output is one `name<TAB>first line of its version<TAB>where it was
-    /// found` row per program. A program with no row (the check ran out of
-    /// time before reaching it) is "not checked"; a row with no path, or
-    /// with nothing that reads as a version, is "not found".
+    /// found` row per program. A row with no path, or with nothing that
+    /// reads as a version, is "not found". When the check was ENDED by its
+    /// time limit (`secondsWaitedForAHungHelper`), the first program with no
+    /// row is the one that hung — it "did not answer within N s" — and any
+    /// after it were never reached, "not checked".
     static func helperDescription(
         fromProbeOutput output: String,
         toolsFolder: String,
+        secondsWaitedForAHungHelper: Int64? = nil,
         resolvingLinks resolve: (String) -> String = { path in return path }
     ) -> String {
         var rowsByName: [String: [String]] = [:]
@@ -408,9 +433,18 @@ nonisolated enum ProblemReportEnvironment {
         }
 
         var parts: [String] = [bundledEngineDescription]
+        var hungHelperIsNamed: Bool = false
         for helper in pinnedHelpers {
             guard let fields = rowsByName[helper.probeName] else {
-                parts.append(helper.displayName + " not checked (pinned " + helper.pinnedVersion + ")")
+                if let secondsWaitedForAHungHelper, !hungHelperIsNamed {
+                    hungHelperIsNamed = true
+                    parts.append(
+                        helper.displayName + " did not answer within \(secondsWaitedForAHungHelper) s (pinned "
+                        + helper.pinnedVersion + ")"
+                    )
+                } else {
+                    parts.append(helper.displayName + " not checked (pinned " + helper.pinnedVersion + ")")
+                }
                 continue
             }
             let versionLine: String = fields[1]
