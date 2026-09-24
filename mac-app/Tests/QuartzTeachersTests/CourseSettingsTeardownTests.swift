@@ -7,9 +7,10 @@ import XCTest
 /// real window (issue #266).
 ///
 /// **The fault this pins.** With the settings page showing, simply choosing
-/// nothing in the sidebar — or another working folder, or one of the
-/// course's sections — aborted the whole app with SwiftUI's "precondition
-/// failure: no subgraph". The measured trigger was a table CELL calling the
+/// nothing in the sidebar, or another working folder, aborted the whole app
+/// with SwiftUI's "precondition failure: no subgraph". Choosing one of the
+/// course's sections did not; that test is kept as a guard for the path a
+/// teacher takes most, not as a must-fail. The measured trigger was a table CELL calling the
 /// list's `protection` closure while it was drawn: the marks table's tick
 /// cell called it (the closure reads the course's configuration and walks
 /// its folders). Measured by bisecting on 2026-09-24: only the marks table
