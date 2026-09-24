@@ -681,7 +681,8 @@ enum ScheduledDeploy {
         lines.append("    NEEDS_BUILD=1")
         lines.append("  elif [ -z \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath))"
             + " -type f -newer \"$FRESH_SINCE\" -not -path '*/.*' -print -quit)\" ]; then")
-        // Nothing under the course is newer than the built page, so the site
+        // Nothing under the course is newer than the start of the build that
+        // made the page (or the page, for a site built before that was noted), so the site
         // on disk already says what the teacher means. Rebuilding it at half
         // six would cost a container start and a full Quartz run to produce
         // the same bytes.
