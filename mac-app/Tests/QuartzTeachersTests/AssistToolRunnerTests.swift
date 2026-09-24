@@ -3921,6 +3921,33 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertNil(made.runner.conversationBackupURL)
     }
 
+    /// Over MCP nothing binds a window's course onto a call, so a client can
+    /// send none. The answer says no course was named — not that a course
+    /// called "“”" is missing, which names something nobody named and reads,
+    /// relayed to a teacher, as a complaint about what they typed (#198).
+    @MainActor
+    func testACallThatNamesNoCourseIsToldSo() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        for tool in ["publish_pages", "deploy_section", "back_up_course"] {
+            for arguments in [[String: Any](), ["course": "  ", "section": 1]] {
+                let outcome: AssistToolOutcome = await made.runner.run(call: call(tool, arguments: arguments))
+                XCTAssertTrue(
+                    outcome.summary.contains(AssistWording.noCourseNamed)
+                        || outcome.detail.contains(AssistWording.noCourseNamed),
+                    "\(tool) \(arguments): \(outcome.summary) / \(outcome.detail)"
+                )
+            }
+        }
+        // A course that IS named and is not here still says which.
+        let named: AssistToolOutcome = await made.runner.run(call: call(
+            "publish_pages", arguments: ["course": "ZZZ9Z", "section": 1, "pages": "Unit 1, Day 1"]
+        ))
+        XCTAssertFalse(named.detail.contains(AssistWording.noCourseNamed), named.detail)
+        XCTAssertTrue(named.detail.contains("ZZZ9Z") || named.summary.contains("ZZZ9Z"), named.detail)
+    }
+
     /// The gate is the tool's own answer, not a list kept beside it, and the
     /// explanation is the sentence the teacher reads before pressing anything.
     @MainActor

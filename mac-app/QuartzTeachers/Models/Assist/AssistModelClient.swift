@@ -114,8 +114,13 @@ struct AssistToolCall: Codable, Equatable, Sendable, Identifiable {
 
     // MARK: - Functions
 
+    /// The arguments a section window supplies itself, whatever the model
+    /// wrote: the window binds its own course and section onto every call
+    /// whose schema declares them (`AssistAgent.boundToThisSection`).
+    static let argumentsTheWindowSupplies: [String] = ["course", "section"]
+
     /// Whether the arguments are readable FOR THIS TOOL — the gate a finished
-    /// answer must pass before anything runs (issue #198).
+    /// answer must pass before anything runs in a section window (issue #198).
     ///
     /// `argumentsAreReadable` answers yes for an empty string and for `{}`,
     /// deliberately, because `undo_last_change` takes nothing and llama.cpp
@@ -123,26 +128,59 @@ struct AssistToolCall: Codable, Equatable, Sendable, Identifiable {
     /// `publish_pages` and wrote nothing reach the tool, where — bound to the
     /// window's section, with no pages and no dates — it answered with a
     /// sentence reading as a complaint about the teacher's request, when the
-    /// teacher had named pages and the model had dropped them. So "wrote
-    /// nothing" is readable only for a tool that REQUIRES nothing; the tool's
-    /// own `required` list, read from the surface the model was shown, says
-    /// which. Refusing every empty call instead was REJECTED: it would
-    /// refuse "Undo that", the tool a card reaches most.
+    /// teacher had named pages and the model had dropped them.
     ///
-    /// `required` rather than "the arguments the window binds": every local
-    /// tool but undo requires `course` and `section`, which the window fills
-    /// in anyway, so that version would keep the empty `publish_pages`
-    /// running — its real content (pages, dates, a unit) is optional in its
-    /// schema, and a model shown a schema requiring arguments that wrote none
-    /// has not answered.
-    func argumentsAreReadable(forToolRequiring required: [String]) -> Bool {
+    /// So a call that wrote nothing is readable only when the WINDOW can
+    /// supply everything the tool needs — and it needs more than the window
+    /// can supply when:
+    /// - its schema REQUIRES an argument other than course and section (a
+    ///   date, a page, a time), or
+    /// - it CHANGES pages (`readOnly` false) and its schema declares any
+    ///   argument other than course and section — which pages, which dates,
+    ///   which unit. A write told only its section has nothing to act on.
+    ///
+    /// Everything else RUNS on an empty call, because the window supplies the
+    /// rest: undo (no arguments at all), rebuild, deploy (still behind its
+    /// button), check, add the next class, and a read like `list_pages` whose
+    /// extra argument only narrows it. REJECTED on review: refusing every
+    /// tool with a `required` list (`required` is exactly course and section
+    /// for nine of the thirteen local tools, so it refused "rebuild the
+    /// preview" when the model wrote nothing, although the window supplies
+    /// everything that tool takes); and refusing every empty call (breaks
+    /// undo, the tool a card reaches most).
+    func argumentsAreReadable(
+        forToolRequiring required: [String],
+        declaring properties: [String],
+        readOnly: Bool
+    ) -> Bool {
         if !argumentsAreReadable {
             return false
         }
-        if wroteNoArguments {
-            return required.isEmpty
+        if !wroteNoArguments {
+            return true
         }
-        return true
+        return !AssistToolCall.needsMoreThanTheWindowSupplies(
+            required: required, properties: properties, readOnly: readOnly
+        )
+    }
+
+    /// Whether a tool needs an argument a section window cannot supply for it
+    /// — see `argumentsAreReadable(forToolRequiring:declaring:readOnly:)`.
+    static func needsMoreThanTheWindowSupplies(
+        required: [String],
+        properties: [String],
+        readOnly: Bool
+    ) -> Bool {
+        for name in required where !argumentsTheWindowSupplies.contains(name) {
+            return true
+        }
+        if readOnly {
+            return false
+        }
+        for name in properties where !argumentsTheWindowSupplies.contains(name) {
+            return true
+        }
+        return false
     }
 }
 

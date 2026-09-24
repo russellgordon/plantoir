@@ -406,8 +406,12 @@ final class AssistCutOffAnswerTests: XCTestCase {
             )
             XCTAssertTrue(onDisk.contains("publish: false"), "\"\(written)\" changed a page")
             XCTAssertTrue(
+                transcript(of: agent).contains(AssistWording.answerLeftOutWhatItWasFor),
+                "\"\(written)\": the teacher was not told nothing was done: \(transcript(of: agent))"
+            )
+            XCTAssertFalse(
                 transcript(of: agent).contains(AssistWording.answerWasCutOff),
-                "\"\(written)\": the teacher was not told the answer did not come through: \(transcript(of: agent))"
+                "\"\(written)\": an empty answer got the advice about the teacher's sentence"
             )
             XCTAssertEqual(toolResults(in: agent), [], "\"\(written)\" reached a tool")
             XCTAssertNil(agent.pendingApproval, "\"\(written)\" put a card up")
@@ -418,6 +422,60 @@ final class AssistCutOffAnswerTests: XCTestCase {
             trail.contains("finished answering but wrote nothing for publish pages"),
             "The trail does not say the assistant wrote nothing:\n\(trail)"
         )
+    }
+
+    /// A tool whose every argument the window supplies RUNS on an empty
+    /// call: the model chose it and the window knows the rest (the first cut
+    /// of #198 refused this, and review caught it).
+    func testAFinishedAnswerThatWroteNothingForAToolTheWindowCanCompleteStillRuns() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let engine: StubEngine = try StubEngine()
+        defer { engine.stop() }
+        engine.serve(Canned.finished(tool: "rebuild_preview", arguments: ""))
+
+        let agent: AssistAgent = AssistFixture.makeAgent(
+            tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
+        )
+        await agent.say("Bring my section's preview up to date please")
+        XCTAssertGreaterThan(engine.requestCount, 0, "The sentence was answered in code; the model was never asked")
+        let said: String = transcript(of: agent)
+        XCTAssertFalse(said.contains(AssistWording.answerLeftOutWhatItWasFor), said)
+        XCTAssertFalse(said.contains(AssistWording.answerWasCutOff), said)
+        XCTAssertFalse(toolResults(in: agent).isEmpty, "The rebuild did not run: \(said)")
+    }
+
+    /// The trail's account of the turn does not claim it "waited for the
+    /// button" when the gate refused the call and no card went up (#198
+    /// review). `schedule_deploy` needs approval AND a time the window cannot
+    /// supply, so an empty call to it is exactly that case.
+    func testARefusedCallIsNotRecordedAsWaitingForTheButton() async throws {
+        let made: AssistFixture.Made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let folderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("no-button-trail-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: folderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: folderURL)
+        }
+
+        let engine: StubEngine = try StubEngine()
+        defer { engine.stop() }
+        engine.serve(Canned.finished(tool: "schedule_deploy", arguments: ""))
+
+        let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner, engineAt: engine.baseURL)
+        await agent.say("Send my section out to the students early tomorrow morning")
+        XCTAssertGreaterThan(engine.requestCount, 0, "The sentence was answered in code; the model was never asked")
+        XCTAssertNil(agent.pendingApproval, "An empty schedule_deploy put a card up")
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("wrote nothing for schedule deploy"), trail)
+        XCTAssertFalse(trail.contains("waited for the button"), trail)
     }
 
     /// And the tool that genuinely takes nothing still runs on nothing:

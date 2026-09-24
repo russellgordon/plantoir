@@ -933,7 +933,8 @@ apart**, because whoever reads a problem report cannot: *"the assistant's
 answer was cut off part way through publish pages"* is a question about how
 much the model was asked to write, and *"the assistant finished answering but
 what it wrote for publish pages could not be read"* is a question about the
-model itself. One event (`assistant answer was cut off`), two sentences.
+model itself. One event (`assistant answer was cut off`), two trail sentences
+— three since #198, below, which also gives the teacher a sentence of its own.
 (Until #166 neither was true: `finish_reason` was
 never read, the unparseable arguments were silently replaced with `{}`, and
 the tool RAN — against no course, producing "There is no course called "" in
@@ -941,8 +942,8 @@ this working folder", which reads to a teacher as a complaint about what they
 typed.)
 
 **A third cause, since [#198](https://github.com/russellgordon/plantoir/issues/198)
-(2026-09-23): a finished answer that wrote NOTHING for a tool that needs
-something.** An empty string (and `{}`) is readable on purpose —
+(2026-09-23): a finished answer that wrote NOTHING for a tool that needs more
+than the window supplies.** An empty string (and `{}`) is readable on purpose —
 `undo_last_change` takes no arguments and llama.cpp sends `""` for it, so a gate
 refusing every empty call would refuse "Undo that", the tool a card reaches
 most. But the same yes let a finished `publish_pages` with `""` through. The
@@ -950,44 +951,83 @@ issue predicted the stale #166 refusal; that is **no longer reachable** from
 the local path, because the window binds `course` and `section` onto every
 call whose schema declares them (since 2026-08-15). What happened instead,
 traced by reading (the must-fail run confirms only that the old gate let the
-call through to a reply other than `answerWasCutOff`): bound to this section, with plan
-mode on, it reached `plan_publish_pages` → `.nothingNamed` → a sentence saying
-no pages and no dates were given — the #166 fault in different words, since
-the teacher HAD named pages and the model dropped them. `""` for
-`deploy_section` would, by the same reading, have put the deploy card up
-although the model wrote nothing.
+call through to a reply other than the refusal): bound to this section, with
+plan mode on, it reached `plan_publish_pages` → `.nothingNamed` → a sentence
+saying no pages and no dates were given — the #166 fault in different words,
+since the teacher HAD named pages and the model dropped them.
 
-The gate is now `AssistToolCall.argumentsAreReadable(forToolRequiring:)`:
-arguments that say nothing (empty, whitespace, or an object with no keys) are
-readable only when the tool's schema `required` list is empty — read from the
-surface the model was shown (`tools.definition(named:)`; the local and MCP
-schemas agree on `required` for every local tool, checked), so no schema byte
-moved. `undo_last_change`'s schema has NO `required` key at all, which reads
-as empty; a Windows port must treat a missing key the same way. An unknown
-tool name counts as requiring nothing and still reaches "There is no tool by
-that name." The teacher gets `wording.answerWasCutOff`, and the trail line's
-third phrasing is "wrote nothing for <tool>". Contract:
+**The rule: an empty call runs only when the window supplies everything the
+tool needs.** The window supplies `course` and `section`
+(`AssistToolCall.argumentsTheWindowSupplies`). A tool needs more than that when
+its schema REQUIRES any other argument (a date, a page, a time), or when it
+changes pages (`readOnly` false) and declares any other argument at all (which
+pages, which dates, which unit) — a write told only its section has nothing to
+act on. Everything else runs on an empty call: undo, rebuilding the preview,
+the deploy (still behind its own button), checking the section, adding the
+next class, and `list_pages`, whose other argument only narrows it. The gate
+is `AssistAgent.argumentsAreReadable(of:for:)` over
+`AssistToolCall.argumentsAreReadable(forToolRequiring:declaring:readOnly:)`,
+reading `required`, the declared properties and `readOnly` from the tool's own
+definition — the schema is only READ, so no description, schema or prompt byte
+moved (hashes unchanged). `undo_last_change`'s schema has NO `required` key,
+which reads as requiring nothing; a Windows port must treat a missing key the
+same way. An unknown tool name is judged tool-blind and still reaches "There
+is no tool by that name."
+
+Re-taken after the change on 2026-09-23 by running the real gate over every
+definition on the surface (the local thirteen; the MCP-only nineteen never pass
+this gate — `AssistMCPServer` calls the runner directly — and are in the
+review notes):
+
+| Local tool | Requires beyond course/section | Declares beyond course/section | Not `readOnly` | First cut | Now |
+|---|---|---|---|---|---|
+| `list_pages` | — | `matching` | no | refused | **runs** |
+| `read_page` | `page` | `page` | no | refused | refused |
+| `check_section` | — | — | no | refused | **runs** |
+| `publish_class_on` | `date` | `date` | yes | refused | refused |
+| `publish_pages` | — | `pages`, `before`, `onOrAfter` | yes | refused | refused |
+| `unpublish_pages` | — | `pages`, `before`, `onOrAfter` | yes | refused | refused |
+| `rebuild_preview` | — | — | yes | refused | **runs** |
+| `undo_last_change` | (no `required` key) | — | yes | runs | runs |
+| `deploy_section` | — | — | yes | refused | **runs** (its button still asks) |
+| `schedule_deploy` | `when` | `when` | yes | refused | refused |
+| `cancel_scheduled_deploy` | — | — | yes | refused | **runs** |
+| `read_remembered_timetable` | — | — | no | refused | **runs** |
+| `add_next_class` | — | — | yes | refused | **runs** |
+
+**What the teacher is told: its own sentence.** A refused empty call answers
+`wording.answerLeftOutWhatItWasFor` — the assistant did not work out which
+pages, day or time was meant, so nothing was done — and NOT
+`wording.answerWasCutOff`, whose advice ("a shorter sentence, or fewer pages")
+is about the teacher's request; an empty answer is not its fault. The trail's
+third phrasing is "wrote nothing for <tool>", and the "assistant chose a tool"
+line no longer says "waited for the button" for a call the gate refused (or
+one the engine cut off) — no button went up. Contract:
 `app-rules.json → modelTiers.requirements`, "A finished reply that wrote
-nothing for a tool that needs something runs no tool and says so", with nine
-pure cases (each case's `required` is checked against the real schema).
+nothing runs a tool only when the window supplies everything that tool
+needs", with fourteen pure cases; each case's `required`, properties and
+`readOnly` are checked against the real definition, and the agent's gate is
+run on each.
 
-Measured cost: across the 990 tool-call rows in `research/ai-assist/*.txt`,
+**Over MCP, where nothing binds a course,** an empty `course` used to come back
+as "There is no course called “” in this working folder" — false in its own
+terms, and a complaint about the teacher when relayed. It is now
+`wording.noCourseNamed` (the runner's `noSuchCourse` refusal and
+`back_up_course`). Result text only; no schema moved.
+
+**Measured cost:** across the 990 tool-call rows in `research/ai-assist/*.txt`,
 175 were empty-argument calls — every one to a tool that requires nothing —
 and none left out `course`/`section`, so the rule changes no measured routing
-outcome and closes a path no recorded run has taken. (Whether a model ever
-sends `{}` for `rebuild_preview` in a section window, which used to rebuild
-this section and is now refused, is unmeasured; nothing recorded has done it.)
+outcome and closes a path no recorded run has taken.
 
-REJECTED: (i) refusing every empty call — breaks undo; (ii) "readable when
-every required argument is one the window binds" (`course`, `section`) — that
-keeps the empty `publish_pages` RUNNING, because its real content (pages,
-dates, a unit) is optional in its schema, and a model shown a schema requiring
-arguments that wrote none has not answered; (iii) rewording "There is no course
-called “”" — unreachable from the local path now; still reachable from MCP,
-where a client can send `course: ""` (`backUpCourse`, the publish plan), and
-left for the wording pass. Known and NOT changed here: `answerWasCutOff` advises
-a shorter sentence or fewer pages, which is the wrong advice when the model
-wrote nothing — a wording-pass question, recorded rather than fixed.
+**REJECTED:** (i) refusing every empty call — breaks undo; (ii) refusing every
+tool with a `required` list — THE FIRST CUT of this piece, caught on review: it
+refused "rebuild the preview", the deploy, checking the section and adding the
+next class on an empty call although the window supplies everything they take
+(nine of the thirteen local tools require exactly course and section);
+(iii) "readable when every REQUIRED argument is one the window supplies" alone
+— keeps the empty `publish_pages` running, because its real content is
+optional in its schema, which is why a write's declared arguments count too.
 
 **The gate is the finish reason, not a parse check, and that is measured.**
 Sweeping `max_tokens` across every cut point of two ordinary requests on the

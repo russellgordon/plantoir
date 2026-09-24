@@ -1089,8 +1089,16 @@
         "cases" : [
           {
             "arguments" : "",
-            "name" : "an empty string, for a tool that needs a course and section",
+            "name" : "an empty string, for a write that has to be told which pages or dates",
+            "properties" : [
+              "before",
+              "course",
+              "onOrAfter",
+              "pages",
+              "section"
+            ],
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1099,8 +1107,16 @@
           },
           {
             "arguments" : "   ",
-            "name" : "only whitespace, for a tool that needs a course and section",
+            "name" : "only whitespace, for a write that has to be told which pages or dates",
+            "properties" : [
+              "before",
+              "course",
+              "onOrAfter",
+              "pages",
+              "section"
+            ],
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1109,18 +1125,97 @@
           },
           {
             "arguments" : "{}",
-            "name" : "an object with nothing in it, for a tool that needs a course and section",
+            "name" : "an object with nothing in it, for a write that has to be told which pages or dates",
+            "properties" : [
+              "before",
+              "course",
+              "onOrAfter",
+              "pages",
+              "section"
+            ],
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
             ],
-            "tool" : "publish_pages"
+            "tool" : "unpublish_pages"
           },
           {
             "arguments" : "",
-            "name" : "an empty string, for the deploy",
+            "name" : "an empty string, for a tool that requires a day",
+            "properties" : [
+              "course",
+              "date",
+              "section"
+            ],
             "readable" : false,
+            "readOnly" : false,
+            "required" : [
+              "course",
+              "section",
+              "date"
+            ],
+            "tool" : "publish_class_on"
+          },
+          {
+            "arguments" : "",
+            "name" : "an empty string, for a tool that requires a time",
+            "properties" : [
+              "course",
+              "section",
+              "when"
+            ],
+            "readable" : false,
+            "readOnly" : false,
+            "required" : [
+              "course",
+              "section",
+              "when"
+            ],
+            "tool" : "schedule_deploy"
+          },
+          {
+            "arguments" : "",
+            "name" : "an empty string, for a read that requires a page",
+            "properties" : [
+              "course",
+              "page",
+              "section"
+            ],
+            "readable" : false,
+            "readOnly" : true,
+            "required" : [
+              "course",
+              "section",
+              "page"
+            ],
+            "tool" : "read_page"
+          },
+          {
+            "arguments" : "",
+            "name" : "an empty string, for a tool whose every argument the window supplies",
+            "properties" : [
+              "course",
+              "section"
+            ],
+            "readable" : true,
+            "readOnly" : false,
+            "required" : [
+              "course",
+              "section"
+            ],
+            "tool" : "rebuild_preview"
+          },
+          {
+            "arguments" : "{}",
+            "name" : "an object with nothing in it, for the deploy, whose every argument the window supplies (its button still asks)",
+            "properties" : [
+              "course",
+              "section"
+            ],
+            "readable" : true,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1129,8 +1224,28 @@
           },
           {
             "arguments" : "",
-            "name" : "an empty string, for a tool whose schema requires nothing",
+            "name" : "an empty string, for a read whose only other argument narrows it",
+            "properties" : [
+              "course",
+              "matching",
+              "section"
+            ],
             "readable" : true,
+            "readOnly" : true,
+            "required" : [
+              "course",
+              "section"
+            ],
+            "tool" : "list_pages"
+          },
+          {
+            "arguments" : "",
+            "name" : "an empty string, for a tool whose schema declares nothing and requires nothing",
+            "properties" : [
+
+            ],
+            "readable" : true,
+            "readOnly" : false,
             "required" : [
 
             ],
@@ -1138,8 +1253,12 @@
           },
           {
             "arguments" : "{}",
-            "name" : "an object with nothing in it, for a tool whose schema requires nothing",
+            "name" : "an object with nothing in it, for a tool whose schema declares nothing",
+            "properties" : [
+
+            ],
             "readable" : true,
+            "readOnly" : false,
             "required" : [
 
             ],
@@ -1147,8 +1266,16 @@
           },
           {
             "arguments" : "{\"course\": \"ICS3U\"}",
-            "name" : "something written, even without everything the schema requires",
+            "name" : "something written, even without the pages",
+            "properties" : [
+              "before",
+              "course",
+              "onOrAfter",
+              "pages",
+              "section"
+            ],
             "readable" : true,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1158,7 +1285,15 @@
           {
             "arguments" : "{\"course\": \"ICS3U\", \"pages\": \"Unit 1, Day",
             "name" : "half-written, which is unreadable for any tool",
+            "properties" : [
+              "before",
+              "course",
+              "onOrAfter",
+              "pages",
+              "section"
+            ],
             "readable" : false,
+            "readOnly" : false,
             "required" : [
               "course",
               "section"
@@ -1167,17 +1302,21 @@
           },
           {
             "arguments" : "{\"course\": \"ICS3U\", \"pages\": \"Unit 1, Day",
-            "name" : "half-written, even for a tool that requires nothing",
+            "name" : "half-written, even for a tool that needs nothing",
+            "properties" : [
+
+            ],
             "readable" : false,
+            "readOnly" : false,
             "required" : [
 
             ],
             "tool" : "undo_last_change"
           }
         ],
-        "detail" : "A reply that finished normally and named a tool, but wrote NO arguments for it - nothing, only whitespace, or an object with no keys - is readable only when that tool's schema requires nothing. Otherwise nothing runs and the teacher is answered with wording.answerWasCutOff, exactly as for arguments that cannot be read, and the trail says the assistant wrote nothing for that tool. Which arguments a tool requires is read from its schema as the model was shown it: a schema with NO required key (undo_last_change's has none) requires nothing, the same as an empty list. 'Wrote something' is readable however little it wrote - binding the window's course and section, and the tool's own refusals, decide what happens next.",
-        "rule" : "A finished reply that wrote nothing for a tool that needs something runs no tool and says so",
-        "why" : "Issue #198, 2026-09-23. An empty string is readable on purpose, because undo_last_change takes nothing and llama.cpp sends an empty string for it, so a gate that refused every empty call would refuse 'Undo that', the tool a card reaches most. But the same yes let a finished reply naming publish_pages with nothing written reach the tool, where, bound to the window's section with no pages and no dates, it answered that nothing had been named to change - a sentence reading as a complaint about the teacher's request when the teacher had named pages and the model had dropped them. Measured against the recorded routing runs (990 tool-call rows in research/ai-assist): 175 empty-argument calls, every one to a tool that requires nothing, and none to a tool that needs a course or section - so this costs nothing measured, and closes a path no measured run has taken yet. REJECTED: refusing every empty call (breaks undo); treating a call as readable when every required argument is one the window fills in (course and section) - that keeps the empty publish_pages running, because its real content is optional in its schema."
+        "detail" : "A reply that finished normally and named a tool but wrote NO arguments for it - nothing, only whitespace, or an object with no keys - runs only when the section window can supply everything the tool needs. The window supplies course and section. A tool needs more than that when its schema REQUIRES any other argument (a date, a page, a time), or when it changes pages (readOnly false) and its schema declares any other argument at all (which pages, which dates, which unit) - a write told only its section has nothing to act on. Otherwise it runs: undo (no arguments), rebuilding the preview, the deploy (still behind its own button), and a read whose other argument only narrows it. Refused, nothing runs, and the teacher is answered with wording.answerLeftOutWhatItWasFor - NOT wording.answerWasCutOff, whose advice is about the teacher's request - and the trail says the assistant wrote nothing for that tool. A schema with NO required key (undo_last_change's has none) requires nothing, the same as an empty list; each case's required, properties and readOnly are the tool's own. Written arguments of any kind are readable, however little they say - binding the window's course and section, and the tool's own refusals, decide what happens next.",
+        "rule" : "A finished reply that wrote nothing runs a tool only when the window supplies everything that tool needs",
+        "why" : "Issue #198, 2026-09-23. An empty string is readable on purpose, because undo_last_change takes nothing and llama.cpp sends an empty string for it, so a gate refusing every empty call would refuse 'Undo that', the tool a card reaches most. But the same yes let a finished reply naming publish_pages with nothing written reach the tool, where, bound to the window's section with no pages and no dates, it answered that nothing had been named to change - a sentence reading as a complaint about the teacher's request, when the teacher had named pages and the model had dropped them. Measured against the recorded routing runs (990 tool-call rows in research/ai-assist): 175 empty-argument calls, every one to a tool that requires nothing, none to a tool that needs a course or section - so this costs nothing measured. REJECTED: refusing every empty call (breaks undo); refusing every tool with a required list - the first cut of this rule - which refused 'rebuild the preview' and the deploy on an empty call although the window supplies everything they take (found on review); and 'readable when every REQUIRED argument is one the window supplies' alone, which keeps the empty publish_pages running because its real content is optional in its schema."
       }
     ]
   },

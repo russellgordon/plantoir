@@ -471,35 +471,51 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertFalse(AssistWording.answerWasCutOff.isEmpty)
         answer("A reply the engine stopped part way runs no tool and says so")
 
-        // A finished reply that wrote NOTHING for a tool that needs something
-        // (issue #198). The contract's own cases, run through the gate
-        // `AssistAgent.think` uses; the whole behaviour — no page changed,
-        // the teacher told `answerWasCutOff`, the trail saying "wrote nothing"
-        // — is executed in `AssistCutOffAnswerTests`.
-        let emptyRule: String = "A finished reply that wrote nothing for a tool that needs something runs no tool and says so"
+        // A finished reply that wrote NOTHING (issue #198): it runs only when
+        // the window supplies everything the tool needs. The contract's own
+        // cases, run through the gate `AssistAgent.think` uses; the whole
+        // behaviour — nothing changed, the teacher told
+        // `answerLeftOutWhatItWasFor`, the trail saying "wrote nothing" — is
+        // executed in `AssistCutOffAnswerTests`.
+        let emptyRule: String = "A finished reply that wrote nothing runs a tool only when the window supplies everything that tool needs"
         var emptyCases: [[String: Any]] = []
         for requirement in requirements where (requirement["rule"] as? String) == emptyRule {
             emptyCases = try XCTUnwrap(requirement["cases"] as? [[String: Any]])
         }
-        XCTAssertGreaterThan(emptyCases.count, 5, "The empty-arguments rule has lost its cases")
+        XCTAssertGreaterThan(emptyCases.count, 10, "The empty-arguments rule has lost its cases")
         for emptyCase in emptyCases {
             let name: String = try XCTUnwrap(emptyCase["name"] as? String)
             let tool: String = try XCTUnwrap(emptyCase["tool"] as? String)
             let written: String = try XCTUnwrap(emptyCase["arguments"] as? String)
             let required: [String] = try XCTUnwrap(emptyCase["required"] as? [String])
+            let properties: [String] = try XCTUnwrap(emptyCase["properties"] as? [String])
+            let readOnly: Bool = try XCTUnwrap(emptyCase["readOnly"] as? Bool)
             let readable: Bool = try XCTUnwrap(emptyCase["readable"] as? Bool)
             let call: AssistToolCall = AssistToolCall(
                 id: "1", type: "function",
                 function: AssistToolCall.Function(name: tool, arguments: written)
             )
-            XCTAssertEqual(call.argumentsAreReadable(forToolRequiring: required), readable, name)
-            // And each case's `required` is what the tool's schema really
-            // says, so the cases cannot drift from the surface they model.
-            var requiredOnTheSurface: [String]?
+            XCTAssertEqual(
+                call.argumentsAreReadable(forToolRequiring: required, declaring: properties, readOnly: readOnly),
+                readable, name
+            )
+
+            // And each case's schema facts are the tool's own, so the cases
+            // cannot drift from the surface they model — and the agent's
+            // gate, fed the real definition, agrees with the case.
+            var definitionOnTheSurface: AssistToolDefinition?
             for definition in AssistToolRunner.mcpTools where definition.name == tool {
-                requiredOnTheSurface = definition.required
+                definitionOnTheSurface = definition
             }
-            XCTAssertEqual(requiredOnTheSurface, required, "\(name): the case says the tool requires something its schema does not")
+            let definition: AssistToolDefinition = try XCTUnwrap(definitionOnTheSurface, "\(name): no tool \(tool)")
+            XCTAssertEqual(definition.required, required, "\(name): the case's required list is not the schema's")
+            var declared: [String] = []
+            for key in definition.parameters.keys {
+                declared.append(key)
+            }
+            XCTAssertEqual(declared.sorted(), properties.sorted(), "\(name): the case's properties are not the schema's")
+            XCTAssertEqual(definition.readOnly, readOnly, "\(name): the case's readOnly is not the tool's")
+            XCTAssertEqual(AssistAgent.argumentsAreReadable(of: call, for: definition), readable, name)
         }
         answer(emptyRule)
 
