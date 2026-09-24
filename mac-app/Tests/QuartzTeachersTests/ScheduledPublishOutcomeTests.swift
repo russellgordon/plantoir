@@ -518,4 +518,68 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         XCTAssertTrue(sentence.contains("did not finish"))
         XCTAssertTrue(sentence.contains("your deploy folder"))
     }
+    // MARK: - Whether the overnight run builds first (issue #265)
+
+    /// A course whose site was built by a publish that STARTED at `started`
+    /// and wrote its page at `pageWritten`, with the settings saved at
+    /// `settingsSaved`; then the real wrapper, with a `preview.sh` that
+    /// leaves a note when it is asked to build. Returns whether it was.
+    private func overnightRunBuilt(
+        course: String,
+        started: TimeInterval,
+        settingsSaved: TimeInterval,
+        pageWritten: TimeInterval
+    ) throws -> Bool {
+        let buildNote: URL = workspace.appendingPathComponent("the-build-ran")
+        let previewScript: String = "#!/bin/bash\n/usr/bin/touch \(buildNote.path)\nexit 0\n"
+        for (name, script) in [("preview.sh", previewScript), ("deploy.sh", "#!/bin/bash\nexit 0\n")] {
+            let url: URL = workspace.appendingPathComponent(name)
+            try script.write(to: url, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        }
+
+        let courseURL: URL = workspace.appendingPathComponent("courses").appendingPathComponent(course)
+        let siteURL: URL = courseURL.appendingPathComponent(".merged_output/section1")
+        try FileManager.default.createDirectory(at: siteURL.appendingPathComponent("public"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: courseURL.appendingPathComponent("section1"), withIntermediateDirectories: true)
+        let page: URL = courseURL.appendingPathComponent("section1/index.md")
+        let settings: URL = courseURL.appendingPathComponent("course_config.json")
+        let builtPage: URL = siteURL.appendingPathComponent("public/index.html")
+        let marker: URL = siteURL.appendingPathComponent(BuildFreshness.buildStartedMarkerName)
+        try "# lesson\n".write(to: page, atomically: true, encoding: .utf8)
+        try "{}\n".write(to: settings, atomically: true, encoding: .utf8)
+        try "<html>a published build</html>".write(to: builtPage, atomically: true, encoding: .utf8)
+        try "".write(to: marker, atomically: true, encoding: .utf8)
+
+        let now: Date = Date()
+        let stamps: [(URL, TimeInterval)] = [
+            (page, -600), (marker, started), (settings, settingsSaved), (builtPage, pageWritten),
+        ]
+        for (url, offset) in stamps {
+            try FileManager.default.setAttributes(
+                [.modificationDate: now.addingTimeInterval(offset)], ofItemAtPath: url.path
+            )
+        }
+
+        try runWrapper(course: course, section: 1, destinations: ["netlify"], descriptions: ["Netlify"])
+        return FileManager.default.fileExists(atPath: buildNote.path)
+    }
+
+    /// The reviewer's H1, in the overnight run's own shell: settings saved
+    /// while the last publish was building are older than its page, and the
+    /// run must still build rather than send that publish's site again.
+    func testTheOvernightRunBuildsWhenSettingsWereSavedDuringTheLastBuild() throws {
+        XCTAssertTrue(
+            try overnightRunBuilt(course: "ZZQ7U", started: -400, settingsSaved: -350, pageWritten: -300),
+            "A Save after the last build started was not in it: the overnight run must build first"
+        )
+    }
+
+    /// And the check still says "up to date" when nothing changed after the
+    /// build started — the marker must not make every run rebuild.
+    func testTheOvernightRunDoesNotBuildWhenNothingChangedSinceTheBuildStarted() throws {
+        XCTAssertFalse(
+            try overnightRunBuilt(course: "ZZQ8U", started: -400, settingsSaved: -500, pageWritten: -300)
+        )
+    }
 }
