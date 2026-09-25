@@ -20,6 +20,16 @@ own artwork rather than against screenshots of our own app — which is how the
 field once ended up 30pt tall beside a native 24pt one. Cited from
 `CourseCodePickerView.swift`.
 
+## `frontmatter-fences/` — where a page's settings block ends
+
+A seeded fuzz of one question: does each reader of a page's frontmatter find
+the block python-frontmatter finds? `fuzz_fences.py` regenerates the 3,000
+pages from seed 188 and compares the build's and the app's finders with the
+library's; `RESULTS.md` records the run behind issue #188 — 1,316
+disagreements before its asymmetric fence rule, 0 after, on both readers —
+and how to re-run it. Cited from `PageVisibilityReader.isFence` and
+`documentation/08-course-config-reference.md`.
+
 ## `ai-assist/` — the local assistant
 
 Why the assistant is built the way it is: which models were tried, which were

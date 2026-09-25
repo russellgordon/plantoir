@@ -719,6 +719,46 @@
               "value": "2026-09-24T07:00:00.000+0000"
             },
             "after": null
+          },
+          {
+            "name": "a line of INDENTED dashes is part of the value, not the closing fence: it goes with the key",
+            "before": "---\ncreatedSection1: 2026-09-08T07:00:00.000+0000\n  ---\ntitle: Notes\n---\nBody\n",
+            "write": {
+              "key": "createdSection1",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": "---\ncreatedSection1: 2026-09-24T07:00:00.000+0000\ntitle: Notes\n---\nBody\n",
+            "why": "Issue #188. python-frontmatter's closing fence is `^-{3,}\\s*$` at column 0, so the indented dashes are a continuation of the date. The splice used to trim both ends of a fence, as the apps did, end the block there, and write a page that read back wrong — so the write was dropped and the page quietly left undated."
+          },
+          {
+            "name": "an INDENTED opening fence still opens the block",
+            "before": "  ---\ntitle: Notes\n---\nBody\n",
+            "write": {
+              "key": "createdSection1",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": "  ---\ncreatedSection1: 2026-09-24T07:00:00.000+0000\ntitle: Notes\n---\nBody\n",
+            "why": "The guard on #188's other half: python-frontmatter strips the whole document before it matches, so an indented opener is a fence. Refusing it would give the page a second block in front of the teacher's own."
+          },
+          {
+            "name": "a block closed only by INDENTED dashes is never closed, and is not written",
+            "before": "---\ntitle: Notes\n  ---\nBody\n",
+            "write": {
+              "key": "createdSection1",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": null,
+            "why": "Issue #188. With no column-0 close the page has no frontmatter to python-frontmatter, and this writer refuses a block that is opened and never closed rather than prepend one. The apps' writers PREPEND a block on the same shape - the visibility writer (file-formats.json -> pageVisibility.writingCases) and, measured, the date writer too (datesAndTitles.writingCases) - because they act on a teacher's request and read the result back. This splice runs unattended on every build over the teacher's own files, so it keeps its one rule for every block that is opened and never closed rather than restructure a file nobody asked it to; the SITE is dated anyway, because the build dates its own copy whether or not the teacher's file is written. documentation/08-course-config-reference.md says why the two differ."
+          },
+          {
+            "name": "a block whose first line is INDENTED has no place for a new key, and is not written",
+            "before": "---\n  a: 1\n---\nBody\n",
+            "write": {
+              "key": "createdSection1",
+              "value": "2026-09-24T07:00:00.000+0000"
+            },
+            "after": null,
+            "why": "Issue #186, the apps' rule (PageVisibilityReader.placeForANewTopLevelKey): a new key goes at the top of the block only when the block's own first line - blank lines and notes aside - names a top-level key. Written above `  a: 1` it would adopt that line as its value and make settings the build cannot read. The read-back refused that write already, so the page was left undated either way; now the splice says so itself."
           }
         ]
       }

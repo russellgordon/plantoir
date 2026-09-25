@@ -514,6 +514,11 @@ nonisolated enum PageVisibilityReader {
     ///
     /// This does NOT parse block scalars and must not start to: it only finds
     /// where a value ends.
+    ///
+    /// There is a second, nearly identical walk beside this one —
+    /// `linesOwnedByKey` — for the caller that REMOVES a key's line rather
+    /// than rewriting it. They differ in one clause and the reason is a
+    /// sentence rather than a parameter; see it for which and why.
     static func continuationLineIndices(
         belowKeyAt keyIndex: Int,
         in lines: [String],
@@ -545,6 +550,82 @@ nonisolated enum PageVisibilityReader {
         var taken: [Int] = []
         var index: Int = keyIndex + 1
         while index <= lastValueLine {
+            taken.append(index)
+            index += 1
+        }
+        return taken
+    }
+
+    /// Every line below a key that goes wherever the key's OWN LINE goes when
+    /// that line is REMOVED rather than rewritten.
+    ///
+    /// `continuationLineIndices` answers the rewriting writer's question —
+    /// which lines are part of this key's VALUE — and deliberately leaves an
+    /// indented `# note` with nothing under it exactly where the teacher wrote
+    /// it, because the key stays above it and the note still reads as theirs.
+    /// A REMOVAL is a different question: once the key's line is gone, an
+    /// indented line below it belongs to whatever lands there instead.
+    ///
+    /// Measured 2026-09-25 through the real chain (python-frontmatter 1.3.0 /
+    /// PyYAML 6.0.3, then gray-matter and `patches/publish.ts`): a live
+    /// `draftSection1: >-` / `  # note` whose backup held the page back with
+    /// `publishForSection1: |-` / `  false` restored as
+    /// `publishForSection1: |-` / `  false` / `  # note` — the note joined the
+    /// literal block scalar, the value became `"false\n# note"`, and the page
+    /// the teacher had held back came back PUBLISHED. The first attempt at
+    /// this issue measured the same over 2,000 fuzzed restores (2026-09-19):
+    /// twelve restores in the dangerous direction with
+    /// `continuationLineIndices`, and none with this one.
+    ///
+    /// Otherwise it is the same walk, and it must stay the same walk: blank
+    /// lines and `# note`s at any indent are STEPPED OVER, a column-0 block
+    /// sequence counts only when the key's own value was empty, and nothing
+    /// here parses a block scalar. What is taken is a contiguous RUN, so a
+    /// column-0 `# note` sitting between a key and its indented value goes
+    /// with the key too — the better of the two outcomes, since leaving it
+    /// behind makes a block the build cannot read.
+    ///
+    /// The two are kept as separate functions rather than one with a flag,
+    /// because the reason they differ is a sentence, not a parameter — and a
+    /// flag on this family is how the "step over comments only when indented"
+    /// divergence happened three times.
+    /// [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
+    static func linesOwnedByKey(
+        belowKeyAt keyIndex: Int,
+        in lines: [String],
+        closeIndex: Int,
+        keyValueWasEmpty: Bool
+    ) -> [Int] {
+        var lastOwned: Int = keyIndex
+        var position: Int = keyIndex + 1
+        while position < closeIndex && position < lines.count {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[position])
+            if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
+                // The one clause that differs: an indented line counts whether
+                // or not it is a comment, because a comment left under a key
+                // that has gone attaches to whatever arrives in its place.
+                lastOwned = position
+                position += 1
+                continue
+            }
+            if isSteppedOverLookingForAValue(bare) {
+                position += 1
+                continue
+            }
+            if keyValueWasEmpty {
+                let content: String = trimmingYAMLSpaces(bare)
+                if content == "-" || content.hasPrefix("- ") {
+                    lastOwned = position
+                    position += 1
+                    continue
+                }
+            }
+            break
+        }
+
+        var taken: [Int] = []
+        var index: Int = keyIndex + 1
+        while index <= lastOwned {
             taken.append(index)
             index += 1
         }
@@ -609,27 +690,162 @@ nonisolated enum PageVisibilityReader {
 
     // Finding the block.
 
-    /// Is this line one of the fences around a page's frontmatter?
+    /// Where a brand-new top-level key may be written into this block, or nil
+    /// when there is nowhere in it that one can go.
     ///
-    /// Three dashes OR MORE, with nothing after them but spaces and tabs.
-    /// That is python-frontmatter's own boundary, `^-{3,}\s*$`, and therefore
-    /// the build's. A page fenced with `----` really does have frontmatter,
-    /// and reading it as an ordinary page said a hidden page was visible.
+    /// The answer is the first line INSIDE the block — where the course
+    /// installer puts these keys, where a teacher with the file open sees the
+    /// smallest diff, and where a key can never land inside a nested list.
+    /// What is new is the nil: a block whose own first line — blank lines and
+    /// `# note`s aside — is INDENTED, or is not a key at all, has no column-0
+    /// level for a key to join, and a key written into it anyway is not a key.
     ///
-    /// **It is not quite that regex, in one measured way**: this trims
-    /// LEADING spaces and tabs before testing, and `^-{3,}\s*$` allows none —
-    /// so a line of INDENTED dashes is a closing fence here and part of the
-    /// value to the build. Measured: `publish: false` over `  ---` is the
-    /// plain scalar `"false ---"` and the site PUBLISHES the page, while this
-    /// reader ends the block at the `  ---`, sees a complete `false`, and
-    /// answers `hidden` — confidently, so a writer's already-right gate makes
-    /// "hide this page" a no-op. Pre-existing, shared with Windows, and NOT
-    /// changed with issue #176 on purpose: four callers share this finder —
-    /// the reader, both visibility writers and `PageFrontmatter` — so it is
-    /// its own piece.
+    /// Measured 2026-09-25 through `build_site.process_frontmatter`,
+    /// gray-matter and `patches/publish.ts` (python-frontmatter 1.3.0 /
+    /// PyYAML 6.0.3): `---` / `  a: 1` / `---` is a page the site shows, and
+    /// with `publish: false` written above it the build can no longer read
+    /// the block at all — it stopped the build until #246, and since #246 it
+    /// hides the page and names it as unreadable on every build, so the same
+    /// write asked to SHOW the page would hide it instead. Worse, where the
+    /// indented line can FOLD — `---` / `  false` / `---` — the value becomes
+    /// the string `"false false"`, which is not `false`, so a page the teacher
+    /// asked to HIDE is left where students can read it while the teacher is
+    /// told it was hidden. Both are shapes a teacher can only type by hand
+    /// (0 of 9,553 shipped pages).
+    ///
+    /// **The END of the block is not an alternative**, and that was measured
+    /// rather than assumed by the first attempt at #186 (2026-09-19, 384 block
+    /// shapes): there is no shape where the end works and the top does not,
+    /// and appending instead moves the bytes of an existing shared writing
+    /// case for no gain. Also rejected there: writing the key at the block's
+    /// own indent (the site hides the page and this app then reads it as
+    /// visible for ever, and a second write duplicates the key), refusing
+    /// whenever ANY line in the block is indented (which would refuse `tags:`
+    /// over `  - a`, the commonest page there is), and re-indenting the
+    /// teacher's block (rewriting their YAML is what `PageFrontmatter` exists
+    /// not to do).
+    ///
+    /// It answers "may a key GO here", not "will this app be able to read the
+    /// page afterwards". A block holding a tab-indented line takes the key,
+    /// while `frontmatterBlock` still answers `unreadable` about it.
+    /// [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
+    static func placeForANewTopLevelKey(
+        in lines: [String], openIndex: Int, closeIndex: Int
+    ) -> Int? {
+        var position: Int = openIndex + 1
+        while position < closeIndex && position < lines.count {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[position])
+            // The same stepping the reader and the sweep use, so three walks
+            // cannot disagree about what a `# note` is.
+            if isSteppedOverLookingForAValue(bare) {
+                position += 1
+                continue
+            }
+            if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
+                return nil
+            }
+            if namesATopLevelKey(bare) {
+                return openIndex + 1
+            }
+            return nil
+        }
+        // Nothing but blank lines and notes: an empty mapping, and a key is
+        // the first thing in it. Measured HIDDEN after the write for `---` /
+        // `---`, `---` / `# note` / `---` and `---` / `  # note` / `---`.
+        return openIndex + 1
+    }
+
+    /// Does this column-0 line name a key of the page's own mapping?
+    ///
+    /// A key, not a sequence entry (`- a` makes the document a LIST, and a key
+    /// beside it is a block the build cannot read) and not a bare scalar
+    /// (`just text`, or `a:1`, whose colon has no space after it —
+    /// `valuePart` makes the same distinction for the same measured reason).
+    /// Quoted keys count, because `"a b": 1` is a mapping to YAML and the
+    /// reader already accepts the quoted spelling of its own keys — refusing
+    /// them would be a regression rather than a caution.
+    ///
+    /// Two shapes, each one line:
+    ///
+    /// * a FLOW collection — `{a: 1}` or `[a, b]` — is not a block a key can
+    ///   join, however much the line looks like `key: value`. A key written
+    ///   above `{a: 1}` makes a block the build cannot read (`can not read an
+    ///   implicit mapping pair; a colon is missed`) while this reader answers
+    ///   `hidden` about the result. A key whose VALUE is a flow collection
+    ///   (`tags: [a,` over ` b]`) is a different line and is still accepted.
+    /// * YAML's explicit key, `? ` at column 0, names a top-level key as
+    ///   surely as `key:` does, and refusing it was the one regression the
+    ///   first attempt found in forty shapes.
+    static func namesATopLevelKey(_ line: String) -> Bool {
+        // `? complex` over `:  v` is a mapping whose key is written out long
+        // hand. A new key joins it perfectly well.
+        if line.hasPrefix("? ") {
+            return true
+        }
+        // A flow collection is the whole document's value, not a mapping with
+        // room in it.
+        if line.hasPrefix("{") || line.hasPrefix("[") {
+            return false
+        }
+        if line.hasPrefix("-") {
+            let characters: [Character] = Array(line)
+            if characters.count == 1 || characters[1] == " " || characters[1] == "\t" {
+                return false
+            }
+        }
+        var rest: Substring = Substring(line)
+        if let quote = rest.first, quote == "\"" || quote == "'" {
+            let body: Substring = rest.dropFirst()
+            guard let closing = body.firstIndex(of: quote) else {
+                return false
+            }
+            rest = body[body.index(after: closing)...]
+        }
+        guard let colon = rest.firstIndex(of: ":") else {
+            return false
+        }
+        // A colon at the very start of the line is not a key — but a QUOTED
+        // key's colon comes first in what is left after the quotes, and that
+        // one counts. The two are told apart by where the remainder began.
+        if colon == rest.startIndex && rest.startIndex == line.startIndex {
+            return false
+        }
+        let afterColon: Substring = rest[rest.index(after: colon)...]
+        if let next = afterColon.first, next != " ", next != "\t" {
+            return false
+        }
+        return true
+    }
+
+    /// Is this line the CLOSING fence of a page's frontmatter?
+    ///
+    /// Three dashes OR MORE, with nothing after them but spaces and tabs and
+    /// **nothing before them at all**. That is python-frontmatter's own
+    /// boundary, `^-{3,}\s*$`, matched with `re.MULTILINE` against the text of
+    /// the whole page — so `^` is the start of a LINE, there is no room for
+    /// whitespace in front of the dashes, and a line of INDENTED dashes is not
+    /// a fence at all: it is part of the value above it. A page fenced with
+    /// `----` really does have frontmatter, and reading it as an ordinary page
+    /// said a hidden page was visible.
+    ///
+    /// Until issue #188 this trimmed LEADING spaces and tabs too. Measured:
+    /// `publish: false` over `  ---` is the plain scalar `"false ---"` and the
+    /// site PUBLISHES the page, while this reader ended the block at the
+    /// `  ---`, saw a complete `false` and answered `hidden` — confidently, so
+    /// `AssistPageVisibility.setting`'s already-right gate made "hide this
+    /// page" a no-op while students went on reading it. On a course page the
+    /// same shape let adding a section split section 1's key from its value.
+    ///
+    /// The whole argument in one number: `fenceIndices`, with this test for
+    /// the close and `isOpeningFence` for the open, was compared page by page
+    /// against python-frontmatter's own `detect`/`split` over 3,000 generated
+    /// pages (indents, tabs, dash counts, trailing whitespace, CRLF, leading
+    /// blank lines, dashes inside values) and **disagreed 0 times**; the
+    /// version that trimmed both ends disagreed 1,316 times. The generator is
+    /// `research/frontmatter-fences/fuzz_fences.py`.
     /// [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
     static func isFence(_ line: String) -> Bool {
-        let bare: String = trimmingYAMLSpaces(line)
+        let bare: String = trimmingTrailingYAMLSpaces(line)
         if bare.count < 3 {
             return false
         }
@@ -639,6 +855,38 @@ nonisolated enum PageVisibilityReader {
             }
         }
         return true
+    }
+
+    /// A string without the spaces and tabs at the END of it, and without a
+    /// Windows line ending's carriage return. The leading end is deliberately
+    /// left alone — see `isFence`, which is the one caller that needs the
+    /// difference.
+    static func trimmingTrailingYAMLSpaces(_ text: String) -> String {
+        var trimmed: Substring = Substring(PageFrontmatter.trimmingCarriageReturn(text))
+        while trimmed.last == " " || trimmed.last == "\t" {
+            trimmed = trimmed.dropLast()
+        }
+        return String(trimmed)
+    }
+
+    /// Is this the line that OPENS a page's frontmatter?
+    ///
+    /// The same dashes, but indentation IS allowed here, and the asymmetry is
+    /// measured rather than chosen: `frontmatter.parse` does `text.strip()` on
+    /// the WHOLE document before it tests anything, so the whitespace in front
+    /// of the first line — blank lines and the indent of the fence itself — is
+    /// gone by the time `^-{3,}\s*$` looks at it. Measured:
+    /// `  ---` / `publish: false` / `---` is HIDDEN on the site, and so is the
+    /// tab-indented form.
+    ///
+    /// Reading it the strict way would be worse than wrong. This app would see
+    /// no block on such a page, and `AssistPageVisibility.setting` would
+    /// PREPEND one of its own — leaving the teacher's real frontmatter behind
+    /// it as body text printed to their students, which is the bug #140 fixed.
+    /// A symmetric "never indented" finder was measured and REJECTED for
+    /// exactly that reason.
+    static func isOpeningFence(_ line: String) -> Bool {
+        return isFence(trimmingYAMLSpaces(line))
     }
 
     /// Where this page's frontmatter is.
@@ -684,7 +932,7 @@ nonisolated enum PageVisibilityReader {
             }
             openIndex += 1
         }
-        guard openIndex < lines.count, isFence(lines[openIndex]) else {
+        guard openIndex < lines.count, isOpeningFence(lines[openIndex]) else {
             return nil
         }
         var index: Int = openIndex + 1
@@ -704,7 +952,7 @@ nonisolated enum PageVisibilityReader {
             if trimmingYAMLSpaces(line).isEmpty {
                 continue
             }
-            return isFence(line)
+            return isOpeningFence(line)
         }
         return false
     }

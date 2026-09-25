@@ -741,6 +741,24 @@ nonisolated enum ActivityTrail {
         /// minutes late, or not at all, looks from outside exactly like one
         /// that misfired.
         case scheduledPublishWaitedForTheCourse = "scheduled publish waited for the course"
+        /// A launcher had to remake a working folder's workspace and found
+        /// something running in it (GitHub #94). Carries where the run was
+        /// for — course and section, or the word "setup" — and which of
+        /// three it was: it WAITED for a build or publish to finish, and for
+        /// how long; it stopped because a preview from the folder was still
+        /// open, and which one; or it stopped because something was still
+        /// being built or published after ten minutes.
+        ///
+        /// Written by the app, from the line the launcher prints
+        /// (`WorkspaceInUseReport`): `ScriptRunner` reads it from a run's
+        /// console, `ScheduledDeploy` from the log of a publish launchd ran.
+        /// On the trail because each of the three is a new way for a run to
+        /// be slow or not to happen — "my publish did not go out last night",
+        /// "it told me to close a preview" — and the app otherwise shows a
+        /// refusal only as a run that did not finish. A remake with nothing
+        /// running writes nothing. Mac only, permanently: Windows builds
+        /// natively and has no workspace.
+        case workspaceWasInUse = "workspace was in use"
 
         /// Whether the teacher was told, with a macOS notification, how a
         /// scheduled publish went (#212) — or why not: notifications turned
@@ -753,6 +771,16 @@ nonisolated enum ActivityTrail {
         /// notice went out: a notification that was sent and one that was
         /// blocked look identical from the teacher's side.
         case scheduledPublishNotification = "scheduled publish notification"
+        /// Plantoir left some pages' settings exactly as they were, because
+        /// the settings at the top of those pages have no place a new line
+        /// can safely go (#186's shape — indented, or written as a list).
+        /// Carries the course and section, WHAT was being done, and HOW MANY
+        /// pages — never which, because a page's name is the teacher's own
+        /// words. Written by a section restore since #182, and by publishing,
+        /// hiding, re-dating and making room since #186; the teacher is told
+        /// in the same breath, and this is the line that is still there next
+        /// week, when "why is this page still showing?" arrives.
+        case pageSettingsLeftAsTheyWere = "page settings left as they were"
     }
 
     // MARK: - Stored properties
@@ -800,6 +828,13 @@ nonisolated enum ActivityTrail {
     /// section a line belongs to without every caller remembering to.
     static func note(_ event: Event, _ what: String, course: String, section: Int, at moment: Date = Date()) {
         ActivityTrail.note(event, "\(course)/\(section) · " + what, at: moment)
+    }
+
+    /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and
+    /// how many pages — never which.
+    static func pageSettingsLeftAsTheyWereLine(act: String, pages: Int) -> String {
+        let counted: String = pages == 1 ? "1 page" : "\(pages) pages"
+        return "left the settings of \(counted) as they were while \(act): no room at the top for a new setting"
     }
 
     static func formatter(timeZone: TimeZone = TimeZone.current) -> DateFormatter {

@@ -531,9 +531,13 @@ separately from the reader:
   is strict on Windows and, since the mac's `PageFrontmatter.block` was
   loosened for the reason above, lenient on the mac — so a restore reaches
   different pages on the two platforms, which is
-  [issue #177](https://github.com/russellgordon/plantoir/issues/177) and needs
-  a decision. The trap to avoid is reading "one fence finder" and making the
-  MAC strict, which puts the second-block bug straight back.
+  [issue #177](https://github.com/russellgordon/plantoir/issues/177). Russell
+  decided it on 2026-09-19: the restore uses the SHARED finder, on both
+  platforms. The mac's has since #140; since #182 (2026-09-25) it also carries
+  and drops each key WITH the lines it owns (below), and Windows owes both in
+  one change (the `windows` issue from #182). The trap to avoid is reading
+  "one fence finder" and making the MAC strict, which puts the second-block bug
+  straight back.
 
 * **A writer must take a value's CONTINUATION lines with the key.**
   Replacing a key's line alone orphans the indented line below it onto the new
@@ -585,28 +589,95 @@ separately from the reader:
   in full and sweeps. Measured after that write: `False` → HIDDEN. It changes
   none of the 54 shared `readingCases` that existed before it.
 
-  **"Whatever is on the key's own line" is closed; "the first line that could
-  be a value" has one pre-existing exception, and it is the one that reaches
-  this same fault.** A line of INDENTED DASHES — `publish: false` over
-  `  ---` — never reaches the rule above, because `isFence` trims leading
-  whitespace before testing for dashes and so takes `  ---` for the CLOSING
-  fence. python-frontmatter's own boundary is `^-{3,}\s*$`, which allows no
-  leading whitespace at all, so the build reads that line as part of the value
-  and the site PUBLISHES the page (`"false ---"`), while the reader says
-  `hidden` — confidently — and "hide this page" is a no-op, exactly the shape
-  this section exists to close. `publish: no` over `  ---` behaves the same;
-  `publish: >-` and `publish:` over `  ---` are written but the `  ---` is
-  left behind, because `continuationLineIndices` is bounded by
-  `block.closeIndex`, which is the fake fence. All measured; `origin/dev` and
-  Windows produce byte-identical output on every row, so this is pre-existing
-  and shared rather than anything this piece introduced. It is NOT fixed here
-  on purpose: `isFence` is the fence finder that the reader, both visibility
-  writers and `PageFrontmatter` all share, so changing it is its own piece
-  rather than a ride-along.
+  **"The first line that could be a value" had one exception until #188 (2026-09-25),
+  and it reached this same fault.** A line of INDENTED DASHES — `publish: false`
+  over `  ---` — never reached the rule above, because `isFence` trimmed leading
+  whitespace before testing for dashes and so took `  ---` for the CLOSING
+  fence. python-frontmatter's own boundary is `^-{3,}\s*$` matched line by line,
+  which allows no leading whitespace at all, so the build reads that line as
+  part of the value and the site PUBLISHES the page (`"false ---"`), while the
+  reader said `hidden` — confidently — and "hide this page" was a no-op.
+  `publish: no` over `  ---` behaved the same; `publish: >-` and `publish:` over
+  `  ---` were written but the `  ---` was left behind, because the sweep is
+  bounded by the block's close, which was the fake fence. On a course page the
+  same early close let ADDING A SECTION split section 1's key from its value:
+  measured, section 1 turned hidden and the new section read `"false ---"` and
+  was published.
+
+  **The fence rule is now asymmetric, on the mac and in the build's own
+  splice.** The CLOSING fence is three or more dashes at column 0, trailing
+  spaces and tabs only (`PageVisibilityReader.isFence`,
+  `build_site._is_frontmatter_fence`); the OPENING fence may be indented
+  (`isOpeningFence`, `_is_opening_frontmatter_fence`), because
+  `frontmatter.parse` strips the whole document before it matches, so the
+  indent of the first line is gone by the time the regex looks — measured,
+  `  ---` / `publish: false` / `---` is HIDDEN on the site. Every mac writer
+  finds its block through that one finder (`PageFrontmatter.block` →
+  `fenceIndices`), and the page copier's builder-agreement guard asks the same
+  `isFence` rather than keeping its own copy. Measured over 3,000 seeded pages
+  against python-frontmatter's own `detect`/`split`: the old finder disagreed
+  on **1,316**, the new one on **0**, and the build's Python copy the same
+  (1,316 → 0) — `research/frontmatter-fences/`, which regenerates the corpus
+  from its seed.
+
+  **Rejected: a symmetric "never indented" rule.** It sees no block behind an
+  indented OPENER, which python-frontmatter does read, and every writer then
+  prepends a second block and turns the teacher's own into body text — #140's
+  bug. `testAnIndentedOpeningFenceIsStillFrontmatter` and the contract's
+  indented-opener writing case are the guard, and they pass on the old finder
+  too, on purpose.
+
+  **One shape's STRUCTURE changes, and the apps and the build answer it
+  differently on purpose.** A page whose only closing-looking line is indented —
+  `---` / `title: x` / `  ---` / body — has no closed block to python-frontmatter,
+  so every line of it is body text and the page is PUBLISHED. Since #188 the
+  apps agree it has no block, and the visibility writer PREPENDS one of its
+  own, as it does for any fence that is never closed: measured, the page goes
+  from published to HIDDEN. This is the move #140 teaches nobody to make, and
+  it is right here because there was never a block for it to push into the
+  body — those lines already were the body. The app's DATE writer
+  (`PageFrontmatter.settingCreated`, re-date and make-room) does the same —
+  measured `.written`, and the site reads the new date — and that was kept
+  rather than refused: those are a teacher's requests, and the app reads the
+  date back to order the section's classes, so a page it declined would drop
+  out of that order. The build's date splice (`_setting_frontmatter_value`)
+  REFUSES the same shape instead, as it refuses every block that is opened and
+  never closed: it runs unattended on every build over the teacher's own
+  files, and the site is dated anyway because the build dates its own copy.
+  All three are contract cases (`pageVisibility.writingCases`,
+  `datesAndTitles.writingCases`, `atBuildTime.writingCases`). (This paragraph
+  said at first that a date is "not worth restructuring a teacher's file
+  for" — true of the build, and contradicted by the app's own date writer, as
+  the review found.)
+
+  **What a teacher sees change on upgrade, with nothing written.** The reader
+  answers differently on pages it used to close early, and it says so on
+  screen the moment the app is updated — no file is touched and no trail line
+  records it, because no trail event carries a visibility READING (all 75
+  `mustRecord` events were checked; none does). Measured over the same 3,000
+  pages, each judged on the site with #246's build (a page whose settings it
+  cannot read is hidden): **99 that the app showed as hidden now show as
+  published** — the site was publishing every one of them all along, so the
+  app is catching up with what students could already read; 15 go from "says
+  nothing" to hidden, all of them hidden on the site; and 12 that the app
+  showed as hidden now show as published while the site HIDES them — every
+  one a page the build cannot parse (a tab used as indentation, or an
+  indented line below the value that YAML cannot fold into it), which since #246 the build hides and names in
+  a folder-problem finding, so reporting visible there is the documented mild
+  direction and the finding says what is wrong. Pages the app calls hidden
+  while the site publishes them: 99 before, **0** after. A `cannot tell` guard
+  for the pages that went the other way was considered by the plan's review
+  and not needed on this base. Whitespace python's `\s` matches and the apps'
+  trim does not — a non-breaking space, a FORM FEED or a vertical tab after
+  the dashes — closes a block for the build and not for the apps, and a
+  byte-order mark is its own case. The review's extended fuzz (seed 31337,
+  3,000 pages with `---\f` among the fences) disagreed on 199 pages, every one
+  a form feed after the dashes; without it, 0 of 2,663. None of these was
+  measured on a real page; they are named here rather than coded for.
   [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
 
-  **Windows fixed all of this — everything above except that one indented-dashes
-  shape — on 2026-09-19** — `PageVisibilityReader
+  **Windows fixed all of this — everything above except the indented-dashes
+  shape, which it owes with #188 — on 2026-09-19** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
   sweep, used by both of `SetDraft`'s branches; tests in
   `PageVisibilityReadingTests` →
@@ -680,9 +751,9 @@ separately from the reader:
   the splitter change: **11,891 pages, 0 whose split output moves.** Nothing
   the build does changes.
 
-  **Three of this app's own write paths orphaned a continuation** (the first
-  is fixed; the others stand), and they are named here rather than left to be
-  discovered:
+  **Three of this app's own write paths orphaned a continuation** (all three
+  fixed by 2026-09-25: #175's review, #182 and #186), and they are named here
+  rather than left to be discovered:
 
   * ~~`SectionAdder.extendFrontmatter` inserts the new section's
     `createdSection<N>` / `publishForSection<N>` pair after the last
@@ -699,27 +770,81 @@ separately from the reader:
     `SectionAdder.cs:222-234`, which still inserts after the key line; the
     seventh `addingKeysToAPage` case is what closes it there (the `windows`
     issue from #175 carries it).
-  * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
-    the backup's without either side's continuation lines — measured, a live
-    `publishForSection1:` / `  a: 1` whose backup had no such key is left as
-    `  a: 1` alone and the build stops (since #246: the build hides the page
-    and names it as unreadable).
+  * ~~`CourseRestorer.settingPerSectionKeys` swaps this section's key line for
+    the backup's without either side's continuation lines~~ — **fixed
+    2026-09-25 by #182.** Measured before the fix, on #246's build: a live
+    `publishForSection1:` / `  a: 1` whose backup had no such key was left as
+    `  a: 1` alone, a block the build cannot read, so the page went HIDDEN in
+    every section; a backup's `publishForSection1: >-` / `  false` (hidden)
+    came back as `publishForSection1: >-` alone — empty, PUBLISHED; and a
+    live `draftSection1: >-` / `  # note` left its note to join a restored
+    `|-` scalar (`"false\n# note"`, PUBLISHED). Both halves of the swap now
+    walk `PageVisibilityReader.linesOwnedByKey` — `continuationLineIndices`
+    with ONE clause changed: an indented line counts even when it is a
+    `# note`, because a note under a key that is REMOVED attaches to whatever
+    arrives in its place. Separate function, not a flag: the reason they
+    differ is a sentence, and a flag on this family is how "step over comments
+    only when indented" diverged three times. Restored lines now go after the
+    last line any per-section key OWNS: placed after the last line that
+    merely NAMED one, restoring section 1 onto a page whose last key was
+    section 2's `publishForSection2: >-` / `  false` split section 2's key
+    from its value and PUBLISHED section 2 (a finding of #182's plan, not of
+    the issue). And when this section has no line on the live page and the
+    block has no column-0 level for a new key (#186's shape — `---` /
+    `  a: 1` / `---`), the page is left exactly as it is and COUNTED:
+    `restoreSection` returns the count, the transcript adds
+    `AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack`, and the trail
+    gets `page settings left as they were`. Six whole-file cases, byte-compared
+    by the mac and judged on the site per section by
+    `check_visibility_against_the_site.py`: `course-management.json` →
+    `backups.restoringOneSectionsKeys`.
     [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
-  * **`setting`'s own INSERT branch** — the third branch of the very function
-    the sweep was added to, and the surprising one. It CREATES an orphan
-    rather than leaving one: a block whose first line is indented gets the new
-    key inserted above it at `openIndex + 1`, and that indented line becomes
-    the new key's value. Measured, `---` / `  a: 1` / `---` is VISIBLE (no
-    flag at all) and after a hide it STOPS the build — `bad indentation of a
-    mapping entry (3:4)`. There is nothing to SWEEP there; the fix is where to
-    insert, which is a decision about a teacher's hand-edited YAML rather than
-    a mechanical one.
+  * ~~**`setting`'s own INSERT branch** CREATES an orphan~~ — **fixed
+    2026-09-25 by #186.** A block whose first line is indented got the new
+    key inserted above it at `openIndex + 1`, and that indented line became
+    the new key's value. Measured on #246's build: `---` / `  a: 1` / `---` is
+    VISIBLE, and after a hide it was a block the build cannot read (it stopped
+    the build until #246; since, it is hidden and named — so the same write
+    asked to SHOW the page hid it); `---` / `  false` / `---` after a hide was
+    `"false false"` and stayed PUBLISHED while the teacher was told it was
+    hidden. There is nothing to SWEEP there; the fix is WHERE a new key may
+    go. `PageVisibilityReader.placeForANewTopLevelKey` answers the first line
+    inside the block, as before — and nil when the block's own first line,
+    blank lines and `# note`s aside, is indented or names no key (a flow
+    collection, `- a`, a bare scalar, `a:1`; a quoted key and `? key` DO name
+    one). Nil means nothing is written: `setting` and
+    `PageFrontmatter.settingCreated` return `.noRoomForAKey` — a three-way
+    `FrontmatterWriteOutcome` (`written` / `alreadyRight` / `noRoomForAKey`)
+    replaced their `changed` flag, because `changed: false` could not tell
+    "already hidden" from "declined", which is the lie this issue was about.
+    Every caller says so: the publish/unpublish plan asks the real writer at
+    plan time and names the page on the card and in the reply
+    (`AssistWording.pagesWhoseSettingsCannotBeAddedTo`), a whole unit no
+    longer answers "already hidden" about pages it declined, a re-date and a
+    make-room name the pages they could not date, the section restore counts
+    them (#182), the page copier's plain-key append declines too (its
+    read-back then refuses the copy), and the trail records
+    `page settings left as they were` with the act and the count. The build's
+    date splice follows the same rule (`_place_for_a_new_top_level_key`).
+    **Rejected** (measured by the first attempt, 2026-09-19, over 384 block
+    shapes): inserting at the END of the block (fixes none and moves a shared
+    case's bytes), writing the key at the block's own indent (the site hides
+    the page and this app reads it visible for ever; a second write
+    duplicates the key), refusing whenever ANY line is indented (refuses
+    `tags:` over `  - a`, the commonest page there is), and re-indenting the
+    teacher's block (rewriting their YAML is what `PageFrontmatter` exists not
+    to do). The honest cost: on `---` / `  a: 1` / `---` a HIDE now leaves the
+    page visible, where #246's build had been hiding it by accident, because
+    the orphan made the block unreadable — the teacher is told instead, and
+    told which page. Contract cases: four `pageVisibility.writingCases` (with
+    `expectOutcome`), one `datesAndTitles.writingCases`, one
+    `atBuildTime.writingCases`.
     [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
 
-  All three are pre-existing, all three are shared with Windows (which inserts
-  at `open + 1` too), and none is worsened by this piece. The first two are not
-  reached by the fixed reader or writer at all — neither calls `setting`. The
-  rule above is the app's rule; these three are where it is not yet kept.
+  All three were pre-existing and all three are shared with Windows (which
+  inserts at `open + 1` too, and owes #182 and #186 with #188 — one `windows`
+  issue). The first two are not reached by the fixed reader or writer at all
+  — neither calls `setting`. The rule above is now kept by every one of them.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
   `PageFrontmatter.settingCreated` (every re-date, move, insert and the
@@ -766,9 +891,10 @@ separately from the reader:
   up to a ` #` comment (`scalarText(ofRawValue:)`); the quotes and the note go
   with the old value. Three more cases (13 in all).
   **Not in it, recorded:** an all-indented block — `settingTitle` declines it
-  silently, and `settingCreated` INSERTS `created:` at `openIndex + 1`, above
-  the indented line, which is #186's orphan shape (the #186 decision about an
-  indented root mapping — `rawValue` cannot read that page's date either); duplicate keys — the writer and `rawValue` take the
+  silently, and `settingCreated` INSERTED `created:` at `openIndex + 1`, above
+  the indented line, which was #186's orphan shape; since #186 (2026-09-25) it
+  declines too and says `.noRoomForAKey` (`rawValue` cannot read that page's
+  date either, so nothing a teacher could see is lost); duplicate keys — the writer and `rawValue` take the
   FIRST `created:`, PyYAML keeps the LAST (measured) — is a separate
   disagreement; and the time of a folded or below-key date is not read, so the
   rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows'

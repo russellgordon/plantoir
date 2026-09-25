@@ -305,8 +305,10 @@ workspace's block, or for workspaces made before #280.
 **Never `docker rm -f` in either path.** A failed start proves nothing runs in
 that workspace, but two launchers on the same folder (a scheduled publish and
 a Preview) can both find it stopped; the second one's `-f` would kill the
-workspace the first had just remade, mid-publish — #94's shape. Plain `rm`
-refuses a running workspace, and the start path then uses it as it is.
+workspace the first had just remade, mid-publish — the shape GitHub #94 was
+about. Plain `rm` refuses a running workspace, and the start path then uses it
+as it is. Every OTHER remake, since #94, looks at what is running first and
+removes by id: "Before a workspace is remade" below.
 
 **When all forty are taken.** Exit 1, and
 `previewPorts.whenNoBlockIsFree.sentence` word for word. It names the two
@@ -341,9 +343,11 @@ writes nothing: the announced address already carries the port.
   publish-only folder should not need a port block at all"). Rejected by the
   director on 2026-09-25, reversibly: the workspace is made once per folder
   and serves both, so the next Preview in that folder would have to remake it
-  — a remake stops the workspace without asking what runs in it, so a
-  scheduled publish of another section in progress would be killed (#94 made
-  routine), and it throws away the warm website builder (109 s cold). It also
+  — which, when that was decided, stopped the workspace without asking what
+  ran in it, so a scheduled publish of another section in progress would have
+  been killed. Since #94 a remake waits for the publish instead, so the cost
+  became a routine wait (or a refused preview) rather than a killed publish;
+  and it still throws away the warm website builder (109 s cold). It also
   only moves the wall: that folder's next preview meets the same ceiling.
 - **A throwaway `docker run --rm` workspace per publish.** A second workspace
   cannot see the first's processes, so a publish could no longer stop a
@@ -722,33 +726,194 @@ transient — the free-address probe sees the virtual machine's forwarder
 try again" is the right next step for them; narrowing the launcher's
 sentence to the daemon's text is tracked as its own issue.
 
-Every launcher inspects the existing container before using it:
+Each launcher inspects the existing container before using it, and remakes
+it for any of these reasons. **They are not the same in all three**, and this
+section said "every launcher" until #94 counted them (2026-09-25):
 
-1. **No `/teaching/courses` mount at all?** Recreate the container.
-2. **Mounted from a different host folder than the current one?** Recreate
-   it pointing at `$(pwd)/courses` (rare now that names are per-folder,
-   but a moved folder keeps its old name with a stale mount).
-3. **Running a different image than the recipe resolves?** Recreate — a
-   container keeps running the version it was created from, so a changed
-   recipe only takes effect through recreation.
-4. **Missing the 9081–9084 websocket ports?** (An older container
-   published only 8081; published ports cannot be changed after creation.)
-   Recreate.
-5. **Mount correct but not writable?** (Checked by creating and deleting a
-   probe file inside the container.) **`setup.sh` and `deploy.sh` only** —
-   `preview.sh` implements the other four checks but not this one, and no
-   comment in it says why. Recreate. This catches macOS
-   permission/ACL oddities after folder moves or restores.
-6. Otherwise, start the container if stopped (`start_the_existing_workspace`
-   — which, only when the start is refused because its ports were taken,
-   recreates it on free ones; see "How a folder finds its ports" above), or
-   reuse it as-is.
+| Reason to remake | `setup.sh` | `preview.sh` | `deploy.sh` |
+|---|---|---|---|
+| No `/teaching/courses` mount at all | yes | yes | yes |
+| Mounted from a different host folder (a moved folder keeps its old name with a stale mount) | yes | yes | yes |
+| No builds mount (`buildOutputLocation` — every container made before built sites moved out) | yes | yes | yes |
+| Running a different image than the recipe resolves (a container keeps the version it was made from) | yes | yes | **no** |
+| Missing the 9081–9084 live-reload ports (published ports cannot be added later) | yes | yes | **no** |
+| `courses/` was created by this very run | yes | — | — |
+| Mount correct but not writable (a probe file made and deleted inside; macOS permission/ACL oddities after a move or restore) — while running, and again after starting | yes | **no** | yes |
+| The connection has gone stale (`getent hosts` of the destination fails; not for a folder publish) — while running, and again after starting | — | — | yes |
+
+That is **twenty places** (8 + 5 + 7), plus the three that retired the old
+shared `teaching-quartz` workspace. `deploy.sh` never checks the image or
+the live-reload ports: a publish runs in whatever workspace the last preview
+or build left, and the next preview remakes it. That is an inconsistency, not
+a decision — written down here rather than fixed by #94, which is about what
+a remake may END, not about when one is due. `preview.sh` has no writability
+check and no comment in it says why.
+
+Otherwise the container is started if stopped (`start_the_existing_workspace`
+— which, only when the start is refused because its ports were taken,
+recreates it on free ones; see "How a folder finds its ports" above), or
+reused as it is.
 
 Recreating the container loses nothing of the teacher's, because their
 content lives in the bind mounts — but it is not free: the warm Quartz
 scaffold and `node_modules` live in the container's own `/tmp/quartz-builds`,
 so the next preview is a first preview again (109.3 s measured on a teacher's
-Mac for #225).
+Mac for #225). And removing it ENDS everything running inside it, which is
+the next section.
+
+### Before a workspace is remade: what is running in it (GitHub #94)
+
+Until 2026-09-25 each of those twenty places ran `docker stop` and `docker
+rm` (or `docker rm -f`) on the folder's workspace without looking. A preview
+open in one window died when another launcher in the same folder remade the
+workspace — after an update changed the recipe, once per folder for the
+builds mount, on a publish whose connection had gone stale — and a build or a
+publish half-way through its upload was killed. Now every one of them says
+WHY in its own line and then calls one function, `remake_the_workspace`, in
+the PREVIEW PORT BLOCK the three launchers share (byte-identical, checked by
+`scripts/test_port_blocks.py`). The rule is data:
+`contracts/app-rules.json` → `previewPorts.whenTheWorkspaceIsInUse`.
+
+**What it looks at.** Measured on the development Mac, 2026-09-25:
+
+| What | Result |
+|---|---|
+| An idle workspace, `docker top` | exactly one process, `tail -f /dev/null` — 6 of 6 running workspaces |
+| A preview, from outside | `python3 … build_site.py --course=C --section=N … --port P` (no `--build-only`) and its `node … --serve` child and that one's `esbuild`, whole command lines in `CMD`, with PID and PPID |
+| Cost of one look | 23 ms (10 looks, 0.233 s) |
+| A STOPPED workspace | `docker top` exits 1 — so "stopped" is asked first, with `.State.Running` |
+| `.State.Pid` | the same number `docker top` shows for the first process, so "its own first process" is found by pid, not by position |
+
+One look answers one of three: **nothing** (stopped, gone, or only its first
+process), **other work** (anything else — a build for publishing, a publish,
+a course being set up, another launcher's probe — and a running workspace
+`docker top` did not answer), or **a preview**. The app's quit path uses the
+same count to decide whether a workspace is busy (documentation/09-mac-app.md),
+so the two agree on what "running" means.
+
+**A preview counts as open only while its launcher is running on this Mac.**
+Measured by the plan review: killing the host side of `docker exec` leaves
+the process running inside the workspace, parented to the engine's shim. So
+a preview is left behind whenever the app is force-quit, a Terminal window is
+closed or an assistant's client exits. Counted as open, it would refuse every
+remake of that folder for ever with nothing a teacher could close. So each
+`build_site.py` preview in the workspace is matched against the Mac's own
+process table (`ps -Ao pid=,ppid=,args=`, read once) for a `preview.sh`
+whose next two words are that course (either case — the launcher upper-cases
+it) and that section; a `--stop` or `--build-only` run does not count, and
+this run's own ancestors and descendants are left out, because a login shell
+wrapping it carries the same words. A preview with no launcher is an orphan
+and counts as nothing, with everything it started; so does a website builder
+serving with no `build_site.py` above it (its parent waits on it for as long
+as a preview is open, so its absence means the preview side is gone). A
+process table that cannot be read counts the launcher as running — a refused
+remake can be retried, a killed preview is what #94 was.
+
+**What it does.** Nothing running: remade at once, as before. Otherwise one
+line (`sentences.whileWaiting`), then a look every 2 s:
+
+- **a build or a publish** is waited for up to **600 s**, then refused
+  (`sentences.whenWorkDidNotFinish`, exit 1). Ten minutes is the wait a
+  publish set for later already gives a busy course (#156), so a scheduled
+  publish and the launcher it runs give up on the same horizon.
+- **an open preview** is refused after **20 s**, naming it
+  (`sentences.whenAPreviewIsOpen`, exit 1). Twenty seconds is the app's quit
+  path's wait, for the same race: a preview closed a moment ago may still be
+  ending (the Stop button does not wait for the stop). An open preview does
+  not end on its own, so waiting longer only delays the same answer. An open
+  preview wins over other work.
+
+The time is counted in looks rather than read from a clock, as the app's quit
+script counts its own — which is also what lets the test replace `sleep` and
+run a ten-minute wait in a moment. A publish set for later meets the rule
+like any other run: it WAITS for a build or a publish, and STANDS DOWN on an
+open preview; it never ends one, consistent with #156.
+
+**Then it stops and removes the workspace BY ID, never by name, never with
+`-f`.** Two launchers started together after an update can both find the old
+workspace idle; by name, the slower one's stop landed on the NEW workspace the
+faster one had just made — #94's shape one step down. By id it lands on the
+old one. A remove that fails because that id is already gone is no failure; one
+that fails with it still there is tried once more two seconds later, then the
+run stops with `hostBlockClash.saysWhenAStartIsRefused`. At the making, a
+refusal because the NAME is taken (`is already in use by container`) waits two
+seconds and uses that workspace if it is running, else tries once more — a
+second such refusal stops with the same sentence. Until this, a name conflict
+fell through to the mount refusal's advice to keep the folder inside the home
+folder, which was never its trouble (plan review, F4).
+
+**The old shared workspace** (`teaching-quartz`, from before each folder had
+its own) is retired from the same block, only when nothing is running in it,
+by id; otherwise it is left, silently — it holds nothing of the teacher's and
+the port walk already steps round its addresses.
+
+**On the trail.** When it waited or refused, the launcher prints one
+`PLANTOIR_WORKSPACE_IN_USE:` line, which the console a teacher reads leaves
+out, and the APP writes the `workspace was in use` event from it —
+`ScriptRunner` from a run it started, `ScheduledDeploy` from the log of a
+publish launchd ran, exactly as the build's `PLANTOIR_DATED` line reaches the
+trail. The app writes it rather than the launcher so the event has one writer
+for its words and a real call site (`ActivityTrailWiringTests`); the cost is
+that a run typed at the command line leaves its console sentence and no trail
+line. A remake with nothing running writes nothing.
+
+**Tested** by `scripts/test_port_blocks.py` — every `whatCountsAsRunning` case
+and every `sequences` case through the REAL block under `/bin/bash` 3.2, with
+a pretend engine, `ps` and `sleep`, plus the id race, the retire, and a check
+that no launcher stops or removes a workspace outside the block — and by
+`verify.sh` §6c, which puts a pretend preview (`exec -a` renames `sleep`, and
+`docker top` shows it exactly as a real one) inside a real workspace with a
+pretend `preview.sh` on the Mac, and requires the remake to refuse after at
+least 20 s, name the preview, and leave the workspace's id and the preview
+untouched; then ends both and lets the section's own remake go ahead.
+
+**Known limits, written down:**
+
+- Between the last look and the stop — tens of milliseconds — another
+  launcher can start something in the workspace, and it is ended. Narrowed,
+  not closed. Closing it needs a lock every launcher and the app honour.
+- The host launcher is matched on its words, not its folder: another working
+  folder's `preview.sh` for the SAME course and section makes an orphan here
+  count as open (a refusal, never a kill).
+- A preview started through the assistant over MCP may meet its client's own
+  tool timeout during a ten-minute wait for a build.
+- Work that hangs inside the workspace costs a ten-minute wait and a refusal,
+  every time, until this Mac is restarted. Quitting Plantoir does NOT clear
+  it: the quit path stops a workspace only when it is idle, and one with hung
+  work in it counts as busy and is left running (documentation/09-mac-app.md).
+
+**What was rejected, and why:**
+
+- **The #156 work leases as the signal.** A launcher's own caller already
+  holds one — a publish takes its build and publish leases before its
+  launchers run — so a remake would see its own run as busy, and telling the
+  caller's lease from another's needs a pid the pty in between hides. A
+  command-line run writes none. And a lease says "may be about to"; a remake
+  ends only what EXISTS, which `docker top` sees directly in 23 ms. Leases
+  stay the app's tool for "do not start a build"; this is "do not end a
+  running one".
+- **Refuse at once, no wait.** A publish and a build end by themselves;
+  refusing a scheduled publish because another section's build had forty
+  seconds left is a failure made out of nothing.
+- **Wait for ever.** A serving preview never ends; a wedged daemon never
+  answers.
+- **Keep using the old workspace and remake later.** Fine for a missing
+  live-reload port on a publish; wrong for the rest — a wrong mount or a
+  missing builds mount builds into the wrong place, and an old image runs the
+  OLD recipe while looking healthy.
+- **Count every `build_site.py` preview as open** (the plan as first
+  written). Orphans are real and common enough to have their own trail event
+  (`section processes reclaimed`); counting them would refuse for ever.
+- **Exempt this section's own preview** (the run would end it anyway). The app
+  already waits for its own stop before starting a preview, so only a second
+  command-line run of the same section meets it; one rule is easier to trust
+  than two.
+- **`docker rm -f` anywhere, and stop or remove by name** — the id race above.
+- **A test-only knob for the waits** in a teacher's launcher — a pretend
+  `sleep` does it without one.
+- **The launcher writing the trail line itself**, as #280's and #189's lines
+  do. It would cover command-line runs, but the event would have no app call
+  site and two writers for one sentence.
 
 ### How a folder is NAMED to the container, and why it is not `-v`
 

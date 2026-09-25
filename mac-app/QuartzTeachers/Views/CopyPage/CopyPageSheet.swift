@@ -380,6 +380,13 @@ struct CopyPageSheet: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
+            if !outcome.sourceSettingsUnreadable.isEmpty {
+                Text(CopyPageWording.theSourcesSettingsCouldNotBeRead(
+                    names: outcome.sourceSettingsUnreadable
+                ))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
             if !outcome.linksLeadingNowhere.isEmpty {
                 Text(CopyPageWording.theseLinksWillNotLeadAnywhereYet(
                     names: outcome.linksLeadingNowhere
@@ -675,6 +682,9 @@ struct CopyPageSheet: View {
         }
         if !outcome.skipped.isEmpty {
             line += "; \(outcome.skipped.count) not copied"
+        }
+        if !outcome.sourceSettingsUnreadable.isEmpty {
+            line += "; \(outcome.sourceSettingsUnreadable.count) copied hidden because the settings they came with could not be read"
         }
         if !outcome.couldNotBeRemoved.isEmpty {
             // The one thing in this line that asks the teacher to DO

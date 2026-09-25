@@ -1995,6 +1995,403 @@
       },
       "why" : "GitHub issue #225. A teacher pressed Preview, the progress bar filled, the builder said its server was listening, and the app then waited ten minutes and said nothing at all — no sentence, no line on the trail, the section still reporting itself as building. The website was built and was being served the whole time; that Mac had stopped passing new addresses through. Every part of this rule exists because of one half of that: the bound is on the quiet because the run was not slow, the question is put to the builder because guessing between the two causes would have told a teacher their pages were broken when they were not, and the run is stopped because leaving it holding a port while saying nothing is the state the report was made about."
     },
+    "whenTheWorkspaceIsInUse" : {
+      "appliesOn" : [
+        "mac"
+      ],
+      "appliesOnWhy" : "PERMANENT: Windows builds natively — there is no `docker` in setup.ps1, preview.ps1 or deploy.ps1 — so it has no workspace to remake and nothing to wait for.",
+      "idRace" : {
+        "rule" : "Stopped and removed by the id read at the start. A remove that fails because that id is gone is no failure (another launcher removed it); a remove that fails with it still there is tried once more two seconds later, then the run stops with hostBlockClash.saysWhenAStartIsRefused. At the making, a refusal because a workspace by this name already exists (Docker: 'is already in use by container') waits two seconds, uses that workspace if it is running, else tries the making once more — and a second such refusal stops the run with the same sentence, never with the home-folder advice a mount refusal gets.",
+        "why" : "Two launchers remaking together (two previews started after an update) both find the old workspace idle. By NAME, the slower one's stop and remove landed on the NEW workspace the faster one had just made — #94's shape one step down. By id they land on the old one, already gone. Plan review 2026-09-25 (F4): without the conflict branch the slower launcher's `docker run` was refused with the name taken and told the teacher to keep their folder inside their home folder."
+      },
+      "rule" : "Before ANY launcher removes this folder's workspace to make it again — for any of the reasons it has (made for another folder, no builds mount, an older recipe, no live-reload addresses, a courses folder it cannot write, a connection gone stale) — it looks at what is running inside it. Nothing: it is remade at once, as before. A build or a publish: it is waited for, looking every lookEverySeconds, and refused after workSeconds. A preview whose launcher is still running on this Mac: refused after previewSeconds, naming the preview. It is then stopped and removed BY ID, never by name and never with -f. One function does all of this for every launcher, remake_the_workspace in the PREVIEW PORT BLOCK, and each of the launchers' twenty places that remade a workspace calls it; the old shared workspace (teaching-quartz) is retired only when nothing is running in it, and otherwise left, silently.",
+      "sentences" : {
+        "exitCode" : 1,
+        "whenAPreviewIsOpen" : [
+          "❌ The preview of {course} section {section} from this folder is still open, and this folder's workspace needs updating before Plantoir can go on.",
+          "   Close that preview — in Plantoir, or wherever it was started — then try again. Nothing was changed."
+        ],
+        "whenTheRemoveFails" : "hostBlockClash.saysWhenAStartIsRefused — the same sentence, after one retry two seconds later, when the old workspace is still there and will not go. It is ALSO what a second name conflict says (idRace).",
+        "whenWorkDidNotFinish" : [
+          "❌ Something in this folder was still being built or published after ten minutes, so Plantoir stopped rather than interrupt it.",
+          "   Try again once it has finished. Nothing was changed."
+        ],
+        "whileWaiting" : "⏳ Something in this folder is still running. Plantoir will update this folder's workspace as soon as it has finished…",
+        "why" : "Printed by all three launchers, each once. 'Workspace' is already a teacher's word here (#280's sentences). No machinery words (rule 1). whileWaiting is said once, however long the wait. 'Nothing was changed' is true: nothing has been stopped when either refusal is said."
+      },
+      "sequences" : {
+        "cases" : [
+          {
+            "expect" : "remade",
+            "looks" : [
+              "nothing"
+            ],
+            "name" : "nothing running: remade at once",
+            "waited" : 0
+          },
+          {
+            "expect" : "remade",
+            "looks" : [
+              "other work",
+              "other work",
+              "nothing"
+            ],
+            "name" : "a build that finishes: waited for, then remade",
+            "waited" : 4
+          },
+          {
+            "expect" : "remade",
+            "looks" : [
+              "a preview",
+              "nothing"
+            ],
+            "name" : "a preview closed a moment ago: waited for, then remade",
+            "waited" : 2
+          },
+          {
+            "expect" : "refused: a preview",
+            "looks" : [
+              "a preview"
+            ],
+            "name" : "a preview left open",
+            "waited" : 20
+          },
+          {
+            "expect" : "refused: other work",
+            "looks" : [
+              "other work"
+            ],
+            "name" : "work that never finishes",
+            "waited" : 600
+          },
+          {
+            "expect" : "refused: a preview",
+            "looks" : [
+              "other work",
+              "other work",
+              "other work",
+              "other work",
+              "other work",
+              "other work",
+              "other work",
+              "other work",
+              "other work",
+              "other work",
+              "other work",
+              "a preview"
+            ],
+            "name" : "a preview opened while a build was being waited for",
+            "waited" : 22
+          }
+        ],
+        "why" : "What the looks add up to, run through the REAL remake_the_workspace against a pretend engine by scripts/test_port_blocks.py. `looks` are what each look finds, the last one repeating. `waited` is the seconds counted before the outcome."
+      },
+      "trailMarker" : "The launcher prints `PLANTOIR_WORKSPACE_IN_USE: <waited|preview|work> <seconds> <course>/<section or setup> [<the open preview's course>/<section>]` when it waited or refused, and the app writes the trail line from it — shared-rules.json -> activityTrail.mustRecord.\"workspace was in use\". A remake with nothing running prints nothing.",
+      "waiting" : {
+        "lookEverySeconds" : 2,
+        "previewSeconds" : 20,
+        "why" : "600 s is the wait a publish set for later already gives a busy course (#156, shared-rules.json -> workLeases.declining.whyTheScheduledPublishWaits), so a scheduled publish and the launcher it runs give up on the same horizon. 20 s is the app's quit path's wait (secondsToWaitForWorkToFinish), for the same race: a preview closed a moment ago may still be ending when the next launcher looks. A preview that is open does not end on its own, so waiting ten minutes for one would only delay the same refusal. Counted in looks, not read from a clock (a test replaces `sleep`). A publish set for later meets the preview rule like any other run: it WAITS for a build or publish and STANDS DOWN on an open preview — it never ends one, consistent with #156.",
+        "workSeconds" : 600
+      },
+      "whatCountsAsRunning" : {
+        "cases" : [
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "name" : "idle: only its own first process",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ]
+            ]
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "name" : "stopped: not asked what runs in it",
+            "running" : false,
+            "top" : "not asked"
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "name" : "gone",
+            "running" : "gone",
+            "top" : "not asked"
+          },
+          {
+            "expect" : "a preview",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh ICS4U 1"
+            ],
+            "name" : "a preview being built, its launcher running",
+            "preview" : "ICS4U/1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8081"
+              ]
+            ]
+          },
+          {
+            "expect" : "a preview",
+            "launchers" : [
+              "/bin/bash ./preview.sh ics4u 1"
+            ],
+            "name" : "a preview serving, with what it started, launcher typed by hand in lower case",
+            "preview" : "ICS4U/1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8081"
+              ],
+              [
+                220,
+                210,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081"
+              ],
+              [
+                230,
+                220,
+                "/opt/quartz/node_modules/@esbuild/linux-arm64/bin/esbuild --service=0.25.1 --ping"
+              ]
+            ]
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "name" : "a preview whose launcher has gone",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8081"
+              ],
+              [
+                220,
+                210,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081"
+              ],
+              [
+                230,
+                220,
+                "/opt/quartz/node_modules/@esbuild/linux-arm64/bin/esbuild --service=0.25.1 --ping"
+              ]
+            ]
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh ICS4U 1 --stop"
+            ],
+            "name" : "a preview whose launcher is only stopping it",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8081"
+              ],
+              [
+                220,
+                210,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081"
+              ]
+            ]
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh ICS4U 2"
+            ],
+            "name" : "a preview of another section is not this launcher's",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8081"
+              ]
+            ]
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh ICS4U 1"
+            ],
+            "name" : "a website builder serving with nothing above it",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                220,
+                1,
+                "node /tmp/quartz-builds/ICS4U/section1/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081"
+              ],
+              [
+                230,
+                220,
+                "/opt/quartz/node_modules/@esbuild/linux-arm64/bin/esbuild --service=0.25.1 --ping"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh ICS4U 2 --build-only"
+            ],
+            "name" : "a build for publishing",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=2 --port 8082 --build-only"
+              ],
+              [
+                320,
+                310,
+                "node /tmp/quartz-builds/ICS4U/section2/quartz/bootstrap-cli.mjs build --concurrency 1"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+
+            ],
+            "name" : "a publish",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc tok=$(cat /tmp/deploy_pat); python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+
+            ],
+            "name" : "another launcher checking the courses folder",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                510,
+                1,
+                "sh -lc mkdir -p /teaching/courses && echo ok >/teaching/courses/.write_probe && rm -f /teaching/courses/.write_probe"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+
+            ],
+            "name" : "running, but could not be asked",
+            "running" : true,
+            "top" : "fails"
+          },
+          {
+            "expect" : "a preview",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh ICS4U 1"
+            ],
+            "name" : "an open preview wins over a publish",
+            "preview" : "ICS4U/1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8081"
+              ],
+              [
+                410,
+                1,
+                "python3 /opt/scripts/deploy.py --host-os mac --course ICS4U --section 2"
+              ]
+            ]
+          }
+        ],
+        "knownLimits" : "Another working folder's preview.sh for the SAME course and section makes an orphan here count as open (the words are all that is matched; the folder is not). And between the last look and the stop — tens of milliseconds — another launcher can start something in the workspace, which is then ended: narrowed, not closed. Closing it needs a lock every launcher and the app honour, which is what #156's work leases are for, and they are the app's.",
+        "rule" : "One look answers one of three: 'nothing' (not running, gone, or only its own first process), 'a preview' (build_site.py WITHOUT --build-only, with everything it started, AND a preview.sh for that course and section running on this Mac other than this run), or 'other work' (anything else, and a running workspace that `docker top` did not answer). An open preview wins over other work, because waiting cannot end it. A preview whose launcher has gone counts as nothing, and so does a website builder serving with no build_site.py above it, with whatever it started.",
+        "whyTheLauncherIsAsked" : "Measured 2026-09-25 (plan review): killing the host side of `docker exec` leaves the process running inside the workspace, parented to the engine's shim. That is how a preview is left behind when the app is force-quit, a Terminal window is closed or an assistant's client exits. Counted as an open preview it would refuse every remake of that folder for ever, with nothing a teacher could close; the stop rule's own sweep (section processes reclaimed) exists because this happens. The host launcher is matched on the two words after preview.sh — the course, in either case, and the section — because a command-line run names the launcher by a relative path; a --stop or --build-only run is not a preview; and this run, its ancestors and its descendants are left out (a login shell wrapping it carries the same words). A process table that cannot be read counts as the launcher running: a refused remake is recoverable, a killed preview is what #94 is."
+      },
+      "why" : "GitHub #94. Removing a workspace ends everything running inside it, and until this every one of those places stopped it without looking (setup.sh 8, preview.sh 5, deploy.sh 7, plus the three that retired the old shared workspace with -f). A preview open in one window died when another launcher in the same folder remade the workspace — after an update changed the recipe, once per folder for the builds mount, on a publish whose connection had gone stale — and a build or a publish half-way through was killed. The look is the app's own quit rule (documentation/09-mac-app.md: a workspace listing more than its first process is busy, and one that cannot be asked counts as busy), so the app and the launchers agree on what 'running' means. Measured on the development Mac 2026-09-25: an idle workspace lists exactly one process (tail -f /dev/null), `docker top` prints whole command lines, one look costs 23 ms, and a STOPPED workspace cannot be asked at all (exit 1) — hence 'stopped' is checked first. By id: two launchers started together can both find the old workspace idle, and a stop by NAME from the slower one would land on the new workspace the faster one has just made."
+    },
     "whenThisMacCannotReachTheBuilder" : {
       "attempts" : 20,
       "attemptsWhenThisRunStartedTheBuilder" : 60,
