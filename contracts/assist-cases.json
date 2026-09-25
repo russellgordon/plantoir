@@ -516,10 +516,10 @@
         "tool" : "add_next_class"
       },
       {
-        "becauseNotThis" : "A one-digit hour with no am or pm is morning or evening and nobody can tell which. A deploy set twelve hours wrong is a site that updates after the class it was meant for, so the doubt goes to the model rather than being resolved by a coin toss.",
+        "becauseNotThis" : "A one-digit hour with no am or pm is morning or evening and nobody can tell which. A deploy set twelve hours wrong is a site that updates after the class it was meant for, so nothing is scheduled: the app asks which, in code, naming the two sentences this family accepts, and the model is never sent it. Every sentence that is asked about rather than answered is in deployAtATime.asked.",
         "example" : "deploy at 6:30 am",
         "fills" : {
-          "when" : "<time> as HH:mm, with the day word in front of it when one was said — settled into a whole moment where the call is made, not here. Every accepted and refused spelling is in deployAtATime."
+          "when" : "<time> as HH:mm, with the day word in front of it when one was said — settled into a whole moment where the call is made, not here. Every accepted, asked and refused spelling is in deployAtATime."
         },
         "notThis" : "deploy at 6:30",
         "shape" : "[please] deploy [it|this section] [today|tomorrow] at <time> [today|tomorrow]",
