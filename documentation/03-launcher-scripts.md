@@ -66,7 +66,8 @@ Every launcher derives the image from the folder's build recipe: the tag is
 
 Each working folder gets its own container, named
 `teaching-quartz-<hash>` where the hash is the first eight characters of
-`pwd -P | shasum -a 256` — so two folders (this year's courses and last
+`/bin/pwd -P | shasum -a 256` — the disk's own spelling of the folder; see
+"One folder, one spelling" below — so two folders (this year's courses and last
 year's, say) never repoint each other's mounts, and can preview at the same
 time. At creation the launcher walks upward for a free block of HOST ports
 (bases 8081, 8091, 8101 … 8471 — forty blocks of four site ports each, plus a
@@ -99,9 +100,111 @@ it refuses to free, and why".
   scans the whole argument list, since the flag follows the course and
   section.
 
-The scripts then ensure a container runtime is available (next section)
+The scripts then ensure a container runtime is available (section 3)
 and build the image locally if the recipe's tag is missing — nothing is
 ever pulled from a registry.
+
+### One folder, one spelling (GitHub #189)
+
+The same folder can reach a launcher spelled several ways: through a link, as
+`/tmp` for `/private/tmp`, by the firmlink `/System/Volumes/Data/…`, in the
+wrong case (a Mac's disk ignores case), or with an accented letter in the
+other Unicode form — é stored as one character by Terminal, a zip or a
+Windows PC, and as e + accent by Finder. The disk treats them all as one
+folder. Until #189 the launchers hashed bash's BUILT-IN `pwd -P`, which keeps
+the case and form it was HANDED, while the app hashed `realpath`, which
+returns the disk's. And the app cannot hand a launcher the disk's bytes even
+if it wants to: Foundation passes an accented name to a child process as
+e + accent whatever the disk stores (measured, `Process.arguments`). So a
+working folder with an accented name stored the Terminal way — or reached in
+another case — had two workspaces and two builds folders, one the app's and
+one the launchers', and each side cleared the other's builds as "a link that
+is not mine".
+
+**The fix is one line after each launcher's first `cd`**, identical in all
+three and checked by `scripts/test_folder_spelling.py`:
+
+```bash
+FOLDER_ID_AS_HANDED="$(pwd -P | shasum -a 256 | cut -c1-8)"
+cd "$(/bin/pwd -P)"
+```
+
+`/bin/pwd` asks the disk (`getcwd`), so after it `pwd`, `$(pwd)` and the id
+are the disk's spelling, and the id, the container's name, the builds folder
+and the `courses/` folder the container mounts all come from ONE spelling.
+The id line itself became `/bin/pwd -P | shasum` too, and so did the builds
+folder's `working-folder.txt` and `verify.sh`'s own derivations. The app asks
+the same question with `FolderIdentity.canonicalPath`
+([09](09-mac-app.md) → "One folder, however it is spelled").
+
+What was measured on this Mac (macOS 26.6, APFS, case-insensitive), `/bin/bash`
+3.2, against C `realpath` and `fcntl(F_GETPATH)`:
+
+| Spelling handed in | bash built-in `pwd -P` | `/bin/pwd -P` |
+|---|---|---|
+| the disk's own | same | same |
+| wrong case (`plantoircase`) | keeps the typed case | disk's case |
+| through a link | target | target |
+| `/tmp/…` | `/private/tmp/…` | `/private/tmp/…` |
+| `/System/Volumes/Data/Users/…` | keeps the prefix | `/Users/…` |
+| an NFC-stored name reached as NFD | NFD (typed bytes) | NFC (disk bytes) |
+| an NFD-stored (Finder-made) name typed NFC, upper case | typed | disk's |
+
+`/bin/pwd -P` and `F_GETPATH` agreed byte for byte on all 17 spellings tried
+(the table's, plus iCloud Drive, `~/Library/CloudStorage/Dropbox` and an
+external HFS+ disk, each in the right and the wrong case). `realpath`
+agreed on all but the firmlink, where it keeps `/System/Volumes/Data`.
+
+**Rejected:** `realpath(1)` and `python3 -c os.path.realpath` in the launcher
+(the second measured in the issue not to fold case, and Python is not there
+before setup has run); making the app imitate the built-in instead (the id
+would then depend on how the folder was reached, which is the bug, and the
+app's "typed" bytes are not even its own); `cd -P` (measured: also keeps the
+spelling). A reviewer showed that switching only the id line to `/bin/pwd`
+would have been worse than nothing: `HOST_COURSES="$(pwd)/courses"` would
+still hold the typed spelling, one container would be told two mount sources
+on alternate runs, and it would be stopped and recreated each time — a cold
+workspace (about two minutes) instead of a second one. Hence the `cd`.
+
+**The second copy is cleared away.** `clear_away_this_folders_other_spelling`,
+in the PREVIEW PORT BLOCK and called by each launcher just before it looks at
+its own workspace, handles what an old spelling left behind: if
+`FOLDER_ID_AS_HANDED` differs from the folder's id, a STOPPED
+`teaching-quartz-<that id>` is removed with a plain `docker rm` (never `-f`),
+and `builds/<that id>` is removed when its `working-folder.txt` names THIS
+folder (compared through `/bin/pwd -P`, since an old launcher wrote the typed
+spelling; an EMPTY note names no folder, because `cd ""` stays put and would
+read as this one) and no workspace, running or stopped, still mounts it. A RUNNING
+copy is left alone and named on the console — it may be an older launcher's
+publish in the middle of its work. Nothing is removed when Docker cannot be
+asked, and the teacher's courses are never touched. The console says what was
+cleared — the workspace, the built websites, or both, naming only what went —
+and the trail gets one line (`contracts/shared-rules.json` →
+`buildOutputLocation.aSecondSpellingIsClearedAway`, and
+`activityTrail` → "built site moved out of the working folder" →
+`launcherLineWhenASecondCopyIsClearedAway`). Rejected: doing it in the app at
+launch — a publish launchd started with the OLD `deploy.sh` could be building
+into that folder at that moment; moving the old folder's content to the new
+id — adoption under another name, for a build nothing vouches for (the two
+had been clearing each other), which `aBuildWithNoLinkIsNotAdopted` already
+refuses.
+
+**What a teacher pays, once.** Any launcher edit changes the image tag, which
+recreates every folder's container on its next run — this one included; an
+ordinary folder whose path is already in the disk's spelling keeps its id, its
+builds folder and its built websites. A folder that had the split builds from
+scratch once more (the builds folder the launchers now use is the app's, whose
+link the last launcher run had cleared), and never again. Known limits: a
+second copy that is RUNNING when the launcher looks keeps `docker ps` from
+being empty, so the app's quit leaves the virtual machine running until it
+stops ([09](09-mac-app.md) → "Quitting"); a spelling that is never used again
+leaves its stopped copy behind, holding one of the forty preview blocks, which
+the walk's second pass will take when nothing else is free; and one narrow
+race is open — an OLD launcher (a launchd publish still on the pre-refresh
+`deploy.sh`) that has made its builds folder but not yet started its stopped
+workspace can lose that folder to a new launcher handed the same old spelling
+at the same moment, costing that one publish a build
+(`buildOutputLocation.aSecondSpellingIsClearedAway.knownLimits`).
 
 ### How a folder finds its ports, and when it cannot
 

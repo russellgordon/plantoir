@@ -67,7 +67,7 @@ final class BuildOutputLocationTests: XCTestCase {
     // MARK: - Where it goes
 
     /// The folder identifier is the one the launchers derive with
-    /// `pwd -P | shasum -a 256 | cut -c1-8`, which is also the container's
+    /// `/bin/pwd -P | shasum -a 256 | cut -c1-8`, which is also the container's
     /// name — one derivation, so a folder's container and its builds folder
     /// cannot disagree about which folder they belong to.
     @MainActor
@@ -78,7 +78,7 @@ final class BuildOutputLocationTests: XCTestCase {
 
         let shell: Process = Process()
         shell.executableURL = URL(fileURLWithPath: "/bin/bash")
-        shell.arguments = ["-c", "cd \"$1\" && pwd -P | shasum -a 256 | cut -c1-8", "bash", path]
+        shell.arguments = ["-c", "cd \"$1\" && /bin/pwd -P | shasum -a 256 | cut -c1-8", "bash", path]
         let output: Pipe = Pipe()
         shell.standardOutput = output
         try shell.run()
@@ -479,14 +479,11 @@ final class BuildOutputLocationTests: XCTestCase {
             .appendingPathComponent(BuildOutputLocation.workingFolderMarkerName)
         let recorded: String = try String(contentsOf: marker, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        // POSIX realpath, not Foundation's resolvingSymlinksInPath(): under
-        // /var/folders the two disagree about the /private prefix, and the
-        // launchers' `pwd -P` keeps it.
-        var physical: String = workingFolder.path
-        if let resolved = realpath(workingFolder.path, nil) {
-            physical = String(cString: resolved)
-            free(resolved)
-        }
+        // The disk's own spelling, as the launchers' `/bin/pwd -P` writes it
+        // (#189) — not Foundation's resolvingSymlinksInPath(), which drops
+        // the /private prefix under /var/folders.
+        let physical: String = FolderIdentity.canonicalPath(workingFolder.path)
+        XCTAssertTrue(physical.hasPrefix("/private/"), "the /private case is the one this pins")
         XCTAssertEqual(recorded, physical)
     }
 

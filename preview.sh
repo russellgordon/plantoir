@@ -20,6 +20,28 @@ fi
 # Ensure we're in the same directory as this script
 cd "$(dirname "$0")"
 
+# ---- One spelling of this folder (GitHub #189) ------------------------
+# Identical in setup.sh, preview.sh and deploy.sh, straight after the line
+# above, and checked there by scripts/test_folder_spelling.py.
+#
+# The same folder can arrive here spelled several ways: through a link, as
+# /tmp for /private/tmp, as /System/Volumes/Data/…, in the wrong case, or
+# with an accented letter in the other Unicode form (the app hands a
+# launcher é as e + accent whatever the disk stores). bash's own `pwd -P`
+# keeps the case and the form it was HANDED; /bin/pwd asks the disk, and
+# answers with the folder's own name — the same answer the app gets
+# (FolderIdentity.canonicalPath). Moving into that spelling here means the
+# folder's id, its workspace's name, the builds folder and the courses
+# folder the workspace mounts all come from ONE spelling, whoever ran this
+# and however they typed it. Without it, two spellings of one folder had
+# two workspaces and two builds folders, and each cleared the other's.
+#
+# The id the spelling we were handed WOULD have had is kept, so the
+# leftovers of that second copy can be cleared away (see
+# clear_away_this_folders_other_spelling).
+FOLDER_ID_AS_HANDED="$(pwd -P | shasum -a 256 | cut -c1-8)"
+cd "$(/bin/pwd -P)"
+
 # Arguments
 COURSE="$1"
 SECTION="$2"
@@ -314,8 +336,9 @@ fi
 # (this year's courses and last year's, say) each get their own container
 # and never repoint each other's mounts. The same derivation is used by
 # the macOS app; the trailing newline from pwd is part of the hashed
-# input, so keep `pwd -P | shasum` exactly as written.
-WORKDIR_ID="$(pwd -P | shasum -a 256 | cut -c1-8)"
+# input, so keep `/bin/pwd -P | shasum` exactly as written — /bin/pwd, not
+# bash's own `pwd -P`, for the reason given at the top of this file.
+WORKDIR_ID="$(/bin/pwd -P | shasum -a 256 | cut -c1-8)"
 CONTAINER_NAME="teaching-quartz-${WORKDIR_ID}"
 
 # >>> BUILD OUTPUT BLOCK >>> — identical in setup.sh, preview.sh and
@@ -357,7 +380,7 @@ BUILD_ROOT="${HOME%/}/Library/Application Support/Plantoir/builds/${WORKDIR_ID}"
 # could never be recognised as abandoned.
 ensure_build_root() {
   mkdir -p "$BUILD_ROOT" 2>/dev/null || true
-  printf '%s\n' "$(pwd -P)" > "$BUILD_ROOT/working-folder.txt" 2>/dev/null || true
+  printf '%s\n' "$(/bin/pwd -P)" > "$BUILD_ROOT/working-folder.txt" 2>/dev/null || true
 }
 
 # Adds one line to the breadcrumb trail the app keeps, so that a move done by
@@ -1183,6 +1206,109 @@ start_the_existing_workspace() {
   echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
   exit 1
 }
+
+# ---- The second copy another spelling of this folder left (GitHub #189) --
+# Until #189 a launcher named this folder by the spelling it was HANDED
+# (bash's own `pwd -P`), so a folder reached in the wrong case, by the
+# firmlink, or with an accented letter in the other Unicode form had a
+# second workspace — teaching-quartz-<FOLDER_ID_AS_HANDED> — and a second
+# builds folder, builds/<FOLDER_ID_AS_HANDED>, beside the ones the app used.
+# Every launcher now names it by the disk's own spelling, so nothing makes
+# that copy any more; this clears away what is left of it, the next time
+# the folder is used under the spelling that made it.
+#
+# Only ever the copy for THIS folder under the spelling this run was handed,
+# and only what nothing is using:
+#   - a workspace that is RUNNING is left exactly as it is, and named on the
+#     console: it may be an older launcher's publish in the middle of its
+#     work. It stops when this Mac restarts (or Plantoir stops its
+#     workspaces), and is cleared away on a later run. Until then it keeps
+#     `docker ps` from being empty, so quitting Plantoir leaves the virtual
+#     machine running (documentation/09-mac-app.md).
+#   - a STOPPED one is removed with a plain `docker rm` — never -f, which is
+#     what would kill one another launcher started a moment ago.
+#   - the builds folder is removed only when its note of which folder it
+#     serves names THIS folder, and no workspace, running or stopped, still
+#     mounts it. A builds folder is derived — every file in it is made again
+#     by the next build — and the teacher's courses are never touched.
+# When Docker cannot be asked, nothing is removed. The console says what
+# was cleared away and the trail gets one line (contracts/shared-rules.json
+# -> buildOutputLocation.aSecondSpellingIsClearedAway, and activityTrail).
+clear_away_this_folders_other_spelling() {
+  local old_id="${FOLDER_ID_AS_HANDED:-}"
+  local old_name old_builds everything running names mounted recorded workspace_gone builds_gone what
+  case "$old_id" in
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+    *) return 0 ;;
+  esac
+  if [ "$old_id" = "$WORKDIR_ID" ]; then
+    return 0
+  fi
+  old_name="teaching-quartz-${old_id}"
+  old_builds="${BUILD_ROOT%/*}/${old_id}"
+  if ! everything="$(docker ps -a --format '{{.Names}}' 2>/dev/null)" \
+    || ! running="$(docker ps --format '{{.Names}}' 2>/dev/null)"; then
+    return 0
+  fi
+  # Matched as whole lines by `case` rather than by `grep -q`, which can end
+  # the pipe early and read as "not there" under pipefail.
+  workspace_gone=false
+  builds_gone=false
+  case $'\n'"$everything"$'\n' in
+    *$'\n'"$old_name"$'\n'*)
+      case $'\n'"$running"$'\n' in
+        *$'\n'"$old_name"$'\n'*)
+          echo "ℹ️  A second copy of this folder's workspace, made under another spelling of the folder's name, is still running (${old_name})."
+          echo "   Plantoir is leaving it as it is, and will clear it away once it has stopped."
+          return 0 ;;
+      esac
+      if ! docker rm "$old_name" >/dev/null 2>&1; then
+        return 0
+      fi
+      workspace_gone=true ;;
+  esac
+  if [ -f "$old_builds/working-folder.txt" ]; then
+    recorded="$(head -n 1 "$old_builds/working-folder.txt" 2>/dev/null || true)"
+    # An EMPTY note names no folder: `cd ""` stays where it is, and would
+    # read as this one.
+    if [ -n "$recorded" ]; then
+      recorded="$( (cd "$recorded" 2>/dev/null && /bin/pwd -P) || true)"
+    fi
+    if [ -n "$recorded" ] && [ "$recorded" = "$(/bin/pwd -P)" ]; then
+      # Names are teaching-quartz-<8 hex digits>, so splitting on spaces is
+      # safe. A question Docker does not answer counts as "still mounted",
+      # so it removes nothing.
+      mounted="$old_builds"
+      if names="$(docker ps -a --filter 'name=^teaching-quartz-' --format '{{.Names}}' 2>/dev/null)"; then
+        names="$(printf '%s' "$names" | tr '\n' ' ')"
+        if [ -z "${names// /}" ]; then
+          mounted=""
+        else
+          # shellcheck disable=SC2086
+          mounted="$(docker inspect -f '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}' $names 2>/dev/null)" || mounted="$old_builds"
+        fi
+      fi
+      case $'\n'"$mounted"$'\n' in
+        *$'\n'"$old_builds"$'\n'*) ;;
+        *)
+          rm -rf -- "$old_builds"
+          builds_gone=true ;;
+      esac
+    fi
+  fi
+  # The sentence names only what was removed.
+  if [ "$workspace_gone" = true ] && [ "$builds_gone" = true ]; then
+    what="a second copy of this working folder's workspace and built websites"
+  elif [ "$workspace_gone" = true ]; then
+    what="a second copy of this working folder's workspace"
+  elif [ "$builds_gone" = true ]; then
+    what="a second copy of this working folder's built websites"
+  else
+    return 0
+  fi
+  echo "🧹 Cleared away ${what}, left behind under another spelling of the folder's name. Nothing in your courses was touched."
+  note_on_the_trail "${WORKSPACE_TRAIL_PLACE:-setup} · cleared away ${what}, left under another spelling of its name"
+}
 # <<< PREVIEW PORT BLOCK <<<
 # Where the refusal above is filed on the trail: this run's course and section.
 WORKSPACE_TRAIL_PLACE="${COURSE}/${SECTION}"
@@ -1241,6 +1367,7 @@ DESIRED_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null 
 RUNNING_IMAGE_ID=$(docker inspect -f '{{.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
 
 echo "🚀 Starting container if needed..."
+clear_away_this_folders_other_spelling
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   # Container exists — check its current /teaching/courses mount
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")

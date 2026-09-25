@@ -4,7 +4,8 @@ import Foundation
 ///
 /// Each working folder has its own container, named after a hash of the
 /// folder's path — the launchers derive the same name with
-/// `pwd -P | shasum -a 256`, so the trailing newline is part of the hashed
+/// `/bin/pwd -P | shasum -a 256` (the disk's own spelling of the folder —
+/// `FolderIdentity`, #189), so the trailing newline is part of the hashed
 /// input here too. When the last window using a folder closes, that
 /// folder's container is stopped: it holds no content (everything lives on
 /// the host) and restarts in about a second on the next preview, so keeping
