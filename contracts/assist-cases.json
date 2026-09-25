@@ -101,6 +101,13 @@
       },
       {
         "arguments" : {
+          "when" : "tomorrow"
+        },
+        "phrasing" : "publish tomorrow's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
           "when" : "monday"
         },
         "phrasing" : "publish monday's class",
@@ -150,6 +157,55 @@
       },
       {
         "arguments" : {
+          "when" : "monday"
+        },
+        "phrasing" : "publish monday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "tuesday"
+        },
+        "phrasing" : "publish tuesday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "wednesday"
+        },
+        "phrasing" : "publish wednesday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "thursday"
+        },
+        "phrasing" : "publish thursday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "friday"
+        },
+        "phrasing" : "publish friday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "saturday"
+        },
+        "phrasing" : "publish saturday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
+          "when" : "sunday"
+        },
+        "phrasing" : "publish sunday's meeting",
+        "tool" : "publish_class_on"
+      },
+      {
+        "arguments" : {
 
         },
         "phrasing" : "what pages are in this section?",
@@ -160,6 +216,13 @@
 
         },
         "phrasing" : "add the next class page",
+        "tool" : "add_next_class"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "add the next meeting page",
         "tool" : "add_next_class"
       },
       {
@@ -202,6 +265,34 @@
 
         },
         "phrasing" : "when is my next class",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "when are my next meetings?",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "when are my next meetings",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "when is my next meeting?",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "when is my next meeting",
         "tool" : "read_remembered_timetable"
       },
       {
@@ -269,6 +360,27 @@
       },
       {
         "arguments" : {
+          "revise" : "yes"
+        },
+        "phrasing" : "i have a revised list of meeting dates",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+          "revise" : "yes"
+        },
+        "phrasing" : "i have a new list of meeting dates",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
+          "revise" : "yes"
+        },
+        "phrasing" : "change my meeting dates",
+        "tool" : "read_remembered_timetable"
+      },
+      {
+        "arguments" : {
 
         },
         "phrasing" : "re-date my classes",
@@ -279,6 +391,20 @@
 
         },
         "phrasing" : "redate my classes",
+        "tool" : "re_date_classes"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "re-date my meetings",
+        "tool" : "re_date_classes"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "redate my meetings",
         "tool" : "re_date_classes"
       },
       {
@@ -365,6 +491,27 @@
         },
         "notThis" : "duplicate Unit 3, Day 2",
         "shape" : "duplicate <page title> as my next class",
+        "tool" : "add_next_class"
+      },
+      {
+        "becauseNotThis" : "'day' would put the number in the unit slot, so a Unit/Day course would read 'at day 5' as Unit 5. It goes to the model, which can ask which unit.",
+        "example" : "make room for one meeting at Week 5",
+        "fills" : {
+          "howMany" : "<count>, as a number — words up to twelve are understood",
+          "unit" : "<number> — the one number a numbered course's page names carry. <word> is not read: this table cannot know a course's own word, so any single word except 'day' is taken, and a Unit/Day course given a unit and no day asks which day rather than guessing one"
+        },
+        "notThis" : "make room for one meeting at day 5",
+        "shape" : "make room for <count> class|classes|meeting|meetings at <word> <number>",
+        "tool" : "make_room_for_classes"
+      },
+      {
+        "becauseNotThis" : "The closing half is what makes the sentence unambiguous, exactly as in 'as my next class'.",
+        "example" : "duplicate Week 3 as my next meeting",
+        "fills" : {
+          "duplicate" : "<page title>, with the capitals the teacher typed"
+        },
+        "notThis" : "duplicate Week 3",
+        "shape" : "duplicate <page title> as my next meeting",
         "tool" : "add_next_class"
       },
       {
