@@ -707,6 +707,35 @@ separately from the reader:
   reached by the fixed reader or writer at all — neither calls `setting`. The
   rule above is the app's rule; these three are where it is not yet kept.
 
+  **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
+  `PageFrontmatter.settingCreated` (every re-date, move, insert and the
+  section index pointer) and `settingTitle` (renames, the unit-word rename)
+  replaced a key's line alone, and so did `SectionAdder`'s copy of a section's
+  landing page and its scaffold. Measured with python-frontmatter 1.3.0 /
+  PyYAML 6.0.3: a date or title below its key, folded, or quoted over two
+  lines read on the site as the new value and the old one JOINED
+  (`2026-09-24T07:00:00.000-0400 2026-09-08T07:00:00.000-0400`,
+  `Unit 1, Day 2 Unit 1, Day 1`, `Unit 1, Day 2 Day 1"`), and a `# note`
+  between key and value STOPPED the build — while the app read the new value,
+  so the two disagreed about a class's day in silence. None is a visibility
+  key, so none could publish a hidden page; each needed a hand-typed shape.
+  All four now go through `PageFrontmatter.replacingKeyLine`, which asks
+  `continuationLineIndices` BEFORE replacing the line (with `keyValueWasEmpty`
+  from the reader's matcher), removes bottom-up, and keeps the line's `\r`;
+  `SectionAdder` walks its replacements from the bottom of the block so a
+  removal never moves a key still to come. Cases: `file-formats.json` →
+  `datesAndTitles.writingCases` (10, whole-file, with `expectSiteReads`),
+  run as bytes by `FileFormatsContractTests` and re-checked against the real
+  build in the image by `scripts/check_dates_and_titles_against_the_site.py`.
+  **Not in it, recorded:** an all-indented block still declines silently (the
+  #186 decision about an indented root mapping — `rawValue` cannot read that
+  page's date either); duplicate keys — the writer and `rawValue` take the
+  FIRST `created:`, PyYAML keeps the LAST (measured) — is a separate
+  disagreement; and the time of a folded or below-key date is not read, so the
+  rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows'
+  `SetTitle`/`SetCreated` still replace one line (the `windows` issue from
+  #199).
+
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a
   `publish: "false # why"` page left an unbalanced quote — frontmatter the
