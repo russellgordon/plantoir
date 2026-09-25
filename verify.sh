@@ -286,9 +286,9 @@ else
 fi
 
 if (cd scripts && python3 test_stop_quietly.py) >/tmp/verify_stop_quietly_test.log 2>&1; then
-  pass "pressing Stop ends a build quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
+  pass "pressing Cancel ends a build or a publish quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
 else
-  fail "pressing Stop ends a build quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
+  fail "pressing Cancel ends a build or a publish quietly, exit 130 and no traceback (scripts/test_stop_quietly.py)"
   cat /tmp/verify_stop_quietly_test.log
 fi
 
