@@ -663,9 +663,10 @@ which is not a new list. The two `atBuildTime` lists DO have a Windows reader
 seven `dateCases` with a `pointAt` are owed by Windows' own pointer.
 
 **Re-taken 2026-09-25 with [#242](https://github.com/russellgordon/plantoir/issues/242)**
-(what backups take, and deleting several), on the tree merged with `origin/dev`
-634182d7 (#235, #275 and #276 already in). The walker read **174** there and
-reads **177** after: `course-management.json` → `backups.pruneCases` (3),
+(what backups take, and deleting several), counted ON THIS BRANCH — which
+carries `origin/dev` 634182d7 (#235, #275 and #276), not whatever `dev` holds
+when it merges; re-take it then. On this branch the walker read **174** before
+#242's lists and **177** after: `course-management.json` → `backups.pruneCases` (3),
 `.sizeCases` (2) and `.deleteCases` (3), none with a Windows reader, all in the
 table below; and `activityTrail.mustRecord` grew from 71 to 72 (`backups
 deleted`), which is not a new list.

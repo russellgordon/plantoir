@@ -52,8 +52,9 @@ struct AllBackupsView: View {
                         Text(madeBy(item))
                     }
                     TableColumn("Size") { item in
-                        Text(workspace.sizeDescription(of: item) ?? "—")
+                        Text(workspace.shortSizeDescription(of: item) ?? "—")
                             .monospacedDigit()
+                            .help(workspace.sizeDescription(of: item) ?? "")
                     }
                 }
                 .accessibilityIdentifier("allBackupsTable")
@@ -65,7 +66,12 @@ struct AllBackupsView: View {
                     Button(deleteButtonTitle, role: .destructive) {
                         workspace.backupsDeleteRequest = selectedItems
                     }
-                    .disabled(selectedItems.isEmpty)
+                    // Disabled when nothing selected can go — including a
+                    // selection of held backups only (the delete would keep
+                    // them all, so there is nothing to confirm).
+                    .disabled(WorkspaceModel.deletableCount(
+                        of: selectedItems, heldPaths: WorkspaceModel.heldBackupPaths()
+                    ) == 0)
                     .accessibilityIdentifier("deleteSelectedBackupsButton")
                 }
             }
@@ -170,10 +176,11 @@ struct AllBackupsView: View {
         return "\(share.courseCode) — \(share.count) \(noun), \(BackupSizes.description(ofBytes: share.bytes))"
     }
 
-    /// "1 backup: size could not be read, so it is not in the total".
+    /// "1 backup — Size could not be read, so it is not in the total". The
+    /// wording key is rendered exactly as written, never re-cased.
     func unsizedLine(_ count: Int) -> String {
         let noun: String = count == 1 ? "backup" : "backups"
-        return "\(count) \(noun): " + AssistWording.backupSizeCouldNotBeRead.lowercased()
+        return "\(count) \(noun) — " + AssistWording.backupSizeCouldNotBeRead
     }
 
     /// Who made a backup, short enough for a column.

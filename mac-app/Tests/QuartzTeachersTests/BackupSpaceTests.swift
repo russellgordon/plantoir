@@ -128,6 +128,8 @@ final class BackupSpaceTests: XCTestCase {
         XCTAssertEqual(space.unsizedCount, 1)
         XCTAssertEqual(space.totalBytes, 300)
         XCTAssertEqual(model.sizeDescription(of: gone), AssistWording.backupSizeCouldNotBeRead)
+        // The Size column gets the SHORT form; the sentence is its tooltip.
+        XCTAssertEqual(model.shortSizeDescription(of: gone), AssistWording.backupSizeCouldNotBeReadShort)
     }
 
     /// The confirmation says, BEFORE anything is deleted, that the open
@@ -159,6 +161,61 @@ final class BackupSpaceTests: XCTestCase {
         XCTAssertTrue(message.contains("It takes \(BackupSizes.description(ofBytes: 1_000_000))."), message)
         XCTAssertFalse(message.contains(BackupSizes.description(ofBytes: 10_000_000)), message)
         XCTAssertTrue(message.contains("One of these is kept: the assistant for ICS3U Section 2 is open"), message)
+    }
+
+    /// A selection of held backups ONLY has nothing to delete, so the button
+    /// is disabled — never a confirmation saying "deletes them for good" that
+    /// then deletes nothing.
+    func testASelectionOfHeldBackupsOnlyHasNothingToDelete() throws {
+        let root: URL = try makeWorkingFolder()
+        let own: URL = try makeBackup(named: "ICS3U_backup_2026-09-01_120000.zip", course: "ICS3U", bytes: 1, in: root)
+        let held: URL = try makeBackup(
+            named: "ICS3U_backup_2026-09-02_120000_assistant-section2.zip", course: "ICS3U", bytes: 1, in: root
+        )
+        let model: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        model.chooseWorkspace(at: root)
+        AssistActivity.begin(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 2)
+        AssistActivity.holdBackups(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 2) {
+            return [held]
+        }
+        let heldPaths: Set<String> = WorkspaceModel.heldBackupPaths()
+
+        XCTAssertEqual(WorkspaceModel.deletableCount(of: try items(named: [held], in: model), heldPaths: heldPaths), 0)
+        XCTAssertEqual(WorkspaceModel.deletableCount(of: try items(named: [own, held], in: model), heldPaths: heldPaths), 1)
+    }
+
+    /// The single "Delete Backup…" on the held backup refuses at once, with the
+    /// multi-delete's own sentence, offers no confirmation, and deletes nothing.
+    func testTheSingleDeleteOfAHeldBackupRefusesAsTheMultiDeleteDoes() throws {
+        let root: URL = try makeWorkingFolder()
+        let own: URL = try makeBackup(named: "ICS3U_backup_2026-09-01_120000.zip", course: "ICS3U", bytes: 1, in: root)
+        let held: URL = try makeBackup(
+            named: "ICS3U_backup_2026-09-02_120000_assistant-section2.zip", course: "ICS3U", bytes: 1, in: root
+        )
+        let model: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        model.chooseWorkspace(at: root)
+        AssistActivity.begin(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 2)
+        AssistActivity.holdBackups(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 2) {
+            return [held]
+        }
+        let heldItem: BackupItem = try items(named: [held], in: model)[0]
+
+        model.requestDeleteBackup(heldItem)
+
+        XCTAssertNil(model.backupDeleteRequest, "a confirmation was offered for a backup that will not be deleted")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: held.path))
+        let multiSentence: String? = WorkspaceModel.problem(with: WorkspaceModel.BackupDeletion(
+            deleted: [], keptForTheAssistant: [heldItem], failed: []
+        ))
+        XCTAssertNotNil(multiSentence)
+        XCTAssertEqual(model.backupProblem, multiSentence)
+
+        // Any other backup still gets the usual confirmation.
+        model.backupProblem = nil
+        let ownItem: BackupItem = try items(named: [own], in: model)[0]
+        model.requestDeleteBackup(ownItem)
+        XCTAssertEqual(model.backupDeleteRequest, ownItem)
+        XCTAssertNil(model.backupProblem)
     }
 
     // MARK: - Deleting several

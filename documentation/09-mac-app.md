@@ -3772,7 +3772,14 @@ is kept in sync by a cloud service, and a table of every backup — course, when
 who made it, size — with ordinary macOS multiple selection (⌘-click, ⇧-click)
 and ONE button whose label carries the count ("Delete 3 Backups…"). It goes
 through a confirmation with the single delete's honesty: for good, nothing
-kept, the courses untouched, and what they take together.
+kept, the courses untouched, and what they take together. **A backup the open
+assistant conversation holds** (below) is named in that confirmation as KEPT,
+and "Together they take" counts only what will actually go
+(`WorkspaceModel.deleteConfirmation`); a selection of held backups ONLY has
+nothing to delete, so the button is disabled rather than offering a
+confirmation that deletes nothing. The sidebar's and the pane's single "Delete
+Backup…" on a held backup offers no confirmation at all: it refuses at once
+with the same sentence the multi-delete uses (`requestDeleteBackup`).
 
 **Measured, on this Mac.** Russell's real working folder, read-only
 (`~/Desktop/Class Websites - 2026-27/courses/_backups`, `stat` only, nothing
@@ -3794,9 +3801,16 @@ not compile inside an async function), and `BackupSpaceTests` reads it.
 `WorkspaceModel.reloadCourses` lists backups synchronously as before, then
 starts a numbered measurement; one that finishes after a newer one was started
 is thrown away (`finishMeasuringBackupSizes`), so a slow first measurement
-landing after a delete cannot put back sizes for zips that are gone. A total
-missing any backup is not shown at all (`BackupSpace.isComplete`): a number that
-is quietly too small is worse than none. No GCD hop and no sleep anywhere.
+landing after a delete cannot put back sizes for zips that are gone. While a
+measurement is still running no total is shown — "Working out how much space
+these backups take…" — because a number that is quietly too small is worse
+than none (`BackupSpace.isComplete`). Once it has FINISHED, a backup it could
+not size (deleted in Finder between listing and measuring, or unreadable) is
+not "still being worked out": it shows the short `backupSizeCouldNotBeReadShort`
+in the Size column and the full `backupSizeCouldNotBeRead` in its tooltip, its
+pane and a line under the total, and the total — which IS then shown — leaves it
+out. Without that, one unreadable zip would leave "Working out…" up for ever.
+No GCD hop and no sleep anywhere.
 
 **The LOGICAL size, never the size on this disk.** Russell's working folder is
 in iCloud Drive (Desktop & Documents sync is on), and an evicted file takes
