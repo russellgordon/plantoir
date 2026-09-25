@@ -278,9 +278,15 @@ struct SidebarView: View {
                     // are safety nets the teacher made on purpose, not
                     // things put away.
                     Section(isExpanded: $workspace.isShowingBackups) {
+                        // Every backup at once: what they take, and a way to
+                        // delete several (#242). First, so it is found before
+                        // the list it summarises.
+                        Label("All Backups", systemImage: "square.stack.3d.up")
+                            .tag(SidebarSelection.allBackups)
+                            .accessibilityIdentifier("allBackups")
                         ForEach(workspace.backupItems) { item in
                             Label(item.title, systemImage: item.symbolName)
-                                .help(item.subtitle)
+                                .help(backupHelp(for: item))
                                 .tag(SidebarSelection.backup(item.id))
                                 .accessibilityIdentifier("backup-\(item.id)")
                                 .contextMenu {
@@ -297,8 +303,19 @@ struct SidebarView: View {
                                 }
                         }
                     } header: {
-                        Text("Backups")
-                            .accessibilityIdentifier("backupsGroup")
+                        // The total beside the name, once every backup has
+                        // been measured — the space is what a teacher could
+                        // not see before (#242).
+                        HStack {
+                            Text("Backups")
+                            Spacer()
+                            if workspace.backupSpace.isComplete {
+                                Text(BackupSizes.description(ofBytes: workspace.backupSpace.totalBytes))
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("backupsTotal")
+                            }
+                        }
+                        .accessibilityIdentifier("backupsGroup")
                     }
                 }
 
@@ -442,11 +459,7 @@ struct SidebarView: View {
             Button("Cancel", role: .cancel) {
             }
         } message: { item in
-            Text("""
-                This deletes the backup for good — unlike removing a course, nothing is kept.
-
-                \(item.courseCode) itself is not touched.
-                """)
+            Text(singleBackupDeleteMessage(for: item))
         }
         .alert(
             "Delete this archive of \(workspace.archiveDeleteRequest?.title ?? "")?",
@@ -826,6 +839,25 @@ struct SidebarView: View {
                 }
             }
         )
+    }
+
+    /// A backup's tooltip: when, who, and — once measured — what it takes.
+    func backupHelp(for item: BackupItem) -> String {
+        guard let size = workspace.sizeDescription(of: item) else {
+            return item.subtitle
+        }
+        return item.subtitle + " · " + size
+    }
+
+    /// The single delete's confirmation, with what the backup takes once it
+    /// has been measured.
+    func singleBackupDeleteMessage(for item: BackupItem) -> String {
+        var message: String = "This deletes the backup for good — unlike removing a course, nothing is kept."
+        if let size = workspace.sizeDescription(of: item) {
+            message += " It takes \(size)."
+        }
+        message += "\n\n\(item.courseCode) itself is not touched."
+        return message
     }
 
     var backupDeleteRequestIsPresented: Binding<Bool> {
@@ -1376,7 +1408,7 @@ struct SidebarView: View {
             // The minus button removes live courses; an archived item is
             // already put away.
             return
-        case .backup:
+        case .backup, .allBackups:
             // Deleting a backup is a real deletion, so it happens only
             // through its own explicit menu item, never the minus button.
             return
