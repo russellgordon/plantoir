@@ -888,7 +888,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 fills: [
                     "when": "<time> as HH:mm, with the day word in front of it when one was said — "
                           + "settled into a whole moment where the call is made, not here. Every "
-                          + "accepted and refused spelling is in deployAtATime.",
+                          + "accepted, asked and refused spelling is in deployAtATime.",
                 ],
                 example: "deploy at 6:30 am",
                 notThis: "deploy at 6:30",
