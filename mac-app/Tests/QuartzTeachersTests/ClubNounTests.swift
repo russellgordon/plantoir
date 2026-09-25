@@ -134,6 +134,24 @@ final class ClubNounTests: XCTestCase {
         }
     }
 
+    /// "When are my next meetings?" — the answer the teacher reads is in the
+    /// course's noun, and the copy the model keeps in its history is not.
+    func testTheDatesAnswerIsInTheCoursesNounForTheTeacherOnly() async throws {
+        let club = try makeClub(noun: .meeting)
+        defer { try? FileManager.default.removeItem(at: club.root) }
+        let arguments: [String: Any] = ["course": "ICS3U", "section": 1]
+
+        try setNoun(.class, in: club.course)
+        let asClass: AssistToolOutcome = await run(club.runner, "read_remembered_timetable", arguments)
+        try setNoun(.meeting, in: club.course)
+        let asMeeting: AssistToolOutcome = await run(club.runner, "read_remembered_timetable", arguments)
+
+        XCTAssertEqual(asMeeting.detail, asClass.detail)
+        XCTAssertEqual(asClass.summary, asClass.detail)
+        XCTAssertTrue(asMeeting.summary.contains("meeting"), asMeeting.summary)
+        XCTAssertFalse(saysClass(asMeeting.summary), asMeeting.summary)
+    }
+
     /// A course that says nothing hears exactly what it heard before #267.
     func testAnOrdinaryCourseHearsTheSameSentences() {
         XCTAssertEqual(

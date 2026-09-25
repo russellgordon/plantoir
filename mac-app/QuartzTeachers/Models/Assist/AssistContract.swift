@@ -319,6 +319,48 @@ enum AssistContract {
             "movesToTheFirstDayForAMeeting": AssistWording.movesToTheFirstDay(
                 page: pagePlaceholder, to: "2026-09-08", noun: .meeting
             ),
+            "datesToFindADaysPage": AssistWording.datesToFindADaysPage(),
+            "datesToFindADaysPageForAMeeting": AssistWording.datesToFindADaysPage(noun: .meeting),
+            "datesToReplace": AssistWording.datesToReplace(for: "\(course) Section \(section)"),
+            "datesToReplaceForAMeeting": AssistWording.datesToReplace(
+                for: "\(course) Section \(section)", noun: .meeting
+            ),
+            "datesForTheNextPage": AssistWording.datesForTheNextPage(),
+            "datesForTheNextPageForAMeeting": AssistWording.datesForTheNextPage(noun: .meeting),
+            "datesToDuplicate": AssistWording.datesToDuplicate(),
+            "datesToDuplicateForAMeeting": AssistWording.datesToDuplicate(noun: .meeting),
+            "datesToReDate": AssistWording.datesToReDate(),
+            "datesToReDateForAMeeting": AssistWording.datesToReDate(noun: .meeting),
+            "theSemesterBegins": AssistWording.theSemesterBegins(
+                on: "Tuesday, 2026-09-08", showing: 3
+            ),
+            "theSemesterBeginsForAMeeting": AssistWording.theSemesterBegins(
+                on: "Tuesday, 2026-09-08", showing: 3, noun: .meeting
+            ),
+            "allScheduledDatesHaveConcluded": AssistWording.allScheduledDatesHaveConcluded(
+                count: 12, for: "\(course) Section \(section)", last: "Tuesday, 2026-12-15"
+            ),
+            "allScheduledDatesHaveConcludedForAMeeting": AssistWording.allScheduledDatesHaveConcluded(
+                count: 12, for: "\(course) Section \(section)", last: "Tuesday, 2026-12-15", noun: .meeting
+            ),
+            "yourNextUpcoming": AssistWording.yourNextUpcoming(
+                count: 3, for: "\(course) Section \(section)"
+            ),
+            "yourNextUpcomingForAMeeting": AssistWording.yourNextUpcoming(
+                count: 3, for: "\(course) Section \(section)", noun: .meeting
+            ),
+            "pagesAcrossTheDates": AssistWording.pagesAcrossTheDates(
+                for: "\(course) Section \(section)", pages: 4, dates: 12, spare: 8
+            ),
+            "pagesAcrossTheDatesForAMeeting": AssistWording.pagesAcrossTheDates(
+                for: "\(course) Section \(section)", pages: 4, dates: 12, spare: 8, noun: .meeting
+            ),
+            "everyDateIsSpokenFor": AssistWording.everyDateIsSpokenFor(),
+            "everyDateIsSpokenForForAMeeting": AssistWording.everyDateIsSpokenFor(noun: .meeting),
+            "theNextWouldFallOn": AssistWording.theNextWouldFallOn("2026-09-14 (Monday)"),
+            "theNextWouldFallOnForAMeeting": AssistWording.theNextWouldFallOn(
+                "2026-09-14 (Monday)", noun: .meeting
+            ),
             "reDated": AssistWording.reDated(count: 12, pagesTheyUse: 5),
             "reDatedForAMeeting": AssistWording.reDated(count: 12, pagesTheyUse: 5, noun: .meeting),
         ]
