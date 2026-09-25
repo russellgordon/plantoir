@@ -1765,14 +1765,24 @@ def _extract_wikilink_targets(text: str) -> set[str]:
             targets.add(norm_path)
     return targets
 
-def _find_class_reachable_pages(content_root: Path) -> set[Path]:
+# Pages a link can never land on: a folder's own index, and the two pages
+# every section carries. A class does not "bring" them, whatever it links to.
+_STRUCTURAL_PAGE_NAMES = ("index.md", "key links.md", "curriculum coverage.md")
+
+
+def _read_pages_for_linking(content_root: Path):
     """
-    Find all pages in content_root that are reachable (directly or transitively)
-    from any Unit x, Day y class page via wikilinks.
+    Every page in content_root, with the two lookups a wikilink is resolved
+    through: by its path relative to content_root, and by its bare stem.
+
+    Shared by `_find_class_reachable_pages` and `_date_pages_from_their_classes`
+    so that "which pages does this class bring?" has ONE answer in the build —
+    the page the first pass leaves alone as reachable is the page the second
+    pass dates.
     """
     pages_by_stem: dict[str, list[Path]] = {}
     pages_by_rel: dict[str, Path] = {}
-    all_pages: dict[Path, frontmatter.Post] = {}
+    all_pages: dict[Path, "frontmatter.Post"] = {}
 
     for root, dirs, files in os.walk(content_root):
         for name in files:
@@ -1786,7 +1796,7 @@ def _find_class_reachable_pages(content_root: Path) -> set[Path]:
                 continue
 
             stem_lower = fp.stem.lower()
-            if name.lower() not in ("index.md", "key links.md", "curriculum coverage.md"):
+            if name.lower() not in _STRUCTURAL_PAGE_NAMES:
                 pages_by_stem.setdefault(stem_lower, []).append(fp)
             try:
                 rel = fp.relative_to(content_root).as_posix().lower()
@@ -1795,6 +1805,38 @@ def _find_class_reachable_pages(content_root: Path) -> set[Path]:
                 pages_by_rel[rel] = fp
             except Exception:
                 pass
+
+    return all_pages, pages_by_stem, pages_by_rel
+
+
+def _pages_a_page_links_to(post, pages_by_stem, pages_by_rel) -> list[Path]:
+    """
+    The pages one page's wikilinks resolve to, by relative path and by stem —
+    never a structural page and never a class page, so a walk built on this
+    stops AT a class rather than continuing through it (#173).
+    """
+    linked: list[Path] = []
+    for target in _extract_wikilink_targets(post.content):
+        matched_paths = []
+        if target in pages_by_rel:
+            matched_paths.append(pages_by_rel[target])
+        if target in pages_by_stem:
+            matched_paths.extend(pages_by_stem[target])
+
+        for target_fp in matched_paths:
+            if target_fp.name.lower() in _STRUCTURAL_PAGE_NAMES or _is_class_page(target_fp):
+                continue
+            if target_fp not in linked:
+                linked.append(target_fp)
+    return linked
+
+
+def _find_class_reachable_pages(content_root: Path) -> set[Path]:
+    """
+    Find all pages in content_root that are reachable (directly or transitively)
+    from any Unit x, Day y class page via wikilinks.
+    """
+    all_pages, pages_by_stem, pages_by_rel = _read_pages_for_linking(content_root)
 
     class_page_paths: list[Path] = []
     for fp, post in all_pages.items():
@@ -1811,20 +1853,10 @@ def _find_class_reachable_pages(content_root: Path) -> set[Path]:
         if post is None:
             continue
 
-        targets = _extract_wikilink_targets(post.content)
-        for target in targets:
-            matched_paths = []
-            if target in pages_by_rel:
-                matched_paths.append(pages_by_rel[target])
-            if target in pages_by_stem:
-                matched_paths.extend(pages_by_stem[target])
-
-            for target_fp in matched_paths:
-                if target_fp.name.lower() in ("index.md", "key links.md", "curriculum coverage.md") or _is_class_page(target_fp):
-                    continue
-                if target_fp not in visited:
-                    visited.add(target_fp)
-                    queue.append(target_fp)
+        for target_fp in _pages_a_page_links_to(post, pages_by_stem, pages_by_rel):
+            if target_fp not in visited:
+                visited.add(target_fp)
+                queue.append(target_fp)
 
     return visited
 
@@ -1852,13 +1884,16 @@ def _sync_non_class_pages_created(content_root: Path, first_class_dt: datetime) 
             except Exception:
                 continue
 
-            # The root section landing page (content/index.md) carries the date of
-            # the section's newest published class; it is never reset to the first day.
+            # The root section landing page (content/index.md) is never reset to
+            # the first day: it carries the date of the class its embed names,
+            # which `_date_pages_from_their_classes` gives it on every build.
             if fp == content_root / "index.md":
                 continue
             title = str(post.get("title") or "")
             if _is_class_page(fp, title):
                 continue
+            # A page a class brings is dated from that class instead, by
+            # `_date_pages_from_their_classes`, which runs straight after this.
             if fp in reachable_from_classes:
                 continue
 
@@ -1875,6 +1910,128 @@ def _sync_non_class_pages_created(content_root: Path, first_class_dt: datetime) 
                     pass
 
     return (updated, total_non_class)
+
+
+def _class_embed_target(line: str) -> str | None:
+    """
+    The page a front-page line transcludes, lowercased, or None when the line
+    is not a transclusion. The same rule as the app's pointer
+    (`contracts/class-planning.json` → `sectionIndexPointer.found`): the
+    line's trimmed text is `![[…]]`, the target is what comes before any `|`
+    display name or `#` heading, after any folder path.
+    """
+    trimmed = line.strip()
+    if not (trimmed.startswith("![[") and trimmed.endswith("]]")):
+        return None
+    inside = trimmed[3:-2]
+    target = inside.split("|")[0].split("#")[0].strip()
+    bare = target.split("/")[-1].strip()
+    return bare.lower() if bare else None
+
+
+def _date_pages_from_their_classes(content_root: Path) -> tuple[str | None, int]:
+    """
+    Give the site's front page, and every page a visible class brings, the
+    date of their class (GitHub #275 and #276). Runs on EVERY build, over the
+    build's own copy (`content_root`) — the teacher's files are never touched.
+
+    1. The front page (`content_root/index.md`) takes the `created` of the
+       class page its embed names — the first `![[…]]` line naming one of
+       this build's class pages, found the way the app's pointer finds it —
+       when that class is VISIBLE and dated. A front page with no class embed,
+       or whose embed names a hidden or undated class, keeps its own date.
+    2. A page a visible, dated class brings — reached by following links from
+       the class, never through or onto another class page — takes the date
+       of the EARLIEST such class (ties by title), even over a date of its
+       own. Russell's choice (A), 2026-09-24: the date a site shows for a page
+       a class brings is the day it was first taught, and a page duplicated
+       from a template carries the template's install-day stamp, which no
+       other writer ever moves once the page is visible.
+
+    The value is copied VERBATIM rather than re-formatted: converting it to
+    Toronto time can move the calendar day of a timestamp near midnight UTC,
+    and the page must show the same day as its class.
+
+    Returns (the front page's new `created` or None when it kept its own,
+    the number of other pages whose date changed).
+    """
+    all_pages, pages_by_stem, pages_by_rel = _read_pages_for_linking(content_root)
+
+    # This build's class pages, by title and by file name.
+    class_pages_by_name: dict[str, Path] = {}
+    for fp, post in all_pages.items():
+        title = str(post.get("title") or "")
+        if _is_class_page(fp, title):
+            class_pages_by_name[fp.stem.strip().lower()] = fp
+            if title.strip():
+                class_pages_by_name[title.strip().lower()] = fp
+
+    def visible_date_of(class_fp: Path):
+        """The class's `created`, when students can see it and it has one."""
+        post = all_pages[class_fp]
+        if _is_draft(frontmatter.dumps(post)):
+            return None
+        raw = post.get("created")
+        if _parse_created_value(raw) is None:
+            return None
+        return raw
+
+    def write(fp: Path, post) -> bool:
+        try:
+            with open(fp, "w", encoding="utf-8") as f:
+                f.write(frontmatter.dumps(post))
+            return True
+        except Exception:
+            return False
+
+    # 1. The front page.
+    front_page_created = None
+    front_page = content_root / "index.md"
+    front_post = all_pages.get(front_page)
+    if front_post is not None:
+        for line in front_post.content.split("\n"):
+            target = _class_embed_target(line)
+            if target is None or target not in class_pages_by_name:
+                continue
+            named_created = visible_date_of(class_pages_by_name[target])
+            if named_created is not None and front_post.get("created") != named_created:
+                front_post["created"] = named_created
+                if write(front_page, front_post):
+                    front_page_created = named_created
+            break
+
+    # 2. The pages each visible class brings, earliest class first.
+    dated_classes = []
+    for class_fp in set(class_pages_by_name.values()):
+        created = visible_date_of(class_fp)
+        if created is None:
+            continue
+        title = str(all_pages[class_fp].get("title") or class_fp.stem).strip().lower()
+        dated_classes.append((_parse_created_value(created), title, class_fp, created))
+    dated_classes.sort(key=lambda entry: (entry[0], entry[1]))
+
+    claimed: set[Path] = set()
+    changed = 0
+    for class_dt, class_title, class_fp, class_created in dated_classes:
+        seen: set[Path] = {class_fp}
+        queue: list[Path] = [class_fp]
+        while queue:
+            current = queue.pop(0)
+            for linked_fp in _pages_a_page_links_to(all_pages[current], pages_by_stem, pages_by_rel):
+                if linked_fp in seen:
+                    continue
+                seen.add(linked_fp)
+                queue.append(linked_fp)
+                if linked_fp in claimed:
+                    continue
+                claimed.add(linked_fp)
+                linked_post = all_pages[linked_fp]
+                if linked_post.get("created") != class_created:
+                    linked_post["created"] = class_created
+                    if write(linked_fp, linked_post):
+                        changed += 1
+
+    return (front_page_created, changed)
 # ===========================================================================
 
 
@@ -4280,7 +4437,8 @@ def _is_draft(text: str) -> bool:
     existing course may carry it — but an explicit `publish` always wins.
 
     The text this runs over has ALREADY been through `process_frontmatter`:
-    the only caller is the curriculum-coverage map, which walks the merged
+    its callers are the curriculum-coverage map and the date pass for the
+    pages a class brings (`_date_pages_from_their_classes`), which walk the merged
     `content/` tree. So the per-section keys are gone, `draft:` has been
     deleted, and PyYAML has rewritten any real boolean as lowercase `false`.
     The `draft` branch below is therefore unreachable for anything the build
@@ -5314,6 +5472,12 @@ def build_section_site(
     else:
         updated, total = _sync_non_class_pages_created(content_root, first_class_dt)
         print(f"📆 Synced non-class pages 'created' → {first_class_stamp} for {updated} file(s) ({total} non-class file(s) in total).")
+    # The front page and the pages a class brings take their CLASS's date
+    # (#275, #276) — on every build, whichever way the class was published.
+    front_page_created, linked_dated = _date_pages_from_their_classes(content_root)
+    if front_page_created is not None:
+        print(f"📆 The front page now carries the date of the class it shows ({front_page_created}).")
+    print(f"📆 Dated {linked_dated} page(s) from the first class that links to them.")
     # ===========================================================================
 
     # Copy course config into output root (back-compat)
