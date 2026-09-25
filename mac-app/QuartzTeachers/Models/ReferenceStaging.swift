@@ -204,8 +204,9 @@ enum ReferenceStaging {
             let recorded: (name: String?, start: String?) = ProcessLiveness.recordedFacts(
                 inLeaseText: text
             )
+            let judgedName: String? = ProcessLiveness.nameToCompare(recorded: recorded.name, kind: "import")
             if ProcessLiveness.ownerIsAlive(
-                pid: pid, recordedName: recorded.name, recordedStart: recorded.start
+                pid: pid, recordedName: judgedName, recordedStart: recorded.start
             ) {
                 someoneIsAlive = true
                 continue
