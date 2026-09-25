@@ -1562,6 +1562,39 @@ class WorkspaceModel {
         performRename(course, to: requestedCode)
     }
 
+    /// Why what has been typed into a course's rename field cannot be used,
+    /// or nil when it can — the same rule the New Course wizard asks, in the
+    /// short words a sidebar row has room for.
+    ///
+    /// ONE function for both halves of the field: the reason drawn under it,
+    /// and Return's refusal in `renameFromTheField`. Two copies of this
+    /// check could drift until the field showed no problem and still beeped,
+    /// or showed one and renamed anyway.
+    func renameFieldProblem(_ course: Course, typed text: String) -> String? {
+        var existingCodes: [String] = []
+        for existingCourse in courses {
+            existingCodes.append(existingCourse.code)
+        }
+        return CourseCodeRule.shortProblem(text, existingCodes: existingCodes, currentCode: course.code)
+    }
+
+    /// Return in the rename field. False — and nothing changes — when the
+    /// code cannot be used: its reason is already under the field, so it is
+    /// not raised again as an alert, and the field stays open for another
+    /// try. True when the rename was handed on to `rename(_:to:)`, which
+    /// still has its own reasons to stop (a preview, an open Obsidian).
+    ///
+    /// A model function rather than a line in the field so a test can press
+    /// Return without the window: #293 was a test that waited for the
+    /// window instead, and lost the field to a focus change on the way.
+    func renameFromTheField(_ course: Course, typed text: String) -> Bool {
+        if renameFieldProblem(course, typed: text) != nil {
+            return false
+        }
+        rename(course, to: text)
+        return true
+    }
+
     /// Closes Obsidian, renames, and opens the vaults again — the answer to
     /// the question `rename` asked.
     ///
