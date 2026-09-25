@@ -737,7 +737,17 @@ separately from the reader:
   (ScannerError). `replacingKeyLine` now also takes lines until an open
   quote or bracket closes, at any indent (`linesUntilOpenValueCloses`: `"`
   honours a backslash escape and `'` a doubled quote; a quote that never
-  closes inside the block takes nothing). And a QUOTED date with a note after
+  closes inside the block takes nothing). Its limit, recorded rather than
+  fixed: "never closes" means never closes LEXICALLY — on a page that ALREADY
+  fails to build, a quote left open on one key can be closed by a quote on a
+  later key, and every line up to that one goes with the value (probe:
+  `title: "Unit 1,` then `description: say "hi"` — a ParserError before, a
+  page that builds with the new title and no `description:` after, which is
+  what YAML's own scanner makes of it). The scanner also ignores comments, so a
+  `'` inside a `# note` within a multi-line flow value, or an apostrophe in a
+  plain scalar in a flow list (`[teacher's day]`), opens a quote; every such
+  shape the review tried fell back harmlessly (to `continuationLineIndices`,
+  or to "never closes"). And a QUOTED date with a note after
   it (`created: "2026-09-08T09:30:00.000-0400" # moved`) was rewritten as
   `…-0400"` — `timeAndOffset` stripped quotes only from the two ends, so the
   closing quote stayed on the tail, and Quartz replaces a date it cannot read
