@@ -147,6 +147,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             return
         }
         let driver: HoldingUserDriver = HoldingUserDriver(hostBundle: Bundle.main, owner: self)
+        adopt(driver)
         let made: SPUUpdater = SPUUpdater(
             hostBundle: Bundle.main,
             applicationBundle: Bundle.main,
@@ -158,7 +159,6 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         // Plantoir somewhere else — a development feed by another name
         // (decision 5; the plan review's M4). Cleared every launch.
         _ = made.clearFeedURLFromUserDefaults()
-        userDriver = driver
         updater = made
         // The updater changes this on the main thread (it is a main-actor
         // type), so the observation is delivered there too.
@@ -174,6 +174,12 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
             let code: Int = (error as NSError).code
             ActivityTrail.note(.updateStopped, UpdateTrail.stoppedLine(version: nil, code: code))
         }
+    }
+
+    /// Remembers the wrapper, so a held install can close the updater's own
+    /// window. Separate from `start` so a test can hand in one of its own.
+    func adopt(_ driver: HoldingUserDriver) {
+        userDriver = driver
     }
 
     /// Check for Updates…, from the menu.
@@ -240,7 +246,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         showHeldNotice(work: work)
         watchTask?.cancel()
         watchTask = Task { @MainActor in
-            await AppUpdates.shared.waitUntilNothingIsUnderWay()
+            await self.waitUntilNothingIsUnderWay()
         }
     }
 
@@ -365,7 +371,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         forwardReady(.skip)
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(10))
-            AppUpdates.shared.finishWaitingQuit(heardBack: false)
+            self.finishWaitingQuit(heardBack: false)
         }
     }
 
@@ -626,15 +632,21 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
 
     // MARK: - Stored properties
 
-    private let standard: SPUStandardUserDriver
+    /// The updater's own windows — `SPUStandardUserDriver`, or a stand-in
+    /// a test hands in so nothing appears on screen.
+    private let standard: any SPUUserDriver
     private weak var owner: AppUpdates?
 
     // MARK: - Initializer
 
-    init(hostBundle: Bundle, owner: AppUpdates) {
-        self.standard = SPUStandardUserDriver(hostBundle: hostBundle, delegate: nil)
+    init(standard: any SPUUserDriver, owner: AppUpdates) {
+        self.standard = standard
         self.owner = owner
         super.init()
+    }
+
+    convenience init(hostBundle: Bundle, owner: AppUpdates) {
+        self.init(standard: SPUStandardUserDriver(hostBundle: hostBundle, delegate: nil), owner: owner)
     }
 
     // MARK: - Functions: the two that are not simply passed on
@@ -645,8 +657,8 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
             return
         }
         owner.updateIsReady(reply: reply)
-        standard.showReady { choice in
-            AppUpdates.shared.teacherAnsweredReady(choice)
+        standard.showReady { [weak owner] choice in
+            owner?.teacherAnsweredReady(choice)
         }
     }
 
@@ -728,7 +740,7 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
     }
 
     func showUpdateInFocus() {
-        standard.showUpdateInFocus()
+        standard.showUpdateInFocus?()
     }
 }
 
