@@ -426,7 +426,10 @@ nonisolated enum ActivityTrail {
         /// how long it had been saying nothing, and WHICH of the three things
         /// was true: the website builder was serving the site and this Mac
         /// could not reach it, nothing was serving it at all, or the builder
-        /// could not be asked and Plantoir does not know.
+        /// could not be asked and Plantoir does not know. Or — with no
+        /// silence waited out and nobody asked — that its website started and
+        /// no address for it was ever announced, so there was nothing to open
+        /// (issue #235; before it, a guessed address was tried instead).
         ///
         /// This is the line whose absence produced the report it exists for
         /// (issue #225). A teacher built three previews in four minutes, none
