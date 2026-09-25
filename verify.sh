@@ -157,12 +157,33 @@ take_verify_lock() {
       holder_line="$(cat "$VERIFY_LOCK/holder" 2>/dev/null || true)"
     fi
     holder_pid="${holder_line%% *}"
+    # A pause between reading the holder and acting on it, for
+    # scripts/test_verify_lock.py only: it is how the takeover race is made
+    # to happen every time rather than once in a thousand. Unset, nothing.
+    if [[ -n "${PLANTOIR_VERIFY_LOCK_TEST_PAUSE:-}" ]]; then
+      sleep "$PLANTOIR_VERIFY_LOCK_TEST_PAUSE"
+    fi
     if [[ -n "$holder_pid" ]] && ! kill -0 "$holder_pid" 2>/dev/null; then
-      echo "🧹 A verify.sh that is no longer running (pid $holder_pid) left its lock behind; taking it over."
-      rm -f "$VERIFY_LOCK/holder"
-      rmdir "$VERIFY_LOCK" 2>/dev/null || true
-      if ! mkdir "$VERIFY_LOCK" 2>/dev/null; then
+      # Taken over under a second lock, so that two runs finding the same
+      # dead holder cannot both win: without it, B's rmdir removed the new,
+      # still-empty lock A had just made, and both held it. Inside, the
+      # holder is read AGAIN and the lock is removed only if it still names
+      # the dead run.
+      local took_over="false"
+      if mkdir "$VERIFY_LOCK.takeover" 2>/dev/null; then
+        if [[ "$(cat "$VERIFY_LOCK/holder" 2>/dev/null || true)" == "$holder_line" ]]; then
+          echo "🧹 A verify.sh that is no longer running (pid $holder_pid) left its lock behind; taking it over."
+          rm -f "$VERIFY_LOCK/holder"
+          rmdir "$VERIFY_LOCK" 2>/dev/null || true
+          if mkdir "$VERIFY_LOCK" 2>/dev/null; then
+            took_over="true"
+          fi
+        fi
+        rmdir "$VERIFY_LOCK.takeover" 2>/dev/null || true
+      fi
+      if [[ "$took_over" != "true" ]]; then
         echo "❌ Another verify.sh took the lock at the same moment; run this one again when it has finished."
+        echo "   If nothing is running, remove $VERIFY_LOCK (and $VERIFY_LOCK.takeover if it is there)."
         exit 1
       fi
     else
@@ -295,9 +316,6 @@ else
   cat /tmp/verify_preview_sh_questions_test.log
 fi
 
-# preview.sh announces the address the app opens, or says it cannot and stops;
-# it never announces a port it guessed (GitHub #235). Runs the launcher's own
-# functions with docker answering as told, so it needs no Docker at all.
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
 else
@@ -312,6 +330,9 @@ else
   cat /tmp/verify_lock_test.log
 fi
 
+# preview.sh announces the address the app opens, or says it cannot and stops;
+# it never announces a port it guessed (GitHub #235). Runs the launcher's own
+# functions with docker answering as told, so it needs no Docker at all.
 if (cd scripts && python3 test_preview_address.py) >/tmp/verify_preview_address_test.log 2>&1; then
   pass "preview.sh announces the preview's real address or stops, never a guessed one (scripts/test_preview_address.py)"
 else

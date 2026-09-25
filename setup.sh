@@ -731,10 +731,11 @@ build_image_if_missing
 # ---- Where this folder's previews are served on this Mac ---------------
 # Every working folder's workspace publishes a BLOCK of eight host ports: four
 # for previews (base … base+3 -> 8081-8084 inside) and their four live-reload
-# websockets (base+1000 … base+1003 -> 9081-9084). A block is held for as long
-# as the workspace EXISTS — running or stopped, preview or no preview — so the
-# number of blocks is the number of working folders this Mac has ever opened
-# since it last restarted, not the number of previews.
+# websockets (base+1000 … base+1003 -> 9081-9084). A workspace keeps its
+# block for as long as it EXISTS — running or stopped, preview or no preview,
+# across restarts — and nothing removes another folder's workspace, so the
+# number of blocks spoken for is the number of working folders this Mac has
+# ever used (moved and deleted ones included), not the number of previews.
 #
 # The walk starts at 8081 and steps by 10 through FORTY blocks (8081 … 8471).
 # Until 2026-09-25 it tried six and stopped, and a Mac with six working
@@ -756,6 +757,17 @@ build_image_if_missing
 #     workspace listens on nothing, so without this a new folder would take
 #     its block and the stopped one could not start again (quitting Plantoir
 #     stops workspaces since #220, so that is an everyday path).
+#
+# TWO PASSES. The first counts all of that. Only when it finds nothing does a
+# second walk count what is actually IN USE — listening on this Mac, or
+# published by a RUNNING workspace — and take a block a STOPPED workspace was
+# keeping. That workspace is remade on free ports the next time its own
+# folder starts it (start_the_existing_workspace), at the cost of one slow
+# preview. Without the second pass a block would be kept for ever by a
+# folder that was moved, renamed or deleted — its workspace's name is a hash
+# of its path, so it can never be started again — and neither remedy the
+# refusal names (close the other folders' windows, restart the Mac) would
+# free anything, since both only STOP workspaces. With it, both do.
 FIRST_HOST_BLOCK=8081
 HOST_BLOCK_STEP=10
 HOST_BLOCK_COUNT=40
@@ -769,12 +781,17 @@ listening_ports_on_this_mac() {
     | sed -n 's/^n.*:\([0-9][0-9]*\)$/\1/p'
 }
 
-# Every host port published by another working folder's workspace, running
-# or stopped, one per line. This folder's own workspace is left out: it is
-# only ever made after the old one has been removed.
+# Every host port published by another working folder's workspace, one per
+# line: running or stopped, or with "running" as $1 only running ones. This
+# folder's own workspace is left out: it is only ever made after the old one
+# has been removed.
 ports_held_by_other_workspaces() {
-  local names
-  names="$(docker ps -a --filter 'name=^teaching-quartz-' --format '{{.Names}}' 2>/dev/null \
+  local names which="-a"
+  if [ "${1:-}" = "running" ]; then
+    which=""
+  fi
+  # shellcheck disable=SC2086
+  names="$(docker ps $which --filter 'name=^teaching-quartz-' --format '{{.Names}}' 2>/dev/null \
     | grep -Fxv -- "$CONTAINER_NAME" || true)"
   if [ -z "$names" ]; then
     return 0
@@ -786,12 +803,20 @@ ports_held_by_other_workspaces() {
 }
 
 # Prints the first free block's base, walking upward from $1 (default: the
-# first block) to the fortieth; fails when none is free.
+# first block) to the fortieth; fails when none is free. $2 is the pass:
+# "kept" (the first — stopped workspaces' blocks count as taken) or "in-use"
+# (the second — only what is listening or running counts).
 find_free_port_block() {
   local base="${1:-$FIRST_HOST_BLOCK}"
+  local pass="${2:-kept}"
   local last=$((FIRST_HOST_BLOCK + (HOST_BLOCK_COUNT - 1) * HOST_BLOCK_STEP))
-  local busy offset all_free
-  busy=" $(listening_ports_on_this_mac | tr '\n' ' ') $(ports_held_by_other_workspaces | tr '\n' ' ') "
+  local busy offset all_free held
+  if [ "$pass" = "in-use" ]; then
+    held="$(ports_held_by_other_workspaces running | tr '\n' ' ')"
+  else
+    held="$(ports_held_by_other_workspaces | tr '\n' ' ')"
+  fi
+  busy=" $(listening_ports_on_this_mac | tr '\n' ' ') $held "
   while [ "$base" -le "$last" ]; do
     all_free=true
     for offset in 0 1 2 3; do
@@ -824,9 +849,10 @@ it_was_a_port_clash() {
 # The sentence when all forty blocks are taken. Pinned word for word in
 # contracts/app-rules.json -> previewPorts.whenNoBlockIsFree. The old one
 # told a teacher to "stop another preview", which frees nothing: a block is
-# held by a workspace that EXISTS. Closing a folder's last window stops its
-# workspace; one a scheduled publish, a command line or an older Plantoir
-# left behind keeps its block until the Mac restarts — so both remedies.
+# held by a workspace that EXISTS. Both remedies it names are true because
+# of the walk's second pass: closing a folder's last window stops its
+# workspace, a restart stops every workspace, and a STOPPED workspace's block
+# is taken when nothing else is free.
 # The trail line is the existing `preview did not appear` event's second
 # launcher line (contracts/shared-rules.json -> activityTrail.mustRecord);
 # WORKSPACE_TRAIL_PLACE is "<course>/<section>" where the launcher has one.
@@ -843,9 +869,11 @@ say_there_is_no_room_for_previews() {
 # under this name a moment ago, mid-publish (#94's shape).
 create_the_workspace_on_free_ports() {
   local base="$FIRST_HOST_BLOCK"
-  local output
+  local next output
   while true; do
-    if ! base="$(find_free_port_block "$base")"; then
+    next="$base"
+    if ! base="$(find_free_port_block "$base" kept)" \
+      && ! base="$(find_free_port_block "$next" in-use)"; then
       say_there_is_no_room_for_previews
       exit 1
     fi
