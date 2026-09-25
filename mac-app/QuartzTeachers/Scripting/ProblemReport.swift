@@ -642,9 +642,12 @@ nonisolated struct ProblemReportStore {
         return ProblemReportStore(folderURL: ProblemReportStore.defaultFolderURL())
     }
 
-    /// True while XCTest is hosting the app.
+    /// True while XCTest is hosting the app. The same question
+    /// `RealHome.isInsideTestBundle` answers, asked in one place (#264) —
+    /// this used to read `XCTestConfigurationFilePath` from the environment,
+    /// a third definition of "under test" beside the two class lookups.
     static var isRunningTests: Bool {
-        return ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        return RealHome.isInsideTestBundle
     }
 
     /// One folder per test RUN rather than per call, so that a test which
@@ -663,7 +666,7 @@ nonisolated struct ProblemReportStore {
 
     /// `~/Library/Logs/Plantoir`.
     static func defaultFolderURL() -> URL {
-        let library: URL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+        let library: URL = RealHome.forFiles.appendingPathComponent("Library", isDirectory: true)
         return library.appendingPathComponent("Logs", isDirectory: true)
             .appendingPathComponent("Plantoir", isDirectory: true)
     }

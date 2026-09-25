@@ -7,14 +7,14 @@ final class FinderPathBarTests: XCTestCase {
 
     @MainActor
     func testAncestorPathsWalkFromRootToFolder() {
-        let url: URL = URL(fileURLWithPath: "/Users/russellgordon/Desktop/Class Websites")
+        let url: URL = URL(fileURLWithPath: "/Users/jordanteacher/Desktop/Class Websites")
         let paths: [String] = FinderPathBarView.ancestorPaths(for: url)
         XCTAssertEqual(paths, [
             "/",
             "/Users",
-            "/Users/russellgordon",
-            "/Users/russellgordon/Desktop",
-            "/Users/russellgordon/Desktop/Class Websites",
+            "/Users/jordanteacher",
+            "/Users/jordanteacher/Desktop",
+            "/Users/jordanteacher/Desktop/Class Websites",
         ])
     }
 

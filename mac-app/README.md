@@ -118,6 +118,19 @@ the file itself carries the stack, the numbers, and the levers that look like
 they should work and do not. If a test ever needs to watch a sheet ANIMATE, that
 is the thing standing in its way.
 
+**The suite never asks for the real home folder, and a test says so.** Only
+`QuartzTeachers/Models/RealHome.swift` may ask macOS where the home folder is;
+everything else takes `RealHome.forFiles`, which is the real home in the app
+and one throwaway folder while the unit suite hosts the process.
+`RealHomeTripwireTests` scans the product and test sources for every way to ask
+(`homeDirectoryForCurrentUser`, `URL.applicationSupportDirectory`,
+`expandingTildeInPath`, `getenv("HOME")`, a literal `"/Users/"` …) and fails
+naming the file and line. If it fails on something you just wrote, use
+`RealHome.forFiles` — or, in a test, a made-up home such as `/Users/teacher`.
+What it catches, what it cannot (a child process takes `HOME` from its
+environment), and the probes that were measured and rejected are in
+`documentation/09-mac-app.md` → "Testing: the real-home tripwire (#264)".
+
 There is also a conventional **XCUITest** suite (`QuartzTeachersUITests`)
 that drives the app with synthesized clicks. Running it requires a one-time
 macOS approval: the first run fails with "Timed out while enabling automation

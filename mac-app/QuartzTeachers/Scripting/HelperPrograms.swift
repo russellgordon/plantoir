@@ -69,7 +69,7 @@ nonisolated enum HelperPrograms {
     /// reason: the rule stays checkable without a test asserting anything
     /// about the teacher's real Application Support.
     static func binDirectory(
-        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder homeFolder: URL = RealHome.forFiles
     ) -> String {
         return homeFolder
             .appendingPathComponent("Library")
@@ -82,7 +82,7 @@ nonisolated enum HelperPrograms {
 
     /// Every directory Plantoir adds, in the order they are searched.
     static func searchDirectories(
-        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder homeFolder: URL = RealHome.forFiles
     ) -> [String] {
         var directories: [String] = [binDirectory(inHomeFolder: homeFolder)]
         for directory in sharedSearchDirectories {
@@ -99,7 +99,7 @@ nonisolated enum HelperPrograms {
     /// deliberately costs them a program they were relying on.
     static func pathValue(
         inheriting inherited: String?,
-        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder homeFolder: URL = RealHome.forFiles
     ) -> String {
         var parts: [String] = searchDirectories(inHomeFolder: homeFolder)
         let tail: String = (inherited ?? "").isEmpty ? pathWhenNothingWasInherited : (inherited ?? "")
@@ -111,7 +111,7 @@ nonisolated enum HelperPrograms {
     /// `PATH` replaced. `HOME` and everything else survive untouched.
     static func environment(
         basedOn inherited: [String: String] = ProcessInfo.processInfo.environment,
-        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder homeFolder: URL = RealHome.forFiles
     ) -> [String: String] {
         var result: [String: String] = inherited
         result["PATH"] = pathValue(inheriting: inherited["PATH"], inHomeFolder: homeFolder)
@@ -124,7 +124,7 @@ nonisolated enum HelperPrograms {
     /// has a space in it and a home folder can contain a quote; `$PATH` is
     /// left outside the quotes so the shell still expands it.
     static func exportLine(
-        inHomeFolder homeFolder: URL = FileManager.default.homeDirectoryForCurrentUser
+        inHomeFolder homeFolder: URL = RealHome.forFiles
     ) -> String {
         let directories: String = searchDirectories(inHomeFolder: homeFolder).joined(separator: ":")
         return "export PATH=" + shellQuoted(directories) + ":\"$PATH\""
