@@ -2464,6 +2464,7 @@ final class SharedRulesContractTests: XCTestCase {
         case .didNotFinish: return "didNotFinish"
         case .succeeded: return "succeeded"
         case .tooLateToRun: return "tooLateToRun"
+        case .courseWasBusy: return "courseWasBusy"
         }
     }
 
