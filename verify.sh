@@ -556,6 +556,22 @@ else
   cat /tmp/verify_visibility_site.log
 fi
 
+# ---- The date and title writers, against what the site reads ----
+# GitHub #199. `contracts/file-formats.json` -> `datesAndTitles.writingCases`
+# says what the built site reads from each page a writer produces; this runs
+# every `after` through the real process_frontmatter so that stays true.
+echo ""
+echo "🔎 Checking the date and title writing cases against what the real build reads…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_dates_and_titles_against_the_site.py" /opt/scripts/check_dates_and_titles_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_dates_and_titles_against_the_site.py \
+  >/tmp/verify_dates_titles_site.log 2>&1; then
+  pass "every datesAndTitles writing case reads on the site as the contract says (scripts/check_dates_and_titles_against_the_site.py)"
+else
+  fail "every datesAndTitles writing case reads on the site as the contract says (scripts/check_dates_and_titles_against_the_site.py)"
+  cat /tmp/verify_dates_titles_site.log
+fi
+
 # ---- The sidebar's hide rule, against the REAL Quartz file tree ----
 # Issue #265. Every `file-formats.json` -> `sidebarHiding.matchRule` case is
 # run through Quartz 4.5's own FileTrieNode with the filter text the build

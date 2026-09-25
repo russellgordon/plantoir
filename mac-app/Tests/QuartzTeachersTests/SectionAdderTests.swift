@@ -854,6 +854,50 @@ final class SectionAdderTests: XCTestCase {
         )
     }
 
+    /// A section's landing page copied into a new one, its date on the line
+    /// BELOW the key (GitHub #199): the new date replaces the old one whole.
+    /// Replacing the key's line alone left the old date underneath, and the
+    /// new section's page read the two dates joined.
+    @MainActor
+    func testACopiedLandingPageTakesADateBelowItsKeyAway() throws {
+        let (root, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let source: String = "---\ntitle:\n  Grade 11 Introduction to Computer Science, Section 1\n"
+            + "created:\n  2026-08-10T14:30:00.000-0400\npublish: true\n---\n# Most Recent Class\n"
+        let sourceURL: URL = course.sectionDirectoryURL(forSection: 1).appendingPathComponent("index.md")
+        try Data(source.utf8).write(to: sourceURL)
+        let destinationURL: URL = root.appendingPathComponent("copied-index.md")
+
+        try SectionAdder.replicateMarkdownFile(
+            from: sourceURL, to: destinationURL, relativePath: "index.md",
+            course: course, sectionNumber: 2, created: "2026-09-25T07:00:00.000-0400"
+        )
+
+        // The title below its key is not one `sectionTitle` can read, so the
+        // wizard's form stands in — and it too replaces the old title whole.
+        let expected: String = "---\ntitle: \(SectionAdder.sectionTitle(for: course, sectionNumber: 2))\n"
+            + "created: 2026-09-25T07:00:00.000-0400\npublish: true\n---\n# Most Recent Class\n"
+        XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), expected)
+    }
+
+    /// The same for the frontmatter a missing file is scaffolded from.
+    @MainActor
+    func testAScaffoldTakesADateBelowItsKeyAway() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scaffold-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let siblingURL: URL = root.appendingPathComponent("Snippets.md")
+        try Data("---\ntitle: Snippets\ncreated: >-\n  2026-08-10T14:30:00.000-0400\npublish: true\n---\nBody.\n".utf8)
+            .write(to: siblingURL)
+
+        let frontmatter: String = SectionAdder.scaffoldFrontmatter(
+            sibling: siblingURL, replacingTitleWith: nil, created: "2026-09-25T07:00:00.000-0400"
+        )
+        XCTAssertEqual(frontmatter, "title: Snippets\ncreated: 2026-09-25T07:00:00.000-0400\npublish: true")
+    }
+
     /// The value on a `key: value` line, whatever the line ends with.
     static func value(ofKey key: String, in text: String) -> String? {
         for line in text.components(separatedBy: "\n") {

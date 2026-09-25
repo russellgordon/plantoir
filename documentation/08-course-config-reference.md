@@ -710,6 +710,60 @@ separately from the reader:
   reached by the fixed reader or writer at all — neither calls `setting`. The
   rule above is the app's rule; these three are where it is not yet kept.
 
+  **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
+  `PageFrontmatter.settingCreated` (every re-date, move, insert and the
+  section index pointer) and `settingTitle` (renames, the unit-word rename)
+  replaced a key's line alone, and so did `SectionAdder`'s copy of a section's
+  landing page and its scaffold. Measured with python-frontmatter 1.3.0 /
+  PyYAML 6.0.3: a date or title below its key, folded, or quoted over two
+  lines read on the site as the new value and the old one JOINED
+  (`2026-09-24T07:00:00.000-0400 2026-09-08T07:00:00.000-0400`,
+  `Unit 1, Day 2 Unit 1, Day 1`, `Unit 1, Day 2 Day 1"`), and a `# note`
+  between key and value STOPPED the build — while the app read the new value,
+  so the two disagreed about a class's day in silence. None is a visibility
+  key, so none could publish a hidden page; each needed a hand-typed shape.
+  All four now go through `PageFrontmatter.replacingKeyLine`, which asks
+  `continuationLineIndices` BEFORE replacing the line (with `keyValueWasEmpty`
+  from the reader's matcher), removes bottom-up, and keeps the line's `\r`;
+  `SectionAdder` walks its replacements from the bottom of the block so a
+  removal never moves a key still to come. Cases: `file-formats.json` →
+  `datesAndTitles.writingCases` (13, whole-file, with `expectSiteReads`),
+  run as bytes by `FileFormatsContractTests` and re-checked against the real
+  build in the image by `scripts/check_dates_and_titles_against_the_site.py`.
+  **Two more shapes, from its review:** a quoted or flow value continued at
+  COLUMN 0 (`title: "Unit 1,` / `Day 1"`, `title: [Unit 1,` / `Day 1]`) —
+  PyYAML reads each as one value, the indentation rule stopped at the second
+  line, and leaving `Day 1"` behind made the page unreadable to the build
+  (ScannerError). `replacingKeyLine` now also takes lines until an open
+  quote or bracket closes, at any indent (`linesUntilOpenValueCloses`: `"`
+  honours a backslash escape and `'` a doubled quote; a quote that never
+  closes inside the block takes nothing). Its limit, recorded rather than
+  fixed: "never closes" means never closes LEXICALLY — on a page that ALREADY
+  fails to build, a quote left open on one key can be closed by a quote on a
+  later key, and every line up to that one goes with the value (probe:
+  `title: "Unit 1,` then `description: say "hi"` — a ParserError before, a
+  page that builds with the new title and no `description:` after, which is
+  what YAML's own scanner makes of it). The scanner also ignores comments, so a
+  `'` inside a `# note` within a multi-line flow value, or an apostrophe in a
+  plain scalar in a flow list (`[teacher's day]`), opens a quote; every such
+  shape the review tried fell back harmlessly (to `continuationLineIndices`,
+  or to "never closes"). And a QUOTED date with a note after
+  it (`created: "2026-09-08T09:30:00.000-0400" # moved`) was rewritten as
+  `…-0400"` — `timeAndOffset` stripped quotes only from the two ends, so the
+  closing quote stayed on the tail, and Quartz replaces a date it cannot read
+  with today. It now reads a quoted value INSIDE its quotes and an unquoted one
+  up to a ` #` comment (`scalarText(ofRawValue:)`); the quotes and the note go
+  with the old value. Three more cases (13 in all).
+  **Not in it, recorded:** an all-indented block — `settingTitle` declines it
+  silently, and `settingCreated` INSERTS `created:` at `openIndex + 1`, above
+  the indented line, which is #186's orphan shape (the #186 decision about an
+  indented root mapping — `rawValue` cannot read that page's date either); duplicate keys — the writer and `rawValue` take the
+  FIRST `created:`, PyYAML keeps the LAST (measured) — is a separate
+  disagreement; and the time of a folded or below-key date is not read, so the
+  rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows'
+  `SetTitle`/`SetCreated` still replace one line (the `windows` issue from
+  #199).
+
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a
   `publish: "false # why"` page left an unbalanced quote — frontmatter the
