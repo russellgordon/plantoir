@@ -1652,9 +1652,13 @@ struct CourseCodeField: View {
             // The field and its message share ONE solid card, and that is
             // what makes them readable.
             //
-            // A course is always SELECTED while it is being renamed, so this
-            // row is drawing on the selection colour — and everything inside
-            // a selected sidebar row is tinted to sit on it. Black-on-blue
+            // A course renamed from Return or the Edit menu is SELECTED
+            // while it is being renamed, so this row is drawing on the
+            // selection colour — and everything inside a selected sidebar
+            // row is tinted to sit on it. (The context menu can open the
+            // field on a row that is NOT selected — driven for #293, where
+            // the card read the same on a plain row, so it is harmless
+            // there.) Black-on-blue
             // for the field and red-on-blue for the message were the result.
             // Painting a card in the system's own text-background colour
             // takes the content off the selection entirely, and because that
