@@ -282,7 +282,7 @@ Order matters here. Steps 1–5 each build on the seam the step before left.
 | 13 | **#274** | Clubs, the largest single piece. The numbered scheme on every class-planning path, with no default naming. **No whole-unit path in a numbered course** (otherwise "publish Week 1" publishes every meeting). A numbered course orders by DATE. `positionInSentences`. The wizard's `clubToggle` and the locked settings rows. `sectionIndexPointer` (9, which **changes shipped pointer behaviour**). 60 `…ForAMeeting` keys that must **never reach the model's copy or `plantoir-mcp`**. Card phrasings read the window's page word. Needs #157, #158, #279 and #167's seam | MATCH | `class-planning.json` (numbered cases, `wholeUnit`, `insertion.numberedPosition`, `sectionIndexPointer`); `shared-rules.json` → `wizard.clubToggle`; docs 04, 08, 09, 10 |
 | 14 | **#210** | The "Revise with Codex…" door (TOML escaping inside `wt.exe`/`cmd`: its own function and a round-trip test through a stub `codex.cmd`). An `outsideAgents` reader. **And the one-line trail note in the EXISTING Claude door**, which has shipped writing nothing: pull that forward into Phase 3 if convenient. Re-measure Codex start-up on Windows | MATCH | `app-rules.json` → `outsideAgents`; doc 10 → "The other doors" |
 
-### Phase 6: course creation, reference courses and import (8 issues). Decision gate: #257, #258
+### Phase 6: course creation, reference courses and import (8 issues). Decision gate: #257, #258 (decided 2026-09-25)
 
 | # | What it is | Kind | Where the rule lives |
 |---|---|---|---|
@@ -292,8 +292,8 @@ Order matters here. Steps 1–5 each build on the seam the step before left.
 | **#241** (+ #287 and #255 comments) | Reference courses. Two config keys, read STRICTLY (`1` and `"true"` are not true). The refusal at 15 doors, including `deploy.ps1`'s folder branch against the real launcher. A MCP write gate on `readOnly` across all 37 tools. **DESIGN an NTFS lock**: the read-only attribute does not stop a rename-over, and **the read-only attribute travelling through `shutil.copy2` publishes a hidden page on Windows; test with `draft:`**. Unlock before removing. Withhold controls, do not grey them (Site Health is the trap). Events, including `course could not be kept for reference`, written ONCE from a catch around the whole act. Add-ons left behind | MATCH + DESIGN | `shared-rules.json` → `referenceCourses.*`, `.obsidianAddOns`; docs 03, 07, 08, 09, 10 |
 | **#244** (+ #245, #287, #255) | Import Courses for Reference. Never write to the source (prove it with a manifest). Skip a name by not DESCENDING into it. Clear the lock first. Stage, then rename. **Real progress, because NTFS cannot clone** (489 MB is a real copy). One failing course does not take the others. The lease claim rows from #245. A line for every course not imported | MATCH | `referenceCourses.importing.*`, `.oneImportPerCourseAtATime`; doc 09 → "Importing last year's folder" |
 | **#247** (+ #258's section-2 keys) | Copy a Page. **Wire `frontmatterCases` (9) and `builderAgreement` (36) FIRST.** The four-step order. **Fuzz against YOUR YAML library**. `FileMode.CreateNew`, never `File.Exists`. NFC only to COMPARE, ordinal string checks. Strip `draftSectionTwo`/`createdForSectionTwo` by their exact names | MATCH | `shared-rules.json` → `copyingAPageBetweenCourses`; doc 09 → "Copying a page from one course into another" |
-| **#257** | Import the older folder-per-class layout, if Windows needs it. **If Russell declines it, the honest form is `appliesOn: ["mac"]`** on its trail event (and on the layout's block): a deliberate, permanent difference is what `appliesOn` is for. Not a ledger line, because the issue would then close, and a ledger entry needs an OPEN issue | **DECISION** | `referenceCourses.importing.olderLayout`; doc 09 → "The older layout: a folder per class (#254)" |
-| **#258** | Import the 2024–25 website-folder layout, if Windows needs it. If declined, `appliesOn: ["mac"]` on its trail event, as for #257. The Copy a Page half is owed either way, and is done in #247 | **DECISION** | `referenceCourses.importing.quartzCheckoutLayout`; doc 09 → "The 2024–25 layout" |
+| **#257** | Import the older folder-per-class layout. **Decided 2026-09-25: no** — only Russell kept courses that way, and only on the mac. The issue is closed. The trail event `course imported from the older layout` now carries `appliesOn: ["mac"]` (done on the mac), so the by-name test stays green: a deliberate, permanent difference, which is what `appliesOn` is for. Nothing to build | **DECIDED: not on Windows** | `shared-rules.json` → `activityTrail.mustRecord`; doc 09 → "The older layout: a folder per class (#254)" |
+| **#258** | **Decided 2026-09-25: no** to the 2024–25 website-folder import; its trail event `course imported from a class website folder` now carries `appliesOn: ["mac"]` (done on the mac). **The issue stays open for the other half, retitled**: Copy a Page strips the old section-2 keys, owed regardless and done in #247 | **DECIDED**: only the Copy a Page half, MATCH | `shared-rules.json` → `copyingAPageBetweenCourses`; doc 09 → "Copying a page from one course into another" |
 
 ### Phase 7: Windows-only interface and the UI-test runner (5 issues). Decision gate: #101
 
@@ -460,16 +460,27 @@ out?**
    until it is built, and then "did I break anything?" cannot be answered
    for weeks.
 2. **Phase 2: #177** (labelled `decision`). Should a restore use the lenient shared fence finder
-   (as the issue recommends), or stay strict on purpose?
+   (as the issue recommends), or stay strict on purpose? **Decided
+   2026-09-25: Windows MATCHES the mac** — `CourseRestorer.FrontmatterBounds`
+   adopts python-frontmatter's boundary and runs the frontmatter piece's
+   whole-file cases.
 3. **Phase 3: #231.** Delete the dead WSL fallback in `FolderContainers`, or
    harden it? The issue leaves this to "whoever owns that side". It is
-   listed here so that somebody actually owns it.
+   listed here so that somebody actually owns it. **Decided 2026-09-25:
+   match all three** — stop only what can be proved idle, refuse while any
+   launcher is running, ask before quitting through a running publish; WHAT
+   is stopped (a WSL2 distribution vs a Colima VM) is the one recorded
+   difference, not WHEN.
 4. **Phase 6: #257 and #258.** Does Windows import Russell's two older
    layouts at all (both labelled `decision`)? If not: `appliesOn: ["mac"]`
    on each layout's trail event and block, because it is a deliberate,
-   permanent difference, and the issue closes.
+   permanent difference, and the issue closes. **Decided 2026-09-25: no, for
+   both.** The two trail events carry `appliesOn: ["mac"]`; #257 is closed;
+   #258 stays open for its Copy a Page half only.
 5. **Phase 7: #101** (labelled `decision`). Reserve "work" as a course code in both wizards, or
-   accept it. This needs a mac change too if it is reserved.
+   accept it. This needs a mac change too if it is reserved. **Decided
+   2026-09-25: reserved on both.** The mac refuses it now, with the cases in
+   `course-management.json` → `courseCode.problems`; Windows adopts them.
 6. **Scope:** whether #167 and #238 belong to this milestone (the issues and
    their comments disagree), and the issues in section 6.
 7. **Wording, which is Russell's:** "this Mac" in #286's sentence (propose a

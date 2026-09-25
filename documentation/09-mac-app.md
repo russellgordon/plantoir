@@ -1979,6 +1979,36 @@ preview not waited for); the stand-down record and its trail line; the MCP
 leaving order. It resets process-wide stores and relies on the scheme's
 `parallelizable = "NO"`, like `CourseActivityTests`.
 
+## A course code Plantoir keeps for itself: WORK (#101)
+
+`CourseCodeRule` refuses the code `WORK`, in any case and with any surrounding
+spaces, with its own sentence (`CourseCodeRule.Trouble.keptForPlantoir`, both
+lengths). It is the one rule the New Course wizard, a rename in the sidebar and
+Keep a Copy for Reference all ask, so the refusal reaches all three; the cases
+are in [`contracts/course-management.json`](../contracts/course-management.json)
+→ `courseCode.problems`, which both apps run.
+
+**Why, when nothing on a Mac collides.** The Windows launchers build each
+preview in `<buildRoot>\work\<CODE>\section<N>`, beside every course's
+`<buildRoot>\<CODE>` — so a Windows course called "work" would share its
+folder with the build ([`12-windows-app.md`](12-windows-app.md) → the builds
+table). `preview.sh` never sets `PLANTOIR_WORK_DIR`, so the mac's builds folder
+holds only course folders. Russell decided on 2026-09-25 to reserve the name on
+BOTH platforms anyway: a code one app accepts and the other refuses is a course
+a teacher can make on one computer and not open on the other.
+
+**Rejected:** refusing it on Windows only (a platform difference somebody has
+to remember for ever), and renaming the Windows folder instead (the clash goes,
+but the name stays free for the next thing to want it).
+
+**Two edges, both pinned by cases.** The kept name is checked BEFORE the clash
+with an existing course, so a folder already called `WORK` is not answered
+with "keep a copy for reference", which would invite another. And it is checked
+AFTER the rename's self-check, so a course that already carries the name (made
+on a Mac before 2026-09-25) can still have its own code re-typed while being
+renamed — it cannot be given the name, and renaming it away is how it leaves.
+The sentence says the name is kept, never what for: rule 1.
+
 ## Renaming a course folder
 
 Folder rows in Course Settings carry a pencil. It renames the folder **on
