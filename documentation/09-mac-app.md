@@ -319,7 +319,8 @@ precondition that fails, rather than passing vacuously, if it ever fits);
 two rows and requires the icons-only row. Put the 520 back and both fail
 (measured, 2 of the class's 8): the first with the bar claiming 520 against
 the fixture's full row of 687, the second with 503.5 against its icons-only
-row of 320 — the limit had turned the midpoint into the scrolling form.
+row of 320 — the limit is a flexible frame, so it claims whatever it is
+offered up to 520 while the bar inside it is still drawing icons only.
 
 **Rejected:**
 
