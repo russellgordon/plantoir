@@ -87,7 +87,7 @@ final class PagesDatedByTheBuildTests: XCTestCase {
     /// line lands on the trail, and never in the console a teacher reads.
     func testARunRecordsTheNamesAndHidesTheLine() throws {
         let runner: ScriptRunner = ScriptRunner()
-        runner.receiveOutput("📆 Gave 2 of your page(s) the date of the class that brings them.\r\n")
+        runner.receiveOutput("📆 Gave 2 of your page(s) the date of the first class that links to them.\r\n")
         runner.receiveOutput(
             "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\", \"Exercises/Using Aggregate Functions\"]}\r\n"
         )
@@ -97,6 +97,34 @@ final class PagesDatedByTheBuildTests: XCTestCase {
 
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
         XCTAssertTrue(trail.contains("ICS4U/1 · the build gave 2 pages the date of their class: section1/index, Exercises/Using Aggregate Functions"), trail)
+    }
+
+    /// A scheduled publish runs with nobody watching a console: its build's
+    /// output goes to the run's own log, and the run reads that log once it
+    /// is done. The trail line has to come from there, or the build likeliest
+    /// to rewrite a teacher's files — the first one after a class goes
+    /// visible, often at half six in the morning — leaves no trace.
+    func testAScheduledPublishRecordsTheNamesFromItsLog() throws {
+        let home: URL = scratchFolderURL.appendingPathComponent("home", isDirectory: true)
+        let log: URL = ScheduledDeploy.logURL(courseCode: "ICS4U", sectionNumber: 1, inHomeFolder: home)
+        try FileManager.default.createDirectory(
+            at: log.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let lastNight: String = "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"Exercises/Joins\"]}\n"
+        let tonight: String = "Deploying ICS4U…\n"
+            + "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\", \"Exercises/Using Aggregate Functions\"]}\n"
+            + "Deploy complete\n"
+        try (lastNight + tonight).write(to: log, atomically: true, encoding: .utf8)
+
+        ScheduledDeploy.recordFolderProblems(
+            section: (courseDirectory: URL(fileURLWithPath: "/tmp"), courseCode: "ICS4U", sectionNumber: 1),
+            fromByteOffset: UInt64(lastNight.utf8.count),
+            inHomeFolder: home
+        )
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("ICS4U/1 · the build gave 2 pages the date of their class: section1/index, Exercises/Using Aggregate Functions"), trail)
+        XCTAssertFalse(trail.contains("Exercises/Joins"), "an earlier night's line was recorded again")
     }
 
     func testOrdinaryOutputAndBrokenLinesReportNothing() {
