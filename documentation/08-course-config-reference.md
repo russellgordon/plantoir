@@ -684,8 +684,11 @@ separately from the reader:
     HIDDEN in section 1 became VISIBLE in both sections (`None` and
     `'false false'`); after it, hidden in both. Case seven of
     `course-management.json` → `sectionNumbers.addingKeysToAPage`.
-    [Issue #181](https://github.com/russellgordon/plantoir/issues/181) — its
-    SectionAdder half; the rest of #181 is untouched.
+    [Issue #181](https://github.com/russellgordon/plantoir/issues/181) is
+    all section adder: this is its mac half. Windows' half is
+    `SectionAdder.cs:222-234`, which still inserts after the key line; the
+    seventh `addingKeysToAPage` case is what closes it there (the `windows`
+    issue from #175 carries it).
   * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
     the backup's without either side's continuation lines — measured, a live
     `publishForSection1:` / `  a: 1` whose backup had no such key is left as
