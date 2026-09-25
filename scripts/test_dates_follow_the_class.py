@@ -398,19 +398,38 @@ class DatesFollowTheClassTests(unittest.TestCase):
         self.assertEqual(page.read_text(encoding="utf-8"), text)
         self.assertEqual(sorted(path.name for path in self.temporary.iterdir()), ["Interrupted.md"])
 
-    def test_a_page_that_cannot_be_written_is_left_alone(self):
-        page = self.temporary / "Read Only.md"
-        text = "---\ncreatedSection1: 2026-09-08T07:00:00.000+0000\n---\nBody\n"
-        page.write_text(text, encoding="utf-8")
+    def test_a_read_only_page_is_named_and_left_alone_even_for_root(self):
+        # The build runs as ROOT in the container, and root passes os.access
+        # for every file: the first version rewrote a 0444 page there. The
+        # mode bits are read instead, so this holds for any user — os.access
+        # is made to answer the way it does for root, to prove it.
+        case = self.one_class_linking("Read Only")
+        self.use_the_course_words(case)
+        folder = self.folder_for(case, 94)
+        page = folder.files_by_title["Read Only"]
+        original = page.read_bytes()
         os.chmod(page, 0o444)
+        real_access = build_site.os.access
+
+        def as_root(path, mode, *arguments, **keywords):
+            return True
+
+        build_site.os.access = as_root
         try:
-            wrote = build_site._write_date_into_the_teachers_page(
-                page, False, 1, "2026-09-24T07:00:00.000+0000")
-            if os.geteuid() != 0:
-                self.assertIsNone(wrote)
-                self.assertEqual(page.read_text(encoding="utf-8"), text)
+            content, result = folder.build(1)
         finally:
+            build_site.os.access = real_access
             os.chmod(page, 0o644)
+        self.assertEqual(page.read_bytes(), original, "the build rewrote a read-only page")
+        self.assertEqual(result["rewritten"], [])
+        self.assertEqual(result["left_locked"], ["Exercises/Read Only"])
+        self.assertEqual(frontmatter.load(self.copy_of(content, "Read Only")).get("created"),
+                         "2026-09-24T07:00:00.000+0000", "the site is still dated")
+
+        printed: list[str] = []
+        build_site.announce_dated_pages(result, "TEST", 1, printer=printed.append)
+        self.assertEqual(len(printed), 1)
+        self.assertIn("Exercises/Read Only", printed[0])
 
     def test_a_date_that_would_read_back_differently_is_quoted(self):
         # A plain `2026-09-24` is a DATE to YAML, not the string the class

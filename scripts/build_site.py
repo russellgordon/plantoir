@@ -2160,8 +2160,16 @@ def _reaches_the_page_through_a_link(source: Path) -> bool:
 
 def _is_locked(source: Path) -> bool:
     """Whether the page is locked — Finder's Locked (`uchg`) or the system's
-    immutable flag, where the platform has them, or simply not writable. A
-    rename would replace a locked file that an ordinary write refuses."""
+    immutable flag, where the platform has them, or read-only. A rename would
+    replace a locked file that an ordinary write refuses.
+
+    Read-only is read from the MODE BITS — no write bit for owner, group or
+    anyone — and not from `os.access`: the build runs as root in the
+    container, root passes `os.access` for every file, and a 0444 page was
+    rewritten there (measured, review of 2026-09-25). The Locked flag is not
+    visible from Linux at all (no `st_flags`); there the host refuses the
+    rename instead, and `_replace_the_page_safely` removes its temporary file
+    — measured, not checked here."""
     try:
         status = os.stat(source)
     except OSError:
@@ -2171,6 +2179,9 @@ def _is_locked(source: Path) -> bool:
         flag = getattr(stat_module, name, 0)
         if flag and flags & flag:
             return True
+    write_bits = stat_module.S_IWUSR | stat_module.S_IWGRP | stat_module.S_IWOTH
+    if stat_module.S_IMODE(status.st_mode) & write_bits == 0:
+        return True
     return not os.access(source, os.W_OK)
 
 
@@ -2233,8 +2244,10 @@ def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
     checking the page has not changed since it was read.
 
     Returns "written", "linked" when the date is wrong but the page is a link
-    to a file kept elsewhere (never written through — the build names it), or
-    None when nothing was written for any other reason.
+    to a file kept elsewhere (never written through — the build names it),
+    "locked" when the date is wrong but the page is locked or read-only (not
+    written — the build names it), or None when nothing was written for any
+    other reason.
     """
     try:
         with open(source, "r", encoding="utf-8", newline="") as handle:
@@ -2252,7 +2265,7 @@ def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
     if _reaches_the_page_through_a_link(source):
         return "linked"
     if _is_locked(source):
-        return None
+        return "locked"
 
     per_section_key = f"createdSection{section_number}"
     if not is_section_page or per_section_key in before.metadata:
@@ -2342,7 +2355,8 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
             return None
         return raw
 
-    result = {"front_page": None, "site_pages": 0, "rewritten": [], "left_linked": []}
+    result = {"front_page": None, "site_pages": 0, "rewritten": [], "left_linked": [],
+              "left_locked": []}
 
     def give_date(fp: Path, value) -> bool:
         """Dates the build's copy, then the teacher's page it came from."""
@@ -2351,6 +2365,13 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
         if post.get("created") != value:
             post["created"] = value
             try:
+                # The build's copy keeps the page's permissions (copy2), so a
+                # read-only page arrives read-only; it is the build's own file,
+                # and a build not running as root (the Windows app's native
+                # build, the tests) could not date it otherwise.
+                mode = stat_module.S_IMODE(os.stat(fp).st_mode)
+                if not mode & stat_module.S_IWUSR:
+                    os.chmod(fp, mode | stat_module.S_IWUSR)
                 with open(fp, "w", encoding="utf-8") as f:
                     f.write(frontmatter.dumps(post))
                 changed_here = True
@@ -2364,6 +2385,8 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
                 result["rewritten"].append(_name_in_the_course(source_path))
             elif outcome == "linked":
                 result["left_linked"].append(_name_in_the_course(source_path))
+            elif outcome == "locked":
+                result["left_locked"].append(_name_in_the_course(source_path))
         return changed_here
 
     # 1. The front page.
@@ -2435,6 +2458,12 @@ def announce_dated_pages(result: dict, course: str, section_number: int, printer
         more = f" and {len(left_linked) - 10} more" if len(left_linked) > 10 else ""
         printer(f"📆 Left the date on {len(left_linked)} page(s) as it was, because each one also "
                 f"lives somewhere else and changing it here would change it there too: {shown}{more}.")
+    left_locked = result.get("left_locked") or []
+    if left_locked:
+        shown = ", ".join(left_locked[:10])
+        more = f" and {len(left_locked) - 10} more" if len(left_locked) > 10 else ""
+        printer(f"📆 Left the date on {len(left_locked)} page(s) as it was, because each one is "
+                f"locked or set so it cannot be changed: {shown}{more}.")
     rewritten = result.get("rewritten") or []
     if not rewritten:
         return
