@@ -26,6 +26,8 @@ import reference_course
 import stop_preview
 import toolchain_paths
 from datetime import date, datetime, timezone
+import stat as stat_module
+import tempfile
 import threading
 import time
 
@@ -1555,10 +1557,17 @@ def _parse_created_value(val) -> datetime | None:
       - 2025-08-10T12:34:56.000-0400 (no colon offset)
       - 2025-08-10T12:34:56.000-04:00
       - 2025-08-10T12:34:56Z
+      - a plain `2025-08-10` that YAML has already read as a DATE — what
+        Obsidian's Date property writes. It counts as midnight in Toronto.
+        Until 2026-09-25 it was read as no date at all, so a class dated
+        this way dated nothing, and a page it linked took a LATER class's
+        date (measured: Day 2's 09-24 instead of Day 1's 09-10).
     Naive datetimes are assumed in America/Toronto.
     """
     if isinstance(val, datetime):
         dt = val
+    elif isinstance(val, date):
+        dt = datetime(val.year, val.month, val.day)
     elif isinstance(val, str):
         s = val.strip()
         if not s:
@@ -2008,6 +2017,36 @@ def _continuation_line_indices(lines: list[str], key_index: int, close_index: in
     return list(range(key_index + 1, last_value_line + 1))
 
 
+def _trailing_comment(raw_value: str) -> str:
+    """
+    The `# note` at the end of a key's line, with the space before it, or ""
+    when there is none — so a rewrite of the value keeps the teacher's note.
+    YAML starts a comment at a `#` that follows a space or a tab and is not
+    inside quotes; a `#` in the middle of a word is part of the value.
+    """
+    quote = None
+    escaped = False
+    for index, character in enumerate(raw_value):
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif quote == '"' and character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            continue
+        if character in ("'", '"') and raw_value[:index].strip() == "":
+            quote = character
+            continue
+        if character == "#" and (index == 0 or raw_value[index - 1] in (" ", "\t")):
+            start = index
+            while start > 0 and raw_value[start - 1] in (" ", "\t"):
+                start -= 1
+            comment = raw_value[start:]
+            return comment if comment.startswith((" ", "\t")) else " " + comment
+    return ""
+
+
 def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | None:
     """
     The page with `key: value_text` in its frontmatter, every other byte left
@@ -2017,8 +2056,9 @@ def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | No
     PyYAML keeps when a page carries the same key twice. Its continuation lines
     go with it. A missing key is inserted at the top of the block, where the
     apps and the installer put `created`. A page with no frontmatter block
-    gets one. A block opened and never closed, or indented with a tab (which
-    YAML refuses), is not touched.
+    gets one. A `# note` at the end of the key's line stays there. A block
+    opened and never closed, or indented with a tab (which YAML refuses), is
+    not touched.
     """
     newline = "\r\n" if "\r\n" in text else "\n"
     lines = text.split("\n")
@@ -2049,7 +2089,8 @@ def _setting_frontmatter_value(text: str, key: str, value_text: str) -> str | No
     was_empty = trimmed_value == "" or trimmed_value.startswith("#")
     taken = _continuation_line_indices(lines, found, close_index, was_empty)
     carriage = "\r" if lines[found].endswith("\r") else ""
-    lines[found] = f"{key}: {value_text}{carriage}"
+    comment = _trailing_comment(raw_value)
+    lines[found] = f"{key}: {value_text}{comment}{carriage}"
     for index in reversed(taken):
         del lines[index]
     return "\n".join(lines)
@@ -2087,8 +2128,89 @@ def _yaml_text_for_date(value) -> str | None:
     return None
 
 
+def _reaches_the_page_through_a_link(source: Path) -> bool:
+    """
+    Whether the teacher's page is a link to a file kept somewhere else — the
+    page itself, or a folder between it and the course folder — or one of two
+    names for the same file. Writing through it would change a file outside
+    this course, or one a second course shares, and two courses sharing one
+    page would overwrite each other's date on alternate builds (measured on
+    2026-09-25: a file outside the course was rewritten).
+    """
+    course_folders = _vault_course_folder[:1]
+    try:
+        if source.is_symlink():
+            return True
+        if source.stat().st_nlink > 1:
+            return True
+        if course_folders:
+            course_folder = course_folders[0]
+            folder = source.parent
+            while folder != course_folder and course_folder in folder.parents:
+                if folder.is_symlink():
+                    return True
+                folder = folder.parent
+    except OSError:
+        return True
+    return False
+
+
+def _is_locked(source: Path) -> bool:
+    """Whether the page is locked — Finder's Locked (`uchg`) or the system's
+    immutable flag, where the platform has them, or simply not writable. A
+    rename would replace a locked file that an ordinary write refuses."""
+    try:
+        status = os.stat(source)
+    except OSError:
+        return True
+    flags = getattr(status, "st_flags", 0)
+    for name in ("UF_IMMUTABLE", "SF_IMMUTABLE", "UF_APPEND", "SF_APPEND"):
+        flag = getattr(stat_module, name, 0)
+        if flag and flags & flag:
+            return True
+    return not os.access(source, os.W_OK)
+
+
+def _replace_the_page_safely(source: Path, original: str, rewritten: str) -> bool:
+    """
+    Puts `rewritten` in place of the teacher's page without ever leaving a
+    half-written file: the new text goes to a hidden file beside the page, is
+    flushed to disk, and is renamed over the page in one step — but only if
+    the page still holds exactly the text the date was worked out from. A
+    Stop partway through leaves the old page or the new one, never an empty
+    one; an Obsidian save that lands after the page was read is kept, and the
+    next build dates it.
+    """
+    folder = source.parent
+    try:
+        handle_number, temporary_name = tempfile.mkstemp(
+            dir=folder, prefix=f".{source.name}.", suffix=".plantoir-dating")
+    except OSError:
+        return False
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(handle_number, "w", encoding="utf-8", newline="") as handle:
+            handle.write(rewritten)
+            handle.flush()
+            os.fsync(handle.fileno())
+        shutil.copymode(source, temporary)
+        with open(source, "r", encoding="utf-8", newline="") as handle:
+            still_there = handle.read()
+        if still_there != original:
+            temporary.unlink()
+            return False
+        os.replace(temporary, source)
+        return True
+    except Exception:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        return False
+
+
 def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
-                                       section_number: int, value) -> bool:
+                                       section_number: int, value) -> str | None:
     """
     Writes a class's date into the teacher's own page — only when the build
     would otherwise read a different one, so a build whose dates are already
@@ -2103,21 +2225,31 @@ def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
 
     Every write is checked by reading the page back the way the build does:
     this section's date must now be `value`, and every other key and the whole
-    body must be exactly what they were. Anything else is not written.
+    body must be exactly what they were. Anything else is not written. The
+    write itself goes to a file beside the page and is renamed over it, after
+    checking the page has not changed since it was read.
+
+    Returns "written", "linked" when the date is wrong but the page is a link
+    to a file kept elsewhere (never written through — the build names it), or
+    None when nothing was written for any other reason.
     """
     try:
         with open(source, "r", encoding="utf-8", newline="") as handle:
             text = handle.read()
     except Exception:
-        return False
+        return None
     if text.startswith("\ufeff"):
-        return False
+        return None
     try:
         before = frontmatter.loads(text)
     except Exception:
-        return False
+        return None
     if _date_for_this_section(before.metadata, section_number) == value:
-        return False
+        return None
+    if _reaches_the_page_through_a_link(source):
+        return "linked"
+    if _is_locked(source):
+        return None
 
     per_section_key = f"createdSection{section_number}"
     if not is_section_page or per_section_key in before.metadata:
@@ -2126,32 +2258,29 @@ def _write_date_into_the_teachers_page(source: Path, is_section_page: bool,
         key = "created"
     value_text = _yaml_text_for_date(value)
     if value_text is None:
-        return False
+        return None
     rewritten = _setting_frontmatter_value(text, key, value_text)
     if rewritten is None or rewritten == text:
-        return False
+        return None
 
     try:
         after = frontmatter.loads(rewritten)
     except Exception:
-        return False
+        return None
     if _date_for_this_section(after.metadata, section_number) != value:
-        return False
+        return None
     if after.content != before.content:
-        return False
+        return None
     for name in set(before.metadata) | set(after.metadata):
         if name == key:
             continue
         if before.metadata.get(name) != after.metadata.get(name) or \
                 (name in before.metadata) != (name in after.metadata):
-            return False
+            return None
 
-    try:
-        with open(source, "w", encoding="utf-8", newline="") as handle:
-            handle.write(rewritten)
-    except Exception:
-        return False
-    return True
+    if not _replace_the_page_safely(source, text, rewritten):
+        return None
+    return "written"
 
 
 def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
@@ -2169,10 +2298,10 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
        pointer finds it — when that class is VISIBLE and dated. A front page
        with no class embed, or whose embed names a hidden or undated class,
        keeps its own date.
-    2. A page a visible, dated class brings — reached by following links from
-       the class, never through or onto another class page — takes the date
-       of the EARLIEST such class (ties by title), even over a date of its
-       own. Russell's choice (A), 2026-09-24: a page duplicated from a
+    2. A page a visible, dated class links to DIRECTLY — never another class
+       page — takes the date of the EARLIEST such class (ties by title), even
+       over a date of its own. A page reached only through another shared page
+       keeps its own date. Russell's choice (A), 2026-09-24: a page duplicated from a
        template carries the template's install-day stamp, which no other
        writer ever moves once the page is visible.
 
@@ -2185,7 +2314,9 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
     Returns {"front_page": the front page's new date or None,
              "site_pages": pages whose date changed in the build's copy,
              "rewritten": the teacher's pages rewritten, by their place in the
-                          course folder}.
+                          course folder,
+             "left_linked": pages whose date is wrong but which are links to
+                          a file kept elsewhere, and so are never written}.
     """
     all_pages, pages_by_stem, pages_by_rel = _read_pages_for_linking(content_root)
 
@@ -2208,7 +2339,7 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
             return None
         return raw
 
-    result = {"front_page": None, "site_pages": 0, "rewritten": []}
+    result = {"front_page": None, "site_pages": 0, "rewritten": [], "left_linked": []}
 
     def give_date(fp: Path, value) -> bool:
         """Dates the build's copy, then the teacher's page it came from."""
@@ -2225,8 +2356,11 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
         source = _vault_sources.get(fp)
         if write_back and source is not None:
             source_path, is_section_page = source
-            if _write_date_into_the_teachers_page(source_path, is_section_page, section_number, value):
+            outcome = _write_date_into_the_teachers_page(source_path, is_section_page, section_number, value)
+            if outcome == "written":
                 result["rewritten"].append(_name_in_the_course(source_path))
+            elif outcome == "linked":
+                result["left_linked"].append(_name_in_the_course(source_path))
         return changed_here
 
     # 1. The front page.
@@ -2253,22 +2387,22 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
         dated_classes.append((_parse_created_value(created), title, class_fp, created))
     dated_classes.sort(key=lambda entry: (entry[0], entry[1]))
 
+    # DIRECT links only. A page reached only THROUGH another shared page — a
+    # hub like "How Marks Work" that Unit 1, Day 1 links, and that links half
+    # the course — keeps its own date, and an undated one stays undated. When
+    # the walk followed links through pages, Day 1 claimed 98 of the 105 pages
+    # EXC2O's first build rewrote, and 2,150 of 5,177 reached pages across the
+    # 39 payloads took an EARLIER class than the first one linking them
+    # directly (reviews of 2026-09-25). Russell's words were "the first
+    # Unit x, Day y page that linked to them".
     claimed: set[Path] = set()
     for class_dt, class_title, class_fp, class_created in dated_classes:
-        seen: set[Path] = {class_fp}
-        queue: list[Path] = [class_fp]
-        while queue:
-            current = queue.pop(0)
-            for linked_fp in _pages_a_page_links_to(all_pages[current], pages_by_stem, pages_by_rel):
-                if linked_fp in seen:
-                    continue
-                seen.add(linked_fp)
-                queue.append(linked_fp)
-                if linked_fp in claimed:
-                    continue
-                claimed.add(linked_fp)
-                if give_date(linked_fp, class_created):
-                    result["site_pages"] += 1
+        for linked_fp in _pages_a_page_links_to(all_pages[class_fp], pages_by_stem, pages_by_rel):
+            if linked_fp in claimed:
+                continue
+            claimed.add(linked_fp)
+            if give_date(linked_fp, class_created):
+                result["site_pages"] += 1
 
     return result
 
@@ -2292,10 +2426,16 @@ def announce_dated_pages(result: dict, course: str, section_number: int, printer
     (`contracts/shared-rules.json` → `pagesDatedByTheBuild`) — the NAMES of
     the pages, never anything written on them.
     """
+    left_linked = result.get("left_linked") or []
+    if left_linked:
+        shown = ", ".join(left_linked[:10])
+        more = f" and {len(left_linked) - 10} more" if len(left_linked) > 10 else ""
+        printer(f"📆 Left the date on {len(left_linked)} page(s) as it was, because each one also "
+                f"lives somewhere else and changing it here would change it there too: {shown}{more}.")
     rewritten = result.get("rewritten") or []
     if not rewritten:
         return
-    printer(f"📆 Gave {len(rewritten)} of your page(s) the date of the class that brings them.")
+    printer(f"📆 Gave {len(rewritten)} of your page(s) the date of the first class that links to them.")
     try:
         prefix = contracts.section("shared-rules", "pagesDatedByTheBuild", "marker", "prefix")
     except Exception:
