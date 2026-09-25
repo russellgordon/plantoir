@@ -577,6 +577,11 @@ def intercepted(message):
         # own and sends nothing to the model (#194), so a probe like this one
         # measures nothing about routing either.
         return ASKED_IN_CODE
+    if deploy_time_said_as(tidied):
+        # Not a tool either: a time written a way the app can read but does
+        # not set ("deploy at 6.30 pm") is answered with the one sentence to
+        # type instead, and nothing is sent to the model (#277).
+        return SAID_AS_IN_CODE
     if re.fullmatch(r"duplicate .+ as (my next class|the next class|my next lesson)", tidied):
         return "add_next_class"
     return None
@@ -668,6 +673,9 @@ def swift_int(text):
 # answers or routes — deliberately not a tool name.
 ASKED_IN_CODE = "(asked morning or evening, in code)"
 
+# The same, for a time the app answers with the spelling to use (#277).
+SAID_AS_IN_CODE = "(answered with the spelling to use, in code)"
+
 
 def deploy_at_a_time(tidied):
     """Whether "deploy at 6:30 am" and its spellings are answered in code.
@@ -681,19 +689,204 @@ def deploy_at_a_time(tidied):
 
 
 def deploy_time_asked_about(tidied):
-    """Whether "deploy at 6:30" is ASKED about in code (#194).
+    """Whether "deploy at 6:30" is ASKED about in code (#194, widened by #277).
 
     Mirrors `AssistCardCommand.morningOrEvening`: the same frame, and a time
     that is a one-digit hour 1-9 with two digits of minutes and no am or pm.
     A full stop may stand for the colon ("6.30") and a comma may follow the
     time ("6:30, please"), because both reached deploy_section 10 of 10 when
-    sent to the model. Such a sentence never reaches the model, so it is not
-    a routing probe.
+    sent to the model. Since #277 a DOTTED hour 10-12 ("10.30") is asked too,
+    and so is a one-digit hour outside the part of the day the sentence names
+    ("deploy at 2:30 in the evening") - see `respelling_reading`. Such a
+    sentence never reaches the model, so it is not a routing probe.
     """
     frame = deploy_frame(tidied)
-    if frame is None or len(frame[1]) != 1:
+    if frame is not None and asked_outright(frame[1]):
+        return True
+    reading = respelling_reading(tidied)
+    return reading is not None and reading[0] == "ask"
+
+
+def deploy_time_said_as(tidied):
+    """The sentence the app hands back for "deploy at 6.30 pm", "deploy at
+    6:30 tonight" and their relatives (#277), else None.
+
+    Mirrors `AssistCardCommand.timeToSayAs`. Such a sentence is answered in
+    code with the spelling to use, so it never reaches the model either.
+    """
+    reading = respelling_reading(tidied)
+    if reading is None or reading[0] != "say":
+        return None
+    return reading[1]
+
+
+def asked_outright(time_words):
+    """Mirrors `AssistCardCommand.askedOutright`: one word, a one-digit hour
+    1-9 with a colon or a full stop, or a DOTTED hour 10-12; then two digits of
+    minutes, and at most one comma after."""
+    if len(time_words) != 1:
         return False
-    return re.fullmatch(r"[1-9][:.][0-5][0-9],?", frame[1][0]) is not None
+    return re.fullmatch(r"(?:[1-9][:.]|1[0-2]\.)[0-5][0-9],?", time_words[0]) is not None
+
+
+# (words, day word, kind) - mirrors `DayPart.all` in AssistCardCommand.swift.
+DAY_PARTS = [
+    (["in", "the", "morning"], None, "morning"),
+    (["in", "the", "afternoon"], None, "afternoon"),
+    (["in", "the", "evening"], None, "evening"),
+    (["this", "morning"], "today", "morning"),
+    (["this", "afternoon"], "today", "afternoon"),
+    (["this", "evening"], "today", "evening"),
+    (["tonight"], "today", "tonight"),
+    (["tomorrow", "morning"], "tomorrow", "morning"),
+    (["tomorrow", "afternoon"], "tomorrow", "afternoon"),
+    (["tomorrow", "evening"], "tomorrow", "evening"),
+]
+
+
+def day_part_holds(kind, on_the_clock):
+    """Morning 1-11, afternoon 12-17, evening 17-23, tonight 17-23 and 0."""
+    if kind == "morning":
+        return 1 <= on_the_clock <= 11
+    if kind == "afternoon":
+        return 12 <= on_the_clock <= 17
+    if kind == "evening":
+        return 17 <= on_the_clock <= 23
+    return 17 <= on_the_clock <= 23 or on_the_clock == 0
+
+
+def day_part_place(kind, hour):
+    """An hour 1-12 with no am or pm, on the 24-hour clock, else None."""
+    if kind == "morning" and 1 <= hour <= 11:
+        return hour
+    if kind == "afternoon":
+        if hour == 12:
+            return 12
+        if 1 <= hour <= 5:
+            return hour + 12
+    if kind in ("evening", "tonight") and 5 <= hour <= 11:
+        return hour + 12
+    if kind == "tonight" and hour == 12:
+        return 0
+    return None
+
+
+def respelling_frame(tidied):
+    """`deploy_frame`, plus a part of the day in front of "at" ("deploy
+    tonight at 6:30"), moved to the end and read by `deploy_frame` itself.
+    Mirrors `AssistCardCommand.respellingFrame`."""
+    frame = deploy_frame(tidied)
+    if frame is not None:
+        return frame
+    words = [word for word in tidied.rstrip("?").split(" ") if word]
+    if "at" not in words:
+        return None
+    at = words.index("at")
+    before, after = words[:at], words[at + 1:]
+    for part, _, _ in DAY_PARTS:
+        if len(before) > len(part) and before[-len(part):] == part:
+            closing_please = after[-1:] == ["please"]
+            if closing_please:
+                after = after[:-1]
+            rebuilt = before[:-len(part)] + ["at"] + after + part
+            if closing_please:
+                rebuilt.append("please")
+            return deploy_frame(" ".join(rebuilt))
+    return None
+
+
+def respelling_reading(tidied):
+    """("say", sentence) / ("ask", clock) / None. Mirrors
+    `AssistCardCommand.respellingReading`, step for step."""
+    frame = respelling_frame(tidied)
+    if frame is None:
+        return None
+    frame_day, words = frame[0], list(frame[1])
+    if time_of_day(words) is not None or asked_outright(words):
+        return None
+    comma = False
+    if words and words[-1].endswith(","):
+        words[-1] = words[-1][:-1]
+        if not words[-1]:
+            return None
+        comma = True
+    part = None
+    for candidate in DAY_PARTS:
+        if len(words) > len(candidate[0]) and words[-len(candidate[0]):] == candidate[0]:
+            part = candidate
+            words = words[:-len(candidate[0])]
+            break
+    if part is not None and words and words[-1].endswith(","):
+        words[-1] = words[-1][:-1]
+        if not words[-1]:
+            return None
+        comma = True
+    if len(words) not in (1, 2):
+        return None
+    clock, meridiem = words[0], None
+    if len(words) == 2:
+        meridiem = words[1].replace(".", "")
+        if meridiem not in ("am", "pm"):
+            return None
+    else:
+        for ending in ("a.m.", "p.m.", "a.m", "p.m", "am", "pm"):
+            if meridiem is None and clock.endswith(ending):
+                meridiem = ending.replace(".", "")
+                clock = clock[: -len(ending)]
+    hour_text, minute_text, dotted = clock, "00", False
+    separator = ":" if ":" in clock else ("." if "." in clock else None)
+    if separator:
+        dotted = separator == "."
+        hour_text, _, minute_text = clock.partition(separator)
+    elif meridiem is None and part is None:
+        return None
+    for text in (hour_text, minute_text):
+        if not text or any(character not in "0123456789" for character in text):
+            return None
+    if len(hour_text) > 2 or len(minute_text) != 2:
+        return None
+    hour, minute = int(hour_text), int(minute_text)
+    if minute > 59:
+        return None
+    if not (dotted or comma or part):
+        return None
+    day = frame_day
+    if part is not None and part[1] is not None:
+        if day is not None and day != part[1]:
+            return None
+        day = part[1]
+    if meridiem is not None:
+        if not 1 <= hour <= 12:
+            return None
+        on_the_clock = hour
+        if meridiem == "pm" and hour != 12:
+            on_the_clock = hour + 12
+        if meridiem == "am" and hour == 12:
+            on_the_clock = 0
+        if part is not None and not day_part_holds(part[2], on_the_clock):
+            return None
+    elif part is not None:
+        if len(hour_text) == 2 and (hour_text.startswith("0") or hour >= 13):
+            if hour > 23 or not day_part_holds(part[2], hour):
+                return None
+            on_the_clock = hour
+        else:
+            on_the_clock = day_part_place(part[2], hour)
+            if on_the_clock is None:
+                if len(hour_text) != 1 or hour < 1:
+                    return None
+                return ("ask", "%s:%s" % (hour_text, minute_text))
+    else:
+        if len(hour_text) != 2 or hour > 23:
+            return None
+        on_the_clock = hour
+    if part is not None and part[2] == "tonight" and on_the_clock < 12:
+        if frame_day is not None:
+            return None
+        day = None
+    twelve = on_the_clock % 12 or 12
+    half = "am" if on_the_clock < 12 else "pm"
+    return ("say", "deploy %sat %d:%s %s" % (day + " " if day else "", twelve, minute_text, half))
 
 
 def deploy_frame(tidied):
@@ -702,8 +895,10 @@ def deploy_frame(tidied):
 
     Mirrors `AssistCardCommand.deployFrame`, which both of the above read.
     """
-    frame = tidied.rstrip("?").strip()
-    words = frame.split()
+    # Split on the literal space, as the Swift does: `.split()` would also
+    # split on a tab or a no-break space, which the Swift keeps inside a word.
+    frame = tidied.rstrip("?")
+    words = [word for word in frame.split(" ") if word]
     if words[:1] == ["please"]:
         words = words[1:]
     if words[-1:] == ["please"]:
@@ -795,18 +990,26 @@ def assert_deploy_at_a_time_matches_contract():
         if intercepted(row["input"]) != "schedule_deploy":
             wrong.append("accepted and NOT intercepted: %r" % row["input"])
     for row in family["refused"]:
-        if intercepted(row["input"]) in ("schedule_deploy", ASKED_IN_CODE):
+        if intercepted(row["input"]) in ("schedule_deploy", ASKED_IN_CODE, SAID_AS_IN_CODE):
             wrong.append("refused and intercepted anyway: %r" % row["input"])
     for row in family.get("asked", []):
         if intercepted(row["input"]) != ASKED_IN_CODE:
             wrong.append("asked about in code and NOT intercepted: %r" % row["input"])
+    for row in family.get("sayItAs", []):
+        tidied = row["input"].strip().strip(".!").lower()
+        if intercepted(row["input"]) != SAID_AS_IN_CODE:
+            wrong.append("answered with a spelling in code and NOT intercepted: %r" % row["input"])
+        elif deploy_time_said_as(tidied) != row["expectSay"]:
+            wrong.append("answered with %r, the contract says %r: %r"
+                         % (deploy_time_said_as(tidied), row["expectSay"], row["input"]))
     if wrong:
         sys.exit(
             "deploy_at_a_time() no longer agrees with contracts/assist-cases.json "
             "-> deployAtATime:\n  %s\nFix it before quoting a number from this suite."
             % "\n  ".join(wrong)
         )
-    return len(family["accepted"]) + len(family.get("asked", [])) + len(family["refused"])
+    return (len(family["accepted"]) + len(family.get("asked", []))
+            + len(family.get("sayItAs", [])) + len(family["refused"]))
 
 
 def assert_hide_is_unpublish_matches_contract():
