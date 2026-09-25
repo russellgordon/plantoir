@@ -383,7 +383,7 @@
       {
         "carries": "the course and section that was built, how many of the teacher's pages the build rewrote, and their NAMES - their place in the course folder, never anything written on them",
         "event": "pages dated by the build",
-        "why": "From 2026-09-25 every preview and every publish can REWRITE the teacher's own pages: the front page takes the date of the class it shows, and a page a class brings takes the date of the earliest visible class that brings it (class-planning.json -> sectionIndexPointer.dateCases and datingPagesAClassBrings.atBuildTime). A change to a teacher's files that nobody asked for in so many words is exactly what a trail exists to answer - 'why did the date on this page change?' - and the build's console, where it is also said, is gone by the time anyone asks. Recorded from the build's own PLANTOIR_DATED: line (pagesDatedByTheBuild), which says nothing when nothing was rewritten, so a build whose dates were already right leaves no line."
+        "why": "From 2026-09-25 every preview and every publish can REWRITE the teacher's own pages: the front page takes the date of the class it shows, and a page a class links to directly takes the date of the earliest visible class that links to it (class-planning.json -> sectionIndexPointer.dateCases and datingPagesAClassBrings.atBuildTime). A change to a teacher's files that nobody asked for in so many words is exactly what a trail exists to answer - 'why did the date on this page change?' - and the build's console, where it is also said, is gone by the time anyone asks. Recorded from the build's own PLANTOIR_DATED: line (pagesDatedByTheBuild), which says nothing when nothing was rewritten, so a build whose dates were already right leaves no line. A SCHEDULED publish records it too, from that run's own part of its log once the run is done: it is often the first build after a class goes visible, so the one likeliest to rewrite files, and nobody is watching a console then."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -1475,7 +1475,8 @@
     "trailLine": {
       "event": "pages dated by the build",
       "shape": "the build gave N page(s) the date of their class: <names, comma-separated>",
-      "why": "Names only, and the count first, so a long list can be shortened without losing how many there were."
+      "why": "Names only, and the count first, so a long list can be shortened without losing how many there were.",
+      "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, which reads that log for PLANTOIR_HEALTH: lines already). Both, or the scheduled build — the one likeliest to rewrite files — leaves no trace."
     }
   },
   "siteHealth": {
