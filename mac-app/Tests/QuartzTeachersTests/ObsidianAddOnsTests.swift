@@ -79,7 +79,7 @@ final class ObsidianAddOnsTests: XCTestCase {
     /// links' targets included, is exactly as it was.
     func runEveryCase(throughKeepACopy: Bool) async throws {
         let cases: [[String: Any]] = try XCTUnwrap(try ObsidianAddOnsTests.rules()["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 8, "The contract's cases did not load.")
+        XCTAssertGreaterThanOrEqual(cases.count, 9, "The contract’s cases did not load.")
         let route: String = throughKeepACopy ? "Keep a Copy" : "import"
 
         for testCase in cases {
