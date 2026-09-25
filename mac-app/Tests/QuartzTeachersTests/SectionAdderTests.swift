@@ -648,9 +648,6 @@ final class SectionAdderTests: XCTestCase {
                         "\(stamp) should match the wizard's created: form")
     }
 
-    /// When a section is added to a course that already has a sibling section,
-    /// all class pages in All Classes/, transclusions, notes, links, and body
-    /// content are replicated into the new section.
     // MARK: - However the frontmatter is fenced (GitHub #175)
 
     /// The whole road, through `addSection`: a course-level page HIDDEN in
@@ -815,6 +812,48 @@ final class SectionAdderTests: XCTestCase {
         )
     }
 
+    /// A page whose section-1 setting sits on the line BELOW its key, on a
+    /// four-dash fence, hidden. The pair must go after the whole value — put
+    /// between key and value it left section 1 with no setting (published)
+    /// and section 2 reading "false false" (also published) — and the new
+    /// section is held back, counted on the trail as a setting that could not
+    /// be read (review of #175).
+    @MainActor
+    func testASettingOnTheLineBelowItsKeyStaysWholeAndHidden() throws {
+        let (root, course) = try makeWorkspace()
+        let scratchFolderURL: URL = root.appendingPathComponent("trail", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let before: String = "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n"
+            + "publishForSection1:\n  false\n----\nBody line one.\n"
+        let pageURL: URL = course.directoryURL.appendingPathComponent("Loops.md")
+        try Data(before.utf8).write(to: pageURL)
+
+        try SectionAdder.addSection(2, to: course)
+
+        let written: String = String(decoding: try Data(contentsOf: pageURL), as: UTF8.self)
+        let created: String = try XCTUnwrap(
+            SectionAdderTests.value(ofKey: "createdSection2", in: written), written.debugDescription
+        )
+        let expected: String = "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n"
+            + "publishForSection1:\n  false\ncreatedSection2: \(created)\n"
+            + "publishForSection2: false\n----\nBody line one.\n"
+        XCTAssertEqual(written, expected)
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains(
+                SectionAdder.trailLine(sectionNumber: 2, pagesGivenKeys: 1, pagesKeptHiddenUnreadable: 1)
+            ),
+            trail
+        )
+    }
+
     /// The value on a `key: value` line, whatever the line ends with.
     static func value(ofKey key: String, in text: String) -> String? {
         for line in text.components(separatedBy: "\n") {
@@ -826,6 +865,9 @@ final class SectionAdderTests: XCTestCase {
         return nil
     }
 
+    /// When a section is added to a course that already has a sibling section,
+    /// all class pages in All Classes/, transclusions, notes, links, and body
+    /// content are replicated into the new section.
     @MainActor
     func testAddingASectionCopiesAllClassPagesAndBodiesFromSiblingSection() throws {
         let (root, course) = try makeWorkspace()
