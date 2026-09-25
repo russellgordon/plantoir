@@ -430,6 +430,11 @@ nonisolated enum ActivityTrail {
         /// silence waited out and nobody asked — that its website started and
         /// no address for it was ever announced, so there was nothing to open
         /// (issue #235; before it, a guessed address was tried instead).
+        /// The launcher writes this event too, in words the contract pins
+        /// (`launcherLine`): when `preview.sh` cannot find out the address at
+        /// all it stops before building and says so on the trail itself —
+        /// the ending a teacher will actually meet, since the app's own
+        /// no-address stop only fires if a launcher ever announced nothing.
         ///
         /// This is the line whose absence produced the report it exists for
         /// (issue #225). A teacher built three previews in four minutes, none

@@ -1172,7 +1172,19 @@ which a teacher had met, all of which were measured:
   run is stopped the Stop-button way, the teacher gets the third sentence
   (`plantoirCouldNotTell` — exactly true), the builder is NOT asked (its
   question is about an address), and the trail gets `preview did not appear`
-  with its own line saying no address was announced.
+  with its own line saying no address was announced. Not if the teacher has
+  just pressed Stop: Stop only signals the run, which is still "running" until
+  it has ended, so a wait waking in that gap would have reported a preview
+  they ended themselves — `nextStep` waits instead (review of #235).
+
+  **The ending a teacher will actually meet is the launcher's**, not the
+  app's: with the two shipped together `preview.sh` always announces or
+  stops, so the app's no-address stop is a defence. So the launcher writes its
+  own trail line when it stops — `preview did not appear`, in words
+  `contracts/shared-rules.json` pins as `launcherLine` and
+  `scripts/test_preview_address.py` checks (with `HOME` in a scratch folder,
+  so no test ever writes the real trail). Without it the trail said only that
+  `preview.sh` failed.
 
 REJECTED: keeping a tail fallback behind the arrival capture (nothing reaches
 the runner by any other road, so a second reader can only be staler or wronger
