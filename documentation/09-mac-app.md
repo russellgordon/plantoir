@@ -759,6 +759,69 @@ already formed, so they can be pinned by a test; the script appends directly, so
 `LogRedactor` never sees them and they must carry nothing that would need
 redacting — the working folder's LAST COMPONENT, never its path.
 
+### Testing it against a written-down process list (#243)
+
+The quit script reads what is running on this Mac INSIDE the script, by `sh`,
+after the app has gone — `launcherRunning` and `anyLauncherRunning` both used to
+call `ps -Ao args=` directly. Under the unit suite that list is shared with
+everything else on the Mac, so the suite's answer depended on what else
+happened to be running. Measured on 2026-09-25, with one stand-in
+`/bin/bash "…/Other Class/preview.sh" ICS3U 1` started under `/private/tmp`
+(inside the test-run lock, killed by PID from a trap before the lock was
+released) and `QuitScriptRunsTests` run on unmodified `dev`: **12 tests, 1
+failure, 1 skipped** — `testTheSharedMachineIsLeftAloneWhenSomethingElseIsInIt`
+red (the "a publish or preview is still going" branch won, and it asserts
+"other software on this Mac"), and `testTheSharedMachineIsStoppedOnAClearAnswer`
+skipped by its own `XCTSkipIf`, hiding the one case that proves the machine is
+ever freed. Three review runs flaked the same day from another worktree's
+`testNothingIsStoppedWhileThatFoldersLauncherIsRunning`, whose stand-in
+`deploy.sh` sleeps 25 seconds. A `verify.sh` does it too: its
+`./preview.sh … --build-only` is RELATIVE, which the per-folder check cannot
+see, but `/preview.sh ` is still in it, which the any-launcher pattern matches.
+
+**The seam is a choice of shell command, `FolderContainers.ProcessListing`.**
+The script now has one function, `processesOnThisMac`, which both checks call:
+`.thisMac` writes `ps -Ao args= 2>/dev/null`, `.readFrom(file:)` writes `cat
+'<file>' 2>/dev/null`. The default is keyed on `RealHome.isInsideTestBundle`,
+the same fact as `RealHome.forFiles`: the real list in the app, and under the
+suite a file in the throwaway home that nothing writes — a missing file lists
+nothing, which is what a test that said nothing means. `QuitScriptRunsTests.run`
+writes its own list (empty unless a test passes `processesRunningOnThisMac:`).
+The app's script differs from the one before this change by exactly the new
+three-line function and the two `seen=` lines that call it; that was diffed,
+not assumed, by generating the script from `dev` and from the branch.
+After the change, with the same stand-in running: **0 failures, 0 skipped.**
+
+**One test reads the real list on purpose**:
+`testNothingIsStoppedWhileThatFoldersLauncherIsRunning`, the only proof that a
+real `ps` line carries a launcher's absolute path. It cannot be flaked from
+outside (its own "Teach 2" publish already makes the any-launcher check true;
+its folders sit under a unique scratch root). Its stand-ins are still VISIBLE
+to anything reading the real list for up to 25 seconds — and after a crash of
+the test host, which skips its `defer` — but no other test reads the real list
+any more. The same two rules it proves are also checked against a written-down
+list (`testALauncherForAnyFolderHoldsTheSharedMachine`,
+`testThatFoldersOwnLauncherHoldsItsBuilderButNotItsNeighbours`), so they are
+checked on every run whatever the Mac is doing.
+
+Rejected, and why:
+
+- **`XCTSkipIf` when a launcher is running** — what was there. It hid the
+  coverage it guarded, and it raced: the check and the run were two reads of a
+  list that changes in between.
+- **A Swift protocol, like `LaunchControlRunning`.** The read happens in `sh`
+  after the app has quit; there is nothing in Swift to inject.
+- **A stand-in `ps` in the scratch tools folder**, shadowing `/bin/ps` the way
+  the stand-in `docker` does. It WOULD work — the script calls `ps` unqualified,
+  after `HelperPrograms`' export line — and needed no product change. Rejected
+  because it is opt-in per test: the next test that runs a quit script without
+  writing the shim reads this Mac again, which is the failure this issue is; and
+  the shim would have to impersonate `ps -Ao args=`'s flags.
+- **An explicit parameter with no suite default.** It fixes this file and
+  leaves the next test exposed — the argument #264 made for `RealHome.forFiles`.
+- **Serialising suites across worktrees.** The test-run lock already exists and
+  does not help: `verify.sh` and real previews are not suites.
+
 ### ⌘Q while something is under way
 
 `applicationShouldTerminate` used to return `.terminateNow` unconditionally.
@@ -1939,7 +2002,8 @@ this Mac: `FolderContainers`' quit script reads `ps -Ao args=`, which sees a
 launchd's scheduled run, a Terminal. `QuitScriptRunsTests.
 testNothingIsStoppedWhileThatFoldersLauncherIsRunning` proves exactly that
 with a stand-in launcher started as a separate process, not through the app's
-own `ScriptRunner`. So the quit path reads no lease; it simply removes this
+own `ScriptRunner` — the one quit test that reads the real list, on purpose
+(#243; every other test hands the script a written-down list). So the quit path reads no lease; it simply removes this
 app's own (`WorkLeaseRegistry.releaseEverything()` — tidiness, since a reader
 ignores a lease whose process has gone). During a scheduled publish's WAIT no
 launcher runs, so a quit may rest the machine then, which is harmless: the run
@@ -4960,7 +5024,10 @@ failures**, led by "found no product source" and "found no test source".
   real `HOME` — so a test that drove a real `setup.sh` could reach
   `~/Library/Application Support/Plantoir/tools` with every check here green.
   Not live today, measured two ways: every test that executes a launcher or a
-  generated script either sets a scratch `HOME` (`QuitScriptRunsTests.run`),
+  generated script either sets a scratch `HOME` (`QuitScriptRunsTests.run`,
+  which since #243 also hands the quit script a written-down list of what is
+  running, so it does not read this Mac's real processes either — "Testing it
+  against a written-down process list"),
   passes a scratch home (`ScheduledPublishOutcomeTests.runWrapper`), runs a
   stub, or is opt-in and skipped (`ScriptRunnerIntegrationTests`,
   `NewCourseCreatorIntegrationTests`); and a full suite run on this branch
