@@ -33,12 +33,16 @@ nonisolated enum ScheduledPublishOutcome {
 
     /// How a scheduled publish turned out.
     ///
-    /// The two FAILURE kinds are the two a launcher can tell apart without
-    /// guessing: `deploy.sh` and `deploy.py` exit **3** when a question went
-    /// unanswered and **1** for everything else. `buildNeededAnAnswer` splits
-    /// the first of those by WHICH LEG stopped, because a scheduled publish
-    /// builds before it publishes and the two legs send a teacher to two
-    /// different buttons. The list here and the one in
+    /// A launcher can report two failures without guessing: `preview.sh`,
+    /// `deploy.sh` and `deploy.py` exit **3** when a question went unanswered
+    /// and anything else non-zero for everything else. Each of those is split
+    /// by WHICH LEG stopped — the build or a destination — because a scheduled
+    /// publish builds before it publishes and the two legs send a teacher to
+    /// two different buttons. That gives four failure kinds; the other kinds
+    /// are a run that got through and runs that stood down without attempting
+    /// anything. Which leg and code give which kind is a case list in the
+    /// contract (`scheduledPublishStopped.whichKind`), run against the real
+    /// wrapper by `ScheduledPublishOutcomeTests`. The list here and the one in
     /// `contracts/shared-rules.json` → `scheduledPublishStopped` → `kinds` are
     /// pinned against each other by a test, so a kind added on one platform
     /// cannot be missed on the other.
@@ -67,7 +71,38 @@ nonisolated enum ScheduledPublishOutcome {
         /// correctly and it is false.
         case buildNeededAnAnswer = "build needed an answer"
 
-        /// Any other non-zero exit.
+        /// Any other non-zero exit from the BUILD, before any destination
+        /// was reached — so nothing was published anywhere. (#137)
+        ///
+        /// Russell's decision, 2026-09-23. A SEPARATE kind from
+        /// `didNotFinish` for `buildNeededAnAnswer`'s reason: that sentence
+        /// names a DESTINATION that stopped, and none was contacted. Until
+        /// #137 this side filled the slot with `buildDestinationName` — a
+        /// phrase that is not a destination — and sent the teacher to
+        /// Publish; this sentence names nothing and sends them to PREVIEW,
+        /// which is the button that rebuilds the pages and shows why they
+        /// would not build.
+        ///
+        /// ANY code but 3, not only 1: a build launcher that could not be run
+        /// at all, or was stopped by a signal, exits with another code, and
+        /// the pages were not built either way.
+        ///
+        /// REJECTED, and recorded so they are not proposed again: merging the
+        /// two build kinds (it loses `buildNeededAnAnswer`'s promise that one
+        /// answer lets the section publish on its own after that); rewording
+        /// `didNotFinish` to cover both (a sentence that fits a revoked token
+        /// and a page that would not build names neither the place nor the
+        /// fix); and telling the two apart by the record's destination line,
+        /// which would make a display string carry meaning.
+        case buildDidNotFinish = "build did not finish"
+
+        /// Any other non-zero exit from a DESTINATION — a revoked token, a
+        /// network that was down.
+        ///
+        /// A build that fails INSIDE a destination's own rebuild still lands
+        /// here, as that destination's exit 1, because the exit code is all
+        /// the wrapper has. See `documentation/07-deployment.md` for when a
+        /// scheduled run can reach that.
         case didNotFinish = "did not finish"
 
         /// It worked.
@@ -83,7 +118,7 @@ nonisolated enum ScheduledPublishOutcome {
         /// deployed nothing.
         ///
         /// Nothing was attempted and nothing failed — which is exactly why it
-        /// could not be filed under any of the three above. `didNotFinish`'s
+        /// could not be filed under any of the failures above. `didNotFinish`'s
         /// own sentence names a DESTINATION that stopped, and there was none:
         /// filling that slot in would read correctly and be false, which is
         /// the mistake `buildNeededAnAnswer` was created to stop being made,
@@ -109,7 +144,7 @@ nonisolated enum ScheduledPublishOutcome {
         /// Whether this is something the teacher should be chased about.
         ///
         /// The test is not "did something break" but "is the site other than
-        /// the teacher expects". All three failures are, and so is a run that
+        /// the teacher expects". Every failure is, and so is a run that
         /// stood down — which is NOT a failure, and still earns the badge,
         /// because the site the teacher was expecting is not there either way
         /// and the whole reason this type exists is that silence reads as
@@ -121,7 +156,8 @@ nonisolated enum ScheduledPublishOutcome {
         /// nobody reads by Wednesday.
         var needsAttention: Bool {
             switch self {
-            case .neededAnAnswer, .buildNeededAnAnswer, .didNotFinish, .tooLateToRun, .courseWasBusy:
+            case .neededAnAnswer, .buildNeededAnAnswer, .buildDidNotFinish, .didNotFinish,
+                 .tooLateToRun, .courseWasBusy:
                 return true
             case .succeeded:
                 return false
@@ -153,17 +189,22 @@ nonisolated enum ScheduledPublishOutcome {
     /// What the record calls the build, when the BUILD is what stopped.
     ///
     /// A scheduled publish builds before it publishes, so a run can stop
-    /// before any destination is reached. For a build that failed OUTRIGHT
-    /// this stands in for a destination in the teacher's sentence, so it has
-    /// to read naturally in "publishing to ___ stopped".
+    /// before any destination is reached. It is written for BOTH build kinds
+    /// and shown for NEITHER: `buildNeededAnAnswer`'s sentence and
+    /// `buildDidNotFinish`'s name no destination, because there was none.
+    /// (Until #137 a build that failed outright put this phrase in the
+    /// teacher's sentence as though it were a destination.)
     ///
-    /// For `buildNeededAnAnswer` it is written to the record and never shown:
-    /// that sentence names no destination, because there was none. The line is
-    /// still written so every record has ONE shape — two lines, the kind and
+    /// The line is still written so every record has ONE shape — two lines, the kind and
     /// then a name — which is what `stopped(inHomeFolder:course:section:)`
     /// reads and what a person opening the file in TextEdit sees. A record
     /// whose second line was sometimes absent would be a second format for a
     /// shell script to get right at half six in the morning.
+    ///
+    /// The VALUE is kept although nobody sees it now. REJECTED renaming it
+    /// when #137 stopped showing it: only a person opening the file would see
+    /// the difference, and keeping it means a record written by a wrapper
+    /// scheduled before #137 and one written after differ only in the kind.
     static let buildDestinationName: String = "your website (it could not be built)"
 
     /// The same stand-in, for a run that stood down without attempting
@@ -332,8 +373,8 @@ nonisolated enum ScheduledPublishOutcome {
     /// wrapper runs. Plantoir runs the wrapper.
     ///
     /// The line carries the course, the section and which destination stopped
-    /// — or, when the BUILD stopped for a question, that it stopped before any
-    /// destination was reached, because none was.
+    /// — or, when the BUILD stopped, for a question or outright, that it
+    /// stopped before any destination was reached, because none was.
     ///
     /// NEVER the question's own text: that comes from a launcher's console,
     /// and a line naming a credential prompt would put a teacher's own words
@@ -367,6 +408,18 @@ nonisolated enum ScheduledPublishOutcome {
             ActivityTrail.note(
                 .scheduledPublishNeededAnAnswer,
                 "a scheduled publish stopped — building the pages needed an answer",
+                course: course, section: section, at: stopped.when
+            )
+        case .buildDidNotFinish:
+            // The SAME event as didNotFinish, for buildNeededAnAnswer's reason:
+            // the run did not finish, which is what that event is about, and
+            // an event of its own would put a distinction on the trail that
+            // means nothing to the person reading it. The line names no
+            // destination because none was reached (#137) — see
+            // `activityTrail.mustRecord` for that event, which says so.
+            ActivityTrail.note(
+                .scheduledPublishDidNotFinish,
+                "a scheduled publish stopped — the pages could not be built",
                 course: course, section: section, at: stopped.when
             )
         case .didNotFinish:
@@ -431,6 +484,16 @@ nonisolated enum ScheduledPublishOutcome {
                  + "before it started, because building the pages needed an answer nobody was "
                  + "there to give. Preview this section once yourself, answer the question, and "
                  + "it can publish on its own after that."
+        case .buildDidNotFinish:
+            // No destination, on purpose: none was reached (#137). It sends
+            // the teacher to PREVIEW, which rebuilds the pages and shows why
+            // they would not build; the last clause echoes
+            // `AssistWording.couldNotBuildBeforeDeploying`. Russell's starting
+            // wording, 2026-09-23, his to polish.
+            return "\(course) Section \(section) was set to publish on its own, and it stopped "
+                 + "before it started — the pages could not be built, so nothing went up "
+                 + "anywhere. Preview this section once yourself, and the reason will be in "
+                 + "that section's window."
         case .didNotFinish:
             return "\(course) Section \(section) was set to publish on its own, and it did not "
                  + "finish — publishing to \(stopped.destination) stopped, so nothing went up "
