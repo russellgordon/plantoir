@@ -236,7 +236,7 @@ enum SectionAdder {
             return
         }
 
-        guard let lines = frontmatterLines(ofFileAt: sourceURL) else {
+        guard let block = PageFrontmatter.block(in: text) else {
             try text.write(to: destinationURL, atomically: true, encoding: .utf8)
             return
         }
@@ -244,21 +244,22 @@ enum SectionAdder {
         let isRootIndex: Bool = relativePath == "index.md"
         let isTopLevelPerSectionFile: Bool = course.configuration.perSectionFiles.contains(relativePath)
 
-        var newLines: [String] = []
-        for line in lines {
+        // Edited in place, line by line, INSIDE the block: the fence the
+        // teacher typed, anything before it and the whole body are never
+        // rebuilt, so none of them can be rebuilt wrongly. See
+        // `extendFrontmatter` for what rebuilding them cost.
+        var allLines: [String] = text.components(separatedBy: "\n")
+        for position in (block.openIndex + 1)..<block.closeIndex {
+            let line: String = allLines[position]
+            let lineEnding: String = SectionAdder.carriageReturn(endingLine: line)
             if isRootIndex && line.hasPrefix("title:") {
                 let newTitle: String = sectionTitle(for: course, sectionNumber: sectionNumber)
-                newLines.append("title: \(newTitle)")
+                allLines[position] = "title: \(newTitle)" + lineEnding
             } else if (isRootIndex || isTopLevelPerSectionFile) && line.hasPrefix("created:") {
-                newLines.append("created: \(created)")
-            } else {
-                newLines.append(line)
+                allLines[position] = "created: \(created)" + lineEnding
             }
         }
-
-        let prefixToDrop: Int = ("---\n" + lines.joined(separator: "\n")).count
-        let restOfText: String = String(text.dropFirst(prefixToDrop))
-        let rewritten: String = "---\n" + newLines.joined(separator: "\n") + restOfText
+        let rewritten: String = allLines.joined(separator: "\n")
         try rewritten.write(to: destinationURL, atomically: true, encoding: .utf8)
     }
 
@@ -300,9 +301,10 @@ enum SectionAdder {
     /// block further down the page is documentation, not metadata.
     static func extendFrontmatter(ofPageAt url: URL, toInclude sectionNumber: Int, created: String) {
         guard let text = try? String(contentsOf: url, encoding: .utf8),
-              let lines = frontmatterLines(ofFileAt: url) else {
+              let block = PageFrontmatter.block(in: text) else {
             return
         }
+        let lines: [String] = block.lines
         if alreadyHasKeys(for: sectionNumber, in: lines) {
             return
         }
@@ -333,20 +335,37 @@ enum SectionAdder {
 
         // The pair goes after the last per-section key, so each section's
         // lines stay together and in order.
-        var updated: [String] = []
         var lastKeyIndex: Int = -1
         for (index, line) in lines.enumerated() where perSectionKeyNumber(in: line) != nil {
             lastKeyIndex = index
         }
-        for (index, line) in lines.enumerated() {
-            updated.append(line)
-            if index == lastKeyIndex {
-                updated.append(contentsOf: addition)
-            }
+        if lastKeyIndex < 0 {
+            return
         }
 
-        let body: String = String(text.dropFirst(("---\n" + lines.joined(separator: "\n")).count))
-        let rewritten: String = "---\n" + updated.joined(separator: "\n") + body
+        // Spliced in by LINE, at the position the shared finder reported —
+        // never by rebuilding "---" plus the block and cutting the old text
+        // after it by a character count. That arithmetic assumed a fence of
+        // exactly three dashes on the first line, and the finder accepts what
+        // the build accepts (three dashes or more, blank lines before them,
+        // spaces after). MEASURED with the build's own reader on each shape
+        // (GitHub #175): with a `----` fence, a blank line before it or a
+        // trailing space, the old cut left one character of the old text
+        // behind, so the new date read `…-0400e`, the `e` of `true`; with
+        // Windows line endings the build read NO keys at all and printed the
+        // whole block to students as the page's first lines.
+        //
+        // The new lines take the line ending of the line they follow, so a
+        // page saved with Windows line endings stays one.
+        var allLines: [String] = text.components(separatedBy: "\n")
+        let lastKeyPosition: Int = block.openIndex + 1 + lastKeyIndex
+        let lineEnding: String = SectionAdder.carriageReturn(endingLine: allLines[lastKeyPosition])
+        var insertAt: Int = lastKeyPosition + 1
+        for newLine in addition {
+            allLines.insert(newLine + lineEnding, at: insertAt)
+            insertAt += 1
+        }
+        let rewritten: String = allLines.joined(separator: "\n")
         try? rewritten.write(to: url, atomically: true, encoding: .utf8)
     }
 
@@ -492,10 +511,11 @@ enum SectionAdder {
         if let sibling, let siblingLines = frontmatterLines(ofFileAt: sibling) {
             var result: [String] = []
             for line in siblingLines {
+                let lineEnding: String = SectionAdder.carriageReturn(endingLine: line)
                 if line.hasPrefix("created:") {
-                    result.append("created: \(created)")
+                    result.append("created: \(created)" + lineEnding)
                 } else if line.hasPrefix("title:"), let newTitle {
-                    result.append("title: \(newTitle)")
+                    result.append("title: \(newTitle)" + lineEnding)
                 } else {
                     result.append(line)
                 }
@@ -507,26 +527,34 @@ enum SectionAdder {
         return "title: \(title)\ncreated: \(created)\npublish: \(publish)"
     }
 
-    /// The lines between a file's opening and closing `---` markers, or nil
-    /// when the file has no frontmatter to speak of.
+    /// The lines between a file's opening and closing fences, or nil when the
+    /// file has no frontmatter to speak of.
+    ///
+    /// Found by `PageFrontmatter.block(in:)` — the one idea of where a page's
+    /// frontmatter is that every other reader and writer uses (#140), and the
+    /// build's own: a fence of three dashes or more, blank lines allowed
+    /// before it. This was the last copy of the old rule, exactly `---` on the
+    /// first line, and a page fenced any other way was silently skipped when
+    /// a section was added — so the new section got no `publishForSection`
+    /// key, and a page the teacher had HIDDEN in section 1 was published in
+    /// the new one, because a page with no key is shown (GitHub #175).
+    /// Lines keep any carriage return a Windows-saved file has on them.
     static func frontmatterLines(ofFileAt url: URL) -> [String]? {
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+        guard let text = try? String(contentsOf: url, encoding: .utf8),
+              let block = PageFrontmatter.block(in: text) else {
             return nil
         }
-        let lines: [String] = text.components(separatedBy: "\n")
-        guard lines.first == "---" else {
-            return nil
+        return block.lines
+    }
+
+    /// The carriage return a line of a Windows-saved file ends with, or
+    /// nothing — so a line written in its place, or beside it, ends the same
+    /// way and the file keeps one kind of line ending.
+    static func carriageReturn(endingLine line: String) -> String {
+        if line.hasSuffix("\r") {
+            return "\r"
         }
-        var collected: [String] = []
-        var index: Int = 1
-        while index < lines.count {
-            if lines[index] == "---" {
-                return collected
-            }
-            collected.append(lines[index])
-            index += 1
-        }
-        return nil
+        return ""
     }
 
     /// The new section's landing-page title. A sibling section's title with
@@ -539,7 +567,9 @@ enum SectionAdder {
            let siblingLines = frontmatterLines(ofFileAt: siblingIndex) {
             for line in siblingLines {
                 if line.hasPrefix("title:") {
-                    let siblingTitle: String = String(line.dropFirst("title:".count)).trimmingCharacters(in: .whitespaces)
+                    // `.whitespacesAndNewlines`, so the carriage return at the
+                    // end of a Windows-saved line is not carried into the title.
+                    let siblingTitle: String = String(line.dropFirst("title:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
                     if let range = siblingTitle.range(of: #"Section \d+$"#, options: .regularExpression) {
                         return siblingTitle.replacingCharacters(in: range, with: "Section \(sectionNumber)")
                     }

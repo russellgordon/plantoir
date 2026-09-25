@@ -185,6 +185,42 @@ final class CourseManagementContractTests: XCTestCase {
         }
     }
 
+    /// A new section's keys, added to a page however its frontmatter is
+    /// fenced — and nothing else about the page changed (GitHub #175).
+    ///
+    /// Compared as BYTES, whole file: a test for the new key's presence
+    /// passes a splice that leaves a stray character on the new date, and
+    /// Swift's `==` reads "\r\n" as one character, which is exactly the
+    /// difference the Windows-line-ending case is about.
+    func testAddingASectionsKeysToAPageIsWhatTheContractSays() throws {
+        let section: [String: Any] = try CourseManagementContractTests.section("sectionNumbers")
+        let rule: [String: Any] = try XCTUnwrap(section["addingKeysToAPage"] as? [String: Any])
+        let created: String = try XCTUnwrap(rule["created"] as? String)
+        let newSection: Int = try XCTUnwrap(rule["section"] as? Int)
+        let folder: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("adding-keys-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6)
+        for testCase in cases {
+            let shape: String = try XCTUnwrap(testCase["shape"] as? String)
+            let before: String = try XCTUnwrap(testCase["before"] as? String)
+            let after: String = try XCTUnwrap(testCase["after"] as? String)
+            let pageURL: URL = folder.appendingPathComponent("Loops.md")
+            try Data(before.utf8).write(to: pageURL)
+
+            SectionAdder.extendFrontmatter(ofPageAt: pageURL, toInclude: newSection, created: created)
+
+            let written: Data = try Data(contentsOf: pageURL)
+            XCTAssertEqual(
+                written, Data(after.utf8),
+                "\(shape): wrote \(String(decoding: written, as: UTF8.self).debugDescription)"
+            )
+        }
+    }
+
     // MARK: - What a course code says about the grade
 
     func testTheGradeLabelsAreWhatTheContractSays() throws {
