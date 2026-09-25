@@ -567,7 +567,11 @@ nonisolated enum ActivityTrail {
 
         /// A course was kept for reference: which folder it was given, the
         /// code and school year it shows, how many sections came across, and
-        /// which course it was copied from. Never the contents of a page.
+        /// which course it was copied from. Since #255 it also names the
+        /// Obsidian add-ons the copy was made without, by folder name — only
+        /// when there were any, so a course with none leaves the same line as
+        /// before (`ObsidianAddOns.trailClause`). Never the contents of a
+        /// page, and never anything read from inside an add-on.
         case courseKeptForReference = "course kept for reference"
 
         /// A reference course's pages were locked again, with the count —
@@ -583,7 +587,10 @@ nonisolated enum ActivityTrail {
         /// here, the code and school year it shows, and how many sections
         /// came across. The folder it was READ from is the half a copy does
         /// not have, and it is the answer to "where did this ICS4U come
-        /// from". Never the contents of a page.
+        /// from". For a MODERN course it also names the Obsidian add-ons left
+        /// behind, by folder name and only when there were any (#255); the
+        /// older layouts say theirs on their own second line. Never the
+        /// contents of a page.
         case courseImportedForReference = "course imported for reference"
 
         /// A class kept in the OLDER layout (a folder per class, #254) came
