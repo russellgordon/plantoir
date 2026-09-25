@@ -31,10 +31,9 @@ TAS2O is a broad-based course. Two of its expectations say so in as many
 words: A1.1 asks students to work with fundamental technological concepts
 "in a variety of broad-based technology areas", and B3.1 asks them to
 explore careers "including a variety of broad-based technology areas, and
-the skilled trades". A school may give the course a focus — communications,
-construction, manufacturing, and so on — but the projects in it should
-still reach into more than one area, and the careers the class looks at
-should reach further still.
+the skilled trades". A teacher can lean the examples towards an area they
+know well, but the projects should still reach into more than one area,
+and the careers the class looks at further still.
 
 ## The codes
 
