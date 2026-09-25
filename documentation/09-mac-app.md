@@ -4866,8 +4866,11 @@ purpose:
   the tree half of the check is not dead code that always says "missing".
 
 **Reading the totals.** A normal full run has **3 skipped** — the three tests
-that want `INTEGRATION_WORKSPACE`. More than 3 means read the skip reasons: a
-Space skip says so. A test that always skips is a test nobody runs, and that
+that want `INTEGRATION_WORKSPACE` — plus a fourth,
+`QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, whenever
+any launcher is running on the Mac (a preview in the app, another session's
+`verify.sh`; #243 is fixing that class). More than 3 means read the skip
+reasons: a Space skip says so, and so does that one. A test that always skips is a test nobody runs, and that
 is the risk this change carries; the reason in the log is the defence. One
 way it could happen for good is the test host (the same bundle as the
 teacher's app) restoring a full-screen window. Checked 2026-09-25 after the

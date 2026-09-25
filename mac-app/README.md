@@ -107,8 +107,10 @@ accessibility tree (`AccessibilityInspector`). macOS leaves a window out of
 that tree while it sits on a Space that is not showing — a full-screen app or
 another desktop in front — so those tests skip, saying so, rather than fail on
 a tree that holds only the menu bar. Being in the background is fine and is
-the normal case. **A normal full run has 3 skipped; more than 3 skipped means
-read the skip reasons.** Why, and what was rejected:
+the normal case. **A normal full run has 3 skipped (a fourth,
+`QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, skips while
+any launcher is running on the Mac); more than 3 skipped means read the skip
+reasons.** Why, and what was rejected:
 `documentation/09-mac-app.md` → "Testing: the tests that read the real window,
 and a window on another Space (#249)".
 
