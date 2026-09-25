@@ -1,4 +1,215 @@
 {
+  "backups": {
+    "note": "What happens to backups over time, and how the space they take is counted (issue #242). DECIDED by Russell, 2026-09-21 (option C): keep every backup a teacher makes, and make the space they take VISIBLE - per course and in total - with a way to delete several at once. The assistant's own backups keep their cap. AUTHORED; edit as text. pruneCases run the pruning that follows a new backup, sizeCases the count, deleteCases the delete. Formatting a byte count is each platform's own ('105.6 MB' on the mac, the way Finder writes it), so the cases carry bytes only.",
+    "assistantKept": 5,
+    "assistantKeptWhy": "The assistant saves one backup per conversation whether or not anybody asked, so it clears up after itself: the five most recent of ITS backups of a course are kept, counted per course, and a backup whose stamp cannot be true is neither counted nor deleted (zipNames.couldHaveBeenStamped).",
+    "teacherBackupsPruned": "never",
+    "teacherBackupsPrunedWhy": "A backup made on purpose before a risky change should not vanish because ten more were made after it - deciding on a teacher's behalf that last month's copy has expired is not the app's call. The fault was never that they are kept but that nothing SHOWED the space, so the space is shown and deleting old ones is made easy; the teacher decides what goes. A cap for teacher backups with the oldest shown before removal was the alternative considered and not chosen.",
+    "mediaIsAlwaysIncluded": true,
+    "mediaIsAlwaysIncludedWhy": "Every backup carries the whole course, Media included - measured at 467 MB and 9.7 s for a real course with 487 MB of Media. REJECTED, and recorded so it is not proposed again: a lighter backup that leaves Media out. Restoring one would DELETE the course's Media.",
+    "sizeIsLogical": true,
+    "sizeIsLogicalWhy": "The size shown is the file's LOGICAL size (on the mac, fileSize), never what it occupies on this disk. A working folder kept in iCloud Drive can have its backups evicted to the cloud, where they take almost nothing on this disk while costing their whole size in the teacher's cloud storage - and costing it on this disk again the moment one is restored. Measured on the sparse shape of an evicted file: logical 244.84 GB, on disk 'Zero KB'. The on-disk number would tell that teacher their backups take nothing. Not measured on a real evicted file, and whether a deleted file keeps costing cloud storage while in that service's own recently-deleted folder is not measured either - so nothing promises the space is freed at once.",
+    "neverDeletedWhileAConversationCanRestoreFromIt": true,
+    "neverDeletedWhileAConversationCanRestoreFromItWhy": "An open assistant conversation offers 'Restore Section N...' from the backup it made before its first change. Deleting that backup - one click after selecting the assistant's backups, which is exactly what the #242 plan review measured - leaves a button that fails after the teacher has agreed to it. So a delete leaves it alone, deletes everything else asked for, and says which assistant window to close (the same 'Close the assistant for <course> Section <n> first' a second assistant window is refused with).",
+    "pruneCases": [
+      {
+        "name": "the assistant keeps its five most recent, and none of the teacher's is touched",
+        "course": "ICS3U",
+        "existing": [
+          "ICS3U_backup_2026-09-01_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-03_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-04_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-05_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-06_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-07_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-08-21_090000.zip",
+          "ICS3U_backup_2026-08-22_090000.zip",
+          "ICS3U_backup_2026-08-23_090000.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-01_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section1.zip"
+        ],
+        "why": "Seven assistant backups and three of the teacher's: the two OLDEST assistant backups go. The teacher's three are not counted among the five and are not deleted, however old."
+      },
+      {
+        "name": "a teacher's own backups are never pruned, however many there are",
+        "course": "ICS3U",
+        "existing": [
+          "ICS3U_backup_2026-01-15_080000.zip",
+          "ICS3U_backup_2026-02-15_080000.zip",
+          "ICS3U_backup_2026-03-15_080000.zip",
+          "ICS3U_backup_2026-04-15_080000.zip",
+          "ICS3U_backup_2026-05-15_080000.zip",
+          "ICS3U_backup_2026-06-15_080000.zip",
+          "ICS3U_backup_2026-07-15_080000.zip",
+          "ICS3U_backup_2026-08-15_080000.zip",
+          "ICS3U_backup_2026-09-15_080000.zip",
+          "ICS3U_backup_2026-10-15_080000.zip",
+          "ICS3U_backup_2026-11-15_080000.zip",
+          "ICS3U_backup_2026-12-15_080000.zip"
+        ],
+        "expectDeleted": [],
+        "why": "Twelve of the teacher's own backups and none of the assistant's: nothing is deleted. Russell's decision on #242."
+      },
+      {
+        "name": "an archive and the setup wizard's zip are never pruned",
+        "course": "ICS3U",
+        "existing": [
+          "ICS3U_backup_2026-09-10_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-11_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-12_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-13_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-14_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-15_120000_assistant-section2.zip",
+          "ICS3U_2026-08-10_143005.zip",
+          "2026-08-10_143005.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-10_120000_assistant-section2.zip"
+        ],
+        "why": "Six assistant backups beside an archive and the wizard's automatic zip: only the oldest assistant backup goes. The other two share the folder but are not backups at all."
+      }
+    ],
+    "sizeCases": [
+      {
+        "name": "backups are counted per course and in total; archives and the wizard's zips are not",
+        "files": [
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_backup_2026-09-01_120000.zip",
+            "bytes": 11300000
+          },
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_backup_2026-09-02_120000_assistant-section1.zip",
+            "bytes": 15900000
+          },
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_backup_2026-08-20_083000.zip",
+            "bytes": 105000
+          },
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_2026-08-19_140000.zip",
+            "bytes": 9000000
+          },
+          {
+            "course": "ICS4U",
+            "name": "2026-08-18_101500.zip",
+            "bytes": 800
+          },
+          {
+            "course": "CODING",
+            "name": "CODING_backup_2026-09-03_070000.zip",
+            "bytes": 2000000
+          }
+        ],
+        "expectCourses": [
+          {
+            "courseCode": "CODING",
+            "count": 1,
+            "bytes": 2000000
+          },
+          {
+            "courseCode": "ICS4U",
+            "count": 3,
+            "bytes": 27305000
+          }
+        ],
+        "expectTotalCount": 4,
+        "expectTotalBytes": 29305000,
+        "why": "The shape of Russell's real folder early in a term: teacher and assistant backups of two courses, beside an archive and a setup-wizard zip that are not in the Backups list and so are not in its total - a number the teacher cannot act on from that list would only mislead. Courses are listed in course-code order."
+      },
+      {
+        "name": "the logical size counts, not what the file takes on this disk",
+        "files": [
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_backup_2026-09-05_120000.zip",
+            "bytes": 467000000,
+            "sparse": true
+          }
+        ],
+        "expectCourses": [
+          {
+            "courseCode": "ICS4U",
+            "count": 1,
+            "bytes": 467000000
+          }
+        ],
+        "expectTotalCount": 1,
+        "expectTotalBytes": 467000000,
+        "why": "A file whose contents are not on this disk - the shape of one a cloud service has evicted - still counts at its whole size, which is what it costs in the teacher's cloud storage and what it will take again when restored. A runner makes it sparse (the mac truncates an empty file to the size) so the case costs no disk; counted by what the disk holds it would be nearly nothing."
+      }
+    ],
+    "deleteCases": [
+      {
+        "name": "several backups are deleted at once, and only those",
+        "backups": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-02_120000.zip",
+          "ICS3U_backup_2026-09-03_120000.zip",
+          "ICS3U_backup_2026-09-04_120000.zip",
+          "ICS3U_backup_2026-09-05_120000.zip"
+        ],
+        "delete": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-03_120000.zip",
+          "ICS3U_backup_2026-09-05_120000.zip"
+        ],
+        "heldByAnOpenConversation": [],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-03_120000.zip",
+          "ICS3U_backup_2026-09-05_120000.zip"
+        ],
+        "expectKept": [],
+        "why": "Three of five, permanently - as the single delete always was and as its confirmation says."
+      },
+      {
+        "name": "the backup an open assistant conversation can restore from is kept, and the rest are deleted",
+        "backups": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "delete": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "heldByAnOpenConversation": [
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-01_120000.zip"
+        ],
+        "expectKept": [
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "why": "The assistant window for Section 2 is open and made this backup before its first change; its Restore button puts the section back from it. It is kept and the teacher is told which window to close. The other backup asked for is still deleted - one refusal is not a reason to stop."
+      },
+      {
+        "name": "an older assistant backup is not held just because the assistant is open",
+        "backups": [
+          "ICS3U_backup_2026-08-01_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "delete": [
+          "ICS3U_backup_2026-08-01_120000_assistant-section2.zip"
+        ],
+        "heldByAnOpenConversation": [
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-08-01_120000_assistant-section2.zip"
+        ],
+        "expectKept": [],
+        "why": "Only the backups the OPEN conversation made are held. An assistant backup from an earlier conversation about the same section is an ordinary backup now, and a rule keyed on 'made by the assistant' or 'this section' would refuse it for nothing."
+      }
+    ]
+  },
   "courseCode": {
     "mostCharacters": 12,
     "normalized": [
