@@ -16,7 +16,7 @@ tags:
 3. Final cuts: eight sheets, about 56 laser minutes, in queue order;
    everyone else finishes files and practises reading the settings
    sheet
-4. Last ten minutes: the laser's maintenance from [[Laser Cutting]] —
+4. Last five minutes: the laser's maintenance from [[Laser Cutting]] —
    bed cleared, crumb tray emptied, lens checked — and offcuts sorted
    the way [[Safety in the Shop]] asks
 

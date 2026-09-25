@@ -73,9 +73,11 @@ The days are Unit 3's.
    and log the numbers, using [[Quality Control]]. Then the checkpoint
    conference, and straight after it each member models their own
    change as v2, traced to a number in their test log.
-7. **Reprint (Days 18–20).** At the start of your crew's print day
-   the crew chooses the change the data supports best, and it goes
-   straight into the printer. A print that fails is data too —
+7. **Reprint (Days 18–20).** On Day 18 every crew chooses the change
+   the data supports best — crews 1 and 2 in the first ten minutes,
+   because they print that day; crews 3 to 5 later in the period, and
+   crew 6 once it has tested — then slices it, and it goes into the
+   printer in its queue slot. A print that fails is data too —
    [[Getting Unstuck]] has the move.
 8. **Credit and record (Days 19–21).** If you remixed a shared model,
    credit it as [[Copyright and Fair Dealing]] requires. Then write

@@ -294,7 +294,7 @@ folder — a generic index and a placeholder called `A1.1` — so
 `_find_curriculum_folder` found a folder and `_collect_expectations`
 returned exactly one specific expectation. Switching the map on there would
 have drawn a single cell for an expectation that does not exist. A teacher
-who declines the ready-made pages for one of the 38 codes that have them
+who declines the ready-made pages for one of the 39 codes that have them
 now gets that code's real expectations installed into the skeleton, so the
 map is built from the same 47-and-12 (ICS4U) the payload course draws.
 
