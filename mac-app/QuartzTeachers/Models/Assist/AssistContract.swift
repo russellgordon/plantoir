@@ -231,6 +231,96 @@ enum AssistContract {
                     page: pagePlaceholder, as: copyPlaceholder,
                     backupNamed: "{course}_backup_2026-09-08_190000.zip"
                 ),
+            // A club's noun (#267). Every sentence a teacher reads that says
+            // "class" in a club course has a `…ForAMeeting` twin here, rendered
+            // from the same function with `noun: .meeting`, beside the "class"
+            // form it has always had — some of which are keys for the first
+            // time, having been typed inline in a planner until now. Both forms
+            // take the SAME inputs apart from the noun and, where a page is
+            // named, the page's shape ("Unit 3, Day 4" against "Week 5"), so
+            // the difference between the two keys is the noun and nothing else.
+            // None of the twins is ever part of what a model reads; see
+            // documentation/10-local-ai-assistant.md.
+            "otherClassesWouldMoveAndLinksFollowForAMeeting": AssistWording.otherClassesWouldMove(
+                moving: 2, renaming: 1, noun: .meeting
+            ),
+            "otherClassesWouldMoveKeepingTheirNamesForAMeeting": AssistWording.otherClassesWouldMove(
+                moving: 2, renaming: 0, noun: .meeting
+            ),
+            "linkedClassWasLeftAloneForAMeeting": AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(["Week 4"]), count: 1, noun: .meeting
+            ),
+            "linkedClassesWereLeftAloneForAMeeting": AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(["Week 4", "Week 5"]), count: 2, noun: .meeting
+            ),
+            "mayIAskForYourDates": AssistWording.mayIAskForYourDates(for: .class),
+            "mayIAskForYourDatesForAMeeting": AssistWording.mayIAskForYourDates(for: .meeting),
+            "datesNotGivenYet": AssistWording.datesNotGivenYet(for: .class),
+            "datesNotGivenYetForAMeeting": AssistWording.datesNotGivenYet(for: .meeting),
+            "wouldMakeRoom": AssistWording.wouldMakeRoom(
+                count: 2, at: "Unit 3, Day 4", course: course, section: section
+            ),
+            "wouldMakeRoomForAMeeting": AssistWording.wouldMakeRoom(
+                count: 2, at: "Week 5", course: course, section: section, noun: .meeting
+            ),
+            "movedToLaterDays": AssistWording.movedToLaterDays(count: 3),
+            "movedToLaterDaysForAMeeting": AssistWording.movedToLaterDays(count: 3, noun: .meeting),
+            "makingRoomCannotBeUndone": AssistWording.makingRoomCannotBeUndone(),
+            "makingRoomCannotBeUndoneForAMeeting": AssistWording.makingRoomCannotBeUndone(noun: .meeting),
+            "madeRoom": AssistWording.madeRoom(count: 1, at: "Unit 3, Day 4"),
+            "madeRoomForAMeeting": AssistWording.madeRoom(count: 1, at: "Week 5", noun: .meeting),
+            "publishedTheClassOn": AssistWording.publishedTheClassOn("2026-09-14"),
+            "publishedTheClassOnForAMeeting": AssistWording.publishedTheClassOn(
+                "2026-09-14", noun: .meeting
+            ),
+            "wouldAddPages": AssistWording.wouldAddPages(
+                count: 1, to: "Unit 4 of \(course) Section \(section)"
+            ),
+            "wouldAddPagesForAMeeting": AssistWording.wouldAddPages(
+                count: 1, to: "\(course) Section \(section)", noun: .meeting
+            ),
+            "spareDatesAfterThese": AssistWording.spareDatesAfterThese(
+                count: 3, source: "timetable.xlsx, block H"
+            ),
+            "spareDatesAfterTheseForAMeeting": AssistWording.spareDatesAfterThese(
+                count: 3, source: "timetable.xlsx, block H", noun: .meeting
+            ),
+            "sharingTheLastDay": AssistWording.sharingTheLastDay(count: 1),
+            "sharingTheLastDayForAMeeting": AssistWording.sharingTheLastDay(count: 1, noun: .meeting),
+            "addedTheNextPage": AssistWording.addedTheNextPage(),
+            "addedTheNextPageForAMeeting": AssistWording.addedTheNextPage(noun: .meeting),
+            "reDatingOntoTheDatesOnFile": AssistWording.reDatingOntoTheDatesOnFile(
+                course: course, section: section
+            ),
+            "reDatingOntoTheDatesOnFileForAMeeting": AssistWording.reDatingOntoTheDatesOnFile(
+                course: course, section: section, noun: .meeting
+            ),
+            "pagesRunFrom": AssistWording.pagesRunFrom(
+                count: 12, first: "2026-09-08 (Tuesday)", last: "2026-12-15 (Tuesday)"
+            ),
+            "pagesRunFromForAMeeting": AssistWording.pagesRunFrom(
+                count: 12, first: "2026-09-08 (Tuesday)", last: "2026-12-15 (Tuesday)", noun: .meeting
+            ),
+            "pagesWithNoDayOfTheirOwn": AssistWording.pagesWithNoDayOfTheirOwn(
+                count: 2, lastDay: "2026-12-15"
+            ),
+            "pagesWithNoDayOfTheirOwnForAMeeting": AssistWording.pagesWithNoDayOfTheirOwn(
+                count: 2, lastDay: "2026-12-15", noun: .meeting
+            ),
+            "movesAndBecomesADraft": AssistWording.movesAndBecomesADraft(
+                page: pagePlaceholder, to: "2026-12-15"
+            ),
+            "movesAndBecomesADraftForAMeeting": AssistWording.movesAndBecomesADraft(
+                page: pagePlaceholder, to: "2026-12-15", noun: .meeting
+            ),
+            "movesToTheFirstDay": AssistWording.movesToTheFirstDay(
+                page: pagePlaceholder, to: "2026-09-08"
+            ),
+            "movesToTheFirstDayForAMeeting": AssistWording.movesToTheFirstDay(
+                page: pagePlaceholder, to: "2026-09-08", noun: .meeting
+            ),
+            "reDated": AssistWording.reDated(count: 12, pagesTheyUse: 5),
+            "reDatedForAMeeting": AssistWording.reDated(count: 12, pagesTheyUse: 5, noun: .meeting),
         ]
         return [
             "note": "Generated from mac-app AssistWording by `Plantoir --write-contracts`. "
@@ -249,7 +339,8 @@ enum AssistContract {
                         + "written the way the scheduled card writes its own moment "
                         + "(day, date and time in this Mac's own style), e.g. "
                         + "Friday 25 September, 6:30 AM",
-                "page": "the page being copied, e.g. Unit 3, Day 2",
+                "page": "a page's title, e.g. Unit 3, Day 2 — the page being copied, or one a "
+                      + "re-date moves",
                 "copy": "what the copy is called, e.g. Unit 3, Day 3",
                 "moving": "how many later classes move, counted once each even when a page is "
                         + "both renamed and re-dated — here 2",

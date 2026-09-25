@@ -172,7 +172,11 @@ struct AssistPublishPlan {
     /// none of them is how a person says it — `publishForSection1` especially,
     /// which is the name of a line in a file, shown to somebody who asked to
     /// hide a lesson.
-    func describe(mostListed: Int = 15) -> String {
+    ///
+    /// `noun` is what the course calls one of its class pages (#267). The
+    /// model is always given the `.class` form; a club's CARD says
+    /// "meeting" — see `AssistToolOutcome.planned(_:plan:card:)`.
+    func describe(mostListed: Int = 15, noun: ClassNoun = .class) -> String {
         var lines: [String] = []
         lines.append("\(courseCode) Section \(sectionNumber): \(verb)ing.")
         lines.append("")
@@ -225,7 +229,7 @@ struct AssistPublishPlan {
                 names.append(page.displayTitle)
             }
             lines.append(AssistWording.linkedClassesWereLeftAlone(
-                AssistPublishPlan.listing(names), count: names.count
+                AssistPublishPlan.listing(names), count: names.count, noun: noun
             ))
         }
 

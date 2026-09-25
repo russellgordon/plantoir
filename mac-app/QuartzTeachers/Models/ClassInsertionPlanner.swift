@@ -638,8 +638,15 @@ struct ClassInsertionPlan {
         return names.count
     }
 
-    /// The proposal, as a teacher would hear it.
+    /// The proposal, as a teacher would hear it — and as the model reads it,
+    /// which is why this form always says "class".
     var description: String {
+        return describe(noun: .class)
+    }
+
+    /// The proposal in the course's own noun (#267): "meeting" on a club's
+    /// card. Only the card takes this; see `AssistToolOutcome.planned`.
+    func describe(noun: ClassNoun) -> String {
         var lines: [String] = []
 
         if changesNothing {
@@ -650,8 +657,10 @@ struct ClassInsertionPlan {
             return lines.joined(separator: "\n")
         }
 
-        let room: String = added.count == 1 ? "one new class" : "\(added.count) new classes"
-        lines.append("Make room for \(room) at \(positionTitle) in \(courseCode) Section \(sectionNumber).")
+        lines.append(AssistWording.wouldMakeRoom(
+            count: added.count, at: positionTitle,
+            course: courseCode, section: "\(sectionNumber)", noun: noun
+        ))
         lines.append("")
 
         lines.append("New, and unpublished until you write \(added.count == 1 ? "it" : "them"):")
@@ -686,7 +695,7 @@ struct ClassInsertionPlan {
 
         if !moves.isEmpty {
             lines.append("")
-            lines.append("Moved to later class days — \(moves.count):")
+            lines.append(AssistWording.movedToLaterDays(count: moves.count, noun: noun))
             var shown: Int = 0
             for move in moves {
                 if shown >= ClassInsertionPlan.mostShown {
