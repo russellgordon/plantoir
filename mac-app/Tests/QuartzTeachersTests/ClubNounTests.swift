@@ -246,6 +246,8 @@ final class ClubNounTests: XCTestCase {
             ["unit": "3", "howMany": "2"]
         )
         XCTAssertNil(AssistCardCommand.matching("make room for one meeting at day 5"))
+        // The shipped near-miss: "at Unit 3" names no day and goes to the model.
+        XCTAssertNil(AssistCardCommand.matching("make room for a class at Unit 3"))
         XCTAssertNil(AssistCardCommand.matching("make room for two meeting at week 5"))
         XCTAssertNil(AssistCardCommand.matching("make room for one meeting at 5 5"))
         // The two-number shape is untouched.
@@ -261,7 +263,7 @@ final class ClubNounTests: XCTestCase {
         let made = try AssistFixture.makeRunner()
         defer { try? FileManager.default.removeItem(at: made.root) }
         let command: AssistCardCommand = try XCTUnwrap(
-            AssistCardCommand.matching("make room for one class at unit 5")
+            AssistCardCommand.matching("make room for one class at week 5")
         )
         var arguments: [String: Any] = ["course": "ICS3U", "section": 1]
         for (key, value) in command.arguments {

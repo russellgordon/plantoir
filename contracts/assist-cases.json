@@ -498,7 +498,7 @@
         "example" : "make room for one meeting at Week 5",
         "fills" : {
           "howMany" : "<count>, as a number — words up to twelve are understood",
-          "unit" : "<number> — the one number a numbered course's page names carry. <word> is not read: this table cannot know a course's own word, so any single word except 'day' is taken, and a Unit/Day course given a unit and no day asks which day rather than guessing one"
+          "unit" : "<number> — the one number a numbered course's page names carry. <word> is not read: this table cannot know a course's own word, so any single word except 'day' and 'unit' is taken ('at unit 3' names no day and goes to the model, as it always has), and a Unit/Day course given a unit and no day asks which day rather than guessing one"
         },
         "notThis" : "make room for one meeting at day 5",
         "shape" : "make room for <count> class|classes|meeting|meetings at <word> <number>",
