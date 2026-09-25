@@ -452,6 +452,7 @@ recounted 2026-09-07.
 | Which folders the marks checklist OFFERS | `shared-rules.json` → `gradedFolders.choices` | `GradedFolderChoices` (14 cases, the depth cap and the skip list), against real directory trees — a walk over a fixture is not a walk. Proposed from Windows 2026-09-06 and run on the mac since 2026-09-09 (issues [#79](https://github.com/russellgordon/plantoir/issues/79) and [#112](https://github.com/russellgordon/plantoir/issues/112)); both platforms now go red for it. |
 | What a window lets go of when it is pointed at a different working folder | `shared-rules.json` → `workingFolderSelection` | `SharedRulesContract` (1, running all four cases), `WorkingFolderSelection` (8), `WindowRestorationScenario` (2 of its 8). **Run on BOTH platforms since 2026-09-19**: Windows plays the same four cases through `SharedRuleContractTests.AWindowLetsGoOfTheOldFoldersSelectionAsTheContractSays`, against a `Plantoir.Core.Models.WindowFolderState` — the rule and the selection type moved down into Core for exactly this reason, since `Plantoir.Tests` cannot reference the WinUI project and so could gate nothing while both lived there. Added from the mac 2026-09-18 ([#93](https://github.com/russellgordon/plantoir/issues/93), handed over as [#162](https://github.com/russellgordon/plantoir/issues/162)), where Windows had the identical defect and the suite stayed GREEN because this file deserialises `shared-rules.json` by NAMED key and a key nobody asks for is silently ignored — the same precedent as `gradedFolders.removingAFolder` above. Read `howToRunACase` before touching the runner: each case needs its OWN folders (one of them deletes a course), and `then.removeTheSelectedCourseAndReload` and `expectNamesALoadedCourse` are what pin the “Course Not Found” that must SURVIVE. `alsoCleared` reduces to the selection on Windows and the reduction is a finding, not an omission — the mac's five confirmations and four alerts are awaited modal `ContentDialog`s there, continuations rather than fields; `documentation/12-windows-app.md` has it, including the one route the modality does NOT close. |
 | What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (9), SiteHealthFinding (19), ScheduledDeployFolderProblem (3), SiteHealthRepair (25), and `scripts/test_site_health.py`. `marker.consoleCases.cases` (4) arrived 2026-09-25 with [#153](https://github.com/russellgordon/plantoir/issues/153) — what the console shows of a marker line glued to another, still arriving, or on its own — and `SiteHealthContract.testTheConsoleCasesHold` walks all four; **no Windows reader**, see the census table below |
+| What the build does with a page whose settings it cannot read: hidden in every section, named once per section build with the line it stopped near, and an unreadable front page refused in its own words ([#246](https://github.com/russellgordon/plantoir/issues/246)) | `shared-rules.json` → `unreadablePageSettings`, `siteHealth.checks[pageSettingsUnreadable]`; `app-rules.json` → `failureExplanations` (the three front-page cases) | `scripts/test_unreadable_page_settings.py` (in the image by `verify.sh`, on Windows by `PythonToolchainTests`), `scripts/test_site_health.py`, `scripts/check_visibility_against_the_site.py` (down to the site, `verify.sh` only), SiteHealthContract and AppRulesContract on the mac. AUTHORED. Shared Python, so Windows inherits the rule, the console line and the finding's words; it owes the front page's `FailureExplainer` card |
 
 ### Which of these the WINDOWS suite runs
 
@@ -753,6 +754,22 @@ before it and **188** after: one new list, `shared-rules.json` →
 is below. No trail event was added — the scheduled run now WRITES the existing
 `folder problem found`, whose `why` grew — so `activityTrail.mustRecord` is
 unchanged at **75**.
+
+**Re-taken 2026-09-25 with [#246](https://github.com/russellgordon/plantoir/issues/246)**
+(a page whose settings the build cannot read is hidden and named), counted ON
+THIS BRANCH, which is built on #153's (05bc5216). The walker read **188**
+before it and **189** after: one new list, `shared-rules.json` →
+`unreadablePageSettings.cases` (18). It HAS a Windows reader —
+`scripts/test_unreadable_page_settings.py`, which `PythonToolchainTests`
+discovers (it needs python-frontmatter 1.3.0 and PyYAML 6.0.3 on that
+interpreter, like `test_dates_follow_the_class.py`) — so it is not in the
+table below. Rows, not lists: `app-rules.json` → `failureExplanations.cases`
+went from 16 to 19 (the unreadable front page's own card, which Windows'
+`FailureExplainer` owes — red there until it has it), `siteHealth.checks` from
+6 to 7 and `siteHealth.marker.examples` from 2 to 3. No trail event was added —
+the finding reaches the trail through `folder problem found`, whose `why`
+grew — so `activityTrail.mustRecord` is unchanged at **75**, and
+`shared-rules.json` now has thirty-one top-level keys.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through

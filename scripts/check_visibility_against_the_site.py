@@ -99,11 +99,11 @@ FORMS_THE_CONTRACT_CANNOT_CARRY = [
 # shows up.
 #
 # Since #246 the three left-behind pages that STOPPED the build are hidden
-# instead, because the build hides a page whose settings it cannot read. For
-# `publish:\n# note\n  false` that is the same answer as before the write, but
-# the sweep is still owed: a left-behind continuation turns a page that built
-# cleanly into one the build names as unreadable, and a page the teacher meant
-# to SHOW (`publish:\n  a: 1`, `publish:\n- a`) disappears, on every build.
+# instead, because the build hides a page whose settings it cannot read. That
+# is what these writes asked for, and the sweep is still owed: the page is
+# named as unreadable on every build, and the same orphan left behind by a
+# write that SHOWS a page (`publish: true` over `publish:\n  a: 1`) would now
+# hide the page the teacher asked to show.
 #
 # **What this does NOT pin is the sweep itself.** Nothing in `verify.sh` runs
 # Swift or C#: delete `PageVisibilityReader.continuationLineIndices` and every

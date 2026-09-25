@@ -7408,7 +7408,7 @@
       }
     ],
     "builderAgreement": {
-      "note": "Whether the WEBSITE BUILDER would read the composed page's settings block the same way the app does. A composed text that fails this is NOT COPIED, whatever the app's own reader says - the two shapes below were reproduced end to end with the copy certified hidden here and PUBLISHED there.",
+      "note": "Whether the WEBSITE BUILDER would read the composed page's settings block the same way the app does. A composed text that fails this is NOT COPIED, whatever the app's own reader says - the two shapes below were reproduced end to end with the copy certified hidden here and PUBLISHED there. Since #246 (2026-09-25) the builder HIDES a page whose settings it cannot read and names it in a folder-problem finding, where before it published such a page or stopped the whole build - so the cases below that say \"reads no keys\" or \"PUBLISHED\" describe what happened BEFORE #246 (unreadablePageSettings has what happens now). The copy is STILL refused: a copy that arrives hidden by accident, and named as a problem on every build, is not a clean copy. Whether this guard can now be relaxed is a follow-up, not part of #246.",
       "cases": [
         {
           "name": "an ordinary composed page",
@@ -7464,7 +7464,7 @@
       },
       {
         "name": "a YAML-1.1 bool word as a KEY",
-        "why": "`yes:` loads as a True KEY rather than a string, and build_site.py then raises on it. When the build cannot parse the block it reads NO keys, so the page is PUBLISHED everywhere.",
+        "why": "`yes:` loads as a True KEY rather than a string, and build_site.py then raises on it. Before #246, when the build could not parse the block it read NO keys, so the page was PUBLISHED everywhere; since #246 it is hidden everywhere and named (unreadablePageSettings) - still not the page the teacher copied.",
         "text": "---\npublishForSection1: false\nyes: value\npublish: false\n---\nBody\n",
         "builderAgrees": false
       },
@@ -7510,7 +7510,7 @@
       },
       {
         "name": "an indented continuation of a plain scalar that contains a colon",
-        "why": "PyYAML raises on it, and when the build cannot parse the block it reads NO keys, so the page is published whatever the copy wrote. 30 of the 36 failures the grammar fuzz found were of this kind - which is why the test is a WHITELIST of shapes rather than a list of forbidden ones.",
+        "why": "PyYAML raises on it, and before #246, when the build could not parse the block it read NO keys, so the page was published (or the build stopped) whatever the copy wrote; since #246 it is hidden and named instead. 30 of the 36 failures the grammar fuzz found were of this kind - which is why the test is a WHITELIST of shapes rather than a list of forbidden ones.",
         "text": "---\npublishForSection1: false\ndescription: A long note\n  about time: 10am\npublish: false\n---\nBody\n",
         "builderAgrees": false
       },

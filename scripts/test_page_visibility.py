@@ -281,10 +281,11 @@ class CourseLevelSplitterTests(unittest.TestCase):
         self.assertIn("publishForSection2: false", out)
         self.assertNotIn("  false", out)
 
-        # The same where the key's own line looks complete. That page does not
-        # build either way — the orphaned value is a mapping error — so this is
-        # a page that stops building being split into pages that still do not,
-        # rather than a published page becoming one that will not build.
+        # The same where the key's own line looks complete. The build cannot
+        # parse that page either way — the orphaned value is a mapping error —
+        # so this is an unreadable page being split into pages that still are
+        # (hidden and named by the build since #246; before it, a build that
+        # stopped), rather than a published page becoming an unreadable one.
         out = self.split("publish: false\n# note\n  false")
         self.assertIn("publishForSection1: false", out)
         self.assertNotIn("  false", out)
