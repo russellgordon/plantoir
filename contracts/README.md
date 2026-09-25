@@ -745,6 +745,13 @@ gained the kind and sentence `courseWasBusy` (objects, not lists), and
 `shared-rules.json` still has twenty-nine top-level keys — `declining` sits
 inside `workLeases`, beside #245's `liveness`.
 
+**Re-taken 2026-09-25 with [#287](https://github.com/russellgordon/plantoir/issues/287)**
+(every import refusal and every Keep a Copy failure on the trail), counted ON
+THIS BRANCH: **187**, unchanged — no new list. `activityTrail.mustRecord` grew
+from 75 to **76** (`course could not be kept for reference`), and the `carries`
+of `course could not be imported for reference` now says it is written for
+every course the summary lists as not imported.
+
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
 objects only*: an array inside a case is a FIELD of that case (each
