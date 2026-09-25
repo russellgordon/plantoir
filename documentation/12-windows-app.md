@@ -1312,9 +1312,12 @@ finders are still hand-rolled and were deliberately left alone:
 `CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
 #140, so a restore reaches different pages on the two platforms — that is
 [issue #177](https://github.com/russellgordon/plantoir/issues/177), a
-`decision`) and `SectionAdder.FrontmatterLines` (strict on BOTH platforms, so
-the section carry agrees with itself — parity, not a divergence, and
-documented rather than filed). Four finders, two unified. Check which one you
+`decision`) and `SectionAdder.FrontmatterLines` (strict here; it was strict
+on the mac too until #175, 2026-09-25, when that strictness was measured to
+PUBLISH a page hidden in section 1 into a newly added section — the mac now
+uses the shared finder and splices by line, and this one owes the same, see
+`documentation/08-course-config-reference.md` → "A writer must find the BLOCK").
+Four finders, two unified here, three on the mac. Check which one you
 are looking at before "tidying" any of them.
 
 A third fault was shared with the mac and **was fixed here first, on

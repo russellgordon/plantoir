@@ -9,6 +9,24 @@ enum SectionAdder {
 
     // MARK: - Types
 
+    /// What adding a section did to one course-level page.
+    enum PageOutcome: Equatable {
+
+        /// Nothing: no frontmatter, no per-section keys, or the new section's
+        /// keys were already there.
+        case untouched
+
+        /// Given a date and the lowest section's published-or-hidden setting.
+        case givenKeys
+
+        /// Given a date and HELD BACK, because the lowest section's setting
+        /// runs onto the lines below it and cannot be read as one value.
+        /// The safe direction — a page wrongly hidden is one a teacher
+        /// notices; a page wrongly published is one nobody does — and the
+        /// trail counts these separately so it is not silent (review of #175).
+        case givenKeysAndKeptHiddenBecauseUnreadable
+    }
+
     /// Why a section could not be added, in words a teacher can act on.
     enum Problem: LocalizedError {
         case sectionAlreadyListed(String, Int)
@@ -132,7 +150,9 @@ enum SectionAdder {
         // for. A page that has those keys for the existing sections needs a
         // pair for this one too, or the new section builds it with no date
         // and no publishing state at all.
-        extendCourseLevelPages(in: course, toInclude: sectionNumber, created: created)
+        let extended: (givenKeys: Int, keptHiddenUnreadable: Int) = extendCourseLevelPages(
+            in: course, toInclude: sectionNumber, created: created
+        )
 
         // Only once the folder is safely in place does the section join the
         // course's settings — the same order restore uses, so a failure
@@ -142,6 +162,38 @@ enum SectionAdder {
         numbers.sort()
         course.configuration.setSectionNumbers(numbers)
         try course.configuration.write(to: course.configFileURL)
+
+        // Rule 5: this writes into pages the teacher never opened, so the
+        // trail says it happened and how many — never which.
+        ActivityTrail.note(
+            .sectionAdded,
+            SectionAdder.trailLine(
+                sectionNumber: sectionNumber,
+                pagesGivenKeys: extended.givenKeys,
+                pagesKeptHiddenUnreadable: extended.keptHiddenUnreadable
+            ),
+            course: course.code,
+            section: sectionNumber
+        )
+    }
+
+    /// The trail's line for a section added: what a teacher would say they
+    /// did, and how many shared pages it touched.
+    ///
+    /// Pages kept hidden because their setting could not be read are counted
+    /// among the pages given keys, and named as a count of their own — never
+    /// by title — so "why is this page hidden in section 2?" has a line.
+    static func trailLine(sectionNumber: Int, pagesGivenKeys: Int, pagesKeptHiddenUnreadable: Int = 0) -> String {
+        let pages: String = pagesGivenKeys == 1 ? "1 page" : "\(pagesGivenKeys) pages"
+        var line: String = "added section \(sectionNumber); \(pages) shared by every section "
+            + "given a date and a published-or-hidden setting for it"
+        if pagesKeptHiddenUnreadable > 0 {
+            let unread: String = pagesKeptHiddenUnreadable == 1
+                ? "1 of them was" : "\(pagesKeptHiddenUnreadable) of them were"
+            line += "; \(unread) kept hidden because its setting for the other sections "
+                + "could not be read"
+        }
+        return line
     }
 
     /// Finds the directory of the lowest-numbered section in the course that exists on disk.
@@ -236,7 +288,7 @@ enum SectionAdder {
             return
         }
 
-        guard let lines = frontmatterLines(ofFileAt: sourceURL) else {
+        guard let block = PageFrontmatter.block(in: text) else {
             try text.write(to: destinationURL, atomically: true, encoding: .utf8)
             return
         }
@@ -244,21 +296,22 @@ enum SectionAdder {
         let isRootIndex: Bool = relativePath == "index.md"
         let isTopLevelPerSectionFile: Bool = course.configuration.perSectionFiles.contains(relativePath)
 
-        var newLines: [String] = []
-        for line in lines {
+        // Edited in place, line by line, INSIDE the block: the fence the
+        // teacher typed, anything before it and the whole body are never
+        // rebuilt, so none of them can be rebuilt wrongly. See
+        // `extendFrontmatter` for what rebuilding them cost.
+        var allLines: [String] = text.components(separatedBy: "\n")
+        for position in (block.openIndex + 1)..<block.closeIndex {
+            let line: String = allLines[position]
+            let lineEnding: String = SectionAdder.carriageReturn(endingLine: line)
             if isRootIndex && line.hasPrefix("title:") {
                 let newTitle: String = sectionTitle(for: course, sectionNumber: sectionNumber)
-                newLines.append("title: \(newTitle)")
+                allLines[position] = "title: \(newTitle)" + lineEnding
             } else if (isRootIndex || isTopLevelPerSectionFile) && line.hasPrefix("created:") {
-                newLines.append("created: \(created)")
-            } else {
-                newLines.append(line)
+                allLines[position] = "created: \(created)" + lineEnding
             }
         }
-
-        let prefixToDrop: Int = ("---\n" + lines.joined(separator: "\n")).count
-        let restOfText: String = String(text.dropFirst(prefixToDrop))
-        let rewritten: String = "---\n" + newLines.joined(separator: "\n") + restOfText
+        let rewritten: String = allLines.joined(separator: "\n")
         try rewritten.write(to: destinationURL, atomically: true, encoding: .utf8)
     }
 
@@ -272,7 +325,13 @@ enum SectionAdder {
     /// fresh, because the page did not appear in this section until now.
     /// Pages with no per-section keys are left alone — a plain `created:`
     /// already applies to every section, including this one.
-    static func extendCourseLevelPages(in course: Course, toInclude sectionNumber: Int, created: String) {
+    ///
+    /// Returns how many pages were given keys, and how many of those were
+    /// kept hidden because their setting could not be read, for the trail.
+    @discardableResult
+    static func extendCourseLevelPages(
+        in course: Course, toInclude sectionNumber: Int, created: String
+    ) -> (givenKeys: Int, keptHiddenUnreadable: Int) {
         var sectionFolderNames: Set<String> = Set<String>()
         for number in course.sectionNumbers {
             sectionFolderNames.insert("section\(number)")
@@ -281,8 +340,10 @@ enum SectionAdder {
         guard let enumerator = fileManager.enumerator(
             at: course.directoryURL, includingPropertiesForKeys: nil
         ) else {
-            return
+            return (0, 0)
         }
+        var pagesGivenKeys: Int = 0
+        var pagesKeptHiddenUnreadable: Int = 0
         while let entry = enumerator.nextObject() as? URL {
             if sectionFolderNames.contains(entry.lastPathComponent) {
                 enumerator.skipDescendants()
@@ -291,20 +352,33 @@ enum SectionAdder {
             if entry.pathExtension != "md" {
                 continue
             }
-            extendFrontmatter(ofPageAt: entry, toInclude: sectionNumber, created: created)
+            switch extendFrontmatter(ofPageAt: entry, toInclude: sectionNumber, created: created) {
+            case .untouched:
+                break
+            case .givenKeys:
+                pagesGivenKeys += 1
+            case .givenKeysAndKeptHiddenBecauseUnreadable:
+                pagesGivenKeys += 1
+                pagesKeptHiddenUnreadable += 1
+            }
         }
+        return (pagesGivenKeys, pagesKeptHiddenUnreadable)
     }
 
     /// One page's frontmatter, given a pair for the new section. Only the
     /// frontmatter block is read: a `publish: false` shown inside a fenced code
     /// block further down the page is documentation, not metadata.
-    static func extendFrontmatter(ofPageAt url: URL, toInclude sectionNumber: Int, created: String) {
+    ///
+    /// Says what it did, for the trail.
+    @discardableResult
+    static func extendFrontmatter(ofPageAt url: URL, toInclude sectionNumber: Int, created: String) -> PageOutcome {
         guard let text = try? String(contentsOf: url, encoding: .utf8),
-              let lines = frontmatterLines(ofFileAt: url) else {
-            return
+              let block = PageFrontmatter.block(in: text) else {
+            return .untouched
         }
+        let lines: [String] = block.lines
         if alreadyHasKeys(for: sectionNumber, in: lines) {
-            return
+            return .untouched
         }
 
         var lowestSection: Int? = nil
@@ -317,11 +391,12 @@ enum SectionAdder {
             }
         }
         guard let source = lowestSection else {
-            return
+            return .untouched
         }
 
         var addition: [String] = ["createdSection\(sectionNumber): \(created)"]
-        if let publish = publishValue(forSection: source, in: lines) {
+        let reading: (value: String?, couldBeRead: Bool) = publishReading(forSection: source, in: lines)
+        if let publish = reading.value {
             // An empty value is a null, and `key:` is how YAML spells one —
             // `key: ` with a trailing space would say the same thing and look
             // like a typo in the teacher's file.
@@ -333,21 +408,73 @@ enum SectionAdder {
 
         // The pair goes after the last per-section key, so each section's
         // lines stay together and in order.
-        var updated: [String] = []
         var lastKeyIndex: Int = -1
         for (index, line) in lines.enumerated() where perSectionKeyNumber(in: line) != nil {
             lastKeyIndex = index
         }
-        for (index, line) in lines.enumerated() {
-            updated.append(line)
-            if index == lastKeyIndex {
-                updated.append(contentsOf: addition)
-            }
+        if lastKeyIndex < 0 {
+            return .untouched
         }
 
-        let body: String = String(text.dropFirst(("---\n" + lines.joined(separator: "\n")).count))
-        let rewritten: String = "---\n" + updated.joined(separator: "\n") + body
-        try? rewritten.write(to: url, atomically: true, encoding: .utf8)
+        // Spliced in by LINE, at the position the shared finder reported —
+        // never by rebuilding "---" plus the block and cutting the old text
+        // after it by a character count. That arithmetic assumed a fence of
+        // exactly three dashes on the first line, and the finder accepts what
+        // the build accepts (three dashes or more, blank lines before them,
+        // spaces after). MEASURED with the build's own reader on each shape
+        // (GitHub #175): with a `----` fence, a blank line before it or a
+        // trailing space, the old cut left one character of the old text
+        // behind, so the new date read `…-0400e`, the `e` of `true`; with
+        // Windows line endings the build read NO keys at all and printed the
+        // whole block to students as the page's first lines.
+        //
+        // The new lines take the line ending of the line they follow, so a
+        // page saved with Windows line endings stays one.
+        //
+        // And AFTER the last key's value, not merely its line. A value can
+        // run onto the lines below the key (`publishForSection1:` with
+        // `  false` under it); a pair put between the two split them, so
+        // section 1 lost its setting — PUBLISHED — and the new section read
+        // the two joined (measured by the review of #175; this was #181's
+        // report for the `---` fence, and #175 made it reachable on four more
+        // fences). The same rule every other writer uses to find where a value
+        // ends, asked on the whole file's lines, bounded by the block.
+        var allLines: [String] = text.components(separatedBy: "\n")
+        let lastKeyPosition: Int = block.openIndex + 1 + lastKeyIndex
+        let lineEnding: String = SectionAdder.carriageReturn(endingLine: allLines[lastKeyPosition])
+        let lastKeysValue: [Int] = PageVisibilityReader.continuationLineIndices(
+            belowKeyAt: lastKeyPosition,
+            in: allLines,
+            closeIndex: block.closeIndex,
+            keyValueWasEmpty: SectionAdder.valueIsEmpty(onKeyLine: allLines[lastKeyPosition])
+        )
+        var insertAt: Int = lastKeyPosition + 1 + lastKeysValue.count
+        for newLine in addition {
+            allLines.insert(newLine + lineEnding, at: insertAt)
+            insertAt += 1
+        }
+        let rewritten: String = allLines.joined(separator: "\n")
+        do {
+            try rewritten.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            return .untouched
+        }
+        if reading.couldBeRead {
+            return .givenKeys
+        }
+        return .givenKeysAndKeptHiddenBecauseUnreadable
+    }
+
+    /// Whether a per-section key's line has nothing after its colon — the one
+    /// shape whose value can continue at column 0. Asked with the reader's own
+    /// matcher, for whichever of the three per-section names the line has.
+    static func valueIsEmpty(onKeyLine line: String) -> Bool {
+        let bare: String = PageFrontmatter.trimmingCarriageReturn(line)
+        guard let colon = bare.firstIndex(of: ":") else {
+            return false
+        }
+        let key: String = String(bare[bare.startIndex..<colon])
+        return AssistPageVisibility.valueIsEmpty(ofKey: key, inLine: line)
     }
 
     /// Does this page already carry the new section's keys?
@@ -402,6 +529,16 @@ enum SectionAdder {
     /// answer matches the site, and this one errs the safe way, which is also
     /// the way Windows and `setup_course.per_section_frontmatter` err.
     static func publishValue(forSection sectionNumber: Int, in lines: [String]) -> String? {
+        return publishReading(forSection: sectionNumber, in: lines).value
+    }
+
+    /// `publishValue`, and whether the value could be READ — false when it
+    /// is written as held back only because it runs onto the next line, is
+    /// not complete on its own line, or is a legacy value the reader cannot
+    /// tell. Those pages are counted on the trail.
+    static func publishReading(
+        forSection sectionNumber: Int, in lines: [String]
+    ) -> (value: String?, couldBeRead: Bool) {
         // The reader's own matcher and the reader's own LAST-wins rule, so the
         // value carried across is the value the build reads. A prefix test
         // missed `"publishForSection1": false` entirely, and stopping at the
@@ -413,18 +550,18 @@ enum SectionAdder {
             let continues: Bool = entry.nextLine?.hasPrefix(" ") == true
                 || entry.nextLine?.hasPrefix("\t") == true
             if continues {
-                return "false"
+                return ("false", false)
             }
             if value.isEmpty {
                 // A key with nothing after it is a null, which PUBLISHES the
                 // page. Copying the emptiness keeps the new section saying
                 // what the old one says; writing "false" would hide it.
-                return ""
+                return ("", true)
             }
             if !PageVisibilityReader.isCompleteOnItsOwnLine(entry.value) {
-                return "false"
+                return ("false", false)
             }
-            return value
+            return (value, true)
         }
 
         if let entry = PageVisibilityReader.lastTopLevelEntry(
@@ -435,12 +572,14 @@ enum SectionAdder {
             )
             switch PageVisibilityReader.answerFromDraftFamily(scalar) {
             case .visible:
-                return "true"
-            case .hidden, .cannotTell, .saysNothing:
-                return "false"
+                return ("true", true)
+            case .hidden, .saysNothing:
+                return ("false", true)
+            case .cannotTell:
+                return ("false", false)
             }
         }
-        return nil
+        return (nil, true)
     }
 
     /// The section number in a per-section key.
@@ -492,10 +631,11 @@ enum SectionAdder {
         if let sibling, let siblingLines = frontmatterLines(ofFileAt: sibling) {
             var result: [String] = []
             for line in siblingLines {
+                let lineEnding: String = SectionAdder.carriageReturn(endingLine: line)
                 if line.hasPrefix("created:") {
-                    result.append("created: \(created)")
+                    result.append("created: \(created)" + lineEnding)
                 } else if line.hasPrefix("title:"), let newTitle {
-                    result.append("title: \(newTitle)")
+                    result.append("title: \(newTitle)" + lineEnding)
                 } else {
                     result.append(line)
                 }
@@ -507,26 +647,34 @@ enum SectionAdder {
         return "title: \(title)\ncreated: \(created)\npublish: \(publish)"
     }
 
-    /// The lines between a file's opening and closing `---` markers, or nil
-    /// when the file has no frontmatter to speak of.
+    /// The lines between a file's opening and closing fences, or nil when the
+    /// file has no frontmatter to speak of.
+    ///
+    /// Found by `PageFrontmatter.block(in:)` — the one idea of where a page's
+    /// frontmatter is that every other reader and writer uses (#140), and the
+    /// build's own: a fence of three dashes or more, blank lines allowed
+    /// before it. This was the last copy of the old rule, exactly `---` on the
+    /// first line, and a page fenced any other way was silently skipped when
+    /// a section was added — so the new section got no `publishForSection`
+    /// key, and a page the teacher had HIDDEN in section 1 was published in
+    /// the new one, because a page with no key is shown (GitHub #175).
+    /// Lines keep any carriage return a Windows-saved file has on them.
     static func frontmatterLines(ofFileAt url: URL) -> [String]? {
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+        guard let text = try? String(contentsOf: url, encoding: .utf8),
+              let block = PageFrontmatter.block(in: text) else {
             return nil
         }
-        let lines: [String] = text.components(separatedBy: "\n")
-        guard lines.first == "---" else {
-            return nil
+        return block.lines
+    }
+
+    /// The carriage return a line of a Windows-saved file ends with, or
+    /// nothing — so a line written in its place, or beside it, ends the same
+    /// way and the file keeps one kind of line ending.
+    static func carriageReturn(endingLine line: String) -> String {
+        if line.hasSuffix("\r") {
+            return "\r"
         }
-        var collected: [String] = []
-        var index: Int = 1
-        while index < lines.count {
-            if lines[index] == "---" {
-                return collected
-            }
-            collected.append(lines[index])
-            index += 1
-        }
-        return nil
+        return ""
     }
 
     /// The new section's landing-page title. A sibling section's title with
@@ -539,7 +687,9 @@ enum SectionAdder {
            let siblingLines = frontmatterLines(ofFileAt: siblingIndex) {
             for line in siblingLines {
                 if line.hasPrefix("title:") {
-                    let siblingTitle: String = String(line.dropFirst("title:".count)).trimmingCharacters(in: .whitespaces)
+                    // `.whitespacesAndNewlines`, so the carriage return at the
+                    // end of a Windows-saved line is not carried into the title.
+                    let siblingTitle: String = String(line.dropFirst("title:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
                     if let range = siblingTitle.range(of: #"Section \d+$"#, options: .regularExpression) {
                         return siblingTitle.replacingCharacters(in: range, with: "Section \(sectionNumber)")
                     }

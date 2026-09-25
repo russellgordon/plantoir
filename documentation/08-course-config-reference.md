@@ -502,11 +502,23 @@ separately from the reader:
   closing fence: python-frontmatter does not accept one, and Windows'
   `Block.Parse` did until 2026-09-19, which read a block as ending early.)
 
-  **Two other finders are still hand-rolled, and knowing which is which
-  matters more than unifying them.** `SectionAdder`'s (`frontmatterLines` /
-  `FrontmatterLines`) is strict on BOTH platforms — the very first line
-  exactly `---` — so the section carry agrees with itself across the two apps;
-  that is parity, and it is recorded here rather than filed. `CourseRestorer`'s
+  **Other finders are still hand-rolled, and knowing which is which matters
+  more than unifying them.** `SectionAdder`'s WAS one — strict on both
+  platforms, the very first line exactly `---`, recorded here as parity — until
+  it was measured to PUBLISH pages: a page it could not find the block of got
+  no `publishForSection<N>` for the new section, and a page with no key is
+  shown, so a page hidden in section 1 appeared in the new section (#175,
+  2026-09-25; the build's own `process_frontmatter` read section 2 as
+  `publish=None` for a `----` fence, a blank line before the fence, a space
+  after it, and Windows line endings). The mac's `frontmatterLines` now asks
+  `PageFrontmatter.block`, and its two writers splice by LINE inside the block
+  rather than rebuilding `---` + block and cutting the old text by a character
+  count — the old arithmetic, pointed at the lenient finder, left `…-0400e`
+  on the new date and made a Windows-line-ending page lose its frontmatter
+  entirely. The cases are `contracts/course-management.json` →
+  `sectionNumbers.addingKeysToAPage`; Windows' `FrontmatterLines` is still
+  strict and owes the same change (the `windows` issue from #175).
+  `CourseRestorer`'s
   is strict on Windows and, since the mac's `PageFrontmatter.block` was
   loosened for the reason above, lenient on the mac — so a restore reaches
   different pages on the two platforms, which is
@@ -658,15 +670,25 @@ separately from the reader:
   the splitter change: **11,891 pages, 0 whose split output moves.** Nothing
   the build does changes.
 
-  **Three of this app's own write paths still orphan a continuation**, and
-  they are named here rather than left to be discovered:
+  **Three of this app's own write paths orphaned a continuation** (the first
+  is fixed; the others stand), and they are named here rather than left to be
+  discovered:
 
-  * `SectionAdder.extendFrontmatter` inserts the new section's
+  * ~~`SectionAdder.extendFrontmatter` inserts the new section's
     `createdSection<N>` / `publishForSection<N>` pair after the last
-    per-section KEY LINE, so on a page whose value continues below it the pair
-    lands between the key and its value — measured, a page HIDDEN in section 1
-    becomes VISIBLE in both sections.
-    [Issue #181](https://github.com/russellgordon/plantoir/issues/181).
+    per-section KEY LINE~~ — **fixed 2026-09-25 by the review of #175**: the
+    pair now goes after the last key's continuation lines
+    (`continuationLineIndices`, asked on the whole file's lines, bounded by the
+    block), and a setting that runs onto the next line is carried as held back
+    and counted on the trail (`section added`). Measured before the fix, a page
+    HIDDEN in section 1 became VISIBLE in both sections (`None` and
+    `'false false'`); after it, hidden in both. Case seven of
+    `course-management.json` → `sectionNumbers.addingKeysToAPage`.
+    [Issue #181](https://github.com/russellgordon/plantoir/issues/181) is
+    all section adder: this is its mac half. Windows' half is
+    `SectionAdder.cs:222-234`, which still inserts after the key line; the
+    seventh `addingKeysToAPage` case is what closes it there (the `windows`
+    issue from #175 carries it).
   * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
     the backup's without either side's continuation lines — measured, a live
     `publishForSection1:` / `  a: 1` whose backup had no such key is left as
