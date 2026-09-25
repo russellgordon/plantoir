@@ -1112,6 +1112,53 @@ final class ClassPlanningContractTests: XCTestCase {
         XCTAssertNotNil(section["howAPageIsRenamed"])
     }
 
+    // MARK: - Repointing the front page
+
+    /// `sectionIndexPointer` (#267): the front page's class embed is found by
+    /// the page it names, never by the heading above it. The mac never
+    /// inserts an embed, so every case the contract gives Windows its own
+    /// answer for (`expectBodyOnWindows`) must be one the mac leaves alone.
+    func testTheFrontPageIsRepointedAsTheContractSays() throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("sectionIndexPointer")
+        let noEmbed: [String: Any] = try XCTUnwrap(section["whenNoClassIsTransclusion"] as? [String: Any])
+        XCTAssertNotNil(noEmbed["mac"] as? String)
+        XCTAssertNotNil(noEmbed["windows"] as? String)
+
+        let cases: [[String: Any]] = try ClassPlanningContractTests.cases(in: "sectionIndexPointer")
+        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let body: String = try XCTUnwrap(testCase["indexBody"] as? String, name)
+            let pointAt: String = try XCTUnwrap(testCase["pointAt"] as? String, name)
+            let titles: [String] = try XCTUnwrap(testCase["classTitles"] as? [String], name)
+            var classTitles: Set<String> = []
+            for title in titles {
+                classTitles.insert(title.lowercased())
+            }
+            let page: AssistSectionPage = AssistSectionPage(
+                title: pointAt,
+                displayTitle: pointAt,
+                fileURL: URL(fileURLWithPath: "/courses/CLUB/section1/All Classes/\(pointAt).md"),
+                relativePath: "courses/CLUB/section1/All Classes/\(pointAt).md",
+                isSectionLocal: true,
+                isVisibleToStudents: true,
+                visibilityIsCertain: true,
+                date: nil,
+                linkedTitles: [],
+                classFolderNames: ["All Classes"],
+                pathWithinSection: "All Classes/\(pointAt).md"
+            )
+            let result: SectionIndexPointer.Result? = SectionIndexPointer.repointing(
+                body, at: page, classTitles: classTitles, createdTail: "T07:00:00.000-0400"
+            )
+            let expected: String? = testCase["expectBody"] as? String
+            XCTAssertEqual(result?.text, expected, name)
+            if testCase["expectBodyOnWindows"] != nil {
+                XCTAssertNil(expected, "\(name): the mac never inserts, so a case where Windows differs must leave the page alone here")
+            }
+        }
+    }
+
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
