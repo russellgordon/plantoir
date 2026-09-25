@@ -193,6 +193,25 @@ in `deploy.ps1`, which tests for a match object rather than a Boolean. The
 general rule for PowerShell written from the mac: `-Quiet` is not a scalar when
 the input is a pipeline.
 
+**Cancelling a publish ends it quietly (GitHub #259, 2026-09-25).** The
+progress view's Cancel types a `^C` (`ScriptRunner.cancelByUser`), which reaches
+`deploy.py` as `KeyboardInterrupt` wherever it is waiting — most often inside
+this production rebuild. It used to escape and print a Python traceback (26
+lines during the rebuild, 10 at the surname question, measured through a pty);
+`deploy.py` now enters through `run_until_stopped()` and exits 130 with nothing
+printed, and a rebuild or a wrangler run that reports 130 or −2 is read as the
+same Cancel rather than as a failure. The app decides a cancelled leg by its own
+flags, not by that 130; the code is for every other reader (a terminal,
+`deploy.sh`'s `set -e`, `deploy.ps1`). A Cancel during the upload now also drops
+the uploads still queued — before the fix round, 25 of 40 went up after it — and
+since neither Netlify nor Cloudflare publishes a half-finished upload, the site
+stays as it was, except for a Cancel in the last second or two, once the final
+files are already on their way. **Only that Cancel sends a `^C`** — the Stop Preview and console Stop
+buttons end the process without one (SIGTERM raises no `KeyboardInterrupt`), so
+nobody should expect this handler to be what covers them; they never printed the
+traceback. The reasoning, the numbers and what was rejected are in
+[the build pipeline](05-build-pipeline.md#stopping-a-build-exit-130-and-no-traceback).
+
 ### Why determinism matters
 
 The delta algorithm is the reason several build-side customizations exist:
