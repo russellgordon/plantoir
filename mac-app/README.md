@@ -101,6 +101,19 @@ xcodebuild -project Plantoir.xcodeproj -scheme Plantoir test \
   -only-testing:QuartzTeachersTests/NewCourseCreatorIntegrationTests
 ```
 
+**The tests that read the real window run with the app in the background,
+and SKIP when its desktop is not showing.** Six classes walk the window's
+accessibility tree (`AccessibilityInspector`). macOS leaves a window out of
+that tree while it sits on a Space that is not showing — a full-screen app or
+another desktop in front — so those tests skip, saying so, rather than fail on
+a tree that holds only the menu bar. Being in the background is fine and is
+the normal case. **A normal full run has 3 skipped (a fourth,
+`QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, skips while
+any launcher is running on the Mac); more than 3 skipped means read the skip
+reasons.** Why, and what was rejected:
+`documentation/09-mac-app.md` → "Testing: the tests that read the real window,
+and a window on another Space (#249)".
+
 > **Tip:** stop any copy of the app running under Xcode's debugger (⏹)
 > before running the UI tests — a debugged instance cannot be terminated
 > by the test runner, which fails the first UI test with

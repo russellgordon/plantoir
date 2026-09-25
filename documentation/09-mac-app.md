@@ -4901,6 +4901,104 @@ it, and the scheduled-publish path registers a real Task Scheduler task. The
 `windows` issue for this asks for the intent — redirect `AppDataRoot` in the
 test assembly and add a source-scan test — not the Swift mechanism.
 
+## Testing: the tests that read the real window, and a window on another Space (#249)
+
+Written 2026-09-25. Six test classes read the real window through the
+accessibility tree, starting at `AXUIElementCreateApplication` on the test
+host's own process — `AccessibilityInspector.collectAllLabels`,
+`frame(forIdentifier:)` and `press(identifier:)`:
+`InAppUserInterfaceTests`, `RemovalButtonTests`,
+`SidebarRestorationProbeTests` (two tests), `WindowPathBarTests` and
+`HitAreaTests`. On 2026-09-21 five of them failed together in the gate, each
+with a tree that held the menu bar and nothing else.
+
+**The cause is the window's Space, not the foreground.** The issue as filed
+blamed another app being frontmost. That was measured and is wrong: in every
+normal run the test host is never the active app (`NSApp.isActive` false at
+launch, iTerm in front), and the walk finds everything. A probe walked the
+tree in each window state (origin/dev 68214a6c):
+
+| Window state | `isActive` | window `isOnActiveSpace` | windows in the tree | walk finds the sidebar row, the − button, the path bar |
+|---|---|---|---|---|
+| normal, iTerm in front | false | true | 1 | yes |
+| miniaturized | false | true | 1 | yes |
+| app hidden | false | — | 1 | yes |
+| `orderOut` | false | — | 0 | no (menu bar only, 166 labels) |
+| **full screen, then another app activated, so its Space is not showing** | false | **false** | **0** | **no (menu bar only, 167 labels)** |
+| full screen exited | false | true | 1 | yes |
+
+The full-screen row reproduces the 9/21 signature exactly, down to the
+Window menu still listing the window (so AppKit had it while the tree did
+not). A clean full suite that run had all five passing, with the app in the
+background throughout.
+
+**What the tests do now.** Before every walk they call
+`AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)`,
+which SKIPS with a reason naming the Space only when all three hold: the
+tree does not list the test's own window (matched by frame), the test's own
+window is visible, and AppKit says that window is not on the showing Space.
+The decision is a pure function, `reasonTheWindowCannotBeRead`, pinned by
+`AccessibilityInspectorTests`. Every other shape still FAILS as before, on
+purpose:
+
+- **Only the test's own window counts** (the one its `WorkspaceModel` holds).
+  An assistant, Settings or About window sitting off-Space says nothing about
+  it — and if the test's window has actually gone, skipping because some
+  OTHER window is off-Space would hide a real fault. That case is pinned.
+- A window on the showing Space that is missing from the tree is a real fault
+  and fails.
+- A missing window model keeps its existing `XCTFail` / `XCTSkip` guard; that
+  is a different fault.
+- `RemovalButtonTests` checks again after its press, and closes the alert
+  before skipping, so a desktop change mid-test does not leave an alert over
+  the window for the next class.
+- `AccessibilityInspectorTests.testTheTestsWindowIsFoundInTheTreeWhenItIsShowing`
+  checks, live, that the frame match finds the window when it is showing — so
+  the tree half of the check is not dead code that always says "missing".
+
+**Reading the totals.** A normal full run has **3 skipped** — the three tests
+that want `INTEGRATION_WORKSPACE` — plus a fourth,
+`QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, whenever
+any launcher is running on the Mac (a preview in the app, another session's
+`verify.sh`; #243 is fixing that class). More than 3 means read the skip
+reasons: a Space skip says so, and so does that one. A test that always skips is a test nobody runs, and that
+is the risk this change carries; the reason in the log is the defence. One
+way it could happen for good is the test host (the same bundle as the
+teacher's app) restoring a full-screen window. Checked 2026-09-25 after the
+full-screen probe: there is no `Saved Application State` folder for
+`ca.russellgordon.Plantoir`, the saved main-window frame
+(`NSWindow Frame main-AppWindow-1`) is 1100×720 — the size
+`InAppUserInterfaceTests` sets — and no full-screen key is stored.
+
+**Rejected, with the numbers:**
+
+- **Activate the test host and wait for `NSApp.isActive`.** Refused by macOS
+  at 3 of 4 probe points (`activate(ignoringOtherApps: true)`, then polling
+  for 3 s, left it inactive, iTerm still in front), granted once mid-suite —
+  not deterministic. It also fixes the wrong thing (being inactive never broke
+  the walk), and where it IS granted it takes the foreground from the person
+  at the Mac for the rest of the run, which rules 9 and 10 exist to stop.
+- **Walk the window's own element instead.** In process,
+  `NSObject.accessibilityAttributeValue(.children)` yields 4–5 labels in every
+  state, none of the controls — SwiftUI does not surface its tree that way.
+  Through AX, the app's `kAXWindows` list is exactly what empties off-Space.
+- **Make the test window join every Space** (`canJoinAllSpaces` /
+  `fullScreenAuxiliary`). Not measured: the tests would drive a window
+  configured unlike the teacher's, and it would draw over whatever is
+  full-screen on the Mac — possibly a class being taught.
+- **Opt-in behind a flag**, as Windows' `PLANTOIR_UI_TESTS=1` is. An opt-in
+  test is one nobody runs, and in the normal case these pass in the gate.
+
+**Test hygiene only**: no product file changed, so there is no
+`GUI-IMPROVEMENTS.md` row, no contract case, no trail event and no `windows`
+issue. Windows has no Spaces, and its UI Automation tests already require the
+foreground by design.
+
+**Honest limit.** Removing the check from one class and running it on the
+showing Space still passes, so the call sites are not proven by a must-fail;
+only the predicate is. The off-Space end-to-end path was measured with the
+probe above, before the helper existed, not re-run against it.
+
 ## A test host that segfaults, and the six levers that look like they should fix it
 
 Written 2026-09-07, for whoever meets a modal that kills a test process rather
