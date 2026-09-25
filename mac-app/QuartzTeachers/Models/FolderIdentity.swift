@@ -47,8 +47,10 @@ nonisolated enum FolderIdentity {
     static func canonicalPath(_ path: String) -> String {
         // O_EVTONLY: opened only to be asked its name. It needs no read
         // permission on the folder, and it does not stop a disk from being
-        // ejected while it is open.
-        let descriptor: Int32 = open(path, O_EVTONLY)
+        // ejected while it is open. O_NONBLOCK: a FIFO would otherwise block
+        // the open until a writer came (measured, #189 review L2), and this
+        // runs on the main actor; F_GETPATH still answers.
+        let descriptor: Int32 = open(path, O_EVTONLY | O_NONBLOCK)
         if descriptor >= 0 {
             var buffer: [CChar] = [CChar](repeating: 0, count: Int(MAXPATHLEN))
             let answer: Int32 = fcntl(descriptor, F_GETPATH, &buffer)

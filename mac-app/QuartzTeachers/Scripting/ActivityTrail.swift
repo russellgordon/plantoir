@@ -436,6 +436,12 @@ nonisolated enum ActivityTrail {
         /// uploading builds. Each of those arrives as a separate report
         /// ("where has my site gone?", "did something delete my files?"), and
         /// this line — dated, per course — is what answers all three at once.
+        /// The LAUNCHERS write it once more, in words the contract pins
+        /// (`launcherLineWhenASecondCopyIsClearedAway`, GitHub #189): when a
+        /// launcher handed another spelling of the folder clears away the
+        /// second workspace or builds folder that spelling made before #189,
+        /// filed under the course/section it ran for (or "setup"). The app
+        /// never writes that one; it sweeps nothing.
         case builtSiteMovedOutOfTheFolder = "built site moved out of the working folder"
         /// A section's leftover website-builder processes were reclaimed —
         /// after a preview was stopped, a window closed, or a publish was
