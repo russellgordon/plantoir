@@ -332,7 +332,11 @@ tag such as
 inside double quotes, an indented key, a value that starts with a character
 YAML reserves (`%`, `@`, a backtick, `- `) or carries its own `key: value`, and
 frontmatter the build cannot parse at all — tab indentation or an unclosed
-fence, which stop the whole build so there is no site verdict to mirror).
+quote, which until #246 stopped the whole build and since #246 (2026-09-25)
+the build HIDES and names in a folder-problem finding; so the site's verdict
+is hidden, each app's reporting of visible is the mild direction, and the
+finding tells the teacher — see `05-build-pipeline.md` → "A page whose
+settings cannot be read is hidden (#246)").
 
 Two shapes are NOT `cannotTell` and are worth naming, because both were read
 the dangerous way round before they were measured:
@@ -340,7 +344,9 @@ the dangerous way round before they were measured:
 * **`publish:false`, with no space after the colon, is not a key at all.** YAML
   needs a space, a tab or the end of the line after the colon to make a mapping
   — so that line is one plain scalar, the page reaches Quartz with no keys, and
-  it is PUBLISHED. (With another key beside it the same line stops the build.)
+  it is PUBLISHED. (With another key beside it the same line cannot be parsed
+  at all: that stopped the build until #246, and since #246 the build hides
+  the page and names it.)
   Reading everything after the first colon called this page hidden.
 * **YAML's whitespace is a space and a tab, and nothing else.** The
   non-breaking space Option-Space types on a Mac is not whitespace to YAML, so
@@ -454,7 +460,8 @@ separately from the reader:
   which cannot be copied to another key's line at all; that, and a DRAFT value
   the reader cannot read, are written as HELD BACK — and the continuation
   lines are taken WITH the key, because an indented scalar left behind lands
-  under whatever key follows and stops the build. A key with nothing after it
+  under whatever key follows and makes a block the build cannot parse — which
+  stopped the build until #246, and since #246 hides the page and names it. A key with nothing after it
   is the one exception: that is a null, which PUBLISHES the page, so the copy
   keeps it a null rather than deciding for the teacher. A page wrongly held back is
   one a teacher notices and fixes; a page wrongly published is one nobody
@@ -643,13 +650,14 @@ separately from the reader:
     steps over blank lines but not comments, unlike every other stepping in
     this family. Measured consequence: `publish: false` / `# note` /
     `  false` is a page the build cannot parse, and `_is_draft` calls it
-    hidden. **Left alone deliberately.** It is not unreachable —
-    `process_frontmatter` CATCHES the YAML error, prints `⚠️ Could not read
-    frontmatter from …` and leaves the file byte-identical
-    (`build_site.py:1976-1979`), so such a page reaches the merged tree with
-    its comments intact and `_is_draft` reads raw text. But every page that
-    can reach it is a page that stops the Quartz build anyway, so the gap has
-    no teacher behind it; and `scripts/build_site.py` is inside
+    hidden. **Left alone deliberately.** Since #246 it is unreachable from
+    the build: `process_frontmatter` catches the reader's error and rewrites
+    the build's copy to `publish: false` over the page's body, so `_is_draft`
+    never meets the original block. (Before #246 it left the copy
+    byte-identical after printing the reader's message, such a page reached
+    the merged tree with its comments intact, and every page that could reach
+    it stopped the Quartz build anyway — so the gap never had a teacher behind
+    it); and `scripts/build_site.py` is inside
     `.githooks/pre-commit`'s publishing closure, which engages `RELEASING.md`'s
     rule that a release changing the publishing path needs a full
     `verify-deploy` run. Twenty minutes and three credentials for a two-line
@@ -694,7 +702,8 @@ separately from the reader:
   * `CourseRestorer.settingPerSectionKeys` swaps this section's key line for
     the backup's without either side's continuation lines — measured, a live
     `publishForSection1:` / `  a: 1` whose backup had no such key is left as
-    `  a: 1` alone and the build stops.
+    `  a: 1` alone and the build stops (since #246: the build hides the page
+    and names it as unreadable).
     [Issue #182](https://github.com/russellgordon/plantoir/issues/182).
   * **`setting`'s own INSERT branch** — the third branch of the very function
     the sweep was added to, and the surprising one. It CREATES an orphan

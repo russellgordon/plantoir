@@ -83,8 +83,9 @@ final class PageVisibilityReadingTests: XCTestCase {
         XCTAssertEqual(answer("publish: {a: false}"), .cannotTell,
                        "A flow mapping.")
 
-        // Measured: the build stops entirely on these, so there is no site
-        // verdict to mirror.
+        // Measured: the build cannot parse these at all. Until #246 that
+        // stopped it entirely; since #246 it hides the page and names it, so
+        // `cannotTell` reported as visible is the mild direction.
         XCTAssertEqual(answer("title: x\n\tpublish: false"), .cannotTell,
                        "A tab used as indentation is YAML the parser throws on.")
         XCTAssertEqual(
@@ -119,7 +120,7 @@ final class PageVisibilityReadingTests: XCTestCase {
     func testAColonWithNoSpaceAfterItIsNotAKey() {
         // Measured: a page whose whole frontmatter is `publish:false` reaches
         // Quartz with NO keys and is published; one with another key beside it
-        // stops the build. Either way this is not the page's flag, and reading
+        // cannot be parsed (it stopped the build until #246, and is hidden since). Either way this is not the page's flag, and reading
         // it as one called a live page hidden.
         XCTAssertEqual(answer("publish:false"), .saysNothing)
         XCTAssertEqual(answer("publish:true"), .saysNothing)

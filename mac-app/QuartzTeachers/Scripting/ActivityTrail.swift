@@ -177,7 +177,11 @@ nonisolated enum ActivityTrail {
         /// that recorded only the release could not answer the question anyone
         /// actually reads it for.
         case sectionKeptItsWebsiteOnRollover = "section kept its website"
-        /// A folder a feature depends on was missing, renamed or emptied.
+        /// A folder a feature depends on was missing, renamed or emptied — or,
+        /// since #246, a PAGE whose settings the build could not read and so
+        /// hid (`pageSettingsUnreadable`). The name is kept because the event
+        /// is the site-health family; the line still names the check, never
+        /// the pages, which are the teacher's own names.
         /// Carries the check's NAME, never its wording: the sentence is
         /// product wording and will be reworded, while the name is what
         /// somebody reading the trail months later can match against the

@@ -29,6 +29,9 @@ struct FailureExplainer {
         if let reason = connectionExplanation(in: output) {
             return reason
         }
+        if let reason = unreadableFrontPageExplanation(in: output) {
+            return reason
+        }
         if let reason = missingFrontPageExplanation(in: output) {
             return reason
         }
@@ -269,5 +272,53 @@ struct FailureExplainer {
                  + "Put the front page back, then publish again."
         }
         return nil
+    }
+
+    /// The build produced no website because the front page's SETTINGS could
+    /// not be read, so the build hid it (#246).
+    ///
+    /// Not the missing front page: the page is there, and "Put the front page
+    /// back" would send a teacher to restore a page they can see — with a
+    /// repair that would find it and say it was already put right. Asked
+    /// BEFORE `missingBuildExplanation` for the same reason as the missing
+    /// front page is: a publish's transcript carries the deploy's "Built site
+    /// not found" after it, and the build's reason is the specific one.
+    ///
+    /// The line the build's reader stopped near travels in the output as
+    /// "near line N", and is passed on when it is there — the build can tell
+    /// for most shapes, not all (`documentation/05-build-pipeline.md`).
+    static func unreadableFrontPageExplanation(in output: String) -> String? {
+        let sign: String = "the settings at the top of its front page could not be read"
+        guard let signRange = output.range(of: sign) else {
+            return nil
+        }
+        let headline: String = "The settings at the top of this section's front page could not be read, "
+            + "so there is no website to publish. "
+        if let line = lineNumber(after: "(near line ", in: output[signRange.upperBound...]) {
+            return headline + "Open the front page in Obsidian, fix its settings near line \(line), "
+                + "then publish again."
+        }
+        return headline + "Open the front page in Obsidian, fix its settings, then publish again."
+    }
+
+    /// The whole number written straight after `marker` on the same line of
+    /// `text`, or nil when there is none.
+    private static func lineNumber(after marker: String, in text: Substring) -> Int? {
+        guard let markerRange = text.range(of: marker) else {
+            return nil
+        }
+        let before: Substring = text[..<markerRange.lowerBound]
+        if before.contains("\n") {
+            return nil
+        }
+        var digits: String = ""
+        for character in text[markerRange.upperBound...] {
+            if character.isASCII && character.isNumber {
+                digits.append(character)
+            } else {
+                break
+            }
+        }
+        return Int(digits)
     }
 }

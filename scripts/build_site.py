@@ -2605,13 +2605,243 @@ def _strip_sentinels(text: str, start: str, end: str) -> str:
     return pattern.sub("", text)
 
 
+# Pages of THIS build whose settings could not be read (#246), each as
+# (the build's copy, its name in the course folder, the line the reader
+# stopped near or None). Filled by `process_frontmatter`, read by the health
+# facts in `build_section_site`, and cleared beside `forget_vault_sources`, one
+# build of one section per process — the module's existing pattern, rather
+# than threading a return value through the five places a page is copied.
+_unreadable_pages: list[tuple[Path, str, int | None]] = []
+
+# The whole of a hidden page's settings. `publish: false` is the one key every
+# section reads as hidden (publishForSection<N>, then publish, then the old
+# draft keys — `contracts/file-formats.json` -> `pageVisibility.note`), and
+# the patched PublishFlag filter drops it.
+#
+# No newline after the closing fence: the body python-frontmatter splits off
+# begins with the newline that ended the page's own fence, so the page reads
+# exactly as it did below its settings, with no blank line added.
+_HIDDEN_SETTINGS = "---\npublish: false\n---"
+
+
+def forget_unreadable_pages() -> None:
+    """Starts a new build's list of pages whose settings could not be read."""
+    _unreadable_pages.clear()
+
+
+def _line_the_reader_stopped_near(error: Exception, text: str | None) -> int | None:
+    """
+    The line of the PAGE the settings reader stopped near, counted the way a
+    teacher counts it in Obsidian (the opening `---` is line 1), or None when
+    the reader does not say.
+
+    Worked out from the character INDEX PyYAML reports, never from its own
+    line number. PyYAML counts U+2028, U+2029, U+0085 and a lone carriage
+    return as line breaks, which an editor does not show as one, so its
+    `mark.line` points one or two lines past the line the teacher sees
+    (measured: U+2028 on line 3 reported as 5). A ReaderError carries no mark
+    but a `position`, which is the same kind of index.
+
+    The index is into the text python-frontmatter handed PyYAML: the file read
+    with universal newlines, then split at the fences. That text begins with
+    the newline that ends the opening fence, so counting newlines before the
+    index and adding one gives the file's line.
+
+    "near" is honest for every shape measured: of the 18 in
+    `builderAgreement` the reader refuses, 15 carry a position — 10 point AT
+    the wrong line, 4 one line past it (a key with no space after its colon,
+    `-- -`, `%YAML`, U+2028) and an unclosed quote two past, at the closing
+    fence. A date that cannot be, and a key that is a number, a date or a
+    yes/no, give no line at all.
+    """
+    if text is None:
+        return None
+    mark = getattr(error, "problem_mark", None)
+    index = getattr(mark, "index", None) if mark is not None else getattr(error, "position", None)
+    if not isinstance(index, int):
+        return None
+    try:
+        settings, _ = frontmatter.YAMLHandler().split(text)
+    except Exception:
+        return None
+    return settings[:index].count("\n") + 1
+
+
+def _body_after_the_settings(file_path: Path) -> str:
+    """
+    The page below its settings, byte for byte as the teacher wrote it, or ""
+    when even that cannot be found. The split is python-frontmatter's own and
+    does no YAML, so it cannot fail the way the settings did.
+
+    Read with `newline=""` so a page written with Windows line endings keeps
+    them; if the split cannot find the fences in that text (a page whose lines
+    end in a lone carriage return), it is tried again on the text as the
+    settings reader saw it.
+    """
+    for newline in ("", None):
+        try:
+            with open(file_path, "r", encoding="utf-8", newline=newline) as handle:
+                text = handle.read()
+            _, body = frontmatter.YAMLHandler().split(text)
+            return body
+        except Exception:
+            continue
+    return ""
+
+
+def _hide_a_page_whose_settings_cannot_be_read(file_path: Path, error: Exception) -> None:
+    """
+    Hide, in THIS BUILD'S COPY only, a page whose settings could not be read,
+    and remember it so the build can say so (#246, Russell's option B).
+
+    A page whose settings cannot be read might be one the teacher meant to
+    keep from students — and one hidden only by `publishForSection1: false`,
+    which is what the app writes, was PUBLISHED whenever Quartz could read
+    what PyYAML could not. "A page that wrongly DISAPPEARS is noticed and
+    harmless; one that wrongly APPEARS cannot be undone." So the copy's
+    settings are replaced by `publish: false` and its body is kept, and the 14
+    measured shapes that used to STOP the whole build now build with the page
+    hidden and named.
+
+    The teacher's own file is never touched: this runs on the copy in
+    `content/`, and `_write_the_date_back` refuses a source that cannot be
+    parsed.
+
+    Hiding must not depend on anything that can fail for another reason — the
+    contract, a name — so it comes first, and a copy that cannot be rewritten
+    is REMOVED. A build that can do neither stops: it cannot promise the page
+    is hidden, and a site that might show it is worse than no site.
+
+    The console line names the page and nothing else. The line this replaced
+    printed PyYAML's message, which quotes the page's own words into a
+    console that goes into problem reports, and said "frontmatter".
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8") as handle:
+            seen_text = handle.read()
+    except Exception:
+        seen_text = None
+    body = _body_after_the_settings(file_path)
+    try:
+        mode = stat_module.S_IMODE(os.stat(file_path).st_mode)
+        if not mode & stat_module.S_IWUSR:
+            os.chmod(file_path, mode | stat_module.S_IWUSR)
+        with open(file_path, "w", encoding="utf-8", newline="") as handle:
+            if body and not body.startswith(("\n", "\r")):
+                body = "\n" + body
+            handle.write(_HIDDEN_SETTINGS + (body if body else "\n"))
+    except Exception:
+        try:
+            os.unlink(file_path)
+        except Exception:
+            print()
+            print("❌ Refusing to build: a page whose settings could not be read")
+            print("   could not be hidden, so it might appear on your site.")
+            sys.exit(1)
+
+    source = _vault_sources.get(Path(file_path))
+    if source is not None:
+        name = _name_in_the_course(source[0])
+    else:
+        name = file_path.name[:-3] if file_path.name.lower().endswith(".md") else file_path.name
+    line = _line_the_reader_stopped_near(error, seen_text)
+    _unreadable_pages.append((Path(file_path), name, line))
+    near = f" (near line {line})" if line is not None else ""
+    print(f"🙈 Hidden from students until its settings can be read: {name}{near}")
+
+
+def _front_page_cannot_be_published(content_root: Path) -> bool:
+    """Is this section's front page among the pages hidden above?"""
+    front_page = Path(content_root) / "index.md"
+    for copy, _, _ in _unreadable_pages:
+        if copy == front_page:
+            return True
+    return False
+
+
+def _unreadable_page_facts() -> list:
+    """The health facts' `unreadable_pages`: each page's name in the course
+    folder and its line, sorted by name. Names only — never page text."""
+    listed = []
+    for copy, name, line in _unreadable_pages:
+        listed.append({"page": name, "line": line})
+    listed.sort(key=lambda entry: entry["page"])
+    return listed
+
+
+def _clear_a_site_this_build_cannot_replace(health_facts: dict, host_output_dir: Path,
+                                             course_code: str, section_number) -> None:
+    """
+    A section with no front page produces no root index.html, so this build
+    cannot replace the one already sitting on the host. Clear it here rather
+    than in the sync, because BOTH modes need it: a preview never reaches the
+    sync at all (its watcher waits on an index.html that never appears), and
+    a publish from the command line after a preview would otherwise upload
+    the older pages.
+
+    A front page whose settings could not be read is HIDDEN (#246), so it
+    produces no root index.html either and the same stale site would go out.
+    It is cleared the same way and said differently: the page is there.
+    """
+    if not health_facts["section_index_exists"]:
+        _clear_stale_host_site(host_output_dir, course_code, section_number)
+    elif health_facts.get("front_page_unreadable"):
+        _clear_stale_host_site(host_output_dir, course_code, section_number,
+                               front_page_is_unreadable=True)
+
+
+def _nothing_to_publish(course_code: str, section_number, health_facts: dict,
+                        front_line: int | None) -> list:
+    """
+    What a publish build says when it produced no website, as printed lines.
+
+    Two reasons, said differently. A front page whose settings could not be
+    read is THERE and hidden (#246), so "Put the front page back" — and the
+    app's explanation of it, which offers the same — would send a teacher to
+    restore a page they can see. Its line is matched by the app's explanation
+    (`contracts/app-rules.json` -> `failureExplanations`) by "the settings at
+    the top of its front page could not be read", with the line read from
+    "near line N", and it never carries "no front page, so no website was
+    produced", which the app reads as the missing front page.
+    `scripts/test_unreadable_page_settings.py` checks each contract case's
+    output against what this returns.
+    """
+    if health_facts.get("front_page_unreadable") and health_facts.get("section_index_exists"):
+        near = f" (near line {front_line})" if front_line is not None else ""
+        return [
+            f"❌ Nothing to publish for {course_code} Section {section_number}: "
+            f"the settings at the top of its front page could not be read{near}, "
+            f"so the website was left without one.",
+            "   Open the front page in Obsidian, fix those lines, then build again.",
+        ]
+    return [
+        f"❌ Nothing to publish for {course_code} Section {section_number}: "
+        f"it has no front page, so no website was produced.",
+        "   Put the front page back — Plantoir offers to do that for "
+        "you — then build again.",
+    ]
+
+
+def _front_page_line(content_root: Path) -> int | None:
+    """The line the front page's settings reader stopped near, if it is one
+    of the hidden pages and the reader said."""
+    front_page = Path(content_root) / "index.md"
+    for copy, _, line in _unreadable_pages:
+        if copy == front_page:
+            return line
+    return None
+
+
 def process_frontmatter(file_path: Path, section_number: int):
     if file_path.suffix.lower() != ".md":
         return
     try:
         post = frontmatter.load(file_path)
     except Exception as e:
-        print(f"⚠️ Could not read frontmatter from {file_path}: {e}")
+        # The ONE door: every non-string key and every construct error raises
+        # inside `frontmatter.load` (measured), so nothing below can meet a
+        # page whose settings cannot be read.
+        _hide_a_page_whose_settings_cannot_be_read(file_path, e)
         return
 
     # Whether students see a page is `publish:`, and per-section it is
@@ -4235,7 +4465,8 @@ def _sync_public_to_host(output_dir: Path, host_output_dir: Path) -> bool:
 
     return mirrored_a_site
 
-def _clear_stale_host_site(host_output_dir: Path, course_code: str, section_number) -> None:
+def _clear_stale_host_site(host_output_dir: Path, course_code: str, section_number,
+                           front_page_is_unreadable: bool = False) -> None:
     """
     Throw away the last built site when this build cannot replace it.
 
@@ -4257,10 +4488,16 @@ def _clear_stale_host_site(host_output_dir: Path, course_code: str, section_numb
     stale_public = host_output_dir / "public"
     if not stale_public.exists():
         return
+    # The front page is THERE when its settings could not be read (#246), so
+    # "without a front page" would send a teacher looking for a missing file.
+    if front_page_is_unreadable:
+        why = "its front page is hidden until its settings can be read, so"
+    else:
+        why = "without a front page"
     try:
         shutil.rmtree(stale_public)
         print(f"🗑️  Removed the last built website for {course_code} Section {section_number}: "
-              f"without a front page this build cannot replace it, and publishing "
+              f"{why} this build cannot replace it, and publishing "
               f"it again would have sent out the older pages.")
     except Exception as error:
         print(f"⚠️  Could not remove the last built website at {stale_public}: {error}")
@@ -5764,6 +6001,7 @@ def build_section_site(
     install_favicon(output_dir, content_root)
 
     forget_vault_sources(course_dir)
+    forget_unreadable_pages()
     section_index = section_dir / "index.md"
     if section_index.exists():
         dest = content_root / "index.md"
@@ -5872,23 +6110,35 @@ def build_section_site(
         # every build a few hundred lines above, so checking it always passes.
         # What actually breaks is the folder it points AT.
         "media_target_exists": (course_dir / "Media").is_dir(),
-        "section_index_exists": (content_root / "index.md").exists(),
+        # A front page whose settings could not be read is THERE — hidden,
+        # not missing — so "has no front page" and its repair (which would
+        # find the page and say "already put right") must not be offered for
+        # it, even in the one case where its copy had to be removed to hide it.
+        "section_index_exists": ((content_root / "index.md").exists()
+                                 or _front_page_cannot_be_published(content_root)),
         # Anything by this name at this moment came from the teacher's own
         # notes: the build writes its own copy further down, so a page here now
         # is one that is about to be overwritten.
         "hand_written_coverage_page": (
             content_root / f"{COVERAGE_PAGE_TITLE}.md").exists(),
+        # Pages hidden because their settings could not be read (#246), by
+        # their names in the course folder, and whether the front page is one.
+        "unreadable_pages": _unreadable_page_facts(),
+        "front_page_unreadable": _front_page_cannot_be_published(content_root),
     }
+    if health_facts["front_page_unreadable"]:
+        front_line = _front_page_line(content_root)
+        near = f", near line {front_line}" if front_line is not None else ""
+        # Its own line, because what it costs is not what any other hidden
+        # page costs: the whole section's website, until it is fixed.
+        print(f"🙈 The settings at the top of the front page of {course_code} Section "
+              f"{section_number} could not be read{near}, so the website has no front "
+              f"page until they are fixed, and it cannot be published.")
     site_health.announce_or_stay_quiet(health_facts, course_code, section_number)
 
-    # A section with no front page produces no root index.html, so this build
-    # cannot replace the one already sitting on the host. Clear it here rather
-    # than in the sync, because BOTH modes need it: a preview never reaches the
-    # sync at all (its watcher waits on an index.html that never appears), and
-    # a publish from the command line after a preview would otherwise upload
-    # the older pages.
-    if not health_facts["section_index_exists"]:
-        _clear_stale_host_site(host_output_dir, course_code, section_number)
+    # Clear a last built site this build cannot replace — no front page, or
+    # one hidden because its settings could not be read (#246).
+    _clear_a_site_this_build_cannot_replace(health_facts, host_output_dir, course_code, section_number)
 
     # === Curriculum coverage heat map =========================================
     first_class_dt = _find_first_class_created(content_root)
@@ -5927,7 +6177,10 @@ def build_section_site(
     # copy is dated the same way, but its files are never rewritten.
     frozen_course = reference_course.is_reference(course_dir) or reference_course.cannot_tell(course_dir)
     dating = _date_pages_from_their_classes(content_root, section_number, write_back=not frozen_course)
-    if dating["front_page"] is not None:
+    # Not said of a front page hidden because its settings could not be read
+    # (#246): only the build's hidden copy was dated, and the teacher's page
+    # cannot be, so the sentence would describe a page nobody will see.
+    if dating["front_page"] is not None and not health_facts["front_page_unreadable"]:
         print(f"📆 The front page now carries the date of the class it shows ({dating['front_page']}).")
     print(f"📆 Dated {dating['site_pages']} page(s) from the first class that links to them.")
     announce_dated_pages(dating, course_code, section_number)
@@ -6143,10 +6396,9 @@ def build_section_site(
             _mark_build_finished(host_output_dir)
             print("✅ Static build complete.")
         else:
-            print(f"❌ Nothing to publish for {course_code} Section {section_number}: "
-                  f"it has no front page, so no website was produced.")
-            print("   Put the front page back — Plantoir offers to do that for "
-                  "you — then build again.")
+            for line in _nothing_to_publish(course_code, section_number, health_facts,
+                                            _front_page_line(content_root)):
+                print(line)
             sys.exit(1)
     else:
         # Preview mode (default): do NOT pre-build. Build+serve once.
