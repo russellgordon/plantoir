@@ -2601,7 +2601,6 @@ away a finished reference course. Asked of a lease rather than of the folder's
 AGE deliberately: a threshold is a guessed duration, and the case that needs
 it most is the slow disk where the guess is wrong. Who counts as a live owner,
 and what happens when two imports want the same folder, is the next section.
-XXBUTONE
 
 A leftover from an import that never finished is **swept when a working folder
 is read** (`ReferenceStaging.sweepLeftovers`): unlock, remove, one trail line
@@ -2639,12 +2638,31 @@ six). Windows' reader reads two lines and ignores the rest. The NAME did not
 change, on purpose: an older Plantoir reads only the name and the pid in it, so
 it still leaves a new lease's folder alone. The format is
 `contracts/file-formats.json` → `workLease`; before #245 the body was the pid
-alone, and a one-line lease is still honoured (judged on the pid) because an
-older copy of Plantoir still writes one.
+alone, and a one-line lease is still honoured because an older copy of
+Plantoir still writes one — judged as if its name line said "Plantoir", the
+only program that ever wrote an import lease
+(`ProcessLiveness.nameToCompare`). Judging it on the pid alone, as the first
+version of this piece did, was caught in review: a one-line lease left by a
+pre-#245 crash names a pid that, after a restart, can belong to an unrelated
+daemon for the whole uptime — and since #245 a live lease REFUSES the import,
+with a sentence ("being imported in another window…") that is false and has
+no way out. The name check turns that into litter again.
+
+**Line 2 through a symlink — measured in review, and fixed by #156, not
+here.** #245 writes line 2 from `ProcessInfo.processName`, which is the last
+part of argv[0]; the reader compares it with the process table's `p_comm`,
+the executable's real name. Run through `ln -s LongBinaryNameForTest
+link-name`, `processName` was `link-name`, `p_comm` was `LongBinaryNameFo`,
+and the process read its OWN live lease as GONE — the destructive direction.
+Latent today: only the GUI writes import leases, and LaunchServices launches it
+with argv[0] ending `…/MacOS/Plantoir`. #156, stacked on this branch, makes
+line 2 the process table's own name (falling back to `processName`) for every
+lease it writes; it was left there rather than changed here so the two
+branches do not edit the same function.
 
 **Who counts as alive is ONE reader, `ProcessLiveness`**, shared with every
 other lease (#156 builds its build/preview/publish leases on it rather than
-growing a second). The rule and its eighteen cases are
+growing a second). The rule and its nineteen cases are
 `contracts/shared-rules.json` → `workLeases.liveness`, run by
 `WorkLeaseLivenessTests` against the pure `ProcessLiveness.decide`, so a case
 needs no real process. Measured on this Mac as an ordinary user, 2026-09-25:

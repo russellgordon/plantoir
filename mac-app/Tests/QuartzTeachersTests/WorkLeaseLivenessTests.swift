@@ -45,7 +45,7 @@ final class WorkLeaseLivenessTests: XCTestCase {
     func testTheLivenessRuleIsTheContracts() throws {
         let block: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["workLeases", "liveness"])
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 18, "Cases went missing from the contract.")
+        XCTAssertGreaterThanOrEqual(cases.count, 19, "Cases went missing from the contract.")
 
         for item in cases {
             let name: String = item["name"] as? String ?? "?"
@@ -82,7 +82,9 @@ final class WorkLeaseLivenessTests: XCTestCase {
                 pid: pid,
                 signal: signal,
                 table: table,
-                recordedName: lease["name"] as? String,
+                recordedName: ProcessLiveness.nameToCompare(
+                    recorded: lease["name"] as? String, kind: item["kind"] as? String ?? ""
+                ),
                 recordedStart: lease["start"] as? String
             )
             XCTAssertEqual(alive ? "alive" : "gone", expect, name)
@@ -221,7 +223,10 @@ final class WorkLeaseLivenessTests: XCTestCase {
     // MARK: - The sweep
 
     /// A lease naming a live process whose recorded name or start is not
-    /// that process's holds nothing; a one-line lease is still honoured.
+    /// that process's holds nothing — and a one-line import lease is read as
+    /// Plantoir's, so one naming launchd's id holds nothing either (L2 of
+    /// #245's review: after a restart a crashed import's id can belong to
+    /// anything, and since #245 a live lease refuses the import).
     func testARecycledProcessIdDoesNotHoldALeftover() throws {
         let names: [String] = ["ICS4U-2025", "ICS3U-2025", "MPM2D-2025"]
         for name in names {
@@ -233,10 +238,15 @@ final class WorkLeaseLivenessTests: XCTestCase {
         try writeLease(for: "ICS4U-2025", pid: 1, body: "1\nPlantoir\n2026-09-25T13:59:23.8960000Z\n")
         try writeLease(for: "ICS3U-2025", pid: 1, body: "1\nlaunchd\n2026-09-25T13:59:23.8960000Z\n1.000000\n")
         try writeLease(for: "MPM2D-2025", pid: 1, body: "1")
+        try FileManager.default.createDirectory(
+            at: coursesDirectoryURL.appendingPathComponent(ReferenceStaging.stagingName(for: "ICD2O-2025")),
+            withIntermediateDirectories: true
+        )
+        try writeLease(for: "ICD2O-2025", pid: 1, body: "1\nlaunchd\n2026-09-25T13:59:23.8960000Z\n")
 
         var swept: [String] = ReferenceStaging.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL)
         swept.sort()
-        XCTAssertEqual(swept, ["ICS3U-2025", "ICS4U-2025"])
+        XCTAssertEqual(swept, ["ICS3U-2025", "ICS4U-2025", "MPM2D-2025"])
     }
 
     // MARK: - The claim, as the contract writes it
@@ -273,7 +283,9 @@ final class WorkLeaseLivenessTests: XCTestCase {
             }
             if given["anotherLiveLease"] as? Bool == true {
                 try FileManager.default.createDirectory(at: activity, withIntermediateDirectories: true)
-                try Data("1".utf8).write(to: activity.appendingPathComponent("\(folderName).import.1.lease"))
+                try Data("1\nlaunchd\n".utf8).write(
+                    to: activity.appendingPathComponent("\(folderName).import.1.lease")
+                )
             }
             let leftover: String = try XCTUnwrap(given["leftover"] as? String, name)
             var removalFails: Bool = false
