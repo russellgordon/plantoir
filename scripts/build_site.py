@@ -1786,9 +1786,11 @@ def _read_pages_for_linking(content_root: Path):
     through: by its path relative to content_root, and by its bare stem.
 
     Shared by `_find_class_reachable_pages` and `_date_pages_from_their_classes`
-    so that "which pages does this class bring?" has ONE answer in the build —
-    the page the first pass leaves alone as reachable is the page the second
-    pass dates.
+    so that "which page does this link land on?" has ONE answer in the build.
+    The two passes ask different questions of it: the first leaves alone every
+    page a class reaches, directly or through other pages; the second dates
+    only the pages a class links to DIRECTLY — so a page reached only through
+    another keeps its own date, in both.
     """
     pages_by_stem: dict[str, list[Path]] = {}
     pages_by_rel: dict[str, Path] = {}
@@ -1902,8 +1904,9 @@ def _sync_non_class_pages_created(content_root: Path, first_class_dt: datetime) 
             title = str(post.get("title") or "")
             if _is_class_page(fp, title):
                 continue
-            # A page a class brings is dated from that class instead, by
-            # `_date_pages_from_their_classes`, which runs straight after this.
+            # A page a class links to directly is dated from that class
+            # instead, by `_date_pages_from_their_classes`, which runs straight
+            # after this; one reached only through another page keeps its own.
             if fp in reachable_from_classes:
                 continue
 
