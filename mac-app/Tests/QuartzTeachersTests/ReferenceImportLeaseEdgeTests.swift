@@ -150,6 +150,17 @@ extension ReferenceImportTests {
             FileManager.default.fileExists(atPath: sentinel.path),
             "Keep a Copy's tidy-up removed the other copy's half-made course."
         )
+        // The refusal leaves its own line on the trail (#287) — not the
+        // import's, because nothing was imported.
+        XCTAssertNotNil(refusal)
+        if let refusal = refusal {
+            XCTAssertTrue(
+                ActivityTrail.store.activityText(includingPrompts: true).contains(
+                    "could not keep a copy of \(course.displayCode) for reference as ICS3U-2025 — \(refusal)"
+                ),
+                "Keep a Copy's refusal left no line on the trail."
+            )
+        }
     }
 
     /// The same app, two acts: an import of ICS4U-2025 is under way, and

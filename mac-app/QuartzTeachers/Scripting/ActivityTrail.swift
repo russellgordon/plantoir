@@ -570,6 +570,17 @@ nonisolated enum ActivityTrail {
         /// which course it was copied from. Never the contents of a page.
         case courseKeptForReference = "course kept for reference"
 
+        /// "Keep a Copy for Reference…" was pressed and no copy was made
+        /// (#287): which course it was copied from, the folder it was to be
+        /// given, and why — being made in another window or copy of Plantoir,
+        /// a folder of that name already there, or the copy could not be
+        /// made (the system's reason, which may name a file; never a page's
+        /// contents). Its own event rather than the import's, because
+        /// nothing was imported. A disabled button writes nothing — the sheet
+        /// refuses a name or a school year by greying Keep a Copy out, and
+        /// that is not a press.
+        case courseCouldNotBeKeptForReference = "course could not be kept for reference"
+
         /// A reference course's pages were locked again, with the count —
         /// because a backup came back unlocked, or a folder that syncs
         /// cleared the locks while it uploaded, or the folder had been opened
@@ -623,13 +634,15 @@ nonisolated enum ActivityTrail {
         case courseImportedFromAClassWebsiteFolder = "course imported from a class website folder"
 
         /// One course of an import did not come across, and the rest did.
-        /// Carries which course and why — already being imported in another
-        /// window or another copy of Plantoir, or something an earlier
-        /// unfinished attempt left behind could not be cleared (both #245,
-        /// written before anything is copied), a folder that could not be
-        /// read, a disk that filled. The shelf refusal and a folder of that
-        /// name already existing are said on the sheet and do not write this
-        /// line. Written per COURSE, because "the import
+        /// Carries which course and why, as the sentence the summary showed —
+        /// already on the shelf under that school year (also a second course
+        /// of the same code in one run), a folder of that name already there
+        /// (both #287), already being imported in another window or another
+        /// copy of Plantoir, or something an earlier unfinished attempt left
+        /// behind could not be cleared (both #245), a folder that could not
+        /// be read, a disk that filled. Written for EVERY course the summary
+        /// lists as not imported; never for one the teacher stopped. Written
+        /// per COURSE, because "the import
         /// failed" is exactly the report that cannot be looked into: a run of
         /// four courses that imports three is the ordinary shape of this.
         case courseCouldNotBeImportedForReference = "course could not be imported for reference"

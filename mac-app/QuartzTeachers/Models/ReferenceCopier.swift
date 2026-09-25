@@ -86,12 +86,62 @@ enum ReferenceCopier {
     /// part-way through a locked copy would leave a folder the teacher cannot
     /// delete. Everything that can fail happens while the folder is still
     /// ordinary.
+    ///
+    /// Every way this can fail leaves ONE line on the trail —
+    /// `courseCouldNotBeKeptForReference`, carrying the sentence the sheet
+    /// shows (#287). It is written HERE, around the whole act, rather than at
+    /// each `throw`, so a new way to fail added later is on the trail without
+    /// anyone having to remember. A copy that was made writes
+    /// `courseKeptForReference` instead, never both.
+    ///
+    /// *Rejected: borrowing the import's "could not be imported for
+    /// reference".* Nothing was imported, and that line names a source folder
+    /// this act does not have — a failure line carrying the other act's name
+    /// misleads whoever reads it back. *Rejected: writing it in the sheet's
+    /// catch* — the success line lives here, and a view is not where a test
+    /// can reach it.
     static func keepACopy(
         of course: Course,
         named folderName: String,
         schoolYear: Int?,
         coursesDirectoryURL: URL,
         at moment: Date = Date()
+    ) throws -> Made {
+        do {
+            return try ReferenceCopier.makeTheCopy(
+                of: course,
+                named: folderName,
+                schoolYear: schoolYear,
+                coursesDirectoryURL: coursesDirectoryURL,
+                at: moment
+            )
+        } catch {
+            ActivityTrail.note(
+                .courseCouldNotBeKeptForReference,
+                ReferenceCopier.failureTrailLine(
+                    copiedFrom: course.displayCode,
+                    folderName: folderName,
+                    reason: error.localizedDescription
+                )
+            )
+            throw error
+        }
+    }
+
+    /// The trail line for a copy that was not made, and why — the reason is
+    /// the sentence the sheet showed the teacher.
+    static func failureTrailLine(copiedFrom source: String, folderName: String, reason: String) -> String {
+        return "could not keep a copy of \(source) for reference as \(folderName) — \(reason)"
+    }
+
+    /// The whole act, for `keepACopy` to wrap. Throws a `Problem` for every
+    /// way it can fail.
+    private static func makeTheCopy(
+        of course: Course,
+        named folderName: String,
+        schoolYear: Int?,
+        coursesDirectoryURL: URL,
+        at moment: Date
     ) throws -> Made {
         let fileManager: FileManager = FileManager.default
         let destinationURL: URL = coursesDirectoryURL.appendingPathComponent(folderName)

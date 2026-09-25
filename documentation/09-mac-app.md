@@ -2904,6 +2904,53 @@ where one clashes imports three. Only Stop ends a run early, and it has its own
 trail event rather than being recorded as a failure: a teacher who stops
 something chose to.
 
+**Every course the summary lists as not imported leaves one line on the
+trail** (#287) — "course could not be imported for reference", naming the
+course, the folder it was read from, and the sentence the summary showed. Until
+#287 two refusals wrote nothing: the shelf rule's (already kept for reference
+under that school year — which also refuses the second of two courses of one
+code in one run) and a folder of that name already being there. Both were
+thought "said on the sheet", and the sheet does drop a shelf-troubled course
+before the run — but the importer reaches both when the shelf or the disk
+changed after the sheet read them (another window kept or imported one) and
+for the same-code pair, and then the summary lists a course as not imported
+with nothing behind it on the trail. Each early `continue` in
+`ReferenceImporter.importCourses` that appends `.notImported` now calls
+`noteNotImported` first; the reason is the teacher's sentence, the same shape
+#245's claim refusals already wrote, so one event does not carry two formats.
+Pinned by `testAShelfRefusalLeavesALineOnTheTrail` and
+`testAFolderAlreadyThereLeavesALineOnTheTrail`.
+
+**Keep a Copy for Reference… has its own failure line**, "course could not be
+kept for reference": which course it was copied from, the folder it was to be
+given, and the sentence the sheet showed. Before #287 no failure of Keep a Copy
+wrote anything — only a copy that was made did. It is written ONCE, by a catch
+around the whole act in `ReferenceCopier.keepACopy` (the body is
+`makeTheCopy`), so the four ways it throws today and any fifth added later are
+covered without anyone remembering; a copy that was made writes "course kept
+for reference" instead, never both. The copy-failed reason is the system's
+sentence, which can name a FILE in the course (never a page's contents) — the
+same exposure the import's catch already had. The sheet's own refusals of a
+name or a school year grey the button out with a sentence; a disabled button
+is not a press, and writes nothing. Pinned by
+`ReferenceCopierTests.testAFailedCopyLeavesNothingBehind` (the full prefix plus
+the thrown sentence), `testAFolderNameAlreadyTakenIsRefusedBeforeAnythingIsWritten`
+and `testKeepACopyLeavesAnotherCopysWorkAlone`; a successful copy is asserted
+to write no failure line. Measured by copying the old `ReferenceImporter.swift`
+and `ReferenceCopier.swift` back in under the new tests: 5 tests red (6
+assertions), green once restored.
+
+*Rejected: routing Keep a Copy's failures through "course could not be
+imported for reference"*, which is what the issue literally asked. Nothing was
+imported, and that line names a source folder this act does not have; the
+contract keeps "course kept for reference" and "course imported for reference"
+apart on purpose (one line per thing the teacher did), and a failure line
+carrying the other act's name misleads whoever reads it back. *Rejected:
+noting only #245's already-being-made refusal* — a disk that filled is the
+same gap on the same button, and one catch covers all of them for no extra
+code. *Rejected: writing the line in the sheet's catch* — the success line
+lives in the model, and a view is not where a test can reach it.
+
 #### Who counts as alive, and two imports of the same course at once (#245)
 
 **What a lease holds.** Since #245 the import writes Windows' `WorkLease`
@@ -3000,12 +3047,14 @@ Copy before anything is read; the folder exists, empty, from the claim):
 4. make the folder EXCLUSIVELY; already there means somebody slipped in →
    refused, nothing removed.
 
-A refused course is reported with `wording.alreadyBeingImported` — Keep a Copy
-with `referenceCourses.wording.copyAlreadyBeingMade` — and writes the "course
-could not be imported for reference" trail line, and the run carries on to the
-next course. The sentence says only that it is being imported elsewhere; it
-does not promise the course will appear, because the other import may fail or
-be stopped. The cases are `contracts/shared-rules.json` →
+A refused course is reported with `wording.alreadyBeingImported` and writes
+the "course could not be imported for reference" trail line, and the run
+carries on to the next course. That import sentence says only that the course
+is being imported elsewhere; it does not promise the course will appear,
+because the other import may fail or be stopped. Keep a Copy is refused with
+`referenceCourses.wording.copyAlreadyBeingMade` and writes its OWN line,
+"course could not be kept for reference" (#287 — this paragraph said it wrote
+the import's line, which no failure of Keep a Copy did until then). The cases are `contracts/shared-rules.json` →
 `referenceCourses.importing.oneImportPerCourseAtATime.cases`, run by
 `WorkLeaseLivenessTests.testTheClaimIsTheContracts` through the REAL claim. The sweep
 also skips any staging folder THIS app has claimed, whether or not its lease
