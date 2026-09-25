@@ -1314,8 +1314,14 @@ enum ScheduledDeploy {
             // LAST, once the work above is done. See the note in
             // oneShotCommand: this used to be the wrapper's final line, which
             // killed this process before any of the three calls above ran.
-            bootOutAgent(courseCode: section?.courseCode, sectionNumber: section?.sectionNumber)
-            exit(process.terminationStatus)
+            // The notification (#212) goes out first, for the same reason.
+            let status: Int32 = process.terminationStatus
+            let courseCode: String? = section?.courseCode
+            let sectionNumber: Int? = section?.sectionNumber
+            announceThenLeave(courseCode: courseCode, sectionNumber: sectionNumber) {
+                bootOutAgent(courseCode: courseCode, sectionNumber: sectionNumber)
+                exit(status)
+            }
         } catch {
             for lease in leasesTaken {
                 WorkLeaseFiles.remove(at: lease)
@@ -1562,14 +1568,55 @@ enum ScheduledDeploy {
             )
         }
 
-        if let label = label(fromScriptPath: script) {
-            bootOutAgent(label: label)
+        let jobLabel: String? = label(fromScriptPath: script)
+        announceThenLeave(courseCode: section?.courseCode, sectionNumber: section?.sectionNumber) {
+            if let jobLabel {
+                bootOutAgent(label: jobLabel)
+            }
+            // Zero, not a failure: nothing went wrong. The job was asked to do
+            // something that no longer made sense and declined, which is the
+            // feature rather than a fault, and a non-zero exit here would land
+            // in the section's log as an error nobody can act on.
+            exit(0)
         }
-        // Zero, not a failure: nothing went wrong. The job was asked to do
-        // something that no longer made sense and declined, which is the
-        // feature rather than a fault, and a non-zero exit here would land in
-        // the section's log as an error nobody can act on.
-        exit(0)
+    }
+
+    /// Tell the teacher how the run went (#212), then leave. Never returns.
+    ///
+    /// Called with the record written and the trail line down, and BEFORE the
+    /// job is booted out, because booting it out ends this process. A plist
+    /// written before v1.2.0 names no section, writes no record, and so has
+    /// nothing to announce: it leaves at once, as it always did.
+    ///
+    /// **`dispatchMain()` is a deliberate exception to the no-GCD rule**, the
+    /// same one `AssistMCPServer.serve` makes and #216's `DispatchSource`
+    /// was given. This function is synchronous and never returns — it runs
+    /// inside `App.init`, before any run loop exists — and the notification
+    /// centre only answers asynchronously. Something has to keep the process
+    /// alive while it does, and parking the main thread in `dispatchMain()`
+    /// is what lets the task below (and the main actor) run at all.
+    /// REJECTED: `RunLoop.main.run()`, which returns at once when no input
+    /// source is attached; a semaphore, which is worse GCD and would block the
+    /// very thread the answer may need.
+    ///
+    /// The wait is bounded (`ScheduledPublishNotice.ceiling`), so a
+    /// notification service that never answers cannot keep a finished run
+    /// alive.
+    nonisolated static func announceThenLeave(
+        courseCode: String?,
+        sectionNumber: Int?,
+        leave: @escaping @Sendable () -> Never
+    ) -> Never {
+        guard let courseCode, let sectionNumber else {
+            leave()
+        }
+        Task { @MainActor in
+            await ScheduledPublishNotice.announce(
+                inHomeFolder: RealHome.forFiles, course: courseCode, section: sectionNumber
+            )
+            leave()
+        }
+        dispatchMain()
     }
 
     /// Which destination types this course publishes to, in deploy order.
