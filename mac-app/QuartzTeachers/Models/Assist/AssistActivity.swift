@@ -40,6 +40,12 @@ enum AssistActivity {
     @Observable
     final class Store {
         var active: Session?
+
+        /// The backups the open conversation can put its section back from —
+        /// asked of that window's own tool runner each time, so a copy the
+        /// conversation makes mid-way is covered the moment it exists. Nil
+        /// while no assistant window is open. See `backupsAnOpenConversationHolds`.
+        var heldBackups: (@MainActor () -> [URL])?
     }
 
     // MARK: - Stored properties
@@ -82,7 +88,60 @@ enum AssistActivity {
         )
         if store.active == ending {
             store.active = nil
+            store.heldBackups = nil
         }
+    }
+
+    /// Says where the open conversation's backups are, so nothing deletes one
+    /// while its "Restore Section N…" button is still offered (issue #242).
+    ///
+    /// Only for the window holding the claim: a stale window's report would
+    /// protect backups nobody can restore from, which is harmless, but a claim
+    /// that has moved on belongs to somebody else.
+    static func holdBackups(
+        folderPath: String,
+        courseCode: String,
+        sectionNumber: Int,
+        from report: @escaping @MainActor () -> [URL]
+    ) {
+        let holding: Session = Session(
+            folderPath: folderPath,
+            courseCode: courseCode,
+            sectionNumber: sectionNumber
+        )
+        if store.active == holding {
+            store.heldBackups = report
+        }
+    }
+
+    /// The backups an open assistant conversation can restore from.
+    ///
+    /// **A delete must never remove one of these.** The conversation's banner
+    /// still offers "Restore Section N…", and a restore from a zip that is gone
+    /// fails after the teacher has already agreed to it. Measured by the plan
+    /// review: the "Select the Assistant's" convenience first proposed for the
+    /// All Backups pane, followed by one Delete, would remove exactly that
+    /// backup — reasoned from the code, not measured.
+    static func backupsAnOpenConversationHolds() -> [URL] {
+        guard let report = store.heldBackups else {
+            return []
+        }
+        return report()
+    }
+
+    /// "Close the assistant for ICS3U Section 2 " followed by `when` — the ONE
+    /// place the sentence is built, because a teacher meets it from three:
+    /// opening a second assistant and deleting a backup the open conversation
+    /// still needs ("…first", `closeTheAssistantFirst`), and removing a
+    /// downloaded assistant ("…before removing this.",
+    /// `AssistModelLibrary.reasonItCannotBeRemoved`).
+    static func closeTheAssistant(_ session: Session, _ when: String) -> String {
+        return "Close the assistant for \(session.courseCode) Section \(session.sectionNumber) " + when
+    }
+
+    /// "Close the assistant for ICS3U Section 2 first".
+    static func closeTheAssistantFirst(_ session: Session) -> String {
+        return AssistActivity.closeTheAssistant(session, "first")
     }
 
     /// Whether the assistant may be opened for this section.
@@ -117,6 +176,6 @@ enum AssistActivity {
         guard let active = store.active else {
             return nil
         }
-        return "Close the assistant for \(active.courseCode) Section \(active.sectionNumber) first"
+        return AssistActivity.closeTheAssistantFirst(active)
     }
 }

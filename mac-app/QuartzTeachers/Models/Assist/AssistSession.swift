@@ -369,6 +369,17 @@ final class AssistSession {
             workspace: workspace, openMainWindow: openMainWindow
         )
         self.toolRunner = runner
+        // The backups this conversation makes are the ones its Restore button
+        // puts the section back from, so nothing may delete them while this
+        // window is open (#242). Asked of the runner each time rather than
+        // copied, because the first copy is made part way through.
+        AssistActivity.holdBackups(
+            folderPath: workingFolder.path,
+            courseCode: courseCode,
+            sectionNumber: sectionNumber
+        ) { [weak runner] in
+            return runner?.backupsThisConversationMade ?? []
+        }
         let agent: AssistAgent = AssistAgent(
             courseCode: courseCode,
             sectionNumber: sectionNumber,

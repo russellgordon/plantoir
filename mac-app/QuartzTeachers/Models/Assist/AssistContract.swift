@@ -157,6 +157,8 @@ enum AssistContract {
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
+            "backupSizeCouldNotBeRead": AssistWording.backupSizeCouldNotBeRead,
+            "backupSizeCouldNotBeReadShort": AssistWording.backupSizeCouldNotBeReadShort,
             "planWasCancelled": AssistWording.planWasCancelled,
             "deployed": AssistWording.deployed(course: course, section: section),
             "couldNotBuildBeforeDeploying": AssistWording.couldNotBuildBeforeDeploying(
