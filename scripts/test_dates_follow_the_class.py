@@ -299,6 +299,23 @@ class DatesFollowTheClassTests(unittest.TestCase):
         self.assertEqual(build_site._yaml_text_for_date("2026-09-24T07:00:00.000+0000"),
                          "2026-09-24T07:00:00.000+0000")
 
+    def test_the_build_names_what_it_rewrote_the_way_the_contract_shows(self):
+        # The line the apps read, compared with the contract's own example so
+        # the printer and the readers (PagesDatedByTheBuildTests on the mac)
+        # cannot drift apart. Nothing is printed when nothing was rewritten.
+        rules = contracts.load("shared-rules")["pagesDatedByTheBuild"]
+        printed: list[str] = []
+        build_site.announce_dated_pages(
+            {"rewritten": ["section1/index", "Exercises/Using Aggregate Functions"]},
+            "ICS4U", 1, printer=printed.append)
+        self.assertEqual(len(printed), 2)
+        self.assertNotIn(rules["marker"]["prefix"], printed[0], "the first line is the teacher's")
+        self.assertEqual(printed[1], rules["marker"]["examples"][0])
+
+        nothing: list[str] = []
+        build_site.announce_dated_pages({"rewritten": []}, "ICS4U", 1, printer=nothing.append)
+        self.assertEqual(nothing, [])
+
     # MARK: - Assertions
 
     def copy_of(self, content: Path, title: str) -> Path:
