@@ -337,6 +337,16 @@ else
   cat /tmp/verify_trail_lock_test.log
 fi
 
+# RUNS deploy.sh's folder publish from a working folder whose own name has a
+# colon, to relative folders with colons in them (GitHub issue #227): where
+# each one lands, and that a copy that did not finish is never "Published".
+if (cd scripts && python3 test_deploy_folder_target.py) >/tmp/verify_deploy_folder_target_test.log 2>&1; then
+  pass "deploy.sh: a publish to a folder lands in the folder it names, and a copy that did not finish says so (scripts/test_deploy_folder_target.py)"
+else
+  fail "deploy.sh: a publish to a folder lands in the folder it names, and a copy that did not finish says so (scripts/test_deploy_folder_target.py)"
+  cat /tmp/verify_deploy_folder_target_test.log
+fi
+
 if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
   pass "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
 else
@@ -1406,6 +1416,35 @@ if [[ "$COLON_MOUNT_SRC" == "$VERIFY_COLON_DIR/courses" ]]; then
   pass "and the workspace was given the colon-named folder itself, byte for byte"
 else
   fail "the workspace was given [${COLON_MOUNT_SRC:-nothing}], not $VERIFY_COLON_DIR/courses"
+fi
+# And PUBLISH it, from inside the colon folder, to a folder whose name has a
+# colon too, given the way a teacher might type it: relative (GitHub issue
+# #227). rsync reads a colon before the first slash as another COMPUTER; the
+# launcher used to say "Published" over an empty folder here. The folder
+# publish needs no container, so this runs before the one above is removed
+# only because that is the tidier order. PUBLISHED_FOLDER= is compared with
+# the working folder as `/bin/pwd -P` spells it, which is how the launcher
+# spells it.
+VERIFY_COLON_PUBLISHED="$(cd "$VERIFY_COLON_DIR" && /bin/pwd -P)/out 26:27/section1"
+if (cd "$VERIFY_COLON_DIR" && ./deploy.sh EXC2O 1 --to-folder "out 26:27" --non-interactive --image "$DEV_TEST_IMAGE") \
+     >/tmp/verify_colon_folder_publish.log 2>&1; then
+  pass "a folder publish from it, to a relative folder with a colon, finished"
+else
+  fail "a folder publish from it, to a relative folder with a colon, did not finish"
+  tail -20 /tmp/verify_colon_folder_publish.log
+fi
+COLON_BUILT_PAGES="$(find "$VERIFY_COLON_BUILDS/EXC2O/section1/public" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
+COLON_PUBLISHED_PAGES="$(find "$VERIFY_COLON_DIR/out 26:27/section1" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
+if [[ -f "$VERIFY_COLON_DIR/out 26:27/section1/index.html" && "$COLON_PUBLISHED_PAGES" == "$COLON_BUILT_PAGES" ]]; then
+  pass "and every page (${COLON_PUBLISHED_PAGES} of ${COLON_BUILT_PAGES}) is in that folder, inside the working folder"
+else
+  fail "the published folder holds ${COLON_PUBLISHED_PAGES:-0} of ${COLON_BUILT_PAGES:-0} pages"
+fi
+if grep -Fxq "PUBLISHED_FOLDER=${VERIFY_COLON_PUBLISHED}" /tmp/verify_colon_folder_publish.log; then
+  pass "and the launcher named that folder by its full path"
+else
+  fail "the launcher did not name ${VERIFY_COLON_PUBLISHED} as the published folder"
+  grep '^PUBLISHED_FOLDER=' /tmp/verify_colon_folder_publish.log || true
 fi
 docker rm -f "$VERIFY_COLON_CONTAINER" >/dev/null 2>&1 || true
 rm -rf "$VERIFY_COLON_DIR" "$VERIFY_COLON_BUILDS"

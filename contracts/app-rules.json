@@ -197,6 +197,26 @@
         "expectProblem" : null,
         "input" : "@FOLDER@",
         "why" : "@FOLDER@ is replaced with a real, writable folder."
+      },
+      {
+        "expectProblem" : "That isn’t a full folder location — use Choose… to pick the folder.",
+        "input" : ".",
+        "why" : "GitHub issue #227. A partial path is refused BEFORE the folder is looked for, and this is the case that proves the order: '.' exists wherever the check happens to run, so a check that looked first would answer nil or 'can't be written' depending on the app's current folder - which is not the working folder the publish runs from. Validated in one folder and published into another is the hole."
+      },
+      {
+        "expectProblem" : "That isn’t a full folder location — use Choose… to pick the folder.",
+        "input" : "out 26:27/section1",
+        "why" : "The issue's own shape: a typed folder name with a colon in it. The mac's publishing step read 'out 26' as another COMPUTER and said Published over an empty folder; the launcher now takes a partial path from the working folder, and the app refuses one outright, so the teacher sees why before anything runs."
+      },
+      {
+        "expectProblem" : "That isn’t a full folder location — use Choose… to pick the folder.",
+        "input" : "~/Sites",
+        "why" : "The app does not expand ~ - a shell does, and the app starts no shell for the folder - so this is a partial path like any other. Windows substitutes nothing; its own full-path test refuses it too."
+      },
+      {
+        "expectProblem" : null,
+        "input" : "  @FOLDER@  ",
+        "why" : "Spaces around a full path are trimmed before it is checked, and the launcher is handed the SAME trimmed path (deployArguments -> 'A local folder is handed over without the spaces around it'), so the folder checked is the folder published into."
       }
     ],
     "note" : "What a teacher is told about what they typed. Both apps ask the same questions and must give the same answers; the exact sentences are the product's, so they are asserted by equality rather than by 'contains'."
@@ -467,6 +487,24 @@
       {
         "cloudflareAccountID" : "",
         "configuration" : {
+          "course_code" : "SPH3U",
+          "deploy_folder_path" : "  /Users/teacher/Sites/sph3u  ",
+          "deploy_target" : "local_folder"
+        },
+        "course" : "SPH3U",
+        "expectArguments" : [
+          "SPH3U",
+          "1",
+          "--to-folder",
+          "/Users/teacher/Sites/sph3u"
+        ],
+        "name" : "A local folder is handed over without the spaces around it",
+        "section" : 1,
+        "why" : "GitHub issue #227. The folder is checked with the spaces around it trimmed (configurationRules.deployFolder), and the settings form saves what was typed, spaces and all. Handed over verbatim, a LEADING space makes the path a partial one to the launcher, which publishes into a folder inside the working folder, and a TRAILING space names a different folder altogether - either way, checked in one place and published into another."
+      },
+      {
+        "cloudflareAccountID" : "",
+        "configuration" : {
           "course_code" : "ICS3U"
         },
         "course" : "ICS3U",
@@ -539,6 +577,11 @@
         "expect" : "ICS3U is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
         "output" : "❌ ICS3U is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
         "why" : "The launcher's refusal, lifted out of the log and into the sentence the teacher reads. It matters most for a deploy set to happen on its own: that one runs with the app closed, and without this the app shows the generic 'did not finish' while the real reason sits in a file nobody opens. NO NEW EXIT CODE was added for it - deploy.sh states its own invariant, that exit 3 means 'a question nobody was there to answer' and nothing else, and every other exit is 0 or 1 - so this is matched on OUTPUT, which is how every other launcher failure already becomes a sentence. The line is LIFTED rather than rewritten: the launcher's output already is a sentence a teacher can act on, and a second explanation of one rule is how one rule comes to be said two ways."
+      },
+      {
+        "expect" : "Plantoir could not copy every page into your publishing folder, so it is not up to date. Try publishing again; if the same thing happens, one of your pages may not open or the folder may not be taking new files.",
+        "output" : "📦 Publishing ICS4U section 1 to a folder…\n❌ Not every page could be copied into the publishing folder, so it is not up to date.\n   Folder: /Users/teacher/Sites/ics4u/section1\n   (copy error 23)\nrsync(19876): error: ./stale/x.html: unlinkat: Permission denied\nrsync(19876): error: ./stale: unlinkat: Directory not empty",
+        "why" : "GitHub issue #227. deploy.sh used to throw the copy's exit status away and say Published over an empty or stale folder; it now fails, INCLUDING when the copy finished only in part (exit 23), because the page left behind may be one the teacher took down. Its line carries the copy's error number, which means nothing to a teacher, so it is matched on the launcher's own words and replaced. The output is the one measured from the real launcher with a stale folder --delete could not remove; scripts/test_deploy_folder_target.py checks that the launcher's cross line is still carried by exactly one case here, so rewording it cannot silently drop this sentence."
       },
       {
         "expect" : "Netlify is limiting how often websites can be deployed right now. Try deploying again in about a minute.",

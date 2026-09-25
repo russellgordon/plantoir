@@ -558,6 +558,93 @@ panel with a reveal-in-file-manager button instead of a link — plus a note
 that pages opened straight from disk won't look right, since the site expects
 to be served over HTTP.
 
+### A relative folder, and a copy that did not finish
+
+GitHub issue [#227](https://github.com/russellgordon/plantoir/issues/227),
+2026-09-25. Two holes, both of which ended in "Published" over a folder that
+was empty, stale, or somewhere else entirely.
+
+**A relative `--to-folder` was handed to rsync as it was typed, and rsync reads
+a colon before the first `/` as a REMOTE computer.** Measured on macOS 26.6 with
+`/usr/bin/rsync` (openrsync, protocol 29), from a copy of `deploy.sh` in a
+scratch working folder called `Comm Tech 26:27`:
+
+| `--to-folder` | Before: exit, pages that landed, what it said |
+|---|---|
+| `out 26:27` | 0, **0** — "hostname contains invalid characters", then `✅ Published: 0 file(s)` and a RELATIVE `PUBLISHED_FOLDER=` |
+| `a:b` | 0, **0** — rsync ran `ssh a` |
+| `localhost:site` | 0, **0** — rsync **opened an ssh connection to this Mac**, refused only because Remote Login was off |
+| `-x` | 1 — `mkdir -p` read it as an option |
+| `sub/a:b`, `./a:b`, a full path with a colon | 0, all — a colon after the first `/` is local |
+
+**The ssh finding is the reason this is more than a cosmetic bug.** With Remote
+Login on, or with a real computer's name before the colon, the site would have
+been copied to ANOTHER MACHINE using the teacher's own ssh keys, while the
+launcher named a local folder as the place it went. "Publishes somewhere else,
+or nowhere, and says Published" is the shape of it.
+
+**What the launcher does now.** A relative `--to-folder` is taken from the
+working folder — which it always was, implicitly, because `deploy.sh` begins
+`cd "$(dirname "$0")"` — and is made a full path (`$(pwd)/<path>`) before
+anything reads it. A path starting with `/` cannot be read as a host or as an
+option, and `PUBLISHED_FOLDER=` is then a path the app can open (a relative one
+would be opened against the APP's current folder, which is `/`). A working
+folder whose own name has a colon is fine: the result still starts with `/`.
+
+**And it reads rsync's own exit status.** It used to pipe rsync into
+`grep -c … || true`, which threw the status away. Now any non-zero status —
+including **23 and 24, a copy that finished only in part** — exits 1 with a
+cross line and no `PUBLISHED_FOLDER=`, so the app's "copied to its publishing
+folder" panel never appears. A partial copy is a failure on purpose (director's
+ruling): measured with a stale folder `--delete` could not remove, the new pages
+landed, the page the teacher had taken down stayed, and the launcher said
+`Published: 2`. The cross line is matched by the app and replaced with
+`FailureExplainer.folderCopyDidNotFinish` (`app-rules.json` →
+`failureExplanations`), because "copy error 23" means nothing to a teacher.
+
+**Not measured, and worth knowing before a report arrives:** a network share
+(SMB — a school web server's share is a plausible destination) and a folder in
+iCloud Drive. rsync's exit 23 also covers attributes it could not SET, which
+is typical on SMB and possible on iCloud's evicted files; if a teacher reports
+"it always fails to my network drive", that is the first thing to look at. An
+exFAT and an MS-DOS disk image were measured (plan review, 2026-09-25): exit 0
+on a first and a second publish, so a USB stick is not a false failure. (On
+those every file is counted as "updated" on every publish, because the count
+includes permission-only lines — cosmetic, and left alone.)
+
+**The app refuses a partial path outright.** `CourseConfiguration.
+deployFolderProblem` now answers `deployFolderIsNotAFullLocation` for anything
+not starting with `/`, BEFORE it looks for the folder: the app's own current
+folder is `/`, so `Users/Shared` used to pass the check and then be published
+into `<working folder>/Users/Shared`. `Choose…` always yields a full path, so
+only a typed one reaches this. Every caller goes through the one function —
+the settings form and the wizard (Save is blocked), every leg of a
+multi-destination deploy, and a scheduled deploy — so a course that already
+SAVED a partial path is refused at Deploy rather than published somewhere
+else; no migration. `DeployCommand.arguments` also hands the launcher the
+path TRIMMED, the same way the check trims it: the settings form saves what was
+typed, and `" /Users/x/Sites"` was a relative path to the launcher.
+
+**Rejected:**
+
+- **Prefixing `./`.** Fixes rsync's reading, but `PUBLISHED_FOLDER=` stays
+  relative and the app would reveal the wrong folder.
+- **`--` or `--protect-args`.** `--` stops OPTION parsing, not HOST parsing;
+  openrsync's `-s` support was not measured.
+- **Refusing a relative path in the launcher.** Breaks command-line users who
+  rely on the working-folder meaning `deploy.sh` has always had.
+- **Counting copied files instead of reading the status.** Exit 23 still
+  copies files, so the count is non-zero while the stale page stays.
+
+Pinned by `scripts/test_deploy_folder_target.py` (the real launcher, from a
+working folder named with a colon, against `shared-rules.json` →
+`folderPublishTarget`), by verify.sh's colon-folder step, which now also
+publishes to `out 26:27`, and by the `configurationRules.deployFolder`,
+`deployArguments` and `failureExplanations` contract cases. **Windows** has no
+colon hole — robocopy has no remote syntax and NTFS forbids `:` in a name —
+and already fails on robocopy ≥ 8; it does have the relative half, owed in the
+`windows` issue drafted from #227.
+
 ## Publishing while a preview is running — the race, and the harness that found it
 
 Two defects on 2026-09-05, both in the publish path, both invisible to every
