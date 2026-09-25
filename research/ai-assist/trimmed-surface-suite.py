@@ -588,7 +588,7 @@ def intercepted(message, window_course=None, window_section=None):
         # type instead, and nothing is sent to the model (#277).
         return SAID_AS_IN_CODE
     links = links_question(message, window_course, window_section)
-    if links == "read_page":
+    if links is not None and links[0] == "page":
         return "read_page"
     if links is not None:
         # Not a tool: another course named in a links question is refused in
@@ -607,8 +607,10 @@ REFUSED_IN_CODE = "(refused in code: another course named)"
 def links_question(message, window_course, window_section):
     """Mirror of `AssistCardCommand.linksQuestion` (#167).
 
-    "read_page" for a question the app answers in code, ("another", code) for
-    one naming another course, None for one that goes to the model. Pinned
+    ("page", title) for a question the app answers in code — the title as the
+    Swift extracts it, so a fuzz can compare TITLES as well as outcomes —
+    ("another", code) for one naming another course, None for one that goes
+    to the model. Pinned
     against `linksQuestion` in the contract by
     `assert_links_question_matches_contract()` before anything is measured.
     """
@@ -666,7 +668,17 @@ def links_question(message, window_course, window_section):
             return None
     if places > 1:
         return None
-    return "read_page" if links_page_title(title) else None
+    page = links_page_title(title)
+    if not page:
+        return None
+    # A title slot that is itself a place asks about a section or a course,
+    # not a page (#167 review R1).
+    place = links_place(page, window_course, window_section)
+    if isinstance(place, tuple):
+        return place
+    if place is not None:
+        return None
+    return ("page", page)
 
 
 def links_without_please(typed):
@@ -701,9 +713,16 @@ def links_page_title(slot):
         return None
     if folded.startswith(("the page ", "this page ", "that page ")):
         return None
+    if folded.startswith("the "):
+        if not folded.endswith(" page") or len(folded) <= len("the  page"):
+            return None
+        title = title[len("the "):len(title) - len(" page")].strip(" \t")
+        if not title:
+            return None
+        return links_page_title(title)
     for day in ("today", "tomorrow", "yesterday", "tonight", "monday", "tuesday", "wednesday",
                 "thursday", "friday", "saturday", "sunday"):
-        if folded.startswith(day + "'s "):
+        if folded == day or folded.startswith(day + "'s "):
             return None
     for word in ("next ", "last ", "previous ", "first ", "upcoming "):
         for opening in ("", "my ", "the "):
@@ -740,7 +759,7 @@ def links_place_against_the_window(words, window_course, window_section):
     elif len(folded) == 1:
         if window_course and parts[0].lower() == window_course.lower():
             return "window"
-        if re.fullmatch(r"[A-Za-z]{3}[0-9][A-Za-z0-9]", parts[0]):
+        if re.fullmatch(r"[A-Za-z]{3}[0-9][A-Za-z]", parts[0]):
             return ("another", parts[0])
         return None
     else:
@@ -1246,6 +1265,9 @@ def assert_links_question_matches_contract():
     for row in family["accepted"]:
         if intercepted(row["input"], course, section) != "read_page":
             wrong.append("accepted and NOT intercepted: %r" % row["input"])
+    for row in family["accepted"]:
+        if links_question(row["input"], course, section) != ("page", row["expectPage"]):
+            wrong.append("accepted with another title than %r: %r" % (row["expectPage"], row["input"]))
     for row in family["anotherCourse"]:
         if links_question(row["input"], course, section) != ("another", row["expectCourse"]):
             wrong.append("another course and not refused naming %s: %r" % (row["expectCourse"], row["input"]))
