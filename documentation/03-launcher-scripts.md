@@ -307,17 +307,38 @@ command line. The bash launchers:
    6 CPUs and 12 GB. Deliberately not the whole machine: the teacher is using
    it while a site builds.
    What it prints differs by path: a VM being created for the first time
-   prints "🚀 First start: building the virtual machine…", an existing one
+   prints "🚀 First start: setting up your website builder…" (before GitHub
+   #263, "building the virtual machine…" with its disk image), an existing one
    "▶️  Starting the website builder…" (before 2026-09-23, "Starting Colima…";
-   GitHub #228). The app's `ScriptRunner.friendlyPhase` labels only the SECOND
+   GitHub #228). The downloads in step 2 print "📦 Downloading what your
+   website builder needs (N of 4)…", where N is the TOOL's fixed number —
+   Lima 1, Colima 2, the Docker CLI 3, buildx 4 — not a running count, so a
+   Mac missing only buildx reads "(4 of 4)"; it said "Getting the container
+   runtime…" and the like until #263. The app's `ScriptRunner.friendlyPhase` labels only the SECOND
    "Starting up (first time can take a few minutes)…", so that label shows on
    exactly the start that is not the first. Known and left alone: it is shown
    only when a runner has no milestones, which no launcher run lacks.
-4. Poll `docker info` for up to a minute. If the VM claims to be running but
+4. Poll `docker info` for up to 30 seconds ("⏳ Waiting for the website
+   builder to be ready…" — `friendlyPhase`'s "Starting up…" marker, which
+   moved with the text in #263). If the VM claims to be running but
    the daemon never answers (a known Colima state after the Mac sleeps or
    shuts down uncleanly, where a plain `colima start` no-ops), force a clean
-   `colima stop --force && colima start` cycle and wait again before giving
-   up with manual-recovery instructions.
+   `colima stop --force && colima start` cycle ("🔁 The website builder isn't
+   answering yet — restarting it…") and wait up to 60 seconds more before
+   giving up with "❌ The website builder did not start." and "Restart this
+   Mac, then try again." The by-hand recovery a developer would use —
+   `colima stop --force && colima start`, then re-run the launcher — is a
+   COMMENT beside that line since #263, not output: a teacher cannot act on a
+   `colima` command, and a restart is what cleared the wedged builder in
+   GitHub #225.
+
+   Every line this step and steps 2–3 print — the whole block from
+   `_download()` to the bare `ensure_container_runtime` call, byte-identical
+   in `setup.sh`, `preview.sh` and `deploy.sh` — is pinned by
+   `AppRulesContractTests.testTheFirstRunLinesNameNoMachinery`: no Colima,
+   Lima, Docker, buildx, container, image, script or toolchain on a printed
+   line, and the three copies still identical. The rest of each launcher still
+   names the machinery in places; that is its own follow-up issue.
 
 One consequence worth knowing: Colima's VM mounts the teacher's home
 directory by default, so the working folder containing `courses/` must live
@@ -332,6 +353,16 @@ when needed but never shut it down, and the only disruptive action — the
 force-restart in step 4 — happens exclusively when the Docker daemon is
 already dead, i.e. when no Colima-based tool is functional anyway
 (containers with restart policies come back automatically afterwards).
+Until GitHub #263 the launchers PRINTED that last point — "(Colima is shared
+by any other Colima-based toolchains on this Mac; their containers restart
+automatically afterwards if configured to.)" — beside the restart. It is a
+comment now, and that is a trade-off, not a free improvement: the one reader
+the printed note served was a DEVELOPER at the command line whose other
+Colima containers (a Supabase stack, say) the force-cycle was about to take
+down, and a comment is invisible at run time. It went because the console
+is read by teachers, who have nothing else using Colima and for whom every
+word of it was machinery (`CLAUDE.md` rule 1). Do not restore it as output
+without a way to print it only to a developer.
 Whichever toolchain creates the VM first determines its CPU/RAM size, so the
 launchers may find a VM somebody else built. `_colima_growth_flags` handles
 that under two rules: it only ever asks for MORE (a VM another toolchain
