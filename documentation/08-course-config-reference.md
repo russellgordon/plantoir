@@ -244,7 +244,7 @@ belong in the same mental model:
 
 | Frontmatter key | Where | Effect |
 |---|---|---|
-| `publishForSection<N>` / `createdSection<N>` | shared content | Per-section publication state; collapsed to `publish`/`created` when building section N ([mechanism](05-build-pipeline.md#frontmatter-processing)). |
+| `publishForSection<N>` / `createdSection<N>` | shared content | Per-section publication state; collapsed to `publish`/`created` when building section N ([mechanism](05-build-pipeline.md#frontmatter-processing)). Since 2026-09-25 the BUILD writes `createdSection<N>` too, for the section it is building only: a shared page a visible class brings is given that class's date ([dates](05-build-pipeline.md#dates-drive-everything), #276). |
 | `publish` | any page | `false` keeps the page out of the built site. Anything else — including no key at all — publishes it. **"`false`" is not the same as "looks false"**: see [Whether students see a page](#whether-students-see-a-page) below, which is the measured table and the one both apps are written against. |
 | `created` | any page | The displayed and sort date ([C1-3](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)). |
 | `draft` / `draftSection<N>` | any page | **Legacy, still read.** The same idea with the opposite polarity (`draft: true` hides). Used only when no `publish` key is present. Editing such a page's visibility rewrites the key to `publish` / `publishForSection<N>` on the same line and removes the old one (decided 2026-09-07; `contracts/file-formats.json` → `pageVisibility.writingRules`). The build reads both spellings either way. |
