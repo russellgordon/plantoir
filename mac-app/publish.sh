@@ -87,6 +87,11 @@ fi
 echo ""
 echo "📦 Step 1: Checking llama.cpp engine..."
 ./Vendor/fetch-llama.sh
+# The updater (#204): `project.yml` embeds Vendor/Sparkle/Sparkle.framework,
+# so it must be in place before step 2 generates the project. Signing its
+# helpers item by item is #204's second slice and is NOT done here yet.
+echo "📦 Checking Sparkle (the updater)..."
+./Vendor/fetch-sparkle.sh
 
 # ---- 2. Generate Xcode Project -----------------------------------------------
 echo ""
