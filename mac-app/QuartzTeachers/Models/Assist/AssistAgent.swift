@@ -196,7 +196,9 @@ final class AssistAgent {
 
         // The fixed shapes never reach the model — see AssistCardCommand for
         // the measurement that decided this.
-        if let command = AssistCardCommand.matching(trimmed) {
+        if let command = AssistCardCommand.matching(
+            trimmed, numberedPageWord: tools.numberedPageWord(forCourse: courseCode)
+        ) {
             // Built and SETTLED before the line is written, and then run
             // without being settled again. The order is the whole point: the
             // matcher is clock-free, so "deploy at 6:30 am" arrives here as

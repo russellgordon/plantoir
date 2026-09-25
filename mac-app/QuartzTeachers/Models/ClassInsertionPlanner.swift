@@ -89,6 +89,14 @@ enum ClassInsertionPlanner {
             problems.append("\(unnumbered) class page\(unnumbered == 1 ? " is" : "s are") not named “\(naming.shapeDescription)”, so \(unnumbered == 1 ? "it was" : "they were") left where \(unnumbered == 1 ? "it is" : "they are") — including \(unnumbered == 1 ? "its" : "their") date.")
         }
 
+        if naming.isNumbered {
+            return try ClassInsertionPlanner.planNumbered(
+                atNumber: atDay, count: count, numbered: numbered,
+                timetable: remembered.dates, problems: problems,
+                forSection: sectionNumber, in: course
+            )
+        }
+
         // Everything at or after the insertion point moves along: later days
         // of this unit, and every class of every later unit.
         var shifted: [ClassPageSummary] = []
@@ -203,35 +211,11 @@ enum ClassInsertionPlanner {
         }
 
         // Dates: the new classes take the first slots, then everything shifted
-        // follows in the order it was already in.
-        //
-        // A numbered course (#267) keeps its GAPS. A club's pages are sparse
-        // — Russell's CODING has "Week 1", "Week 2", then "Week 8" eight
-        // weeks on, the pages between never written — so packing the later
-        // pages onto the next free days would move "Week 8" SIX WEEKS
-        // EARLIER while the plan said "later class days". There, a page moves
-        // only as far as it must: to the first free day after the page before
-        // it, and never before its own date. For a section with no gaps this
-        // is the same answer as the slot rule. A "Unit N, Day N" course keeps
-        // the slot rule it has always had; its pages sit on consecutive
-        // class days by construction.
+        // follows in the order it was already in. (A numbered course keeps its
+        // gaps instead, and never reaches here — see `planNumbered`.)
         var destinations: [CalendarDay] = []
-        if naming.isNumbered {
-            guard let kept = ClassInsertionPlanner.destinationsKeepingGaps(
-                for: shifted, after: runway, skippingFirst: count
-            ) else {
-                problems.append("There are not enough class days after the last page to move it onto. Add more class dates and ask again.")
-                return ClassInsertionPlan(
-                    courseCode: course.code, sectionNumber: sectionNumber,
-                    unit: unit, atDay: atDay, naming: naming,
-                    added: [], renames: [], moves: [], linksToRewrite: 0, problems: problems
-                )
-            }
-            destinations = kept
-        } else {
-            for index in 0..<shifted.count {
-                destinations.append(runway[count + index])
-            }
+        for index in 0..<shifted.count {
+            destinations.append(runway[count + index])
         }
         var moves: [ClassDateMove] = []
         for index in 0..<shifted.count {
@@ -404,6 +388,199 @@ enum ClassInsertionPlanner {
         return ClassChangeOutcome(message: message, backupURL: backupURL, created: created)
     }
 
+    /// Making room in a numbered course (#267) — a club's "Week 1", "Week 2".
+    ///
+    /// **Pages order by DATE here, and the numbers may have gaps.** Russell's
+    /// CODING club has Week 1, Week 2, Week 8 and Week 9 on weekly Thursdays,
+    /// the pages between never written. The ordinary rule — the new page takes
+    /// the day the page AT the insertion point sits on, and everything from
+    /// there along is renamed one up and packed onto the next class days —
+    /// was measured on that shape: "make room at Week 3" dated the new page
+    /// 2025-11-20 (Week 8's day, with 10-02 free) and renamed two published
+    /// meetings, Week 8 → 9 and Week 9 → 10, a week later each, to make room
+    /// in a slot that was empty.
+    ///
+    /// So, here:
+    /// * the new pages take the first free class days after the LATEST page
+    ///   numbered below the insertion point — "after Week 2";
+    /// * a page is renamed only when a new number would land on its name, and
+    ///   the run stops at the first page whose number is already clear;
+    /// * a later page keeps its date when it is already after the page before
+    ///   it, and only a page whose date COLLIDES moves — to the first class
+    ///   day after that page. Only then does the plan list a move.
+    ///
+    /// In a numbered course with no gaps (a club filled one page at a time)
+    /// this gives the same answer as the ordinary rule.
+    static func planNumbered(
+        atNumber: Int,
+        count: Int,
+        numbered: [ClassPageSummary],
+        timetable: [CalendarDay],
+        problems startingProblems: [String],
+        forSection sectionNumber: Int,
+        in course: Course
+    ) throws -> ClassInsertionPlan {
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        var problems: [String] = startingProblems
+
+        // Below the insertion point stays; at or after it may move.
+        var shifted: [ClassPageSummary] = []
+        var untouched: [ClassPageSummary] = []
+        for page in numbered {
+            guard let numbers = page.unitAndDay else {
+                continue
+            }
+            if numbers.day >= atNumber {
+                shifted.append(page)
+            } else {
+                untouched.append(page)
+            }
+        }
+
+        // The latest date among the pages that stay — "after Week 2", by
+        // date, which is also after every other page below the insertion.
+        var held: [CalendarDay] = []
+        var latestKept: CalendarDay? = nil
+        for page in untouched {
+            guard let date = page.date else {
+                continue
+            }
+            held.append(date)
+            if let current = latestKept, current >= date {
+                continue
+            }
+            latestKept = date
+        }
+        var runway: [CalendarDay] = []
+        for date in timetable {
+            if held.contains(date) {
+                continue
+            }
+            if let latestKept, date <= latestKept {
+                continue
+            }
+            runway.append(date)
+        }
+        runway.sort()
+
+        if runway.count < count {
+            let missing: Int = count - runway.count
+            let from: String = latestKept?.text ?? "the start of the course"
+            problems.append("This needs \(count) class day\(count == 1 ? "" : "s") after \(from) and the timetable only has \(runway.count). Add \(missing) more class date\(missing == 1 ? "" : "s") and ask again.")
+            return ClassInsertionPlan(
+                courseCode: course.code, sectionNumber: sectionNumber,
+                unit: 1, atDay: atNumber, naming: naming,
+                added: [], renames: [], moves: [], linksToRewrite: 0, problems: problems
+            )
+        }
+
+        let folderURL: URL = ClassPages.folderURL(forSection: sectionNumber, in: course)
+        var added: [PlannedClass] = []
+        for offset in 0..<count {
+            let number: Int = atNumber + offset
+            let title: String = naming.title(unit: 1, day: number)
+            added.append(PlannedClass(
+                title: title,
+                fileURL: folderURL.appendingPathComponent(title + ".md"),
+                day: number,
+                date: runway[offset]
+            ))
+        }
+
+        // Renames: only the run whose numbers the new pages would land on.
+        // `shifted` is in number order (see `numberedClasses`).
+        var newNames: [String: String] = [:]
+        var renamesUpward: [ClassRename] = []
+        var firstClearNumber: Int = atNumber + count
+        for page in shifted {
+            guard let numbers = page.unitAndDay else {
+                continue
+            }
+            if numbers.day >= firstClearNumber {
+                break
+            }
+            let newTitle: String = naming.title(unit: 1, day: firstClearNumber)
+            renamesUpward.append(ClassRename(
+                from: page.title,
+                to: newTitle,
+                fromURL: page.fileURL,
+                toURL: folderURL.appendingPathComponent(newTitle + ".md")
+            ))
+            newNames[page.title] = newTitle
+            firstClearNumber += 1
+        }
+        // Highest number first — see `apply` for why the order is part of the
+        // plan.
+        var renames: [ClassRename] = []
+        for rename in renamesUpward.reversed() {
+            renames.append(rename)
+        }
+
+        // Dates, in DATE order: a page already after the one before it stays.
+        let shiftedByDate: [ClassPageSummary] = ClassInsertionPlanner.inDateOrder(shifted)
+        guard let destinations = ClassInsertionPlanner.destinationsKeepingGaps(
+            for: shiftedByDate, after: runway, skippingFirst: count
+        ) else {
+            problems.append("There are not enough class days after the last page to move it onto. Add more class dates and ask again.")
+            return ClassInsertionPlan(
+                courseCode: course.code, sectionNumber: sectionNumber,
+                unit: 1, atDay: atNumber, naming: naming,
+                added: [], renames: [], moves: [], linksToRewrite: 0, problems: problems
+            )
+        }
+        var moves: [ClassDateMove] = []
+        for index in 0..<shiftedByDate.count {
+            let moving: ClassPageSummary = shiftedByDate[index]
+            let destination: CalendarDay = destinations[index]
+            if moving.date == destination {
+                continue
+            }
+            moves.append(ClassDateMove(
+                title: newNames[moving.title] ?? moving.title,
+                fileURL: moving.fileURL,
+                from: moving.date,
+                to: destination
+            ))
+        }
+
+        var renamedFrom: [String] = []
+        for rename in renames {
+            renamedFrom.append(rename.from)
+        }
+
+        return ClassInsertionPlan(
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            unit: 1,
+            atDay: atNumber,
+            naming: naming,
+            added: added,
+            renames: renames,
+            moves: moves,
+            linksToRewrite: countLinks(to: renamedFrom, forSection: sectionNumber, in: course),
+            problems: problems
+        )
+    }
+
+    /// Pages by date, earliest first; a page with no date after every dated
+    /// one; the number decides a tie. How a numbered course orders (#267).
+    static func inDateOrder(_ pages: [ClassPageSummary]) -> [ClassPageSummary] {
+        var ordered: [ClassPageSummary] = pages
+        ordered.sort { first, second in
+            if let left = first.date, let right = second.date, left != right {
+                return left < right
+            }
+            if first.date != nil && second.date == nil {
+                return true
+            }
+            if first.date == nil && second.date != nil {
+                return false
+            }
+            return (first.unitAndDay?.day ?? 0) < (second.unitAndDay?.day ?? 0)
+        }
+        return ordered
+    }
+
     /// The one number a make-room request names in a numbered course
     /// (#267), read from the tool's two arguments.
     ///
@@ -451,7 +628,11 @@ enum ClassInsertionPlanner {
             var chosen: CalendarDay? = nil
             // Already after the page before it: it does not move at all.
             if let own = page.date {
-                if previous == nil || own > previous! {
+                if let previous {
+                    if own > previous {
+                        chosen = own
+                    }
+                } else {
                     chosen = own
                 }
             }

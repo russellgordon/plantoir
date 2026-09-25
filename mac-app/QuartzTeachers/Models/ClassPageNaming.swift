@@ -107,13 +107,6 @@ nonisolated struct ClassPageNaming: Equatable, Hashable {
         }
     }
 
-    // MARK: - Initializer
-
-    init(word: String, scheme: ClassPageScheme) {
-        self.word = ClassPageTerm.cleaned(word)
-        self.scheme = scheme
-    }
-
     /// The shape a class page's name takes, as a teacher would write it
     /// down: "Unit N, Day N", or "Week N". For sentences that say which
     /// pages were passed over, so a Module course and a club each hear their
@@ -125,6 +118,13 @@ nonisolated struct ClassPageNaming: Equatable, Hashable {
         case .numbered:
             return "\(word) N"
         }
+    }
+
+    // MARK: - Initializer
+
+    init(word: String, scheme: ClassPageScheme) {
+        self.word = ClassPageTerm.cleaned(word)
+        self.scheme = scheme
     }
 
     // MARK: - Functions

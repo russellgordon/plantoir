@@ -1581,6 +1581,22 @@ final class AssistToolRunner {
         return lines.joined(separator: "\n")
     }
 
+    /// The page word of this course when it names its pages with ONE number
+    /// ("Week" in a club, #267), and nil for every other course — what the
+    /// card matcher needs to read "make room for a meeting at Week 5" as this
+    /// course's page and nothing else (`AssistCardCommand.matching`). Read
+    /// at the moment of asking, like everything else here.
+    func numberedPageWord(forCourse code: String) -> String? {
+        guard let course = course(withCode: code) else {
+            return nil
+        }
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if naming.isNumbered {
+            return naming.word
+        }
+        return nil
+    }
+
     /// The course with this code, or nil when the working folder no longer has
     /// one — a course renamed or archived mid-conversation.
     private func course(withCode code: String) -> Course? {

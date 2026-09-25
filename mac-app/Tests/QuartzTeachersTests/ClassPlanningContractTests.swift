@@ -85,6 +85,10 @@ final class ClassPlanningContractTests: XCTestCase {
 
     func testTheNextClassIsNamedAsTheContractSays() throws {
         for testCase in try ClassPlanningContractTests.cases(in: "nextClass") {
+            if testCase["existingClasses"] != nil {
+                try checkTheNextClassIsDated(testCase)
+                continue
+            }
             let (root, _, course) = try makeWorkspace(
                 word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
             )
@@ -109,6 +113,32 @@ final class ClassPlanningContractTests: XCTestCase {
             XCTAssertEqual(next.unit, testCase["expectUnit"] as? Int, "after [\(what)]")
             XCTAssertEqual(next.day, testCase["expectDay"] as? Int, "after [\(what)]")
         }
+    }
+
+    /// The dated form of a `nextClass` case (#267): the real planner, with
+    /// the case's timetable remembered, asserting the title AND the date.
+    private func checkTheNextClassIsDated(_ testCase: [String: Any]) throws {
+        let (root, _, course) = try makeWorkspace(
+            meetingDates: try XCTUnwrap(testCase["timetable"] as? [String]),
+            word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var what: [String] = []
+        for existing in try XCTUnwrap(testCase["existingClasses"] as? [[String: String]]) {
+            let title: String = try XCTUnwrap(existing["title"])
+            try writeClass(title, on: try XCTUnwrap(existing["date"]), in: course)
+            what.append(title)
+        }
+        let plan: PlaceholderClassPlan = try NextClassPlanner.plan(forSection: 1, in: course)
+        let planned: PlannedClass = try XCTUnwrap(plan.classes.first, "after \(what)")
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        let number: Int = try XCTUnwrap(testCase["expectNumber"] as? Int)
+        XCTAssertEqual(planned.title, naming.title(unit: 1, day: number), "after \(what)")
+        XCTAssertEqual(
+            planned.date.text, try XCTUnwrap(testCase["expectDate"] as? String),
+            "after \(what): the next page's date"
+        )
     }
 
     // MARK: - Making room
@@ -177,6 +207,24 @@ final class ClassPlanningContractTests: XCTestCase {
                         + "\(move.from?.text ?? "none") to \(move.to.text)"
                     )
                 }
+            }
+
+            // The new pages' own days (#267: after the page before them).
+            if let addedOn = testCase["expectAddedOn"] as? [String: String] {
+                for (title, date) in addedOn {
+                    var landed: String? = nil
+                    for planned in plan.added where planned.title == title {
+                        landed = planned.date.text
+                    }
+                    XCTAssertEqual(landed, date, "\(name): the day the new \(title) takes")
+                }
+            }
+            if testCase["expectNoMoves"] as? Bool == true {
+                var moved: [String] = []
+                for move in plan.moves {
+                    moved.append("\(move.title) \(move.from?.text ?? "none") → \(move.to.text)")
+                }
+                XCTAssertEqual(moved, [], "\(name): nothing may move")
             }
 
             if let mentions = testCase["expectProblemMentions"] as? String {

@@ -210,7 +210,10 @@ final class ClubNounTests: XCTestCase {
                     if phrasing == "Cancel scheduled deploy" {
                         continue
                     }
-                    XCTAssertNotNil(AssistCardCommand.matching(phrasing), "“\(phrasing)” goes to the model")
+                    XCTAssertNotNil(
+                        AssistCardCommand.matching(phrasing, numberedPageWord: naming.word),
+                        "“\(phrasing)” goes to the model"
+                    )
                     XCTAssertFalse(phrasing.contains("Unit"), phrasing)
                     XCTAssertFalse(phrasing.contains(", Day"), phrasing)
                     if noun == .meeting {
@@ -234,22 +237,44 @@ final class ClubNounTests: XCTestCase {
         }
     }
 
-    /// "Make room for a meeting at Week 5": one number, into `unit`, the
-    /// slot both kinds of course read safely.
+    /// "Make room for a meeting at Week 5": one number, into `unit` — and
+    /// only on the course's own word or a bare number (#267 review).
     func testMakeRoomAtOneNumberIsReadIntoTheUnitSlot() {
-        let command: AssistCardCommand? = AssistCardCommand.matching("Make room for one meeting at Week 5")
+        let command: AssistCardCommand? = AssistCardCommand.matching(
+            "Make room for one meeting at Week 5", numberedPageWord: "Week"
+        )
         XCTAssertEqual(command?.toolName, "make_room_for_classes")
         XCTAssertEqual(command?.arguments, ["unit": "5", "howMany": "1"])
-
         XCTAssertEqual(
-            AssistCardCommand.matching("make room for two meetings at week 3")?.arguments,
+            AssistCardCommand.matching("make room for two meetings at week 3", numberedPageWord: "Week")?.arguments,
             ["unit": "3", "howMany": "2"]
         )
-        XCTAssertNil(AssistCardCommand.matching("make room for one meeting at day 5"))
-        // The shipped near-miss: "at Unit 3" names no day and goes to the model.
-        XCTAssertNil(AssistCardCommand.matching("make room for a class at Unit 3"))
-        XCTAssertNil(AssistCardCommand.matching("make room for two meeting at week 5"))
-        XCTAssertNil(AssistCardCommand.matching("make room for one meeting at 5 5"))
+        // The bare number.
+        XCTAssertEqual(
+            AssistCardCommand.matching("make room for a meeting at 4", numberedPageWord: "Week")?.arguments,
+            ["unit": "4", "howMany": "1"]
+        )
+        // The course's word, not any word.
+        XCTAssertEqual(
+            AssistCardCommand.matching("make room for one class at Session 2", numberedPageWord: "Session")?
+                .arguments,
+            ["unit": "2", "howMany": "1"]
+        )
+        for nearMiss in [
+            "make room for a meeting at period 3",
+            "make room for a meeting at block 2",
+            "make room for one meeting at section 2",
+            "make room for one meeting at day 5",
+            "make room for a class at Unit 3",
+            "make room for two meeting at week 5",
+            "make room for one meeting at 5 5",
+            "make room for one meeting at week",
+        ] {
+            XCTAssertNil(
+                AssistCardCommand.matching(nearMiss, numberedPageWord: "Week"),
+                "“\(nearMiss)” is not this club's page and goes to the model"
+            )
+        }
         // The two-number shape is untouched.
         XCTAssertEqual(
             AssistCardCommand.matching("make room for two classes at Unit 3, Day 4")?.arguments,
@@ -257,21 +282,24 @@ final class ClubNounTests: XCTestCase {
         )
     }
 
-    /// In a Unit/Day course the one-number shape is a QUESTION, never a
-    /// rename: a unit with no day asks which day.
-    func testTheOneNumberShapeInAnOrdinaryCourseAsksRatherThanGuesses() async throws {
+    /// In a Unit/Day course the one-number shape matches NOTHING, so those
+    /// sentences reach the model exactly as they did before #267 — and the
+    /// window's course is what says which kind of course it is.
+    func testTheOneNumberShapeInAnOrdinaryCourseGoesToTheModel() throws {
         let made = try AssistFixture.makeRunner()
         defer { try? FileManager.default.removeItem(at: made.root) }
-        let command: AssistCardCommand = try XCTUnwrap(
-            AssistCardCommand.matching("make room for one class at week 5")
-        )
-        var arguments: [String: Any] = ["course": "ICS3U", "section": 1]
-        for (key, value) in command.arguments {
-            arguments[key] = value
+        let word: String? = made.runner.numberedPageWord(forCourse: "ICS3U")
+        XCTAssertNil(word)
+        for sentence in [
+            "make room for one class at week 5", "make room for a class at period 3",
+            "make room for a class at 3", "make room for a meeting at Week 5",
+        ] {
+            XCTAssertNil(AssistCardCommand.matching(sentence, numberedPageWord: word), sentence)
         }
-        let outcome: AssistToolOutcome = await run(made.runner, "plan_make_room_for_classes", arguments)
-        XCTAssertFalse(outcome.isPlan)
-        XCTAssertTrue(outcome.detail.contains("Which day"), outcome.detail)
+
+        let club = try makeClub(noun: .meeting)
+        defer { try? FileManager.default.removeItem(at: club.root) }
+        XCTAssertEqual(club.runner.numberedPageWord(forCourse: club.course.code), "Week")
     }
 
     /// "Duplicate Week 2 as my next meeting" is the duplicate family.

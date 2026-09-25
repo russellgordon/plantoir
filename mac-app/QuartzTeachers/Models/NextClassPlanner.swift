@@ -110,7 +110,20 @@ enum NextClassPlanner {
 
         // Position, not numbering: the class after this section's 15th class
         // takes the 16th date, whatever the 15 pages happen to be called.
-        let position: Int = existing.count
+        //
+        // A numbered course (#267) is the exception, and orders by DATE. A
+        // club's pages are sparse — Russell's CODING has "Week 1", "Week 2",
+        // then "Week 8" and "Week 9" eight weeks on — so four pages does NOT
+        // mean the fifth date: measured, the position rule dated the new
+        // "Week 10" 2025-10-16, five weeks BEFORE Week 8, where the front page
+        // (which follows the latest date) never showed it. There the next
+        // page takes the first class day after the LATEST dated page.
+        var position: Int = existing.count
+        if naming.isNumbered, let after = NextClassPlanner.positionAfterTheLatestPage(
+            existing, in: remembered.dates
+        ) {
+            position = after
+        }
         let date: CalendarDay = try NextClassPlanner.date(
             at: position, from: remembered.dates, course: course, sectionNumber: sectionNumber
         )
@@ -275,6 +288,37 @@ enum NextClassPlanner {
             return dates[position]
         }
         return dates[dates.count - 1]
+    }
+
+    /// Where in the timetable a numbered course's next page goes: the index
+    /// of the first date after the LATEST date any class page carries — the
+    /// timetable's length when none is later, so the page shares the last
+    /// day as every other planner here does. Nil when no page is dated, and
+    /// the position rule applies. Pure, so the rule can be tested alone.
+    static func positionAfterTheLatestPage(
+        _ pages: [ClassPageSummary], in dates: [CalendarDay]
+    ) -> Int? {
+        var latest: CalendarDay? = nil
+        for page in pages {
+            guard let date = page.date else {
+                continue
+            }
+            if let current = latest, current >= date {
+                continue
+            }
+            latest = date
+        }
+        guard let latest else {
+            return nil
+        }
+        var index: Int = 0
+        for date in dates {
+            if date > latest {
+                return index
+            }
+            index += 1
+        }
+        return dates.count
     }
 
     /// The first class of the NEXT unit: one past the highest unit, Day 1.
