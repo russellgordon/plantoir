@@ -899,9 +899,9 @@ create_the_workspace_on_free_ports() {
 }
 
 # Starts this folder's stopped workspace. When Docker refuses because another
-# folder's workspace has taken its block — possible for one made before the
-# walk skipped stopped workspaces, or by a launcher that did not — the
-# workspace is made again on free ports. That throws away the warm copy of
+# folder's workspace has taken its block — mainly because the walk's SECOND
+# pass took it on purpose when nothing else was free, or for a workspace
+# made before #280 — the workspace is made again on free ports. That throws away the warm copy of
 # the website builder kept inside it (a first preview again: 109 s measured
 # on a teacher's Mac for #225), so it happens ONLY for a port refusal, and
 # the console says what it costs. Any other refusal stops here with Docker's
