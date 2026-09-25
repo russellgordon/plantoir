@@ -426,7 +426,7 @@ the MODEL writes is a different matter entirely — it is guarded rather than
 bound; see "Never ask the model for something the window already knows".)
 
 Every accepted, asked and refused spelling is DATA, in
-`contracts/assist-cases.json` → `deployAtATime` (23 accepted, 9 asked, 28
+`contracts/assist-cases.json` → `deployAtATime` (23 accepted, 11 asked, 28
 refused, 11 resolving rows — count them rather than trusting this line),
 authored rather than generated and preserved across `--write-contracts`. One
 example and one near-miss — all `cardPhrasings.parsed` can carry — would have
@@ -445,6 +445,16 @@ question, "nothing is set yet", and two sentences to type — built by
 `AssistCardCommand.morningOrEvening` through `deployFrame`, the SAME frame
 `deployAtATime` reads, so the two cannot disagree about what counts as "deploy
 at a time". Nothing is scheduled and no card goes up.
+
+Two near-spellings are asked about as well (the #194 fix round), because
+both still reached `deploy_section` 10 trials out of 10 when they went to the
+model (measurement below): a full stop for the colon, `deploy at 6.30`, and a
+comma after the time, `deploy at 6:30, please` — the comma the frame leaves
+behind when it takes "please" off the end. Asking is safe whatever was meant:
+nothing is set, the clock is named back as `6:30`, and both answers are built
+with a colon, so neither spelling is ever offered back. What is ASKED widened;
+what is ANSWERED did not — `deploy at 6.30 pm` is a `refused` row and still
+goes to the model.
 
 - **Both answers are sentences the family already accepts**, in one canonical
   form — `deploy [today |tomorrow ]at H:MM am|pm` — never an echo of the
@@ -474,27 +484,60 @@ at a time". Nothing is scheduled and no card goes up.
   not an hour on a twelve-hour clock, so there is no morning or evening to
   choose between), `deploy at 6:3`, and anything the frame refuses — a day word
   on both sides, a section, `can you…`. Those still go to the model, and each
-  is a `refused` row that asserts it is neither answered nor asked.
+  is a `refused` row that asserts it is neither answered nor asked. So does a
+  day-part word — `deploy at 6:30 tonight`, `… in the evening`, `… in the
+  morning` — which is outside the frame. Reading one would change what the
+  family ACCEPTS (it is unambiguous to a person), which is Russell's call and
+  a follow-up issue, not this piece.
+- **A `today` question can offer two answers that are both refused.** "deploy
+  today at 9:15" typed at 22:00 is asked about, and both `deploy today at
+  9:15 am` and `… pm` meet the runner's "…has already passed" refusal — by
+  design, since a named day is never moved (below). Nothing is set either way;
+  the teacher reads a refusal rather than a wrong deploy.
 - **The MCP path is unaffected.** `AssistAgent.say` is called only from
   `AssistWindowView`; an MCP client calls `schedule_deploy` directly with its
   own `when`, and no tool, schema, description or system-prompt byte moved (both
   tool-surface hashes identical before and after, `--write-contracts` run
   twice).
 
-**The risk this leaves, recorded rather than measured.** A teacher who answers
-the question in their own words — "pm", "evening", "in the evening", "6:30 pm",
-"at 6:30 pm" — types a sentence the matcher does not read (the plan review
-checked all five, and so did this piece's own run: each returns nil from
-both `matching` and `morningOrEvening`), so it goes to the MODEL, and because the
-question was never put in `messages` the model gets that reply with no context
-at all. That is the same fault one turn later, with even less to go on. The
-stateless design is still the right one — the question names the exact
-sentences to type, and a stateful reply-reader would be a new near-miss surface
-with state to carry and clear across turns — but what the smaller assistant
-does with a bare "pm" has NOT been measured; routing is measured by hand
-(`research/ai-assist/`), and that measurement is owed before anybody calls this
-closed. On the smaller assistant a misroute there still lands on an approval
-card — "This happens now." (#168) — rather than on students.
+**The risk this leaves — measured, and it is not where it was first
+expected.** Measured by the #194 review (Opus 5.5, 2026-09-25): Qwen2.5-1.5B
+Q4_K_M, ctx 8192, the app's own server flags, Metal, Apple M4 Pro; the
+branch's system prompt and 13-tool surface, the app's request body
+(temperature 0), the date line appended, a fresh conversation each time —
+which is exactly what the model sees, since the question never enters
+`messages`. Ten greedy trials per sentence, so a trial count rather than a
+rate:
+
+| Sent to the model | Chose (10 trials) |
+|---|---|
+| `pm` | check_section 10 |
+| `evening` / `in the evening` / `no idea` | declined, 10 each |
+| `6:30 pm` / `at 6:30 pm` / `6:30 in the evening` | schedule_deploy 10 each, `when` 18:30 today |
+| `tonight` / `the evening one` / `am` | check_section 10 each |
+| `morning` | read_remembered_timetable 10 |
+| `6:30 am` | schedule_deploy 10, `when` 06:30 today (already past, so the runner's refusal) |
+| `deploy at 6:30` (what the model was sent before this piece) | **deploy_section 10** |
+| `deploy at 6.30` | **deploy_section 10** |
+| `deploy at 6:30, please` | **deploy_section 10** |
+| `deploy at 6:30 tonight` | **deploy_section 10** |
+| `deploy at 6:30 in the evening` | **deploy_section 10** |
+
+A teacher who answers the question in their own words is **not** the risk:
+0 of 120 reply trials (twelve replies) chose `deploy_section`; the replies that
+name a time produced a correctly timed `schedule_deploy` card, the rest a read
+or a decline. That settles the stateless design against a reply-reader. What
+still deployed on the spot was a sentence one character away from the issue's
+own that escapes the frame — and it is also the first time `deploy at 6:30`
+itself was measured rather than inferred (10 of 10 on the dev branch before
+this piece). The fix round widened what is ASKED to the first two
+(`6.30`, `6:30, please`), which are asked-about rows now. **What still
+deploys now, 10 of 10, is a day-part word:** `deploy at 6:30 tonight` and
+`deploy at 6:30 in the evening`. Reading those is a change to the accepted
+grammar and is left to its own follow-up issue; until then the approval
+card's "This happens now." (#168) is what stands between them and students.
+The probe was `research/ai-assist/probe194.py` in the reviewer's scratch copy;
+re-run the table if the model, quant, prompt or tool surface changes.
 
 **Rejected, and why:**
 - a pending "waiting for morning or evening" state that accepts "morning",
