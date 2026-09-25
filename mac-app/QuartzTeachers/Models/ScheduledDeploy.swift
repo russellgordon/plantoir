@@ -775,12 +775,19 @@ enum ScheduledDeploy {
         lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.buildNeededAnAnswer.rawValue))"
             + " > \(shellQuoted(stoppedPartialRecord))")
         lines.append("    else")
-        lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.didNotFinish.rawValue))"
+        // Any OTHER code from the build is its own kind too (#137): the
+        // pages could not be built, nothing was contacted, and the sentence
+        // names no destination and sends the teacher to Preview. `else`, not
+        // `-eq 1` — a launcher that could not be run at all, or was stopped
+        // by a signal, exits with another code, and
+        // `scheduledPublishStopped.whichKind` carries a case for exactly
+        // that. Until #137 this wrote `didNotFinish`, whose sentence put
+        // buildDestinationName where a destination goes and said Publish.
+        lines.append("      /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.buildDidNotFinish.rawValue))"
             + " > \(shellQuoted(stoppedPartialRecord))")
         lines.append("    fi")
-        // Written for BOTH build branches. The outright failure puts it in
-        // the teacher's sentence; buildNeededAnAnswer never shows it, and it
-        // is written anyway so every record has one shape for the reader — see
+        // Written for BOTH build branches and shown by NEITHER: it is written
+        // anyway so every record has one shape for the reader — see
         // ScheduledPublishOutcome.buildDestinationName.
         for completion in recordCompletionLines(
             indentedBy: "    ",
