@@ -274,6 +274,81 @@ the `…StillWrapsInFullAtRealWidths` tests host the view alone, so they prove
 "not line-limited", not "never truncated". Issue #213; never answer it by
 putting the modifier back.
 
+## The chosen folder's path bar names every folder when there is room (#295)
+
+The folder picker, once a teacher has chosen an EMPTY folder (the offer to set
+it up) or one a cloud service keeps in sync (the note about what that costs),
+names the chosen folder first with the same Finder-style path bar the window
+uses — "Macintosh HD › Users › … › Desktop › Class Websites". Until
+2026-09-25 that bar showed only icons for every folder but the chosen one, at
+every window size, however wide the window. Russell confirmed the screen.
+The main window's "Working folder:" bar is a different place and was not
+changed.
+
+**The fault was a width limit that had outlived its reason.** The picker drew
+the bar as `FinderPathBarView(folderURL:).frame(maxWidth: 520)`. The 520 came
+in with the bar itself on 2026-08-09 (c97a05a5), when the bar was a horizontal
+scroll view — a scroll view fills whatever width it is offered, so it needed
+holding in. Issues #145 and #148 (2026-09-09) changed the bar underneath it:
+it now asks only for the room its crumbs need, and its own `ViewThatFits`
+chooses between every name, icons only, and a scroll from the end. That choice
+is made against the width OFFERED, and the 520 was still offering 520 whatever
+the window had. Measured with the real `FinderPathBarView` compiled standalone
+and `NSHostingController.sizeThatFits`: Russell's own path, `~/Desktop/Class
+Websites - 2026-27`, needs **554 points** with every name and 303 as icons
+only, so 520 picked icons only at 900, 1200 and 1600 points of window alike.
+Rendered without the limit, the same path is named at all three.
+
+**The fix is to remove the limit and nothing else.** The bar now gets the
+picker's own width: the window, whose minimum is 900, less `.padding(40)` on
+each side — so it is always offered **at least 820 points**. For an ordinary
+path the icons-only form therefore never appears in the picker; it and the
+scroll still take over for a path longer than that, which is what they are
+for. The 520 on the cloud-sync explanation below the bar stays: that one is a
+reading measure for prose, and a line of prose 1,500 points long is hard to
+read in a way a path is not. The bar can now be wider than the text under it,
+both centred; it is a path rather than a paragraph, and that reads fine.
+
+**Pinned by measuring what the screen draws.** The bar moved into
+`WorkspacePickerView.chosenFolderPathBar(for:)`, and `body` calls it and adds
+nothing after it, so `PathBarWidthTests` measures exactly what the picker
+draws. `testThePickerDrawsEveryNameWhenTheWindowHasRoom` offers 1,400 points
+and requires the width of the full row (a fixture path deeper than 520, with a
+precondition that fails, rather than passing vacuously, if it ever fits);
+`testThePickerStillCollapsesWhenTheWindowHasNoRoom` offers a width between the
+two rows and requires the icons-only row. Put the 520 back and both fail
+(measured, 2 of the class's 8): the first with the bar claiming 520 against
+the fixture's full row of 687, the second with 503.5 against its icons-only
+row of 320 — the limit is a flexible frame, so it claims whatever it is
+offered up to 520 while the bar inside it is still drawing icons only.
+
+**Rejected:**
+
+- **A larger limit** (say 800). The same fault, moved: it still decides "does
+  not fit" without asking the window, and a deeper folder meets it.
+- **A hand-written width → named / icons-only / scrolling rule with a custom
+  `Layout`.** It would re-implement `ViewThatFits`, which already re-measures
+  on every layout pass — a window resize included — and could drift from what
+  is drawn. Measuring the real view tests the decision where it is made.
+- **An accessibility check.** The bar is one accessibility element labelled
+  with the whole path in every form, before the fix and after, so VoiceOver
+  was never affected and cannot tell a named row from an icons-only one.
+  `WindowPathBarTests` already asserts that label.
+
+**Not changed, and why.** The main window's footer bar was measured every
+50 points from 600 to 1300 of detail column: Russell's path is named from 676
+up. At the app's minimum window of 900 with a 228-point sidebar the column is
+671, so it collapses there by five points — a genuine lack of room rather than
+a limit, and a separate question if it ever matters.
+
+**Windows** carries the same limit: `MaxWidth="520"` on the `BreadcrumbBar`
+in its picker's empty-folder offer, where it ellipsises the leftmost crumbs at
+520 whatever the window's width. Its picker shows no bar for a synced folder
+(that notice lives in its main window), so there the empty-folder offer is
+the only place. The rule is `contracts/shared-rules.json` →
+`workingFolderPathBar.fitsInTheSpace`, whose second sentence says "the space"
+means the room the window gives the bar.
+
 ## What a window lets go of when it changes working folder
 
 The defect, reported as [issue
