@@ -4163,7 +4163,7 @@ and redirected that resolver (#240 above: 482 reaches in one run before its
 fix). A resolver added next month would not have been redirected, and nothing
 would have said so. That is the gap this closes.
 
-### The seam: `RealHome`, two doors
+### The seam: `RealHome`, one door
 
 `mac-app/QuartzTeachers/Models/RealHome.swift` is the only product file allowed
 to ask.
@@ -4184,16 +4184,16 @@ to ask.
   folder), so a typed `~` under the suite also lands in the throwaway home.
   It expands `~` and `~/…` only; `~name/…`, another account's home, is left as
   typed rather than looked up.
-- **`RealHome.real(for: Use)`** — the real home, always, for a reach a TEST
-  must see the real value of. Each `Use` case is allowed only from the files
-  `RealHomeTripwireTests.filesAllowedPerUse` names for it, so reusing a case
-  somewhere new is a diff a reviewer sees; `RealHome.real(` anywhere under
-  `Tests/` fails outright. **`Use` has no cases, and that was measured:** every
-  one of the 27 lookups was moved to `forFiles`, the full suite ran, and every
-  test outside the tripwire itself stayed green — nothing needed the real
-  answer. (The compiler says "will never be executed" about `real(for:)`'s
-  empty `switch`; that is the door being shut, and it goes with the first
-  case.)
+- **No second door for "the real home, even under the suite".** The first
+  version had one — `RealHome.real(for: Use)`, an enum of named uses, each
+  allowed only from files the tripwire listed, and forbidden in `Tests/` — and
+  review deleted it. It was measured empty: with all 27 lookups moved to
+  `forFiles`, the full suite ran and every test outside the tripwire itself
+  stayed green, so nothing needed a real value. An empty door kept a standing
+  "will never be executed" compiler warning in a teaching codebase and a third
+  test that could only ever check nothing. If a test ever genuinely needs the
+  real home, that is a new function in `RealHome` and a line in the tripwire,
+  made in a diff somebody reviews.
 
 **Keyed on XCTest being loaded in THIS process** (`RealHome.isInsideTestBundle`,
 `NSClassFromString("XCTestCase")`), not on `BuildOutputLocation.isRunningTests`,
@@ -4241,14 +4241,20 @@ the recorder unnecessary.
 ### The tripwire: `RealHomeTripwireTests`
 
 A source scan, the `ActivityTrailWiringTests` device, over every Swift file in
-`QuartzTeachers/` and `Tests/` (1.8 seconds for its three tests):
+`QuartzTeachers/` and `Tests/` (about 2.3 seconds for its three tests). It fails
+outright if it read fewer than 50 files on either side, so a scan that found
+nothing cannot pass by checking nothing:
 
-1. **The product asks only the seam.** Any of 23 lookups outside
+1. **The product asks only the seam.** Any of 31 lookups outside
    `RealHome.swift` fails, naming file and line: `homeDirectoryForCurrentUser`,
-   `NSHomeDirectory`, `homeDirectory(forUser`, `URL.homeDirectory`, `urls(for:`,
-   `url(for:`, `NSSearchPathForDirectoriesInDomains`, the `URL` statics
-   `.applicationSupportDirectory` `.desktopDirectory` `.libraryDirectory`
-   `.documentsDirectory` `.downloadsDirectory` `.cachesDirectory`,
+   `NSHomeDirectory`, `homeDirectory(forUser`, `.homeDirectory` (as
+   `URL.homeDirectory` or the implicit member `let h: URL = .homeDirectory`),
+   `NSUserName()`, `urls(for:`, `url(for:`, `NSSearchPathForDirectoriesInDomains`,
+   the directory statics `.applicationSupportDirectory` `.desktopDirectory`
+   `.libraryDirectory` `.documentsDirectory` `.downloadsDirectory`
+   `.cachesDirectory` `.picturesDirectory` `.moviesDirectory` `.musicDirectory`
+   `.userDirectory` `.trashDirectory`, a bare `~` handed to a URL
+   (`filePath: "~"`, `fileURLWithPath: "~"` — both answer the real home),
    `expandingTildeInPath`, `abbreviatingWithTildeInPath`, `standardizingPath`,
    `getpwuid`, `getpwnam`, `CFCopyHomeDirectoryURL`, `environment["HOME"]`,
    `getenv("HOME")`, a `"~/` literal and a `"/Users/` literal. Three are
@@ -4259,8 +4265,7 @@ A source scan, the `ActivityTrailWiringTests` device, over every Swift file in
    `~/Library/LaunchAgents`.
 2. **Tests reach the real home only where named.** The same lookups (minus the
    generic `/Users/`, since made-up homes like `/Users/teacher` are how a test
-   SHOULD name one), plus `RealHome.real(` and the running account's own home
-   spelt out. Fifteen allowances in twelve files — mostly the guards
+   SHOULD name one), plus the running account's own home spelt out. Fifteen allowances in twelve files — mostly the guards
    themselves, which must know where the real folder is to say nothing answered
    it, and `ToolchainMirrorTests`, whose mirror must sit under `$HOME` because
    Colima mounts nothing else. Two tests that spelt `/Users/russellgordon` as
@@ -4268,8 +4273,12 @@ A source scan, the `ActivityTrailWiringTests` device, over every Swift file in
    account.
 3. **Nothing stale.** An allowance must match exactly as many lines as it
    says — fewer is a stale entry that would let a new reach back in, more is a
-   new reach beside an allowed one — and every `Use` case must be listed and
-   used, from its listed files only.
+   new reach beside an allowed one.
+
+A line is read the way Swift would: `//` starts a comment only outside a
+string literal (a quote-aware pass, with `\"` escapes), so
+`let s = "a //b"; let h = NSHomeDirectory()` is still caught —
+`testACommentStartsOnlyOutsideAString` pins that.
 
 Beside it, `SuiteStaysOutOfRealFoldersTests.testEveryDefaultHomeIsTheSuitesThrowawayOne`
 asks thirteen default-home wrappers what they answer under the suite and
@@ -4280,13 +4289,20 @@ green" and "the one door answers the right home" are separately true.
 deliberate faults (a `homeDirectoryForCurrentUser` in `ScheduledPublishOutcome`,
 `URL.applicationSupportDirectory` in `AssistModelStore`, `HelperPrograms.binDirectory`'s
 default put back to the raw lookup, `NSHomeDirectory()` in `FinderPathBarTests`,
-`RealHome.real(` in `ProblemReportTests`, a stale allowance, and two `Use`
-cases — one used from an unlisted file, one unused): **10 tests, 7 failures**,
-every fault named by file and line, and the reverted default ALSO caught at
+`RealHome.real(` in `ProblemReportTests`, a stale allowance, and two cases of
+the since-deleted `Use` enum): **10 tests, 7 failures**, every fault named by
+file and line, and the reverted default ALSO caught at
 run time (`HelperPrograms.binDirectory named the real home`). A second run with
 `forFiles` made to return the real home under the suite: **7 tests, 18
 failures**, twelve of them naming the wrapper that answered the real home.
-Restored byte-identical (`cmp`) and green.
+Restored byte-identical (`cmp`) and green. The review's fix round added
+seven more spellings to `ScheduledPublishOutcome.swift` at once — implicit
+`.homeDirectory`, `URL(filePath: "~")`, `URL(fileURLWithPath: "~").standardized`,
+`NSUserName()`, `URL.picturesDirectory`, `.userDirectory`, and
+`NSHomeDirectory()` after `"a //b"` on the same line — and the scan named **all
+seven** (3 tests, 1 failure; before the fix the review measured the first two
+of these missed). Pointing both scans at an empty folder: **3 tests, 20
+failures**, led by "found no product source" and "found no test source".
 
 ### What it cannot see — do not oversell it
 
@@ -4305,14 +4321,18 @@ Restored byte-identical (`cmp`) and green.
   file or folder written, added or removed, and cannot see a read). The fix — a throwaway `HOME` in the child
   environment under the suite — is a follow-up, not part of this piece.
 - **A path spelt out with no lookup at all**: another account's `/Users/…`
-  written in full, or `~` expanded from a VARIABLE by `URL(filePath:)` or
-  `.standardized` (both expand it; no scan can see what a variable holds).
+  written in full or assembled (`"/Users" + "/"`), or `~` expanded from a
+  VARIABLE by `URL(filePath:)` or `.standardized` (both expand it; no scan can
+  see what a variable holds).
+- **`HOME` read through a local copy of the environment** —
+  `let env = ProcessInfo.processInfo.environment` then `env["HOME"]`. Only the
+  spellings `environment["HOME"]` and `getenv("HOME")` are scanned.
 - **`UserDefaults.standard`**, which holds the working-folder path and window
   claims. Guarded today by `isRunningTests && defaults === .standard` checks in
   `WorkspaceModel`, `AppSettings` and `WindowFolderMemory`; the scan cannot see
   that channel.
-- **Block comments.** The scan skips `//` lines and anything after ` //`; it
-  does not understand `/* … */`. A block comment naming a lookup is reported
+- **Block comments.** The scan skips `//` comments (outside string literals);
+  it does not understand `/* … */`, nor `//` inside a multi-line `"""` string. A block comment naming a lookup is reported
   rather than missed — the safe way round.
 - **The tripwire's own file**, which spells every lookup as the text it looks
   for, and the opt-in UI and integration tests, which name a real workspace or
@@ -4339,9 +4359,10 @@ Restored byte-identical (`cmp`) and green.
   failure), breaks the tests that need the real `$HOME` (`ToolchainMirrorTests`:
   Colima mounts only `$HOME`), and makes "a home named explicitly is used
   exactly" untestable.
-- **Ten `Use` cases chosen by "touches no file"** (the plan). The only reason
-  for a real door is a test that needs the real value; `forFiles` already
-  answers the real home in the app. See above: measured, none do.
+- **Ten `Use` cases chosen by "touches no file"** (the plan), and then the
+  empty `Use` door itself (the first implementation). The only reason for a
+  real door is a test that needs the real value; `forFiles` already answers
+  the real home in the app. Measured: none do, so there is no door.
 - **A contract entry.** How a test host finds a home is platform mechanics —
   not a sentence, a rule with portable inputs and outputs, or an ordered
   sequence — and `contracts/README.md`'s coverage table already leaves test

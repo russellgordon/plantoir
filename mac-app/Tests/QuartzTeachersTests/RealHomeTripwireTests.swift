@@ -13,10 +13,12 @@ import XCTest
 /// the SOURCE, the way `ActivityTrailWiringTests` does, and fails naming
 /// the file and line.
 ///
-/// **What a line is.** Comment lines (`//`, `///`) are skipped, and so is
-/// anything after ` //` on a line of code. Block comments (`/* … */`) are
-/// not understood; nothing in this project uses them, and one that named a
-/// home lookup would be reported rather than missed — the safe way round.
+/// **What a line is.** Comment lines (`//`, `///`) are skipped, and so is a
+/// `//` comment after code — found by walking the line and ignoring `//`
+/// inside a string literal, so `"a //b"; NSHomeDirectory()` is still read.
+/// Block comments (`/* … */`) are not understood; nothing in this project
+/// uses them, and one that named a home lookup would be reported rather
+/// than missed — the safe way round.
 ///
 /// The allow-lists are counted per FILE and per LOOKUP, so a second call
 /// of the same kind in an allowed file is as red as a first call in a new
@@ -33,7 +35,11 @@ final class RealHomeTripwireTests: XCTestCase {
         "homeDirectoryForCurrentUser",
         "NSHomeDirectory",
         "homeDirectory(forUser",
-        "URL.homeDirectory",
+        // `URL.homeDirectory` and the implicit member `let home: URL =
+        // .homeDirectory`; a `homeDirectory:` label has no dot and a longer
+        // name is excluded by `containsAsWholeName`.
+        ".homeDirectory",
+        "NSUserName()",
         "urls(for:",
         "url(for:",
         "NSSearchPathForDirectoriesInDomains",
@@ -43,6 +49,15 @@ final class RealHomeTripwireTests: XCTestCase {
         ".documentsDirectory",
         ".downloadsDirectory",
         ".cachesDirectory",
+        ".picturesDirectory",
+        ".moviesDirectory",
+        ".musicDirectory",
+        ".userDirectory",
+        ".trashDirectory",
+        // A bare `~` handed to a URL: `URL(filePath: "~")` and
+        // `URL(fileURLWithPath: "~").standardized` both answer the real home.
+        "filePath: \"~\"",
+        "fileURLWithPath: \"~\"",
         "expandingTildeInPath",
         "abbreviatingWithTildeInPath",
         "standardizingPath",
@@ -113,19 +128,16 @@ final class RealHomeTripwireTests: XCTestCase {
         "QuartzTeachersUITests/AssistantRolloverUITests.swift | getpwuid": 1,
     ]
 
-    /// Which files may call `RealHome.real(for:)` with each `Use`, by the
-    /// case's name and the file's path under `QuartzTeachers/`.
-    /// Empty because `RealHome.Use` is: nothing needs the real home under
-    /// the suite today (doc 09 says how that was measured).
-    static let filesAllowedPerUse: [String: [String]] = [:]
-
     // MARK: - The product asks only the seam
 
     func testOnlyTheSeamAsksForTheHomeFolder() throws {
         let productFolder: URL = ActivityTrailWiringTests.productSourceFolderURL()
         var found: [String: Int] = [:]
         var unexpected: [String] = []
-        for fileURL in ActivityTrailWiringTests.swiftFiles(under: productFolder) {
+        let productFiles: [URL] = ActivityTrailWiringTests.swiftFiles(under: productFolder)
+        // A scan that read nothing passes vacuously; the product has ~200.
+        XCTAssertGreaterThan(productFiles.count, 50, "The scan found no product source at \(productFolder.path), so it checked nothing.")
+        for fileURL in productFiles {
             let relativePath: String = RealHomeTripwireTests.path(of: fileURL, under: productFolder)
             if relativePath == RealHomeTripwireTests.seamFileName {
                 continue
@@ -141,7 +153,7 @@ final class RealHomeTripwireTests: XCTestCase {
         }
         XCTAssertEqual(
             unexpected, [],
-            "Only RealHome may ask where the home folder is. Use RealHome.forFiles (throwaway under the suite, real in the app), or — only if a TEST needs the real value — add a RealHome.Use case and list this file for it in RealHomeTripwireTests.filesAllowedPerUse."
+            "Only RealHome may ask where the home folder is. Use RealHome.forFiles — throwaway under the suite, real in the app."
         )
         RealHomeTripwireTests.assertCounts(found, match: RealHomeTripwireTests.productAllowances, side: "productAllowances")
     }
@@ -153,7 +165,9 @@ final class RealHomeTripwireTests: XCTestCase {
         let ownName: String = "QuartzTeachersTests/RealHomeTripwireTests.swift"
         var found: [String: Int] = [:]
         var unexpected: [String] = []
-        for fileURL in ActivityTrailWiringTests.swiftFiles(under: testsFolder) {
+        let testFiles: [URL] = ActivityTrailWiringTests.swiftFiles(under: testsFolder)
+        XCTAssertGreaterThan(testFiles.count, 50, "The scan found no test source at \(testsFolder.path), so it checked nothing.")
+        for fileURL in testFiles {
             let relativePath: String = RealHomeTripwireTests.path(of: fileURL, under: testsFolder)
             // This file spells every lookup as the text it looks for, so it
             // is the one test file the scan cannot read.
@@ -167,7 +181,7 @@ final class RealHomeTripwireTests: XCTestCase {
             for hit in try RealHomeTripwireTests.homeLookupHits(in: fileURL) where hit.lookup != "\"/Users/" {
                 hits.append(hit)
             }
-            for hit in try RealHomeTripwireTests.hits(of: ["RealHome.real(", RealHomeTripwireTests.runningAccountHomeLiteral()], in: fileURL) {
+            for hit in try RealHomeTripwireTests.hits(of: [RealHomeTripwireTests.runningAccountHomeLiteral()], in: fileURL) {
                 hits.append(hit)
             }
             for hit in hits {
@@ -180,54 +194,29 @@ final class RealHomeTripwireTests: XCTestCase {
         }
         XCTAssertEqual(
             unexpected, [],
-            "A test reached the teacher's real home folder. Use RealHome.forFiles or a made-up home (`/Users/teacher`); RealHome.real(for:) is never for tests. If this test genuinely needs the real home, list it in RealHomeTripwireTests.testAllowances with the reason."
+            "A test reached the teacher's real home folder. Use RealHome.forFiles or a made-up home (`/Users/teacher`). If this test genuinely needs the real home, list it in RealHomeTripwireTests.testAllowances with the reason."
         )
         RealHomeTripwireTests.assertCounts(found, match: RealHomeTripwireTests.testAllowances, side: "testAllowances")
     }
 
-    // MARK: - Each real reach is named, used, and used only where allowed
+    // MARK: - The scan reads what Swift would compile
 
-    func testEveryRealReachIsNamedAndUsedOnlyWhereAllowed() throws {
-        var caseNames: [String] = []
-        for use in RealHome.Use.allCases {
-            caseNames.append(String(describing: use))
-        }
+    /// `//` starts a comment only outside a string literal: a lookup after
+    /// `"a //b"` is code, and a lookup after a real `//` is not.
+    func testACommentStartsOnlyOutsideAString() {
         XCTAssertEqual(
-            Set(caseNames), Set(RealHomeTripwireTests.filesAllowedPerUse.keys),
-            "Every RealHome.Use case needs a line in filesAllowedPerUse, and every line there needs a case."
+            RealHomeTripwireTests.codePart(of: "let s = \"a //b\"; let h = NSHomeDirectory()"),
+            "let s = \"a //b\"; let h = NSHomeDirectory()"
         )
-
-        let productFolder: URL = ActivityTrailWiringTests.productSourceFolderURL()
-        var usesSeen: Set<String> = []
-        var misplaced: [String] = []
-        for fileURL in ActivityTrailWiringTests.swiftFiles(under: productFolder) {
-            let relativePath: String = RealHomeTripwireTests.path(of: fileURL, under: productFolder)
-            if relativePath == RealHomeTripwireTests.seamFileName {
-                continue
-            }
-            for hit in try RealHomeTripwireTests.hits(of: ["RealHome.real("], in: fileURL) {
-                var matchedCase: String?
-                for caseName in caseNames where hit.line.contains("RealHome.real(for: ." + caseName + ")") {
-                    matchedCase = caseName
-                }
-                guard let caseName = matchedCase else {
-                    misplaced.append("\(relativePath):\(hit.lineNumber) calls RealHome.real without naming a case on the same line")
-                    continue
-                }
-                usesSeen.insert(caseName)
-                let allowedFiles: [String] = RealHomeTripwireTests.filesAllowedPerUse[caseName] ?? []
-                if !allowedFiles.contains(relativePath) {
-                    misplaced.append("\(relativePath):\(hit.lineNumber) uses .\(caseName), which is allowed only from \(allowedFiles)")
-                }
-            }
-        }
-        XCTAssertEqual(misplaced, [], "A real-home reach was reused somewhere it was not named for.")
-
-        var unused: [String] = []
-        for caseName in caseNames where !usesSeen.contains(caseName) {
-            unused.append(caseName)
-        }
-        XCTAssertEqual(unused, [], "These RealHome.Use cases are named but nothing uses them — remove them, and their lines in filesAllowedPerUse.")
+        XCTAssertEqual(
+            RealHomeTripwireTests.codePart(of: "let u = \"https://x\" // NSHomeDirectory()"),
+            "let u = \"https://x\""
+        )
+        XCTAssertEqual(
+            RealHomeTripwireTests.codePart(of: "let q = \"say \\\"hi\\\" //\" + x // note"),
+            "let q = \"say \\\"hi\\\" //\" + x"
+        )
+        XCTAssertEqual(RealHomeTripwireTests.codePart(of: "    /// NSHomeDirectory()"), "")
     }
 
     // MARK: - Reading source
@@ -255,7 +244,7 @@ final class RealHomeTripwireTests: XCTestCase {
                 continue
             }
             for needle in needles where code.contains(needle) {
-                if needle == "URL.homeDirectory" || needle.hasPrefix(".") {
+                if needle.hasPrefix(".") {
                     // `.homeDirectory` / `.desktopDirectory` must not match a
                     // longer name that merely starts the same way.
                     if !containsAsWholeName(needle, in: code) {
@@ -269,15 +258,46 @@ final class RealHomeTripwireTests: XCTestCase {
     }
 
     /// A line with its comment taken off, or "" for a comment line.
+    ///
+    /// Walks the line once, remembering whether it is inside a string
+    /// literal, so a `//` inside quotes ("https://…", "a //b") is text
+    /// rather than the start of a comment. A backslash skips the character
+    /// after it, so an escaped quote does not end the string. Raw strings
+    /// (`#"…"#`) are read as ordinary ones, which is right for every raw
+    /// string in this project: none contains an unescaped `"` before `//`.
     static func codePart(of line: String) -> String {
         let trimmed: String = line.trimmingCharacters(in: .whitespaces)
         if trimmed.hasPrefix("//") {
             return ""
         }
-        if let commentStart = trimmed.range(of: " //") {
-            return String(trimmed[trimmed.startIndex..<commentStart.lowerBound])
+        var code: String = ""
+        var isInsideString: Bool = false
+        var previousWasBackslash: Bool = false
+        var previousWasSlash: Bool = false
+        for character in trimmed {
+            if isInsideString {
+                code.append(character)
+                if previousWasBackslash {
+                    previousWasBackslash = false
+                } else if character == "\\" {
+                    previousWasBackslash = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+                continue
+            }
+            if character == "/" && previousWasSlash {
+                code.removeLast()
+                return code.trimmingCharacters(in: .whitespaces)
+            }
+            previousWasSlash = character == "/"
+            if character == "\"" {
+                isInsideString = true
+                previousWasSlash = false
+            }
+            code.append(character)
         }
-        return trimmed
+        return code
     }
 
     /// True when `name` appears and is not followed by a letter, digit or
