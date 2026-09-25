@@ -2870,8 +2870,13 @@ link — so the reference course would have been reading the live settings, add-
 and credential included, and `ReferenceReadingView` would have WRITTEN
 `defaultViewMode` into them through the link, changing a course the teacher is
 teaching. Now the copy gets a real `.obsidian` holding only the reading-view
-default, and the contract case checks the whole source tree, the link's target
-included, is byte-identical afterwards. (The older layout already leaves every
+default. Two contract cases hold it: the live settings folder with an `app.json`
+of `{}` and with none at all — the two shapes the reading-view writer DOES write
+into (it leaves a file that is not JSON alone, which is why the first cut of
+this case, whose `app.json` was plain text, proved nothing about writing through
+the link and was caught in review). Each checks the whole source tree, the
+link's target included, is byte-identical afterwards; with the old copier or
+importer put back, that check fails on both. (The older layout already leaves every
 link out; the 2024–25 layout judges every link at the top of `content/` on its
 own.)
 

@@ -4576,7 +4576,10 @@
           "tree": [
             "courses/ICS3U/course_config.json",
             "courses/ICS3U/section1/index.md",
-            "courses/ICS3U/.obsidian/app.json",
+            {
+              "file": "courses/ICS3U/.obsidian/app.json",
+              "text": "{}"
+            },
             "courses/ICS3U/.obsidian/appearance.json",
             "courses/ICS3U/.obsidian/workspace.json",
             "courses/ICS3U/.obsidian/snippets/x.css",
@@ -4756,7 +4759,44 @@
           "tree": [
             "courses/ICS3U/course_config.json",
             "courses/ICS3U/section1/index.md",
-            "Shared Settings/app.json",
+            {
+              "file": "Shared Settings/app.json",
+              "text": "{}"
+            },
+            "Shared Settings/plugins/digitalgarden/main.js",
+            {
+              "file": "Shared Settings/community-plugins.json",
+              "text": "[\"digitalgarden\"]"
+            },
+            {
+              "link": "courses/ICS3U/.obsidian",
+              "to": "Shared Settings"
+            }
+          ],
+          "expectAbsent": [
+            ".obsidian/plugins",
+            ".obsidian/community-plugins.json"
+          ],
+          "expectNotALink": [
+            ".obsidian"
+          ],
+          "expectUnchanged": [
+            "section1/index.md"
+          ],
+          "expectFound": {
+            "addOnNames": [],
+            "addOnsFolderIsALink": false,
+            "settingsFolderIsALink": true,
+            "publishSiteIsSet": false
+          },
+          "expectSaid": true
+        },
+        {
+          "name": "the settings folder itself is a link and holds no app.json: not copied, and no settings file is made in the live folder",
+          "course": "courses/ICS3U",
+          "tree": [
+            "courses/ICS3U/course_config.json",
+            "courses/ICS3U/section1/index.md",
             "Shared Settings/plugins/digitalgarden/main.js",
             {
               "file": "Shared Settings/community-plugins.json",
