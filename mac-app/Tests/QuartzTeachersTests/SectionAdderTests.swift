@@ -763,6 +763,58 @@ final class SectionAdderTests: XCTestCase {
         )
     }
 
+    /// Rule 5: adding a section writes into pages the teacher never opened,
+    /// so the trail says it happened and how many shared pages it touched —
+    /// and names none of them. Counted, not assumed: the plain page with no
+    /// per-section keys is left alone and is not counted.
+    @MainActor
+    func testAddingASectionLeavesALineOnTheTrail() throws {
+        let (root, course) = try makeWorkspace()
+        let scratchFolderURL: URL = root.appendingPathComponent("trail", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let keyed: String = "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n"
+            + "publishForSection1: false\n----\nBody.\n"
+        try Data(keyed.utf8).write(to: course.directoryURL.appendingPathComponent("Loops.md"))
+        let plain: String = "---\ntitle: Plain\ncreated: 2026-09-08T07:00:00.000-0400\n---\nBody.\n"
+        try Data(plain.utf8).write(to: course.directoryURL.appendingPathComponent("Plain.md"))
+
+        try SectionAdder.addSection(2, to: course)
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains(SectionAdder.trailLine(sectionNumber: 2, pagesGivenKeys: 1)),
+            "the line says a section was added and counts the one page given keys: \(trail)"
+        )
+        XCTAssertTrue(trail.contains("ICS3U/2"), trail)
+        XCTAssertFalse(trail.contains("Loops"), "no page is named: \(trail)")
+    }
+
+    /// A refused add writes nothing: the trail would otherwise say a section
+    /// exists that does not.
+    @MainActor
+    func testARefusedAddLeavesNoLine() throws {
+        let (root, course) = try makeWorkspace()
+        let scratchFolderURL: URL = root.appendingPathComponent("trail", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        XCTAssertThrowsError(try SectionAdder.addSection(1, to: course))
+        XCTAssertFalse(
+            ActivityTrail.store.activityText(includingPrompts: true).contains("added section"),
+            "a section that already exists was refused, so nothing was added"
+        )
+    }
+
     /// The value on a `key: value` line, whatever the line ends with.
     static func value(ofKey key: String, in text: String) -> String? {
         for line in text.components(separatedBy: "\n") {
