@@ -69,8 +69,12 @@ for launcher in setup.sh preview.sh deploy.sh; do
     fail "$launcher has no run_container_with_mount()"
     continue
   fi
-  MOUNTS="$(printf '%s\n' "$BODY" | grep -c -- '--mount "\$(bind_mount_argument ')"
-  check "$launcher asks for both folders through the helper" "2" "$MOUNTS"
+  # Since GitHub #280 the workspace itself is made by ONE function the three
+  # launchers share (the PREVIEW PORT BLOCK), so the same two folders and the
+  # same eight addresses cannot drift apart; scripts/test_port_blocks.py
+  # checks the block is identical in all three. What is checked here is that
+  # the block asks for both folders through the helper, and that each
+  # launcher's own function hands the making to it.
   if printf '%s\n' "$BODY" | grep -q -- '-v "\$'; then
     fail "$launcher still names a folder with -v, which splits on ':'"
   else
@@ -78,8 +82,6 @@ for launcher in setup.sh preview.sh deploy.sh; do
   fi
   check "$launcher says the right sentence when the folder is not there" \
     "1" "$(printf '%s\n' "$BODY" | grep -c 'say_this_folder_is_not_there')"
-  check "$launcher says the OTHER one when the folder is there and cannot be reached" \
-    "1" "$(printf '%s\n' "$BODY" | grep -c 'say_this_folder_cannot_be_reached')"
   # The builds folder is made INSIDE this function and before the workspace.
   # Checked against the function's own body rather than the whole file: the
   # BUILD OUTPUT BLOCK calls ensure_build_root too, hundreds of lines above,
@@ -87,23 +89,38 @@ for launcher in setup.sh preview.sh deploy.sh; do
   # here was deleted. This mount form REFUSES a source that does not exist,
   # so a missing builds root stops the run rather than being created quietly.
   MAKES_BUILDS_ROOT="$(printf '%s\n' "$BODY" | grep -n '^  ensure_build_root$' | cut -d: -f1 | head -1)"
-  MAKES_WORKSPACE="$(printf '%s\n' "$BODY" | grep -n '^  if ! docker run -dit' | cut -d: -f1 | head -1)"
+  MAKES_WORKSPACE="$(printf '%s\n' "$BODY" | grep -n '^  create_the_workspace_on_free_ports$' | cut -d: -f1 | head -1)"
   if [ -z "$MAKES_BUILDS_ROOT" ]; then
     fail "$launcher never makes the builds folder inside run_container_with_mount()"
   elif [ -z "$MAKES_WORKSPACE" ]; then
-    fail "$launcher does not create the workspace in a form that can refuse"
+    fail "$launcher does not make the workspace through the shared block"
   elif [ "$MAKES_BUILDS_ROOT" -lt "$MAKES_WORKSPACE" ]; then
     pass "$launcher makes the builds folder before the workspace, in this very function"
   else
     fail "$launcher makes the builds folder AFTER the workspace, so the run stops on a folder it was about to create"
   fi
-  # The last two lines of the function, in order. Piece A adds a check after
-  # the container is created, and a ragged tail here is what makes that a
-  # conflict rather than an addition.
-  check "$launcher ends the function with the failure branch closed" \
-    "  fi
+  check "$launcher ends the function by making the workspace" \
+    "  create_the_workspace_on_free_ports
 }" "$(printf '%s\n' "$BODY" | tail -2)"
 done
+
+echo
+echo "The shared block asks for both folders through the helper"
+PORT_BLOCK="$(awk '/^# >>> PREVIEW PORT BLOCK >>>/{inside=1} inside{print} /^# <<< PREVIEW PORT BLOCK <<</{inside=0}' "$REPO/setup.sh")"
+MAKER="$(printf '%s\n' "$PORT_BLOCK" | awk '/^create_the_workspace_on_free_ports\(\) \{/{inside=1} inside{print} inside && /^\}/{inside=0}')"
+if [ -z "$MAKER" ]; then
+  fail "setup.sh has no create_the_workspace_on_free_ports() in its PREVIEW PORT BLOCK"
+else
+  check "both folders, through the helper" \
+    "2" "$(printf '%s\n' "$MAKER" | grep -c -- '--mount "\$(bind_mount_argument ')"
+  check "and the sentence for a folder that is there and cannot be reached" \
+    "1" "$(printf '%s\n' "$MAKER" | grep -c 'say_this_folder_cannot_be_reached')"
+  if printf '%s\n' "$MAKER" | grep -q -- '-v "\$'; then
+    fail "the block names a folder with -v, which splits on ':'"
+  else
+    pass "the block names no folder with -v"
+  fi
+fi
 
 # ---- Load the block and put names through it --------------------------
 # shellcheck disable=SC1090
