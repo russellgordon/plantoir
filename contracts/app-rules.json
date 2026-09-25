@@ -1952,7 +1952,9 @@
         "cases" : [
           {
             "expect" : "nothing",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "idle: only its own first process",
             "running" : true,
             "top" : [
@@ -1965,14 +1967,18 @@
           },
           {
             "expect" : "nothing",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "stopped: not asked what runs in it",
             "running" : false,
             "top" : "not asked"
           },
           {
             "expect" : "nothing",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "gone",
             "running" : "gone",
             "top" : "not asked"
@@ -2031,7 +2037,9 @@
           },
           {
             "expect" : "nothing",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "a preview whose launcher has gone",
             "running" : true,
             "top" : [
@@ -2154,7 +2162,9 @@
           },
           {
             "expect" : "other work",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "a publish",
             "running" : true,
             "top" : [
@@ -2177,7 +2187,9 @@
           },
           {
             "expect" : "other work",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "another launcher checking the courses folder",
             "running" : true,
             "top" : [
@@ -2195,7 +2207,9 @@
           },
           {
             "expect" : "other work",
-            "launchers" : [],
+            "launchers" : [
+
+            ],
             "name" : "running, but could not be asked",
             "running" : true,
             "top" : "fails"
