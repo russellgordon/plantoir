@@ -724,7 +724,7 @@ reaches `main()`, so no node server is left behind. Pinned by
     - Netlify's file-digest deploy is created with `draft: false`, and Netlify
       documents that it goes live when its state reaches `ready` — after every
       required file has arrived. A deploy whose files never all arrive never
-      becomes the published one. (The API documents no cancel for a deploy;
+      becomes the published one. (Netlify does document a cancel call, `POST /deploys/{id}/cancel`, but it is deliberately not used here: a deploy whose files have all arrived goes live regardless, and one still receiving files stays a draft anyway;
       the unfinished one is simply left waiting, and nothing is sent after the
       Cancel to tidy it up — a network call during a Cancel was REJECTED, since
       the app ends the launcher two seconds after its `^C`.)
