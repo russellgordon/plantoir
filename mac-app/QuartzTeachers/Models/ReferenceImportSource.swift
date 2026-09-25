@@ -74,6 +74,11 @@ nonisolated struct ReferenceImportSource: Sendable {
         /// where its pages are read from beside the row.
         var checkoutLayout: QuartzCheckoutLayout.Facts? = nil
 
+        /// What of a MODERN course's `.obsidian` will be left behind (#255),
+        /// so the sheet says so only when there is something to say. Empty
+        /// for the older layouts, which say it for every class of theirs.
+        var addOns: ObsidianAddOns.Found = ObsidianAddOns.Found()
+
         // MARK: - Computed properties
 
         var id: String {
@@ -901,8 +906,13 @@ nonisolated struct ReferenceImportSource: Sendable {
             sectionNumbers = recorded
         }
 
+        // The same walk the import makes, add-ons rule included (#255), so
+        // the size a teacher reads is the size that will be copied.
         let walked: ReferenceTreeCopier.Survey = ReferenceTreeCopier.survey(
-            courseAt: courseURL, leavingBehind: leftBehindNames
+            courseAt: courseURL,
+            leavingBehind: leftBehindNames,
+            leavingBehindPaths: ObsidianAddOns.leftBehindFromTheCourse,
+            leavingBehindIfALink: ObsidianAddOns.leftBehindWhenALinkFromTheCourse
         )
 
         // A folder inside the course that the disk will not hand over is said
@@ -925,7 +935,8 @@ nonisolated struct ReferenceImportSource: Sendable {
             suggestedSchoolYear: ReferenceImportSource.suggestedSchoolYear(
                 fromPagesChangedIn: walked.pageYears, on: day
             ),
-            directoryURL: courseURL
+            directoryURL: courseURL,
+            addOns: ObsidianAddOns.found(inCourseAt: courseURL)
         )
     }
 
