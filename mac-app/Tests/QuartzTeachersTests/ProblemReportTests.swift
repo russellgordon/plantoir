@@ -403,7 +403,8 @@ final class ProblemReportTests: XCTestCase {
     /// first line has landed — adds ONE line from the app, which trims while
     /// the launcher is still appending. After the trim every line of the
     /// round is inside the kept window, so each round must keep all of them.
-    /// Forty rounds, forty trims raced.
+    /// Twenty rounds, twenty trims raced. Measured with the app's lock taken
+    /// out: 42 to 54 lines lost in forty rounds, in each of six runs.
     @MainActor
     func testTheTrimNeverLosesALauncherLine() async throws {
         let home: URL = folderURL.appendingPathComponent("home", isDirectory: true)
@@ -411,14 +412,22 @@ final class ProblemReportTests: XCTestCase {
         try FileManager.default.createDirectory(at: trailFolder, withIntermediateDirectories: true)
         let trailURL: URL = trailFolder.appendingPathComponent(ProblemReportStore.activityFileName)
         let store: ProblemReportStore = ProblemReportStore(folderURL: trailFolder)
+        // Long seed lines make the trim's read and rewrite take several
+        // milliseconds — longer than the gap between two of the launcher's
+        // appends — so a trim that did not wait for the lock would all but
+        // certainly swallow one. With short lines the trim is over before
+        // the launcher's next line and the test could pass on a writer that
+        // takes no lock at all (it did, before this was measured).
+        let padding: String = String(repeating: "x", count: 2000)
         var seed: String = ""
         for number in 0..<(ProblemReportStore.mostActivityLines - 1) {
-            seed += "seed line \(number)\n"
+            seed += "seed line \(number) \(padding)\n"
         }
-        let launcherLines: Int = 6
+        let launcherLines: Int = 10
         var linesLost: Int = 0
         var trims: Int = 0
-        for round in 0..<40 {
+        let rounds: Int = 20
+        for round in 0..<rounds {
             try seed.write(to: trailURL, atomically: true, encoding: .utf8)
             let launcher: Process = try ProblemReportTests.startLauncherWriting(
                 lines: launcherLines, inHome: home, saying: "round \(round) launcher line"
@@ -428,7 +437,7 @@ final class ProblemReportTests: XCTestCase {
             )
             XCTAssertEqual(launcher.terminationStatus, 0)
             let text: String = store.activityText(includingPrompts: true)
-            if !text.contains("seed line 0\n") {
+            if !text.contains("seed line 0 ") {
                 trims += 1
             }
             if !text.contains("round \(round) app line\n") {
@@ -440,8 +449,8 @@ final class ProblemReportTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(trims, 40, "a round did not trim, so it proved nothing")
-        XCTAssertEqual(linesLost, 0, "lines lost to a trim across 40 rounds")
+        XCTAssertEqual(trims, rounds, "a round did not trim, so it proved nothing")
+        XCTAssertEqual(linesLost, 0, "lines lost to a trim across \(rounds) rounds")
     }
 
     /// The generated script's append and the launchers' are the same lines,
