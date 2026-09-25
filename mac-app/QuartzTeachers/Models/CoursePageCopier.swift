@@ -66,12 +66,22 @@ nonisolated enum CopiedPageText {
 
     /// The text with a plain `publish: false` as the last line of its
     /// frontmatter.
+    ///
+    /// Not into a block with no column-0 level for a new key (#186): the text
+    /// comes back unchanged, and the read-back that follows refuses the copy
+    /// because it is not certainly hidden. The `setting` calls before this
+    /// one decline the same pages, so this is consistency, not a new refusal.
     static func appendingPlainHiddenKey(to pageText: String) -> String {
         let line: String = "publish: false"
         guard let block = PageFrontmatter.block(in: pageText) else {
             return "---\n" + line + "\n---\n" + pageText
         }
         var lines: [String] = pageText.components(separatedBy: "\n")
+        if PageVisibilityReader.placeForANewTopLevelKey(
+            in: lines, openIndex: block.openIndex, closeIndex: block.closeIndex
+        ) == nil {
+            return pageText
+        }
         lines.insert(line, at: block.closeIndex)
         return lines.joined(separator: "\n")
     }
@@ -153,9 +163,15 @@ nonisolated enum CopiedPageText {
     /// The build's region is python-frontmatter's, not this app's: the first
     /// line must open a block, and the block ENDS at the FIRST later line
     /// matching `^-{3,}\s*$` — at COLUMN 0, with no indentation allowed.
-    /// `PageVisibilityReader.isFence` trims leading spaces before testing a
-    /// fence and therefore can close a block earlier than the build does; the
-    /// gap between the two is where every failure below lives.
+    /// Until issue #188, `PageVisibilityReader.isFence` trimmed leading spaces
+    /// before testing a fence and so could close a block earlier than the
+    /// build does; that gap is where the first two failures below lived. The
+    /// CLOSING rule is one rule now, and this asks it. The invariant stays
+    /// the test rather than the finder all the same: this guard is stricter
+    /// than the app about the OPENING line (it wants the fence on the file's
+    /// first line, at column 0) and about a lone carriage return, and a
+    /// guard that trusted the finder would inherit whatever the next
+    /// divergence turns out to be.
     ///
     /// **Why the key multiset is the whole test.** By the time this is asked,
     /// `hidden(from:forSections:)` has stripped every per-section key and
@@ -168,11 +184,16 @@ nonisolated enum CopiedPageText {
     /// Three failures were reproduced end to end and each one is caught by
     /// exactly that:
     ///
-    /// * a block closed by an INDENTED `---` (issue #188) — the app finds an
-    ///   end the build does not, so the source's own keys survive below it;
+    /// * a block closed by an INDENTED `---` (issue #188) — the app found an
+    ///   end the build does not, so the source's own keys survived below it.
+    ///   Since #188 the app finds no close there either, so such a SOURCE has
+    ///   no block to either reader — its lines are body text on its own
+    ///   site — and the copy is given a block of its own and arrives hidden,
+    ///   with those lines as its body (the composed text above is still
+    ///   refused, and is a `builderAgreement` case);
     /// * a **block scalar carrying a horizontal rule**
-    ///   (`description: |` … `  ---`) — the app closes INSIDE the scalar and
-    ///   inserts its `publish: false` there, while the build reads the whole
+    ///   (`description: |` … `  ---`) — the app closed INSIDE the scalar and
+    ///   inserted its `publish: false` there, while the build reads the whole
     ///   thing and takes the source's `publish: true` from the bottom. The
     ///   copy reached students in section 1 while the summary said it was
     ///   hidden;
@@ -839,21 +860,12 @@ nonisolated enum CopiedPageText {
     /// three or more dashes at COLUMN 0, with nothing after them but spaces.
     ///
     /// python-frontmatter's own boundary, `^-{3,}\s*$`, which allows no
-    /// indentation — unlike `PageVisibilityReader.isFence`, which trims.
+    /// indentation. Since issue #188 that is exactly
+    /// `PageVisibilityReader.isFence`'s closing rule, so this asks it rather
+    /// than keeping a second copy — two copies of a fence rule is how the
+    /// divergence #188 closed began.
     static func isAFenceTheBuilderSees(_ line: String) -> Bool {
-        var rest: Substring = Substring(PageFrontmatter.trimmingCarriageReturn(line))
-        var dashes: Int = 0
-        while rest.first == "-" {
-            dashes += 1
-            rest = rest.dropFirst()
-        }
-        if dashes < 3 {
-            return false
-        }
-        while rest.first == " " || rest.first == "\t" {
-            rest = rest.dropFirst()
-        }
-        return rest.isEmpty
+        return PageVisibilityReader.isFence(line)
     }
 
     /// A section number the course does not have, for the read-back guard to
@@ -892,6 +904,15 @@ nonisolated struct CoursePageCopyOutcome: Sendable {
     /// NOT be taken away again. Named in the summary and on the trail,
     /// because the teacher has to go and remove them.
     let couldNotBeRemoved: [String]
+
+    /// Pages that WERE copied, whose source's settings could not be read — a
+    /// block opened and never closed (since #188 that includes one closed only
+    /// by INDENTED dashes). The copy was given a block of its own and arrived
+    /// hidden, with the source's broken lines as the start of its body; the
+    /// teacher is told, because until #188 such a page was refused with a
+    /// sentence, and a copy that arrives without a word would hide the fact
+    /// that its settings need correcting (#186's review, B6).
+    var sourceSettingsUnreadable: [String] = []
 
     // MARK: - Computed properties
 
@@ -1008,6 +1029,7 @@ nonisolated enum CoursePageCopier {
         // The pages first, with the media names already settled, so nothing
         // touches a page's bytes after its read-back.
         var pagesCreated: [String] = []
+        var sourceSettingsUnreadable: [String] = []
         var writtenPageURLs: [URL] = []
         for placement in plan.pages {
             let sourceFolder: URL = request.source.directoryURL
@@ -1091,6 +1113,9 @@ nonisolated enum CoursePageCopier {
             }
 
             pagesCreated.append(placement.pageName)
+            if PageVisibilityReader.frontmatterBlock(in: sourceText) == .unreadable {
+                sourceSettingsUnreadable.append(placement.pageName)
+            }
             writtenPageURLs.append(writtenURL)
         }
 
@@ -1152,7 +1177,8 @@ nonisolated enum CoursePageCopier {
             skipped: skipped,
             linksLeadingNowhere: plan.linksLeadingNowhere,
             bytesCopied: bytes,
-            couldNotBeRemoved: stillOnDisk
+            couldNotBeRemoved: stillOnDisk,
+            sourceSettingsUnreadable: sourceSettingsUnreadable
         )
     }
 

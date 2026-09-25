@@ -88,6 +88,15 @@ struct AssistPublishPlan {
     /// Pages already the way they were asked to be.
     let alreadyRight: [AssistSectionPage]
 
+    /// Pages the writer would DECLINE: their settings have no column-0 level
+    /// for a new key to join, so nothing can be written to them safely.
+    ///
+    /// Asked at plan time by running the real writer over the page's own text
+    /// — not by a second copy of its rule — so the card cannot promise
+    /// something the writing step then quietly skips.
+    /// [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
+    let noRoomForAKey: [AssistSectionPage]
+
     /// Pages an unpublish reached by following a link and left published, each
     /// with the reason. Always empty when publishing: publishing takes every
     /// page it reaches, and the one thing it does not reach is said in
@@ -128,6 +137,12 @@ struct AssistPublishPlan {
     /// is not the same as one that found everything already done.
     var nothingToDoSentence: String? {
         guard changesNothing, unknownNames.isEmpty, !namedPages.isEmpty else {
+            return nil
+        }
+        // A page the writer would decline is not a page that is "already
+        // hidden". Without this, asking to hide such a page answered "It's
+        // already hidden." about a page students can read.
+        guard noRoomForAKey.isEmpty else {
             return nil
         }
         // Every page they named is already the way they asked for it — and
@@ -219,6 +234,13 @@ struct AssistPublishPlan {
             lines.append("\(alreadyRight.count) \(word) already \(publishes ? "visible" : "hidden").")
         }
 
+        // The pages that will be left alone. Said on the card, BEFORE the
+        // teacher presses Go, because a refusal they only hear about
+        // afterwards is one they have already been told did not happen.
+        if !noRoomForAKey.isEmpty {
+            lines.append(AssistPublishPlan.sayingPagesWithNoRoomForAKey(noRoomForAKey))
+        }
+
         // The classes a link landed on, which this publish left where they
         // are. Said once, here, so it appears on the plan card AND in the
         // reply afterwards — `describe()` is the text used for both.
@@ -285,6 +307,42 @@ struct AssistPublishPlan {
     }
 
     /// "a", "a and b", "a, b and c" — the way a sentence says a list.
+    /// The sentence for pages the writer declined, naming a few of them.
+    static func sayingPagesWithNoRoomForAKey(_ pages: [AssistSectionPage]) -> String {
+        var names: [String] = []
+        for page in pages {
+            names.append(page.displayTitle)
+        }
+        return sayingPagesWithNoRoomForAKey(named: names)
+    }
+
+    /// The same, from titles already to hand.
+    static func sayingPagesWithNoRoomForAKey(named names: [String]) -> String {
+        return AssistWording.pagesWhoseSettingsCannotBeAddedTo(listingAFew(names), count: names.count)
+    }
+
+    /// The sentence for pages whose new date could not be set, naming a few.
+    static func sayingPagesWhoseNewDateCouldNotBeSet(named names: [String]) -> String {
+        return AssistWording.pagesWhoseNewDateCouldNotBeSet(listingAFew(names), count: names.count)
+    }
+
+    /// `listing`, naming at most `mostNamed` and counting the rest — "“a”,
+    /// “b”, “c” and 2 more" — for a sentence that names a few pages without
+    /// turning into a list. Always names at least one: "0 pages" with nothing
+    /// named is the silence #186 closes.
+    static func listingAFew(_ names: [String], mostNamed: Int = 3) -> String {
+        if names.count <= mostNamed {
+            return listing(names)
+        }
+        var quoted: [String] = []
+        var position: Int = 0
+        while position < mostNamed {
+            quoted.append("“\(names[position])”")
+            position += 1
+        }
+        return quoted.joined(separator: ", ") + " and \(names.count - mostNamed) more"
+    }
+
     static func listing(_ names: [String]) -> String {
         var quoted: [String] = []
         for name in names {
@@ -489,13 +547,16 @@ enum AssistPublishPlanner {
 
         var changes: [AssistPublishChange] = []
         var alreadyRight: [AssistSectionPage] = []
+        var noRoomForAKey: [AssistSectionPage] = []
         appendChanges(
             for: named, becauseLinked: false, publishes: publishes,
-            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight
+            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
+            noRoomForAKey: &noRoomForAKey
         )
         appendChanges(
             for: linked, becauseLinked: true, publishes: publishes,
-            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight
+            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
+            noRoomForAKey: &noRoomForAKey
         )
 
         // A page whose date would move but whose visibility is already right
@@ -509,6 +570,7 @@ enum AssistPublishPlanner {
             namedPages: named,
             changes: changes,
             alreadyRight: alreadyRight,
+            noRoomForAKey: noRoomForAKey,
             kept: kept,
             linkedClassesLeftAlone: linkedClassesLeftAlone,
             dateMoves: dateMoves
@@ -543,7 +605,8 @@ enum AssistPublishPlanner {
         publishes: Bool,
         forSection sectionNumber: Int,
         into changes: inout [AssistPublishChange],
-        alreadyRight: inout [AssistSectionPage]
+        alreadyRight: inout [AssistSectionPage],
+        noRoomForAKey: inout [AssistSectionPage]
     ) {
         for page in pages {
             // "Already the way you asked" needs CERTAINTY, not just a match.
@@ -559,7 +622,20 @@ enum AssistPublishPlanner {
             // A page that cannot be read cannot be changed either, and
             // listing it would promise the teacher something the writing step
             // then quietly skips.
-            guard (try? String(contentsOf: page.fileURL, encoding: .utf8)) != nil else {
+            guard let text = try? String(contentsOf: page.fileURL, encoding: .utf8) else {
+                continue
+            }
+            // The same argument, one step further: a page the WRITER would
+            // decline is not a change either. Asked by running the real
+            // writer over the page's own text — this read was already being
+            // made and thrown away — because a second copy of the rule here
+            // is a second copy to keep in step (#186).
+            let trial: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
+                published: publishes, in: text,
+                forSection: sectionNumber, isSectionLocal: page.isSectionLocal
+            )
+            if trial.outcome == .noRoomForAKey {
+                noRoomForAKey.append(page)
                 continue
             }
             changes.append(AssistPublishChange(
@@ -1003,27 +1079,37 @@ enum AssistPublishPlanner {
         return moves
     }
 
-    /// Carry the plan out. Returns the change record so it can be undone.
+    /// Carry the plan out. Returns the change record so it can be undone, and
+    /// the titles of any pages the writer DECLINED as it went (#186).
+    ///
+    /// The plan asked the same question before the card was shown, so the
+    /// second list is almost always empty. It is returned all the same,
+    /// because "almost always" is a page the teacher edited in Obsidian
+    /// between reading the card and pressing Go — and a reply that claimed
+    /// that page would be claiming a write that did not happen.
     static func apply(
         _ plan: AssistPublishPlan,
         forSection sectionNumber: Int,
         in course: Course
-    ) throws -> AssistChange {
+    ) throws -> (change: AssistChange, leftAlone: [String]) {
         // Every file this plan touches, gathered first, so a page that both
         // changes visibility and moves date is written once.
         var editsByPath: [String: (url: URL, isSectionLocal: Bool)] = [:]
         var publishByPath: [String: Bool] = [:]
         var dateByPath: [String: CalendarDay] = [:]
+        var titleByPath: [String: String] = [:]
 
         for change in plan.changes {
             let path: String = change.page.fileURL.path
             editsByPath[path] = (change.page.fileURL, change.page.isSectionLocal)
             publishByPath[path] = change.willBeVisible
+            titleByPath[path] = change.page.displayTitle
         }
         for move in plan.dateMoves {
             let path: String = move.page.fileURL.path
             editsByPath[path] = (move.page.fileURL, move.page.isSectionLocal)
             dateByPath[path] = move.to
+            titleByPath[path] = move.page.displayTitle
         }
 
         var paths: [String] = []
@@ -1038,35 +1124,60 @@ enum AssistPublishPlanner {
         )
 
         var saved: [AssistSavedFile] = []
+        // Pages that were planned as changes and then declined at the moment
+        // of writing, and the pages whose VISIBILITY actually moved — what the
+        // teacher is told is built from these, not from the plan.
+        var leftAlone: [String] = []
+        var movedTitles: [String] = []
         for path in paths {
             guard let edit = editsByPath[path] else {
                 continue
             }
             let before: String = try String(contentsOf: edit.url, encoding: .utf8)
             var text: String = before
+            var declined: Bool = false
+            var visibilityMoved: Bool = false
 
             if let published = publishByPath[path] {
-                text = AssistPageVisibility.setting(
+                let result: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
                     published: published, in: text,
                     forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
-                ).text
+                )
+                if result.outcome == .noRoomForAKey {
+                    declined = true
+                }
+                if result.outcome == .written {
+                    visibilityMoved = true
+                }
+                text = result.text
             }
             if let day = dateByPath[path] {
-                text = PageFrontmatter.settingCreated(
+                let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                     in: text,
                     key: PageFrontmatter.createdKey(
                         forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
                     ),
                     to: day,
                     fallbackTail: tail
-                ).text
+                )
+                if result.outcome == .noRoomForAKey {
+                    declined = true
+                }
+                text = result.text
             }
 
+            let title: String = titleByPath[path] ?? edit.url.deletingPathExtension().lastPathComponent
+            if declined {
+                leftAlone.append(title)
+            }
             if text == before {
                 continue
             }
             try text.write(to: edit.url, atomically: true, encoding: .utf8)
             saved.append(AssistSavedFile(fileURL: edit.url, before: before, after: text))
+            if visibilityMoved {
+                movedTitles.append(title)
+            }
         }
 
         // The section's landing page follows its most recent visible class.
@@ -1080,8 +1191,9 @@ enum AssistPublishPlanner {
             saved.append(repointed)
         }
 
-        return AssistChange(
-            whatHappened: "\(plan.verb)ed \(AssistPublishPlanner.namingWhatMoved(in: plan, savedCount: saved.count))",
+        let change: AssistChange = AssistChange(
+            whatHappened: "\(plan.verb)ed "
+                + AssistPublishPlanner.namingWhatMoved(movedTitles: movedTitles, savedCount: saved.count),
             courseCode: plan.courseCode,
             sectionNumber: sectionNumber,
             // Publishing and hiding rebuild the preview, so taking them back
@@ -1089,6 +1201,7 @@ enum AssistPublishPlanner {
             rebuildsThePreview: true,
             files: saved
         )
+        return (change: change, leftAlone: leftAlone)
     }
 
     /// What to call the thing that moved, for a sentence read back to the
@@ -1104,11 +1217,13 @@ enum AssistPublishPlanner {
     ///
     /// Three or more falls back to a count, because a sentence listing nine
     /// class titles is not a sentence anybody reads.
-    private static func namingWhatMoved(in plan: AssistPublishPlan, savedCount: Int) -> String {
-        var names: [String] = []
-        for change in plan.changes {
-            names.append(change.page.displayTitle)
-        }
+    ///
+    /// **Built from the pages actually WRITTEN, not from the plan** (#186).
+    /// The two used to be the same list; they stopped being the same the day
+    /// the writer learned to decline a page it cannot change safely, and an
+    /// undo labelled "unpublished Unit 4, Day 23" about a page nothing was
+    /// written to would be the claim this piece removes.
+    private static func namingWhatMoved(movedTitles names: [String], savedCount: Int) -> String {
         if names.count == 1 {
             return names[0]
         }
