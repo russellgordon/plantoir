@@ -729,6 +729,9 @@ class ScriptRunner {
                 course: report.course, section: report.section
             )
         }
+        // A launcher that waited for, or refused on, something running in
+        // the folder's workspace before remaking it (#94).
+        WorkspaceInUseReport.noteOnTheTrail(from: text)
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
@@ -887,6 +890,9 @@ class ScriptRunner {
     /// teacher as something to answer, raw JSON and all.
     static func looksLikeQuestion(_ line: String) -> Bool {
         if SiteHealthFinding.isMarkerLine(line) || PagesDatedByTheBuild.isMarkerLine(line) {
+            return false
+        }
+        if WorkspaceInUseReport.isMarkerLine(line) {
             return false
         }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {

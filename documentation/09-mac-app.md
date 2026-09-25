@@ -832,6 +832,13 @@ issue #220 one level down — a line that will be believed.
    FAILS the container counts as busy**, because "I could not ask" must never
    mean "nobody is using it".
 
+   Since GitHub #94 the launchers use the same count before they REMAKE a
+   folder's container (`remake_the_workspace`, documentation/03 → "Before a
+   workspace is remade"), so the app and the launchers agree on what
+   "running" means. They add one refinement the quit path does not need: a
+   preview whose `preview.sh` is no longer running on the Mac is an orphan
+   and counts as nothing, because refusing for it would refuse for ever.
+
 Check 1 exists because check 2 is **blind to the long windows**. A launcher
 that has to build the image, start Colima or download the pinned tools does all
 of that with no container of ours running at all — measured, `docker buildx
