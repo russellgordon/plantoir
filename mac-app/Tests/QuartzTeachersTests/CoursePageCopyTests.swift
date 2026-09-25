@@ -480,6 +480,7 @@ final class CoursePageCopyTests: XCTestCase {
     /// source's own site shows them. Measured 2026-09-25 on the real chain:
     /// the source is published, the copy hidden in sections 1 and 2.
     /// [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
+    @MainActor
     func testASourceWhoseOnlyCloseIsIndentedIsCopiedHidden() async throws {
         let built: Built = try buildPair(
             in: "indented-fence",
@@ -503,6 +504,26 @@ final class CoursePageCopyTests: XCTestCase {
             text.hasSuffix("\n---\ntitle: X\npublish: true\n  ---\nbody\n"),
             "The source's lines were its body, and stay the copy's body:\n\(text)"
         )
+        // And the teacher is TOLD: until #188 this page was refused with a
+        // sentence, and arriving without one would hide that its settings
+        // need correcting (#186's review, B6).
+        XCTAssertEqual(outcome.sourceSettingsUnreadable, ["Recursion"])
+        let line: String = CopyPageSheet.trailLine(
+            for: outcome, fromCourseFolder: "ICS4U 2025", intoCourse: "ICS4U",
+            folder: "Concepts", backupNamed: nil
+        )
+        XCTAssertTrue(line.contains("1 copied hidden because the settings they came with could not be read"), line)
+        XCTAssertFalse(line.contains("Recursion"), "never a page's title on the trail: \(line)")
+    }
+
+    /// An ordinary source says nothing about unreadable settings.
+    func testAnOrdinarySourceIsNotSaidToHaveUnreadableSettings() async throws {
+        let built: Built = try buildPair(
+            in: "ordinary", pageText: "---\ntitle: X\npublish: true\n---\nbody\n", sourceMedia: []
+        )
+        let outcome: CoursePageCopyOutcome = await CoursePageCopier.copying(try XCTUnwrap(built.request))
+        XCTAssertEqual(outcome.pagesCreated, ["Recursion"])
+        XCTAssertEqual(outcome.sourceSettingsUnreadable, [])
     }
 
     /// A page from the 2024–25 website-folder layout, carrying that layout's

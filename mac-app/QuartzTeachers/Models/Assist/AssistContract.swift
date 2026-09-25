@@ -189,6 +189,12 @@ enum AssistContract {
                 ),
                 count: 5
             ),
+            "pageWhoseNewDateCouldNotBeSet": AssistWording.pagesWhoseNewDateCouldNotBeSet(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4"]), count: 1
+            ),
+            "pagesWhoseNewDatesCouldNotBeSet": AssistWording.pagesWhoseNewDateCouldNotBeSet(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4", "Unit 2, Day 5"]), count: 2
+            ),
             // Two keys for one function: the sentence changes every pronoun
             // in it between one page and several, and one rendering cannot
             // show both (#182).

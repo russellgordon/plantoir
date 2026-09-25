@@ -385,7 +385,7 @@
         "why": "A reference course is built under a hidden name and renamed into place last, so an import the app never finished leaves a folder nothing can see - and therefore nothing would ever remove. This is the line that says the disk space came back, and the answer to 'my import did not finish and now there is no trace of it'."
       },
       {
-        "carries": "the course the pages came FROM by its folder name, the course and folder they landed in, how many pages and pictures were created, reused, brought in under a new name and left alone, how many could not be removed and must not be deployed, and the backup's file name",
+        "carries": "the course the pages came FROM by its folder name, the course and folder they landed in, how many pages and pictures were created, reused, brought in under a new name and left alone, how many could not be removed and must not be deployed, how many were copied hidden because the settings they came with could not be read (since #188/#186, 2026-09-25 - a source closed only by INDENTED dashes is copied hidden rather than refused), and the backup's file name",
         "event": "pages copied from another course",
         "why": "A page appearing in a course a teacher did not write it in has no explanation anywhere else: on disk a copied page looks exactly like one they typed, and 'where did this come from?' is a question nothing else in this trail could answer. One line at the END of a copy, in every outcome - a copy that stopped part way says so in the same line, because the counts already show it. NEVER a page's title and never anything from inside one, the line classCopyNotMade's own entry draws for the same kind of act."
       },

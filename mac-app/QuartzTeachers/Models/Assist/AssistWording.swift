@@ -807,6 +807,20 @@ nonisolated enum AssistWording {
              + "as they are. Open them in Obsidian to set them there."
     }
 
+    /// Pages a re-date or a make-room could not give their new date (#186's
+    /// review, B3). Not `pagesWhoseSettingsCannotBeAddedTo`: that one says the
+    /// page "stays exactly as it is", and here it may just have been renamed,
+    /// moved or had its links rewritten — what was NOT done is the date, so
+    /// the sentence says the date.
+    static func pagesWhoseNewDateCouldNotBeSet(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "I couldn’t set the new date on \(listing): the settings at the top of it are "
+                 + "written in a way I can’t add to. Open it in Obsidian to set the date there."
+        }
+        return "I couldn’t set the new dates on \(listing): the settings at the top of them are "
+             + "written in a way I can’t add to. Open them in Obsidian to set the dates there."
+    }
+
     // MARK: - What publishing means here
 
     /// The two acts, in a teacher's words, said once.

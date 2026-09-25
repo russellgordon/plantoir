@@ -321,6 +321,11 @@ struct AssistPublishPlan {
         return AssistWording.pagesWhoseSettingsCannotBeAddedTo(listingAFew(names), count: names.count)
     }
 
+    /// The sentence for pages whose new date could not be set, naming a few.
+    static func sayingPagesWhoseNewDateCouldNotBeSet(named names: [String]) -> String {
+        return AssistWording.pagesWhoseNewDateCouldNotBeSet(listingAFew(names), count: names.count)
+    }
+
     /// `listing`, naming at most `mostNamed` and counting the rest — "“a”,
     /// “b”, “c” and 2 more" — for a sentence that names a few pages without
     /// turning into a list. Always names at least one: "0 pages" with nothing

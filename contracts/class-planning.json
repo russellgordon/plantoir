@@ -748,7 +748,7 @@
               "value": "2026-09-24T07:00:00.000+0000"
             },
             "after": null,
-            "why": "Issue #188. With no column-0 close the page has no frontmatter to python-frontmatter, and this writer refuses a block that is opened and never closed rather than prepend one. The apps' visibility writer PREPENDS on the same shape (file-formats.json -> pageVisibility.writingCases), which is right for a hide; a date is not worth restructuring a teacher's file for, and the SITE is dated anyway, because the build dates its own copy whether or not the teacher's file is written. documentation/08-course-config-reference.md says why the two differ."
+            "why": "Issue #188. With no column-0 close the page has no frontmatter to python-frontmatter, and this writer refuses a block that is opened and never closed rather than prepend one. The apps' writers PREPEND a block on the same shape - the visibility writer (file-formats.json -> pageVisibility.writingCases) and, measured, the date writer too (datesAndTitles.writingCases) - because they act on a teacher's request and read the result back. This splice runs unattended on every build over the teacher's own files, so it keeps its one rule for every block that is opened and never closed rather than restructure a file nobody asked it to; the SITE is dated anyway, because the build dates its own copy whether or not the teacher's file is written. documentation/08-course-config-reference.md says why the two differ."
           },
           {
             "name": "a block whose first line is INDENTED has no place for a new key, and is not written",

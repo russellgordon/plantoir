@@ -964,6 +964,44 @@ final class PageVisibilityReadingTests: XCTestCase {
         }
     }
 
+    /// A re-date names a page whose new date it could not set — built from
+    /// what the writer DID, not from the plan (#186's review, B3) — and the
+    /// trail line the re-date writes counts it, never names it.
+    func testARedateNamesAPageWhoseNewDateCouldNotBeSet() throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
+        defer { ActivityTrail.store = previousStore }
+
+        let dates: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+            dates: ["2026-09-08", "2026-09-10"], source: "timetable.xlsx, block H", forSection: 1,
+            in: made.course
+        )
+        try SectionTimetableStore.applyRememberTimetable(dates)
+        try AssistFixture.write(page: "Unit 1, Day 1", publish: "true", date: "2026-09-01", body: "one", in: made.course)
+        try AssistFixture.write(page: "Unit 1, Day 2", publish: "true", date: "2026-09-02", body: "two", in: made.course)
+        let reDate: SectionReDatePlan = try SectionReDatePlanner.plan(
+            forSection: 1, in: made.course, workspaceURL: made.root
+        )
+        let noRoom: URL = AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course)
+        try "---\n  a: 1\n---\ntwo\n".write(to: noRoom, atomically: true, encoding: .utf8)
+
+        let applied = try SectionReDatePlanner.apply(reDate, forSection: 1, in: made.course)
+        XCTAssertEqual(applied.leftAlone, ["Unit 1, Day 2"])
+        XCTAssertEqual(try String(contentsOf: noRoom, encoding: .utf8), "---\n  a: 1\n---\ntwo\n")
+
+        AssistToolRunner.notePagesLeftAsTheyWere(
+            applied.leftAlone.count, act: "re-dating classes", course: made.course.code, section: 1
+        )
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains(ActivityTrail.pageSettingsLeftAsTheyWereLine(act: "re-dating classes", pages: 1)),
+            trail
+        )
+        XCTAssertFalse(trail.contains("Day 2"), "never which page: \(trail)")
+    }
+
     /// Reading does not depend on where the page lives — the build consults
     /// all four keys on every page it copies. This was the mac's own blind
     /// spot until 2026-09-18.
