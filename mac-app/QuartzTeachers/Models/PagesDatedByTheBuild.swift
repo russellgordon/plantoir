@@ -28,7 +28,7 @@ struct PagesDatedByTheBuild: Equatable {
     /// The trail line, in the shape `contracts/shared-rules.json` →
     /// `pagesDatedByTheBuild.trailLine` gives: the count first, so a long list
     /// can be shortened without losing how many there were.
-    var trailSentence: String {
+    nonisolated var trailSentence: String {
         var shown: [String] = []
         for page in pages {
             if shown.count == PagesDatedByTheBuild.namesShownOnTheTrail {
