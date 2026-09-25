@@ -532,6 +532,7 @@ truth, and generated project files churn and merge badly.
 brew install xcodegen
 cd mac-app
 ./Vendor/fetch-llama.sh     # REQUIRED before generating — see below
+./Vendor/fetch-sparkle.sh   # REQUIRED too, since #204 — see below
 xcodegen generate
 open Plantoir.xcodeproj
 ```
@@ -547,6 +548,13 @@ declares `Vendor/llama` as a resource folder, so `xcodegen generate` fails with
 again; nothing in the repo or the bundle carries them, and the app downloads
 them to `~/Library/Application Support/Plantoir/models` on a teacher's explicit
 yes.
+
+`fetch-sparkle.sh` fetches Sparkle 2.9.6, the framework a released Plantoir
+finds and installs its own updates with (#204), pinned by version AND SHA-256
+and refusing a mismatch. Also **not optional**: `project.yml` embeds
+`Vendor/Sparkle/Sparkle.framework`, so generating without it fails. A Debug
+build carries no update feed and never checks for anything —
+`documentation/09-mac-app.md` → "Updating itself".
 
 Debug builds are signed with a real "Apple Development" identity
 (`DEVELOPMENT_TEAM` in `project.yml`) rather than ad-hoc — an ad-hoc signature
@@ -660,7 +668,9 @@ each working folder's `.toolchain/`. The launchers:
 
 - tag the image `teaching-quartz:src-<hash>`, where the hash covers every file
   in the build context — a changed recipe means a new tag, a rebuild and a
-  recreated container, with no update checks anywhere;
+  recreated container, with no update checks anywhere (this is about the
+  IMAGE: the released app itself does check plantoir.app for a new version of
+  the app once a day, #204);
 - build with BuildKit (`docker buildx build --load`) — the legacy builder
   corrupts a layer, so don't remove that;
 - name containers `teaching-quartz-<hash of /bin/pwd -P>`, one per working
