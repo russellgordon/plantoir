@@ -1289,7 +1289,12 @@ during setup that night, but the report's own transcripts say
 for all three previews — `run_container_with_mount()` is reached only on
 create or recreate — so it would not have run on any of the three occasions a
 teacher was left waiting. A check in the preview path, against the port that
-preview will use, is the one that earns its place. Its own issue.
+preview will use, is the one that earns its place — and since #234 it
+exists: `preview.sh` connects to the address it is about to announce BEFORE it
+builds, and stops in about ten seconds when every try is refused. How, what it
+measured and what it rejected: `03-launcher-scripts.md` → "Before building,
+preview.sh makes sure this Mac can reach the builder". This alert stays the
+backstop for everything that check lets through.
 
 **Believing the log.** `ha.stderr.log` writes `Forwarding TCP from …` even when
 every forward failed; the tell is the `failed to set up forwarding` warning,

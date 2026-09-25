@@ -560,6 +560,11 @@ ensure_container_runtime() {
     return 0
   fi
 
+  # Set when this run starts the builder's virtual machine; preview.sh's
+  # reach check reads it (GitHub #234). The same line is in all three
+  # launchers so that their copies of this function stay identical.
+  THIS_RUN_STARTED_THE_BUILDER=1
+
   # "Setting up this Mac" is a progress marker the app matches word for word
   # (contracts/app-rules.json → milestones); keep those four words. It is not
   # "a one-time step": quitting Plantoir stops this machinery when nothing else
@@ -609,6 +614,8 @@ ensure_container_runtime() {
   exit 1
 }
 
+# Set by ensure_container_runtime when this run starts the builder (#234).
+THIS_RUN_STARTED_THE_BUILDER=""
 ensure_container_runtime
 # ====================================================================
 
