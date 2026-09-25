@@ -226,6 +226,33 @@ final class AssistAgent {
             return
         }
 
+        // "Deploy at 6:30" — morning or evening, and nobody can tell which.
+        // Asked here, in code, rather than handed to the model, which answered
+        // that shape of sentence with an IMMEDIATE deploy on the smaller
+        // assistant (issue #194). The teacher's sentence and the question go
+        // into the transcript only — never into `messages` — so the model
+        // never sees either, on this turn or any later one: the answer is one
+        // of the two sentences the question names, and that turn matches in
+        // code above. Nothing is waiting afterwards, so there is no state to
+        // clear if the teacher asks something else instead.
+        if let question = AssistCardCommand.morningOrEvening(trimmed) {
+            entries.append(Entry(
+                speaker: .assistant,
+                text: AssistWording.morningOrEvening(
+                    clock: question.clock,
+                    sayMorning: question.sayMorning,
+                    sayEvening: question.sayEvening
+                )
+            ))
+            ActivityTrail.note(
+                .assistantMatchedAFixedPhrase,
+                AssistAgent.askedMorningOrEveningLine,
+                course: courseCode,
+                section: sectionNumber
+            )
+            return
+        }
+
         // The date goes on the END of the message. Prepended, the same line
         // cost 15 points of routing accuracy on the Windows measurements —
         // the position really is the finding, not the presence.
@@ -970,6 +997,17 @@ final class AssistAgent {
     private func settled(_ rawCall: AssistToolCall) -> AssistToolCall {
         return withTheMomentSettled(withTheDaySettled(boundToThisSection(rawCall)))
     }
+
+    /// The trail's line for a time asked about rather than answered.
+    ///
+    /// No clock in it, deliberately: "6:30" is something the teacher wrote,
+    /// and the trail never carries that (`assistantAsked` already has the
+    /// sentence, which is where it belongs). "Nothing was set" is the half a
+    /// reader of the trail needs — the line sits where a scheduled deploy's
+    /// line would, and must not be mistaken for one.
+    static let askedMorningOrEveningLine: String =
+        "matched in code, not sent to the model — asked whether the time was morning or evening; "
+        + "nothing was set"
 
     /// The trail line for a sentence answered in code, naming the tool — and
     /// the MOMENT, when the sentence carried one.

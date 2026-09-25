@@ -63,6 +63,7 @@
     "makingRoomCannotBeUndoneForAMeeting" : "Because other meetings move, “Undo that” will not take this back afterwards — the copy made before any of it is in Plantoir's Backups list.",
     "mayIAskForYourDates" : "May I ask you for your class dates?",
     "mayIAskForYourDatesForAMeeting" : "May I ask you for your meeting dates?",
+    "morningOrEvening" : "Is that 6:30 in the morning or in the evening? Nothing is set yet. Say “deploy at 6:30 am” or “deploy at 6:30 pm”.",
     "movedToLaterDays" : "Moved to later class days — 3:",
     "movedToLaterDaysForAMeeting" : "Moved to later meeting days — 3:",
     "movesAndBecomesADraft" : "“{page}” moves to 2026-12-15 and becomes a draft because it has no class date.",

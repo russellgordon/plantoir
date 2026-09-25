@@ -83,6 +83,17 @@ enum AssistContract {
 
     // MARK: - Functions
 
+    /// The question "deploy at 6:30" is answered with, rendered through the
+    /// same two functions the assistant calls.
+    static func morningOrEveningForSixThirty() -> String {
+        guard let question = AssistCardCommand.morningOrEvening("deploy at 6:30") else {
+            return ""
+        }
+        return AssistWording.morningOrEvening(
+            clock: question.clock, sayMorning: question.sayMorning, sayEvening: question.sayEvening
+        )
+    }
+
     /// The wording file's contents.
     ///
     /// Every value here comes from calling the real function with the
@@ -96,6 +107,12 @@ enum AssistContract {
             "deployQuestion": AssistWording.deployQuestion,
             "scheduleQuestion": AssistWording.scheduleQuestion,
             "planQuestion": AssistWording.planQuestion,
+            // Rendered through the REAL question for "deploy at 6:30", not
+            // from placeholders, so the sentence in the contract is the one a
+            // teacher reads for that input — and the scenario that types it can
+            // match it as written. The answer sentences for every other input
+            // are in assist-cases.json → deployAtATime.asked (issue #194).
+            "morningOrEvening": AssistContract.morningOrEveningForSixThirty(),
             "deployAccepted": AssistWording.deployAccepted,
             "planAccepted": AssistWording.planAccepted,
             "cancelled": AssistWording.cancelled,

@@ -572,6 +572,11 @@ def intercepted(message):
             return "make_room_for_classes"
     if deploy_at_a_time(tidied):
         return "schedule_deploy"
+    if deploy_time_asked_about(tidied):
+        # Not a tool: the app answers "deploy at 6:30" with a question of its
+        # own and sends nothing to the model (#194), so a probe like this one
+        # measures nothing about routing either.
+        return ASKED_IN_CODE
     if re.fullmatch(r"duplicate .+ as (my next class|the next class|my next lesson)", tidied):
         return "add_next_class"
     return None
@@ -659,12 +664,43 @@ def swift_int(text):
     return -(2 ** 63) <= value <= (2 ** 63) - 1
 
 
+# What `intercepted` answers for a sentence the app asks about rather than
+# answers or routes — deliberately not a tool name.
+ASKED_IN_CODE = "(asked morning or evening, in code)"
+
+
 def deploy_at_a_time(tidied):
     """Whether "deploy at 6:30 am" and its spellings are answered in code.
 
     Mirrors `AssistCardCommand.deployAtATime`. It answers only WHETHER, not
     which minute: the suite measures what reaches the model, and the settling
     into a whole moment happens later, in the app, against a clock.
+    """
+    frame = deploy_frame(tidied)
+    return frame is not None and time_of_day(frame[1]) is not None
+
+
+def deploy_time_asked_about(tidied):
+    """Whether "deploy at 6:30" is ASKED about in code (#194).
+
+    Mirrors `AssistCardCommand.morningOrEvening`: the same frame, and a time
+    that is a one-digit hour 1-9 with two digits of minutes and no am or pm.
+    A full stop may stand for the colon ("6.30") and a comma may follow the
+    time ("6:30, please"), because both reached deploy_section 10 of 10 when
+    sent to the model. Such a sentence never reaches the model, so it is not
+    a routing probe.
+    """
+    frame = deploy_frame(tidied)
+    if frame is None or len(frame[1]) != 1:
+        return False
+    return re.fullmatch(r"[1-9][:.][0-5][0-9],?", frame[1][0]) is not None
+
+
+def deploy_frame(tidied):
+    """(day word or None, the time's words) for "[please] deploy [it|this
+    section] [today|tomorrow] at <time> [today|tomorrow] [please]", else None.
+
+    Mirrors `AssistCardCommand.deployFrame`, which both of the above read.
     """
     frame = tidied.rstrip("?").strip()
     words = frame.split()
@@ -673,7 +709,7 @@ def deploy_at_a_time(tidied):
     if words[-1:] == ["please"]:
         words = words[:-1]
     if words[:1] != ["deploy"]:
-        return False
+        return None
     words = words[1:]
     if words[:1] == ["it"]:
         words = words[1:]
@@ -684,13 +720,14 @@ def deploy_at_a_time(tidied):
         day = words[0]
         words = words[1:]
     if words[:1] != ["at"]:
-        return False
+        return None
     words = words[1:]
     if words[-1:] and words[-1] in ("today", "tomorrow"):
         if day is not None:
-            return False
+            return None
+        day = words[-1]
         words = words[:-1]
-    return time_of_day(words) is not None
+    return (day, words)
 
 
 def time_of_day(words):
@@ -758,15 +795,18 @@ def assert_deploy_at_a_time_matches_contract():
         if intercepted(row["input"]) != "schedule_deploy":
             wrong.append("accepted and NOT intercepted: %r" % row["input"])
     for row in family["refused"]:
-        if intercepted(row["input"]) == "schedule_deploy":
+        if intercepted(row["input"]) in ("schedule_deploy", ASKED_IN_CODE):
             wrong.append("refused and intercepted anyway: %r" % row["input"])
+    for row in family.get("asked", []):
+        if intercepted(row["input"]) != ASKED_IN_CODE:
+            wrong.append("asked about in code and NOT intercepted: %r" % row["input"])
     if wrong:
         sys.exit(
             "deploy_at_a_time() no longer agrees with contracts/assist-cases.json "
             "-> deployAtATime:\n  %s\nFix it before quoting a number from this suite."
             % "\n  ".join(wrong)
         )
-    return len(family["accepted"]) + len(family["refused"])
+    return len(family["accepted"]) + len(family.get("asked", [])) + len(family["refused"])
 
 
 def assert_hide_is_unpublish_matches_contract():

@@ -49,6 +49,62 @@ final class ScheduleDeployCardTests: XCTestCase {
                 AssistCardCommand.matching(input),
                 "\"\(input)\" is in the contract as one that goes to the model and was matched in code"
             )
+            // Refused means neither answered NOR asked about (issue #194):
+            // "deploy at 0:30" and "deploy at 7" keep their written reasons.
+            XCTAssertNil(
+                AssistCardCommand.morningOrEvening(input),
+                "\"\(input)\" is in the contract as one that goes to the model and was asked about in code"
+            )
+        }
+    }
+
+    /// A time that is morning or evening is ASKED about, in code — and the two
+    /// sentences the question names are both answered by the family, to the
+    /// `when` the contract says (issue #194).
+    ///
+    /// **Both halves or neither, pinned.** A question that suggested a
+    /// sentence the matcher then refused would send the teacher's answer to
+    /// the model — the very thing the question exists to prevent — so every
+    /// suggested answer is run through `matching` here rather than trusted.
+    func testATimeThatIsMorningOrEveningIsAskedAboutAndItsAnswersAreUnderstood() throws {
+        for row in try ScheduleDeployCardTests.rows(named: "asked") {
+            let input: String = try XCTUnwrap(row["input"] as? String)
+            XCTAssertNotNil(row["why"] as? String, "\(input) is asked about for no stated reason")
+            XCTAssertNil(
+                AssistCardCommand.matching(input),
+                "\"\(input)\" is in the contract as asked about, and was scheduled without asking"
+            )
+            let question: AssistTimeQuestion = try XCTUnwrap(
+                AssistCardCommand.morningOrEvening(input),
+                "\"\(input)\" is in the contract as asked about, and nothing asked"
+            )
+            XCTAssertEqual(question.clock, row["expectClock"] as? String, input)
+            XCTAssertEqual(question.sayMorning, row["expectSayMorning"] as? String, input)
+            XCTAssertEqual(question.sayEvening, row["expectSayEvening"] as? String, input)
+
+            let morning: AssistCardCommand = try XCTUnwrap(
+                AssistCardCommand.matching(question.sayMorning),
+                "the question for \"\(input)\" suggests \"\(question.sayMorning)\", which matches nothing"
+            )
+            XCTAssertEqual(morning.toolName, "schedule_deploy", input)
+            XCTAssertEqual(morning.arguments["when"], row["expectMorningWhen"] as? String, input)
+
+            let evening: AssistCardCommand = try XCTUnwrap(
+                AssistCardCommand.matching(question.sayEvening),
+                "the question for \"\(input)\" suggests \"\(question.sayEvening)\", which matches nothing"
+            )
+            XCTAssertEqual(evening.toolName, "schedule_deploy", input)
+            XCTAssertEqual(evening.arguments["when"], row["expectEveningWhen"] as? String, input)
+        }
+    }
+
+    /// A time the family answers is never ALSO asked about. The two tables
+    /// cannot overlap, or the order of two `if`s in `AssistAgent.say` would
+    /// decide what a teacher gets.
+    func testATimeThatIsAnsweredIsNeverAlsoAskedAbout() throws {
+        for row in try ScheduleDeployCardTests.rows(named: "accepted") {
+            let input: String = try XCTUnwrap(row["input"] as? String)
+            XCTAssertNil(AssistCardCommand.morningOrEvening(input), input)
         }
     }
 
@@ -287,6 +343,85 @@ final class ScheduleDeployCardTests: XCTestCase {
         )
 
         agent.declinePending()
+    }
+
+    /// "Deploy at 6:30" is asked about, and the model is never consulted —
+    /// not on that turn, and not on the next one either (issue #194).
+    ///
+    /// The engine here is a real HTTP stub, so consulting it shows up as a
+    /// request — on the smaller assistant that consultation was measured
+    /// ending in an IMMEDIATE deploy for this shape of sentence. The turn after
+    /// the question is an unrelated one that DOES go to the model, and what
+    /// the model is sent then must not carry "6:30": appending the question or
+    /// the teacher's sentence to the conversation "for context" would let the
+    /// model act on it a turn later.
+    func testAMorningOrEveningTimeIsAskedInCodeAndNeverReachesTheModel() async throws {
+        let made = try AssistFixture.makeRunner(hasDeployedBefore: true)
+        let launchAgents: URL = made.root.appendingPathComponent("LaunchAgents", isDirectory: true)
+        try FileManager.default.createDirectory(at: launchAgents, withIntermediateDirectories: true)
+        ScheduledDeploy.launchAgentsDirectoryOverride = launchAgents
+        ScheduledDeploy.scheduledScriptsDirectoryOverride =
+            launchAgents.deletingLastPathComponent().appendingPathComponent("scheduled")
+        let scratch: URL = made.root.appendingPathComponent("trail", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        let engine: StubEngine = try StubEngine()
+        defer {
+            engine.stop()
+            ActivityTrail.store = previousStore
+            ScheduledDeploy.launchAgentsDirectoryOverride = nil
+            ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        // Only the unrelated turn is meant to reach it. Were the question turn
+        // to reach it too, `requestCount` below says so.
+        engine.serve(ScheduleDeployCardTests.plainReply("Publishing makes a page visible to students."))
+
+        let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner, engineAt: engine.baseURL)
+        let messagesBefore: Int = agent.messages.count
+        await agent.say("deploy at 6:30")
+
+        XCTAssertEqual(engine.requestCount, 0, "the model was asked about a time the app asks the teacher about")
+        XCTAssertEqual(agent.messages.count, messagesBefore, "the sentence or the question reached the model's conversation")
+        XCTAssertNil(agent.pendingApproval, "a card went up for a time nobody has placed at morning or evening")
+        let last: AssistAgent.Entry = try XCTUnwrap(agent.entries.last)
+        XCTAssertEqual(last.speaker, .assistant)
+        let question: AssistTimeQuestion = try XCTUnwrap(AssistCardCommand.morningOrEvening("deploy at 6:30"))
+        XCTAssertEqual(
+            last.text,
+            AssistWording.morningOrEvening(
+                clock: question.clock, sayMorning: question.sayMorning, sayEvening: question.sayEvening
+            )
+        )
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(atPath: launchAgents.path), [],
+            "nothing may be scheduled by a question"
+        )
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains(AssistAgent.askedMorningOrEveningLine), trail)
+
+        // The next turn goes to the model, and carries nothing of the last one.
+        await agent.say("what does publishing mean here, in a few words")
+        for body in engine.requestBodies {
+            let sent: String = String(describing: body["messages"] ?? "")
+            XCTAssertFalse(sent.contains("6:30"), "the model was sent the earlier time: \(sent)")
+            XCTAssertFalse(sent.contains("morning or in the evening"), "the model was sent the question: \(sent)")
+        }
+
+        // And the answer the question names is understood, in code, with no model.
+        let requestsSoFar: Int = engine.requestCount
+        await agent.say(question.sayEvening)
+        XCTAssertEqual(engine.requestCount, requestsSoFar, "the suggested answer went to the model")
+        let pending: AssistAgent.PendingApproval = try XCTUnwrap(agent.pendingApproval)
+        XCTAssertEqual(pending.call.function.name, "schedule_deploy")
+        let when: String = try XCTUnwrap(pending.call.argumentValues["when"] as? String)
+        XCTAssertTrue(when.hasSuffix("18:30"), when)
+        agent.declinePending()
+    }
+
+    private static func plainReply(_ said: String) -> String {
+        return #"{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":""#
+            + said + #""}}],"usage":{"completion_tokens":4}}"#
     }
 
     /// A phrasing that names no time leaves the line it always left. The

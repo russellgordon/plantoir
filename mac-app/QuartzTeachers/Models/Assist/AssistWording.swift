@@ -104,6 +104,22 @@ nonisolated enum AssistWording {
         return "This replaces the deploy already set for \(moment)."
     }
 
+    /// The answer to "deploy at 6:30" — a time that is morning or evening,
+    /// and nobody can tell which (issue #194). Asked in code; nothing is
+    /// scheduled and nothing is sent to the model.
+    ///
+    /// **Both halves or neither**, as with the rollover question: the two
+    /// sentences it names are built by `AssistCardCommand.morningOrEvening`
+    /// and are sentences the matcher already accepts, so a teacher who types
+    /// either one gets the scheduled deploy's card on the very next turn. It
+    /// says "Nothing is set yet" because the sentence the teacher typed looked
+    /// like an instruction, and a teacher who glances away should not believe
+    /// a deploy was scheduled. A FIRST DRAFT for Russell's wording pass.
+    static func morningOrEvening(clock: String, sayMorning: String, sayEvening: String) -> String {
+        return "Is that \(clock) in the morning or in the evening? Nothing is set yet. "
+            + "Say “\(sayMorning)” or “\(sayEvening)”."
+    }
+
     /// The question under a plan card.
     static let planQuestion: String = "Shall I go ahead?"
 
