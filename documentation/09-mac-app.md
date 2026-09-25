@@ -1126,6 +1126,79 @@ seconds and which of the three it was. The sentences are in
 `contracts/app-rules.json` → `previewPorts.whenThePreviewNeverAppears`, so
 Windows can match the behaviour rather than re-derive it.
 
+### Where the address comes from — and why it is never guessed (#235)
+
+The only address the wait ever tries is the one `preview.sh` announces
+("Preview will be available at: …"). Three things used to break that, none of
+which a teacher had met, all of which were measured:
+
+- **The address was read from a tail.** `ScriptRunner.previewAddress` read
+  `recentText(maximumCharacters: 8000)`, and the announcement is printed EARLY.
+  On one real first preview (now the fixture
+  `mac-app/Tests/Goldens/235-preview-first-build.json` — a pseudo-terminal
+  capture with its CRLF and colour codes kept and one path redacted) the
+  announcement is 6,055 characters in and about 11,000 more follow: fed through
+  in pieces of 256, 1,024 or 4,096, the tail read found it and then LOST it,
+  and was nil by `Started a Quartz server`. It survived only because the wait
+  remembered what it had seen. It is now collected as output ARRIVES, from the
+  same carried-over complete lines as the health findings (one buffer), with
+  colour codes taken out a WHOLE line at a time, last announcement winning, and
+  forgotten by the same `keepingTranscript`-guarded reset.
+- **Two traps in reading it as it arrives,** both measured on the real line.
+  Read a raw piece of terminal output whole and Swift's `"\r\n"` — ONE
+  Character — defeats the `"\n"` split, the "line" runs to the end of the
+  piece, and `URL(string:)` percent-encodes the rest into the path: the RIGHT
+  port and a garbage address (`http://127.0.0.1:8101/%0D%0A…`), which a test
+  that checks only the port passes. And read a piece at a time with nothing
+  carried over, cutting the line after `:8`, `:81` or `:810` gives a valid
+  address on the WRONG port, with the rest of the line arriving unmarked in the
+  next piece. So the collector splits by scalar first, carries the unfinished
+  line over, and the tests assert the whole address, cut at every point.
+- **Nothing announced became a guess, twice.** The wait started from
+  `http://127.0.0.1:<the section's port>/` — the port INSIDE the builder, which
+  this Mac's own folder publishes as 8091 — and `preview.sh`, when
+  `docker port` came back empty, announced that same inside port as fact. A
+  guess is right only for the first working folder on a Mac, and can open
+  another section's preview as this one. Now `preview.sh` asks twice (one
+  empty answer is not proof, and on the commonest Mac the guess happened to be
+  right, so refusing on a single miss would stop previews that used to work),
+  then says it could not find out where the preview will be and stops before
+  building; `--build-only` asks nothing, so a publish is never stopped by it.
+  And the wait starts from nothing: `PreviewReachability.nextStep` tries an
+  announced address, waits while there is none and the server has not started,
+  and — once `Started a Quartz server` is in with no address — stops AT ONCE
+  (`stopBecauseNoAddressWasAnnounced`), because the launcher announces before
+  it builds and output is read in order, so nothing is still on its way. The
+  run is stopped the Stop-button way, the teacher gets the third sentence
+  (`plantoirCouldNotTell` — exactly true), the builder is NOT asked (its
+  question is about an address), and the trail gets `preview did not appear`
+  with its own line saying no address was announced. Not if the teacher has
+  just pressed Stop: Stop only signals the run, which is still "running" until
+  it has ended, so a wait waking in that gap would have reported a preview
+  they ended themselves — `nextStep` waits instead (review of #235).
+
+  **The ending a teacher will actually meet is the launcher's**, not the
+  app's: with the two shipped together `preview.sh` always announces or
+  stops, so the app's no-address stop is a defence. So the launcher writes its
+  own trail line when it stops — `preview did not appear`, in words
+  `contracts/shared-rules.json` pins as `launcherLine` and
+  `scripts/test_preview_address.py` checks (with `HOME` in a scratch folder,
+  so no test ever writes the real trail). Without it the trail said only that
+  `preview.sh` failed.
+
+REJECTED: keeping a tail fallback behind the arrival capture (nothing reaches
+the runner by any other road, so a second reader can only be staler or wronger
+— Windows keeps one and should drop it); waiting on to the silence or
+ten-minute bound when nothing was announced (the "still building for ever"
+state this section exists to end); a new sentence for it (the third one is
+true); and **announcing again, late, from `build_site.py`** — the issue's third
+half. With capture on arrival nothing can scroll out of anything, so a second
+announcement buys the mac nothing, adds a second writer of the address, and
+the `os.name == "nt"` block it would come from RE-PROBES ports and must stay
+Windows-only. The rule is in `contracts/app-rules.json` →
+`previewPorts.announcedAddress` and
+`previewPorts.whenThePreviewNeverAppears.whenNoAddressWasAnnounced`.
+
 ### Seeing it happen on a healthy Mac
 
 `PLANTOIR_PRETEND_THIS_MAC_CANNOT_REACH_THE_PREVIEW=1`, read at the moment the
