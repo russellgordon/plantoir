@@ -177,6 +177,32 @@ enum AssistContract {
             "backedUpCourse": AssistWording.backedUpCourse(
                 course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
+            // Two keys for one function again, for the same reason, and
+            // with literal page names for the reason `linkedClassWasLeftAlone`
+            // gives: half of what the other platform has to match is the
+            // LISTING (#186).
+            "pagesWhoseSettingsCannotBeAddedTo": AssistWording.pagesWhoseSettingsCannotBeAddedTo(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4"]), count: 1
+            ),
+            "pagesWhoseSettingsCannotBeAddedToNamingSeveral": AssistWording.pagesWhoseSettingsCannotBeAddedTo(
+                AssistPublishPlan.listingAFew(
+                    ["Unit 2, Day 4", "Unit 2, Day 5", "Unit 2, Day 6", "Unit 2, Day 7", "Unit 2, Day 8"]
+                ),
+                count: 5
+            ),
+            "pageWhoseNewDateCouldNotBeSet": AssistWording.pagesWhoseNewDateCouldNotBeSet(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4"]), count: 1
+            ),
+            "pagesWhoseNewDatesCouldNotBeSet": AssistWording.pagesWhoseNewDateCouldNotBeSet(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4", "Unit 2, Day 5"]), count: 2
+            ),
+            // Two keys for one function: the sentence changes every pronoun
+            // in it between one page and several, and one rendering cannot
+            // show both (#182).
+            "sharedPageWhoseSettingCouldNotBePutBack":
+                AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack(count: 1, section: section),
+            "sharedPagesWhoseSettingsCouldNotBePutBack":
+                AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack(count: 2, section: section),
             "backupSizeCouldNotBeRead": AssistWording.backupSizeCouldNotBeRead,
             "backupSizeCouldNotBeReadShort": AssistWording.backupSizeCouldNotBeReadShort,
             "planWasCancelled": AssistWording.planWasCancelled,

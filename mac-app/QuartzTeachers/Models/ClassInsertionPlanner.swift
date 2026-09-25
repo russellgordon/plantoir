@@ -337,6 +337,11 @@ enum ClassInsertionPlanner {
         // 3. The dates.
         let createdKey: String = PageFrontmatter.createdKey(forSection: plan.sectionNumber, isSectionLocal: true)
         var moved: Int = 0
+        // Pages whose settings have no place a new date line can go (#186).
+        // Named and carried on past: such a page had no date this app could
+        // read before the rename either, so the class list is left exactly as
+        // it was about it.
+        var notDated: [String] = []
         for move in plan.moves {
             // A renamed page is found under its NEW name by now.
             var pageURL: URL = folderURL.appendingPathComponent(move.title + ".md")
@@ -347,13 +352,24 @@ enum ClassInsertionPlanner {
                   let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
                 continue
             }
-            let result: (text: String, changed: Bool) = PageFrontmatter.settingCreated(
+            let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                 in: text, key: createdKey, to: move.to, fallbackTail: tail
             )
-            if result.changed {
+            if result.outcome == .written {
                 try result.text.write(to: pageURL, atomically: true, encoding: .utf8)
                 moved += 1
             }
+            if result.outcome == .noRoomForAKey {
+                notDated.append(pageURL.deletingPathExtension().lastPathComponent)
+            }
+        }
+        if !notDated.isEmpty {
+            ActivityTrail.note(
+                .pageSettingsLeftAsTheyWere,
+                ActivityTrail.pageSettingsLeftAsTheyWereLine(act: "making room for a class", pages: notDated.count),
+                course: course.code,
+                section: plan.sectionNumber
+            )
         }
 
         // 4. The blank pages the room was made for. Checked a second time,
@@ -384,7 +400,10 @@ enum ClassInsertionPlanner {
             created.append(planned.fileURL)
         }
 
-        let message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at \(plan.positionTitle). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
+        var message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at \(plan.positionTitle). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
+        if !notDated.isEmpty {
+            message += " " + AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: notDated)
+        }
         return ClassChangeOutcome(message: message, backupURL: backupURL, created: created)
     }
 

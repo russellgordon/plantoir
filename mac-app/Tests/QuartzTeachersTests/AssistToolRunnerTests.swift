@@ -2785,6 +2785,101 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertEqual(outcome.summary, "It's already hidden.")
     }
 
+    /// A page whose settings have no place a new line can go is NOT "already
+    /// hidden": nothing is written, and the teacher is told which page and
+    /// why, on the card and in the answer (#186).
+    ///
+    /// Measured 2026-09-25: `publish: false` written above `  false` is the
+    /// string "false false" and the page stays PUBLISHED — so the old answer,
+    /// "Unpublished Unit 4, Day 23", was the failure that reports success.
+    @MainActor
+    func testHidingAPageWithNoRoomForAKeySaysSoAndWritesNothing() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 23", publish: "true", date: "2026-09-08",
+                  body: "Nothing yet.", in: made.course)
+        let noRoom: String = "---\n  false\n---\nNothing yet.\n"
+        try noRoom.write(to: pageURL(of: "Unit 4, Day 23", in: made.course), atomically: true, encoding: .utf8)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4, Day 23"]
+        ))
+        let said: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 23"])
+        XCTAssertEqual(outcome.summary, said)
+        XCTAssertTrue(outcome.detail.contains(said), "The plan says it too: \(outcome.detail)")
+        XCTAssertEqual(text(ofPage: "Unit 4, Day 23", in: made.course), noRoom, "Nothing was written")
+    }
+
+    /// And a whole unit whose every page was declined is not "already hidden"
+    /// either (#186).
+    @MainActor
+    func testAUnitWhosePagesHaveNoRoomIsNotCalledAlreadyHidden() async throws {
+        let made = try makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        try write(page: "Unit 4, Day 1", publish: "true", date: "2026-09-08",
+                  body: "One.", in: made.course)
+        let noRoom: String = "---\n  a: 1\n---\nOne.\n"
+        try noRoom.write(to: pageURL(of: "Unit 4, Day 1", in: made.course), atomically: true, encoding: .utf8)
+
+        let outcome: AssistToolOutcome = await made.runner.run(call: call(
+            "unpublish_pages", arguments: ["course": "ICS3U", "section": 1, "pages": "Unit 4"]
+        ))
+        XCTAssertEqual(outcome.summary, AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 1"]))
+        XCTAssertEqual(text(ofPage: "Unit 4, Day 1", in: made.course), noRoom, "Nothing was written")
+    }
+
+    /// The transcript line after a publish is built from what was WRITTEN: a
+    /// page declined only at the write — edited in Obsidian between the card
+    /// and Go — is named and not counted as done, and when the page the
+    /// teacher NAMED is the declined one, the sentence about it is not said
+    /// (#186's review, B1).
+    @MainActor
+    func testTheTranscriptLineCountsOnlyWhatWasWritten() {
+        func page(_ title: String) -> AssistSectionPage {
+            return AssistSectionPage(
+                title: title.lowercased(), displayTitle: title,
+                fileURL: URL(fileURLWithPath: "/c/ICS3U/section1/All Classes/\(title).md"),
+                relativePath: "section1/All Classes/\(title).md", isSectionLocal: true,
+                isVisibleToStudents: true, visibilityIsCertain: true, date: nil,
+                linkedTitles: [], classFolderNames: ["All Classes"],
+                pathWithinSection: "All Classes/\(title).md"
+            )
+        }
+        func change(_ title: String) -> AssistPublishChange {
+            return AssistPublishChange(
+                page: page(title), key: "publish", wasVisible: true, willBeVisible: false, becauseLinked: false
+            )
+        }
+        let plan: AssistPublishPlan = AssistPublishPlan(
+            courseCode: "ICS3U", sectionNumber: 1, publishes: false, unknownNames: [],
+            namedPages: [page("Unit 4, Day 1"), page("Unit 4, Day 2")],
+            changes: [change("Unit 4, Day 1"), change("Unit 4, Day 2")],
+            alreadyRight: [], noRoomForAKey: [page("Unit 4, Day 3")], kept: [],
+            linkedClassesLeftAlone: [], dateMoves: []
+        )
+        let mixed: String = AssistToolRunner.whatWasDone(plan, declinedNow: ["Unit 4, Day 2"]) { written in
+            return "Unpublished \(written) \(written == 1 ? "page" : "pages")."
+        }
+        XCTAssertEqual(
+            mixed,
+            "Unpublished 1 page. "
+                + AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 3", "Unit 4, Day 2"])
+        )
+
+        let classPlan: AssistPublishPlan = AssistPublishPlan(
+            courseCode: "ICS3U", sectionNumber: 1, publishes: true, unknownNames: [],
+            namedPages: [page("Unit 4, Day 1")],
+            changes: [change("Unit 4, Day 1")],
+            alreadyRight: [], noRoomForAKey: [], kept: [], linkedClassesLeftAlone: [], dateMoves: []
+        )
+        let declinedClass: String = AssistToolRunner.whatWasDone(classPlan, declinedNow: ["Unit 4, Day 1"]) { _ in
+            return AssistWording.publishedTheClassOn("2026-09-24")
+        }
+        XCTAssertEqual(declinedClass, AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: ["Unit 4, Day 1"]))
+    }
+
     /// Two pages, both already done, get the plural.
     @MainActor
     func testTwoPagesAlreadyPublishedGetThePlural() async throws {

@@ -2021,6 +2021,11 @@ enum ScheduledDeploy {
             return
         }
         notePagesDatedByTheBuild(in: text)
+        // A launcher of this run that waited for, or refused on, something
+        // running in the folder's workspace before remaking it (#94) — read
+        // from the log for the same reason as the line above: nobody is
+        // watching a console at half six in the morning.
+        WorkspaceInUseReport.noteOnTheTrail(from: text)
         noteFolderProblems(in: text)
         var markerLines: [String] = []
         // Split on scalars, not Characters: Swift folds "\r\n" into one

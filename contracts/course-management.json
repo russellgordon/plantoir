@@ -208,7 +208,90 @@
         "expectKept": [],
         "why": "Only the backups the OPEN conversation made are held. An assistant backup from an earlier conversation about the same section is an ordinary backup now, and a rule keyed on 'made by the assistant' or 'this section' would refuse it for nothing."
       }
-    ]
+    ],
+    "restoringOneSectionsKeys": {
+      "note": "Putting ONE section back from an assistant conversation's backup (\"Restore Section N…\") swaps that section's per-section keys on every page SHARED by the course's sections - the pages outside the section<N> folders - and leaves every other byte alone (CourseRestorer.settingPerSectionKeys on the mac). `live` is the page as it is now, `backup` as the backup has it, `after` the page the restore must write, compared as BYTES. A key's value can live on the lines below it (issue #182): both halves of the swap carry and drop a key WITH the lines it owns - the continuation walk, except that an indented `# note` under a key that is REMOVED goes with it - and restored lines go after the last line any per-section key OWNS. When the live page has no line of this section and its block has no column-0 level for a new key (issue #186's shape), the page is left exactly as it is and `expectCouldNotBePutBack` is true: the restore COUNTS those pages and says so after it is done (AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack). `expectSite` is what the built site does with `after`, per section, `visible` or `hidden` - measured 2026-09-25 (python-frontmatter 1.3.0 / PyYAML 6.0.3, then js-yaml on JSON_SCHEMA and patches/publish.ts) and re-judged by scripts/check_visibility_against_the_site.py inside the image on every verify.sh run. Every `after` differs from what the restore wrote before #182 except the last case, which is the guard. Windows' CourseRestorer still finds the block with its own strict FrontmatterBounds (#177) and copies key LINES only; wiring these in is the acceptance for both (the windows issue from #182).",
+      "cases": [
+        {
+          "name": "a live key whose value is a MAPPING below it, and a backup with no key: the key goes WITH its value",
+          "section": 1,
+          "live": "---\npublishForSection1:\n  a: 1\ntitle: x\n---\n\nThe lesson.\n",
+          "backup": "---\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\ntitle: x\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "visible",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "Dropping the key's line alone left `  a: 1` orphaned under nothing - a block the build cannot read (it stopped the build until #246, and hides the page since, so a restore that should leave it shown hid it in every section). Measured 2026-09-25."
+        },
+        {
+          "name": "a backup whose value runs onto the line below: the value comes back WITH its key",
+          "section": 1,
+          "live": "---\npublishForSection1: true\ntitle: x\n---\n\nThe lesson.\n",
+          "backup": "---\npublishForSection1: >-\n  false\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\npublishForSection1: >-\n  false\ntitle: x\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "hidden",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "The backup HIDES section 1 (`>-` folds `false` onto the key). Carrying the key's line alone restored `publishForSection1: >-` - an empty value, so the page the teacher had held back came back PUBLISHED. Measured 2026-09-25."
+        },
+        {
+          "name": "the restored key goes after the last line another section's key OWNS, never between that key and its value",
+          "section": 1,
+          "live": "---\ntitle: x\npublishForSection2: >-\n  false\n---\n\nThe lesson.\n",
+          "backup": "---\npublishForSection1: false\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\ntitle: x\npublishForSection2: >-\n  false\npublishForSection1: false\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "hidden",
+            "2": "hidden"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "Section 1 has no line of its own on the live page, so the backup's goes after the last per-section key. Placed after the last line that merely NAMES one, it landed between section 2's `>-` and its `  false`: section 2 read an empty value and was PUBLISHED, and section 1 read \"false false\" and was published too. Measured 2026-09-25."
+        },
+        {
+          "name": "a page with no column-0 level for a new key is left exactly as it is, and SAID",
+          "section": 1,
+          "live": "---\n  a: 1\n---\n\nThe lesson.\n",
+          "backup": "---\npublishForSection1: false\n---\n\nThe lesson.\n",
+          "after": "---\n  a: 1\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "visible",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": true,
+          "why": "Issue #186's shape, met by a restore. The live block's first line is indented, so a key written anywhere in it is not a key: appended, it made a block the build cannot read (it stopped the build until #246; since then the page is hidden and named as unreadable on every build). So the page is left byte for byte, the section stays VISIBLE though the backup held it back, and the restore says how many pages it could not put back - AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack. The safe direction in the file, and not a silent one."
+        },
+        {
+          "name": "a note under a dropped key goes WITH the key, or it joins what arrives in its place",
+          "section": 1,
+          "live": "---\ndraftSection1: >-\n  # note\ntitle: x\n---\n\nThe lesson.\n",
+          "backup": "---\npublishForSection1: |-\n  false\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\npublishForSection1: |-\n  false\ntitle: x\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "hidden",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "The one clause where a REMOVAL differs from a rewrite (PageVisibilityReader.linesOwnedByKey against continuationLineIndices): with the live key gone, its indented `# note` belongs to whatever lands there. Left behind, it joined the restored literal block scalar - the value became \"false\\n# note\", not false - and the page the backup held back came back PUBLISHED. Measured 2026-09-25."
+        },
+        {
+          "name": "the plain swap, where nothing runs onto another line",
+          "section": 1,
+          "live": "---\ncreatedSection1: 2026-09-01\npublishForSection1: true\ntitle: x\n---\n\nThe lesson.\n",
+          "backup": "---\ncreatedSection1: 2026-09-01\npublishForSection1: false\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\ncreatedSection1: 2026-09-01\npublishForSection1: false\ntitle: x\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "hidden",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "The guard: what every restore did before #182 and must go on doing. Passes on the old code too, on purpose."
+        }
+      ]
+    }
   },
   "courseCode": {
     "mostCharacters": 12,
@@ -405,6 +488,11 @@
           "after": "---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1:\n  false\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n---\nBody line one.\n",
           "before": "---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1:\n  false\n---\nBody line one.\n",
           "shape": "the setting for section 1 on the line BELOW its key, hidden: the pair goes after the whole value, and is held back because a value that runs onto the next line is not copied (measured: put between the key and its value, as before the review of #175, section 1 read no setting and was PUBLISHED, and section 2 read 'false false', also published)"
+        },
+        {
+          "after": "---\ntitle: Loops\npublishForSection1: false\n  ---\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n---\nBody line one.\n",
+          "before": "---\ntitle: Loops\npublishForSection1: false\n  ---\n---\nBody line one.\n",
+          "shape": "issue #188: section 1's value runs into a line of INDENTED dashes, which is part of it rather than the closing fence (the site reads \"false ---\" and PUBLISHES section 1): the pair goes after the dashes and is held back, because a value that runs onto the next line is not copied. Measured 2026-09-25: before #188 the pair went ABOVE the dashes, so section 1 turned HIDDEN and section 2 read \"false ---\" and was PUBLISHED; now section 1 is unchanged (visible) and section 2 is hidden"
         }
       ],
       "created": "2026-09-25T07:00:00.000-0400",

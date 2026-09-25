@@ -3531,17 +3531,19 @@ shapes that reach it were measured rather than argued:
 | the source's frontmatter | why the copy still answers `cannotTell` |
 |---|---|
 | a TAB used as indentation anywhere in the block | `PageVisibilityReader.frontmatterBlock` answers `.unreadable`, because the build's own parser throws on the same page. Nothing written here can mend it: the strip and `setting` both find the fences and neither cares about tabs. |
-| the block's FIRST line indented, with a top-level `created:` and no publish or draft key | `setting` inserts `publish: false` at the top of the block, the first line that could be its value is the indented one, and `reading(ofValue:followedBy:)` will not guess at that. |
+| the block's FIRST line indented, with a top-level `created:` and no publish or draft key | Until #186, `setting` inserted `publish: false` at the top of the block, where the first line that could be its value is the indented one, and `reading(ofValue:followedBy:)` will not guess at that. Since #186 it declines (`.noRoomForAKey`) and the page is not hidden either way. |
 
 Both are pages the BUILD refuses as well — measured in the image, source and
 copy alike raise `while scanning for the next token` / `mapping values are not
 allowed` — so stopping is the honest answer rather than a shrug, and a copy of
 a lesson students can already see is the one thing not to write on a guess.
 The branch ALSO covers
-[#186](https://github.com/russellgordon/plantoir/issues/186), which may make
-`AssistPageVisibility.setting` decline to write; a check on its `changed` flag
-would be weaker, since `changed: false` cannot tell "already hidden" from
-"declined".
+[#186](https://github.com/russellgordon/plantoir/issues/186), which since
+2026-09-25 makes `AssistPageVisibility.setting` DECLINE to write on the second
+row above (`.noRoomForAKey`) rather than insert a key that adopts the indented
+line; the read-back still sees a page that is not hidden and abandons the
+copy, and it stays the stronger check, because it also catches what the
+outcome cannot see (the tab row).
 
 Abandoning is safe by construction: `ClassInsertionPlanner.apply` has already
 written the blank class page at that path and `ClassPages.skeleton` writes
@@ -3694,6 +3696,22 @@ three consequences worth keeping: the older `draftSection<N>` spelling
 survives untouched where a course still uses it, a key the conversation ADDED
 is removed again, and every other section's keys plus the whole page body stay
 byte for byte.
+
+**"The keys" means each key WITH the lines it owns (#182, 2026-09-25).** A
+value can live on the lines below its key (`publishForSection1: >-` over
+`  false`), and a restore that carried or dropped key lines alone published
+pages the backup held back and made blocks the build cannot read — measured,
+and in `documentation/08-course-config-reference.md` with what was rejected.
+One page shape cannot take a key back at all — a block with no column-0 line
+for a new key, #186's shape — and that page is left exactly as it is and
+COUNTED: `CourseRestorer.restoreSection` returns the count,
+`AssistSectionRestore.doneMessage` adds
+`AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack` after its own
+sentence, and the trail records `page settings left as they were` with the
+count and never the pages. Counted rather than named because the walk has no
+page titles to hand and it is almost always zero; Windows owes the count, the
+sentence and the line (the `windows` issue from #182). The whole-file cases
+are `course-management.json` → `backups.restoringOneSectionsKeys`.
 
 The first of those is worth saying out loud now that an ordinary edit
 MIGRATES that spelling (`AssistPageVisibility.setting`, issue #107): a restore

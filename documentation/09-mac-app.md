@@ -833,6 +833,13 @@ issue #220 one level down — a line that will be believed.
    FAILS the container counts as busy**, because "I could not ask" must never
    mean "nobody is using it".
 
+   Since GitHub #94 the launchers use the same count before they REMAKE a
+   folder's container (`remake_the_workspace`, documentation/03 → "Before a
+   workspace is remade"), so the app and the launchers agree on what
+   "running" means. They add one refinement the quit path does not need: a
+   preview whose `preview.sh` is no longer running on the Mac is an orphan
+   and counts as nothing, because refusing for it would refuse for ever.
+
 Check 1 exists because check 2 is **blind to the long windows**. A launcher
 that has to build the image, start Colima or download the pinned tools does all
 of that with no container of ours running at all — measured, `docker buildx
@@ -4223,11 +4230,19 @@ two shapes were reproduced end to end where the two split — the copy certified
 hidden here and PUBLISHED there:
 
 - a settings block closed by an **indented `---`**. `PageVisibilityReader`
-  trims leading spaces before testing a fence; python-frontmatter's boundary is
-  `^-{3,}\s*$` and does not. The builder never finds the end, reads no settings
-  at all, and Quartz publishes a page that says nothing. (The divergence itself
-  is [#188](https://github.com/russellgordon/plantoir/issues/188); this is the
-  place where it costs the most.)
+  trimmed leading spaces before testing a fence; python-frontmatter's boundary
+  is `^-{3,}\s*$` and does not. The builder never finds the end, reads no
+  settings at all, and Quartz publishes a page that says nothing. (The
+  divergence itself was [#188](https://github.com/russellgordon/plantoir/issues/188),
+  fixed 2026-09-25: the app's closing fence is now column 0 as well, so it too
+  finds no block on such a source, and `isAFenceTheBuilderSees` now simply
+  asks `PageVisibilityReader.isFence`. Such a SOURCE now has no block to
+  either reader — its lines are body text on its own site — so the copy is
+  given a block of its own and arrives HIDDEN, with those lines as its body:
+  `CoursePageCopyTests.testASourceWhoseOnlyCloseIsIndentedIsCopiedHidden`,
+  and measured hidden on the site in both sections. The guard's own
+  must-fail test moved to a lone carriage return, the disagreement that is
+  still real.)
 - a block carrying a **YAML anchor or alias**. Taking the plain `publish:` line
   out can orphan an alias the rest of the block refers to; `frontmatter.load`
   then raises, `build_site.py` prints a warning and RETURNS, and the page
@@ -4244,10 +4259,13 @@ description: |
 publish: true
 ```
 
-The app closes the block at the indented `---` INSIDE the scalar, so it never
-sees the `publish: true` below and inserts its own `publish: false` inside the
+The app closed the block at the indented `---` INSIDE the scalar, so it never
+saw the `publish: true` below and inserted its own `publish: false` inside the
 scalar; the builder reads the whole block and takes the LAST `publish`. The
 copy reached students in section 1 while the summary said it was hidden.
+(Since #188 the app no longer closes there, so the two readers now see the
+same block on this page; the invariant below was kept as the test all the
+same, for the reason it gives.)
 
 Chasing shapes one at a time was clearly the wrong game, so
 `CopiedPageText.theBuilderWouldReadItTheSameWay` states **one invariant** and

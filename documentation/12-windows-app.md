@@ -936,6 +936,23 @@ What replaces the old container concepts:
   Bash's and WSL's `pwd -P` are bash's built-in and keep the typed case.)
   Whether the two already agree on one spelling is a check, not a change; the
   `windows` issue opened with #189 asks for it.
+
+  **A remake never ends live work — what the mac learned, for Windows to KNOW
+  (GitHub #94, 2026-09-25).** The mac's launchers used to remove a folder's
+  container to remake it (after an update, for a new mount, for a stale
+  connection) without looking at what ran inside it, which killed an open
+  preview or a publish half-way through its upload. They now wait for a build
+  or publish, refuse while a preview whose launcher is still running is open,
+  and remove by id ([03](03-launcher-scripts.md) → "Before a workspace is
+  remade"). **Nothing is owed here**: Windows builds natively, so there is no
+  container to remake, and `contracts/app-rules.json` →
+  `previewPorts.whenTheWorkspaceIsInUse` and the `workspace was in use` trail
+  event are both `appliesOn: ["mac"]`, permanently. The trap, if Windows ever
+  gains something long-lived that is shared by a folder's runs and replaced
+  when it goes stale (a warm builder process, a per-folder server): look at
+  what is using it before replacing it, and tell a live user from an orphan by
+  whether the program that started it is still running — an orphan counted as
+  live refuses for ever.
 - **Concurrent previews are still isolated by port, exactly as before.**
   `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
   base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
@@ -1339,8 +1356,10 @@ VISIBILITY writer — and that qualifier is load-bearing, because two other
 finders are still hand-rolled and were deliberately left alone:
 `CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
 #140, so a restore reaches different pages on the two platforms — that is
-[issue #177](https://github.com/russellgordon/plantoir/issues/177), a
-`decision`) and `SectionAdder.FrontmatterLines` (strict here; it was strict
+[issue #177](https://github.com/russellgordon/plantoir/issues/177), which
+Russell decided on 2026-09-19: adopt the shared finder; it is owed together
+with #182's carry-the-value-lines restore, see the `windows` issue from #182)
+and `SectionAdder.FrontmatterLines` (strict here; it was strict
 on the mac too until #175, 2026-09-25, when that strictness was measured to
 PUBLISH a page hidden in section 1 into a newly added section — the mac now
 uses the shared finder and splices by line, and this one owes the same, see

@@ -238,32 +238,47 @@ enum SectionReDatePlanner {
         return dates[dates.count - 1]
     }
 
-    /// Carry it out. Returns the change record so it can be undone.
+    /// Carry it out. Returns the change record so it can be undone, and the
+    /// titles of the pages the writer DECLINED — their settings have no place
+    /// a new date line can go (#186) — so the reply can name them rather than
+    /// count them among the classes it moved.
     static func apply(_ plan: SectionReDatePlan, forSection sectionNumber: Int, in course: Course)
-        throws -> AssistChange {
+        throws -> (change: AssistChange, leftAlone: [String]) {
         let tail: String = ClassPages.siblingTimeAndOffset(
             from: ClassPages.list(forSection: sectionNumber, in: course),
             forSection: sectionNumber
         )
 
         var saved: [AssistSavedFile] = []
+        var leftAlone: [String] = []
         for move in plan.moves {
             let before: String = try String(contentsOf: move.fileURL, encoding: .utf8)
-            var after: String = PageFrontmatter.settingCreated(
+            let dated: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                 in: before,
                 key: PageFrontmatter.createdKey(
                     forSection: sectionNumber, isSectionLocal: move.isSectionLocal
                 ),
                 to: move.to,
                 fallbackTail: tail
-            ).text
+            )
+            var after: String = dated.text
+            // Only the DATE is reported (#186's review, B3): the sentence is
+            // about a new date. A hide declined on a page whose date WAS
+            // written needs a block whose first line is indented with a
+            // column-0 `created:` below it — a block the build cannot read at
+            // all, which the build already hides and names (#246).
+            let declined: Bool = dated.outcome == .noRoomForAKey
             if move.unpublishes {
-                after = AssistPageVisibility.setting(
+                let hidden: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
                     published: false,
                     in: after,
                     forSection: sectionNumber,
                     isSectionLocal: move.isSectionLocal
-                ).text
+                )
+                after = hidden.text
+            }
+            if declined {
+                leftAlone.append(move.fileURL.deletingPathExtension().lastPathComponent)
             }
             if after == before {
                 continue
@@ -276,7 +291,7 @@ enum SectionReDatePlanner {
             saved.append(repointed)
         }
 
-        return AssistChange(
+        let change: AssistChange = AssistChange(
             whatHappened: "re-dated \(plan.classCount) "
                         + "\(plan.classCount == 1 ? "class" : "classes") and what they use",
             courseCode: course.code,
@@ -284,6 +299,7 @@ enum SectionReDatePlanner {
             rebuildsThePreview: true,
             files: saved
         )
+        return (change: change, leftAlone: leftAlone)
     }
 }
 
