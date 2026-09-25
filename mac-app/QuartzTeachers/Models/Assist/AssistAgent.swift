@@ -253,6 +253,31 @@ final class AssistAgent {
             return
         }
 
+        // "Deploy at 6.30 pm", "deploy at 6:30 tonight" — a time the app can
+        // read but does not set, answered with the one sentence to type
+        // instead (issue #277). The same shape as the question above, for the
+        // same reason: every such sentence reached deploy_section 10 of 10 on
+        // the smaller assistant. Transcript only, never `messages`; nothing is
+        // set, and nothing waits for the answer — the sentence it names
+        // matches in code on the next turn.
+        if let respelling = AssistCardCommand.timeToSayAs(trimmed) {
+            entries.append(Entry(
+                speaker: .assistant,
+                text: AssistWording.sayTheTimeAs(
+                    written: respelling.written,
+                    say: respelling.say,
+                    onlyDifference: respelling.onlyDifference
+                )
+            ))
+            ActivityTrail.note(
+                .assistantMatchedAFixedPhrase,
+                AssistAgent.askedToSayTheTimeAsLine,
+                course: courseCode,
+                section: sectionNumber
+            )
+            return
+        }
+
         // The date goes on the END of the message. Prepended, the same line
         // cost 15 points of routing accuracy on the Windows measurements —
         // the position really is the finding, not the presence.
@@ -1007,6 +1032,17 @@ final class AssistAgent {
     /// line would, and must not be mistaken for one.
     static let askedMorningOrEveningLine: String =
         "matched in code, not sent to the model — asked whether the time was morning or evening; "
+        + "nothing was set"
+
+    /// The trail's line for a time answered with the spelling to use
+    /// (issue #277).
+    ///
+    /// No clock and nothing the teacher wrote, for the reason
+    /// `askedMorningOrEveningLine` gives: `assistantAsked` already carries
+    /// the sentence. "Nothing was set" because the line sits where a
+    /// scheduled deploy's would, and must not be mistaken for one.
+    static let askedToSayTheTimeAsLine: String =
+        "matched in code, not sent to the model — asked for the time in a spelling it can set; "
         + "nothing was set"
 
     /// The trail line for a sentence answered in code, naming the tool — and
