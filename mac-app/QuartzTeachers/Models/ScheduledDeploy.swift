@@ -628,6 +628,16 @@ enum ScheduledDeploy {
             .appendingPathComponent("public")
             .appendingPathComponent("index.html")
             .path
+        // Where the build notes when it STARTED (issue #265) — the time the
+        // course's files are compared with, so a Save made while an earlier
+        // publish was building still counts as unpublished. Beside `public/`.
+        let buildStartedPath: String = workspaceURL
+            .appendingPathComponent("courses")
+            .appendingPathComponent(courseCode)
+            .appendingPathComponent(".merged_output")
+            .appendingPathComponent("section\(sectionNumber)")
+            .appendingPathComponent(BuildFreshness.buildStartedMarkerName)
+            .path
         let courseDirectoryPath: String = workspaceURL
             .appendingPathComponent("courses")
             .appendingPathComponent(courseCode)
@@ -650,6 +660,17 @@ enum ScheduledDeploy {
         lines.append("/bin/rm -f \(shellQuoted(plistPath))")
 
         lines.append("NEEDS_BUILD=1")
+        // What the course is compared with: the START of the build that made
+        // the site, when the build noted it and it is not newer than the page
+        // — `BuildFreshness.referenceDate` in shell. The page's own time
+        // otherwise, as before the start was noted. The page's time alone
+        // missed a Save made while a publish was building: that Save is
+        // older than the page the build writes at its end.
+        lines.append("FRESH_SINCE=\(shellQuoted(builtIndexPath))")
+        lines.append("if [ -f \(shellQuoted(buildStartedPath)) ] && [ -f \(shellQuoted(builtIndexPath)) ]"
+            + " && ! [ \(shellQuoted(buildStartedPath)) -nt \(shellQuoted(builtIndexPath)) ]; then")
+        lines.append("  FRESH_SINCE=\(shellQuoted(buildStartedPath))")
+        lines.append("fi")
         lines.append("if [ -f \(shellQuoted(builtIndexPath)) ]; then")
         // A PREVIEW's build is never deploy-fresh. Serve mode bakes a
         // live-reload client pointed at ws://localhost into every page, and
@@ -659,8 +680,9 @@ enum ScheduledDeploy {
         lines.append("  if /usr/bin/grep -q 'ws://localhost:' \(shellQuoted(builtIndexPath)); then")
         lines.append("    NEEDS_BUILD=1")
         lines.append("  elif [ -z \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath))"
-            + " -type f -newer \(shellQuoted(builtIndexPath)) -not -path '*/.*' -print -quit)\" ]; then")
-        // Nothing under the course is newer than the built page, so the site
+            + " -type f -newer \"$FRESH_SINCE\" -not -path '*/.*' -print -quit)\" ]; then")
+        // Nothing under the course is newer than the start of the build that
+        // made the page (or the page, for a site built before that was noted), so the site
         // on disk already says what the teacher means. Rebuilding it at half
         // six would cost a container start and a full Quartz run to produce
         // the same bytes.

@@ -26,14 +26,24 @@
         "why": "Almost every question about a course begins with which folder it is in - and a folder outside the home directory bind-mounts as an EMPTY folder inside the container, which is a whole class of report explained by this line alone."
       },
       {
-        "carries": "the course code",
+        "carries": "the course code; which sidebar items this save hid or showed (names only, compared with the file as it was before the save); which settings it kept or replaced because another window or a build had changed the file since this window read it, and — when the sidebar list was one it replaced — that the teacher was told so (specialNames.settingsSaveReplacedSidebarChange); and whether a preview or a publish of the course was running, so it could not see the save",
         "event": "settings saved",
-        "why": "'It broke after I changed something' is the commonest report there is, and this is the line that dates the change."
+        "why": "'It broke after I changed something' is the commonest report there is, and this is the line that dates the change. Issue #265 (2026-09-24) widened it: two windows on one working folder each held their own copy of a course's settings, a Save in the stale one put back its older sidebar list, and a Save made while a preview was open never reached that preview. Every one of those looks, from the teacher's chair, like switches with 'no correlation' to the site; the line naming what the save hid, what it kept from elsewhere and what was running settles it in one read."
       },
       {
         "carries": "the course code and the reason",
         "event": "settings could not be saved",
         "why": "A save that failed leaves the teacher believing it succeeded. Recording only successes would hide exactly the case worth seeing."
+      },
+      {
+        "carries": "the course code and the section",
+        "event": "preview started with unsaved settings",
+        "why": "A preview reads the SAVED settings file, while Course Settings keeps unsaved edits in memory and goes on showing them after the teacher leaves the form. A preview started in that state disagrees with the switches on screen for a reason nothing on screen explains, so the teacher is told (specialNames.previewUsesSavedSettings) and the trail says it happened (issue #265)."
+      },
+      {
+        "carries": "the course code and the sections whose preview was built again — or, when none was still open at the moment of the press, that nothing was",
+        "event": "preview again after settings saved",
+        "why": "The button beside specialNames.settingsSavedWhilePreviewing. It stops and restarts a preview that may be in another window, so the trail says it was the Settings button that did it rather than a press in that window (issue #265)."
       },
       {
         "carries": "the launcher and its arguments, redacted",
@@ -2729,6 +2739,26 @@
     "contentStructureTip": {
       "message": "Tip: you can also simply create new folders and files in Obsidian — they’re added to your site automatically the next time you preview. The exception is anything you remove here: it stays off your site, even if you make it again in Obsidian, until you add it back here.",
       "why": "The caption under the four Content Structure lists in Course Settings. Proposed from Windows 2026-09-07, resolving a divergence: the two apps had worded the same rule differently since the day it was written (the mac in row 375, 2026-08-24; Windows a day later in its parity pass, because row 375’s Windows-notes cell never mentioned the callout), and neither sentence was pinned. Both halves matter. The FIRST is the promise that a teacher need not come here at all — preflight discovery appends anything new it finds at the top level. The SECOND is the one rule a teacher cannot infer and is not told anywhere else on this page: an exclusion is name-based and does not expire, so a folder removed here stays off the site even if it is deleted and made again in Obsidian, and only this page can undo it. That became more consequential, not less, after excluded_items was made authoritative at build time (GUI-IMPROVEMENTS row 377, the same day): preflight now DROPS an excluded name it finds back in a copy list. The mac’s wording said the exception in a six-word bracket — “(unless you have removed them here)” — and named no remedy; that was rejected as under-weight for a permanent, silent rule with a single escape. Windows’ wording was adopted with two changes. “on this page” became “here”, because the sibling sentence removeLeavesTheFolderOnDisk already says “Add it back here to include it again” and Windows was using two names for one place in one sentence; “in these lists” was rejected as more precise but breaking that parallel, and because no Plantoir sentence calls a mac Form a page. And “folders” became “folders and files”, because the caption sits under FOUR lists of which two are file lists, and the behaviour is identical for files — discovery appends top-level files (discover_shared_items / discover_section_items) and exclusion skips and drops them (build_site.py). Both apps had promised only the folder half, so a teacher who removed a file got the permanent, silent behaviour with nothing anywhere warning them. “pages” was rejected for the widened clause: discovery is not limited to .md, and “files” is the word the four list labels above the caption already use. ONE KNOWN EDGE, named here rather than papered over: “even if you make it again in Obsidian” is true when the name is remade as it was, which is the realistic case, and not when it is remade with different capitalisation. That is not a defect in the matching — exact, case-included matching is the RULE, stated in this same file at gradedFolders.choices.walk.excludedItems (“the same way preflight matches”) and reasoned in GUI-IMPROVEMENTS row 412: a case-insensitive answer would have the app believe a folder is excluded while the build published it. So a teacher who removes “Old Tests” and later makes “old tests” does get it published. What IS inconsistent is that _dropping_excluded_items lowercases both sides while every other consumer matches exactly, so build_site.py gives two answers in one file. Tracked in TODO.md (“_dropping_excluded_items matches excluded names case-insensitively…”) and as issue #99, with the warning that case-folding the live path would break walk.excludedItems and re-introduce what row 412 rejected. Not resolved here: it is a build-behaviour decision wanting its own piece, its own contract case and a verify.sh run."
+    },
+    "settingsSavedWhilePreviewing": {
+      "message": "A preview of this course is still showing the settings it started with. Press Preview Again to see what you just saved.",
+      "why": "Shown beside the Save confirmation in Course Settings when a preview of the course is open, with a Preview Again button that builds that preview afresh (issue #265, Russell's choice 2026-09-24). A preview bakes every setting in when its build starts - measured: 20 s after a save the served sidebar filter was unchanged - so a Save 'did nothing' to the page the teacher was looking at, and stopping and restarting showed the latest, one or more steps behind, which reads as random. About EVERY setting, not only the sidebar, so it names none. A caption, not a removal-blocked sentence: no `reason` key (Windows' NoBlockedSentenceInTheContractIsUnusedHere sweeps those). Rejected: rebuilding the preview automatically on every Save - it kills a page the teacher may be reading, for a Save that may have changed only the footer, and the preview can belong to another window."
+    },
+    "settingsSavedWhilePublishing": {
+      "message": "This course is being published right now, and that publish uses the settings from before this save. Publish again once it has finished to send what you just saved.",
+      "why": "Shown instead of settingsSavedWhilePreviewing when a publish of the course is running (the plan review's A3). The publish read the settings when its build began, so it sends the earlier ones. 'Publish again' is advice that WORKS only because of app-rules.json -> buildFreshness's rule about something saved after the build started: until that rule (issue #265 fix round, 2026-09-24) the next Publish compared the course with the time the built page was WRITTEN, found this Save older, called the site up to date and sent the same old build while reporting success — the review's H1, a sentence promising the opposite of what happened. Said rather than blocked: the Save is right. No Preview Again button beside it, because a preview is refused while that course publishes."
+    },
+    "previewUsesSavedSettings": {
+      "message": "Course Settings has changes you have not saved, so this preview uses the settings as they were last saved.",
+      "why": "Shown where a preview's progress appears when the preview starts while Course Settings holds unsaved changes — in ANY window open on that folder, not only the one previewing (issue #265; the review's L1: with two windows the unsaved switches can be in the other one, and asking only the previewing window's copy said nothing). Unsaved edits live in memory and survive leaving the form, so the switches can say one thing and the preview another with nothing on screen explaining it. Rejected: saving automatically (a half-typed setting would be written without a Save) and refusing the preview (previewing the saved settings may be the point)."
+    },
+    "settingsSaveReplacedSidebarChange": {
+      "message": "Which items the sidebar hides had also been changed somewhere else since this window read them — most likely in another Plantoir window. This save replaced that change with the switches shown here.",
+      "why": "Shown after a Save in Course Settings, first among the after-Save sentences and with or without a preview or publish running, when the Save found that the sidebar list (`hidden`) in the file had been changed since this window read it AND this window had changed it too — savingSettings' replacedChangesFromElsewhere naming `hidden`. The last Save wins for the whole list (savingSettings' case 'both windows changed the same list'); the review's M2 found that was told to nobody but the trail. Ruled by the director for Russell, 2026-09-24: last Save wins, but SAID; no merge of the two lists (rejected for the reason savingSettings gives: rules for order and for an item removed on one side and added on the other, which nothing reported needs). Only the sidebar list, because it is the one a teacher reads back as 'the switches do nothing'; another setting replaced this way is on the trail only. 'Most likely another window' rather than 'another window' because a hand edit of the file reaches the same branch, and the build no longer writes `hidden` at all (sidebarHiding.buildKeepsHidden). Stays on screen after Preview Again is pressed, which answers only the preview sentence. A caption: `message`, never `reason`."
+    },
+    "settingsPreviewAgainNothingOpen": {
+      "message": "That preview has stopped since, so there is nothing to preview again. Open the section and press Preview to see what you saved.",
+      "why": "Shown in place of an enabled Preview Again (the button stays, disabled) when every preview the after-Save notice offered has since stopped: its lease released, its section window gone, or the window still there with its preview no longer running. The notice is worked out at the Save and stays up until the next Save or leaving the course, so this is an ordinary sequence — save, then close the other window, then look back — and before the review's L2 the button stayed enabled and did nothing, with no trail line. Measured from the code rather than driven: an in-app preview lease is taken only in the section view's startPreview and released in the same synchronous onDisappear that unregisters its window, so a lease with no window does not persist; what does is the notice outliving its preview. Re-evaluated whenever PreviewLeases changes, which is observable. A caption: `message`, never `reason`."
     },
     "curriculumFolderResolution": {
       "cases": [
@@ -8599,5 +8629,62 @@
         ]
       }
     ]
+  },
+  "savingSettings": {
+    "rule": "A Save writes only the settings THIS window changed since it last read or wrote the course's settings file. Every other setting keeps the value the file has now. Compared per TOP-LEVEL key of course_config.json, never inside a list. After a Save, every other window's copy of that course that has nothing unsaved reads the file again; a copy with unsaved changes is left alone, and its own Save follows the same rule.",
+    "why": "Issue #265, confirmed by Russell 2026-09-24: two windows were open on one working folder, each holding its own copy of a course's settings, and the Save was a blind whole-file write. Window A saved three sidebar hides; window B, which had not seen that, saved an unrelated setting and the file went back to B's ten hides while both windows said nothing was unsaved - measured with the real CourseConfiguration.swift and a copy of his course. The same stale write came from Add Section, archive, restore, course rename and school year, so the rule is in the ONE write they all use. Per key rather than per list element because merging inside a list needs rules for order and for an item removed on one side and added on the other, and nothing reported needs them. When both sides changed the same key, the Save being made wins and the trail says it replaced a change made elsewhere. Rejected: refusing the Save and reloading (loses what the teacher just did, for a case the trail can record); a file watcher per window (a new moving part for a case the reload-after-Save covers).",
+    "cases": [
+      {
+        "name": "the stale window saves something else",
+        "base": { "hidden": ["Media", "Tasks", "Style"], "show_reading_time": false },
+        "onDisk": { "hidden": ["Media", "All Classes"], "show_reading_time": false },
+        "mine": { "hidden": ["Media", "Tasks", "Style"], "show_reading_time": true },
+        "written": { "hidden": ["Media", "All Classes"], "show_reading_time": true },
+        "keptFromElsewhere": ["hidden"],
+        "replacedChangesFromElsewhere": [],
+        "why": "The reported failure. Before #265 the file went back to [Media, Tasks, Style]."
+      },
+      {
+        "name": "both windows changed the same list",
+        "base": { "hidden": ["Media"] },
+        "onDisk": { "hidden": ["Media", "Tasks"] },
+        "mine": { "hidden": ["Media", "Style"] },
+        "written": { "hidden": ["Media", "Style"] },
+        "keptFromElsewhere": [],
+        "replacedChangesFromElsewhere": ["hidden"],
+        "why": "The Save being made wins, whole list; the trail says it replaced a change made elsewhere."
+      },
+      {
+        "name": "nothing changed elsewhere",
+        "base": { "hidden": ["Media"], "footer_html": "" },
+        "onDisk": { "hidden": ["Media"], "footer_html": "" },
+        "mine": { "hidden": [], "footer_html": "" },
+        "written": { "hidden": [], "footer_html": "" },
+        "keptFromElsewhere": [],
+        "replacedChangesFromElsewhere": [],
+        "why": "The ordinary Save, byte for byte what it always was."
+      },
+      {
+        "name": "a build added a folder it discovered",
+        "base": { "shared_folders": ["Concepts"], "hidden": ["Media"] },
+        "onDisk": { "shared_folders": ["Concepts", "Projects"], "expandable": ["Projects"], "hidden": ["Media"] },
+        "mine": { "shared_folders": ["Concepts"], "hidden": ["Media", "Concepts"] },
+        "written": { "shared_folders": ["Concepts", "Projects"], "expandable": ["Projects"], "hidden": ["Media", "Concepts"] },
+        "keptFromElsewhere": ["expandable", "shared_folders"],
+        "replacedChangesFromElsewhere": [],
+        "why": "A key the file gained (expandable) is kept too. Before #265 a stale Save dropped the build's additions and the next build rediscovered them."
+      },
+      {
+        "name": "the other window removed a key",
+        "base": { "hidden": ["Media"], "old_key": 1 },
+        "onDisk": { "hidden": ["Media"] },
+        "mine": { "hidden": ["Media"], "old_key": 1 },
+        "written": { "hidden": ["Media"] },
+        "keptFromElsewhere": ["old_key"],
+        "replacedChangesFromElsewhere": [],
+        "why": "A key this window did not touch follows the file, including being gone."
+      }
+    ],
+    "casesWhy": "base = the file as this window last read or wrote it; onDisk = the file now; mine = this window now; written = what the Save puts in the file (and this window then holds). keptFromElsewhere and replacedChangesFromElsewhere are sorted key names, and are what the 'settings saved' trail line reports."
   }
 }
