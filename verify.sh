@@ -1095,6 +1095,72 @@ docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 if docker run -dit --name "$CONTAINER_NAME" \
      -v "$(pwd)/courses":/teaching/courses \
      "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1; then
+  # ---- First: an OPEN preview is not killed to remake it (GitHub #94) ----
+  # The launcher is about to remake this workspace (no builds mount). Before
+  # #94 it stopped it without looking, ending whatever ran inside. Here a
+  # pretend preview of section 2 runs inside it, and a pretend preview.sh for
+  # section 2 runs on this Mac — the launcher that keeps a preview OPEN; a
+  # preview without one is an orphan and is (correctly) remade over. `exec -a`
+  # renames `sleep` so the process tables read exactly what a real preview
+  # puts there (measured in this image: `docker top` shows
+  # "python3 /opt/scripts/build_site.py … --section=2 --port 8082 300").
+  # The run must refuse after the preview wait, say which preview, and leave
+  # the workspace and the pretend preview exactly as they were.
+  _old_id="$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME" 2>/dev/null)"
+  docker exec -d "$CONTAINER_NAME" bash -c \
+    'exec -a "python3 /opt/scripts/build_site.py --host-os mac --course=EXC2O --section=2 --port 8082" sleep 300' \
+    >/dev/null 2>&1
+  bash -c 'exec -a "/bin/bash ./preview.sh EXC2O 2" sleep 300' &
+  _pretend_launcher=$!
+  sleep 1
+  _refusal_started=$(date +%s)
+  if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_in_use.log 2>&1; then
+    fail "a remake went ahead while a preview from the folder was open (#94)"
+  else
+    pass "a remake refuses while a preview from the folder is open (#94)"
+  fi
+  _refusal_took=$(( $(date +%s) - _refusal_started ))
+  _open_line="$(python3 -c 'import json,sys; s=json.load(open("contracts/app-rules.json"))["previewPorts"]["whenTheWorkspaceIsInUse"]["sentences"]["whenAPreviewIsOpen"][0]; print(s.replace("{course}","EXC2O").replace("{section}","2"))')"
+  if grep -Fq -- "$_open_line" /tmp/verify_in_use.log; then
+    pass "and says which preview is open, in the contract's words"
+  else
+    fail "the refusal did not say which preview was open"
+    tail -15 /tmp/verify_in_use.log
+  fi
+  if [[ "$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME" 2>/dev/null)" == "$_old_id" ]] \
+     && docker top "$CONTAINER_NAME" 2>/dev/null | grep -Fq -- "--course=EXC2O --section=2"; then
+    pass "and the workspace, and the preview in it, were left exactly as they were"
+  else
+    fail "the workspace was stopped or remade while a preview was open in it"
+  fi
+  if [[ "$_refusal_took" -ge 20 ]]; then
+    pass "and it gave the preview ${_refusal_took} s to close before refusing"
+  else
+    fail "it refused after ${_refusal_took} s, before the preview wait was up"
+  fi
+  # End both pretend processes, and make sure they HAVE ended: the run below
+  # is the remake this section exists to check, and it would otherwise meet
+  # the same open preview and refuse.
+  kill "$_pretend_launcher" >/dev/null 2>&1 || true
+  wait "$_pretend_launcher" 2>/dev/null || true
+  docker exec "$CONTAINER_NAME" python3 -c '
+import os, signal
+for entry in os.listdir("/proc"):
+    if not entry.isdigit() or entry == str(os.getpid()):
+        continue
+    try:
+        line = open("/proc/%s/cmdline" % entry, "rb").read().replace(b"\x00", b" ").decode("utf-8", "replace")
+    except OSError:
+        continue
+    if "--course=EXC2O --section=2" in line:
+        os.kill(int(entry), signal.SIGKILL)
+' >/dev/null 2>&1 || true
+  sleep 1
+  if docker top "$CONTAINER_NAME" 2>/dev/null | grep -Fq -- "--course=EXC2O --section=2"; then
+    fail "the pretend preview could not be ended, so the remake below is not a fair test"
+  else
+    pass "the pretend preview has ended, so the remake below has nothing in its way"
+  fi
   if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_old_container.log 2>&1; then
     pass "a build in a container made before the builds mount existed still works"
   else

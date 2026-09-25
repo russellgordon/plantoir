@@ -144,6 +144,9 @@ struct TranscriptBuilder {
         if PagesDatedByTheBuild.isMarkerLine(line) {
             return
         }
+        if WorkspaceInUseReport.isMarkerLine(line) {
+            return
+        }
         lines.append(line)
     }
 

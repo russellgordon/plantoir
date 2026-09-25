@@ -693,6 +693,24 @@ nonisolated enum ActivityTrail {
         /// minutes late, or not at all, looks from outside exactly like one
         /// that misfired.
         case scheduledPublishWaitedForTheCourse = "scheduled publish waited for the course"
+        /// A launcher had to remake a working folder's workspace and found
+        /// something running in it (GitHub #94). Carries where the run was
+        /// for — course and section, or the word "setup" — and which of
+        /// three it was: it WAITED for a build or publish to finish, and for
+        /// how long; it stopped because a preview from the folder was still
+        /// open, and which one; or it stopped because something was still
+        /// being built or published after ten minutes.
+        ///
+        /// Written by the app, from the line the launcher prints
+        /// (`WorkspaceInUseReport`): `ScriptRunner` reads it from a run's
+        /// console, `ScheduledDeploy` from the log of a publish launchd ran.
+        /// On the trail because each of the three is a new way for a run to
+        /// be slow or not to happen — "my publish did not go out last night",
+        /// "it told me to close a preview" — and the app otherwise shows a
+        /// refusal only as a run that did not finish. A remake with nothing
+        /// running writes nothing. Mac only, permanently: Windows builds
+        /// natively and has no workspace.
+        case workspaceWasInUse = "workspace was in use"
     }
 
     // MARK: - Stored properties
