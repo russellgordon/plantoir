@@ -1017,6 +1017,27 @@ final class ScheduledDeployCleanupTests: XCTestCase {
         XCTAssertTrue(agentExists(sectionNumber: 1, labelled: .beforeFolderScoping))
     }
 
+    /// An OVERDUE job this folder set before #237, under the old label, is
+    /// swept like any other of this folder's — found by the folder scan and
+    /// cancelled by the name it really has (#237 review, L5).
+    func testTheSweepClearsAnOverdueDeploySetBeforeTheUpdate() throws {
+        try prepare()
+        try makeCourse(sections: [1])
+        let now: Date = Date()
+        try writeAgent(
+            sectionNumber: 1, when: now.addingTimeInterval(-8 * 24 * 3600), labelled: .beforeFolderScoping
+        )
+        let outcome = ScheduledDeployCleanup.sweepDeploysThatAreTooLate(
+            inWorkingFolder: workingFolderURL, now: now, runner: launchControl
+        )
+        XCTAssertFalse(outcome.isQuiet, "\(outcome)")
+        XCTAssertFalse(agentExists(sectionNumber: 1, labelled: .beforeFolderScoping))
+        XCTAssertTrue(
+            launchControl.bootedOutLabels.contains(labelFor(sectionNumber: 1, labelled: .beforeFolderScoping)),
+            "Booted out by the name it really has"
+        )
+    }
+
     /// And it never reaches into another working folder, however overdue that
     /// folder's job is.
     func testTheSweepNeverTouchesAnotherFoldersDeploy() throws {
