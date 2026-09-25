@@ -4048,7 +4048,11 @@ the piece, and every rule below exists because of it:
   the other, or the Unit/Day habit `unit: 5, atDay: 1` all mean 5; two
   different numbers, neither 1, are refused so the teacher is asked. Which one
   a small model fills for "make room at Week 5" is a ROUTING question, and is
-  not measured yet (owed with the noun slice, by hand, per `research/`).
+  NOT measured: nothing in this piece changed what the model is shown, and the
+  club's own card, "Make room for one meeting at Week 5", is matched in code
+  and never reaches the model (below). A teacher who types their own phrasing
+  reaches the model on the frozen schema, and the reading above is what makes
+  either filling safe.
 - **Make room keeps a numbered course's date GAPS.** Clubs are sparse: CODING's
   pages are Week 1 (2025-09-18), Week 2 (09-25), Week 8 (11-20), Week 9
   (11-27). The ordinary slot rule packs later pages onto the next free days and
@@ -4069,7 +4073,137 @@ the piece, and every rule below exists because of it:
   gives `local 13 tools 46b96562…2cd96cb6` and `mcp 32 tools 9bcc7eb7…9cef36f7`,
   identical before and after. Refusal sentences that go back to the model say
   "page", never "meeting". What the assistant calls a page in a club
-  (`class_noun`) is a later slice; until then its sentences still say "class".
+  (`class_noun`) is the next section.
+
+## "meeting" in a club: what the teacher reads, never what the model reads (#267)
+
+A club says "meeting" (`class_noun: "meeting"`, [08](08-course-config-reference.md)).
+The assistant says it back — in the plan cards, the one-line results, the
+dates card, the answer to "When are my next meetings?" — and **the model is
+never shown the word.** That is the whole design, and it is why this needed no
+routing measurement: a routing change is a change to what the model reads, and
+nothing the model reads moves.
+
+**How the two audiences are kept apart.** `AssistToolOutcome` already had
+them: `detail` goes to the model (and is the only thing `--mcp-stdio` returns
+to Claude Code), while `summary`, `forTheCard` and `teacherDetail` are the
+teacher's. Every sentence that says "class" and that a club teacher can reach
+now takes a `noun:` (`ClassNoun`, default `.class`), and the runner renders it
+TWICE where both audiences read the same text:
+
+- A **plan** is built once with `.class` for `detail` and once in the course's
+  noun for the card — `AssistToolOutcome.planned(_:plan:card:)`, and
+  `describe(noun:)` on `ClassInsertionPlan`, `PlaceholderClassPlan`,
+  `SectionReDatePlan` and `AssistPublishPlan`.
+- A **write**'s `summary` takes the noun (`madeRoom`, `publishedTheClassOn`,
+  `reDated`, `addedTheNextPage`); its `detail` is built as it always was.
+- The **dates answer** ("When are my next meetings?") was one string for both;
+  it is now two, `summary` in the noun and `detail` unchanged.
+- The **window's own lines** — the dates card's question
+  (`mayIAskForYourDates(for:)`), the reason under it, the answer to declining it
+  (`datesNotGivenYet(for:)`, via `AssistAgent.noteDatesDeclined(noun:)`) — go
+  into the transcript and never into `messages`. `AssistSession` reads the
+  course's noun and naming once, when the window opens.
+
+`ClubNounTests.testTheNounNeverReachesWhatTheModelReads` is the proof: six plan
+tools run in one club with `class_noun` flipped between `class` and `meeting`,
+and `detail` must be byte-identical while the card must change and say no
+"class". Measured by putting the noun into the make-room plan's `detail` (copy
+and restore of `AssistToolRunner.swift`): that test goes red, and so does the
+`detail` check. The tool surface is hashed after regenerating the contracts
+(twice, the second a no-op): `local 13 tools 46b96562…2cd96cb6`, `mcp 32 tools
+9bcc7eb7…9cef36f7` — the baseline.
+
+**Errors stay in the ordinary words, on purpose.** A refusal (`refused`,
+`couldNotRead`) is ONE string for both audiences — the model reads it and
+decides what to say next — so `notANumberedClassPage`,
+`thePlaceForTheCopyIsStillTaken`, `theCopyCouldNotBeMadeHidden`, the planners'
+"I don't know when … meets" and their `problems` lines keep their wording
+(Russell's ruling on the plan review: error text fed back to the model stays
+neutral). Splitting each into two strings would double a sentence set nobody
+asked for, and a refusal is not what a club teacher reads most.
+
+**Named, not substituted.** Every variant is its own key in
+`contracts/assist-wording.json`: `<name>` for the "class" form and
+`<name>ForAMeeting`, following `otherClassesWouldMove…`. 30 pairs; the file went
+from 65 keys to 125 and **no existing value changed** (diffed). Sentences that
+were typed inline in a planner or in `AssistToolRunner` moved into
+`AssistWording` to get their names, so some "class" forms are keys for the
+first time. `ClubNounTests.testEveryMeetingKeyHasItsClassTwin` holds every
+`…ForAMeeting` key to having a twin, saying "meeting" and never "class" or
+", Day ". REJECTED: a substitution function over finished sentences (it would
+eat "classroom", a page title with "Class" in it, and "this class actually
+meets", where "class" means the group — the meeting form says "this group");
+free text for the noun (sentences carry articles and plurals).
+
+**The inventory, and what was left and why.** Varied: the make-room plan and
+result, the duplicate plan's "later meetings move", the next-page plan (and its
+spare-dates and shared-last-day lines), the re-date plan and result, the
+publish plans' "is a meeting of its own", "Published the meeting on …", the
+dates answer, and the five reasons under the dates card. Left as "class":
+refusals and planner `problems` (both audiences, above); `otherClassesMoved`
+and the planners' own result messages (`detail` only — the teacher reads the
+summary); the undo clauses ("added the class page Week 2"), because one stored
+clause feeds both the undo's summary and its detail; the whole-unit sentences
+(unreachable — a numbered course has no whole-unit path); plan summaries such as
+"Worked out what making room in that unit would do." (a plan's transcript line
+is its card, so the summary is shown nowhere); `remember_timetable`'s sentences
+(MCP only, which returns `detail`); the "classes this deploy is meant to carry"
+line (only when the MODEL passes `classes`, which no card does). The full table
+is in the #267 hand-over.
+
+**What still says "class" in a club, stated rather than hidden.** The model's
+OWN prose: its inputs did not change, so when it answers in its own words it
+may say "class". Claude Code over MCP likewise reads `detail`. Neither is a bug
+to chase by editing the prompt — that would move a routing byte.
+
+**The card phrasings and the shelf.** Matched in code, so they cost the router
+nothing: every "class" fixed phrasing a club's shelf offers has a "meeting"
+twin in `AssistCardCommand.fixedShapes` (publish tomorrow's / a weekday's
+meeting, add the next meeting page, when are my next meetings, I have a revised
+list of meeting dates — the sentence `datesNotGivenYet(for: .meeting)` tells a
+club to say, and a test holds the two together — re-date my meetings), and two
+new PARSED families, added beside the old ones so the entries Windows already
+implements are byte-for-byte unchanged: "make room for <count>
+class|classes|meeting|meetings at <word> <number>" and "duplicate <page title>
+as my next meeting". The one-number make-room family puts the number in `unit`,
+the slot both kinds of course read safely — a numbered course reads a lone
+`unit` as its position, and a Unit/Day course given a unit and no day ASKS
+which day (`testTheOneNumberShapeInAnOrdinaryCourseAsksRatherThanGuesses`); "at
+day 5" is refused because it would land in the unit slot. A numbered course
+gets its OWN shelf (`AssistPromptShelfView.groups(naming:noun:)`): every card
+on it is matched in code except "Cancel scheduled deploy", which was already
+measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
+it — a title-bearing publish or hide goes to the model, and no routing
+measurement has been made in a club course.
+
+## The front page's embed is found by the page it names (#267)
+
+`SectionIndexPointer` never reads or writes the heading above the embed, and
+never INSERTS an embed into a front page that has none. It finds the first
+line that transcludes one of the section's class pages — by title, after any
+folder path and before any `|` or `#` — and replaces that line. So a course's
+"# Most Recent Class", a club's "# Most Recent Meeting" (written once, at
+creation, by `setup_course.py`) and CODING's hand-made "## Most Recent Meeting"
+all repoint the same way, and an existing course keeps its heading. Nothing
+here changed in behaviour; what changed is that it is now CONTRACT data,
+`class-planning.json` → `sectionIndexPointer` (9 cases, run by
+`ClassPlanningContractTests.testTheFrontPageIsRepointedAsTheContractSays`;
+removing the class-title check turns it red).
+
+Windows differs, and the contract says how rather than pretending it does not:
+`SectionIndex.cs` finds the embed by the literal heading "# Most Recent Class",
+so a club's front page — or CODING's — is never repointed there, and it takes
+the first `![[` under that heading whatever it names, so "Help Sessions" can be
+replaced by a lesson. Those are the requests (the cases go red there). Where no
+class embed exists at all, the two apps are allowed to differ, and both
+behaviours are pinned (`whenNoClassIsTransclusion`, `expectBodyOnWindows`): the
+mac leaves the page alone; Windows inserts the embed on the line after the
+course's own heading (`front_page_heading`, absent → "Most Recent Class"),
+which is its shipped behaviour widened to the course's heading. REJECTED:
+making them match by breaking one — neither behaviour has cost a teacher
+anything; REJECTED: having the pointer re-assert the heading (a one-off choice
+turned into a fight with the teacher's own edits).
 
 ## Further reading in this repository
 
