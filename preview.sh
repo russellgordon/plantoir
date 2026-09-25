@@ -941,24 +941,225 @@ build_image_if_missing
 
 
 
-# Finds a free block of host ports for this container: four site ports and
-# their four live-reload websocket ports. Different working folders get
-# different blocks, which is what lets their previews run at the same time.
+# >>> PREVIEW PORT BLOCK >>> — identical in setup.sh, preview.sh and
+# deploy.sh, and extracted between these two markers by
+# scripts/test_port_blocks.py, which checks that the three copies are the
+# same and runs them against a pretend Mac. Keep the markers, and keep the
+# three copies the same: the three launchers must create a folder's
+# workspace IDENTICALLY — the same two folders, the same eight addresses —
+# or two of them would recreate it away from each other on alternate runs.
+# The rule is data in contracts/app-rules.json -> previewPorts, which
+# preview.ps1 follows too; the reasoning is in
+# documentation/03-launcher-scripts.md, "How a folder finds its ports, and
+# when it cannot" (GitHub issue #280).
+#
+# ---- Where this folder's previews are served on this Mac ---------------
+# Every working folder's workspace publishes a BLOCK of eight host ports: four
+# for previews (base … base+3 -> 8081-8084 inside) and their four live-reload
+# websockets (base+1000 … base+1003 -> 9081-9084). A workspace keeps its
+# block for as long as it EXISTS — running or stopped, preview or no preview,
+# across restarts — and nothing removes another folder's workspace, so the
+# number of blocks spoken for is the number of working folders this Mac has
+# ever used (moved and deleted ones included), not the number of previews.
+#
+# The walk starts at 8081 and steps by 10 through FORTY blocks (8081 … 8471).
+# Until 2026-09-25 it tried six and stopped, and a Mac with six working
+# folders' workspaces alive could make no seventh, preview or publish (#280).
+# Forty is a CHOSEN number, not a measured one: any number up to 99 would
+# keep the site ports clear of block one's websockets (block 100 starts at
+# 9081), forty keeps the walk under 8888, and a ceiling at all keeps the
+# refusal below reachable, so it can be tested and its sentence stays true.
+#
+# A block is taken if ANY of its eight ports is
+#   - listening on this Mac, by anybody — one `lsof` listing, parsed once
+#     (0.12 s measured, against 0.123 s PER PORT for the old one-call-per-port
+#     probe: 9.8 s for forty blocks). Docker cannot see a program on the Mac
+#     holding a port and publishes over it anyway (measured: exit 0), so this
+#     is the only guard against another app. A listing that cannot be read
+#     counts as nothing listening, which is what the old probe did too.
+#   - published by ANOTHER working folder's workspace, stopped ones included
+#     — one `docker inspect` over every teaching-quartz-* workspace. A stopped
+#     workspace listens on nothing, so without this a new folder would take
+#     its block and the stopped one could not start again (quitting Plantoir
+#     stops workspaces since #220, so that is an everyday path).
+#
+# TWO PASSES. The first counts all of that. Only when it finds nothing does a
+# second walk count what is actually IN USE — listening on this Mac, or
+# published by a RUNNING workspace — and take a block a STOPPED workspace was
+# keeping. That workspace is remade on free ports the next time its own
+# folder starts it (start_the_existing_workspace), at the cost of one slow
+# preview. Without the second pass a block would be kept for ever by a
+# folder that was moved, renamed or deleted — its workspace's name is a hash
+# of its path, so it can never be started again — and neither remedy the
+# refusal names (close the other folders' windows, restart the Mac) would
+# free anything, since both only STOP workspaces. With it, both do.
+FIRST_HOST_BLOCK=8081
+HOST_BLOCK_STEP=10
+HOST_BLOCK_COUNT=40
+
+# Every TCP port something on this Mac is listening on, one per line. lsof
+# writes `n*:8081`, `n127.0.0.1:8443` and `n[::1]:8443`; the port is what
+# follows the LAST colon, whichever of the three it is. Prints nothing, and
+# still succeeds, when lsof is missing or fails.
+listening_ports_on_this_mac() {
+  { lsof -nP -iTCP -sTCP:LISTEN -Fn 2>/dev/null || true; } \
+    | sed -n 's/^n.*:\([0-9][0-9]*\)$/\1/p'
+}
+
+# Every host port published by another working folder's workspace, one per
+# line: running or stopped, or with "running" as $1 only running ones. This
+# folder's own workspace is left out: it is only ever made after the old one
+# has been removed.
+ports_held_by_other_workspaces() {
+  local names which="-a"
+  if [ "${1:-}" = "running" ]; then
+    which=""
+  fi
+  # shellcheck disable=SC2086
+  names="$(docker ps $which --filter 'name=^teaching-quartz-' --format '{{.Names}}' 2>/dev/null \
+    | grep -Fxv -- "$CONTAINER_NAME" || true)"
+  if [ -z "$names" ]; then
+    return 0
+  fi
+  # Names are teaching-quartz-<8 hex digits>, so splitting on spaces is safe.
+  # shellcheck disable=SC2086
+  { docker inspect -f '{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}{{.HostPort}} {{end}}{{end}}' $names 2>/dev/null || true; } \
+    | tr ' ' '\n' | grep -E '^[0-9]+$' || true
+}
+
+# Prints the first free block's base, walking upward from $1 (default: the
+# first block) to the fortieth; fails when none is free. $2 is the pass:
+# "kept" (the first — stopped workspaces' blocks count as taken) or "in-use"
+# (the second — only what is listening or running counts).
 find_free_port_block() {
-  local base offset
-  for base in 8081 8091 8101 8111 8121 8131; do
-    local all_free=true
+  local base="${1:-$FIRST_HOST_BLOCK}"
+  local pass="${2:-kept}"
+  local last=$((FIRST_HOST_BLOCK + (HOST_BLOCK_COUNT - 1) * HOST_BLOCK_STEP))
+  local busy offset all_free held
+  if [ "$pass" = "in-use" ]; then
+    held="$(ports_held_by_other_workspaces running | tr '\n' ' ')"
+  else
+    held="$(ports_held_by_other_workspaces | tr '\n' ' ')"
+  fi
+  busy=" $(listening_ports_on_this_mac | tr '\n' ' ') $held "
+  while [ "$base" -le "$last" ]; do
+    all_free=true
     for offset in 0 1 2 3; do
-      if lsof -nP -iTCP:$((base + offset)) -sTCP:LISTEN >/dev/null 2>&1; then all_free=false; break; fi
-      if lsof -nP -iTCP:$((base + 1000 + offset)) -sTCP:LISTEN >/dev/null 2>&1; then all_free=false; break; fi
+      case "$busy" in
+        *" $((base + offset)) "*|*" $((base + 1000 + offset)) "*) all_free=false; break ;;
+      esac
     done
-    if [[ "$all_free" == "true" ]]; then
+    if [ "$all_free" = true ]; then
       echo "$base"
       return 0
     fi
+    base=$((base + HOST_BLOCK_STEP))
   done
   return 1
 }
+
+# Whether Docker refused because a port was taken. The probe and the
+# creation are two steps, so two launchers starting at the same moment (two
+# folders opened together, two gates) can both see a block free. Three
+# wordings, all three measured or quoted: Colima's "Bind for 0.0.0.0:N
+# failed: port is already allocated" (a workspace already has it), and
+# Docker Desktop's "Ports are not available: … bind: address already in use".
+it_was_a_port_clash() {
+  case "$1" in
+    *"port is already allocated"*|*"Ports are not available"*|*"address already in use"*) return 0 ;;
+  esac
+  return 1
+}
+
+# The sentence when all forty blocks are taken. Pinned word for word in
+# contracts/app-rules.json -> previewPorts.whenNoBlockIsFree. The old one
+# told a teacher to "stop another preview", which frees nothing: a block is
+# held by a workspace that EXISTS. Both remedies it names are true because
+# of the walk's second pass: closing a folder's last window stops its
+# workspace, a restart stops every workspace, and a STOPPED workspace's block
+# is taken when nothing else is free.
+# The trail line is the existing `preview did not appear` event's second
+# launcher line (contracts/shared-rules.json -> activityTrail.mustRecord);
+# WORKSPACE_TRAIL_PLACE is "<course>/<section>" where the launcher has one.
+say_there_is_no_room_for_previews() {
+  echo "❌ Every address Plantoir can use for a preview is taken."
+  echo "   Close Plantoir's windows for your other working folders, or restart this Mac, then try again."
+  note_on_the_trail "${WORKSPACE_TRAIL_PLACE:-setup} · stopped before starting — every address Plantoir can use for a preview was taken"
+}
+
+# Makes this folder's workspace on the first free block, walking on past a
+# block that Docker says was taken in the meantime. The half-made workspace
+# of a refused attempt is removed with a plain `docker rm` — never -f: it was
+# never started, and -f is what would kill a workspace another launcher made
+# under this name a moment ago, mid-publish (#94's shape).
+create_the_workspace_on_free_ports() {
+  local base="$FIRST_HOST_BLOCK"
+  local next output
+  while true; do
+    next="$base"
+    if ! base="$(find_free_port_block "$base" kept)" \
+      && ! base="$(find_free_port_block "$next" in-use)"; then
+      say_there_is_no_room_for_previews
+      exit 1
+    fi
+    if output="$(docker run -dit \
+        --name "$CONTAINER_NAME" \
+        --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
+        --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
+        -p "${base}-$((base + 3)):8081-8084" \
+        -p "$((base + 1000))-$((base + 1003)):9081-9084" \
+        "$IMAGE" \
+        tail -f /dev/null 2>&1)"; then
+      return 0
+    fi
+    if ! it_was_a_port_clash "$output"; then
+      printf '%s\n' "$output"
+      say_this_folder_cannot_be_reached
+      exit 1
+    fi
+    echo "↪️  Those preview addresses were taken a moment ago; trying the next ones…"
+    docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    base=$((base + HOST_BLOCK_STEP))
+  done
+}
+
+# Starts this folder's stopped workspace. When Docker refuses because another
+# folder's workspace has taken its block — mainly because the walk's SECOND
+# pass took it on purpose when nothing else was free, or for a workspace
+# made before #280 — the workspace is made again on free ports. That throws away the warm copy of
+# the website builder kept inside it (a first preview again: 109 s measured
+# on a teacher's Mac for #225), so it happens ONLY for a port refusal, and
+# the console says what it costs. Any other refusal stops here with Docker's
+# own words: setup.sh and deploy.sh used to end on the bare `docker start`
+# under `set -e` with only those words, and preview.sh carried on past it and
+# failed later at a step that could not say why.
+start_the_existing_workspace() {
+  local output
+  if output="$(docker start "$CONTAINER_NAME" 2>&1)"; then
+    return 0
+  fi
+  if ! it_was_a_port_clash "$output"; then
+    printf '%s\n' "$output"
+    echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+    exit 1
+  fi
+  echo "♻️  Something else is now using this folder's preview addresses, so Plantoir is setting this folder up again on free ones."
+  echo "   The next preview will be slower than usual — about two minutes — while it gets ready."
+  if docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
+    run_container_with_mount
+    return 0
+  fi
+  # Refused: another launcher got here first and it is running again. Use it.
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq -- "$CONTAINER_NAME"; then
+    return 0
+  fi
+  printf '%s\n' "$output"
+  echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+  exit 1
+}
+# <<< PREVIEW PORT BLOCK <<<
+# Where the refusal above is filed on the trail: this run's course and section.
+WORKSPACE_TRAIL_PLACE="${COURSE}/${SECTION}"
 
 # The one shared container from before working folders each had their own.
 # Superseded: it holds no content (everything lives on the host), and left
@@ -972,12 +1173,6 @@ retire_legacy_container() {
 
 run_container_with_mount() {
   retire_legacy_container
-  local HOST_BASE
-  HOST_BASE=$(find_free_port_block) || {
-    echo "❌ Could not find free ports for this folder's previews."
-    echo "   Stop another preview (or another app using ports 8081+), then try again."
-    exit 1
-  }
   echo "🔗 Binding host courses to container: $HOST_COURSES ➜ /teaching/courses"
   # The builds folder is mounted at its OWN absolute path, unconditionally,
   # so that courses/<CODE>/.merged_output — a symlink to a path under
@@ -986,11 +1181,12 @@ run_container_with_mount() {
   # here, and every build would fail on a path the teacher can plainly see
   # working in Finder. It is created before this runs: a bind mount whose
   # source does not exist is REFUSED ("bind source path does not exist"),
-  # and the run stops with the sentence below rather than building into a
-  # folder nobody can find.
+  # and the run stops with say_this_folder_cannot_be_reached rather than
+  # building into a folder nobody can find.
   ensure_build_root
   # The source of a bind mount has to EXIST. `-v` quietly CREATED a folder at
-  # whatever path it was handed; the form below refuses, and refusing is the
+  # whatever path it was handed; the form the PREVIEW PORT BLOCK uses refuses,
+  # and refusing is the
   # better answer — a working folder renamed or deleted while this was
   # running would otherwise be silently re-made, empty, at a path nobody is
   # looking at any more. Nothing ordinary reaches this with no courses
@@ -1000,17 +1196,7 @@ run_container_with_mount() {
     say_this_folder_is_not_there
     exit 1
   fi
-  if ! docker run -dit \
-      --name "$CONTAINER_NAME" \
-      --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
-      --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
-      -p ${HOST_BASE}-$((HOST_BASE + 3)):8081-8084 \
-      -p $((HOST_BASE + 1000))-$((HOST_BASE + 1003)):9081-9084 \
-      "$IMAGE" \
-      tail -f /dev/null; then
-    say_this_folder_cannot_be_reached
-    exit 1
-  fi
+  create_the_workspace_on_free_ports
 }
 
 # Whether this container was created with the builds mount. Containers made
@@ -1075,7 +1261,7 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
       echo "✅ Container $CONTAINER_NAME is already running with correct mount."
     else
       echo "🚀 Starting existing container $CONTAINER_NAME..."
-    docker start "$CONTAINER_NAME" >/dev/null
+      start_the_existing_workspace
     fi
   fi
 else

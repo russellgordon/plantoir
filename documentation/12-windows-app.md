@@ -917,7 +917,10 @@ What replaces the old container concepts:
 - **Concurrent previews are still isolated by port, exactly as before.**
   `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
   base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
-  websocket) and prints the exact "Preview will be available at:" line the
+  websocket — six blocks, where the mac launchers walk forty since GitHub
+  #280 and `preview.ps1` owes the same walk: `contracts/app-rules.json` →
+  `previewPorts.hostBlockCases`, and 03 → "How a folder finds its ports, and
+  when it cannot") and prints the exact "Preview will be available at:" line the
   app watches for. What changed is only what is listening on that port: a
   Node process running directly on the PC, bound to `127.0.0.1` (patched at
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
@@ -972,7 +975,10 @@ as history, not as what Windows does today.
   matching the mac's naming scheme, but nothing native reads it today —
   don't build app logic around a container name existing.
 - **Port blocks**: `preview.ps1` still probes a free host port block
-  (bases 8081, 8091, 8101, 8111, 8121, 8131): base..base+3 for the preview
+  (bases 8081, 8091, 8101, 8111, 8121, 8131 — the mac's six until GitHub #280
+  made it forty, 8081 … 8471; `preview.ps1` owes that walk, and
+  `build_site.py`'s own native re-probe already walks forty blocks from the
+  port it is given): base..base+3 for the preview
   site (four concurrent previews per folder) and base+1000..+1003 for
   Quartz's live-reload websockets. What is listening on those ports is now
   a native Node process bound to `127.0.0.1`, not a container's forwarded
