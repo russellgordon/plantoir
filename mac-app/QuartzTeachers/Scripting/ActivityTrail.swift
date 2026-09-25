@@ -185,6 +185,12 @@ nonisolated enum ActivityTrail {
         /// is long gone by the time it is reported, and the condition is
         /// invisible on disk — a renamed folder looks exactly like a folder
         /// that was always called that.
+        ///
+        /// Two writers, one sentence (`SiteHealthFinding.trailSentence`): a
+        /// build the app runs, as its output arrives; and a SCHEDULED publish,
+        /// from its own log at the end of the run
+        /// (`ScheduledDeploy.recordFolderProblems`, #153) — dated to the run,
+        /// not to whenever somebody next opens the section.
         case folderProblemFound = "folder problem found"
         /// A folder a feature depends on was put back, at the teacher's
         /// request. Separate from `folderProblemFound` because it is a

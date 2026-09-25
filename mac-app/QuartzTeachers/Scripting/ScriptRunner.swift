@@ -734,15 +734,10 @@ class ScriptRunner {
                 continue
             }
             healthFindings.append(finding)
-            // A sentence a teacher would recognise, carrying the stable check
-            // NAME in brackets. Both halves earn their place: rule 5 says a
-            // trail line must read as something that happened rather than as a
-            // function name, while the name is what somebody reading the trail
-            // months later can match against the contract — the product
-            // wording will have been reworded by then.
+            // The sentence and why it is shaped so: `trailSentence`, which the
+            // scheduled run writes too.
             ActivityTrail.note(
-                .folderProblemFound,
-                "found a problem with this course's folders (\(finding.name))",
+                .folderProblemFound, finding.trailSentence,
                 course: finding.course, section: finding.section
             )
         }
@@ -886,7 +881,14 @@ class ScriptRunner {
     }
 
     /// Prompt shapes the toolchain's scripts actually use.
+    ///
+    /// Never a marker line (#153): half a health payload cut after
+    /// `"sentence":` ends in a colon, and would otherwise be offered to the
+    /// teacher as something to answer, raw JSON and all.
     static func looksLikeQuestion(_ line: String) -> Bool {
+        if SiteHealthFinding.isMarkerLine(line) || PagesDatedByTheBuild.isMarkerLine(line) {
+            return false
+        }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {
             return true
         }
