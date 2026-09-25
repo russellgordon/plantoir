@@ -127,6 +127,16 @@ final class AssistToolRunner {
         return conversationBackupURL != nil
     }
 
+    /// Every backup this conversation has made, one per course it changed —
+    /// the ones a delete must leave alone while the window is open (#242).
+    var backupsThisConversationMade: [URL] {
+        var made: [URL] = []
+        for (_, backupURL) in conversationBackups {
+            made.append(backupURL)
+        }
+        return made
+    }
+
     /// The day a relative word is counted from, read afresh every time it is
     /// asked for.
     ///

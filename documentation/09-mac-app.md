@@ -3749,6 +3749,137 @@ the position is a signal only half the time, and nothing here relies on the
 teacher noticing it: the guard in the pruner is what keeps such a zip safe,
 not their attention.
 
+## Backups: what they take, and deleting several (#242)
+
+**Decided by Russell, 2026-09-21 (option C): keep every backup a teacher makes,
+and make the space they take VISIBLE.** A backup is the one place where
+silently deleting something is the wrong default — a copy made on purpose
+before a risky change should not vanish because ten more were made after it —
+so the fault was never that they are kept but that nothing SHOWED the space.
+Each backup carries the whole course, Media included: **467 MB and 9.7 s** per
+backup of a real course with 487 MB of Media. The assistant's own backups keep
+their cap of five (`CourseArchiver.mostBackupsKept`, untouched); a teacher's are
+never pruned. The rules are `contracts/course-management.json` → `backups`,
+with `pruneCases`, `sizeCases` and `deleteCases`.
+
+**Where the space is shown.** The sidebar's Backups header carries the total
+once every backup has been measured; each backup's tooltip, its own pane and
+its delete confirmation carry its size; and a new first row, **All Backups**
+(`SidebarSelection.allBackups`, remembered with the window like every other
+selection), opens `AllBackupsView`: "These backups take 105.6 MB.", one line
+per course ("ICS4U — 11 backups, 105.6 MB"), a sentence when the working folder
+is kept in sync by a cloud service, and a table of every backup — course, when,
+who made it, size — with ordinary macOS multiple selection (⌘-click, ⇧-click)
+and ONE button whose label carries the count ("Delete 3 Backups…"). It goes
+through a confirmation with the single delete's honesty: for good, nothing
+kept, the courses untouched, and what they take together. **A backup the open
+assistant conversation holds** (below) is named in that confirmation as KEPT,
+and "Together they take" counts only what will actually go
+(`WorkspaceModel.deleteConfirmation`); a selection of held backups ONLY has
+nothing to delete, so the button is disabled rather than offering a
+confirmation that deletes nothing. The sidebar's and the pane's single "Delete
+Backup…" on a held backup offers no confirmation at all: it refuses at once
+with the same sentence the multi-delete uses (`requestDeleteBackup`).
+
+**Measured, on this Mac.** Russell's real working folder, read-only
+(`~/Desktop/Class Websites - 2026-27/courses/_backups`, `stat` only, nothing
+opened), 2026-09-25: 2 course folders, 23 zips, **11 of them backups totalling
+105,612,629 bytes** (the other 12 are archives and setup-wizard zips, which the
+Backups list does not show and so its total does not count — a number a
+teacher cannot act on from that list would only mislead). Summing is cheap —
+the plan measured 23 real zips in **12.2 ms** cold and 500 sparse 467 MB zips in
+**3.4 ms** — and is still done off the main thread, because a working folder on
+a slow or network volume is not this Mac's SSD.
+
+**Off the main thread, and the traps in that.** `BackupSizes.measure` is
+`@concurrent`: this target builds with `SWIFT_APPROACHABLE_CONCURRENCY`, under
+which a plain `nonisolated async` function runs on its caller's actor — correct
+numbers, on the main thread, every other assertion passing. So it records where
+it ran through a SYNCHRONOUS helper (`noteTheThread`, the
+`CoursePageCopier.lastPassRanOnTheMainThread` seam — `Thread.isMainThread` does
+not compile inside an async function), and `BackupSpaceTests` reads it.
+`WorkspaceModel.reloadCourses` lists backups synchronously as before, then
+starts a numbered measurement; one that finishes after a newer one was started
+is thrown away (`finishMeasuringBackupSizes`), so a slow first measurement
+landing after a delete cannot put back sizes for zips that are gone. While a
+measurement is still running no total is shown — "Working out how much space
+these backups take…" — because a number that is quietly too small is worse
+than none (`BackupSpace.isComplete`). Once it has FINISHED, a backup it could
+not size (deleted in Finder between listing and measuring, or unreadable) is
+not "still being worked out": it shows the short `backupSizeCouldNotBeReadShort`
+in the Size column and the full `backupSizeCouldNotBeRead` in its tooltip, its
+pane and a line under the total, and the total — which IS then shown — leaves it
+out. Without that, one unreadable zip would leave "Working out…" up for ever.
+No GCD hop and no sleep anywhere.
+
+**The LOGICAL size, never the size on this disk.** Russell's working folder is
+in iCloud Drive (Desktop & Documents sync is on), and an evicted file takes
+almost nothing on this disk while costing its whole size in iCloud storage —
+and costing it here again the moment it is restored. The plan measured the
+sparse shape of an evicted file: logical 244.84 GB, on disk "Zero KB". So
+`fileSize`, never `totalFileAllocatedSize`, which would tell that teacher their
+backups take nothing; `sizeCases` carries a sparse case and the test checks the
+file really is sparse before trusting it. **Not measured**: a real evicted file
+(that would mean evicting Russell's), and whether a deleted zip keeps costing
+iCloud storage while it sits in iCloud's Recently Deleted — so nothing here
+promises the space comes back at once.
+
+**Deleting several.** `WorkspaceModel.deleteBackups` removes each permanently,
+as the single delete always did (the single delete is now its one-item case),
+reports one that cannot be deleted — a locked file — with the others still
+deleted rather than stopping at the first, re-reads the list ONCE at the end
+rather than once per file, and lets go of a selection pointing at a zip that is
+gone. **Then every OTHER window on the same folder follows**
+(`followBackupDeletion`, the shape of #265's `followWrite`): Russell runs two
+windows on one folder, and without it the other window's list, total and
+Restore button go on naming zips that are gone. Only the Backups list is
+re-read there — never the courses, whose settings copies may hold changes
+nobody has saved.
+
+**A delete never removes the backup an open assistant conversation restores
+from.** The plan review reasoned the failure from the code (it was not
+measured): the proposed "Select the Assistant's" shortcut, then one Delete,
+would remove the zip behind the open window's "Restore Section N…" button, and
+the restore would then fail with the raw error after the teacher had agreed to
+it. So the shortcut is gone, and the
+window reports which backups its conversation made (`AssistActivity.holdBackups`,
+asked of its runner each time, cleared when the window closes);
+`deleteBackups` leaves those alone, deletes the rest, and says "Close the
+assistant for ICS3U Section 2 first. That conversation can still put Section 2
+back from this backup, so it was kept." — the start of that sentence is the one
+a second assistant window is refused with (`AssistActivity.closeTheAssistantFirst`;
+the sentence is built in ONE place, `AssistActivity.closeTheAssistant`, which the
+"…before removing this." of removing a downloaded assistant goes through too). An OLDER assistant backup of the same section is not held:
+only what the open conversation made. And a conversation backup deleted anyway,
+in Finder, is refused at Restore with the existing plain sentence
+(`AssistSectionRestore.Problem.unreadableBackup`) before anything is touched.
+Not covered: a conversation held by a Claude Code session over MCP runs in a
+different process, which this one cannot see — and the MCP surface offers no
+"Restore Section" button to break.
+
+**On the trail** (rule 5): `backups deleted`, with the course code(s), the
+count, the total when every size is known, each deleted file's NAME (a course
+code, a moment and who made it — never page content), and any kept for the
+assistant. "My backup is gone" is answered by this line and nothing else. There
+is still no line for a backup being MADE or PRUNED — see "One `if` in the
+pruner" above for why.
+
+**What was REJECTED, and why:**
+- **A lighter backup that leaves Media out** — restoring one would DELETE the
+  course's Media (recorded on #242 so it is not proposed again).
+- **Pruning a teacher's backups**, by count or by age — the app overruling
+  them about their own safety net; the space is shown instead.
+- **Multiple selection in the sidebar itself** — it would change how every
+  course and section row is selected, to serve one group of it.
+- **A "Select the Assistant's" convenience** — see above.
+- **Counting archives and wizard zips in the total** — not in the list, not
+  deletable from it.
+- **Labelling a Copy a Page backup "before copying pages from …"** — it needs a
+  new backup-name piece, which Windows' reader (like the mac's `BackupMaker.
+  reading`) would treat as "not a backup", making a mac-made zip VANISH from a
+  Windows list until they ship the same reader. Its own small piece, Windows
+  first or together.
+
 ## Reporting a problem
 
 Plantoir keeps a note of every task it runs — in

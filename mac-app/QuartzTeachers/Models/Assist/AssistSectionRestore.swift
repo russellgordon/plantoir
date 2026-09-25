@@ -159,6 +159,13 @@ enum AssistSectionRestore {
         guard let item = BackupItem.from(fileURL: backupURL, courseCode: courseCode) else {
             throw Problem.unreadableBackup(backupURL.lastPathComponent)
         }
+        // A copy that is no longer there — deleted in Finder, since the app
+        // refuses to delete it while this window is open (#242) — is refused
+        // with the same plain sentence BEFORE anything is touched, rather
+        // than with the unzip tool's own error part way through.
+        if !FileManager.default.fileExists(atPath: backupURL.path) {
+            throw Problem.unreadableBackup(backupURL.lastPathComponent)
+        }
         try CourseRestorer.restoreSection(
             sectionNumber, from: item, coursesDirectoryURL: coursesDirectoryURL
         )

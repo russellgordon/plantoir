@@ -24,6 +24,8 @@
     "askedAboutAnotherCourse" : "This window is for {course}, so nothing was done for {otherCourse}. Open {otherCourse}'s section in Plantoir and ask me there.",
     "askedAboutAReferenceCourse" : "{otherCourse} is kept for reference, so I can't work in it. This window is for {course}.",
     "backedUpCourse" : "Backed up {course} to {course}_backup_2026-09-08_190000.zip. It is in Plantoir's Backups list, and restoring from it puts the whole course back as it is right now.",
+    "backupSizeCouldNotBeRead" : "Size could not be read, so it is not in the total",
+    "backupSizeCouldNotBeReadShort" : "Unknown",
     "builtWithNoWindowOpen" : "Rebuilt the site for {course} Section {section}. Open that section in Plantoir and press Preview to look it over — no window is showing it at the moment.",
     "cancelled" : "Cancel",
     "copiedTo" : "“{page}” was copied to “{copy}”, dated 2026-09-14. It is hidden, so nothing changed on the site — write it, then publish when it is ready.",

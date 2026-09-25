@@ -743,6 +743,18 @@ nonisolated enum AssistWording {
              + "from it puts the whole course back as it is right now."
     }
 
+    /// Said beside a backup whose size a finished measurement could not read
+    /// — deleted in Finder a moment ago, or unreadable (#242). It is left out
+    /// of the total, and this says so rather than showing a number that is
+    /// quietly too small or "Working out…" for ever. Shown in the Backups
+    /// list, not by the assistant; kept here so the sentence has one home and
+    /// reaches the contract. A FIRST DRAFT for Russell's wording pass.
+    static let backupSizeCouldNotBeRead: String = "Size could not be read, so it is not in the total"
+
+    /// The same, short enough for the Size column of All Backups; the whole
+    /// sentence is in the row's tooltip and the backup's own pane.
+    static let backupSizeCouldNotBeReadShort: String = "Unknown"
+
     // MARK: - Listing what is here
 
     /// A working folder with nothing in it yet.
