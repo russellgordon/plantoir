@@ -10,7 +10,7 @@
     "sizeIsLogical": true,
     "sizeIsLogicalWhy": "The size shown is the file's LOGICAL size (on the mac, fileSize), never what it occupies on this disk. A working folder kept in iCloud Drive can have its backups evicted to the cloud, where they take almost nothing on this disk while costing their whole size in the teacher's cloud storage - and costing it on this disk again the moment one is restored. Measured on the sparse shape of an evicted file: logical 244.84 GB, on disk 'Zero KB'. The on-disk number would tell that teacher their backups take nothing. Not measured on a real evicted file, and whether a deleted file keeps costing cloud storage while in that service's own recently-deleted folder is not measured either - so nothing promises the space is freed at once.",
     "neverDeletedWhileAConversationCanRestoreFromIt": true,
-    "neverDeletedWhileAConversationCanRestoreFromItWhy": "An open assistant conversation offers 'Restore Section N...' from the backup it made before its first change. Deleting that backup - one click after selecting the assistant's backups, which is exactly what the #242 plan review measured - leaves a button that fails after the teacher has agreed to it. So a delete leaves it alone, deletes everything else asked for, and says which assistant window to close (the same 'Close the assistant for <course> Section <n> first' a second assistant window is refused with).",
+    "neverDeletedWhileAConversationCanRestoreFromItWhy": "An open assistant conversation offers 'Restore Section N...' from the backup it made before its first change. Deleting that backup - one click after selecting the assistant's backups, which is exactly what the #242 plan review reasoned from the code - leaves a button that fails after the teacher has agreed to it. So a delete leaves it alone, deletes everything else asked for, and says which assistant window to close (the same 'Close the assistant for <course> Section <n> first' a second assistant window is refused with).",
     "pruneCases": [
       {
         "name": "the assistant keeps its five most recent, and none of the teacher's is touched",
@@ -46,9 +46,9 @@
           "ICS3U_backup_2026-07-15_080000.zip",
           "ICS3U_backup_2026-08-15_080000.zip",
           "ICS3U_backup_2026-09-15_080000.zip",
-          "ICS3U_backup_2026-10-15_080000.zip",
-          "ICS3U_backup_2026-11-15_080000.zip",
-          "ICS3U_backup_2026-12-15_080000.zip"
+          "ICS3U_backup_2025-10-15_080000.zip",
+          "ICS3U_backup_2025-11-15_080000.zip",
+          "ICS3U_backup_2025-12-15_080000.zip"
         ],
         "expectDeleted": [],
         "why": "Twelve of the teacher's own backups and none of the assistant's: nothing is deleted. Russell's decision on #242."

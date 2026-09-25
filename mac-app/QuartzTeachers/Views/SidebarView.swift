@@ -853,8 +853,8 @@ struct SidebarView: View {
     /// has been measured.
     func singleBackupDeleteMessage(for item: BackupItem) -> String {
         var message: String = "This deletes the backup for good — unlike removing a course, nothing is kept."
-        if let size = workspace.sizeDescription(of: item) {
-            message += " It takes \(size)."
+        if let size = workspace.backupSizes[item.id] {
+            message += " It takes \(BackupSizes.description(ofBytes: size))."
         }
         message += "\n\n\(item.courseCode) itself is not touched."
         return message

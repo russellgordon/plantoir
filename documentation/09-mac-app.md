@@ -3823,17 +3823,19 @@ re-read there — never the courses, whose settings copies may hold changes
 nobody has saved.
 
 **A delete never removes the backup an open assistant conversation restores
-from.** The plan review measured the failure: the proposed "Select the
-Assistant's" shortcut, then one Delete, removed the zip behind the open
-window's "Restore Section N…" button, and the restore then failed with the raw
-error after the teacher had agreed to it. So the shortcut is gone, and the
+from.** The plan review reasoned the failure from the code (it was not
+measured): the proposed "Select the Assistant's" shortcut, then one Delete,
+would remove the zip behind the open window's "Restore Section N…" button, and
+the restore would then fail with the raw error after the teacher had agreed to
+it. So the shortcut is gone, and the
 window reports which backups its conversation made (`AssistActivity.holdBackups`,
 asked of its runner each time, cleared when the window closes);
 `deleteBackups` leaves those alone, deletes the rest, and says "Close the
 assistant for ICS3U Section 2 first. That conversation can still put Section 2
 back from this backup, so it was kept." — the start of that sentence is the one
-a second assistant window is refused with (`AssistActivity.closeTheAssistantFirst`,
-now its only copy). An OLDER assistant backup of the same section is not held:
+a second assistant window is refused with (`AssistActivity.closeTheAssistantFirst`;
+the sentence is built in ONE place, `AssistActivity.closeTheAssistant`, which the
+"…before removing this." of removing a downloaded assistant goes through too). An OLDER assistant backup of the same section is not held:
 only what the open conversation made. And a conversation backup deleted anyway,
 in Finder, is refused at Restore with the existing plain sentence
 (`AssistSectionRestore.Problem.unreadableBackup`) before anything is touched.
