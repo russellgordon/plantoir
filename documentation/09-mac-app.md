@@ -2796,17 +2796,17 @@ older layout never carries one at all (below). The rest of the list, with a reas
 config, plus a Finder duplicate of a config found in a real course, plus what
 an external disk leaves in a folder.
 
-**`.obsidian` is copied, deliberately.** Opening the course in Obsidian is the
-point of keeping it, and Plantoir opens the course folder AS the vault; without
-those 312 KB the vault opens with first-run prompts, none of the teacher's
-plugins and none of the folder state that makes last year's material
-navigable. Its `workspace.json` was MEASURED on a real imported course rather
-than assumed: every path in it is vault-relative, with no absolute path and no
-mention of the old folder, so it resolves inside the new course as it stands.
-(An earlier draft of this page said the opposite. Nothing needs stripping, and
-nothing needs registering either — the app opens a vault by path.) That is the
-MODERN route; a class from the older layout comes WITHOUT its add-ons, for a
-reason measured in "The older layout" below.
+**`.obsidian` is copied, deliberately — without its add-ons.** Opening the
+course in Obsidian is the point of keeping it, and Plantoir opens the course
+folder AS the vault; without those 312 KB the vault opens with first-run
+prompts, none of the teacher's appearance and none of the folder state that
+makes last year's material navigable. Its `workspace.json` was MEASURED on a
+real imported course rather than assumed: every path in it is vault-relative,
+with no absolute path and no mention of the old folder, so it resolves inside
+the new course as it stands. (An earlier draft of this page said the opposite.
+Nothing needs stripping, and nothing needs registering either — the app opens a
+vault by path.) Since #255 its add-ons stay behind on this route as on every
+other — "Obsidian's settings come; its add-ons do not" below.
 
 **A file name is carried as BYTES, and that is why this path talks to POSIX
 rather than to `FileManager`.** The walk reads names with `readdir` and the
@@ -2843,6 +2843,133 @@ reads the older spelling correctly. (A class from the older folder-per-class
 layout is the exception to "what students saw": its pages carry Digital
 Garden's keys, which the build does not read — see "The older layout" below.) (#207's rule — a page copied INTO a live
 course starts hidden — belongs to the copy, not to the import.)
+
+#### Obsidian's settings come; its add-ons do not (#255)
+
+**Every route that makes a reference course leaves the same three entries of
+the course's `.obsidian` behind** — Keep a Copy for Reference…, and Import
+Courses for Reference… reading a modern working folder, the older
+folder-per-class layout (#254) or the 2024–25 website-folder-per-class layout
+(#256). `ObsidianAddOns` names them, once, for all four:
+
+| Left behind | Why |
+|---|---|
+| `plugins/` | Every community add-on, its code and its settings. An add-on runs code with network access, and a publishing add-on keeps its credential in its own `data.json` — every real 2023–24 class folder carries Digital Garden's with a live `githubToken` ("The older layout", below). Copied, that credential lands in the working folder and in every backup zip, and once Obsidian trusts the vault's add-ons it is a publish command outside all fifteen refusals. |
+| `community-plugins.json` | The list of add-ons Obsidian switches on. |
+| `publish.json` | Core Obsidian Publish's connection to a LIVE site. |
+
+`publish.json` was found by the plan review's question rather than by a folder
+that had one, and was **measured in Obsidian 1.13.6's own bundle**: a core
+add-on's `loadData` is `vault.readConfigJson(id)`, which reads
+`<configDir>/<id>.json`, and Publish's data is `{siteId, host, included,
+excluded}`. With the teacher signed in to Obsidian, a copied one is a click
+from publishing the reference course over the site it came from. Core Sync is
+NOT on the list: its remote lives in Obsidian's own storage, keyed by the vault
+(IndexedDB `<appId>-sync`, the same bundle), so a copied folder carries nothing
+of it. There are 0 `publish.json` files in Russell's 2023–24 folders and 0 in
+the 2025–26 backup.
+
+**Everything else in `.obsidian` comes** — `app.json` (where
+`ReferenceReadingView` writes reading view), `appearance.json`, `themes/`,
+`snippets/` (CSS cannot publish), `core-plugins.json` (switches only — `"sync":
+true, "publish": false` in Russell's four — never an account or a site),
+`graph.json`, `workspace.json` **and its conflicted copies**. MPM2DE's
+`.obsidian` holds 63 `workspace (… conflicted copy …).json` files; they are a
+sync provider's clutter, not a danger, and matching them would mean matching
+every provider's naming in every language. Russell, 2026-09-25: they come.
+
+**Keep a Copy of a LIVE course follows the same rule** (Russell, 2026-09-25).
+The copy is a reference course and is never published, so an add-on in it is
+only ever a way to publish it outside the refusals, whoever installed it; the
+course being taught keeps its add-ons untouched, and the sheet says both halves
+(`referenceCourses.wording.keepACopyLeavesAddOnsBehind`).
+
+**What was measured on Russell's own data.** The 2025–26 backup holds exactly
+four `.obsidian` folders (found case-insensitively, at any depth), all at a
+course's top. ICS3U's has an EMPTY `plugins/` and a `community-plugins.json`
+of `[]`; CODING, ICS4U and MPM2DE have neither. A course Plantoir made
+(`support/obsidian_defaults/.obsidian`) has no add-ons at all. So on Russell's
+folders the change is invisible — one empty folder and a `[]` stop being
+copied — and a teacher notices it only if they installed an add-on themselves.
+
+**Anchored at a place, not matched by a name.** `ReferenceTreeCopier.walk`'s
+by-name list matches at every depth, so `plugins` on it would drop a teacher's
+own `Unit 1/plugins` folder of pages. The three are PATHS instead —
+`leavingBehindPaths`, compared with where the walk is (`.obsidian/plugins` from
+the course; `plugins` from inside `content/.obsidian` in the 2024–25 layout) —
+and a separate parameter from the names, so a caller that overrides the names
+(the sheet does, tests do) cannot drop the rule by accident. Proven by
+mutation: matching by name turns the contract's "a teacher's own pages called
+plugins" case red on both routes.
+
+**Skipped, never walked and filtered.** Each is skipped before it is so much as
+`lstat`-ed. The two older layouts used to walk INTO `plugins/` and drop what
+they found afterwards, so a folder inside an add-on that the disk would not
+hand over landed in `unreadableFolders` and refused the whole class — for
+something that was never going to be copied. All four routes now skip, and
+each has a test that locks a folder inside an add-on (`chmod 000`) and imports
+anyway; putting either older file back as it was turns its test red.
+
+**A `.obsidian` that is itself a link is not copied at all** on the two
+modern routes (`leavingBehindIfALink`). Sharing one settings folder between
+vaults is a known Obsidian practice, and the modern walk copies a link AS a
+link — so the reference course would have been reading the live settings, add-ons
+and credential included, and `ReferenceReadingView` would have WRITTEN
+`defaultViewMode` into them through the link, changing a course the teacher is
+teaching. Now the copy gets a real `.obsidian` holding only the reading-view
+default. Two contract cases hold it: the live settings folder with an `app.json`
+of `{}` and with none at all — the two shapes the reading-view writer DOES write
+into (it leaves a file that is not JSON alone, which is why the first cut of
+this case, whose `app.json` was plain text, proved nothing about writing through
+the link and was caught in review). Each checks the whole source tree, the
+link's target included, is byte-identical afterwards; with the old copier or
+importer put back, that check fails on both. (The older layout already leaves every
+link out; the 2024–25 layout judges every link at the top of `content/` on its
+own.)
+
+**Said only when there is something to say.** A course "has add-ons" when
+`plugins/` holds an entry not starting with `.`, or `plugins/` is a link or
+could not be listed, or `.obsidian` is a link, or `publish.json` is there
+(`ObsidianAddOns.found`: one `lstat` per entry and one listing of `plugins/`,
+nothing inside an add-on opened). ICS3U's empty folder and `[]` say nothing —
+telling a teacher their add-ons were left behind when they had none is false.
+The import sheet says `wording.addOnsAreLeftBehind` when a modern course in the
+list has any, INSTEAD of `wording.olderLayoutAddOnsAreLeftBehind`: beside a
+modern course with an add-on, "…from older class folders…" would read as if
+that course's add-ons came. Otherwise an older class still gets the older
+sentence, as before (`ImportCoursesForReferenceSheet.addOnsNote`). The Keep a
+Copy sheet reads the course once in `.onAppear`, not in `body`.
+
+**The trail** — "course kept for reference", and "course imported for
+reference" for a MODERN course — ends with what was left behind, by folder
+name, only when anything was (`ObsidianAddOns.trailClause`); a course without
+add-ons leaves the line it left before, and a test compares that line written
+out, because a comparison with the function that builds it would change with
+it. `trailLine(for:broughtInFrom:)` is shared by all three import routes, so
+the clause is passed by the modern route only: the older layouts already count
+their add-on entries on their own second line, and two answers to one question
+is one too many.
+
+**Known limits, recorded rather than handled** (the contract's
+`obsidianAddOns.knownLimits`): a vault NESTED inside the course
+(`section1/.obsidian/plugins`) comes across whole, because the rule is
+anchored at the course's own `.obsidian`; another spelling (`.Obsidian/Plugins`,
+which APFS would let Obsidian load) is compared exactly and comes across; and
+Obsidian's "override config folder" setting can move a vault's settings to a
+folder of another name, which is then copied as the teacher's own. None is met
+in any folder measured — the four `.obsidian` folders above are the whole of
+the 2025–26 backup.
+
+**Rejected**, each in `obsidianAddOns.rejected` with its reason: an allow-list
+of "harmless" add-ons (any add-on runs arbitrary code, and the list would rot);
+copying the add-ons but stripping credentials from `data.json` (every add-on
+names its settings differently); copying `plugins/` switched off (the
+credential still lands in every zip, and one toggle turns it back on); walking
+and filtering (the unreadable-folder refusal above); adding `plugins` to the
+by-name list (a teacher's own folder of that name); a different rule for Keep a
+Copy; leaving the conflicted workspace copies behind; and leaving the modern
+route as it was because Plantoir-made courses carry no add-ons — true today,
+and exactly the quiet difference between routes nobody chose.
 
 #### What the copy costs, measured, and why it is still cancellable
 
@@ -3282,7 +3409,7 @@ sizes and the importer both use):
 | `Home.md` | `section1/index.md` — **the one rename**, bytes unchanged | With no `section1/index.md` the build writes no `index.html` and the preview waits forever. 0 real links name `Home` (Russell, decision 6). |
 | a root `index.md` | `section1/index.md` when there is no `Home.md`; left out when there is | Both would fight over the front page. 0 measured. |
 | `All Prior Classes.md` | `section1/All Prior Classes.md` (`per_section_files`) | That section's own list; Copy a Page never offers a section's page. |
-| `.obsidian/…` | the course root, **without** `plugins/` and `community-plugins.json` | See "add-ons" below. |
+| `.obsidian/…` | the course root, **without** `plugins/`, `community-plugins.json` and `publish.json` | See "add-ons" below, and #255's section above. |
 | any other real entry | the course root, same name (`shared_folders` / `shared_files`) | One section, so shared vs per-section is invisible in the build; at the root Copy a Page offers it, which is the point of keeping the course. |
 | a top-level LINK | the Shared folder's REAL entry of that name, copied | "The Shared folder's real folders replace the links." |
 | a top-level link with no Shared counterpart | nothing; named as missing in the sheet (before Import and in the summary) and on the trail | Decision 2: never refused for this. |
@@ -3353,8 +3480,9 @@ add-ons, which Plantoir's "Open in Obsidian" invites — give a publish command
 outside all fifteen of Plantoir's refusals. The rest of `.obsidian` comes, so
 the course opens normally and `ReferenceReadingView` still sets reading view.
 The sheet and its summary say so in plain words
-(`wording.olderLayoutAddOnsAreLeftBehind`). Whether the MODERN route needs the
-same rule is an open question for Russell, not part of this piece.
+(`wording.olderLayoutAddOnsAreLeftBehind`). Since #255 this is the rule EVERY
+route keeps, with `publish.json` added, and the add-ons are skipped rather than
+walked and filtered — "Obsidian's settings come; its add-ons do not" above.
 
 **What its preview shows is more than students saw, and that is accepted.**
 The class pages carry Obsidian Digital Garden's keys (`dg-publish`,
@@ -3564,8 +3692,9 @@ copied), else from the pages.
 already the front page, so nothing is renamed; `All Classes` lands at
 `section1/All Classes`, the modern layout's own place, where #207's class-page
 stop finds it by folder); `shared/*` → the course root, `Media` included;
-`content/.obsidian` WITHOUT `plugins/` and `community-plugins.json` (#254's
-rule; none exist here, core plugins only). The 21 links are a MANIFEST, not a
+`content/.obsidian` WITHOUT `plugins/`, `community-plugins.json` and
+`publish.json` (the rule every route keeps since #255; none exist here, core
+plugins only). The 21 links are a MANIFEST, not a
 source: each link's TEXT, worked out against `content/` as a path, must name
 the page or folder of its OWN name in `shared/` or `s1/`, and that entry must
 be there. Where the per-section/shared split falls is read from the source,
