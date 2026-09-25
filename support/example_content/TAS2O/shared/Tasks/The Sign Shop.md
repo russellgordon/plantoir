@@ -31,6 +31,8 @@ directions again.
 
 ## How to work
 
+The days are Unit 3's.
+
 1. **Launch (Day 4).** Pick your user and your sign, and interview them
    using the questions you wrote in [[Interview Question Practice]]:
    where will they be standing, what are they looking for, what has let

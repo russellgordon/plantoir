@@ -99,8 +99,6 @@ would you tell whoever holds it on the next beat?
 
 ![[A2.1]]
 
-![[A2.4]]
-
 ![[A2.6]]
 
 ![[A3.3]]

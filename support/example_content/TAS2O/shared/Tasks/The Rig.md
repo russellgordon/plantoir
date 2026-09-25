@@ -45,6 +45,8 @@ individual, and each of these carries your name:
 
 ## How to work
 
+The days are Unit 3's.
+
 1. **The problem (Day 10).** Pitch it with the shop version of
    [[One-Minute Pitch]]: what the problem is, who has it, and how you
    will know it is fixed.
